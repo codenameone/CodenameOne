@@ -1588,6 +1588,12 @@ public class EditableResources extends Resources implements TreeModel {
                 "UI container XML persistence requires EditableResourcesEditor");
     }
 
+    // The XML "team mode" mirror is an Ant-only feature: it fires for a .res
+    // directly in an Ant project's src/ (settings file one level up) and writes
+    // res/<name>.xml there. Maven and Gradle keep the .res in src/main/resources
+    // and have no res/ mirror, so this deliberately stays a literal Ant check
+    // rather than going through codenameone-project-model, which would add a
+    // dependency to this module for no change in behaviour.
     public void saveXML(File resFile) throws IOException {
         if(xmlEnabled && resFile.getParentFile().getName().equals("src")) {
             if(new File(resFile.getParentFile().getParentFile(), "codenameone_settings.properties").exists()) {

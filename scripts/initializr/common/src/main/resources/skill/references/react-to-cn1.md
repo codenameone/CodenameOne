@@ -125,6 +125,7 @@ without screenshots:
 
 ```bash
 CP="common/target/classes:$(mvn -q -pl common dependency:build-classpath -Dmdep.outputFile=/dev/stdout | tail -1)"
+# Gradle: CP="$(./gradlew -q printSimulatorClasspath)"   (the task is in tools/README.md)
 java -cp "$CP" tools/DumpForm.java com.example.MyApp --out target/form-model.tsv
 java tools/DescribeForm.java   target/form-model.tsv   # a concise, vision-free outline of the screen
 java tools/AlignmentCheck.java target/form-model.tsv   # designer "guides": elements nudged off the grid

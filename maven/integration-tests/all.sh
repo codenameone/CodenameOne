@@ -15,3 +15,9 @@ bash cn1app-staged-jar-test.sh
 bash bare-bones-kotlin-test.sh
 bash  migrate-kitchensink-test.sh
 bash googlemaps-demo.sh
+bash gradle-app-test.sh
+bash gradle-maven-parity-test.sh
+bash gradle-cn1lib-test.sh
+bash gradle-migrate-test.sh
+bash gradle-initializr-test.sh
+bash gradle-tools-test.sh

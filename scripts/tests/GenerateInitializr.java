@@ -40,6 +40,15 @@ public class GenerateInitializr {
      model.writeProjectZip(out);
     }
    }
+   // Gradle downloads are Java 17 only; one per project type. Named GRADLE-* so
+   // the fixture script tells them from the Maven ones above.
+   for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
+    ProjectOptions options = ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.GRADLE, type);
+    GeneratorModel model=GeneratorModel.create(ide,Template.BAREBONES,"LauncherProbe","com.example.probe",options);
+    try(OutputStream out=Files.newOutputStream(Paths.get(args[0],"GRADLE-"+type.name()+"-"+ide.name()+".zip"))) {
+     model.writeProjectZip(out);
+    }
+   }
   }
   System.exit(0);
  }

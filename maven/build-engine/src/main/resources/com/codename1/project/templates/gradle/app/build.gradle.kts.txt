@@ -1,0 +1,14 @@
+// Optional: the plugin is applied from settings.gradle.kts. This file is where
+// the application's own dependencies go.
+//
+//   ./gradlew run              run in the simulator
+//   ./gradlew buildAndroid     send an Android build to the build server
+//   ./gradlew buildIos         send an iOS build to the build server
+//   ./gradlew tasks            everything else
+dependencies {
+    // Codename One libraries published to a Maven repository:
+    // cn1lib("com.codenameone:googlemaps-lib:1.0")
+
+    // Plain Java libraries, if they only use APIs Codename One supports:
+    // implementation("org.example:library:1.0")
+}

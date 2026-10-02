@@ -1,0 +1,25 @@
+package ${package};
+
+import com.codename1.backend.annotations.Component;
+
+/**
+ * A service: business logic with no HTTP in it, which the controller is given.
+ *
+ * The build finds every &#64;Component, works out
+ * what each one's constructor needs, and writes the `new` calls into the entry
+ * point it generates -- so this reads like Spring, and there is no container, no
+ * reflection and no start-up scan once it runs. A missing or ambiguous dependency
+ * is a build error that names the injection point.
+ *
+ * The same pass handles &#64;Autowired fields, &#64;Value configuration
+ * settings, &#64;Transactional and &#64;Async methods, &#64;Scheduled jobs and
+ * &#64;McpTool methods an agent can call. See the Backend chapter of the developer
+ * guide, or the backend reference in this project's agent skill.
+ */
+@Component
+public class Greeter {
+    /** Greets someone. */
+    public String greet(String name) {
+        return "Hello, " + name;
+    }
+}

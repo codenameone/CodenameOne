@@ -1,0 +1,249 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gradle;
+
+import com.codename1.build.BuildArtifact;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Properties;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+class PluginHelpersTest {
+    @Test
+    void cn1UpdateRewritesOnlyThePluginVersion() {
+        String kts = "pluginManagement { repositories { gradlePluginPortal() } }\n"
+                + "plugins {\n    id(\"com.codenameone\") version \"8.0.1\"\n    kotlin(\"jvm\") version \"2.2.10\"\n}\n";
+        String updated = UpdateSupport.withPluginVersion(kts, "8.0.2");
+        assertEquals(kts.replace("\"8.0.1\"", "\"8.0.2\""), updated);
+
+        String groovy = "plugins {\n    id 'com.codenameone' version '8.0.1'\n}\n";
+        assertEquals(groovy.replace("8.0.1", "9.0"), UpdateSupport.withPluginVersion(groovy, "9.0"));
+
+        assertNull(UpdateSupport.withPluginVersion("plugins { id(\"com.codenameone\") }\n", "1.0"),
+                "a script that declares no version is left to the user");
+        assertNull(UpdateSupport.withPluginVersion("plugins { id(\"com.codenameone.other\") version \"1\" }", "2"));
+    }
+
+    @Test
+    void theLatestReleaseComesFromTheMarkerMetadata() {
+        String metadata = "<metadata><versioning><latest>8.1-SNAPSHOT</latest><release>8.0.2</release>"
+                + "</versioning></metadata>";
+        assertEquals("8.0.2", UpdateSupport.releaseOf(metadata));
+        assertEquals("8.1", UpdateSupport.releaseOf("<metadata><latest> 8.1 </latest></metadata>"));
+        assertNull(UpdateSupport.releaseOf("<metadata/>"));
+    }
+
+    @Test
+    void aResolvedDependencyRoundTripsThroughATaskInput() {
+        BuildArtifact a = GradleProjectHost.decode("com.acme|maps-common|1.2|cn1css|zip|compile|/r/a|b.zip");
+        assertEquals("com.acme", a.getGroupId());
+        assertEquals("maps-common", a.getArtifactId());
+        assertEquals("1.2", a.getVersion());
+        assertEquals("cn1css", a.getClassifier());
+        assertEquals("zip", a.getType());
+        assertEquals("compile", a.getScope());
+        assertEquals(new File("/r/a|b.zip"), a.getFile(), "the path is the last field and may hold anything");
+
+        assertNull(GradleProjectHost.decode("com.acme|x|1||jar|compile|/r/x.jar").getClassifier());
+        assertNull(GradleProjectHost.decode("too|few|fields"));
+        assertNull(GradleProjectHost.decode(null));
+    }
+
+    @Test
+    void liveCssReloadUsesTheListCn1CssRecorded(@org.junit.jupiter.api.io.TempDir File dir) throws Exception {
+        File theme = new File(dir, "theme.css");
+        File recorded = new File(dir, com.codename1.gradle.tasks.Cn1CssTask.SIMULATOR_INPUTS);
+        AppSupport.CssInputArgument arg = new AppSupport.CssInputArgument(recorded, theme, dir);
+        String property = "-D" + com.codename1.maven.SimulatorSupport.CSS_INPUT_PROPERTY + "=";
+        assertEquals(Collections.singletonList(property + theme.getAbsolutePath()), arg.asArguments(),
+                "no list (CSS switched off): the application's stylesheet alone");
+
+        java.nio.file.Files.write(recorded.toPath(), "/x/lib/theme.css,/x/theme.css\n".getBytes("UTF-8"));
+        assertEquals(Collections.singletonList(property + new File("/x/lib/theme.css").getAbsolutePath() + ","
+                + new File("/x/theme.css").getAbsolutePath()), arg.asArguments(),
+                "the library stylesheets come first, as cn1Css compiled them");
+
+        // Recorded relative to the project, so a checkout restored from the build
+        // cache elsewhere still points at its own files.
+        String recordedText = com.codename1.gradle.tasks.Cn1CssTask.relative(
+                new File(dir, "build/css/libs/a/theme.css").getAbsolutePath() + "," + theme.getAbsolutePath(), dir);
+        assertEquals("build/css/libs/a/theme.css,theme.css".replace("/", File.separator), recordedText);
+        java.nio.file.Files.write(recorded.toPath(), recordedText.getBytes("UTF-8"));
+        assertEquals(Collections.singletonList(property + new File(dir, "build/css/libs/a/theme.css").getAbsolutePath()
+                + "," + theme.getAbsolutePath()), arg.asArguments());
+    }
+
+    @Test
+    void aPublishedPomNamesTheFrameworkVersion() throws Exception {
+        String pom = "<project><dependencies>"
+                + "<dependency><groupId>com.codenameone</groupId><artifactId>googlemaps-lib</artifactId></dependency>"
+                + "<dependency><groupId>com.codenameone</groupId><artifactId>pinned</artifactId>"
+                + "<version>1.0</version></dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>other</artifactId></dependency>"
+                + "</dependencies></project>";
+        org.w3c.dom.Element project = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new org.xml.sax.InputSource(new java.io.StringReader(pom))).getDocumentElement();
+        LibrarySupport.fillFrameworkVersions(project, "9.9.9");
+        org.w3c.dom.NodeList deps = project.getElementsByTagName("dependency");
+        assertEquals("9.9.9", version(deps.item(0)), "a versionless framework module gets the framework's");
+        assertEquals("1.0", version(deps.item(1)), "a declared version is kept");
+        assertNull(version(deps.item(2)), "only com.codenameone modules take the framework's version");
+    }
+
+    private static String version(org.w3c.dom.Node dep) {
+        org.w3c.dom.NodeList v = ((org.w3c.dom.Element) dep).getElementsByTagName("version");
+        return v.getLength() == 0 ? null : v.item(0).getTextContent();
+    }
+
+    @Test
+    void everyResolvedModuleButTheFrameworksIsReadForPlatformProfiles() {
+        org.junit.jupiter.api.Assertions.assertTrue(Cn1libs.mayBeCn1lib("com.acme", "maps-lib"));
+        org.junit.jupiter.api.Assertions.assertTrue(Cn1libs.mayBeCn1lib("com.codenameone", "googlemaps-lib"),
+                "a cn1lib published under com.codenameone");
+        org.junit.jupiter.api.Assertions.assertFalse(Cn1libs.mayBeCn1lib("com.codenameone", "codenameone-core"));
+    }
+
+    @Test
+    void aTimestampedSnapshotKeepsItsClassifier() {
+        assertEquals("cn1css", GradleProjectHost.classifierOf("maps-1.0-SNAPSHOT-cn1css", "maps", "1.0-SNAPSHOT"));
+        assertEquals("cn1css", GradleProjectHost.classifierOf("maps-1.0-20260101.120000-3-cn1css", "maps",
+                "1.0-SNAPSHOT"), "a unique snapshot is named for its timestamp");
+        assertEquals("", GradleProjectHost.classifierOf("maps-1.0-20260101.120000-3", "maps", "1.0-SNAPSHOT"));
+        assertEquals("", GradleProjectHost.classifierOf("maps-1.0", "maps", "1.0"));
+        assertEquals("sources", GradleProjectHost.classifierOf("maps-1.0-sources", "maps", "1.0"));
+    }
+
+    @Test
+    void aPlatformPomDependencyIsWrittenAsMavenReadsIt() {
+        assertEquals("    <dependency>\n      <groupId>g</groupId>\n      <artifactId>a</artifactId>\n"
+                + "      <version>1</version>\n    </dependency>\n", LibrarySupport.dependencyXml("g", "a", "1", "compile"));
+        org.junit.jupiter.api.Assertions.assertTrue(LibrarySupport.dependencyXml("g", "a", "1", "runtime")
+                .contains("<scope>runtime</scope>"));
+    }
+
+    @Test
+    void mavenExclusionsBecomeGradleExcludeRules() {
+        assertEquals("{group=g, module=a}", String.valueOf(Cn1libs.exclusionRule("g", "a")));
+        assertEquals("{group=g}", String.valueOf(Cn1libs.exclusionRule("g", "*")), "any artifact of the group");
+        assertEquals("{module=a}", String.valueOf(Cn1libs.exclusionRule("*", "a")));
+        assertNull(Cn1libs.exclusionRule("*", "*"), "*:* means nothing transitive");
+    }
+
+    @Test
+    void declarationsOfOneLibraryDifferingInExclusionsAreKeptApart() {
+        java.util.List<String[]> none = Collections.emptyList();
+        java.util.List<String[]> one = Collections.singletonList(new String[] {"x", "y"});
+        java.util.List<String[]> two = Arrays.asList(new String[] {"x", "y"}, new String[] {"p", "q"});
+        java.util.List<String[]> twoReordered = Arrays.asList(new String[] {"p", "q"}, new String[] {"x", "y"});
+        org.junit.jupiter.api.Assertions.assertNotEquals(Cn1libs.exclusionKey(none), Cn1libs.exclusionKey(one),
+                "a path that excludes nothing is a second edge, not a duplicate");
+        assertEquals(Cn1libs.exclusionKey(two), Cn1libs.exclusionKey(twoReordered), "order does not matter");
+    }
+
+    @Test
+    void aPublishedDependencyKeepsItsExclusions() {
+        String xml = LibrarySupport.exclusionsXml(LibrarySupport.dependencyXml("g", "a", "1", "compile"),
+                java.util.Collections.singletonList(new String[] {"x", "y"}));
+        org.junit.jupiter.api.Assertions.assertTrue(xml.contains("<exclusions>\n        <exclusion>\n"
+                + "          <groupId>x</groupId>\n          <artifactId>y</artifactId>\n"), xml);
+        org.junit.jupiter.api.Assertions.assertTrue(xml.endsWith("      </exclusions>\n    </dependency>\n"), xml);
+        assertEquals(LibrarySupport.dependencyXml("g", "a", "1", "compile"), LibrarySupport.exclusionsXml(
+                LibrarySupport.dependencyXml("g", "a", "1", "compile"), java.util.Collections.<String[]>emptyList()));
+    }
+
+    @Test
+    void aProjectCn1libIsPublishedAsItsLibPom() throws Exception {
+        String pom = "<project><dependencies>"
+                + "<dependency><groupId>com.acme</groupId><artifactId>maps-common</artifactId><version>1</version>"
+                + "</dependency>"
+                + "<dependency><groupId>com.acme</groupId><artifactId>charts-lib</artifactId><version>2</version>"
+                + "</dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>plain</artifactId><version>3</version>"
+                + "</dependency></dependencies></project>";
+        org.w3c.dom.Element project = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new org.xml.sax.InputSource(new java.io.StringReader(pom))).getDocumentElement();
+        java.util.Map<String, String> cn1libs = new java.util.HashMap<String, String>();
+        cn1libs.put("com.acme:maps", "maps-lib");
+        cn1libs.put("com.acme:maps-common", "maps-lib");
+        cn1libs.put("com.acme:charts-lib", "charts-lib");
+        LibrarySupport.markCn1libDependencies(project, cn1libs);
+        org.w3c.dom.NodeList deps = project.getElementsByTagName("dependency");
+        assertEquals("maps-lib", text(deps.item(0), "artifactId"), "a project cn1lib is its -lib pom");
+        assertEquals("pom", text(deps.item(0), "type"));
+        assertEquals("charts-lib", text(deps.item(1), "artifactId"));
+        assertEquals("pom", text(deps.item(1), "type"));
+        assertNull(text(deps.item(2), "type"), "an ordinary library is left alone");
+    }
+
+    private static String text(org.w3c.dom.Node dep, String name) {
+        org.w3c.dom.NodeList v = ((org.w3c.dom.Element) dep).getElementsByTagName(name);
+        return v.getLength() == 0 ? null : v.item(0).getTextContent();
+    }
+
+    @Test
+    void backendArgumentsSplitOnWhitespace() {
+        assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
+        assertEquals(Collections.emptyList(), BackendSupport.split("   "));
+    }
+
+    /// Cached native outputs are rebuilt when a build hint changes, however it
+    /// arrives; the recorded fingerprint never holds a hint's value in the clear.
+    @Test
+    void theBuildHintFingerprintTracksEveryHint() {
+        Properties a = new Properties();
+        a.setProperty("codename1.arg.android.xpermissions", "CAMERA");
+        a.setProperty("codename1.arg.ios.certificatePassword", "s3cret");
+        Properties reordered = new Properties();
+        reordered.setProperty("codename1.arg.ios.certificatePassword", "s3cret");
+        reordered.setProperty("codename1.arg.android.xpermissions", "CAMERA");
+        Properties changed = new Properties();
+        changed.putAll(a);
+        changed.setProperty("codename1.arg.android.xpermissions", "CAMERA,NFC");
+
+        String fingerprint = GradleProjectHost.hintsFingerprint(a);
+        assertEquals(fingerprint, GradleProjectHost.hintsFingerprint(reordered));
+        org.junit.jupiter.api.Assertions.assertNotEquals(fingerprint, GradleProjectHost.hintsFingerprint(changed));
+        org.junit.jupiter.api.Assertions.assertFalse(fingerprint.contains("s3cret"));
+    }
+
+    /// codenameone { mainClass } overrides the settings file's two keys.
+    @Test
+    void theMainClassExtensionSplitsIntoPackageAndName() {
+        java.util.Map<String, String> p = ProjectSupport.mainClassProperties("com.acme.app.OtherApp");
+        assertEquals("com.acme.app", p.get("codename1.packageName"));
+        assertEquals("OtherApp", p.get("codename1.mainName"));
+        assertEquals(Collections.emptyMap(), ProjectSupport.mainClassProperties(""));
+        assertEquals("", ProjectSupport.mainClassProperties("Bare").get("codename1.packageName"));
+    }
+
+    @Test
+    void eachPlatformHasItsOwnCn1libConfiguration() {
+        assertEquals("cn1libIos", Cn1libs.configurationName("ios"));
+        assertEquals("cn1libJavascript", Cn1libs.configurationName("javascript"));
+    }
+}

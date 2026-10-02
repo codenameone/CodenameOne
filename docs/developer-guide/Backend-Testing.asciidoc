@@ -47,6 +47,16 @@ Run the tests with:
 include::../demos/common/src/main/snippets/developer-guide/backend-testing.sh[tag=backend-testing-bash-001,indent=0]
 ----
 
+A Gradle backend gets the same setup from the Codename One plugin: the test
+library, JUnit 5, a fresh JVM per test class and the test pass all come with
+it. The standard `test` task runs the tests, and `backendTest` runs them as a
+native binary, as described below:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-testing.sh[tag=backend-testing-bash-003,indent=0]
+----
+
 === Testing a controller with MockMvc
 
 This controller answers a greeting as JSON, using a `Greetings` bean:

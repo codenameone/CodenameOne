@@ -1,6 +1,6 @@
 # The Full-Stack Loop — App and Backend Together
 
-Use this when a change spans the app (`common/`) and the server (`backend/`): a new
+Use this when a change spans the app (`common/` in Maven, the root project in Gradle) and the server (`backend/`): a new
 screen that needs a new endpoint, a form whose data must land in the database, a
 bug that could be on either side. The loop runs both halves locally and gives you
 **two MCP servers**:
@@ -15,6 +15,8 @@ row — without asking a human to click anything.
 
 ```bash
 CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend
+# Gradle:
+CN1_PROFILE=dev ./gradlew :backend:runBackend
 ```
 
 Run it in the background: it blocks, and it prints
@@ -35,7 +37,7 @@ claude mcp add --transport http cn1-backend http://127.0.0.1:8080/mcp
 ```
 
 For the simulator, follow `references/mcp-agent-control.md`: run
-`mvn -pl common cn1:run`, then **MCP -> Expose This Tool To Agents** and
+`mvn -pl common cn1:run` (Gradle: `./gradlew run`), then **MCP -> Expose This Tool To Agents** and
 **MCP -> Install in MCP Hosts...**. Restart the MCP host after registering either.
 
 ## 3. Point the app at the local backend
@@ -45,7 +47,7 @@ start-up) so switching between local and deployed is one edit:
 
 | Where the app runs | URL that reaches the local backend |
 | --- | --- |
-| Simulator (`cn1:run`) | `http://127.0.0.1:8080` |
+| Simulator (`cn1:run` / `./gradlew run`) | `http://127.0.0.1:8080` |
 | Android emulator | `http://10.0.2.2:8080` |
 | iOS simulator | `http://127.0.0.1:8080` |
 | A physical phone | `http://<your machine's LAN address>:8080` |
@@ -97,7 +99,7 @@ When a step fails, the tools tell you which side to fix:
 - **Backend**: unit-test services by constructing them; integration-test the wired
   server by starting the generated `BackendWiring` on a free port — both are shown
   in `references/backend.md`.
-- **App**: screen tests with `cn1:test` (`references/testing-and-screenshots.md`).
+- **App**: screen tests with `cn1:test` / `./gradlew cn1Test` (`references/testing-and-screenshots.md`).
   Keep them independent of a running backend — fake the client, or point it at a
   backend the test itself starts — so the suite does not depend on whatever you
   left running.
@@ -106,6 +108,7 @@ When a step fails, the tools tell you which side to fix:
 
 ```bash
 mvn -pl backend -Dcodename1.platform=backend cn1:backend-package   # native server binary
+./gradlew :backend:backendPackage                                  # the same, in a Gradle project
 ```
 
 and the app's platform builds as in `references/build-and-run.md`. Before

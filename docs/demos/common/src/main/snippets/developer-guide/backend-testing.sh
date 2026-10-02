@@ -7,3 +7,8 @@ mvn -pl backend -Dcodename1.platform=backend test
 // tag::backend-testing-bash-002[]
 mvn -pl backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true
 // end::backend-testing-bash-002[]
+
+// tag::backend-testing-bash-003[]
+./gradlew test          # on this JVM
+./gradlew backendTest   # as a native binary
+// end::backend-testing-bash-003[]

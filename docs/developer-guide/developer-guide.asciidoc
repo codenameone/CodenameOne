@@ -49,6 +49,8 @@ include::Introduction.asciidoc[]
 
 include::Maven-Project-Workflow.asciidoc[]
 
+include::Gradle-Project-Workflow.asciidoc[]
+
 = Core concepts
 
 include::The-EDT---Event-Dispatch-Thread.asciidoc[]

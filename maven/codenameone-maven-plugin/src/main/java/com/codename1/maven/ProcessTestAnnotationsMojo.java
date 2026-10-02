@@ -79,9 +79,16 @@ public class ProcessTestAnnotationsMojo extends AbstractMojo {
         }
         String encoding = project.getProperties().getProperty("project.build.sourceEncoding",
                 "UTF-8");
-        int generated = BackendTests.process(outputDirectory, testOutputDirectory,
-                new File(project.getBuild().getDirectory(), "generated-test-sources/cn1"),
-                project.getBasedir(), roots, encoding, classpath, false, getLog());
+        int generated;
+        try {
+            generated = BackendTests.process(outputDirectory, testOutputDirectory,
+                    new File(project.getBuild().getDirectory(), "generated-test-sources/cn1"),
+                    project.getBasedir(), roots, encoding, classpath, false, MavenLog.of(getLog()));
+        } catch (com.codename1.build.BuildFailureException e) {
+            throw new MojoFailureException(e.getMessage(), e.getCause() == null ? e : e.getCause());
+        } catch (com.codename1.build.BuildExecutionException e) {
+            throw new MojoExecutionException(e.getMessage(), e.getCause() == null ? e : e.getCause());
+        }
         if (generated > 0) {
             getLog().info("cn1: prepared " + generated + " backend test class(es)");
         }

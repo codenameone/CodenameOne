@@ -11,6 +11,8 @@ Pick per test class. Both run in the same project from the same `common/src/test
 
 See `references/testing-and-screenshots.md` for the AbstractTest path, including the `screenshotTest` baseline algorithm.
 
+**Gradle projects** keep tests in `src/test/java` and run JUnit with `./gradlew test` (filter with `--tests 'GreetingFormTest.formShowsExpectedTitle'`) and the CN1 runner with `./gradlew cn1Test`. The plugin puts `codenameone-core` and `codenameone-javase` on the test classpath; if JUnit is not wired in yet, add `testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")`, `testRuntimeOnly("org.junit.platform:junit-platform-launcher")` and `tasks.test { useJUnitPlatform() }` to `build.gradle.kts`. The Maven setup below does not apply.
+
 ## Project setup
 
 The cn1app archetype generates a `common/pom.xml` and `javase/pom.xml` that already pull in `junit-jupiter` and `codenameone-javase` at test scope. If your project predates that wiring, add these two blocks yourself:

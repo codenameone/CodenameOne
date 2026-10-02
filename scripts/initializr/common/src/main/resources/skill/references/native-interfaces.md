@@ -1,13 +1,13 @@
 # Native Interfaces
 
-A **Native Interface** in Codename One is a Java interface in `common/` that has a per-platform implementation outside of `common/` — Objective-C (or Swift) for iOS, Java (or Kotlin) for Android, JavaScript for the JS port, plain Java for the desktop simulator. At runtime CN1 wires the Java interface to the right platform implementation. This is how you call out to platform APIs CN1 doesn't expose directly (NFC, native ads, Bluetooth, vendor SDKs).
+A **Native Interface** in Codename One is a Java interface in the app's sources (`common/` under Maven, `src/main/java/` under Gradle) that has a per-platform implementation outside of them — Objective-C (or Swift) for iOS, Java (or Kotlin) for Android, JavaScript for the JS port, plain Java for the desktop simulator. At runtime CN1 wires the Java interface to the right platform implementation. This is how you call out to platform APIs CN1 doesn't expose directly (NFC, native ads, Bluetooth, vendor SDKs).
 
 > **The GPS example below is for illustration only.** Codename One already ships a portable **`com.codename1.location`** API (`LocationManager.getLocationManager().getCurrentLocation()`, `setLocationListener(...)`, geofence + background tracking) — you should never roll your own GPS bridge. Maps are likewise already covered by the **`cn1-google-maps`** cn1lib (Google Maps for iOS and Android) and the built-in `com.codename1.maps.MapComponent` for OpenStreetMap. Use native interfaces for things the framework actually doesn't expose; reach for them last, not first.
 
 ## The workflow
 
 1. **Write the Java interface in `common/`** as an extension of `com.codename1.system.NativeInterface`.
-2. **Generate stubs** with `mvn cn1:generate-native-interfaces`. The plugin scans `common/target/classes/` for classes that extend `NativeInterface` and emits per-platform stub files into the matching module's source tree.
+2. **Generate stubs** with `mvn cn1:generate-native-interfaces` (Gradle: `./gradlew generateNativeInterfaces`). The plugin scans the compiled classes for classes that extend `NativeInterface` and emits per-platform stub files into the matching platform source tree -- a platform module under Maven, `src/<platform>/<lang>/` under Gradle.
 3. **Run the target platform first, against the empty stubs**, so you can see exactly where the stub lands and what the file looks like before you implement it.
 4. **Implement the stubs** — fill in the native code for each platform you care about.
 5. **Look up the bridge from Java** with `NativeLookup.create(YourInterface.class)`.
@@ -41,21 +41,25 @@ Constraints on the interface:
 ## 2. Generate the stubs
 
 ```bash
+# Maven
 mvn -pl common compile                       # the generator needs the interface compiled
 mvn -pl common cn1:generate-native-interfaces
+
+# Gradle (compiles first on its own)
+./gradlew generateNativeInterfaces
 ```
 
-This creates files like:
+This creates files like (Maven, then Gradle):
 
 ```
-ios/src/main/objectivec/com_example_myapp_native_GpsBridgeImpl.h
-ios/src/main/objectivec/com_example_myapp_native_GpsBridgeImpl.m
-android/src/main/java/com/example/myapp/native_/GpsBridgeImpl.java
-javase/src/main/java/com/example/myapp/native_/GpsBridgeImpl.java
-javascript/src/main/javascript/com_example_myapp_native_GpsBridgeImpl.js
+ios/src/main/objectivec/com_example_myapp_native_GpsBridgeImpl.h        src/ios/objectivec/com_example_myapp_native_GpsBridgeImpl.h
+ios/src/main/objectivec/com_example_myapp_native_GpsBridgeImpl.m        src/ios/objectivec/com_example_myapp_native_GpsBridgeImpl.m
+android/src/main/java/com/example/myapp/native_/GpsBridgeImpl.java      src/android/java/com/example/myapp/native_/GpsBridgeImpl.java
+javase/src/main/java/com/example/myapp/native_/GpsBridgeImpl.java       src/javase/java/com/example/myapp/native_/GpsBridgeImpl.java
+javascript/src/main/javascript/com_example_myapp_native_GpsBridgeImpl.js src/javascript/javascript/com_example_myapp_native_GpsBridgeImpl.js
 ```
 
-The plugin will **not overwrite existing stubs** by default. Pass `-Dcn1.generateNativeInterfaces.overwrite=true` if you really want to regenerate. To emit Swift instead of Objective-C, or Kotlin instead of Java, add `-Dcn1.generateNativeInterfaces.swift=true` / `-Dcn1.generateNativeInterfaces.kotlin=true`.
+The plugin will **not overwrite existing stubs** by default. Pass `-Dcn1.generateNativeInterfaces.overwrite=true` (Gradle: `-Pcn1.overwrite=true`) if you really want to regenerate. To emit Swift instead of Objective-C, or Kotlin instead of Java, add `-Dcn1.generateNativeInterfaces.swift=true` / `-Dcn1.generateNativeInterfaces.kotlin=true` (Gradle: `-Pcn1.swift=true` / `-Pcn1.kotlin=true`).
 
 ## 3. Verify the stub layout BEFORE implementing
 
@@ -74,11 +78,19 @@ mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarg
 
 # Desktop simulator — just run cn1:run and observe the bridge boots without errors.
 mvn -pl common cn1:run
+
+# Gradle equivalents
+./gradlew buildIosXcodeProject
+./gradlew buildAndroid -Pautomated=true
+./gradlew buildJavascriptLocal
+./gradlew run
 ```
 
 This step matters because every platform has a different stub layout, naming convention, and dependency story. Running the empty stubs first is how you learn what the real implementation file will look like — file path, class/file name, method signatures — without spending time on logic that may need to be reworked.
 
 ## 4. Implement the stubs
+
+Paths below are Maven's; under Gradle `ios/src/main/objectivec/` is `src/ios/objectivec/`, `android/src/main/java/` is `src/android/java/`, and so on (see the table in step 2).
 
 ### iOS (Objective-C)
 
@@ -296,7 +308,7 @@ navigator.geolocation.watchPosition(function(pos) {
 
 ## Common pitfalls
 
-- **Method signature mismatch between the interface and the stub** — happens after you edit the Java interface but forget to regenerate. Re-run `mvn cn1:generate-native-interfaces -Dcn1.generateNativeInterfaces.overwrite=true` and re-apply your platform code.
+- **Method signature mismatch between the interface and the stub** — happens after you edit the Java interface but forget to regenerate. Re-run `mvn cn1:generate-native-interfaces -Dcn1.generateNativeInterfaces.overwrite=true` (Gradle: `./gradlew generateNativeInterfaces -Pcn1.overwrite=true`) and re-apply your platform code.
 - **Returning Java objects** — not supported by the bridge marshaler. Return primitives, `String`, `byte[]`, or `PeerComponent` only.
 - **`PeerComponent` on iOS without ARC** — peer-component implementations can dangle if you treat the bridge like an ARC-managed Swift method. Retain natively, or wrap returned views in a static holder.
 - **Permissions / Info.plist** — the build server happily accepts a native interface that calls a privacy-protected API, but the App Store / Play Store reject it. Set `codename1.arg.ios.plistInject` and `codename1.arg.android.xpermissions` (see `references/build-hints.md`).

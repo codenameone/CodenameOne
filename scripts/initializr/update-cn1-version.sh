@@ -81,6 +81,18 @@ replace_file "$ROOT_INITIALIZR_DIR/pom.xml" "s|(<id>cn1-local-workspace</id>.*?<
 replace_file "$ROOT_INITIALIZR_DIR/pom.xml" "s|(<id>cn1-local-workspace</id>.*?<cn1\\.plugin\\.version>)[^<]+(</cn1\\.plugin\\.version>)|\${1}$SNAPSHOT_VERSION\${2}|s;"
 
 replace_file "$GENERATOR_MODEL" "s|private static final String CN1_PLUGIN_VERSION = \\\"[^\\\"]+\\\";|private static final String CN1_PLUGIN_VERSION = \\\"$VERSION\\\";|g;"
+
+# Gradle downloads resolve the Gradle plugin at this same version, so the
+# initializr offers Gradle only when its marker is published there. Checked, not
+# assumed: the first releases carry no Gradle plugin at all.
+GRADLE_MARKER="https://repo.codenameone.com/maven2/com/codenameone/com.codenameone.gradle.plugin/$VERSION/com.codenameone.gradle.plugin-$VERSION.pom"
+if curl -fsSIL -o /dev/null "$GRADLE_MARKER"; then
+  GRADLE_PUBLISHED=true
+else
+  GRADLE_PUBLISHED=false
+fi
+replace_file "$GENERATOR_MODEL" "s#static final boolean GRADLE_PLUGIN_PUBLISHED = (?:true|false);#static final boolean GRADLE_PLUGIN_PUBLISHED = $GRADLE_PUBLISHED;#g;"
+echo "Gradle plugin published at $VERSION: $GRADLE_PUBLISHED"
 replace_file "$MATRIX_TEST" "s|<cn1\\.plugin\\.version>[^<]+</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
 replace_file "$MATRIX_TEST" "s|<cn1\\.version>[^<]+</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
 

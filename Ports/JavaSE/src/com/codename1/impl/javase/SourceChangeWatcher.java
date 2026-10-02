@@ -24,6 +24,10 @@ package com.codename1.impl.javase;
 
 import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.io.Log;
+import com.codename1.project.BuildSystem;
+import com.codename1.project.ProjectKind;
+import com.codename1.project.ProjectLayout;
+import com.codename1.project.ProjectLayouts;
 import com.codename1.ui.*;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 import org.w3c.dom.Document;
@@ -83,8 +87,86 @@ public class SourceChangeWatcher implements Runnable {
         return null;
     }
 
+    /// The project a watched file belongs to, or null.
+    ///
+    /// This used to be "the directory of the nearest pom.xml", which is
+    /// `common/` for a Maven application and does not exist for Gradle or Ant.
+    /// The project model finds the same `common/` for Maven and the project
+    /// directory for the others. A cache keeps the per-event cost to one
+    /// directory walk per source directory.
+    private final Map<File, ProjectLayout> layoutCache = new HashMap<File, ProjectLayout>();
+
+    /// Set by a Gradle launch (SimulatorSupport in the build engine names them):
+    /// the source set's source directories, path-separated, and where javac and
+    /// the Kotlin compiler write its classes. They win over the conventional
+    /// layout, which a sourceSets block or a relocated build directory moves.
+    static final String SOURCE_ROOTS_PROPERTY = "cn1.hotReload.sourceRoots";
+    static final String JAVA_CLASSES_PROPERTY = "cn1.hotReload.javaClasses";
+    static final String KOTLIN_CLASSES_PROPERTY = "cn1.hotReload.kotlinClasses";
+
+    private static File fromProperty(String name, File fallback) {
+        String value = System.getProperty(name);
+        return value == null || value.length() == 0 ? fallback : new File(value);
+    }
+
+    /// The configured source root holding `file`, or `fallback`.
+    private static File sourceRootOf(File file, File fallback) {
+        String roots = System.getProperty(SOURCE_ROOTS_PROPERTY);
+        if (roots != null && roots.length() > 0) {
+            String path = file.getAbsolutePath();
+            for (String root : roots.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                String rootPath = new File(root).getAbsolutePath();
+                if (path.equals(rootPath) || path.startsWith(rootPath + File.separator)) {
+                    return new File(root);
+                }
+            }
+        }
+        return fallback;
+    }
+
+    private ProjectLayout layoutFor(File startingPoint) {
+        if (startingPoint == null) {
+            return null;
+        }
+        // A file (or a deleted one) is identified by its directory.
+        File dir = startingPoint.isDirectory() ? startingPoint : startingPoint.getParentFile();
+        if (dir == null) {
+            return null;
+        }
+        synchronized (layoutCache) {
+            if (layoutCache.containsKey(dir)) {
+                return layoutCache.get(dir);
+            }
+            // A source root the launch named belongs to the running project, even
+            // outside its directory (sourceSets can point anywhere), where
+            // detection from the file system would find nothing or another project.
+            if (sourceRootOf(dir, null) != null && SimulatorProject.current() != null) {
+                ProjectLayout running = SimulatorProject.current();
+                layoutCache.put(dir, running);
+                return running;
+            }
+            ProjectLayout layout = ProjectLayouts.detect(dir);
+            if (layout != null && layout.kind() == ProjectKind.BACKEND) {
+                layout = null;
+            }
+            layoutCache.put(dir, layout);
+            return layout;
+        }
+    }
+
+    /// Where generated sources go: Maven's `target/generated-sources/<name>`,
+    /// or the same name under Gradle's `build/generated-sources`.
+    private File generatedSourcesDir(File startingPoint, String name) {
+        return new File(getCN1BuildDir(startingPoint), "generated-sources" + File.separator + name);
+    }
+
+    private File getCN1BuildDir(File startingPoint) {
+        ProjectLayout layout = layoutFor(startingPoint);
+        return layout == null ? null : layout.buildDir();
+    }
+
     private File getRADViewsDirectory(File viewXMLFile) {
-        return new File(findPom(viewXMLFile).getParentFile(), "src" + File.separator + "main" + File.separator + "rad" + File.separator + "views");
+        return layoutFor(viewXMLFile).radViewsDir();
     }
 
     private String getPackageForRADView(File viewXMLFile) {
@@ -108,9 +190,9 @@ public class SourceChangeWatcher implements Runnable {
 
     private boolean isRADView(Path path) {
 
-        File pom = findPom(path.toFile().getParentFile());
-        if (!pom.exists()) return false;
-        File radViews = new File(pom.getParentFile(), "src" + File.separator + "main" + File.separator + "rad" + File.separator + "views");
+        ProjectLayout layout = layoutFor(path.toFile().getParentFile());
+        if (layout == null) return false;
+        File radViews = layout.radViewsDir();
         return path.toFile().getName().endsWith(".xml") && path.startsWith(radViews.toPath());
     }
 
@@ -129,11 +211,12 @@ public class SourceChangeWatcher implements Runnable {
     }
 
     private File getCN1ProjectDir(File startingPoint) {
-        return findPom(startingPoint).getParentFile();
+        ProjectLayout layout = layoutFor(startingPoint);
+        return layout == null ? null : layout.projectDir();
     }
 
     private void generateSchemaFor(File xmlViewFile, String contents) throws IOException {
-        File generatedSources = new File(getCN1ProjectDir(xmlViewFile), "target" + File.separator + "generated-sources");
+        File generatedSources = new File(getCN1BuildDir(xmlViewFile), "generated-sources");
         File xmlSchemasDirectory = new File(generatedSources, "rad" + File.separator + "xmlSchemas");
         String packageName = getPackageForRADView(xmlViewFile);
         String baseName = xmlViewFile.getName();
@@ -330,7 +413,7 @@ public class SourceChangeWatcher implements Runnable {
     }
 
     private File getRADGeneratedSourcesDirectory(File viewXMLFile) {
-        return new File(getCN1ProjectDir(viewXMLFile), "target" + File.separator + "generated-sources" + File.separator + "rad-views");
+        return generatedSourcesDir(viewXMLFile, "rad-views");
     }
 
 
@@ -359,9 +442,9 @@ public class SourceChangeWatcher implements Runnable {
         }
 
         File f = path.toFile();
-        File pom = findPom(f.getParentFile());
-        if (pom == null) {
-            System.out.println("Skipping recompile of "+path+" because no pom.xml was found");
+        ProjectLayout layout = layoutFor(f.getParentFile());
+        if (layout == null) {
+            System.out.println("Skipping recompile of "+path+" because no Codename One project was found");
             return false;
         }
 
@@ -390,15 +473,33 @@ public class SourceChangeWatcher implements Runnable {
         }
 
         StringBuilder classPath = new StringBuilder();
-        File classDestination = new File(getCN1ProjectDir(path.toFile()), "target" + File.separator + "classes");
+        File classDestination = fromProperty(JAVA_CLASSES_PROPERTY, layout.classesDir());
         classPath.append(classDestination.getAbsolutePath()).append(File.pathSeparator);
+        // Gradle compiles Kotlin into a directory of its own. It goes on the
+        // classpath -- Java calling Kotlin, or Kotlin calling another Kotlin class,
+        // otherwise recompiles against nothing -- and a recompiled Kotlin class
+        // goes back there, not beside Java's where it would shadow a stale copy.
+        File kotlinClasses = layout.buildSystem() == BuildSystem.GRADLE
+                ? fromProperty(KOTLIN_CLASSES_PROPERTY,
+                        new File(layout.buildDir(), "classes" + File.separator + "kotlin" + File.separator + "main"))
+                : null;
+        if (kotlinClasses != null) {
+            classPath.append(kotlinClasses.getAbsolutePath()).append(File.pathSeparator);
+        }
         classPath.append(System.getProperty("cn1.maven.compileClasspathElements", ""));
 
         boolean isKotlinFile = path.toFile().getName().endsWith(".kt");
 
-        File generatedSources = new File(getCN1ProjectDir(path.toFile()), "target" + File.separator + "generated-sources" + File.separator + "annotations");
-        File sourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile()) : new File(getCN1ProjectDir(path.toFile()), "src" + File.separator + "main" + File.separator + "java");
-        File kotlinSourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile()) : new File(getCN1ProjectDir(path.toFile()), "src" + File.separator + "main" + File.separator + "kotlin");
+        // Gradle's javac writes processor output to its own directory; Maven's
+        // is target/generated-sources/annotations.
+        File generatedSources = layout.buildSystem() == BuildSystem.GRADLE
+                ? new File(layout.buildDir(), "generated" + File.separator + "sources" + File.separator
+                        + "annotationProcessor" + File.separator + "java" + File.separator + "main")
+                : generatedSourcesDir(path.toFile(), "annotations");
+        File sourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile())
+                : sourceRootOf(path.toFile(), layout.javaSourceDir());
+        File kotlinSourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile())
+                : sourceRootOf(path.toFile(), kotlinSourceDir(layout));
         String recompilingClass = isKotlinFile ?
                 path.toFile().getAbsolutePath().substring(kotlinSourcePath.getAbsolutePath().length()+1) :
                 isRADView ?
@@ -426,24 +527,41 @@ public class SourceChangeWatcher implements Runnable {
             pb = new ProcessBuilder(
                     kotlinc.getAbsolutePath(),
                     "-classpath", classPath.toString(),
-                    "-d", classDestination.getAbsolutePath(),
-                    "-jvm-target", "1.8",
+                    "-d", (kotlinClasses != null ? kotlinClasses : classDestination).getAbsolutePath(),
+                    "-jvm-target", javaLevel(layout),
                     recompilingClass
             );
             pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
             pb.directory(kotlinSourcePath);
         } else {
-            pb = new ProcessBuilder(
-                    javac.getAbsolutePath(),
-                    "-cp", classPath.toString(),
-                    "-d", classDestination.getAbsolutePath(),
-                    "-source", "1.8",
-                    "-target", "1.8",
-                    "-encoding", "utf-8",
-                    "-s", generatedSources.getAbsolutePath(),
-                    "-sourcepath", sourcePath.getAbsolutePath(),
-                    recompilingClass
-            );
+            List<String> cmd = new ArrayList<String>();
+            cmd.add(javac.getAbsolutePath());
+            cmd.add("-cp");
+            cmd.add(classPath.toString());
+            cmd.add("-d");
+            cmd.add(classDestination.getAbsolutePath());
+            if (layout.buildSystem() == BuildSystem.GRADLE) {
+                // --release, as Gradle's compile does: -source/-target alone would
+                // let an edit call an API the host JDK has and the target release
+                // lacks, which hot reload runs and the next real build rejects.
+                cmd.add("--release");
+                cmd.add(javaLevel(layout));
+            } else {
+                cmd.add("-source");
+                cmd.add(javaLevel(layout));
+                cmd.add("-target");
+                cmd.add(javaLevel(layout));
+            }
+            // The encoding the build compiles in; a Gradle launch names it.
+            String encoding = System.getProperty("cn1.hotReload.encoding");
+            cmd.add("-encoding");
+            cmd.add(encoding != null && encoding.length() > 0 ? encoding : "utf-8");
+            cmd.add("-s");
+            cmd.add(generatedSources.getAbsolutePath());
+            cmd.add("-sourcepath");
+            cmd.add(sourcePath.getAbsolutePath());
+            cmd.add(recompilingClass);
+            pb = new ProcessBuilder(cmd);
             pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
             pb.directory(sourcePath);
         }
@@ -539,7 +657,36 @@ public class SourceChangeWatcher implements Runnable {
         }
     }
     
-    private boolean recompileWithMaven(Path path) throws IOException, InterruptedException {
+    /// `src/main/kotlin` beside the Java sources, whether or not it exists.
+    /// The language level the direct recompile uses: the project's own, so a
+    /// source using Java 17 syntax recompiles. Gradle projects are always 17,
+    /// the one bytecode level Codename One builds (Android runs nothing newer);
+    /// a Maven or Ant project says so in codenameone_settings.properties, and
+    /// 8 remains the default there.
+    static String javaLevel(ProjectLayout layout) {
+        if (layout.buildSystem() == BuildSystem.GRADLE) {
+            return "17";
+        }
+        Properties settings = new Properties();
+        File file = layout.settingsFile();
+        if (file != null && file.isFile()) {
+            try (InputStream in = new FileInputStream(file)) {
+                settings.load(in);
+            } catch (IOException ex) {
+                return "1.8";
+            }
+        }
+        return "17".equals(settings.getProperty("codename1.arg.java.version", "8").trim()) ? "17" : "1.8";
+    }
+
+    private static File kotlinSourceDir(ProjectLayout layout) {
+        return new File(layout.javaSourceDir().getParentFile(), "kotlin");
+    }
+
+    /// Recompiles the project with its own build tool: `mvn compile` for
+    /// Maven, `gradlew cn1Compile` for Gradle, `ant compile` for Ant, as
+    /// [ProjectLayout#compileCommand(String, boolean)] spells each.
+    private boolean recompileWithBuildTool(Path path) throws IOException, InterruptedException {
         int hotReloadSetting = Integer.parseInt(System.getProperty("hotReload", "0"));
         if (hotReloadSetting == 0) return false;
         if (!path.toFile().exists()) {
@@ -559,35 +706,40 @@ public class SourceChangeWatcher implements Runnable {
 
 
         File f = path.toFile();
-        File pom = findPom(f.getParentFile());
-        if (pom == null) {
-            System.out.println("Skipping recompile of "+path+" because no pom.xml was found");
+        ProjectLayout layout = layoutFor(f);
+        if (layout == null) {
+            System.out.println("Skipping recompile of "+path+" because no Codename One project was found");
             return false;
         }
-        
+
         String mavenHome = System.getProperty("maven.home");
-        if (mavenHome == null) {
-            Log.p("Not recompiling path "+path+" because maven.home system property was not found.");
-            return false;
-        }
-        
-        String mavenPath = mavenHome + File.separator + "bin" + File.separator + "mvn";
-        if (!new File(mavenPath).exists()) {
-            if (new File(mavenPath+".exe").exists()) {
-                mavenPath += ".exe";
-            } else if (new File(mavenPath+".bat").exists()) {
-                mavenPath += ".bat";
-            } else if (new File(mavenPath+".cmd").exists()) {
-                mavenPath += ".cmd";
-            } else {
-                Log.p("Not recompiling path "+path+" because " +mavenPath+" could not be found.");
+        List<String> command = layout.compileCommand(mavenHome, isWindows);
+        File workingDir = layout.compileWorkingDir();
+        if (layout.buildSystem() == BuildSystem.MAVEN) {
+            // Maven keeps its old contract exactly: the Maven that launched the
+            // simulator (maven.home) or nothing -- never a wrapper or whatever
+            // "mvn" is on the PATH -- run in the directory of the pom nearest
+            // the change, which for a watched sibling module is that module.
+            // The one difference is on Windows, where mvn.cmd is now preferred
+            // to the extensionless mvn, a shell script CreateProcess cannot run.
+            if (mavenHome == null) {
+                Log.p("Not recompiling path "+path+" because maven.home system property was not found.");
                 return false;
+            }
+            File mavenBin = new File(mavenHome, "bin");
+            if (!new File(command.get(0)).getAbsoluteFile().getParentFile().equals(mavenBin.getAbsoluteFile())) {
+                Log.p("Not recompiling path "+path+" because " + new File(mavenBin, "mvn") + " could not be found.");
+                return false;
+            }
+            File pom = findPom(f.getParentFile());
+            if (pom != null) {
+                workingDir = pom.getParentFile();
             }
         }
 
-        ProcessBuilder pb = new ProcessBuilder(mavenPath, "compile", "-DskipComplianceCheck", "-Dmaven.compiler.useIncrementalCompilation=false", "-e");
+        ProcessBuilder pb = new ProcessBuilder(command);
         pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
-        pb.directory(pom.getParentFile());
+        pb.directory(workingDir);
         pb.inheritIO();
         Process p = pb.start();
         int result = p.waitFor();
@@ -707,6 +859,9 @@ public class SourceChangeWatcher implements Runnable {
     }
     
     private File findPom(File startingPoint) {
+        if (startingPoint == null) {
+            return null;
+        }
         File pom = new File(startingPoint, "pom.xml");
         if (pom.exists()) return pom;
         File parent = startingPoint.getParentFile();
@@ -765,9 +920,11 @@ public class SourceChangeWatcher implements Runnable {
                                 requiresRecompile = true;
                             }
                             File changedFile = new File(path.toFile(), evt.context().toString());
-                            File cn1ProjectDir = getCN1ProjectDir(changedFile);
-                            File commonSrcDir = cn1ProjectDir == null ? null : new File(cn1ProjectDir, "src" + File.separator + "main" + File.separator + "java");
-                            File kotlinSrcDir = cn1ProjectDir == null ? null : new File(cn1ProjectDir, "src" + File.separator + "main" + File.separator + "kotlin");
+                            ProjectLayout changedLayout = layoutFor(changedFile);
+                            File commonSrcDir = changedLayout == null ? null
+                                    : sourceRootOf(changedFile, changedLayout.javaSourceDir());
+                            File kotlinSrcDir = changedLayout == null ? null
+                                    : sourceRootOf(changedFile, kotlinSourceDir(changedLayout));
                             boolean isEligibleKotlinFile = kotlinSrcDir != null && changedFile.exists() && changedFile.getName().endsWith(".kt") && changedFile.toPath().startsWith(kotlinSrcDir.toPath());
                             boolean isEligibleJavaFile = commonSrcDir != null && changedFile.exists() && changedFile.getName().endsWith(".java") && changedFile.toPath().startsWith(commonSrcDir.toPath());
                             if (isRADView(changedFile.toPath()) || isEligibleJavaFile || isEligibleKotlinFile) {
@@ -790,7 +947,7 @@ public class SourceChangeWatcher implements Runnable {
                                 Log.e(ex);
                             }
                         } else {
-                            recompileWithMaven(path);
+                            recompileWithBuildTool(path);
                         }
                     }
                    
@@ -839,8 +996,17 @@ public class SourceChangeWatcher implements Runnable {
 
 
     private String findKotlinVersion() {
+        // Maven publishes the application's classpath as cn1.class.path; Gradle's
+        // run task puts it on the simulator's own classpath instead, stdlib and all.
         String classPath = System.getProperty("cn1.class.path", null);
+        if (classPath == null || findKotlinStdlib(classPath) == null) {
+            classPath = System.getProperty("java.class.path", null);
+        }
         if (classPath == null) return null;
+        return findKotlinStdlib(classPath);
+    }
+
+    private static String findKotlinStdlib(String classPath) {
 
         Pattern regex = Pattern.compile("kotlin-stdlib-([\\d\\.\\-]+)\\.jar");
         Matcher matcher = regex.matcher(classPath);

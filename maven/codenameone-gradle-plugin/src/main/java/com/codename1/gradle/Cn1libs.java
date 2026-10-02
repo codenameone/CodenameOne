@@ -1,0 +1,316 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gradle;
+
+import com.codename1.maven.Cn1libPomProfiles;
+import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/// Consuming Maven-published cn1libs.
+///
+/// A project declares a cn1lib the way it would declare any library:
+///
+/// ```kotlin
+/// dependencies {
+///     cn1lib("com.codenameone:googlemaps-lib:1.0")
+/// }
+/// ```
+///
+/// Its common jar and `cn1css` bundle arrive through the ordinary dependency
+/// graph, because `implementation` extends `cn1lib`. Its per-platform jars do
+/// not: Maven selects them with profiles activated by `codename1.platform`,
+/// which Gradle never activates. So each platform gets a configuration
+/// (`cn1libAndroid`, `cn1libIos`, ...) filled from those same profiles, read
+/// by [Cn1libPomProfiles] -- the metadata Maven uses, not a naming guess.
+final class Cn1libs {
+    /// The configuration a project declares cn1libs in.
+    static final String DECLARED = "cn1lib";
+
+    /// The platform ids a cn1lib's profiles are keyed by.
+    static final String[] PLATFORMS = {"javase", "android", "ios", "javascript", "win", "linux"};
+
+    private Cn1libs() {
+    }
+
+    /// The name of `platform`'s configuration, e.g. `cn1libIos`.
+    static String configurationName(String platform) {
+        return DECLARED + platform.substring(0, 1).toUpperCase(Locale.ROOT) + platform.substring(1);
+    }
+
+    /// Creates the `cn1lib` configuration and one resolvable configuration per
+    /// platform, and fills the latter once the build script has declared its
+    /// dependencies.
+    static void configure(final Project project) {
+        Configuration declared = project.getConfigurations().create(DECLARED, c -> {
+            c.setCanBeResolved(false);
+            c.setCanBeConsumed(false);
+            c.setDescription("Codename One libraries (cn1libs) published to a Maven repository");
+        });
+        project.getConfigurations().getByName("implementation").extendsFrom(declared);
+        for (String platform : PLATFORMS) {
+            project.getConfigurations().create(configurationName(platform), c -> {
+                c.setCanBeResolved(true);
+                c.setCanBeConsumed(false);
+                c.setDescription("The " + platform + " artifacts of this project's cn1libs");
+            });
+        }
+        // The CSS of cn1libs that are projects of this build, which publish no
+        // cn1css zip for the compile classpath scan to find. Keyed by project
+        // path: the "group|artifact|version|cn1css|zip|compile" each one's
+        // bundle is known by (artifact being the library's -common module, the
+        // path its zip keeps the stylesheet under). Strings only, so the CSS
+        // task's providers can be stored in the configuration cache.
+        final Map<String, String> projectCss = new java.util.HashMap<String, String>();
+        final Configuration projectCssFiles = project.getConfigurations().create(PROJECT_CSS, c -> {
+            c.setCanBeResolved(true);
+            c.setCanBeConsumed(false);
+            c.setDescription("The CSS bundles of this project's cn1libs that are projects of this build");
+        });
+        project.getTasks().withType(com.codename1.gradle.tasks.Cn1CssTask.class).configureEach(t -> {
+            t.getLibraryCss().addAll(projectCssFiles.getIncoming().artifactView(v -> v.setLenient(true))
+                    .getArtifacts().getResolvedArtifacts().map(set -> encodeProjectCss(set, projectCss)));
+            t.getLibraryCssFiles().from(projectCssFiles);
+        });
+        project.afterEvaluate(p -> {
+            // Maven activates codename1.platform in EVERY pom of the graph, so every
+            // cn1lib the application ends up with contributes its platform jars --
+            // including one a cn1lib uses. Gradle ignores those profiles, so each
+            // module of the RESOLVED graph has its pom read for them. The resolved
+            // graph, not a walk of the poms: it already applies every exclusion
+            // (on a declaration, a configuration or a pom's own dependency), the
+            // versions dependency management supplies, and conflict resolution, so
+            // a library is packaged exactly when its classes are on the classpath.
+            Configuration source = p.getConfigurations().findByName("runtimeClasspath");
+            if (source == null) {
+                return;
+            }
+            // A copy: resolving the real configuration here would freeze it for
+            // anything the build still wants to add.
+            Configuration graph = source.copyRecursive();
+            final String framework = p.getExtensions().getByType(CodenameOneExtension.class).getVersion().get();
+            graph.getResolutionStrategy().eachDependency(d -> {
+                String requested = d.getRequested().getVersion();
+                if (PluginInfo.GROUP.equals(d.getRequested().getGroup())
+                        && (requested == null || requested.isEmpty())) {
+                    d.useVersion(framework);
+                }
+            });
+            Set<org.gradle.api.artifacts.result.ResolvedComponentResult> components;
+            try {
+                components = graph.getIncoming().getResolutionResult().getAllComponents();
+            } catch (RuntimeException ex) {
+                p.getLogger().info("cn1: could not resolve the cn1lib graph: " + ex.getMessage());
+                return;
+            }
+            Set<String> added = new java.util.HashSet<String>();
+            for (org.gradle.api.artifacts.result.ResolvedComponentResult component : components) {
+                if (component.getId() instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
+                    addProjectPlatforms(p, (org.gradle.api.artifacts.component.ProjectComponentIdentifier)
+                            component.getId(), projectCss);
+                    continue;
+                }
+                if (!(component.getId() instanceof ModuleComponentIdentifier)) {
+                    continue;
+                }
+                ModuleComponentIdentifier id = (ModuleComponentIdentifier) component.getId();
+                if (!mayBeCn1lib(id.getGroup(), id.getModule())) {
+                    continue;
+                }
+                String pom = pomText(p, id.getGroup(), id.getModule(), id.getVersion());
+                if (pom == null) {
+                    continue;
+                }
+                Cn1libPomProfiles.ParentResolver parents = (g, a, v) -> pomText(p, g, a, v);
+                for (Map.Entry<String, List<Cn1libPomProfiles.Coordinate>> e
+                        : Cn1libPomProfiles.read(pom, parents).entrySet()) {
+                    Configuration target = p.getConfigurations().findByName(configurationName(e.getKey()));
+                    if (target == null) {
+                        continue;
+                    }
+                    for (Cn1libPomProfiles.Coordinate c : e.getValue()) {
+                        // Keyed by the exclusions too: two cn1libs may reach one
+                        // library, only one of them excluding something under it.
+                        // Maven keeps a transitive dependency any path leaves in, and
+                        // so does Gradle when both edges are declared -- dropping
+                        // the second edge would let the first one's exclusion win.
+                        if (added.add(e.getKey() + "|" + c.toNotation() + "|" + exclusionKey(c.exclusions()))) {
+                            target.getDependencies().add(withExclusions(p.getDependencies().create(c.toNotation()),
+                                    c.exclusions()));
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /// The exclusions as one order-independent string, for telling apart two
+    /// declarations of one coordinate.
+    static String exclusionKey(List<String[]> exclusions) {
+        List<String> parts = new java.util.ArrayList<String>();
+        for (String[] x : exclusions) {
+            parts.add(x[0] + ":" + x[1]);
+        }
+        java.util.Collections.sort(parts);
+        return String.join(",", parts);
+    }
+
+    /// `dependency` with the profile's `<exclusions>` applied, as Maven applies
+    /// them: a `*` group or artifact matches any, and `*:*` keeps nothing
+    /// transitive.
+    static org.gradle.api.artifacts.Dependency withExclusions(org.gradle.api.artifacts.Dependency dependency,
+                                                             List<String[]> exclusions) {
+        if (!(dependency instanceof org.gradle.api.artifacts.ModuleDependency)) {
+            return dependency;
+        }
+        org.gradle.api.artifacts.ModuleDependency module = (org.gradle.api.artifacts.ModuleDependency) dependency;
+        for (String[] x : exclusions) {
+            Map<String, String> rule = exclusionRule(x[0], x[1]);
+            if (rule == null) {
+                module.setTransitive(false);
+            } else {
+                module.exclude(rule);
+            }
+        }
+        return module;
+    }
+
+    /// Gradle's exclude rule for a Maven exclusion, or null for `*:*`.
+    static Map<String, String> exclusionRule(String group, String artifact) {
+        Map<String, String> rule = new java.util.LinkedHashMap<String, String>();
+        if (group != null && !"*".equals(group)) {
+            rule.put("group", group);
+        }
+        if (artifact != null && !"*".equals(artifact)) {
+            rule.put("module", artifact);
+        }
+        return rule.isEmpty() ? null : rule;
+    }
+
+    /// The consumable configuration a Gradle cn1lib exposes `platform`'s jar in.
+    static String platformElementsName(String platform) {
+        return configurationName(platform) + "Elements";
+    }
+
+    /// A cn1lib of this build declared as `cn1lib(project(":maps"))`: it has no
+    /// published pom to read, so each platform's jar comes from the library's
+    /// own [#platformElementsName(String)] configuration. A project that is not
+    /// a Codename One library has none and adds nothing.
+    private static void addProjectPlatforms(Project p,
+                                            org.gradle.api.artifacts.component.ProjectComponentIdentifier id,
+                                            Map<String, String> projectCss) {
+        Project other = p.findProject(id.getProjectPath());
+        if (other == null || other == p) {
+            p.getLogger().warn("cn1: " + id.getDisplayName() + " is a project of another build; its platform "
+                    + "implementations are not packaged. Publish it and depend on its coordinates instead.");
+            return;
+        }
+        if (!other.getState().getExecuted()) {
+            try {
+                p.evaluationDependsOn(other.getPath());
+            } catch (RuntimeException ex) {
+                p.getLogger().warn("cn1: could not configure " + other.getPath() + " to read its platform "
+                        + "implementations (" + ex.getMessage() + "); declare evaluationDependsOn(\""
+                        + other.getPath() + "\") in this build script");
+                return;
+            }
+        }
+        for (String platform : PLATFORMS) {
+            String elements = platformElementsName(platform);
+            Configuration target = p.getConfigurations().findByName(configurationName(platform));
+            if (target == null || other.getConfigurations().findByName(elements) == null) {
+                continue;
+            }
+            Map<String, String> notation = new java.util.HashMap<String, String>();
+            notation.put("path", other.getPath());
+            notation.put("configuration", elements);
+            target.getDependencies().add(p.getDependencies().project(notation));
+        }
+        Configuration css = p.getConfigurations().findByName(PROJECT_CSS);
+        if (css != null && other.getConfigurations().findByName(CSS_ELEMENTS) != null
+                && !projectCss.containsKey(other.getPath())) {
+            projectCss.put(other.getPath(), other.getGroup() + "|" + other.getName() + "-common|"
+                    + other.getVersion() + "|cn1css|zip|compile");
+            Map<String, String> notation = new java.util.HashMap<String, String>();
+            notation.put("path", other.getPath());
+            notation.put("configuration", CSS_ELEMENTS);
+            css.getDependencies().add(p.getDependencies().project(notation));
+        }
+    }
+
+    /// The configuration of an application holding its project cn1libs' CSS.
+    static final String PROJECT_CSS = "cn1libProjectCss";
+    /// The consumable configuration a Gradle cn1lib exposes its cn1css zip in.
+    static final String CSS_ELEMENTS = "cn1libCssElements";
+
+    /// The resolved project CSS bundles as [Cn1CssTask] inputs, each known by
+    /// the coordinates `projectCss` recorded for its project.
+    static List<String> encodeProjectCss(Set<org.gradle.api.artifacts.result.ResolvedArtifactResult> set,
+                                         Map<String, String> projectCss) {
+        List<String> out = new java.util.ArrayList<String>();
+        for (org.gradle.api.artifacts.result.ResolvedArtifactResult r : set) {
+            Object id = r.getId().getComponentIdentifier();
+            if (id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
+                String coordinates = projectCss.get(
+                        ((org.gradle.api.artifacts.component.ProjectComponentIdentifier) id).getProjectPath());
+                if (coordinates != null) {
+                    out.add(coordinates + "|" + r.getFile().getAbsolutePath());
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Whether a module's pom is worth reading for platform profiles: anything
+    /// but the framework's own modules, whose poms have none and which every
+    /// application depends on.
+    static boolean mayBeCn1lib(String group, String module) {
+        return !(PluginInfo.GROUP.equals(group) && module.startsWith("codenameone-"));
+    }
+
+    /// A module's pom, fetched from the project's repositories, or null.
+    static String pomText(Project project, String group, String name, String version) {
+        Configuration c = project.getConfigurations().detachedConfiguration(
+                project.getDependencies().create(group + ":" + name + ":" + version + "@pom"));
+        c.setTransitive(false);
+        try {
+            Set<File> files = c.resolve();
+            for (File f : files) {
+                return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+            }
+        } catch (RuntimeException | IOException ex) {
+            project.getLogger().info("Could not read the pom of " + group + ":" + name + ":" + version + ": "
+                    + ex.getMessage());
+        }
+        return null;
+    }
+}

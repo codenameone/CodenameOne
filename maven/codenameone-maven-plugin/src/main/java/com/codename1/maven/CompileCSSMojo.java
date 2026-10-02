@@ -24,6 +24,8 @@ package com.codename1.maven;
 
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.io.IOException;
@@ -35,10 +37,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.apache.tools.ant.taskdefs.Copy;
-import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Java;
-import org.apache.tools.ant.types.FileSet;
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -137,7 +136,12 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         // builds is worse than the one it would add. Two registries on one
         // classpath is separately unsupported; see ensureSvgTranscoderWired.
         SvgTranscodeRunner runner = newSvgTranscodeRunner();
-        Set<String> referenced = runner.cssReferencedVectorNames();
+        Set<String> referenced;
+        try {
+            referenced = runner.cssReferencedVectorNames();
+        } catch (com.codename1.builders.BuildException ex) {
+            throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
+        }
         if (referenced.isEmpty()) {
             return;
         }
@@ -325,130 +329,44 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
             getLog().warn("CSS compilation skipped because no CSS theme was found");
             return;
         }
-        File themeResOutput = new File(project.getBuild().getOutputDirectory() + File.separator + themePrefix + "theme.res");
-        // target/css
+        // target/css, where the merged stylesheet goes
         File cssBuildDir = new File(project.getBuild().getDirectory() + File.separator + "css");
-        cssBuildDir.mkdirs();
 
-        // target/css/theme.css - the merged CSS file
-        File mergeFile = new File(cssBuildDir, themePrefix + "theme.css");
-        mergeFile.getParentFile().mkdirs();
-        try {
-            long sourcesModTime = Math.max(getCSSSourcesModificationTime(),
-                    getLocalizationModificationTime());
-            if (themeResOutput.exists() && sourcesModTime < themeResOutput.lastModified()) {
-                getLog().info("CSS sources unchanged since last compile.  Skipping CSS compilation");
-                return;
-            }
-        } catch (IOException ex) {
-            throw new MojoExecutionException("Failed to check CSS file modification times", ex);
-        }
-
-        // Compile a comma-delimited list a CSS files that will be sent to the CSS compiler as inputs.
-        // We look through all dependency artifacts with the cn1css classifier, and add their
-        // theme.css to the input list.  (Codename One Library projects will include such an
-        // artifact if they have CSS files).
-        final StringBuilder inputs = new StringBuilder();
-
-        project.getArtifacts().forEach(artifact->{
+        // The cn1libs' cn1css bundles, extracted beside the artifact in the local
+        // repository, merged before the project's own theme.css. See CssCompiler,
+        // which the Gradle plugin shares.
+        final List<CssCompiler.LibraryCss> libraries = new ArrayList<CssCompiler.LibraryCss>();
+        for (Artifact artifact : project.getArtifacts()) {
             if (artifact.hasClassifier() && "cn1css".equals(artifact.getClassifier())) {
                 File zip = findArtifactFile(artifact);
                 if (zip == null || !zip.exists()) {
-                    return;
+                    continue;
                 }
-
-                File extracted = new File(zip.getParentFile(), zip.getName()+"-extracted");
-                getLog().debug("Checking for extracted CSS bundle "+extracted);
-                if (extracted.exists() && artifact.isSnapshot() && getLastModified(artifact) > extracted.lastModified()) {
-                    try {
-                        FileUtils.deleteDirectory(extracted);
-                    } catch (IOException ex){
-                        getLog().error(ex);
-                    }
-                }
-                if (!extracted.exists()) {
-                    getLog().debug("CSS bundle "+zip+" not extracted yet.  Extracting to "+extracted);
-                    // This is a cn1css artifact, which is a zip file.
-                    // We extract it so that we can access the files directly.
-                    Expand expand = (Expand)antProject.createTask("unzip");
-                    expand.setSrc(zip);
-                    expand.setDest(extracted);
-                    expand.execute();
-
-                }
-                if (extracted.exists()) {
-                    File extractedCssDir = new File(extracted, path("META-INF","codenameone", artifact.getGroupId(), artifact.getArtifactId(), "css"));
-                    if (extractedCssDir.exists()) {
-                        // We expect that the cn1css artifact has a theme.css file at its root
-                        // If found, we add it to the list of inputs.
-                        File theme = new File(extractedCssDir, themePrefix + "theme.css");
-                        if (theme.exists()) {
-                            if (inputs.length() > 0) {
-                                inputs.append(",");
-                            }
-                            inputs.append(theme.getAbsolutePath());
-                        }
-                    }
-
-                } else {
-                    getLog().debug("CSS bundle extraction must have failed for "+zip+" because after extraction it still doesn't exist at "+extracted);
-                }
+                libraries.add(new CssCompiler.LibraryCss(artifact.getGroupId(), artifact.getArtifactId(), zip,
+                        new File(zip.getParentFile(), zip.getName() + "-extracted"),
+                        artifact.isSnapshot(), getLastModified(artifact)));
             }
-        });
-
-        // The project's theme.css file is added to the input list last so that it will result in it
-        // being last in the merged theme.css file (i.e. the application project CSS can override the
-        // CSS in dependent libraries.
-        File cssTheme = new File(cssDirectory, themePrefix + "theme.css");
-        if (cssTheme.exists()) {
-            if (inputs.length() > 0) {
-                inputs.append(",");
-            }
-            inputs.append(cssTheme.getAbsolutePath());
-        } else {
-            if (themePrefix.isEmpty() && inputs.length() > 0) {
-                throw new MojoFailureException("Cannot compile CSS for this project.  The project does not include a "+themePrefix+"-theme.css file in "+cssTheme+", but it includes dependencies that require CSS.  Please add a CSS file at "+cssTheme);
-
-            }
-            getLog().info("Skipping CSS compilation for because "+themePrefix + cssTheme+" does not exist");
-            return;
         }
-
-
-
-        // Run the CSS compiler CLI. It lives in com.codenameone:codenameone-css-cli, a thin
-        // module that is a dependency of the codenameone-maven-plugin, so the version is
-        // pinned to the plugin rather than picked up from the designer_1.jar in the user's
-        // home directory. We launch it on a resolved classpath instead of `java -jar`
-        // against the designer's shaded artifact -- the CLI needs codenameone-javase for
-        // CEF rasterization, but nothing needs a 43MB shaded copy of it.
-        // The Java task is created via createJava() (overridden in this class to use INFO log
-        // level) so subprocess output -- including stack traces from CN1CSSCLI failures --
-        // shows up in normal mvn output instead of being hidden at DEBUG.
-        Java java = createJava();
-        java.setDir(getCN1ProjectDir());
-        java.setClasspath(new org.apache.tools.ant.types.Path(antProject, getCssCliClasspath()));
-        java.setClassname(CSS_CLI_MAIN_CLASS);
-        java.setFork(true);
-        java.setFailonerror(true);
-        java.createJvmarg().setValue("-Dcli=true");
-        java.createArg().setValue("-css");
-        java.createArg().setValue("-input");
-        java.createArg().setValue(inputs.toString());
-
-        java.createArg().setValue("-output");
-        java.createArg().setFile(themeResOutput);
-
-        java.createArg().setValue("-merge");
-        java.createArg().setFile(mergeFile);
-        File localizationDir = findLocalizationDirectory();
-        if (localizationDir != null) {
-            java.createArg().setValue("-l");
-            java.createArg().setFile(localizationDir);
+        long sourcesModTime;
+        try {
+            sourcesModTime = Math.max(getCSSSourcesModificationTime(), getLocalizationModificationTime());
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to check CSS file modification times", ex);
         }
-        int res = java.executeJava();
-        if (res != 0) {
-            throw new MojoExecutionException("An error occurred while compiling the CSS files.  Inputs: "+inputs+", output: " + new File(project.getBuild().getOutputDirectory() + File.separator + themePrefix + "theme.res") +", merge file: "+mergeFile);
+        try {
+            new CssCompiler(MavenLog.of(getLog()), antProject, new CssCompiler.JavaFactory() {
+                @Override
+                public Java create() {
+                    // Overridden in this class to use INFO, so the compiler's stack
+                    // traces reach normal mvn output; tests substitute a recorder.
+                    return createJava();
+                }
+            }).compile(themePrefix, cssDirectory, new File(project.getBuild().getOutputDirectory()), cssBuildDir,
+                    libraries, findLocalizationDirectory(), getCssCliClasspath(), getCN1ProjectDir(), sourcesModTime);
+        } catch (com.codename1.build.BuildFailureException ex) {
+            throw new MojoFailureException(ex.getMessage(), ex);
+        } catch (com.codename1.build.BuildExecutionException ex) {
+            throw new MojoExecutionException(ex.getMessage(), ex);
         }
     }
     

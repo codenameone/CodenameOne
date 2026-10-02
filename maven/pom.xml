@@ -81,6 +81,7 @@
         <!--<module>codenameone-maven-goals</module>-->
         <module>cn1-binaries</module>
         <module>platform-feature-catalog</module>
+        <module>project-model</module>
         <module>build-hint-catalog</module>
         <module>build-hint-tools</module>
         <module>java-runtime</module>
@@ -110,7 +111,10 @@
              on the plugin's classpath (it carries its own ProGuard/ASM). -->
         <module>cn1-hardening</module>
         <module>designer</module>
+        <module>build-engine</module>
         <module>codenameone-maven-plugin</module>
+        <module>codenameone-gradle-plugin</module>
+        <module>codenameone-gradle-plugin-marker</module>
         <module>cn1app-archetype</module>
         <module>cn1lib-archetype</module>
         <module>cn1-debug-proxy</module>

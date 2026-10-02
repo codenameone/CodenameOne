@@ -19,6 +19,8 @@ on:
       # break this matrix, but almost every PR touches core and this is a long
       # job. The translated tests in pr.yml catch a core break first.
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/build-engine/**'
+      - 'maven/project-model/**'
       - 'maven/backend/**'
       - 'maven/backend-test/**'
       - 'scripts/hellocodenameone/pom.xml'
@@ -61,6 +63,8 @@ on:
       # break this matrix, but almost every PR touches core and this is a long
       # job. The translated tests in pr.yml catch a core break first.
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/build-engine/**'
+      - 'maven/project-model/**'
       - 'maven/backend/**'
       - 'maven/backend-test/**'
       - 'scripts/hellocodenameone/pom.xml'

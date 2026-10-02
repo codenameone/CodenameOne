@@ -104,10 +104,10 @@ class BackendPackageEncodingTest {
 
     private static String encodingOf(MavenProject project) throws Exception {
         BackendPackageMojo mojo = new BackendPackageMojo();
-        Field field = AbstractBackendNativeMojo.class.getDeclaredField("project");
+        Field field = BackendPackageMojo.class.getDeclaredField("project");
         field.setAccessible(true);
         field.set(mojo, project);
-        Method method = AbstractBackendNativeMojo.class.getDeclaredMethod("sourceEncoding");
+        Method method = BackendPackageMojo.class.getDeclaredMethod("sourceEncoding");
         method.setAccessible(true);
         return (String) method.invoke(mojo);
     }

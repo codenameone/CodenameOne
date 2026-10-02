@@ -39,4 +39,30 @@ class ProjectBindingTest {
         assertEquals("com.example.Login", binding.initialForm());
         assertEquals("/tmp/app/common/src/main/css/theme.css", binding.cssFile());
     }
+
+    /// A bare project descriptor names the build system and the project, and
+    /// the form, source and stylesheet locations follow from its conventions.
+    @Test
+    void derivesDirectoriesFromTheDescriptorKeys() {
+        ProjectBinding gradle = ProjectBinding.parse("buildSystem=GRADLE\nkind=APP\nrootDir=/g\nprojectDir=/g\n");
+        assertTrue(gradle.isValid());
+        assertEquals("/g/src/main/guibuilder", gradle.guiDir());
+        assertEquals("/g/src/main/java", gradle.sourceDir());
+        assertEquals("/g/src/main/css/theme.css", gradle.cssFile());
+        assertEquals("/g", gradle.rootDir());
+
+        ProjectBinding ant = ProjectBinding.parse("buildSystem=ANT\nprojectDir=/a\n");
+        assertEquals("/a/res/guibuilder", ant.guiDir());
+        assertEquals("/a/src", ant.sourceDir());
+        assertEquals("/a/css/theme.css", ant.cssFile());
+
+        // Without a build system nothing is guessed, as before.
+        assertFalse(ProjectBinding.parse("projectDir=/p\n").isValid());
+    }
+
+    @Test
+    void fsUrlHandlesWindowsDriveLetters() {
+        assertEquals("file:///C:/app/src", ProjectIO.fsUrl("C:\\app\\src"));
+        assertEquals("file:///app/src", ProjectIO.fsUrl("/app/src"));
+    }
 }

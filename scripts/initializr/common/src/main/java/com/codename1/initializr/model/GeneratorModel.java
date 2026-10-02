@@ -44,6 +44,38 @@ import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
     private static final String CN1_PLUGIN_VERSION = "7.0.273";
+    /// Whether the Codename One Gradle plugin is published at [CN1_PLUGIN_VERSION].
+    /// A Gradle download resolves the plugin by that version, so until a release
+    /// carrying the plugin is what the initializr generates against, a Gradle
+    /// project could not build at all -- and the UI does not offer Gradle.
+    /// `update-cn1-version.sh` sets this with the version, from whether the
+    /// plugin's marker exists in the repository.
+    static final boolean GRADLE_PLUGIN_PUBLISHED = false;
+
+    /// Whether the initializr offers Gradle projects; see [GRADLE_PLUGIN_PUBLISHED].
+    public static boolean isGradleOffered() {
+        return GRADLE_PLUGIN_PUBLISHED;
+    }
+    /// The Kotlin version a Gradle Kotlin project builds with, for both the Kotlin
+    /// Gradle plugin and kotlin-stdlib (the plugin adds its own stdlib anyway, so
+    /// the two cannot usefully differ).
+    ///
+    /// Deliberately NOT kotlin-pom.xml's 1.6.0. The Kotlin Gradle plugin is tied
+    /// to the Gradle it runs in, and 1.6.0 cannot run in the Gradle 9 the shared
+    /// wrapper pins: it fails at configuration with NoClassDefFoundError
+    /// org/gradle/util/WrapUtil, and before that it registers a build listener the
+    /// configuration cache (on in the template's gradle.properties) rejects. 2.2.10
+    /// was verified to compile the Kotlin template with the com.codenameone plugin
+    /// on that wrapper. The Maven template's kotlin-maven-plugin has no such tie.
+    ///
+    /// `GradleConversion.KOTLIN_VERSION` in maven/build-engine writes the same
+    /// line into a converted Kotlin project; bump the two together.
+    static final String KOTLIN_VERSION = "2.2.10";
+    /// The Gradle project template, zipped at build time (common/pom.xml,
+    /// package-gradle-template) from maven/build-engine's
+    /// com/codename1/project/templates/gradle -- the directory the Maven and
+    /// Gradle plugins write projects from, so every generator emits the same files.
+    private static final String GRADLE_TEMPLATE_ZIP = "/gradle.zip";
     private static final String PREVIEW_BUTTON_SELECTOR =
             "Button, InitializrLiveButtonDarkClean, "
                     + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
@@ -87,6 +119,10 @@ public class GeneratorModel {
     // its published name is SKILL.md; this one is renamed for the opposite reason.
     private static final String CLAUDE_SKILL_STUB_RESOURCE = "/agent-skill-claude-stub.md";
     private static final String AGENTS_MD_RESOURCE = "/agent-skill-agents-md.md";
+    // The Gradle variant is a second file rather than placeholders in the first:
+    // maven/cn1app-archetype stages agent-skill-agents-md.md verbatim, so a token
+    // there would reach every archetype-generated Maven project unrendered.
+    private static final String AGENTS_MD_GRADLE_RESOURCE = "/agent-skill-agents-md-gradle.md";
 
     private final IDE ide;
     private final Template template;
@@ -223,10 +259,14 @@ public class GeneratorModel {
     /// localization, generated README/.gitignore/skills) into an ordered map of
     /// path -> bytes. This is the I/O phase, kept separate from the zip assembly.
     Map<String, byte[]> collectProjectEntries() throws IOException {
+        validateOptions();
+        if (options.isGradle()) {
+            return collectGradleProjectEntries();
+        }
         Map<String, byte[]> mergedEntries = new LinkedHashMap<String, byte[]>();
 
         copyZipEntriesToMap(ide.ZIP, mergedEntries, ZipEntryType.IDE);
-        copyZipEntriesToMap("/common.zip", mergedEntries, ZipEntryType.COMMON);
+        copyZipEntriesToMap("/common.zip", mergedEntries, ZipEntryType.COMMON_ARCHIVE);
         copySingleTextEntryToMap(".gitignore", GENERATED_GITIGNORE, mergedEntries, ZipEntryType.COMMON);
         copySingleTextEntryToMap("README.md", buildReadmeMarkdown(), mergedEntries, ZipEntryType.COMMON);
         if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
@@ -241,6 +281,206 @@ public class GeneratorModel {
         addLocalizationEntries(mergedEntries);
         validateGeneratedPomCoordinates(mergedEntries);
         return mergedEntries;
+    }
+
+    /// The Gradle form of [collectProjectEntries()]: one project at the root, laid
+    /// out the way the `com.codenameone` Gradle plugin reads it. The build files
+    /// come from the shared template in gradle.zip; the application's files are the
+    /// same common.zip and template entries a Maven download gets, moved out of
+    /// `common/`.
+    private Map<String, byte[]> collectGradleProjectEntries() throws IOException {
+        Map<String, byte[]> entries = new LinkedHashMap<String, byte[]>();
+        Map<String, byte[]> scaffold = readZipResource(GRADLE_TEMPLATE_ZIP);
+        boolean backendOnly = options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY;
+
+        addGradleIdeEntries(entries);
+        putGradleText(entries, "settings.gradle.kts", gradleTemplate(scaffold, "settings.gradle.kts.txt", ""));
+        putGradleText(entries, "gradle.properties", gradleTemplate(scaffold, "gradle.properties.txt", ""));
+        putGradleText(entries, ".gitignore", gradleTemplate(scaffold, "gitignore.txt", ""));
+        // The wrapper (gradlew, gradlew.bat, gradle/wrapper/*) is every template file
+        // that is not a .txt template, copied byte for byte.
+        for (Map.Entry<String, byte[]> e : scaffold.entrySet()) {
+            if (!e.getKey().endsWith(".txt")) {
+                entries.put(e.getKey(), e.getValue());
+            }
+        }
+
+        if (backendOnly) {
+            // No client: the backend is the root project. No settings file, no CSS and
+            // no icon -- the plugin tells a backend from an app by the absence of
+            // codenameone_settings.properties and the presence of application.properties.
+            addGradleBackendEntries(entries, scaffold, "", "");
+        } else {
+            putGradleText(entries, "build.gradle.kts",
+                    gradleAppBuildScript(gradleTemplate(scaffold, "app/build.gradle.kts.txt", "")));
+            copyZipEntriesToMap("/common.zip", entries, ZipEntryType.COMMON_ARCHIVE);
+            copyZipEntriesToMap(template.CSS, entries, ZipEntryType.TEMPLATE_CSS);
+            copyZipEntriesToMap(template.SOURCE_ZIP, entries, ZipEntryType.TEMPLATE_SOURCE);
+            addLocalizationEntries(entries);
+            if (options.projectType == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
+                // What `./gradlew addBackend` writes, plus the backend's own build script
+                // so there is an obvious place for its dependencies.
+                addGradleBackendEntries(entries, scaffold, "backend/", ":backend:");
+            }
+        }
+        copySingleTextEntryToMap("README.md", buildGradleReadmeMarkdown(), entries, ZipEntryType.COMMON);
+        if (!backendOnly) {
+            // The skill teaches Codename One UI authoring; a project with no client
+            // would only be told to run a simulator it does not have.
+            addAgentSkillEntries(entries);
+        }
+        validateGradleProject(entries);
+        return entries;
+    }
+
+    private void addGradleBackendEntries(Map<String, byte[]> entries, Map<String, byte[]> scaffold, String dir,
+                                         String taskPrefix) throws IOException {
+        putGradleText(entries, dir + "build.gradle.kts",
+                gradleTemplate(scaffold, "backend/build.gradle.kts.txt", taskPrefix));
+        putGradleText(entries, dir + "application.properties",
+                gradleTemplate(scaffold, "backend/application.properties.txt", taskPrefix));
+        putGradleText(entries, dir + "application-dev.properties",
+                gradleTemplate(scaffold, "backend/application-dev.properties.txt", taskPrefix));
+        putGradleText(entries, dir + "src/main/java/" + packageName.replace('.', '/') + "/Api.java",
+                gradleTemplate(scaffold, "backend/Api.java.txt", taskPrefix));
+        putGradleText(entries, dir + "src/main/java/" + packageName.replace('.', '/') + "/Greeter.java",
+                gradleTemplate(scaffold, "backend/Greeter.java.txt", taskPrefix));
+        putGradleText(entries, dir + "src/test/java/" + packageName.replace('.', '/') + "/ApiTest.java",
+                gradleTemplate(scaffold, "backend/ApiTest.java.txt", taskPrefix));
+        putGradleText(entries, dir + "src/test/java/" + packageName.replace('.', '/') + "/ServedApiTest.java",
+                gradleTemplate(scaffold, "backend/ServedApiTest.java.txt", taskPrefix));
+    }
+
+    private void putGradleText(Map<String, byte[]> entries, String path, String content) throws IOException {
+        copySingleTextEntryToMap(path, content, entries, ZipEntryType.COMMON);
+    }
+
+    /// A template from gradle.zip with its tokens filled in, exactly as
+    /// GradleProjectTemplate fills them for the Maven and Gradle plugins.
+    ///
+    /// @param taskPrefix how the backend's tasks are addressed from the root:
+    ///        `:backend:` for a subproject, empty for a backend-only project
+    private String gradleTemplate(Map<String, byte[]> scaffold, String name, String taskPrefix) throws IOException {
+        byte[] data = scaffold.get(name);
+        if (data == null) {
+            throw new IOException("Missing Gradle project template " + name);
+        }
+        String text = StringUtil.newString(data);
+        text = StringUtil.replaceAll(text, "__CN1_VERSION__", CN1_PLUGIN_VERSION);
+        // The same name the Maven reactor gets as its artifactId (cn1app.name).
+        text = StringUtil.replaceAll(text, "__PROJECT_NAME__", toLowerCaseInvariant(appName));
+        text = StringUtil.replaceAll(text, "__BACKEND__", taskPrefix);
+        text = StringUtil.replaceAll(text, "${package}", packageName);
+        return text;
+    }
+
+    /// The application's build.gradle.kts: the template, plus what the chosen
+    /// template's pom adds -- the Kotlin plugin for a Kotlin project, and the
+    /// template's dependencies (cn1libs by coordinates, libraries).
+    String gradleAppBuildScript(String script) {
+        String[] dependencies = template.GRADLE_DEPENDENCIES;
+        if (dependencies.length > 0) {
+            StringBuilder lines = new StringBuilder();
+            for (int i = 0; i < dependencies.length; i++) {
+                lines.append("    ").append(dependencies[i]).append('\n');
+            }
+            script = insertAfter(script, "dependencies {\n", lines.toString() + "\n");
+        }
+        if (template.IS_KOTLIN) {
+            // plugins {} has to be the first statement of a Kotlin build script, so it
+            // goes after the leading comment and before dependencies {}.
+            String plugins = "plugins {\n"
+                    + "    kotlin(\"jvm\") version \"" + KOTLIN_VERSION + "\"\n"
+                    + "}\n\n";
+            int deps = script.indexOf("dependencies {");
+            script = deps < 0 ? plugins + script : script.substring(0, deps) + plugins + script.substring(deps);
+        }
+        return script;
+    }
+
+    private static String insertAfter(String text, String marker, String insertion) {
+        int pos = text.indexOf(marker);
+        if (pos < 0) {
+            return text + "\ndependencies {\n" + insertion + "}\n";
+        }
+        int at = pos + marker.length();
+        return text.substring(0, at) + insertion + text.substring(at);
+    }
+
+    /// The runtime guard for a Gradle download, in the spirit of
+    /// [validateGeneratedPomCoordinates(Map)]: gradle.zip is assembled from a
+    /// directory other generators share, so a token the initializr does not know
+    /// about, or a Maven file that slipped through the mapping, fails closed here
+    /// instead of reaching users.
+    void validateGradleProject(Map<String, byte[]> entries) throws IOException {
+        String settings = entries.get("settings.gradle.kts") == null ? null
+                : StringUtil.newString(entries.get("settings.gradle.kts"));
+        if (settings == null || settings.indexOf("id(\"com.codenameone\") version \"" + CN1_PLUGIN_VERSION + "\"") < 0
+                || settings.indexOf("rootProject.name = \"" + toLowerCaseInvariant(appName) + "\"") < 0) {
+            throw new IOException("Refusing to generate project: settings.gradle.kts does not apply the "
+                    + "Codename One plugin " + CN1_PLUGIN_VERSION + " to " + toLowerCaseInvariant(appName));
+        }
+        if (entries.get("build.gradle.kts") == null || entries.get("gradlew") == null) {
+            throw new IOException("Refusing to generate project: the Gradle build script or wrapper is missing");
+        }
+        String[] tokens = {"__CN1_VERSION__", "__PROJECT_NAME__", "__BACKEND__", "${package}"};
+        for (Map.Entry<String, byte[]> e : entries.entrySet()) {
+            String path = e.getKey();
+            if (path.startsWith("common/") || path.endsWith("pom.xml") || path.startsWith(".mvn/")
+                    || path.startsWith("mvnw")) {
+                throw new IOException("Refusing to generate project: Maven file " + path + " in a Gradle project");
+            }
+            if (path.endsWith(".kts") || path.endsWith(".properties") || path.endsWith(".java")
+                    || path.endsWith(".md") || path.endsWith(".xml") || path.endsWith(".json")) {
+                String text = StringUtil.newString(e.getValue());
+                for (int i = 0; i < tokens.length; i++) {
+                    if (text.indexOf(tokens[i]) >= 0) {
+                        throw new IOException("Refusing to generate project: " + path
+                                + " still contains the template token " + tokens[i]);
+                    }
+                }
+            }
+        }
+    }
+
+    private Map<String, byte[]> readZipResource(String zipResource) throws IOException {
+        Map<String, byte[]> out = new LinkedHashMap<String, byte[]>();
+        InputStream in = getResourceAsStream(zipResource);
+        if (in == null) {
+            throw new IOException("Missing resource " + zipResource);
+        }
+        try (ZipInputStream zis = new ZipInputStream(in)) {
+            ZipEntry entry = zis.getNextEntry();
+            while (entry != null) {
+                if (!entry.isDirectory()) {
+                    // Defensive normalization: ant may produce backslashes on Windows.
+                    out.put(StringUtil.replaceAll(entry.getName(), "\\", "/"), readToBytesNoClose(zis));
+                }
+                zis.closeEntry();
+                entry = zis.getNextEntry();
+            }
+        }
+        return out;
+    }
+
+    /// Refuses a combination of options that has no project to generate. The UI never
+    /// offers these; the check is here so that no caller (tests, fixtures, a future UI)
+    /// can produce a download that fails on its first build.
+    void validateOptions() throws IOException {
+        if (options.isGradle()) {
+            if (options.javaVersion != ProjectOptions.JavaVersion.JAVA_17) {
+                throw new IOException("Gradle projects target Java 17. Choose Java 17, or the Maven build "
+                        + "for a project that must target Java 8.");
+            }
+            if (options.projectType != ProjectOptions.ProjectType.BACKEND_ONLY && !template.supportsGradle()) {
+                throw new IOException(template.GRADLE_UNSUPPORTED_REASON + " Choose the Maven build for this template.");
+            }
+            return;
+        }
+        if (options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            throw new IOException("A backend-only project is generated for Gradle. Every Maven project already "
+                    + "carries the backend module; build it with -Dcodename1.platform=backend.");
+        }
     }
 
     /// Refuses to publish a generated download when one of the embedded module POMs
@@ -405,7 +645,8 @@ public class GeneratorModel {
         }
         // Top-level AGENTS.md so agents that follow the (emerging) AGENTS.md convention
         // discover the skill without having to know our directory layout.
-        copySingleTextEntryToMap("AGENTS.md", readResourceToString(AGENTS_MD_RESOURCE),
+        copySingleTextEntryToMap("AGENTS.md",
+                readResourceToString(options.isGradle() ? AGENTS_MD_GRADLE_RESOURCE : AGENTS_MD_RESOURCE),
                 mergedEntries, ZipEntryType.COMMON);
         // Claude Code stub. Frontmatter so the skill shows up in /skills, body redirects
         // to the canonical vendor-neutral content.
@@ -422,7 +663,7 @@ public class GeneratorModel {
         // anywhere else (e.g. src/main/resources) they are NOT baked into the resource file
         // and Resources.getGlobalResources().getL10N("messages", lang) returns null at runtime.
         copySingleTextEntryToMap(
-                "common/src/main/l10n/messages.properties",
+                appDir() + "src/main/l10n/messages.properties",
                 readResourceToString("/messages.properties"),
                 mergedEntries,
                 ZipEntryType.COMMON
@@ -432,7 +673,7 @@ public class GeneratorModel {
                 continue;
             }
             copySingleTextEntryToMap(
-                    "common/src/main/l10n/messages_" + language.bundleSuffix + ".properties",
+                    appDir() + "src/main/l10n/messages_" + language.bundleSuffix + ".properties",
                     readResourceToString("/messages_" + language.bundleSuffix + ".properties"),
                     mergedEntries,
                     ZipEntryType.COMMON
@@ -458,6 +699,9 @@ public class GeneratorModel {
 
     private void copyEntryToMap(String sourceName, byte[] sourceData, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {
         String targetName = mapTargetPath(sourceName, zipType);
+        if (targetName == null) {
+            return;
+        }
         byte[] targetData = applyDataReplacements(targetName, sourceData);
         mergedEntries.put(targetName, targetData);
     }
@@ -467,24 +711,41 @@ public class GeneratorModel {
         copyEntryToMap(targetPath, sourceData, mergedEntries, zipType);
     }
 
+    /// Where an entry lands in the generated project, or null to leave it out.
     private String mapTargetPath(String sourcePath, ZipEntryType zipType) {
         String targetPath = sourcePath;
-        if (zipType == ZipEntryType.TEMPLATE_CSS) {
-            targetPath = "common/src/main/css/" + sourcePath;
+        if (zipType == ZipEntryType.COMMON_ARCHIVE && options.isGradle()) {
+            // A Gradle project is one project at the root: what common.zip keeps in the
+            // Maven common/ module moves up a level, and everything else in it -- the
+            // reactor and platform module poms, mvnw, .mvn, build/run launchers, the
+            // Maven backend module -- is Maven's and has no Gradle counterpart.
+            if (!sourcePath.startsWith("common/") || sourcePath.endsWith("/pom.xml")
+                    || "common/pom.xml".equals(sourcePath)) {
+                return null;
+            }
+            targetPath = sourcePath.substring("common/".length());
+        } else if (zipType == ZipEntryType.TEMPLATE_CSS) {
+            targetPath = appDir() + "src/main/css/" + sourcePath;
         } else if (zipType == ZipEntryType.TEMPLATE_SOURCE) {
             if (sourcePath.startsWith("java/")) {
-                targetPath = "common/src/main/java/" + sourcePath.substring("java/".length());
+                targetPath = appDir() + "src/main/java/" + sourcePath.substring("java/".length());
             } else if (sourcePath.startsWith("kotlin/")) {
-                targetPath = "common/src/main/kotlin/" + sourcePath.substring("kotlin/".length());
+                targetPath = appDir() + "src/main/kotlin/" + sourcePath.substring("kotlin/".length());
             } else if (sourcePath.startsWith("resources/")) {
-                targetPath = "common/src/main/resources/" + sourcePath.substring("resources/".length());
+                targetPath = appDir() + "src/main/resources/" + sourcePath.substring("resources/".length());
             } else if (sourcePath.startsWith("rad/")) {
-                targetPath = "common/src/main/rad/" + sourcePath.substring("rad/".length());
+                targetPath = appDir() + "src/main/rad/" + sourcePath.substring("rad/".length());
             } else {
-                targetPath = "common/src/main/" + sourcePath;
+                targetPath = appDir() + "src/main/" + sourcePath;
             }
         }
         return applyPathReplacements(targetPath);
+    }
+
+    /// The directory the application's own files live in: the `common/` module of
+    /// a Maven project, the root of a Gradle one.
+    private String appDir() {
+        return options.isGradle() ? "" : "common/";
     }
 
     private String applyPathReplacements(String path) {
@@ -511,14 +772,14 @@ public class GeneratorModel {
         content = StringUtil.replaceAll(content, "MyAppName", appName);
         content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
         content = StringUtil.replaceAll(content, "myappname", toLowerCaseInvariant(appName));
-        if ("common/codenameone_settings.properties".equals(targetPath)) {
+        if ((appDir() + "codenameone_settings.properties").equals(targetPath)) {
             content = replaceProperty(content, "codename1.kotlin", String.valueOf(template.IS_KOTLIN));
             content = applyJavaVersionSettings(content);
         }
         if (options.includeLocalizationBundles && isBareTemplate()) {
             content = injectLocalizationBootstrap(targetPath, content);
         }
-        if (isBareTemplate() && "common/src/main/css/theme.css".equals(targetPath)) {
+        if (isBareTemplate() && (appDir() + "src/main/css/theme.css").equals(targetPath)) {
             content = ensureDefaultLargeTextScale(content);
             content += buildThemeCss();
         }
@@ -654,8 +915,8 @@ public class GeneratorModel {
     }
 
     private String injectLocalizationBootstrap(String targetPath, String content) {
-        String javaMainPath = "common/src/main/java/" + packageName.replace('.', '/') + "/" + appName + ".java";
-        String kotlinMainPath = "common/src/main/kotlin/" + packageName.replace('.', '/') + "/" + appName + ".kt";
+        String javaMainPath = appDir() + "src/main/java/" + packageName.replace('.', '/') + "/" + appName + ".java";
+        String kotlinMainPath = appDir() + "src/main/kotlin/" + packageName.replace('.', '/') + "/" + appName + ".kt";
         if (javaMainPath.equals(targetPath)) {
             return injectJavaLocalizationBootstrap(content);
         }
@@ -848,6 +1109,229 @@ public class GeneratorModel {
         }
         out.append("## VS Code Users\n\n")
                 .append("Open the project folder in VS Code and make sure Java + Maven extensions are installed.\n\n");
+    }
+
+    /// The tasks a Gradle project's IDE files offer, as {label, task path}.
+    private String[][] gradleIdeTasks() {
+        if (options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            return new String[][] {
+                    {"Run Backend", "runBackend"},
+                    {"Package Backend", "backendPackage"},
+                    {"Update Codename One", "cn1Update"}
+            };
+        }
+        String[][] app = new String[][] {
+                {"Run in Simulator", "run"},
+                {"Debug in Simulator", "debug"},
+                {"Android Build", "buildAndroid"},
+                {"iOS Debug Build", "buildIos"},
+                {"iOS Release Build", "buildIosRelease"},
+                {"JavaScript Build", "buildJavascript"},
+                {"JavaScript Local Build", "buildJavascriptLocal"},
+                {"Certificate Wizard", "certificateWizard"},
+                {"Codename One Settings", "settings"},
+                {"Update Codename One", "cn1Update"}
+        };
+        if (options.projectType != ProjectOptions.ProjectType.APP_WITH_BACKEND) {
+            return app;
+        }
+        String[][] out = new String[app.length + 1][];
+        System.arraycopy(app, 0, out, 0, app.length);
+        out[app.length] = new String[] {"Run Backend", ":backend:runBackend"};
+        return out;
+    }
+
+    /// IDE files for a Gradle project. They are generated here rather than kept as
+    /// more resource zips: every IDE imports a Gradle build on its own, so all that
+    /// is left to ship is the list of tasks worth a button, and that list depends
+    /// on the project type. Eclipse (Buildship) and NetBeans need nothing at all --
+    /// their README section says how to open the project.
+    private void addGradleIdeEntries(Map<String, byte[]> entries) throws IOException {
+        String[][] tasks = gradleIdeTasks();
+        if (ide == IDE.INTELLIJ) {
+            // gradle.xml links the build, so opening the folder imports it rather than
+            // treating .idea/ as a plain IntelliJ project with no build attached.
+            putGradleText(entries, ".idea/gradle.xml",
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                            + "<project version=\"4\">\n"
+                            + "  <component name=\"GradleSettings\">\n"
+                            + "    <option name=\"linkedExternalProjectsSettings\">\n"
+                            + "      <GradleProjectSettings>\n"
+                            + "        <option name=\"externalProjectPath\" value=\"$PROJECT_DIR$\" />\n"
+                            + "        <option name=\"modules\">\n"
+                            + "          <set>\n"
+                            + "            <option value=\"$PROJECT_DIR$\" />\n"
+                            + (options.projectType == ProjectOptions.ProjectType.APP_WITH_BACKEND
+                                    ? "            <option value=\"$PROJECT_DIR$/backend\" />\n" : "")
+                            + "          </set>\n"
+                            + "        </option>\n"
+                            + "      </GradleProjectSettings>\n"
+                            + "    </option>\n"
+                            + "  </component>\n"
+                            + "</project>\n");
+            for (int i = 0; i < tasks.length; i++) {
+                putGradleText(entries, ".idea/runConfigurations/" + fileNameFor(tasks[i][0]) + ".xml",
+                        intellijGradleRunConfiguration(tasks[i][0], tasks[i][1]));
+            }
+            return;
+        }
+        if (ide == IDE.VS_CODE) {
+            StringBuilder json = new StringBuilder();
+            json.append("{\n  \"version\": \"2.0.0\",\n  \"tasks\": [\n");
+            for (int i = 0; i < tasks.length; i++) {
+                json.append("    {\n")
+                        .append("      \"label\": \"").append(tasks[i][0]).append("\",\n")
+                        .append("      \"type\": \"shell\",\n")
+                        .append("      \"command\": \"./gradlew\",\n")
+                        .append("      \"windows\": { \"command\": \".\\\\gradlew.bat\" },\n")
+                        .append("      \"args\": [\"").append(tasks[i][1]).append("\"],\n")
+                        .append("      \"problemMatcher\": []\n")
+                        .append("    }").append(i + 1 < tasks.length ? "," : "").append('\n');
+            }
+            json.append("  ]\n}\n");
+            putGradleText(entries, ".vscode/tasks.json", json.toString());
+            putGradleText(entries, ".vscode/extensions.json",
+                    "{\n  \"recommendations\": [\n"
+                            + "    \"vscjava.vscode-java-pack\",\n"
+                            + "    \"vscjava.vscode-gradle\"\n"
+                            + "  ]\n}\n");
+        }
+    }
+
+    private static String intellijGradleRunConfiguration(String name, String task) {
+        return "<component name=\"ProjectRunConfigurationManager\">\n"
+                + "  <configuration default=\"false\" name=\"" + name + "\" type=\"GradleRunConfiguration\" "
+                + "factoryName=\"Gradle\">\n"
+                + "    <ExternalSystemSettings>\n"
+                + "      <option name=\"executionName\" />\n"
+                + "      <option name=\"externalProjectPath\" value=\"$PROJECT_DIR$\" />\n"
+                + "      <option name=\"externalSystemIdString\" value=\"GRADLE\" />\n"
+                + "      <option name=\"scriptParameters\" value=\"\" />\n"
+                + "      <option name=\"taskDescriptions\">\n"
+                + "        <list />\n"
+                + "      </option>\n"
+                + "      <option name=\"taskNames\">\n"
+                + "        <list>\n"
+                + "          <option value=\"" + task + "\" />\n"
+                + "        </list>\n"
+                + "      </option>\n"
+                + "      <option name=\"vmOptions\" />\n"
+                + "    </ExternalSystemSettings>\n"
+                + "    <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>\n"
+                + "    <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>\n"
+                + "    <DebugAllEnabled>false</DebugAllEnabled>\n"
+                + "    <RunAsTest>false</RunAsTest>\n"
+                + "    <method v=\"2\" />\n"
+                + "  </configuration>\n"
+                + "</component>\n";
+    }
+
+    private static String fileNameFor(String label) {
+        StringBuilder out = new StringBuilder(label.length());
+        for (int i = 0; i < label.length(); i++) {
+            char c = label.charAt(i);
+            boolean keep = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+            out.append(keep ? c : '_');
+        }
+        return out.toString();
+    }
+
+    private String buildGradleReadmeMarkdown() {
+        boolean backendOnly = options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY;
+        StringBuilder out = new StringBuilder();
+        out.append("# Codename One Project\n\n");
+        if (backendOnly) {
+            out.append("This is a Gradle project for a Codename One backend: a server written in Java, ")
+                    .append("run on the JVM while you develop and packaged as a single native binary.\n\n");
+        } else {
+            out.append("This is a Gradle project for a Codename One app. ")
+                    .append("You can write the app in Java and/or Kotlin, and build for Android, iOS, desktop, and web.\n\n");
+        }
+        out.append("The only Codename One line the build needs is the `com.codenameone` plugin in ")
+                .append("`settings.gradle.kts`. Bump its version there, or run `./gradlew cn1Update`.\n\n")
+                .append("## Getting Started\n\n")
+                .append("Use JDK 17 or newer, and set JAVA_HOME for terminal builds. Gradle projects target Java 17. ")
+                .append("Extract the entire ZIP, then open the folder in your IDE as a Gradle project.\n\n");
+        String first = backendOnly ? "runBackend" : "run";
+        out.append("macOS/Linux:\n\n```\n./gradlew ").append(first).append("\n```\n\n")
+                .append("Windows PowerShell or Command Prompt:\n\n```\n.\\gradlew.bat ").append(first).append("\n```\n\n")
+                .append("The first build downloads Gradle and the dependencies and can take several minutes. ")
+                .append("If a download fails, check your connection or Gradle proxy settings and retry.\n\n");
+
+        if (backendOnly) {
+            out.append("## Tasks\n\n")
+                    .append("- `./gradlew runBackend` runs the server on this JVM; it starts in seconds.\n")
+                    .append("- `CN1_PROFILE=dev ./gradlew runBackend` also reads `application-dev.properties` ")
+                    .append("(an in-memory database).\n")
+                    .append("- `./gradlew backendPackage` builds a single native binary.\n")
+                    .append("- `./gradlew tasks` lists everything else.\n\n")
+                    .append("Routes are the annotated methods in `src/main/java/")
+                    .append(packageName.replace('.', '/')).append("/Api.java`. Settings live in ")
+                    .append("`application.properties` beside the build files.\n\n");
+        } else {
+            out.append("## Tasks\n\n")
+                    .append("- `./gradlew run` runs the app in the simulator; `./gradlew debug` waits for a debugger on port 5005.\n")
+                    .append("- `./gradlew buildAndroid`, `./gradlew buildIos` and `./gradlew buildIosRelease` send ")
+                    .append("device builds to the build server.\n")
+                    .append("- `./gradlew buildJavascriptLocal` builds the web app locally; `./gradlew buildJavascript` ")
+                    .append("submits a hosted build.\n")
+                    .append("- `./gradlew buildAndroidGradleProject` and `./gradlew buildIosXcodeProject` generate native ")
+                    .append("IDE projects locally.\n")
+                    .append("- `./gradlew buildMacDesktop` and `./gradlew buildWindowsDesktop` build desktop apps.\n")
+                    .append("- `./gradlew settings` opens Codename One Settings; `./gradlew tasks` lists everything else.\n\n")
+                    .append("Complete the browser login when a build asks for it. Local tasks such as `run` and ")
+                    .append("`buildJavascriptLocal` do not create a cloud build.\n\n")
+                    .append("## Libraries\n\n")
+                    .append("Declare Codename One libraries (cn1libs) by their Maven coordinates in `build.gradle.kts`:\n\n")
+                    .append("```\ndependencies {\n    cn1lib(\"com.codenameone:googlemaps-lib:1.0\")\n}\n```\n\n")
+                    .append("Legacy `.cn1lib` files are not supported by the Gradle build.\n\n");
+            if (options.projectType == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
+                out.append("## Backend\n\n")
+                        .append("`backend/` is the app's server. Run it with `./gradlew :backend:runBackend` and ")
+                        .append("package it with `./gradlew :backend:backendPackage`.\n\n");
+            } else {
+                out.append("## Backend\n\n")
+                        .append("`./gradlew addBackend` adds a `backend/` server project to this build.\n\n");
+            }
+        }
+
+        appendGradleIdeSection(out);
+
+        if (!backendOnly) {
+            out.append("## Signing\n\n")
+                    .append("Use the Certificate Wizard to configure Apple signing assets, Android keystores, ")
+                    .append("and desktop signing settings:\n\n")
+                    .append("```\n./gradlew certificateWizard\n```\n\n");
+        }
+        out.append("## Help and Support\n\n")
+                .append("- Codename One website: https://www.codenameone.com\n")
+                .append("- Codename One GitHub: https://github.com/codenameone/CodenameOne\n");
+        return out.toString();
+    }
+
+    private void appendGradleIdeSection(StringBuilder out) {
+        if (ide == IDE.INTELLIJ) {
+            out.append("## IntelliJ Users\n\n")
+                    .append("Open the project folder; IntelliJ imports the Gradle build. The Run menu lists ")
+                    .append("configurations for the common tasks, and the Gradle tool window has the rest.\n\n");
+            return;
+        }
+        if (ide == IDE.ECLIPSE) {
+            out.append("## Eclipse Users\n\n")
+                    .append("Choose File > Import > Gradle > Existing Gradle Project and select this folder. ")
+                    .append("Eclipse's Gradle support (Buildship) imports the build; run tasks from the ")
+                    .append("Gradle Tasks view.\n\n");
+            return;
+        }
+        if (ide == IDE.NETBEANS) {
+            out.append("## NetBeans Users\n\n")
+                    .append("Choose File > Open Project and select this folder. NetBeans opens Gradle builds ")
+                    .append("directly; run tasks from the project's Navigator or context menu.\n\n");
+            return;
+        }
+        out.append("## VS Code Users\n\n")
+                .append("Install the recommended extensions (Extension Pack for Java, Gradle for Java), then use ")
+                .append("Terminal > Run Task for the common tasks.\n\n");
     }
 
     public static String buildThemeOverrides(ProjectOptions options) {
@@ -1097,6 +1581,7 @@ public class GeneratorModel {
                 || path.endsWith(".bat")
                 || path.endsWith(".cmd")
                 || path.endsWith(".sh")
+                || path.endsWith(".kts")
                 || "mvnw".equals(path);
     }
 

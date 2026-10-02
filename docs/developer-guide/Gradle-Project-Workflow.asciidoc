@@ -1,0 +1,391 @@
+[[gradle-project-workflow]]
+== Gradle project workflow
+
+Maven is the standard way to build a Codename One application, and everything in the <<maven-project-workflow,Maven project workflow>> chapter remains the reference. Gradle is an optional alternative for applications that want a smaller project: one directory instead of a root `pom.xml` and eight modules, and no native or backend directories until the application has native code or a server.
+
+The Gradle build isn't a second implementation. The `com.codenameone` Gradle plugin calls the same build engine the Maven plugin uses, so a Gradle project stages the same upload for the build server, runs the same local builders, compiles CSS with the same compiler and checks the same bytecode rules. An application built both ways uploads identical content for every target.
+
+=== Choosing between Maven and Gradle
+
+Choose Gradle when:
+
+* You want the smallest project that works: a settings file, your sources and nothing else.
+* Your team already uses Gradle, or your IDE and CI work better with it.
+* The application doesn't need any of the Maven-only goals listed in <<gradle-limits>>.
+
+Stay with Maven when:
+
+* The application targets Java 8. Gradle projects compile for Java 17 only, the bytecode level Codename One builds for every platform.
+* It still uses legacy `.cn1lib` files rather than libraries published to a Maven repository.
+* It depends on a goal that has no Gradle task yet.
+
+Gradle projects leave out what the Maven build carries for older projects: legacy `.cn1lib` files (consumed or produced), the legacy Designer (resource editor) task, the Java 8 target, and the Maven-only files and profiles such as `codenameone_maven.properties` and the `install-codenameone` profile. Running Gradle needs JDK 17 or newer and Gradle 8.5 or newer; every project ships a Gradle wrapper, so you never install Gradle yourself.
+
+=== Getting started
+
+==== The initializr
+
+In the https://www.codenameone.com/initializr[Codename One initializr], set *Build tool* to *Gradle*. A Gradle project then offers three project types:
+
+App:: A client application.
+App + backend:: A client application with a `backend/` subproject, as described in <<gradle-backend>>.
+Backend only:: A server with no client at all: no settings file, theme, simulator or native directories.
+
+The download opens in IntelliJ IDEA, NetBeans, Eclipse or Visual Studio Code, and builds from the command line with the `./gradlew` wrapper it contains.
+
+==== Converting an existing project
+
+The Maven plugin converts a Maven or Ant application to the Gradle layout, writing a new project beside the old one and leaving the old one untouched. In the commands in this chapter, `VERSION` stands for the Codename One release you use:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-convert,indent=0]
+----
+
+The conversion runs anywhere, with or without a project in the working directory. These properties control it:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-convert-options,indent=0]
+----
+
+`cn1.sourceProject`:: The project to convert. Defaults to the project Maven runs in, else the working directory.
+`cn1.outputDir`:: Where the Gradle project goes. Defaults to `<project>-gradle` beside the source project. It must not exist or must be empty.
+`cn1.includeBackend`:: Carries over a backend module that's still the untouched archetype skeleton. Off by default, because every Maven project has that module; a backend with code of its own is always converted.
+`cn1.gradleVersion`:: The plugin version the new `settings.gradle.kts` declares. Defaults to the version of the Maven plugin doing the conversion.
+
+The conversion moves sources, CSS, localization and resources to `src/main/...`, each platform's native implementations to `src/<platform>/<lang>`, and the dependencies of `common/pom.xml` into `build.gradle.kts`. It raises `codename1.arg.java.version` to 17 and says so. Ant projects that mix Java and Kotlin in `src/` get their Kotlin sources in `src/main/kotlin` and the Kotlin Gradle plugin in `build.gradle.kts`.
+
+A project that uses legacy `.cn1lib` files is refused, and the message names every one of them. Depend on each library's Maven coordinates instead, or republish it as a Gradle cn1lib (see <<gradle-cn1libs>>), then convert again.
+
+The `generate-app-project` goal, which migrates an Ant project or a project template, produces a Gradle project directly with `-Dcn1.buildTool=gradle`:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-generate-app-project,indent=0]
+----
+
+=== The project layout
+
+----
+MyApp/
+  settings.gradle.kts
+  build.gradle.kts            (optional: the application's own dependencies)
+  gradle.properties
+  gradlew, gradlew.bat, gradle/wrapper/
+  codenameone_settings.properties
+  icon.png
+  src/main/java/              (and src/main/kotlin/ for Kotlin sources)
+  src/main/css/theme.css
+  src/main/resources/
+  src/main/l10n/
+  src/test/java/
+  src/android/java/           created by generateNativeInterfaces, when needed
+  src/ios/objectivec/
+  src/javase/java/
+  src/javascript/javascript/
+  src/win/c/
+  src/linux/c/
+  backend/                    created by addBackend, when needed
+----
+
+The native and backend directories don't exist until the application needs them. The plugin declares them anyway, so creating one later needs no build-file edit.
+
+The settings file is the only Codename One line a project needs, with `VERSION` replaced by the release:
+
+[source,kotlin]
+----
+include::../demos/gradle/gradle-project-workflow.kts[tag=gradle-settings,indent=0]
+----
+
+The plugin, applied from the settings file, adds the repository the framework is published to (and Maven Central for other libraries), applies itself to the project and to `backend/` when there is one, and builds against its own version. There's one version number to bump.
+
+A project's kind comes from the files the other build tools already use: `codenameone_settings.properties` makes it an application, `codenameone_library_appended.properties` a cn1lib, and `application.properties` without a settings file a backend. The `codename1.kind` Gradle property (`APP`, `LIB` or `BACKEND`) overrides the detection for the root project. Subprojects, such as an application's `backend`, are always detected from their own files, because a Gradle property set on the command line or in `gradle.properties` reaches every project of the build.
+
+The generated `gradle.properties` turns on the configuration cache and the build cache, which is what makes a second `./gradlew run` start in about a second:
+
+[source,properties]
+----
+include::../demos/gradle/gradle-project-workflow.properties[tag=gradle-properties,indent=0]
+----
+
+To resolve the framework from a mirror, or from a directory holding a locally built Codename One, set `codename1.repository` there:
+
+[source,properties]
+----
+include::../demos/gradle/gradle-project-workflow.properties[tag=gradle-repository-override,indent=0]
+----
+
+=== Running and building
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-run,indent=0]
+----
+
+The simulator reloads CSS as you edit it, and its hot reload recompiles through Gradle. Cloud builds and local builds are tasks too:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-build-targets,indent=0]
+----
+
+`cn1Build` runs any target by name, and `codename1.stageOnly` stops once the upload jar is staged and checked, which is useful for inspecting exactly what a build would send:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-cn1build,indent=0]
+----
+
+Gradle runs one Codename One build at a time, even when a command line names several, because each one uses the build client and the local toolchains.
+
+==== Task reference
+
+[cols="2,2,3",options="header"]
+|===
+| Gradle task
+| Maven goal
+| What it does
+
+| `run`
+| `cn1:run`
+| Runs the application in the simulator.
+
+| `debug`
+| `cn1:debug`
+| Runs the simulator suspended, waiting for a debugger on port 5005.
+
+| `cn1Css`
+| `cn1:css`
+| Compiles `src/main/css/theme.css`, merged with the CSS of every cn1lib, into `theme.res`.
+
+| `transcodeSvg`
+| `cn1:transcode-svg`
+| Turns SVG and Lottie assets into Java sources.
+
+| `generateGuiSources`
+| `cn1:generate-gui-sources`
+| Generates sources from GUI builder XML and CodeRAD view templates.
+
+| `cn1Compile`
+| `compile`
+| Compiles the application and its simulator native code; the simulator's hot reload runs it.
+
+| `prepareSimulator`
+| `cn1:prepare-simulator-classpath`
+| Writes the files the simulator reads at startup.
+
+| `cn1Test`
+| `cn1:test`
+| Runs the unit tests in the simulator's test runner.
+
+| `generateNativeInterfaces`
+| `cn1:generate-native-interfaces`
+| Writes implementation stubs for every native interface; see <<gradle-native-interfaces>>.
+
+| `verifyNativeInterfaces<Build>`
+| (none)
+| Runs before each build task and fails when a native interface has no implementation for that platform.
+
+| `buildAndroid`, `buildAndroidGradleProject`
+| `cn1:buildAndroid`, `cn1:buildAndroidGradleProject`
+| An Android cloud build; an Android Studio project generated locally.
+
+| `buildIos`, `buildIosRelease`, `buildIosXcodeProject`
+| `cn1:buildIos`, `cn1:buildIosRelease`, `cn1:buildIosXcodeProject`
+| An iOS debug or App Store cloud build; an Xcode project generated locally.
+
+| `buildMacNative`, `buildMacDesktop`
+| `cn1:buildMacNative`, `cn1:buildMacDesktop`
+| A native macOS build; a macOS desktop (JVM) build.
+
+| `buildWindowsDesktop`, `buildWindowsDevice`
+| `cn1:buildWindowsDesktop`, `cn1:buildWindowsDevice`
+| A Windows desktop (JVM) build; a native Windows build.
+
+| `buildLinuxDevice`
+| `cn1:buildLinuxDevice`
+| A native Linux build.
+
+| `buildJavascript`, `buildJavascriptLocal`
+| `cn1:buildJavascript`
+| A JavaScript cloud build; the JavaScript port built locally.
+
+| `cn1Build`
+| `cn1:build`
+| The build given by `-Pcodename1.platform` and `-Pcodename1.buildTarget`.
+
+| `settings`, `guibuilder`, `gameBuilder`, `certificateWizard`
+| `cn1:settings`, `cn1:guibuilder`, `cn1:gamebuilder`, `cn1:certificatewizard`
+| Opens Codename One Settings, the GUI Builder, the Game Builder or the iOS Certificate Wizard for this project.
+
+| `addBackend`
+| (none)
+| Adds a `backend/` subproject to the application.
+
+| `runBackend`
+| `cn1:backend`
+| Runs a backend on this JVM.
+
+| `backendPackage`
+| `cn1:backend-package`
+| Builds a backend as a single native binary.
+
+| `backendTest`
+| `test -Dcn1.backend.compiledTests=true`
+| Runs a backend's tests as a native binary. The standard `test` task runs them on this JVM.
+
+| `cn1Update`
+| `cn1:update`
+| Updates the plugin version in `settings.gradle.kts` and the build client.
+|===
+
+A build task accepts `-Pautomated=true` to wait for a cloud build and download its result, and `-Popen=false` (or `-Pcodename1.open=false`) to keep a generated Xcode or Android Studio project from opening.
+
+==== Build hints
+
+Build hints come from `codenameone_settings.properties`, as in every Codename One project. The `codenameone {}` block in `build.gradle.kts` adds hints for every build of the project, without the `codename1.arg.` prefix:
+
+[source,kotlin]
+----
+include::../demos/gradle/gradle-project-workflow.kts[tag=gradle-codenameone-block,indent=0]
+----
+
+A hint on the command line applies to that build only, and wins over both. `-Pcodename1.arg.<hint>` and `-Dcodename1.arg.<hint>` are equivalent:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-hints-cli,indent=0]
+----
+
+The same block also sets `version`, the framework version the project builds against (it defaults to the plugin's), and `mainClass`, which defaults to the package and main name in the settings file.
+
+[[gradle-native-interfaces]]
+=== Native interfaces
+
+A Gradle project starts without native directories, and adding a native interface later needs no change to any build file.
+
+. Declare the interface in `src/main/java`, as described in <<_native_interfaces,native interfaces>>:
++
+[source,java]
+----
+include::../demos/common/src/main/java/com/mycompany/myapp/MyNative.java[tag=myNativeInterface,indent=0]
+----
+
+. Generate the stubs:
++
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-native-generate,indent=0]
+----
++
+The task compiles the application, finds every interface that extends `NativeInterface`, and writes a stub for each platform into `src/<platform>/<lang>`, creating only the directories it writes to. An existing implementation is never overwritten unless you pass `-Pcn1.overwrite=true`.
+
+. Implement the stubs. The Java SE implementation in `src/javase/java` compiles against the application and joins the simulator's classpath on the next `./gradlew run`. The other platforms' sources travel in that platform's upload.
+
+`-Pcn1.nativeInterface` limits the task to one interface, and `-Pcn1.swift=true` and `-Pcn1.kotlin=true` add Swift and Kotlin stubs beside the Objective-C and Java ones:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-native-options,indent=0]
+----
+
+Before every build, the plugin checks that each native interface has an implementation for the target platform. A missing one fails the build before anything is sent, naming the file to create, rather than failing later on the build server.
+
+To remove a native interface, delete the interface and its implementation files; nothing else refers to them.
+
+[[gradle-cn1libs]]
+=== Libraries
+
+==== Using a cn1lib
+
+Declare a cn1lib by its `-lib` coordinates in `build.gradle.kts`, next to any plain Java library:
+
+[source,kotlin]
+----
+include::../demos/gradle/gradle-project-workflow.kts[tag=gradle-build-script,indent=0]
+----
+
+These are the coordinates a Maven project uses with `<type>pom</type>`. The library's classes and CSS reach every build, and its platform-specific code reaches only that platform's: Maven chooses those jars with profiles, and the plugin reads the same profiles from the library's published `pom.xml`. The library's build hints merge into the application's, as they do under Maven.
+
+A project that declares repositories of its own in `build.gradle.kts` keeps the Codename One repository too: the plugin adds it beside them.
+
+==== Building a cn1lib
+
+A Gradle project with a `codenameone_library_appended.properties` file (and no `codenameone_settings.properties`) is a cn1lib. It uses the same settings file, `src/main/java` for the library, `src/main/css` for its CSS and `src/<platform>/<lang>` for native code, and `generateNativeInterfaces` works as it does for an application. The build script sets the coordinates and, to publish somewhere other than the local repository, a repository:
+
+[source,kotlin]
+----
+include::../demos/gradle/gradle-project-workflow.kts[tag=gradle-cn1lib-build,indent=0]
+----
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-cn1lib-publish,indent=0]
+----
+
+The library is published in the same shape the Maven `cn1lib-archetype` produces, so Maven and Gradle applications both consume it. For a project named `N`:
+
+`N-common`:: The compiled library, with `codenameone_library_appended.properties` and `codenameone_library_required.properties` under `META-INF/codenameone/`.
+`N-common`, classifier `cn1css`:: The library's CSS, as a zip.
+`N-<platform>`:: One jar per platform: compiled classes for `javase`, sources for the others, which the native builders compile.
+`N-lib`:: A `pom` that applications depend on, with one `codename1.platform` profile per platform.
+
+Gradle cn1libs don't produce `.cn1lib` files.
+
+=== Kotlin
+
+Kotlin sources go in `src/main/kotlin`, and the project applies the Kotlin Gradle plugin in `build.gradle.kts`. `plugins {}` must be the first statement of the script:
+
+[source,kotlin]
+----
+include::../demos/gradle/gradle-project-workflow.kts[tag=gradle-kotlin-plugin,indent=0]
+----
+
+Java and Kotlin classes in one project can call each other. Both are checked by the same bytecode compliance rules as a Java-only project.
+
+[[gradle-backend]]
+=== The backend
+
+`addBackend` adds a `backend/` subproject to an existing application. The settings plugin includes it automatically, so `settings.gradle.kts` doesn't change. Its tasks run with the project path in front:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-backend,indent=0]
+----
+
+A backend-only project has the same bootstrap with the server at the root: `application.properties`, `application-dev.properties` and `src/main/java`. Its tasks are `runBackend`, `backendPackage`, `backendTest`, `cn1Update` and the standard `test`, which runs the backend's tests on this JVM; <<backend-testing>> covers writing them. `backendPackage` writes the binary to `build/<project name>`:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-backend-only,indent=0]
+----
+
+`CN1_PROFILE=dev` selects the development profile that `application-dev.properties` configures, with an in-memory SQLite database; without it the server reads the production settings and expects `DATABASE_URL`. `PORT` overrides the configured port. `runBackend` takes `-Pcn1.backend.mainClass`, `-Pcn1.backend.args` and `-Pcn1.backend.jvmArgs`. The <<_server_side_backend,server-side backend>> chapter covers the runtime itself.
+
+=== Tools and updates
+
+The desktop tools open on the Gradle project as they do on a Maven one:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-tools,indent=0]
+----
+
+`cn1Update` moves the project to the latest release by rewriting the plugin version in `settings.gradle.kts`, and updates the build client. `-Pcodename1.updateTo` picks a version instead:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-update,indent=0]
+----
+
+[[gradle-limits]]
+=== Limits
+
+These features remain Maven goals, with no Gradle task yet:
+
+* The OpenAPI, gRPC and GraphQL client generators (`cn1:generate-openapi`, `cn1:generate-grpc`, `cn1:generate-graphql`).
+* `cn1:create-game-scene`.
+* The on-device debugging helpers for Android and iOS.
+
+The initializr's Tweet app template isn't available for Gradle projects yet. An application that needs one of these stays on Maven for now.

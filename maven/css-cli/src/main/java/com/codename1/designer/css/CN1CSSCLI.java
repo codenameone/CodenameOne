@@ -30,6 +30,9 @@ import com.codename1.designer.css.CSSTheme.WebViewProvider;
 import com.codename1.impl.javase.CN1Bootstrap;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.project.BuildSystem;
+import com.codename1.project.ProjectLayout;
+import com.codename1.project.ProjectLayouts;
 import com.codename1.tools.resourcebuilder.PropertiesUtil;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.CN;
@@ -515,29 +518,77 @@ public class CN1CSSCLI {
     
    
     
+    /// The directory holding the project's `codenameone_settings.properties`:
+    /// the project root under Ant and Gradle, `common/` under Maven. Null
+    /// when `start` is not inside a Codename One project.
     private static  File getProjectDir(File start) {
-        File f = new File(start, "codenameone_settings.properties");
-        
-        while (!f.exists() && f.getParentFile().getParentFile() != null) {
-            f = new File(f.getParentFile().getParentFile(), "codenameone_settings.properties");
-            if (f.exists()) {
-                return f.getParentFile();
+        ProjectLayout layout = getLayout(start);
+        return layout == null ? null : layout.projectDir();
+    }
+
+    /// The layout of the project containing `start`, or null.
+    ///
+    /// [ProjectLayouts#detect(File)] answers with canonical paths, while this
+    /// class compares paths as the caller spelled them (`getRelativePath` uses
+    /// `startsWith` on absolute paths). On macOS `/tmp` is a link to
+    /// `/private/tmp`, so a canonical project dir would no longer prefix an
+    /// input given under `/tmp`. The detected directories are therefore
+    /// re-expressed as ancestors of `start` in its own spelling.
+    /// The system property a build passes when it has moved the project's build
+    /// directory (Gradle's layout.buildDirectory), which detection by the
+    /// directory tree cannot see.
+    static final String BUILD_DIR_PROPERTY = "cn1.buildDir";
+
+    static ProjectLayout getLayout(File start) {
+        ProjectLayout layout = detectLayout(start);
+        String buildDir = System.getProperty(BUILD_DIR_PROPERTY);
+        return layout != null && buildDir != null && buildDir.length() > 0
+                ? layout.withBuildDir(new File(buildDir)) : layout;
+    }
+
+    private static ProjectLayout detectLayout(File start) {
+        if (start == null) {
+            return null;
+        }
+        ProjectLayout detected = ProjectLayouts.detect(start);
+        if (detected == null) {
+            return null;
+        }
+        File projectDir = sameSpellingAncestor(start.getAbsoluteFile(), detected.projectDir());
+        if (projectDir == null) {
+            return detected;
+        }
+        File rootDir = sameSpellingAncestor(projectDir, detected.rootDir());
+        if (rootDir == null) {
+            return detected;
+        }
+        return ProjectLayouts.of(detected.buildSystem(), detected.kind(), rootDir, projectDir);
+    }
+
+    private static File sameSpellingAncestor(File from, File canonicalTarget) {
+        for (File f = from; f != null; f = f.getParentFile()) {
+            try {
+                if (f.getCanonicalFile().equals(canonicalTarget)) {
+                    return f;
+                }
+            } catch (IOException ex) {
+                return null;
             }
         }
-        return f.exists() ? f.getParentFile() : null;
-        
+        return null;
     }
-    
+
     private static File getLibCSSDirectory(File inputFile) throws IOException {
         if (System.getProperty("cn1.libCSSDir", null) != null) {
             return new File(System.getProperty("cn1.libCSSDir"));
         }
-        if (isMavenProject(inputFile)) {
-            return new File(getProjectDir(inputFile), "target" + File.separator + "css");
+        ProjectLayout layout = getLayout(inputFile);
+        if (layout == null) {
+            // Outside any project: the Ant-relative path this always fell back to.
+            return new File("lib" + File.separator + "impl" + File.separator + "css");
         }
-        return new File(getProjectDir(inputFile), 
-                "lib" + File.separator + "impl" +File.separator + "css"
-        );
+        // Ant: lib/impl/css; Maven: common/target/css; Gradle: build/css.
+        return layout.libraryCssDir();
     }
     
     private static List<File> findLibCSSFiles(File inputFile) throws IOException {
@@ -558,8 +609,13 @@ public class CN1CSSCLI {
        
     }
     
-    private static boolean isMavenProject(File inputFile) throws IOException {
-        return new File(getProjectDir(inputFile), "pom.xml").exists();
+    /// True when the project's CSS output lives in a build directory (Maven's
+    /// `target/`, Gradle's `build/`) rather than beside the sources as under
+    /// Ant. Only Ant keeps the merged file next to `theme.css`, backs up a
+    /// hand-edited `.res`, and stores checksums beside the CSS.
+    private static boolean usesBuildDir(File inputFile) throws IOException {
+        ProjectLayout layout = getLayout(inputFile);
+        return layout != null && layout.buildSystem() != BuildSystem.ANT;
     }
     
     private static String getMergedFile(String inputPath) throws IOException {
@@ -570,9 +626,12 @@ public class CN1CSSCLI {
             return System.getProperty("cn1.cssMergeFile");
         }
         File inputFile = new File(inputPath);
-        if (isMavenProject(inputFile)) {
+        if (usesBuildDir(inputFile)) {
+            // ProjectLayout.cssMergeFile() is libraryCssDir()/<name>.merged here;
+            // resolved through getLibCSSDirectory so cn1.libCSSDir still moves it.
             return new File(getLibCSSDirectory(inputFile), inputFile.getName()+".merged").getAbsolutePath();
         }
+        // Ant: beside the input, spelled as the caller spelled it.
         return inputPath + ".merged";
     }
     
@@ -853,7 +912,7 @@ public class CN1CSSCLI {
         FileLock lock = channel.lock();
         try {
             Map<String,String> checksums = loadChecksums(baseDir);
-            if (outputFile.exists() && !isMavenProject(inputFile)) {
+            if (outputFile.exists() && !usesBuildDir(inputFile)) {
                 String outputFileChecksum = getMD5Checksum(outputFile.getAbsolutePath());
                 String previousChecksum = checksums.get(inputFile.getName());
                 if (previousChecksum == null || !previousChecksum.equals(outputFileChecksum)) {
@@ -1035,14 +1094,16 @@ public class CN1CSSCLI {
    
    private static File getChecksumsFile(File baseDir) {
         try {
-            if (isMavenProject(baseDir)) {
-                return new File(getProjectDir(baseDir), "target" + File.separator + ".cn1_css_checksums");
+            ProjectLayout layout = getLayout(baseDir);
+            if (layout != null) {
+                return new File(layout.cssChecksumDir(), ".cn1_css_checksums");
             }
         } catch (Exception ex) {
             Log.e(ex);
         }
-        
-       return new File(baseDir, ".cn1_css_checksums");
+        // No project around the input: next to the CSS directory, where an Ant
+        // project (whose root this is) has always kept them.
+        return new File(baseDir, ".cn1_css_checksums");
    }
    
    private static void saveChecksums(File baseDir, Map<String,String> map) throws IOException {

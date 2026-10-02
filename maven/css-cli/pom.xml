@@ -49,6 +49,12 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javase</artifactId>
         </dependency>
+        <!-- Finds the project around the CSS file (Ant, Maven or Gradle). -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-project-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

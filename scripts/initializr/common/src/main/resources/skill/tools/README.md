@@ -8,7 +8,9 @@ java tools/<ToolName>.java <args>
 
 Each tool prints a one-line result on stdout and exits with status `0` for success, `1` for negative answer, `2` for a usage / discovery error. Diagnostic messages go to stderr.
 
-The tools require **a Java 17+ JDK on `PATH`**. They auto-discover the Codename One jars under `~/.m2/repository/` — run `mvn -pl common compile` once in the consuming app to make sure that cache is populated.
+The tools require **a Java 17+ JDK on `PATH`**. They auto-discover the Codename One jars in the local Maven repository (`~/.m2/repository/`) or the Gradle cache (`~/.gradle/caches/`, or `$GRADLE_USER_HOME`) — build the consuming app once (`./gradlew classes` in a Gradle project, `mvn -pl common compile` in a Maven one) to make sure a cache is populated.
+
+Paths in the examples are a Maven project's; in a Gradle project the app is at the root, so `common/src/main/css/theme.css` is `src/main/css/theme.css` and `common/target/classes` is `build/classes/java/main`.
 
 ## Available tools
 
@@ -27,7 +29,7 @@ java tools/IsApiSupported.java java.util.HashMap#put
 # YES (class present at java-runtime-7.0.242.jar!java/util/HashMap.class — for method-level confirmation run `javap -p -classpath …` and grep for `put`)
 ```
 
-Useful when porting code from desktop Java and you want a quick "is this safe to use" check before discovering it at `mvn cn1:bytecode-compliance` time.
+Useful when porting code from desktop Java and you want a quick "is this safe to use" check before discovering it at compile time (`mvn cn1:bytecode-compliance`, or any Gradle compile).
 
 For the full picture of what's supported and what isn't, see `references/java-api-subset.md`.
 
@@ -36,13 +38,15 @@ For the full picture of what's supported and what isn't, see `references/java-ap
 Validates a `theme.css` file by running it through the Codename One CSS compiler. Reports `VALID` if the compiler produced a theme, `INVALID` plus the compiler's error message otherwise.
 
 ```bash
+java tools/IsCssValid.java              # finds src/main/css/theme.css or common/src/main/css/theme.css
+# VALID
 java tools/IsCssValid.java common/src/main/css/theme.css
 # VALID
 ```
 
-The tool loads the latest `codenameone-core` jar from `~/.m2` and invokes the compiler via reflection — no manual `-cp` setup needed.
+The tool loads the latest `codenameone-core` jar from `~/.m2` or the Gradle cache and invokes the compiler via reflection — no manual `-cp` setup needed.
 
-This is **not** a substitute for running the simulator and looking at the result; it catches CSS *syntax* errors and unsupported properties, but a syntactically-valid file that styles the wrong UIID will still pass. Use it as a fast pre-flight before `mvn -pl common cn1:run`.
+This is **not** a substitute for running the simulator and looking at the result; it catches CSS *syntax* errors and unsupported properties, but a syntactically-valid file that styles the wrong UIID will still pass. Use it as a fast pre-flight before `./gradlew run` / `mvn -pl common cn1:run`.
 
 ### `CompareToMockup.java`
 
@@ -98,6 +102,20 @@ Run **with the project + CN1 jars on the classpath** (it loads your app classes)
 ```bash
 CP="common/target/classes:$(mvn -q -pl common dependency:build-classpath -Dmdep.outputFile=/dev/stdout | tail -1)"
 java -cp "$CP" tools/DumpForm.java com.example.myapp.MyApp --out target/form-model.tsv [--width 1180] [--height 800] [--dark]
+```
+
+Under **Gradle** there is no `dependency:build-classpath`; add this task to `build.gradle.kts` once and print the same classpath with it (the app's classes, its libraries and the simulator):
+
+```kotlin
+tasks.register("printSimulatorClasspath") {
+    val main = project.extensions.getByType<SourceSetContainer>()["main"]
+    val cp = main.runtimeClasspath + main.compileClasspath + configurations.getByName("cn1Simulator")
+    doLast { println(cp.asPath) }
+}
+```
+
+```bash
+CP="$(./gradlew -q printSimulatorClasspath)"
 ```
 
 ### `DescribeForm.java`

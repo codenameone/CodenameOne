@@ -58,11 +58,32 @@ Edit your app's root `pom.xml`:
 
 (Substitute whatever version is in `~/CodenameOne/maven/pom.xml`.) The properties are referenced from every `<dependency>` and the `codenameone-maven-plugin` block — you should not need to edit individual coordinates.
 
+**Gradle project:** set the plugin version in `settings.gradle.kts` to the SNAPSHOT and let Gradle find it in the local Maven repository:
+
+```kotlin
+pluginManagement {
+    repositories {
+        mavenLocal()                                   // the SNAPSHOT plugin you just installed
+        maven("https://repo.codenameone.com/maven2")
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id("com.codenameone") version "8.0-SNAPSHOT"
+}
+```
+
+and point the framework dependencies at the same repository with `codename1.repository=/home/you/.m2/repository` in `gradle.properties` (or `-Pcodename1.repository=...` on one build). That property replaces the Codename One repository the plugin adds.
+
 ### 4. Rebuild the app and verify
 
 ```bash
 mvn -pl common clean compile        # confirms the plugin + framework jars resolve and compile
 mvn -pl common cn1:run              # simulator boot against the snapshot
+
+./gradlew clean classes --refresh-dependencies   # Gradle: the same two checks
+./gradlew run
 ```
 
 If the build fails with "Could not find artifact com.codenameone:codenameone-core:jar:8.0-SNAPSHOT", the framework's `mvn install` didn't complete. Re-run step 2 and watch for build errors.

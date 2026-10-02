@@ -36,7 +36,7 @@ import com.codename1.settings.extensions.ExtensionDescriptor;
 import com.codename1.settings.extensions.ExtensionCatalogMerger;
 import com.codename1.settings.extensions.MavenCentralSearch;
 import com.codename1.settings.extensions.MavenDependency;
-import com.codename1.settings.extensions.PomEditor;
+import com.codename1.settings.extensions.DependencyEditor;
 import com.codename1.settings.hints.BuildHintCatalog;
 import com.codename1.settings.hints.BuildHintMetadata;
 import com.codename1.settings.hints.BuildHintType;
@@ -1521,6 +1521,10 @@ public class CodenameOneSettings extends Lifecycle {
                 }
             });
             actions.add(BorderLayout.CENTER, add);
+        } else if (descriptor.fileName().length() > 0 && legacyCn1LibDir() == null) {
+            // No Install button that could only fail: the build tool has no
+            // place for a legacy cn1lib file.
+            actions.add(BorderLayout.CENTER, new Label("Not available for Gradle projects", "SettingsExtensionWarning"));
         } else if (descriptor.fileName().length() > 0) {
             boolean installed = isLegacyCn1LibInstalled(descriptor);
             Button install = new Button(installed ? "Installed ✓" : "Install",
@@ -1566,14 +1570,36 @@ public class CodenameOneSettings extends Lifecycle {
         return value;
     }
 
+    /// The editor for the bound project's dependency file, or null when the
+    /// project has none this tool can edit (an Ant project, or a binding that
+    /// names no build file).
+    private DependencyEditor dependencyEditor() {
+        if (binding == null || dependencyFilePath() == null) {
+            return null;
+        }
+        return DependencyEditor.forBuildSystem(binding.buildSystem());
+    }
+
+    /// The build file dependencies are declared in. A Maven binding keeps
+    /// reading `pom=`, the key every Maven launcher writes; a Gradle binding
+    /// names its `build.gradle.kts` through the descriptor's `dependencyFile=`.
+    private String dependencyFilePath() {
+        if (binding == null) {
+            return null;
+        }
+        String path = binding.isGradle() ? binding.dependencyFile() : binding.pom();
+        return path == null || path.length() == 0 ? null : path;
+    }
+
     private boolean isDependencyInstalled(MavenDependency dependency) {
-        if (binding == null || binding.pom() == null || binding.pom().length() == 0 || dependency == null) {
+        DependencyEditor editor = dependencyEditor();
+        if (editor == null || dependency == null) {
             return false;
         }
         InputStream in = null;
         try {
-            in = FileSystemStorage.getInstance().openInputStream(ProjectIO.fsUrl(binding.pom()));
-            return PomEditor.containsDependency(Util.readToString(in, "UTF-8"), dependency);
+            in = FileSystemStorage.getInstance().openInputStream(ProjectIO.fsUrl(dependencyFilePath()));
+            return editor.contains(Util.readToString(in, "UTF-8"), dependency);
         } catch (Exception ex) {
             return false;
         } finally {
@@ -1680,19 +1706,31 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private void addDependency(MavenDependency dependency) {
-        if (binding.pom() == null || binding.pom().length() == 0) {
-            ToastBar.showErrorMessage("No common/pom.xml was bound to this Settings session.");
+        DependencyEditor editor = dependencyEditor();
+        if (editor == null) {
+            ToastBar.showErrorMessage(binding.isGradle()
+                    ? "No build.gradle.kts was bound to this Settings session."
+                    : "No common/pom.xml was bound to this Settings session.");
             return;
         }
+        String label = editor.fileLabel();
         InputStream in = null;
         OutputStream out = null;
         try {
-            String url = ProjectIO.fsUrl(binding.pom());
-            in = FileSystemStorage.getInstance().openInputStream(url);
-            String pom = Util.readToString(in, "UTF-8");
-            Util.cleanup(in);
-            in = null;
-            String updated = PomEditor.addDependency(pom, dependency);
+            String url = ProjectIO.fsUrl(dependencyFilePath());
+            String pom;
+            if (binding.isGradle() && !FileSystemStorage.getInstance().exists(url)) {
+                // build.gradle.kts is optional in a Gradle project (the plugin in
+                // settings.gradle.kts is enough), so a missing one is an empty
+                // script and the add below writes it.
+                pom = "";
+            } else {
+                in = FileSystemStorage.getInstance().openInputStream(url);
+                pom = Util.readToString(in, "UTF-8");
+                Util.cleanup(in);
+                in = null;
+            }
+            String updated = editor.add(pom, dependency);
             if (updated.equals(pom)) {
                 ToastBar.showInfoMessage("Dependency already exists: " + dependency.coordinates());
                 return;
@@ -1700,12 +1738,12 @@ public class CodenameOneSettings extends Lifecycle {
             out = FileSystemStorage.getInstance().openOutputStream(url);
             out.write(updated.getBytes("UTF-8"));
             out.flush();
-            ToastBar.showInfoMessage("Added " + dependency.coordinates() + " to common/pom.xml");
+            ToastBar.showInfoMessage("Added " + dependency.coordinates() + " to " + label);
             renderPage();
             animatePage();
         } catch (Exception ex) {
             Log.e(ex);
-            ToastBar.showErrorMessage("Failed to update common/pom.xml: " + ex.getMessage());
+            ToastBar.showErrorMessage("Failed to update " + label + ": " + ex.getMessage());
         } finally {
             Util.cleanup(in);
             Util.cleanup(out);
@@ -1733,6 +1771,10 @@ public class CodenameOneSettings extends Lifecycle {
     private void installLegacyCn1Lib(ExtensionDescriptor descriptor) {
         if (descriptor.fileName().length() == 0) {
             ToastBar.showErrorMessage("This legacy cn1lib entry does not include a downloadable file.");
+            return;
+        }
+        if (legacyCn1LibDir() == null) {
+            ToastBar.showErrorMessage("Gradle projects do not support legacy cn1lib files.");
             return;
         }
         if (!confirmCompatibility(descriptor)) {
@@ -1773,7 +1815,7 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private boolean isLegacyCn1LibInstalled(ExtensionDescriptor descriptor) {
-        return descriptor.fileName().length() > 0
+        return descriptor.fileName().length() > 0 && legacyCn1LibDir() != null
                 && FileSystemStorage.getInstance().exists(ProjectIO.fsUrl(legacyCn1LibPath(descriptor)));
     }
 
@@ -1802,15 +1844,21 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private void removeDependency(MavenDependency dependency) {
+        DependencyEditor editor = dependencyEditor();
+        if (editor == null) {
+            ToastBar.showErrorMessage("This project has no dependency file Settings can edit.");
+            return;
+        }
+        String label = editor.fileLabel();
         InputStream in = null;
         OutputStream out = null;
         try {
-            String url = ProjectIO.fsUrl(binding.pom());
+            String url = ProjectIO.fsUrl(dependencyFilePath());
             in = FileSystemStorage.getInstance().openInputStream(url);
             String pom = Util.readToString(in, "UTF-8");
             Util.cleanup(in);
             in = null;
-            String updated = PomEditor.removeDependency(pom, dependency);
+            String updated = editor.remove(pom, dependency);
             if (updated.equals(pom)) {
                 ToastBar.showInfoMessage("Dependency is not installed: " + dependency.coordinates());
                 return;
@@ -1818,19 +1866,31 @@ public class CodenameOneSettings extends Lifecycle {
             out = FileSystemStorage.getInstance().openOutputStream(url);
             out.write(updated.getBytes("UTF-8"));
             out.flush();
-            ToastBar.showInfoMessage("Removed " + dependency.coordinates() + " from common/pom.xml");
+            ToastBar.showInfoMessage("Removed " + dependency.coordinates() + " from " + label);
             renderPage();
             animatePage();
         } catch (Exception ex) {
             Log.e(ex);
-            ToastBar.showErrorMessage("Failed to update common/pom.xml: " + ex.getMessage());
+            ToastBar.showErrorMessage("Failed to update " + label + ": " + ex.getMessage());
         } finally {
             Util.cleanup(in);
             Util.cleanup(out);
         }
     }
 
+    /// Where legacy `.cn1lib` files are installed, or null when the project's
+    /// build tool does not support them. The Gradle plugin resolves cn1libs as
+    /// Maven coordinates only (there is no `cn1libs/` directory it scans), so a
+    /// file dropped there would sit unused while the page reported it
+    /// installed. Ant keeps them in `lib/`, as `ProjectLayout.legacyCn1libDir()`
+    /// says; a binding that names no build system came from the Maven plugin.
     private String legacyCn1LibDir() {
+        if (binding.isGradle()) {
+            return null;
+        }
+        if (ProjectBinding.BUILD_ANT.equals(binding.buildSystem())) {
+            return binding.projectDir() + "/lib";
+        }
         if (binding.multimoduleRoot() != null && binding.multimoduleRoot().length() > 0) {
             return binding.multimoduleRoot() + "/cn1libs";
         }
@@ -1849,7 +1909,12 @@ public class CodenameOneSettings extends Lifecycle {
         page.add(pageTitle("Advanced", "Open project files directly when the structured editors are not enough."));
         Container c = card("Files");
         actionRow(c, "Settings file", binding.settings(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.settings())));
-        actionRow(c, "Common POM", binding.pom(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.pom())));
+        if (binding.isGradle()) {
+            actionRow(c, "Build script", binding.dependencyFile(),
+                    () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.dependencyFile())));
+        } else {
+            actionRow(c, "Common POM", binding.pom(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.pom())));
+        }
         page.add(c);
     }
 

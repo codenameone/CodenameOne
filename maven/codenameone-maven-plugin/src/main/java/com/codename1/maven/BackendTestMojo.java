@@ -22,57 +22,55 @@
  */
 package com.codename1.maven;
 
-import com.codename1.maven.processors.BackendTests;
-
+import com.codename1.build.BuildExecutionException;
+import com.codename1.build.BuildFailureException;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.project.MavenProject;
+import org.apache.maven.repository.RepositorySystem;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Runs a backend module's tests as a native binary: `mvn test
  * -Dcn1.backend.compiledTests=true`.
  *
  * The same test classes Surefire runs on the JVM, translated with the application
- * by ParparVM and linked the way {@link BackendPackageMojo} links a server -- so
- * what is tested is the program that ships, generated wiring, woven aspects,
- * natives and all. There is no JUnit and no reflection in that binary: the test
- * pass finds the tests in the bytecode and generates the calls JUnit would make
- * (see `BackendTestGenerator`), and the tests compile against a subset of JUnit 5's
- * API that codenameone-backend-test ships for the purpose.
- *
- * What a compiled run cannot do, it reports rather than fails on: a test class that
- * imports Mockito is left out of the compile (a mocking library builds classes at
- * run time), and a class using {@code @MockitoBean} is reported as skipped.
- * {@code -Dcn1.backend.compiledTests.strict=true} turns either into a failure.
+ * and linked the way {@link BackendPackageMojo} links a server. The work is
+ * {@link BackendTestPackager}, in the build engine; this goal supplies the Maven
+ * answers, as BackendPackageMojo does for BackendPackager.
  *
  * Off unless asked for, because it needs the native toolchain
  * {@code cn1:backend-package} needs, and takes as long as a package does. On
  * Windows, which has no native backend, it says so and does nothing; the JVM run is
  * the coverage there.
- *
- * The results land in target/surefire-reports as {@code TEST-<class>-compiled.xml},
- * beside Surefire's own, so a CI report shows both runs.
  */
+// No @Execute: bound into the test phase, it must not fork the lifecycle again.
 @Mojo(name = "backend-test", defaultPhase = LifecyclePhase.TEST,
         requiresDependencyResolution = ResolutionScope.TEST)
-public class BackendTestMojo extends AbstractBackendNativeMojo {
+public class BackendTestMojo extends AbstractMojo {
+    @Parameter(defaultValue = "${project}", readonly = true, required = true)
+    private MavenProject project;
+
+    @Parameter(defaultValue = "${localRepository}", readonly = true, required = true)
+    private ArtifactRepository localRepository;
+
+    @Component
+    private RepositorySystem repositorySystem;
+
     @Parameter(property = "cn1.backend.compiledTests", defaultValue = "false")
     private boolean enabled;
 
+    /** Fail on a test class left out of the run, or a test skipped in it. */
     @Parameter(property = "cn1.backend.compiledTests.strict", defaultValue = "false")
     private boolean strict;
 
@@ -85,8 +83,17 @@ public class BackendTestMojo extends AbstractBackendNativeMojo {
     @Parameter(property = "maven.test.skip", defaultValue = "false")
     private boolean skip;
 
-    /** Test sources left out of the compile, and why. */
-    private final Map<String, String> excluded = new LinkedHashMap<String, String>();
+    /** As for cn1:backend-package. */
+    @Parameter(property = "cn1.backend.jdk")
+    private String jdkHome;
+
+    /** As for cn1:backend-package. */
+    @Parameter(property = "cn1.backend.jdk8", defaultValue = "${env.JDK_8_HOME}")
+    private String jdk8Home;
+
+    /** As for cn1:backend-package. */
+    @Parameter(property = "cn1.backend.cflags")
+    private String cflags;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -99,205 +106,70 @@ public class BackendTestMojo extends AbstractBackendNativeMojo {
                     + "not build on Windows; the JVM run is this platform's coverage");
             return;
         }
-        if (testSources().isEmpty()) {
+        BackendTestPackager packager = packager();
+        if (!packager.hasTests()) {
             getLog().info("cn1: no test sources, so no compiled backend tests");
             return;
         }
-        super.execute();
-    }
-
-    @Override
-    void prepareSources(File work, String runtimeVersion) throws MojoExecutionException {
-        File testRuntime = new File(work, "test-runtime-src");
-        emptyDirs(testRuntime);
-        mkdirs(testRuntime);
-        File jar = resolve("com.codenameone", "codenameone-backend-test", runtimeVersion,
-                "parparvm-sources");
-        unzip(jar, testRuntime, null);
-        addSources(testRuntime);
-    }
-
-    @Override
-    void afterGenerate(File jdk, File javaApi, File classes, File work)
-            throws MojoExecutionException, MojoFailureException {
-        File testClasses = new File(work, "test-classes");
-        emptyDirs(testClasses);
-        mkdirs(testClasses);
-        List<String> sources = new ArrayList<String>();
-        for (File f : testSources()) {
-            String text;
-            try {
-                text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-            } catch (IOException err) {
-                throw new MojoExecutionException("Could not read " + f, err);
-            }
-            if (text.indexOf("org.mockito") >= 0) {
-                excluded.put(f.getName(), "imports Mockito, which runs only on the JVM");
-                continue;
-            }
-            sources.add(f.getAbsolutePath());
-        }
-        if (!excluded.isEmpty()) {
-            String list = excluded.toString();
-            if (strict) {
-                throw new MojoFailureException("These tests cannot be compiled: " + list);
-            }
-            getLog().warn("cn1: left out of the compiled test run: " + list);
-        }
-        if (sources.isEmpty()) {
-            throw new MojoFailureException("No test source can be compiled for a native run");
-        }
-        List<String> classpath = new ArrayList<String>();
-        classpath.add(classes.getAbsolutePath());
-        classpath.addAll(compileClasspathWithoutRuntime());
-        List<String> command = new ArrayList<String>(Arrays.asList(
-                new File(jdk, "bin/javac").getAbsolutePath(),
-                "-nowarn", "-encoding", sourceEncoding(),
-                "-bootclasspath", javaApi.getAbsolutePath(),
-                "-source", "1.8", "-target", "1.8",
-                "-classpath", join(classpath, File.pathSeparator),
-                "-d", testClasses.getAbsolutePath()));
-        command.addAll(sources);
-        run(command, project.getBasedir(), "compile the tests against the backend's class "
-                + "library (a test that uses a JDK class the server runtime lacks fails here)");
-        // The tests' resources, as Maven processed them.
-        File processed = new File(project.getBuild().getTestOutputDirectory());
-        if (processed.isDirectory()) {
-            copyResources(processed, testClasses);
-        }
-        List<String> roots = new ArrayList<String>(project.getCompileSourceRoots());
-        roots.addAll(project.getTestCompileSourceRoots());
-        List<String> cp = new ArrayList<String>(classpath);
-        cp.add(javaApi.getAbsolutePath());
-        BackendTests.process(classes, testClasses, new File(work, "test-stubs"),
-                project.getBasedir(), roots, sourceEncoding(), cp, true, getLog());
-        copyDirectory(testClasses, classes);
-        // One main per translation: the app's generated entry point goes, and the
-        // test runner's takes its place. No test calls it; a test starts the
-        // application through its context instead.
-        File marker = new File(classes,
-                com.codename1.maven.processors.RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE);
-        if (marker.isFile()) {
-            try {
-                String entry = new String(Files.readAllBytes(marker.toPath()),
-                        StandardCharsets.UTF_8).trim();
-                File entryClass = new File(classes, entry.replace('.', '/') + ".class");
-                if (entryClass.isFile() && !entryClass.delete()) {
-                    throw new MojoExecutionException("Could not remove " + entryClass
-                            + " from the test translation");
-                }
-            } catch (IOException err) {
-                throw new MojoExecutionException("Could not read " + marker, err);
-            }
-        }
-        mainClass = BackendTests.MAIN_CLASS;
-    }
-
-    @Override
-    File binaryFile() {
-        File dir = new File(project.getBuild().getDirectory(), "cn1-backend-test");
-        mkdirs(dir);
-        return new File(dir, project.getArtifactId() + "-tests");
-    }
-
-    @Override
-    void afterLink(File binary) throws MojoExecutionException, MojoFailureException {
-        File log = new File(binary.getParentFile(), "test-output.txt");
-        int status;
         try {
-            ProcessBuilder builder = new ProcessBuilder(binary.getAbsolutePath());
-            builder.directory(project.getBasedir());
-            builder.redirectErrorStream(true);
-            builder.redirectOutput(log);
-            Process process = builder.start();
-            if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new MojoFailureException("The compiled tests did not finish in "
-                        + timeoutSeconds + " seconds; their output is in " + log);
-            }
-            status = process.exitValue();
-        } catch (IOException err) {
-            throw new MojoExecutionException("Could not run " + binary, err);
-        } catch (InterruptedException err) {
-            Thread.currentThread().interrupt();
-            throw new MojoExecutionException("Interrupted while running the compiled tests", err);
-        }
-        List<String> lines;
-        try {
-            lines = Files.readAllLines(log.toPath(), StandardCharsets.UTF_8);
-        } catch (IOException err) {
-            throw new MojoExecutionException("Could not read " + log, err);
-        }
-        CompiledTestReport report = CompiledTestReport.parse(lines);
-        for (String line : lines) {
-            if (!line.startsWith("CN1TEST\t")) {
-                getLog().info("[compiled] " + line);
-            }
-        }
-        File reports = new File(project.getBuild().getDirectory(), "surefire-reports");
-        try {
-            report.write(reports);
-        } catch (IOException err) {
-            throw new MojoExecutionException("Could not write the test reports: "
-                    + err.getMessage(), err);
-        }
-        getLog().info("cn1: compiled tests: " + report.passed + " passed, " + report.failed
-                + " failed, " + report.skipped + " skipped");
-        if (strict && report.skipped > 0) {
-            throw new MojoFailureException(report.skipped + " compiled test(s) were skipped and "
-                    + "cn1.backend.compiledTests.strict is set:\n" + report.skips());
-        }
-        if (!report.done) {
-            throw new MojoFailureException("The compiled tests stopped before reporting their "
-                    + "totals (exit " + status + "): the binary crashed. Its output is in " + log);
-        }
-        if (report.failed > 0 || status != 0) {
-            throw new MojoFailureException(report.failed + " compiled test(s) failed:\n"
-                    + report.failures());
+            packager.execute();
+        } catch (BuildFailureException ex) {
+            throw new MojoFailureException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
+        } catch (BuildExecutionException ex) {
+            throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }
     }
 
-    private List<File> testSources() {
-        List<File> out = new ArrayList<File>();
-        for (Object root : project.getTestCompileSourceRoots()) {
-            List<String> found = new ArrayList<String>();
-            collectJava(new File(String.valueOf(root)), found);
-            for (String f : found) {
-                out.add(new File(f));
+    private BackendTestPackager packager() {
+        BackendTestPackager p = new BackendTestPackager(
+                new MavenModuleHost(project, MavenLog.of(getLog()))) {
+            @Override
+            protected String binaryName() {
+                return project.getArtifactId();
             }
-        }
-        return out;
-    }
 
-    private static void copyResources(File from, File to) throws MojoExecutionException {
-        File[] children = from.listFiles();
-        if (children == null) {
-            return;
-        }
-        for (File child : children) {
-            File target = new File(to, child.getName());
-            if (child.isDirectory()) {
-                copyResources(child, target);
-            } else if (!child.getName().endsWith(".class")) {
+            @Override
+            protected File processedResourcesDirectory() {
+                return new File(project.getBuild().getOutputDirectory());
+            }
+
+            @Override
+            protected boolean declaresResources() {
+                return !project.getBuild().getResources().isEmpty();
+            }
+
+            @Override
+            protected String sourceEncoding() {
+                return BackendPackageMojo.sourceEncodingOf(project);
+            }
+
+            @Override
+            protected File resolve(String groupId, String artifactId, String version, String classifier)
+                    throws BuildExecutionException {
                 try {
-                    Files.createDirectories(to.toPath());
-                    Files.copy(child.toPath(), target.toPath(),
-                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                } catch (IOException err) {
-                    throw new MojoExecutionException("Could not copy " + child, err);
+                    return BackendPackageMojo.resolve(repositorySystem, localRepository, project,
+                            groupId, artifactId, version, classifier);
+                } catch (MojoExecutionException ex) {
+                    throw new BuildExecutionException(ex.getMessage(), ex);
                 }
             }
-        }
-    }
 
-    private static String join(List<String> parts, String separator) {
-        StringBuilder sb = new StringBuilder();
-        for (String p : parts) {
-            if (sb.length() > 0) {
-                sb.append(separator);
+            @Override
+            protected List<String> testSourceRoots() {
+                List<String> roots = new ArrayList<String>();
+                for (Object root : project.getTestCompileSourceRoots()) {
+                    roots.add(String.valueOf(root));
+                }
+                return roots;
             }
-            sb.append(p);
-        }
-        return sb.toString();
+
+            @Override
+            protected File testOutputDirectory() {
+                return new File(project.getBuild().getTestOutputDirectory());
+            }
+        };
+        p.strict(strict).timeoutSeconds(timeoutSeconds);
+        p.jdk(jdkHome, jdk8Home).cflags(cflags);
+        return p;
     }
 }

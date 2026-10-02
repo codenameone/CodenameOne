@@ -1,0 +1,122 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven;
+
+import com.codename1.maven.stubgen.TestNativeInterface;
+import com.codename1.build.SystemStreamLog;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class StubGeneratorTest {
+
+    @Test
+    void optionalSwiftAndKotlinStubsAreGeneratedOnlyWhenEnabled() throws Exception {
+        File tempDir = Files.createTempDirectory("cn1-stubgen").toFile();
+        try {
+            StubGenerator defaultGenerator = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class, false, false);
+            defaultGenerator.generateCode(tempDir, false);
+            File iosSwift = new File(tempDir, "ios/src/main/objectivec/com_codename1_maven_stubgen_TestNativeInterfaceImpl.swift");
+            File androidKotlin = new File(tempDir, "android/src/main/java/com/codename1/maven/stubgen/TestNativeInterfaceImpl.kt");
+            assertFalse(iosSwift.exists());
+            assertFalse(androidKotlin.exists());
+
+            StubGenerator enabledGenerator = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class, true, true);
+            enabledGenerator.generateCode(tempDir, false);
+            assertTrue(iosSwift.exists());
+            assertTrue(androidKotlin.exists());
+        } finally {
+            deleteTree(tempDir);
+        }
+    }
+
+    @Test
+    void existingFilesAreReportedForWarnMode() throws Exception {
+        File tempDir = Files.createTempDirectory("cn1-stubgen-existing").toFile();
+        try {
+            StubGenerator generator = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class, true, true);
+            generator.generateCode(tempDir, false);
+
+            StubGenerator checker = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class, true, true);
+            // android(.java + .kt) + ios(.h + .m + .swift) + win(.c native
+            // win32) + linux(.c native) + javase(.java) + javascript(.js) = 9.
+            List<File> existing = checker.getExistingFiles(tempDir);
+            assertEquals(9, existing.size());
+            assertTrue(checker.isFilesExist(tempDir));
+        } finally {
+            deleteTree(tempDir);
+        }
+    }
+
+    @Test
+    void nativeCStubsAreGeneratedForWin32AndLinux() throws Exception {
+        File tempDir = Files.createTempDirectory("cn1-stubgen-c").toFile();
+        try {
+            StubGenerator generator = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class);
+            generator.generateCode(tempDir, false);
+
+            File winC = new File(tempDir,
+                    "win/src/main/c/com/codename1/maven/stubgen/TestNativeInterfaceImplCodenameOne.c");
+            File linuxC = new File(tempDir,
+                    "linux/src/main/c/com/codename1/maven/stubgen/TestNativeInterfaceImplCodenameOne.c");
+            assertTrue(winC.exists(), "win32 native C stub not generated");
+            assertTrue(linuxC.exists(), "linux native C stub not generated");
+
+            String c = new String(Files.readAllBytes(linuxC.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(c.contains("#include \"cn1_globals.h\""), c);
+            // The ParparVM-mangled function name, thread-state first arg and JAVA_*
+            // types the translated app links against for String hello(String).
+            assertTrue(c.contains(
+                    "JAVA_OBJECT com_codename1_maven_stubgen_TestNativeInterfaceImplCodenameOne_hello___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT param1)"),
+                    "unexpected generated C stub:\n" + c);
+            assertTrue(c.contains("return JAVA_NULL;"), c);
+            // win32 and linux are the same clean-C target, so the stub is identical;
+            // only the module directory differs.
+            assertEquals(c, new String(Files.readAllBytes(winC.toPath()), java.nio.charset.StandardCharsets.UTF_8));
+        } finally {
+            deleteTree(tempDir);
+        }
+    }
+
+    private static void deleteTree(File f) {
+        if (f == null || !f.exists()) {
+            return;
+        }
+        if (f.isDirectory()) {
+            File[] children = f.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteTree(child);
+                }
+            }
+        }
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
+    }
+}

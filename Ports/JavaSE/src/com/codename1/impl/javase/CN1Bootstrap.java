@@ -156,9 +156,7 @@ public class CN1Bootstrap {
         for (int iter = 0; iter < len; iter++) {
             files.add(new File(t.nextToken()));
         }
-        File javase = new File("native" + File.separator + "javase");
-        File libJavase = new File("lib" + File.separator + "impl" + File.separator + "native" + File.separator + "javase");
-        for (File dir : new File[]{javase, libJavase}) {
+        for (File dir : SimulatorProject.legacyNativeJarDirs()) {
             if (dir.exists()) {
                 
                 for (File jar : dir.listFiles()) {

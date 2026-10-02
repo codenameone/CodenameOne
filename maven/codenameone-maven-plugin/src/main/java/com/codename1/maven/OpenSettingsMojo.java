@@ -24,28 +24,19 @@ package com.codename1.maven;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.repository.ArtifactRepository;
-import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
-import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.tools.ant.taskdefs.Java;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import java.util.UUID;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 
 /**
  * Opens the standalone Codename One Settings tool.
@@ -54,6 +45,9 @@ import java.util.jar.JarFile;
  */
 @Mojo(name = "settings")
 public class OpenSettingsMojo extends AbstractCN1Mojo {
+    /// How the tool starts, shared with the Gradle plugin's `settings` task.
+    private static final DesktopTool TOOL = DesktopTool.SETTINGS;
+
     private static final String LAUNCHED_PROPERTY =
             "com.codename1.maven.OpenSettingsMojo.launched";
 
@@ -73,29 +67,16 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         System.setProperty(LAUNCHED_PROPERTY, "true");
 
         File projectDir = getCN1ProjectDir();
-        File runtimeDir = new File(System.getProperty("user.home"), ".codenameoneSettings");
-        runtimeDir.mkdirs();
-        File inputFile = new File(runtimeDir, "settings-" + UUID.randomUUID() + ".input");
+        File inputFile = new File(TOOL.runtimeDir(), "settings-" + UUID.randomUUID() + ".input");
         writeBinding(inputFile, projectDir);
 
-        ToolClasspath toolClasspath = getSettingsClasspath();
+        List<File> classpath = resolveDesktopTool(TOOL, pluginVersion(),
+                "To work on the Settings tool itself, run:\n"
+                + "    cd scripts/settings && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase\n"
+                + "    java -cp \"javase/target/codenameone-settings-*.jar:javase/target/libs/*\" "
+                + "com.codename1.settings.CodenameOneSettingsLauncher");
         getLog().info("Launching Codename One Settings bound to " + projectDir);
-        if (shouldSpawn()) {
-            launchDetached(toolClasspath, runtimeDir, inputFile, projectDir);
-            return;
-        }
-
-        Java java = createJava();
-        java.setFork(true);
-        java.setJvm(namedJavaLauncher(runtimeDir).getAbsolutePath());
-        java.setClassname("com.codename1.settings.CodenameOneSettingsLauncher");
-        java.createClasspath().setPath(joinClasspath(toolClasspath.files));
-        configureDesktopIdentity(java, toolClasspath.primaryJar, runtimeDir);
-        java.createJvmarg().setValue("-Dsettings.input=" + inputFile.getAbsolutePath());
-        for (String arg : forwardedSettingsProperties()) {
-            java.createJvmarg().setValue(arg);
-        }
-        java.executeJava();
+        launchDesktopTool(TOOL, classpath, inputFile, projectDir, shouldSpawn(), null);
     }
 
     /**
@@ -106,15 +87,7 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
      * owned by this mojo and never forwarded.
      */
     List<String> forwardedSettingsProperties() {
-        List<String> args = new ArrayList<String>();
-        for (String key : System.getProperties().stringPropertyNames()) {
-            if (key.startsWith("settings.")
-                    && !key.equals("settings.input")
-                    && !key.equals("settings.spawn")) {
-                args.add("-D" + key + "=" + System.getProperty(key));
-            }
-        }
-        return args;
+        return TOOL.forwardedProperties();
     }
 
     @Override
@@ -145,91 +118,16 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         return spawn;
     }
 
-    private void launchDetached(ToolClasspath toolClasspath, File runtimeDir, File inputFile, File projectDir)
-            throws MojoExecutionException {
-        File log = new File(runtimeDir, "settings.log");
-        List<String> command = new ArrayList<String>();
-        command.add(namedJavaLauncher(runtimeDir).getAbsolutePath());
-        command.addAll(desktopIdentityArgs(toolClasspath.primaryJar, runtimeDir));
-        command.add("-Dsettings.input=" + inputFile.getAbsolutePath());
-        command.addAll(forwardedSettingsProperties());
-        command.add("-cp");
-        command.add(joinClasspath(toolClasspath.files));
-        command.add("com.codename1.settings.CodenameOneSettingsLauncher");
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.directory(projectDir);
-        pb.redirectErrorStream(true);
-        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log));
-        try {
-            pb.start();
-            getLog().info("Codename One Settings launched in the background. Log: " + log.getAbsolutePath());
-        } catch (IOException ex) {
-            throw new MojoExecutionException("Failed to launch Codename One Settings", ex);
-        }
-    }
-
-    private void configureDesktopIdentity(Java java, File jar, File runtimeDir) {
-        for (String arg : desktopIdentityArgs(jar, runtimeDir)) {
-            java.createJvmarg().setValue(arg);
-        }
-    }
-
     List<String> desktopIdentityArgs(File jar, File runtimeDir) {
-        List<String> args = new ArrayList<String>();
-        args.add("-Dapple.awt.application.name=Codename One Settings");
-        args.add("-Dcom.apple.mrj.application.apple.menu.about.name=Codename One Settings");
-        args.add("-Dsun.awt.application.name=Codename One Settings");
-        args.add("-Dsun.awt.X11.XWMClass=CodenameOneSettings");
-        if (isJava9OrNewer()) {
-            args.add("--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED");
-            args.add("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED");
-        }
-        if (isMacOs()) {
-            args.add("-Xdock:name=Codename One Settings");
-            File icon = extractSettingsIcon(jar, runtimeDir);
-            if (icon != null && icon.isFile()) {
-                args.add("-Xdock:icon=" + icon.getAbsolutePath());
-            }
-        }
-        return args;
+        return TOOL.identityArgs(jar, runtimeDir, MavenLog.of(getLog()));
     }
 
     File namedJavaLauncher(File runtimeDir) {
-        File java = new File(javaExecutable());
-        if (isWindows()) {
-            // Never copy javaw.exe out of the JDK: a copied launcher loses the JDK's
-            // bin directory as its DLL search anchor, so dependent native libraries
-            // (fontmanager/freetype and friends) can bind to wrong DLLs from
-            // System32/PATH and break rendering (issue #5443). The cosmetic Task
-            // Manager name is not worth a broken JVM - launch the real javaw.exe.
-            return java;
-        }
-        File launcher = new File(runtimeDir, "Codename One Settings");
-        try {
-            Files.deleteIfExists(launcher.toPath());
-            Files.createSymbolicLink(launcher.toPath(), java.toPath());
-            return launcher;
-        } catch (IOException | UnsupportedOperationException | SecurityException ex) {
-            getLog().debug("Unable to create Settings launcher symlink: " + ex.getMessage());
-            return java;
-        }
+        return TOOL.javaLauncher(runtimeDir, MavenLog.of(getLog()));
     }
 
     File extractSettingsIcon(File jar, File runtimeDir) {
-        File iconFile = new File(runtimeDir, "settings-icon.png");
-        try (JarFile jf = new JarFile(jar)) {
-            JarEntry entry = jf.getJarEntry("icon.png");
-            if (entry == null) {
-                return null;
-            }
-            try (InputStream in = jf.getInputStream(entry)) {
-                FileUtils.copyInputStreamToFile(in, iconFile);
-            }
-            return iconFile;
-        } catch (IOException ex) {
-            getLog().debug("Unable to extract Settings dock icon: " + ex.getMessage());
-            return null;
-        }
+        return TOOL.extractIcon(jar, runtimeDir, MavenLog.of(getLog()));
     }
 
     void writeBinding(File inputFile, File projectDir) throws MojoExecutionException {
@@ -354,78 +252,6 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         return projectDir == null ? new File(".") : projectDir;
     }
 
-    private ToolClasspath getSettingsClasspath() throws MojoExecutionException, MojoFailureException {
-        Artifact artifact = getArtifact("com.codenameone", "codenameone-settings");
-        if (artifact == null) {
-            artifact = repositorySystem.createArtifact(
-                    "com.codenameone", "codenameone-settings", pluginVersion(), "jar");
-        }
-        ToolClasspath classpath = resolveToolClasspath(artifact);
-        if (classpath.primaryJar == null || classpath.files.isEmpty()) {
-            throw new MojoFailureException(
-                    "Could not resolve Codename One Settings "
-                    + "(com.codenameone:codenameone-settings:" + pluginVersion()
-                    + ").\n"
-                    + "It is distributed through Maven Central alongside the Codename One plugin.\n"
-                    + "To work on the Settings tool itself, run:\n"
-                    + "    cd scripts/settings && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase\n"
-                    + "    java -cp \"javase/target/codenameone-settings-*.jar:javase/target/libs/*\" "
-                    + "com.codename1.settings.CodenameOneSettingsLauncher");
-        }
-        return classpath;
-    }
-
-    private ToolClasspath resolveToolClasspath(Artifact artifact) {
-        List<File> files = new ArrayList<File>();
-        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
-                .setLocalRepository(localRepository)
-                .setRemoteRepositories(new ArrayList<ArtifactRepository>(remoteRepositories))
-                .setResolveTransitively(true)
-                .setArtifact(artifact));
-        File primary = addArtifactFile(files, artifact);
-        if (result != null && result.getArtifacts() != null) {
-            for (Artifact resolved : result.getArtifacts()) {
-                File file = addArtifactFile(files, resolved);
-                if (primary == null && resolved != null
-                        && "com.codenameone".equals(resolved.getGroupId())
-                        && "codenameone-settings".equals(resolved.getArtifactId())) {
-                    primary = file;
-                }
-            }
-        }
-        return new ToolClasspath(primary, files);
-    }
-
-    private static File addArtifactFile(List<File> files, Artifact artifact) {
-        if (artifact == null || artifact.getFile() == null || !"jar".equals(artifact.getType())) {
-            return null;
-        }
-        File file = artifact.getFile().getAbsoluteFile();
-        if (!file.exists()) {
-            return null;
-        }
-        if (!files.contains(file)) {
-            files.add(file);
-        }
-        return file;
-    }
-
-    private static String joinClasspath(List<File> files) {
-        StringBuilder out = new StringBuilder();
-        for (File file : files) {
-            if (out.length() > 0) {
-                out.append(File.pathSeparator);
-            }
-            out.append(file.getAbsolutePath());
-        }
-        return out.toString();
-    }
-
-    private String javaExecutable() {
-        String executable = isWindows() ? "javaw.exe" : "java";
-        return new File(new File(System.getProperty("java.home"), "bin"), executable).getAbsolutePath();
-    }
-
     static boolean isMacOs() {
         return System.getProperty("os.name", "").toLowerCase().contains("mac");
     }
@@ -455,13 +281,4 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
                 project.getProperties().getProperty("cn1.version", "8.0-SNAPSHOT"));
     }
 
-    private static final class ToolClasspath {
-        final File primaryJar;
-        final List<File> files;
-
-        ToolClasspath(File primaryJar, List<File> files) {
-            this.primaryJar = primaryJar;
-            this.files = files;
-        }
-    }
 }

@@ -59,4 +59,33 @@ class ProjectBindingTest {
         ProjectBinding b = ProjectBinding.parse("  gamesDir = C:\\proj\\games \r\n");
         assertEquals("C:\\proj\\games", b.gamesDir());
     }
+
+    /// A bare project descriptor names the build system and the project, and
+    /// the scene and source directories follow from its conventions.
+    @Test
+    void derivesDirectoriesFromTheDescriptorKeys() {
+        ProjectBinding gradle = ProjectBinding.parse("buildSystem=GRADLE\nkind=APP\nrootDir=/g\nprojectDir=/g\n"
+                + "dependencyFile=/g/build.gradle.kts\n");
+        assertTrue(gradle.isValid());
+        assertEquals("/g/src/main/resources/games", gradle.gamesDir());
+        assertEquals("/g/src/main/java", gradle.sourceDir());
+        assertEquals("GRADLE", gradle.buildSystem());
+        assertEquals("APP", gradle.kind());
+        assertEquals("/g", gradle.rootDir());
+        assertEquals("/g/build.gradle.kts", gradle.dependencyFile());
+
+        ProjectBinding ant = ProjectBinding.parse("buildSystem=ANT\nprojectDir=/a\n");
+        assertEquals("/a/src/games", ant.gamesDir());
+        assertEquals("/a/src", ant.sourceDir());
+
+        // An explicit key still wins over the convention.
+        assertEquals("/x/games", ProjectBinding.parse("buildSystem=GRADLE\nprojectDir=/g\ngamesDir=/x/games\n").gamesDir());
+    }
+
+    @Test
+    void fsUrlHandlesWindowsDriveLetters() {
+        assertEquals("file:///C:/proj/games", ProjectIO.fsUrl("C:\\proj\\games"));
+        assertEquals("file:///proj/games", ProjectIO.fsUrl("/proj/games"));
+        assertEquals("file:///proj/games", ProjectIO.fsUrl("file:///proj/games"));
+    }
 }

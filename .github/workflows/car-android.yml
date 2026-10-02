@@ -11,8 +11,8 @@ name: Car (Android Auto) integration
       - '.github/workflows/car-android.yml'
       - 'CodenameOne/src/com/codename1/car/**'
       - 'Ports/Android/src/com/codename1/impl/android/AndroidCarSupport.java'
-      - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/builders/car/**'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'maven/build-engine/src/main/resources/com/codename1/builders/car/**'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
       - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
       # The screenshot transport is now a Codename One backend application, so the
       # two files that are ONLY exercised here have to trigger this leg: the
@@ -34,8 +34,8 @@ name: Car (Android Auto) integration
       - '.github/workflows/car-android.yml'
       - 'CodenameOne/src/com/codename1/car/**'
       - 'Ports/Android/src/com/codename1/impl/android/AndroidCarSupport.java'
-      - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/builders/car/**'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'maven/build-engine/src/main/resources/com/codename1/builders/car/**'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
       - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
       # The screenshot transport is now a Codename One backend application, so the
       # two files that are ONLY exercised here have to trigger this leg: the

@@ -47,14 +47,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BackendPackageJdkFallbackTest {
 
     private static File resolve(BackendPackageMojo mojo) throws Exception {
-        Method resolve = AbstractBackendNativeMojo.class.getDeclaredMethod("resolveJdk");
+        Method resolve = BackendPackageMojo.class.getDeclaredMethod("resolveJdk");
         resolve.setAccessible(true);
         return (File) resolve.invoke(mojo);
     }
 
     private static void set(BackendPackageMojo mojo, String field, String value)
             throws Exception {
-        Field declared = AbstractBackendNativeMojo.class.getDeclaredField(field);
+        Field declared = BackendPackageMojo.class.getDeclaredField(field);
         declared.setAccessible(true);
         declared.set(mojo, value);
     }
@@ -131,7 +131,7 @@ class BackendPackageJdkFallbackTest {
     @Test
     void refusesOnlyBelowEight() throws Exception {
         BackendPackageMojo mojo = new BackendPackageMojo();
-        Method require = AbstractBackendNativeMojo.class.getDeclaredMethod(
+        Method require = BackendPackageMojo.class.getDeclaredMethod(
                 "requireEightOrNewer", File.class);
         require.setAccessible(true);
 
@@ -171,7 +171,7 @@ class BackendPackageJdkFallbackTest {
     /// a JDK problem.
     @Test
     void recognisesOnlyTheSourceEightRemoval() throws Exception {
-        Method drops = AbstractBackendNativeMojo.class.getDeclaredMethod(
+        Method drops = BackendPackageMojo.class.getDeclaredMethod(
                 "dropsSourceEight", MojoFailureException.class);
         drops.setAccessible(true);
         assertEquals(Boolean.TRUE, drops.invoke(null, new MojoFailureException(

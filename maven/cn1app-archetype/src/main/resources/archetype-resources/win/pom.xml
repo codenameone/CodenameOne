@@ -21,7 +21,17 @@
       <codename1.defaultBuildTarget>windows-device</codename1.defaultBuildTarget>
   </properties>
     <build>
-
+        <!-- The C implementations of native interfaces travel in the upload jar,
+             where the Windows and Linux native builders find them, as
+             src/main/objectivec does for iOS. -->
+        <resources>
+            <resource>
+                <directory>src/main/c</directory>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>com.codenameone</groupId>
