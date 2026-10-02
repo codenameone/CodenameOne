@@ -25,9 +25,9 @@ master, and a pull request that edits it fails `check`.
 
 AN OVERLAY (pr/<number>.json)
   {"pr": 5931,
-   "reason": "why any rebaselined row moved (required when there are any)",
    "calibrate":  {key: {benchmark: {cores: row}}},
-   "rebaseline": {key: {benchmark: {cores: row + "from": {"time": t, "memory": m}}}}}
+   "rebaseline": {key: {benchmark: {cores: row + "from": {"time": t, "memory": m, ...}
+                                                + "reason": "why THIS row moved"}}}}
 
   calibrate    a row that does not exist yet: a runner CPU model no run had measured.
                Hardware, not code -- whichever branch met the runner first carries it.
@@ -37,7 +37,11 @@ AN OVERLAY (pr/<number>.json)
                superseded and ignored: once one branch's calibration is folded, a second
                branch's adds nothing and must not fail for it.
   rebaseline   a row that exists and moved: a deliberate change in performance, better
-               or worse. "from" is the baseline the pull request measured against.
+               or worse. "from" is the baseline the pull request measured against, and
+               "reason" says why this row moved -- per row, because a pull request can
+               rebaseline rows at different times for different causes, and one reason
+               for the whole file let a later row pass under an earlier row's
+               explanation.
                Rebaselines of one row chain, each from the value the last one left, so a
                pull request measured on top of a merged one need not wait for the fold.
                Two from the SAME value, or one whose "from" the row never reaches --
@@ -219,7 +223,11 @@ def load_overlays(root=ROOT):
 def validate_overlay(number, overlay, where):
     if not isinstance(overlay, dict):
         raise BaselineError('%s must be an object' % where)
-    unknown = set(overlay) - {'pr', 'reason', 'calibrate', 'rebaseline'}
+    if 'reason' in overlay:
+        raise BaselineError('%s: "reason" belongs to each rebaseline row, not the file: one '
+                            'reason for the file lets a later row pass under an earlier '
+                            'row\'s explanation' % where)
+    unknown = set(overlay) - {'pr', 'calibrate', 'rebaseline'}
     if unknown:
         raise BaselineError('%s: unknown field(s) %s' % (where, ', '.join(sorted(unknown))))
     if overlay.get('pr') != number:
@@ -229,17 +237,17 @@ def validate_overlay(number, overlay, where):
     rebaselines = list(_rows(where + ' rebaseline', overlay.get('rebaseline', {})))
     for key, bench, cores, row in rebaselines:
         here = '%s rebaseline %s %s/%s' % (where, key, bench, cores)
-        _check_row(here, row, extra=('from',))
+        _check_row(here, row, extra=('from', 'reason'))
+        reason = row.get('reason')
+        if not isinstance(reason, str) or not reason.strip() or \
+                reason.strip().upper().startswith('TODO'):
+            raise BaselineError('%s: a rebaseline needs a "reason" saying why this row moved'
+                                % here)
         old = row.get('from')
         if not isinstance(old, dict) or set(old) - {'tolerance'} != set(METRICS):
             raise BaselineError('%s: "from" must give the time and memory baseline it '
                                 'replaces, and its tolerance if it had one' % here)
         _check_ratios(here + ' from', old)
-    if rebaselines:
-        reason = overlay.get('reason')
-        if not isinstance(reason, str) or not reason.strip() or reason.strip().upper().startswith('TODO'):
-            raise BaselineError('%s: a rebaseline needs a "reason" saying why the rows moved'
-                                % where)
     if not overlay.get('calibrate') and not rebaselines:
         raise BaselineError('%s changes nothing; delete it' % where)
 
@@ -354,7 +362,8 @@ def resolve(base, overlays, tolerance=None):
                     % (number, where, json.dumps(row['from'], sort_keys=True),
                        json.dumps(from_row(current), sort_keys=True)))
             number, row = ready[0]
-            rows[key][bench][cores] = {k: v for k, v in row.items() if k != 'from'}
+            rows[key][bench][cores] = {k: v for k, v in row.items()
+                                       if k not in ('from', 'reason')}
             pending.remove(ready[0])
     return rows, notes
 
@@ -400,11 +409,20 @@ def fold(root=ROOT):
 
 def write_overlay(root, number, calibrate=None, rebaseline=None, reason=None):
     """Add rows to pr/<number>.json, creating it if needed. A row written again replaces
-    the earlier one, so re-running the calibration after another CI round is safe."""
+    the earlier one, so re-running the calibration after another CI round is safe.
+
+    `reason` is stamped on every rebaseline row written that does not carry its own. A
+    row re-measured without one keeps the reason it already had -- the same row, moved for
+    the same cause -- but a row new to this overlay gets no inherited explanation: with
+    neither, validation fails and says so."""
     path = Path(root) / 'pr' / ('%d.json' % number)
     overlay = _read_json(path) if path.exists() else {'pr': number}
     for kind, tree in (('calibrate', calibrate), ('rebaseline', rebaseline)):
         for key, bench, cores, row in _rows(kind, tree or {}):
+            if kind == 'rebaseline' and 'reason' not in row:
+                earlier = overlay.get('rebaseline', {}).get(key, {}).get(bench, {}).get(cores, {})
+                if reason or earlier.get('reason'):
+                    row = dict(row, reason=reason or earlier['reason'])
             overlay.setdefault(kind, {}).setdefault(key, {}).setdefault(bench, {})[cores] = row
             # One row is one kind: a row calibrated earlier on this branch and now moved
             # again is still a calibration, and a stale entry of the other kind would
@@ -421,8 +439,6 @@ def write_overlay(root, number, calibrate=None, rebaseline=None, reason=None):
                 del tree[key]
         if kind in overlay and not tree:
             del overlay[kind]
-    if reason:
-        overlay['reason'] = reason
     validate_overlay(number, overlay, path.name)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(dump(overlay))
@@ -480,8 +496,12 @@ def summary(rows):
                                 for k in keys),
                  'benchmarks': {}}
         for bench, _, _ in BENCHMARKS:
-            values = [benches[bench]['all'] for benches in keys.values()
-                      if 'all' in benches.get(bench, {})]
+            # Which CPU models THIS cell covers. A model can be calibrated for some
+            # benchmarks and not yet others, and a cell's median taken over a different set
+            # than the platform's list would shift silently as models are filled in.
+            contributing = sorted((k, benches[bench]['all']) for k, benches in keys.items()
+                                  if 'all' in benches.get(bench, {}))
+            values = [v for _, v in contributing]
             if not values:
                 continue
             entry['benchmarks'][bench] = {
@@ -489,6 +509,8 @@ def summary(rows):
                          'min': min(v[metric] for v in values),
                          'max': max(v[metric] for v in values)}
                 for metric in METRICS}
+            entry['benchmarks'][bench]['cpus'] = [
+                k.split('@', 1)[1] if '@' in k else 'unidentified CPU' for k, _ in contributing]
         out.append(entry)
     return {'schema_version': 1,
             'source': 'vm/selfhost/perf-baseline',

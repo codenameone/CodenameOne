@@ -299,7 +299,7 @@ class CalibrationTest(unittest.TestCase):
         # Only the metric that moved is replaced; RAM keeps its baseline and tolerance.
         self.assertEqual(r['memory'], 0.1)
         self.assertEqual(r['tolerance'], {'memory': 0.3})
-        self.assertEqual(overlay['reason'], 'faster partitioning')
+        self.assertEqual(r['reason'], 'faster partitioning')
         self.assertEqual(rows['linux-x64']['quicksort']['all']['time'], 0.7)
 
     def test_all_recalibrates_every_measured_row(self):
@@ -321,10 +321,34 @@ class CalibrationTest(unittest.TestCase):
         self.assertEqual(r['memory'], 0.32)
         self.assertGreaterEqual(r['tolerance']['memory'], 0.25)   # covers the 0.27 mode
 
+    def test_a_new_row_never_inherits_another_rows_reason(self):
+        old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)}, 'recursion': {'all': row(1.0, 0.1)}}}
+        mine = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {'all': dict(
+            row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'faster sort'})}}}}
+        # recursion moved too, later, for some other cause: "faster sort" must not cover it.
+        with self.assertRaises(SystemExit) as caught:
+            self.run_calibration([('linux-x64', {'recursion': (1.5, 0.1)})],
+                                 existing=old, overlays={7: mine})
+        self.assertIn('recursion', str(caught.exception))
+        overlay, _ = self.run_calibration([('linux-x64', {'recursion': (1.5, 0.1)})],
+                                          existing=old, overlays={7: mine}, reason='slower calls')
+        rows = overlay['rebaseline']['linux-x64']
+        self.assertEqual((rows['quicksort']['all']['reason'], rows['recursion']['all']['reason']),
+                         ('faster sort', 'slower calls'))
+
+    def test_a_re_measured_row_keeps_its_own_reason(self):
+        old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)}}}
+        mine = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {'all': dict(
+            row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'faster sort'})}}}}
+        overlay, _ = self.run_calibration([('linux-x64', {'quicksort': (0.5, 0.1)})],
+                                          existing=old, overlays={7: mine})
+        self.assertEqual(overlay['rebaseline']['linux-x64']['quicksort']['all']['reason'],
+                         'faster sort')
+
     def test_rerunning_replaces_this_pull_requests_own_rows(self):
         old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)}}}
-        mine = {'pr': 7, 'reason': 'first try', 'rebaseline': {'linux-x64': {'quicksort': {
-            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}})}}}}
+        mine = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {
+            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'first try'})}}}}
         overlay, rows = self.run_calibration([('linux-x64', {'quicksort': (0.5, 0.1)})],
                                              existing=old, overlays={7: mine})
         r = overlay['rebaseline']['linux-x64']['quicksort']['all']
@@ -336,8 +360,8 @@ class CalibrationTest(unittest.TestCase):
         # pr/7 rebaselined quicksort from 1.0; another merged change has since moved it to
         # 0.8, so pr/7 is stale and the gate judged this run without it.
         moved = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}}}
-        mine = {'pr': 7, 'reason': 'first try', 'rebaseline': {'linux-x64': {'quicksort': {
-            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}})}}}}
+        mine = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {
+            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'first try'})}}}}
         # The fresh run is inside 0.8's tolerance, so only staleness can make it rewrite.
         overlay, rows = self.run_calibration([('linux-x64', {'quicksort': (0.82, 0.1)})],
                                              existing=moved, overlays={7: mine})
@@ -347,8 +371,8 @@ class CalibrationTest(unittest.TestCase):
 
     def test_a_stale_row_the_runs_did_not_measure_is_reported(self):
         moved = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}, 'recursion': {'all': row(1.0, 0.1)}}}
-        mine = {'pr': 7, 'reason': 'first try', 'rebaseline': {'linux-x64': {'quicksort': {
-            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}})}}}}
+        mine = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {
+            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'first try'})}}}}
         with self.assertRaises(SystemExit) as caught:
             self.run_calibration([('linux-x64', {'recursion': (1.0, 0.1)})],
                                  existing=moved, overlays={7: mine})
@@ -386,8 +410,8 @@ class OverlayTests(unittest.TestCase):
         return baselines.resolve(base if base is not None else self.BASE, overlays)
 
     def rebase(self, number, t, frm=1.0, reason='moved'):
-        return (number, {'pr': number, 'reason': reason, 'rebaseline': {'linux-x64@a': {
-            'quicksort': {'all': dict(row(t, 0.1), **{'from': {'time': frm, 'memory': 0.1}})}}}})
+        return (number, {'pr': number, 'rebaseline': {'linux-x64@a': {'quicksort': {
+            'all': dict(row(t, 0.1), **{'from': {'time': frm, 'memory': 0.1}, 'reason': reason})}}}})
 
     def calib(self, number, t, key='linux-x64@b', runs=1, **tol):
         return (number, {'pr': number, 'calibrate': {key: {'quicksort': {'all': row(t, 0.2, runs, **tol)}}}})
@@ -443,6 +467,13 @@ class OverlayTests(unittest.TestCase):
             baselines.resolve(self.BASE, overlays, POLICY['tolerance'])
         self.assertIn('pr/14.json', str(caught.exception))
 
+    def test_a_file_level_reason_is_refused(self):
+        number, overlay = self.rebase(12, 0.8)
+        overlay['reason'] = 'covers everything'
+        with self.assertRaises(baselines.BaselineError) as caught:
+            baselines.validate_overlay(number, overlay, 'pr/12.json')
+        self.assertIn('each rebaseline row', str(caught.exception))
+
     def test_a_rebaseline_needs_a_reason_and_a_from(self):
         number, overlay = self.rebase(12, 0.8, reason='TODO')
         with self.assertRaises(baselines.BaselineError):
@@ -488,8 +519,8 @@ class OverlayTests(unittest.TestCase):
         self.assertIn('superseded', notes[0])
 
     def test_a_rebaseline_can_move_a_row_another_branch_calibrated(self):
-        frm = (15, {'pr': 15, 'reason': 'moved', 'rebaseline': {'linux-x64@b': {'quicksort': {
-            'all': dict(row(0.5, 0.2), **{'from': {'time': 1.0, 'memory': 0.2}})}}}})
+        frm = (15, {'pr': 15, 'rebaseline': {'linux-x64@b': {'quicksort': {
+            'all': dict(row(0.5, 0.2), **{'from': {'time': 1.0, 'memory': 0.2}, 'reason': 'moved'})}}}})
         rows, _ = self.resolve([self.calib(12, 1.0), frm])
         self.assertEqual(rows['linux-x64@b']['quicksort']['all']['time'], 0.5)
 
@@ -616,8 +647,8 @@ class StaleOverlayGateTests(unittest.TestCase):
         import json
         import os
         moved = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}}}
-        mine = {'pr': 7, 'reason': 'first try', 'rebaseline': {'linux-x64': {'quicksort': {
-            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}})}}}}
+        mine = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {
+            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'first try'})}}}}
         tree = BaselineTree(moved, {7: mine})
         saved = os.environ.get('CN1_PR_NUMBER')
         os.environ['CN1_PR_NUMBER'] = '7'
@@ -692,6 +723,16 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(linux['cpus'], ['a', 'b', 'c'])
         self.assertEqual(linux['benchmarks']['quicksort']['time'],
                          {'median': 1.2, 'min': 1.0, 'max': 1.4})
+
+    def test_each_cell_names_the_cpus_it_covers(self):
+        # Model b is calibrated for quicksort only so far.
+        rows = {'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1)}, 'recursion': {'all': row(2.0, 0.1)}},
+                'linux-x64@b': {'quicksort': {'all': row(1.4, 0.3)}}}
+        linux = baselines.summary(rows)['platforms'][0]
+        self.assertEqual(linux['cpus'], ['a', 'b'])
+        self.assertEqual(linux['benchmarks']['quicksort']['cpus'], ['a', 'b'])
+        self.assertEqual(linux['benchmarks']['recursion']['cpus'], ['a'])
+        self.assertEqual(linux['benchmarks']['recursion']['time']['median'], 2.0)
 
     def test_every_gated_benchmark_is_described(self):
         self.assertEqual([b for b, _, _ in baselines.BENCHMARKS],

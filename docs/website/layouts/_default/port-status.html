@@ -351,7 +351,8 @@
             {{- range $jdk.platforms }}
               {{- $platform := . -}}
               {{- $cell := index .benchmarks $benchmark.id -}}
-              <td data-jdk25-cell data-platform="{{ .id }}" title="{{ .name }}: {{ $benchmark.name }}, ParparVM / JDK 25 across {{ len .cpus }} CPU model{{ if ne (len .cpus) 1 }}s{{ end }}">
+              {{- $covered := 0 -}}{{- with $cell -}}{{- $covered = len .cpus -}}{{- end -}}
+              <td data-jdk25-cell data-platform="{{ .id }}" title="{{ .name }}: {{ $benchmark.name }}, ParparVM / JDK 25 across {{ $covered }} of {{ len .cpus }} CPU model{{ if ne (len .cpus) 1 }}s{{ end }}">
                 {{- with $cell -}}
                   {{- range $metric := slice "time" "memory" -}}
                     {{- $m := index $cell $metric -}}

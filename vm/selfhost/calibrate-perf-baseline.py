@@ -17,7 +17,8 @@ What it writes, per platform, benchmark and core setting the runs measured:
   rebaseline  for a row the runs put outside its tolerance, either way: a change that
               moved performance on purpose. Only the metric that moved is replaced, and
               --reason is required -- the reason is what a reviewer reads beside the
-              number. --all rebaselines every measured row instead, for recalibrating a
+              number; a row this pull request already rebaselined keeps its reason when
+              re-measured. --all rebaselines every measured row instead, for recalibrating a
               row's noise from several runs of unchanged code; --metric limits that to one
               metric, so recalibrating a noisy RAM figure leaves a steady time alone.
 
@@ -226,9 +227,17 @@ def main(argv=None):
     if not calibrate and not rebaseline:
         print('Every measured row is inside its tolerance; nothing to write.')
         return 0
-    if rebaseline and not (args.reason or own.get('reason')):
-        raise SystemExit('These rows moved past their tolerance and would be rebaselined; say '
-                         'why with --reason:\n' + json.dumps(rebaseline, indent=1))
+    if not args.reason:
+        # A row this overlay already rebaselined keeps its reason when re-measured; a row
+        # NEW to it needs its own -- never an earlier row's explanation by default.
+        unexplained = ['%s %s/%s' % (key, bench, cores)
+                       for key, bench, cores, _ in perf_baseline._rows('new', rebaseline)
+                       if not own.get('rebaseline', {}).get(key, {}).get(bench, {})
+                       .get(cores, {}).get('reason')]
+        if unexplained:
+            raise SystemExit('These rows moved past their tolerance and would be rebaselined; '
+                             'say why with --reason: %s\n%s' % (', '.join(unexplained),
+                                                              json.dumps(rebaseline, indent=1)))
     try:
         path = perf_baseline.write_overlay(root, number, calibrate, rebaseline, args.reason)
         perf_baseline.load(root)   # the overlay must resolve against everything else
