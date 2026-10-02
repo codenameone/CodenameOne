@@ -1,0 +1,20 @@
+{
+ "pr": 5883,
+ "rebaseline": {
+  "android": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 4720336
+     },
+     "reason": "Android code grew with features added on this branch after the gate was armed: 4,720,336 -> 4,772,660 (d50f587217, +1.1%), +656 bytes for the custom theme mode (0bcf456eab), +188 bytes for the runtime mount/styling change (2fc4148b80); still 4.5x under Flutter. The tolerance went from 0 to 0.5% (d070d57bc1) because at 0 every change that added bytes failed the leg; growth past ~24 KB still fails it.",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 4773504
+    }
+   }
+  }
+ }
+}

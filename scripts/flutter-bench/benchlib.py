@@ -27,8 +27,9 @@ Rules the numbers have to obey, because it is easy to produce flattering ones:
     is the median of the per-round ratios, each from two launches made back to
     back, and the figures shown are each side's median. Not each side's best:
     one undisturbed outlier on either side decided the verdict on its own (see
-    paired_rounds). The baseline gate still reads each side's best run, because
-    that is the statistic every committed baseline was recorded with.
+    paired_rounds). The regression gate (flutter_baseline.py) reads the same
+    statistic, Codename One over Flutter, so the pinned Flutter build is its
+    unit of measure and a slow runner cancels out.
   * The start-up clock runs OUTSIDE both processes: each application prints one
     marker on its first painted frame and the harness times from launch to that
     line, so neither runtime is trusted to time itself.
@@ -76,23 +77,6 @@ METRIC_UNITS = dict((key, unit) for key, _label, unit in METRICS)
 METRIC_LABELS = dict((key, label) for key, label, _unit in METRICS)
 
 SIDES = ("codenameone", "flutter")
-
-# The band a freshly recorded baseline gets, per metric. Size is deterministic
-# on a runner, so it gets a tight band; wall-clock start-up on a shared runner
-# is not, and a band tight enough to catch a real regression there would fire on
-# load alone; memory at rest sits between the two. Written INTO each baseline
-# file, so a platform that needs a different band says so in the file itself.
-# Sizes get NO tolerance: they are deterministic for a given source tree and
-# toolchain, so any growth is a real change and fails the gate. Re-baseline
-# deliberately (commit the run's candidate) when growth is intended.
-DEFAULT_TOLERANCES = {
-    "install_bytes": 0.0,
-    "code_bytes": 0.0,
-    "wire_bytes": 0.0,
-    "cold_start_ms": 0.25,
-    "idle_memory_bytes": 0.15,
-}
-
 
 # ----------------------------------------------------------------------
 # Sizing. Portable: every platform ships either a directory tree or a
@@ -451,20 +435,11 @@ def load_average():
 # ----------------------------------------------------------------------
 
 def summarise(side):
-    """Collapses a side's per-run samples into the figure the BASELINE reads.
+    """Collapses a side's per-run samples into one figure per metric: the best run.
 
-    Deliberately still the best run, not the median the head-to-head verdict
-    uses. These are the values check_regressions compares with, that
-    baseline_candidate records, and that runner_slowdown_discount holds
-    against flutter_reference -- and every committed baseline (cold start,
-    memory, the Flutter reference) was recorded as a best-of-N envelope.
-    Switching the summary to a median would compare a median with a minimum:
-    a gate that fires on a statistic change rather than a regression, with
-    every baseline silently re-meaning. The gate is Codename One against
-    itself across runs, not a comparison of two sides' rounds, so the
-    outlier-pairing problem paired_rounds fixes does not arise there; a lucky
-    round can only make it lenient, never fail a good build. To move the gate
-    to medians, re-record every baseline from medians in the same change.
+    Read only where rounds cannot be paired (verdict's fallback, which says so in
+    the report). Neither the head-to-head verdict nor the regression gate uses it
+    otherwise: both judge the median of the per-round ratios (paired_rounds).
     """
     out = dict(side)
     out["cold_start_ms"] = best_of(side.get("cold_start_runs") or [])
@@ -941,71 +916,6 @@ def tally(reports):
 # The regression gate
 # ----------------------------------------------------------------------
 
-def load_baseline(path):
-    if not os.path.exists(path):
-        return None
-    with open(path) as handle:
-        return json.load(handle)
-
-
-def check_regressions(report, baseline):
-    """Compares this run against the committed baseline for its platform.
-
-    Only Codename One's own numbers are gated. Flutter's are recorded for the
-    ratio and are outside our control, so a Flutter SDK upgrade that makes
-    their build bigger must not turn our build red.
-
-    Each metric carries its own tolerance because they are not equally noisy.
-    Size is deterministic on a runner and gets a tight band; wall-clock
-    measurements on a shared runner do not, and a band tight enough to catch a
-    real regression there would fire constantly on load alone.
-    """
-    if not baseline:
-        return []
-    findings = []
-    tolerances = baseline.get("tolerances", {})
-    values = baseline.get("codenameone", {})
-    for key, label, _unit in METRICS:
-        expected = values.get(key)
-        tolerance = tolerances.get(key)
-        if expected is None or tolerance is None:
-            continue
-        actual = report["codenameone"].get(key)
-        if actual is None:
-            # A gated metric that this run did not produce is a FAILURE, never
-            # a skip. The adapter being available is what made this report
-            # "measured", and sizes are read from the build output whether or
-            # not the app ever ran -- so a desktop build that launches and
-            # never prints its first-frame marker loses every start-up and
-            # memory sample while the size rows still fill in. Skipping the
-            # absent rows then printed "within tolerance" for a run whose
-            # start-up was completely broken.
-            findings.append({
-                "metric": key,
-                "label": label,
-                "baseline": expected,
-                "actual": None,
-                "tolerance": tolerance,
-                "missing": True,
-            })
-            continue
-        judged = actual * runner_slowdown_discount(report, baseline, key)
-        limit = expected * (1.0 + tolerance)
-        if judged > limit:
-            finding = {
-                "metric": key,
-                "label": label,
-                "baseline": expected,
-                "actual": actual,
-                "tolerance": tolerance,
-                "over_by": round((judged / float(expected) - 1.0) * 100.0, 1),
-            }
-            if judged != actual:
-                finding["judged"] = round(judged, 1)
-            findings.append(finding)
-    return findings
-
-
 def check_behind(report):
     """Every measured metric on which Codename One is BEHIND Flutter.
 
@@ -1015,7 +925,7 @@ def check_behind(report):
     source and measured interleaved on the same runner, so a slow runner slows
     both and cannot turn a win into a loss or a loss into a win.
 
-    A metric that was not measured is not judged here; check_regressions fails
+    A metric that was not measured is not judged here; the regression gate fails
     the ones a baseline gates, and the report says which were not measured.
     """
     findings = []
@@ -1060,67 +970,6 @@ def check_behind(report):
     return findings
 
 
-# Wall-clock metrics whose runner speed Flutter's own number measures.
-LOAD_NORMALISED = ("cold_start_ms",)
-
-
-def runner_slowdown_discount(report, baseline, key):
-    """How much of this run's time is the runner being slow, as a factor <= 1.
-
-    The emulator's speed swings by up to 2x between runs: in one run the Android
-    emulator booted in 75s instead of ~57s and Flutter's own cold start came in at
-    2244 ms against 1031-1505 ms in the runs before, and Codename One's rose with it
-    -- the gate failed a change that Linux and Windows, running the same code, showed
-    had not moved at all. Flutter is PINNED (FLUTTER_REF) and measured interleaved on
-    the same emulator, so when it is slower than its recorded reference the runner is
-    slower, by that much.
-
-    One-sided on purpose: a runner no slower than the reference is judged exactly as
-    before, so this only ever discounts load; it never makes the gate stricter, and a
-    slow Flutter cannot hide a regression on a normal runner. Metrics outside
-    LOAD_NORMALISED, and baselines without a flutter_reference, are not adjusted.
-    """
-    if key not in LOAD_NORMALISED:
-        return 1.0
-    reference = (baseline.get("flutter_reference") or {}).get(key)
-    theirs = (report.get("flutter") or {}).get(key)
-    if not reference or not theirs or theirs <= reference:
-        return 1.0
-    return reference / float(theirs)
-
-
-def baseline_candidate(report):
-    """A baseline recorded from this run, ready to commit as-is.
-
-    Only Codename One's figures are gated, and are the values here; Flutter's
-    appear only as flutter_reference, the yardstick for runner speed that
-    runner_slowdown_discount reads.
-    Written by every gated run, so re-baselining after a deliberate change --
-    a Flutter SDK bump moves every number -- is copying one file, not
-    re-deriving it by hand.
-    """
-    values = {}
-    for key, _label, _unit in METRICS:
-        value = report.get("codenameone", {}).get(key)
-        if value is not None:
-            values[key] = value
-    reference = {}
-    for key in LOAD_NORMALISED:
-        value = report.get("flutter", {}).get(key)
-        if value is not None:
-            reference[key] = value
-    candidate = {
-        "schema_version": 1,
-        "platform": report.get("platform"),
-        "generated_at": report.get("generated_at"),
-        "tolerances": dict((k, DEFAULT_TOLERANCES[k]) for k in values if k in DEFAULT_TOLERANCES),
-        "codenameone": values,
-    }
-    if reference:
-        candidate["flutter_reference"] = reference
-    return candidate
-
-
 def render_gate(report):
     """One line saying whether this platform's numbers were actually gated."""
     gate = report.get("gate")
@@ -1131,12 +980,18 @@ def render_gate(report):
             if behind else "")
     if gate.get("status") == "armed":
         findings = report.get("regressions") or []
-        return ("**Gate:** %s against the committed baseline%s."
-                % ("REGRESSED" if findings else "within tolerance", lost))
-    return ("**Gate: NOT ARMED** -- %s. This run's candidate baseline is attached "
-            "to the workflow as an artifact; committing it as `%s` arms the gate%s."
-            % (gate.get("reason", "no baseline"), gate.get("baseline", "baselines/<platform>.json"),
-               lost))
+        line = ("**Gate:** %s against `scripts/flutter-bench/baseline`%s."
+                % ("OUTSIDE THE BASELINE" if findings else "within tolerance", lost))
+        if gate.get("stale_overlay"):
+            line += (" This pull request's own overlay is stale (%s); the run was judged "
+                     "without it, and fails until it is re-measured." % gate["stale_overlay"])
+        if findings or gate.get("stale_overlay"):
+            line += (" To accept the move, download this platform's `baseline-<platform>.json` "
+                     "artifact and run `%s`, then commit the overlay it writes."
+                     % gate.get("fix", "flutter_baseline.py calibrate"))
+        return line
+    return ("**Gate: NOT JUDGED** -- %s%s."
+            % (gate.get("reason", "no baseline could be read"), lost))
 
 
 def render_regressions(platform_id, findings):
@@ -1160,19 +1015,13 @@ def render_regressions(platform_id, findings):
                             format_value(item["metric"], item["flutter"]),
                             item["ratio"]))
             continue
-        if item.get("missing"):
-            lines.append("%s: %s was not measured, but the baseline gates it at %s"
-                         % (platform_id, item["label"],
-                            format_value(item["metric"], item["baseline"])))
+        if item.get("verdict"):
+            # A regression-gate finding (flutter_baseline.judge). Imported here, not at
+            # the top: flutter_baseline imports this module.
+            import flutter_baseline
+            lines.append("%s: %s" % (platform_id, flutter_baseline.describe(item)))
             continue
-        lines.append(
-            "%s: %s is %s%s against a baseline of %s (+%.1f%%, tolerance +%.0f%%)"
-            % (platform_id, item["label"],
-               format_value(item["metric"], item["actual"]),
-               (" (%s after discounting a slow runner)" % format_value(item["metric"], item["judged"])
-                if "judged" in item else ""),
-               format_value(item["metric"], item["baseline"]),
-               item["over_by"], item["tolerance"] * 100.0))
+        lines.append("%s: %s" % (platform_id, item.get("label", item.get("metric"))))
     return lines
 
 

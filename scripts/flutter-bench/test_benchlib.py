@@ -75,11 +75,6 @@ class BehindFlutterGateTest(unittest.TestCase):
         report["behind"] = benchlib.check_behind(report)
         self.assertIn("BEHIND FLUTTER", benchlib.render_gate(report))
 
-    def test_size_metrics_have_no_tolerance(self):
-        for key in ("install_bytes", "code_bytes", "wire_bytes"):
-            self.assertEqual(benchlib.DEFAULT_TOLERANCES[key], 0.0)
-
-
 class ComputeTest(unittest.TestCase):
     """The VM-workload comparison: same checksum or no ratio, geomean gates."""
 
@@ -280,111 +275,6 @@ class StatisticsTest(unittest.TestCase):
         self.assertEqual(side["cold_start_lower_ms"], 200)
 
 
-class RegressionGateTest(unittest.TestCase):
-
-    BASELINE = {
-        "codenameone": {"install_bytes": 1000},
-        "tolerances": {"install_bytes": 0.02},
-    }
-
-    STARTUP_BASELINE = {
-        "codenameone": {"install_bytes": 1000, "cold_start_ms": 200},
-        "tolerances": {"install_bytes": 0.02, "cold_start_ms": 0.25},
-    }
-
-    def test_within_tolerance_is_silent(self):
-        report = _report({"install_bytes": 1015}, {"install_bytes": 5000})
-        self.assertEqual(
-            benchlib.check_regressions(report, self.BASELINE), [])
-
-    def test_past_tolerance_is_reported(self):
-        report = _report({"install_bytes": 1100}, {"install_bytes": 5000})
-        found = benchlib.check_regressions(report, self.BASELINE)
-        self.assertEqual(len(found), 1)
-        self.assertEqual(found[0]["metric"], "install_bytes")
-        self.assertAlmostEqual(found[0]["over_by"], 10.0, places=1)
-
-    def test_an_improvement_never_fails_the_build(self):
-        report = _report({"install_bytes": 500}, {"install_bytes": 5000})
-        self.assertEqual(
-            benchlib.check_regressions(report, self.BASELINE), [])
-
-    def test_only_our_own_numbers_are_gated(self):
-        """A Flutter SDK upgrade must not be able to turn our build red.
-
-        Their size is outside our control and is recorded for the ratio only.
-        """
-        report = _report({"install_bytes": 1000}, {"install_bytes": 99999999})
-        self.assertEqual(
-            benchlib.check_regressions(report, self.BASELINE), [])
-
-    SLOW_RUNNER_BASELINE = {
-        "codenameone": {"cold_start_ms": 418},
-        "tolerances": {"cold_start_ms": 0.25},
-        "flutter_reference": {"cold_start_ms": 1505},
-    }
-
-    def test_a_slow_runner_is_discounted_by_flutters_own_slowdown(self):
-        """The run that motivated it: the emulator was slow for everyone.
-
-        Flutter (pinned) came in at 2244 ms against its 1505 ms reference, and
-        Codename One at 754 ms against a 418 ms baseline; discounted by the same
-        ratio it is 505 ms, inside the 25% band. Linux and Windows showed the code
-        had not moved.
-        """
-        report = _report({"cold_start_runs": [754]}, {"cold_start_runs": [2244]})
-        self.assertEqual(
-            benchlib.check_regressions(report, self.SLOW_RUNNER_BASELINE), [])
-
-    def test_a_normal_runner_gets_no_discount(self):
-        """A slow Flutter cannot hide our regression on a runner that is not slow."""
-        report = _report({"cold_start_runs": [754]}, {"cold_start_runs": [1200]})
-        found = benchlib.check_regressions(report, self.SLOW_RUNNER_BASELINE)
-        self.assertEqual(len(found), 1)
-        self.assertNotIn("judged", found[0])
-
-    def test_a_regression_beyond_the_slowdown_still_fails(self):
-        report = _report({"cold_start_runs": [1500]}, {"cold_start_runs": [2244]})
-        found = benchlib.check_regressions(report, self.SLOW_RUNNER_BASELINE)
-        self.assertEqual(len(found), 1)
-        self.assertAlmostEqual(found[0]["judged"], 1500 * 1505 / 2244.0, places=0)
-
-    def test_without_a_reference_nothing_is_discounted(self):
-        report = _report({"cold_start_runs": [754]}, {"cold_start_runs": [2244]})
-        baseline = {"codenameone": {"cold_start_ms": 418}, "tolerances": {"cold_start_ms": 0.25}}
-        self.assertEqual(len(benchlib.check_regressions(report, baseline)), 1)
-
-    def test_the_candidate_records_the_flutter_reference(self):
-        report = _report({"cold_start_runs": [300]}, {"cold_start_runs": [1400]})
-        candidate = benchlib.baseline_candidate(report)
-        self.assertEqual(candidate["flutter_reference"], {"cold_start_ms": 1400})
-
-    def test_a_gated_metric_the_run_did_not_produce_fails_the_gate(self):
-        # Sizes come from the build output, so they fill in even when the app
-        # never reached its first frame; the start-up row is simply absent.
-        report = _report({"install_bytes": 1000}, {"install_bytes": 5000})
-        found = benchlib.check_regressions(report, self.STARTUP_BASELINE)
-        self.assertEqual([f["metric"] for f in found], ["cold_start_ms"])
-        self.assertTrue(found[0]["missing"])
-        line = benchlib.render_regressions("linux", found)[0]
-        self.assertIn("was not measured", line)
-
-    def test_an_ungated_metric_the_run_did_not_produce_is_not_a_failure(self):
-        baseline = {"codenameone": {"install_bytes": 1000, "cold_start_ms": 200},
-                    "tolerances": {"install_bytes": 0.02}}
-        report = _report({"install_bytes": 1000}, {"install_bytes": 5000})
-        self.assertEqual(benchlib.check_regressions(report, baseline), [])
-
-    def test_a_metric_with_no_tolerance_is_not_gated(self):
-        baseline = {"codenameone": {"install_bytes": 1000}, "tolerances": {}}
-        report = _report({"install_bytes": 99999}, {"install_bytes": 5000})
-        self.assertEqual(benchlib.check_regressions(report, baseline), [])
-
-    def test_no_baseline_yet_is_not_a_failure(self):
-        report = _report({"install_bytes": 99999}, {"install_bytes": 5000})
-        self.assertEqual(benchlib.check_regressions(report, None), [])
-
-
 class SizingTest(unittest.TestCase):
 
     def test_tree_size_sums_file_lengths(self):
@@ -442,29 +332,32 @@ class MarkdownTest(unittest.TestCase):
 
 
 class GateArming(unittest.TestCase):
-    """A gate with no baseline must say so where gates are read: the exit status."""
+    """The gate's result is the exit status: a missing row fails, a judged one passes."""
 
     def _report(self, install=1000):
         return {"platform": "fake", "generated_at": "2026-01-01T00:00:00Z",
-                "codenameone": {"install_bytes": install, "cold_start_ms": 500.0,
-                                "code_bytes": None},
+                "codenameone": {"install_bytes": install, "code_bytes": None},
                 "flutter": {"install_bytes": 2000}}
 
-    def test_candidate_holds_only_codenameone_values_with_their_bands(self):
-        c = benchlib.baseline_candidate(self._report())
-        self.assertEqual({"install_bytes": 1000, "cold_start_ms": 500.0}, c["codenameone"])
-        self.assertEqual({"install_bytes": 0.0, "cold_start_ms": 0.25}, c["tolerances"])
-        self.assertEqual([], benchlib.check_regressions(self._report(), c),
-                         "a run compared against its own candidate is within tolerance")
+    def test_the_gate_line_says_what_to_run(self):
+        report = dict(self._report(), regressions=[{"metric": "install_bytes"}],
+                      gate={"status": "armed", "fix": "flutter_baseline.py calibrate --pr 9 x"})
+        self.assertIn("flutter_baseline.py calibrate --pr 9", benchlib.render_gate(report))
 
-    def test_unarmed_gate_is_rendered_as_such(self):
-        report = dict(self._report(), gate={"status": "unarmed", "reason": "no committed baseline",
-                                            "baseline": "scripts/flutter-bench/baselines/fake.json"})
-        self.assertIn("NOT ARMED", benchlib.render_gate(report))
+    def test_an_unreadable_baseline_is_rendered_as_not_judged(self):
+        report = dict(self._report(), gate={"status": "refused", "reason": "two overlays"})
+        self.assertIn("NOT JUDGED", benchlib.render_gate(report))
 
-    def _main(self, baseline):
+    def _main(self, rows):
         import run_bench
+        import flutter_baseline
         work = tempfile.mkdtemp()
+        root = os.path.join(work, "baseline")
+        os.makedirs(os.path.join(root, "pr"))
+        with open(os.path.join(flutter_baseline.ROOT, "policy.json")) as src, \
+                open(os.path.join(root, "policy.json"), "w") as dst:
+            dst.write(src.read())
+        flutter_baseline.perf_baseline.write_base(root, rows)
         report = self._report()
 
         class Stub(object):
@@ -481,32 +374,37 @@ class GateArming(unittest.TestCase):
             def run_compute(self, side):
                 raise platforms.Unavailable("the stub runs no workloads")
 
-        saved = (run_bench.build_adapter, run_bench.measure, run_bench.BASELINES)
+        saved = (run_bench.build_adapter, run_bench.measure, run_bench.BASELINE_ROOT,
+                 os.environ.get("CN1_PR_NUMBER"))
         run_bench.build_adapter = lambda args: Stub()
         run_bench.measure = lambda adapter, runs, workdir: (
             {side: {"artifact": "x", "install_bytes": report[side]["install_bytes"],
-                    "cold_start_runs": [500.0], "cold_start_lower_runs": [],
+                    "cold_start_runs": [], "cold_start_lower_runs": [],
                     "idle_memory_runs": []} for side in benchlib.SIDES}, [])
-        run_bench.BASELINES = work
+        run_bench.BASELINE_ROOT = root
+        os.environ["CN1_PR_NUMBER"] = "9"
         try:
-            if baseline is not None:
-                with open(os.path.join(work, "fake.json"), "w") as handle:
-                    json.dump(baseline, handle)
             out = os.path.join(work, "result.json")
             candidate = os.path.join(work, "candidate.json")
             code = run_bench.main(["--platform", "fake", "--gate", "--json", out,
                                    "--baseline-out", candidate, "--runs", "1"])
             with open(out) as handle:
                 written = json.load(handle)
-            return code, written, os.path.exists(candidate)
+            with open(candidate) as handle:
+                return code, written, json.load(handle)
         finally:
-            run_bench.build_adapter, run_bench.measure, run_bench.BASELINES = saved
+            (run_bench.build_adapter, run_bench.measure, run_bench.BASELINE_ROOT, number) = saved
+            if number is None:
+                os.environ.pop("CN1_PR_NUMBER", None)
+            else:
+                os.environ["CN1_PR_NUMBER"] = number
 
-    def test_a_missing_baseline_fails_the_run_and_leaves_a_candidate(self):
-        code, written, candidate_written = self._main(None)
-        self.assertEqual(1, code, "an unarmed gate must not report success")
-        self.assertEqual("unarmed", written["gate"]["status"])
-        self.assertTrue(candidate_written)
+    def test_a_missing_row_fails_the_run_and_leaves_a_candidate(self):
+        code, written, candidate = self._main({})
+        self.assertEqual(1, code, "an uncalibrated metric must not report success")
+        self.assertEqual(["uncalibrated"], [f["verdict"] for f in written["regressions"]])
+        self.assertEqual({"install_bytes": 1000}, candidate["values"])
+        self.assertIn("calibrate --pr 9 baseline-fake.json", written["gate"]["fix"])
 
     def test_an_unmeasured_platform_fails_the_gate(self):
         import run_bench
@@ -531,11 +429,18 @@ class GateArming(unittest.TestCase):
         finally:
             run_bench.build_adapter = saved
 
-    def test_an_armed_gate_within_tolerance_passes(self):
-        baseline = {"codenameone": {"install_bytes": 1000}, "tolerances": {"install_bytes": 0.02}}
-        code, written, _ = self._main(baseline)
+    def test_a_judged_run_within_tolerance_passes(self):
+        code, written, _ = self._main({"fake": {"gallery": {"install_bytes": {
+            "value": 1000, "runs": 1}}}})
         self.assertEqual(0, code)
         self.assertEqual("armed", written["gate"]["status"])
+        self.assertEqual([], written["regressions"])
+
+    def test_a_size_that_shrank_fails_until_it_is_rebaselined(self):
+        code, written, _ = self._main({"fake": {"gallery": {"install_bytes": {
+            "value": 1200, "runs": 1}}}})
+        self.assertEqual(1, code)
+        self.assertEqual("improved", written["regressions"][0]["verdict"])
 
 
 class StartupBracket(unittest.TestCase):

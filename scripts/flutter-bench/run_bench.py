@@ -16,8 +16,9 @@ concern on this project: two walkthrough recordings desynchronised and looked
 like a timing regression, and the cause was a stray simulator holding the
 machine at load 8.
 
-Exit status is 0 unless `--gate` was asked for and a metric regressed past its
-baseline tolerance.
+Exit status is 0 unless `--gate` was asked for and either Codename One is behind
+Flutter on a metric, or a metric moved past its row in scripts/flutter-bench/baseline
+(flutter_baseline.py) -- or has no row to be judged by.
 """
 
 import argparse
@@ -30,10 +31,11 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import benchlib          # noqa: E402
+import flutter_baseline  # noqa: E402
 import platforms         # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BASELINES = os.path.join(HERE, "baselines")
+BASELINE_ROOT = str(flutter_baseline.ROOT)
 
 
 def build_adapter(args):
@@ -220,33 +222,23 @@ def main(argv=None):
             "treat the first published run as the thing under review.")
     report = benchlib.build_report(adapter.id, sides, args.runs, notes)
     report["status"] = "measured"
+    # The runner's CPU model, recorded with every result: a ratio row can be keyed by it
+    # (flutter_baseline.row_key), as the ParparVM gate's are. On Android this is the host
+    # the emulator runs on, which is the CPU both apps actually execute on.
+    report["cpu"] = flutter_baseline.perf_gate.cpu_model()
     print("%s: compute workloads" % adapter.label)
     report["compute"] = measure_compute(adapter, args.workdir)
 
     if args.baseline_out:
         _ensure_dir(args.baseline_out)
         with open(args.baseline_out, "w") as handle:
-            json.dump(benchlib.baseline_candidate(report), handle, indent=2, sort_keys=True)
+            json.dump(flutter_baseline.candidate(report), handle, indent=2, sort_keys=True)
         print("wrote baseline candidate %s" % args.baseline_out)
 
     findings = []
-    unarmed = False
+    stale = False
     if args.gate:
-        relative = "scripts/flutter-bench/baselines/%s.json" % adapter.id
-        baseline = benchlib.load_baseline(os.path.join(BASELINES, "%s.json" % adapter.id))
-        if baseline is None:
-            # A FAILURE, not a note. This used to print "recording this run as
-            # the first" and succeed -- while recording nothing -- so every run
-            # took this branch and the gate that was advertised never compared
-            # anything. An unarmed gate has to be visible where a gate's result
-            # is read, which is the job's status.
-            unarmed = True
-            report["gate"] = {"status": "unarmed", "baseline": relative,
-                              "reason": "no committed baseline for %s" % adapter.id}
-        else:
-            findings = benchlib.check_regressions(report, baseline)
-            report["regressions"] = findings
-            report["gate"] = {"status": "armed", "baseline": relative}
+        findings, stale = _judge(report, adapter.id)
         # Losing to Flutter fails the gate on its own, baseline or not: the
         # benchmark exists to show Codename One ahead on every metric, and a
         # loss that matched the baseline would otherwise pass as "no change".
@@ -260,16 +252,55 @@ def main(argv=None):
     # job could not show whether it had compared against anything.
     print(benchlib.render_markdown([report]))
 
-    if findings:
+    if findings or stale:
         print("\nGATE FAILED")
         for line in benchlib.render_regressions(adapter.id, findings):
             print("  " + line)
-        return 1
-    if unarmed:
-        print("\nGATE NOT ARMED: %s has no committed baseline. Commit the candidate "
-              "this run wrote (--baseline-out) as %s." % (adapter.id, report["gate"]["baseline"]))
+        if stale:
+            print("  this pull request's own overlay is stale: %s" % report["gate"]["stale_overlay"])
+        if report.get("regressions") or stale:
+            print("  to accept the move: %s" % report["gate"]["fix"])
         return 1
     return 0
+
+
+def _judge(report, platform_id):
+    """The regression gate: (findings, stale). Reads scripts/flutter-bench/baseline the
+    way the ParparVM gate reads its own (vm/selfhost/perf-gate.py), including what it does
+    when this pull request's own overlay went stale: judge without it and fail, rather than
+    refuse to judge and leave nothing to re-measure from."""
+    number = flutter_baseline.perf_baseline.pr_number()
+    artifact = "baseline-%s.json" % platform_id
+    stale = None
+    try:
+        data = flutter_baseline.load(BASELINE_ROOT)
+    except flutter_baseline.BaselineError as error:
+        data = None
+        own = number and os.path.isfile(os.path.join(BASELINE_ROOT, "pr", "%d.json" % number))
+        if own:
+            try:
+                data = flutter_baseline.load(BASELINE_ROOT, exclude=number)
+                stale = str(error)
+            except flutter_baseline.BaselineError:
+                data = None
+        if data is None:
+            # Overlays that contradict each other leave nothing to judge against: a
+            # failure, never a skip, and the comment says which.
+            report["gate"] = {"status": "refused", "reason": "flutter-baseline: %s" % error}
+            finding = {"metric": "baseline", "label": "the baselines could not be read: %s"
+                       % error}
+            report["regressions"] = [finding]
+            return [finding], False
+    findings = flutter_baseline.judge(report, data)
+    for note in data.get("notes", []):
+        print("flutter-baseline note: %s" % note)
+    report["regressions"] = findings
+    report["gate"] = {"status": "armed", "baseline": "scripts/flutter-bench/baseline",
+                      "pr": number,
+                      "fix": flutter_baseline.fix_command(number, findings, artifact)}
+    if stale:
+        report["gate"]["stale_overlay"] = stale
+    return findings, bool(stale)
 
 
 def _write(args, report, reports):
