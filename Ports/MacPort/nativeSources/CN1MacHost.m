@@ -260,6 +260,18 @@ static CGFloat cn1MacContentHeightPoints(void) {
                                               styleMask:style
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
+    // Published HERE, the instant builtWindow stops being nil, rather than from
+    // the block CN1MacInstallAppDelegate queues for later. In between,
+    // macMonitorForMainWindow found a built window with nothing published and
+    // marshalled onto this thread to ask it -- which, at start-up, is busy
+    // finishing this very build and then launching the application. Measured on
+    // the benchmark runner: the event dispatch thread sat 60-70ms in that hop,
+    // inside UIManager's constructor, on the launches where its first
+    // convertToPixels landed after the window existed. The window has no screen
+    // yet, so this publishes the primary one -- the same answer the hop gave --
+    // and the republish below corrects it once the window is placed.
+    extern void CN1MacPublishMainWindowScreen(void);
+    CN1MacPublishMainWindowScreen();
     cn1StartupPhase("bw.windowAlloc");
     ((CN1MacWindow *)_window).cn1AcceptsKey = YES;
     // Remembers where the user left it between launches. One line, and its
@@ -345,6 +357,8 @@ static CGFloat cn1MacContentHeightPoints(void) {
     // this process in front. Without this the app launches, runs and draws --
     // behind whatever the user was already looking at.
     [NSApp activateIgnoringOtherApps:YES];
+    // On screen now, so the real screen rather than the primary stand-in.
+    CN1MacPublishMainWindowScreen();
     cn1StartupPhase("buildWindow.exit");
 }
 

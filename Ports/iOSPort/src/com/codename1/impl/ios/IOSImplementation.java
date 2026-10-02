@@ -2126,7 +2126,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// still repaint redundantly; that is a real cost, and it is the trade the
     /// mode exists to make.
     @Override
+    private static int diagPaints;
     public void paintDirty() {
+        boolean diag = diagPaints < 3 && hasPendingPaints();
+        if (diag) { diagPaints++; System.out.println("BENCH:T paintDirty=" + System.currentTimeMillis()); }
         if (isDirectToDrawable() && hasPendingPaints()) {
             Form f = Display.getInstance().getCurrent();
             if (f != null) {
@@ -2150,9 +2153,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
         super.paintDirty();
+        if (diag) { System.out.println("BENCH:T paintDirtyEnd=" + System.currentTimeMillis()); }
     }
 
     public void flushGraphics(int x, int y, int width, int height) {
+        if (diagPaints < 3) { System.out.println("BENCH:T flushGraphics=" + System.currentTimeMillis()); }
         if (isDirectToDrawable()) {
             // The flush region is not just a hint here: CodenameOne_GLViewController
             // hands it to ClipRect.setDrawRect and the Metal path clamps every

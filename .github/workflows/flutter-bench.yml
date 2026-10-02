@@ -138,12 +138,14 @@ jobs:
 
       # DIAGNOSTIC BRANCH ONLY: the 09-27 tree, for a same-runner A/B.
       - name: Check out the old tree (diag)
+        if: ${{ false }}
         uses: actions/checkout@v4
         with:
           ref: 83f09b32635333c695b4aee03127c84ecb0127dd
           path: old-src
 
       - name: Build the old framework (diag)
+        if: ${{ false }}
         run: |
           ln -sfn /opt/cn1-binaries "$GITHUB_WORKSPACE/cn1-binaries"
           cd old-src/maven
@@ -159,7 +161,7 @@ jobs:
               -pl dart-runtime,flutter-runtime
 
       - name: Pack the repository
-        run: tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2 m2-old
+        run: tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2 $(cd "$GITHUB_WORKSPACE" && ls -d m2-old 2>/dev/null)
 
       - name: Upload the repository
         uses: actions/upload-artifact@v4
@@ -363,7 +365,7 @@ jobs:
           grep '^flutter=' "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
 
       - name: Check out the old tree (diag)
-        if: ${{ matrix.platform == 'macos' }}
+        if: ${{ false }}
         uses: actions/checkout@v4
         with:
           ref: 83f09b32635333c695b4aee03127c84ecb0127dd
@@ -371,7 +373,7 @@ jobs:
 
       - name: Build the old application (diag)
         id: buildold
-        if: ${{ matrix.platform == 'macos' }}
+        if: ${{ false }}
         continue-on-error: true
         shell: bash
         run: |

@@ -1000,6 +1000,19 @@ static void CN1MacServeFirstFrameBeforeRun(void) {
     extern BOOL cn1MacFirstFramePresented;
     if (getenv("CN1_DIAG_NO_EARLY_FRAME") != NULL) { return; } /* DIAG A/B switch */
     CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 0.75;
+    /* DIAG: what the main run loop does while the first frame is pending */
+    CFRunLoopObserverRef diagObs = NULL;
+    if (getenv("CN1_STARTUP_PHASES") != NULL) {
+        diagObs = CFRunLoopObserverCreateWithHandler(NULL, kCFRunLoopAllActivities, true, -2000000,
+            ^(CFRunLoopObserverRef o, CFRunLoopActivity act) {
+                const char *n = act == kCFRunLoopEntry ? "rl.entry" : act == kCFRunLoopBeforeTimers ? "rl.beforeTimers"
+                    : act == kCFRunLoopBeforeSources ? "rl.beforeSources" : act == kCFRunLoopBeforeWaiting ? "rl.beforeWaiting"
+                    : act == kCFRunLoopAfterWaiting ? "rl.afterWaiting" : "rl.exit";
+                cn1StartupPhase(n);
+            });
+        CFRunLoopAddObserver(CFRunLoopGetMain(), diagObs, kCFRunLoopDefaultMode);
+    }
+    cn1StartupPhase("pump.enter");
     while (!cn1MacFirstFramePresented) {
         CFTimeInterval left = deadline - CFAbsoluteTimeGetCurrent();
         if (left <= 0) {
@@ -1014,6 +1027,7 @@ static void CN1MacServeFirstFrameBeforeRun(void) {
         }
     }
     cn1StartupPhase("firstFrameServedBeforeRun");
+    if (diagObs != NULL) { CFRunLoopRemoveObserver(CFRunLoopGetMain(), diagObs, kCFRunLoopDefaultMode); CFRelease(diagObs); }
 }
 
 /// Builds the main window on the main thread before [NSApp run], called from the
