@@ -85,6 +85,20 @@ public abstract class BackendTestPackager extends BackendPackager {
         return true;
     }
 
+    /// Whether the JVM run runs test `method` of the selected class `binaryName`:
+    /// all of them by default; the Maven goal narrows them by `-Dtest=Class#method`.
+    protected boolean selectsTestMethod(String binaryName, String method) {
+        return true;
+    }
+
+    /// The selection the test pass applies: a class name, or `Class#method` for one
+    /// of its tests.
+    private boolean selects(String name) {
+        int hash = name.indexOf('#');
+        return hash < 0 ? selectsTestClass(name)
+                : selectsTestMethod(name.substring(0, hash), name.substring(hash + 1));
+    }
+
     /// Sets [#strict].
     public BackendTestPackager strict(boolean value) {
         this.strict = value;
@@ -113,6 +127,47 @@ public abstract class BackendTestPackager extends BackendPackager {
         addSources(testRuntime);
     }
 
+    private static final java.util.regex.Pattern MOCKITO =
+            java.util.regex.Pattern.compile("\\borg\\s*\\.\\s*mockito\\b");
+
+    /// Whether Java `source` uses Mockito in its code -- an import or a qualified
+    /// name. Comments and string or character literals are blanked out first: the
+    /// words in a comment, a Javadoc or a fixture string left an otherwise
+    /// translatable test file out of the compiled run.
+    static boolean usesMockito(String source) {
+        StringBuilder code = new StringBuilder(source.length());
+        int n = source.length();
+        int i = 0;
+        while (i < n) {
+            char c = source.charAt(i);
+            char next = i + 1 < n ? source.charAt(i + 1) : 0;
+            if (c == '/' && next == '/') {
+                while (i < n && source.charAt(i) != '\n') {
+                    i++;
+                }
+            } else if (c == '/' && next == '*') {
+                int end = source.indexOf("*/", i + 2);
+                i = end < 0 ? n : end + 2;
+                code.append(' ');
+            } else if (c == '"' && source.startsWith("\"\"\"", i)) {
+                int end = source.indexOf("\"\"\"", i + 3);
+                i = end < 0 ? n : end + 3;
+                code.append(' ');
+            } else if (c == '"' || c == '\'') {
+                i++;
+                while (i < n && source.charAt(i) != c && source.charAt(i) != '\n') {
+                    i += source.charAt(i) == '\\' ? 2 : 1;
+                }
+                i++;
+                code.append(' ');
+            } else {
+                code.append(c);
+                i++;
+            }
+        }
+        return MOCKITO.matcher(code).find();
+    }
+
     @Override
     protected void afterGenerate(File jdk, File javaApi, File classes, File work)
             throws BuildExecutionException {
@@ -136,7 +191,7 @@ public abstract class BackendTestPackager extends BackendPackager {
             } catch (IOException err) {
                 throw new BuildExecutionException("Could not read " + f, err);
             }
-            if (text.indexOf("org.mockito") >= 0) {
+            if (usesMockito(text)) {
                 excluded.put(f.getName(), "imports Mockito, which runs only on the JVM");
                 continue;
             }
@@ -174,7 +229,7 @@ public abstract class BackendTestPackager extends BackendPackager {
         List<String> cp = new ArrayList<String>(classpath);
         cp.add(javaApi.getAbsolutePath());
         BackendTests.process(classes, testClasses, new File(work, "test-stubs"),
-                host.baseDir(), roots, sourceEncoding(), cp, true, this::selectsTestClass, getLog());
+                host.baseDir(), roots, sourceEncoding(), cp, true, this::selects, getLog());
         copyDirectory(testClasses, classes);
         // One main per translation: the app's generated entry point goes, and the
         // test runner's takes its place. No test calls it; a test starts the

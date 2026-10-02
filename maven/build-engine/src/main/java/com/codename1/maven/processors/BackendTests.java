@@ -60,7 +60,8 @@ public final class BackendTests {
     }
 
     /// As above, with a compiled run limited to the test classes, by binary name,
-    /// that `selection` accepts -- the ones the build tool's JVM run discovers.
+    /// that `selection` accepts -- the ones the build tool's JVM run discovers --
+    /// and to the tests of each it accepts as `Class#method`.
     public static int process(File mainClasses, File testClasses, File stubs, File projectDir,
                               List<String> sourceRoots, String encoding, List<String> classpath,
                               boolean compiled, java.util.function.Predicate<String> selection, Log log)

@@ -266,15 +266,19 @@ and `@Tag`, `Assumptions`, and the `Assertions` methods: `assertEquals`,
 
 The compiled run picks the same test classes as the JVM run: under Maven, the
 ones Surefire's includes and excludes select (its defaults, unless the pom names
-others), or the ones `-Dtest` names; under Gradle, every test class. Tag
-selection isn't applied to it.
+others), or the ones `-Dtest` names, down to the methods a `Class#method` entry
+selects; under Gradle, every test class. Tag selection isn't applied to it.
+
+`@BackendTest` is inherited, so an abstract base class can carry it with the
+shared fields and tests. Each concrete subclass gets its own context, and tests
+declared as default methods of an interface the class implements run too.
 
 The results go to `target/surefire-reports` as `TEST-<class>-compiled.xml`,
 beside the JVM run's reports, and a failed test fails the build.
 
 A compiled run has these limits:
 
-* **Mockito.** A test class that imports Mockito is left out of the binary, and
+* **Mockito.** A test class whose code uses Mockito is left out of the binary, and
   a class with a `@MockitoBean` field is reported as skipped. Pass
   `-Dcn1.backend.compiledTests.strict=true` to make either one fail the build.
 * **Java tests only.** The binary is compiled from Java test sources. A module

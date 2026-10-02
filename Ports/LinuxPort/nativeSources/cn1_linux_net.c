@@ -166,11 +166,15 @@ static void cn1HttpPerform(CN1Http* c) {
         curl_easy_setopt(c->easy, CURLOPT_HTTPHEADER, c->reqHeaders);
     }
     {
-        /* An explicit GET or POST wins over the post flag: ConnectionRequest lets a
-         * request set setPost(true) for how its arguments are sent and then ask for
-         * GET, or the reverse, and the method it asked for is the one it means. */
-        int sendBody = c->post;
-        if (c->method != 0 && strcmp(c->method, "GET") == 0) {
+        /* A buffered body is sent whatever the post flag says: RequestBuilder
+         * writes one for a DELETE without setting it, and CUSTOMREQUEST below then
+         * sent the right verb with an empty body (the Windows port already sends
+         * whatever was buffered). An explicit GET, HEAD or POST wins over both:
+         * ConnectionRequest lets a request set setPost(true) for how its arguments
+         * are sent and then ask for GET, or the reverse, and the method it asked
+         * for is the one it means. */
+        int sendBody = c->post || c->reqLen > 0;
+        if (c->method != 0 && (strcmp(c->method, "GET") == 0 || strcmp(c->method, "HEAD") == 0)) {
             sendBody = 0;
         } else if (c->method != 0 && strcmp(c->method, "POST") == 0) {
             sendBody = 1;

@@ -22,6 +22,7 @@
  */
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendClientTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendConnectionRequestTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendRestTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendTransferTest;
@@ -117,6 +118,14 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         if ("HTML5".equals(Display.getInstance().getPlatformName())
                 && testClass instanceof DualAppearanceBaseTest) {
             return TEST_TIMEOUT_MS_NATIVE * 2;
+        }
+        if (testClass instanceof BackendClientTest) {
+            // A backend client test fails a step that hears nothing after
+            // BackendClientTest.STEP_TIMEOUT_MILLIS, naming the request. That only
+            // works inside this budget, and the 10s HTML5 default is shorter than
+            // one step's watchdog -- so a dropped request on the browser came out
+            // as an anonymous "timeout waiting for DONE" instead.
+            return BackendClientTest.STEP_TIMEOUT_MILLIS * 2 + TEST_TIMEOUT_MS_HTML5;
         }
         if (!"HTML5".equals(Display.getInstance().getPlatformName())
                 && testClass instanceof LightweightPickerButtonsScreenshotTest) {

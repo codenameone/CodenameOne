@@ -51,23 +51,27 @@ public final class JsonPathResultMatchers {
         };
     }
 
+    /// A non-null value is there. A JSON `null` does not count, as in Spring:
+    /// `{"value":null}` fails `exists()` and passes [#doesNotExist].
     public ResultMatcher exists() {
         return new ResultMatcher() {
             @Override
             public void match(MvcResult result) throws Exception {
-                Matchers.check(!JsonPath.isMissing(read(result)), "No value at JSON path \""
-                        + expression + "\"");
+                Object actual = read(result);
+                Matchers.check(!JsonPath.isMissing(actual) && actual != null,
+                        "No value at JSON path \"" + expression + "\"");
             }
         };
     }
 
+    /// No non-null value is there: the path is absent or holds JSON `null`.
     public ResultMatcher doesNotExist() {
         return new ResultMatcher() {
             @Override
             public void match(MvcResult result) throws Exception {
                 Object actual = read(result);
-                Matchers.check(JsonPath.isMissing(actual), "Expected no value at JSON path \""
-                        + expression + "\" but found: " + actual);
+                Matchers.check(JsonPath.isMissing(actual) || actual == null,
+                        "Expected no value at JSON path \"" + expression + "\" but found: " + actual);
             }
         };
     }

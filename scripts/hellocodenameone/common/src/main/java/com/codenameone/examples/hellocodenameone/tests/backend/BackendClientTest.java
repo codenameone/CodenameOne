@@ -49,7 +49,7 @@ import java.util.Map;
 public abstract class BackendClientTest extends BaseTest {
     /// How long one step may wait for its answer. Under the runner's per-test
     /// budget, and well over the slowest step (a deliberate four-second delay).
-    static final long STEP_TIMEOUT_MILLIS = 12000;
+    public static final int STEP_TIMEOUT_MILLIS = 12000;
 
     /// Marks a request that reports its own failures through `handleException`.
     /// The application's network error listener (`Lifecycle.handleNetworkError`)

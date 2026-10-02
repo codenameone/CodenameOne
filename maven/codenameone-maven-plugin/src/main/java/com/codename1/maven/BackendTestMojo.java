@@ -177,6 +177,11 @@ public class BackendTestMojo extends AbstractMojo {
             protected boolean selectsTestClass(String binaryName) {
                 return selection.test(binaryName);
             }
+
+            @Override
+            protected boolean selectsTestMethod(String binaryName, String method) {
+                return selection.test(binaryName + "#" + method);
+            }
         };
         p.strict(strict).timeoutSeconds(timeoutSeconds);
         p.jdk(jdkHome, jdk8Home).cflags(cflags);

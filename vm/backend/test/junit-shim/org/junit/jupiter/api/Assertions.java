@@ -550,11 +550,37 @@ public final class Assertions {
             Object a = actual[iter];
             if (e instanceof Object[] && a instanceof Object[]) {
                 assertArrayEquals((Object[]) e, (Object[]) a, message);
-            } else if (!same(e, a)) {
+            } else if (!nestedPrimitiveArrays(e, a, message) && !same(e, a)) {
                 throw new AssertionFailedError(prefix(message) + "array contents differ at index ["
                         + iter + "], expected: <" + e + "> but was: <" + a + ">");
             }
         }
+    }
+
+    /// Compares two elements of an outer array that are primitive arrays of one
+    /// type -- the rows of an `int[][]` -- as JUnit does, by content rather than
+    /// identity; false when they are not, for the caller to compare otherwise.
+    private static boolean nestedPrimitiveArrays(Object e, Object a, String message) {
+        if (e instanceof int[] && a instanceof int[]) {
+            assertArrayEquals((int[]) e, (int[]) a, message);
+        } else if (e instanceof long[] && a instanceof long[]) {
+            assertArrayEquals((long[]) e, (long[]) a, message);
+        } else if (e instanceof byte[] && a instanceof byte[]) {
+            assertArrayEquals((byte[]) e, (byte[]) a, message);
+        } else if (e instanceof short[] && a instanceof short[]) {
+            assertArrayEquals((short[]) e, (short[]) a, message);
+        } else if (e instanceof char[] && a instanceof char[]) {
+            assertArrayEquals((char[]) e, (char[]) a, message);
+        } else if (e instanceof float[] && a instanceof float[]) {
+            assertArrayEquals((float[]) e, (float[]) a, message);
+        } else if (e instanceof double[] && a instanceof double[]) {
+            assertArrayEquals((double[]) e, (double[]) a, message);
+        } else if (e instanceof boolean[] && a instanceof boolean[]) {
+            assertArrayEquals((boolean[]) e, (boolean[]) a, message);
+        } else {
+            return false;
+        }
+        return true;
     }
 
     public static void assertIterableEquals(Iterable<?> expected, Iterable<?> actual) {

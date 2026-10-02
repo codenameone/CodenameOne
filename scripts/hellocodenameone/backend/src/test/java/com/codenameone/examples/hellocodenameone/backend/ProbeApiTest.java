@@ -28,6 +28,7 @@ import com.codename1.backend.test.MockMultipartFile;
 import com.codename1.backend.test.MockMvc;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -85,6 +86,29 @@ class ProbeApiTest {
                 .andExpect(jsonPath("$.target").value("/api/echo?q=inUrl"))
                 .andExpect(jsonPath("$.params.q").value("inUrl"))
                 .andExpect(jsonPath("$.params.a").value("inForm"));
+    }
+
+    @Test
+    void aJsonNullDoesNotExist() throws Exception {
+        // As in Spring: a null-valued property fails exists() and passes doesNotExist().
+        mvc.perform(get("/api/json/map"))
+                .andExpect(jsonPath("$.nothing").doesNotExist())
+                .andExpect(jsonPath("$.absent").doesNotExist());
+        boolean existed;
+        try {
+            mvc.perform(get("/api/json/map")).andExpect(jsonPath("$.nothing").exists());
+            existed = true;
+        } catch (AssertionError expected) {
+            existed = false;
+        }
+        assertTrue(!existed, "exists() passed for a JSON null");
+    }
+
+    @Test
+    void nestedPrimitiveArraysCompareByContent() {
+        // The rows of an int[][] are compared by content, compiled as on the JVM.
+        assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});
+        assertArrayEquals(new double[][] {{0.5}}, new double[][] {{0.5}});
     }
 
     @Test

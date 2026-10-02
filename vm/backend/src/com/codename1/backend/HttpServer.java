@@ -967,9 +967,11 @@ public final class HttpServer {
         /// A text body -- any Content-Type that is not binary, or none -- was
         /// checked to be UTF-8 when it arrived, and a request whose body was not is
         /// answered 400 before any handler runs. A binary body (an upload, a
-        /// `multipart/form-data` form) is read with [#getBodyBytes]; asking for it
-        /// as text throws rather than handing a handler characters the client never
-        /// sent.
+        /// `multipart/form-data` form) is meant for [#getBodyBytes]. Asked for as
+        /// text anyway, it is decoded when its bytes are UTF-8 -- as Spring's string
+        /// converter reads any media type into a `@RequestBody String` -- and throws
+        /// when they are not, rather than handing a handler characters the client
+        /// never sent.
         public String getBody() {
             if (body == null && bodyBytes != null) {
                 if (!Utf8.isValid(bodyBytes, 0, bodyBytes.length)) {
@@ -1039,6 +1041,9 @@ public final class HttpServer {
         /// -- `application/x-www-form-urlencoded`, or the parts of a
         /// `multipart/form-data` one that are not files. Null when neither has it.
         /// A malformed multipart body has no fields here; [#getParts] reports why.
+        ///
+        /// @throws IllegalStateException when the field is a multipart part that is
+        /// not UTF-8 text; a generated `@RequestParam` binding answers that with 400
         public String param(String name) {
             String query = queryParam(name);
             if (query != null || name == null) {

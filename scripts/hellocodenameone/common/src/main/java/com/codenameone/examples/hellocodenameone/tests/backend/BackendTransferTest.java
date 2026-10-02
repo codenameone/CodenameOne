@@ -65,8 +65,13 @@ public class BackendTransferTest extends BackendClientTest {
                 }
 
                 @Override
-                protected void handleException(Exception err) {
-                    expect(false, "upload failed: " + err);
+                protected void handleException(final Exception err) {
+                    // On the network thread; fail on the EDT like every other step.
+                    com.codename1.ui.CN.callSerially(new Runnable() {
+                        public void run() {
+                            expect(false, "upload failed: " + err);
+                        }
+                    });
                 }
             };
             upload.setUrl(url("/api/upload"));

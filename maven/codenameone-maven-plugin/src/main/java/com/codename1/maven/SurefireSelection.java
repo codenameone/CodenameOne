@@ -48,6 +48,12 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
 
     private final List<Pattern> includes = new ArrayList<Pattern>();
     private final List<Pattern> excludes = new ArrayList<Pattern>();
+    /// `-Dtest` entries that name a whole class, which select all its methods.
+    private final List<Pattern> wholeClasses = new ArrayList<Pattern>();
+    /// `-Dtest` method selectors, `{class, method}`: `ApiTest#greets` selects only
+    /// that method of the class, `!ApiTest#slow` leaves just that one out.
+    private final List<Pattern[]> methods = new ArrayList<Pattern[]>();
+    private final List<Pattern[]> excludedMethods = new ArrayList<Pattern[]>();
 
     SurefireSelection(List<String> includes, List<String> excludes) {
         for (String p : includes) {
@@ -63,6 +69,9 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
         if (test != null && test.trim().length() > 0) {
             List<String> named = new ArrayList<String>();
             List<String> excluded = new ArrayList<String>(DEFAULT_EXCLUDES);
+            List<String> whole = new ArrayList<String>();
+            List<String[]> methods = new ArrayList<String[]>();
+            List<String[]> excludedMethods = new ArrayList<String[]>();
             for (String entry : test.split(",")) {
                 String e = entry.trim();
                 // A "!" entry excludes, as Surefire reads it: -Dtest='*Test,!SlowTest'
@@ -71,13 +80,10 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
                 if (negative) {
                     e = e.substring(1).trim();
                 }
+                String method = null;
                 int hash = e.indexOf('#');
                 if (hash >= 0) {
-                    // A method selector narrows a class; a class it excludes by
-                    // method is still run for its other methods.
-                    if (negative) {
-                        continue;
-                    }
+                    method = e.substring(hash + 1).trim();
                     e = e.substring(0, hash);
                 }
                 if (e.length() == 0) {
@@ -86,10 +92,33 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
                 // A bare class name pattern names a class in any package.
                 String pattern = e.indexOf('/') >= 0 || e.endsWith(".java") ? e
                         : "**/" + e.replace('.', '/') + ".java";
-                (negative ? excluded : named).add(pattern);
+                if (method != null && method.length() > 0) {
+                    // A method selector narrows a class rather than excluding it:
+                    // a class excluded by method still runs its other methods.
+                    (negative ? excludedMethods : methods).add(new String[] {pattern, method});
+                    if (!negative) {
+                        named.add(pattern);
+                    }
+                } else {
+                    (negative ? excluded : named).add(pattern);
+                    if (!negative) {
+                        whole.add(pattern);
+                    }
+                }
             }
             // Only exclusions: Surefire runs its usual includes minus those.
-            return new SurefireSelection(named.isEmpty() ? DEFAULT_INCLUDES : named, excluded);
+            SurefireSelection out = new SurefireSelection(named.isEmpty() ? DEFAULT_INCLUDES : named,
+                    excluded);
+            for (String p : whole) {
+                out.wholeClasses.add(glob(p));
+            }
+            for (String[] m : methods) {
+                out.methods.add(new Pattern[] {glob(m[0]), methodGlob(m[1])});
+            }
+            for (String[] m : excludedMethods) {
+                out.excludedMethods.add(new Pattern[] {glob(m[0]), methodGlob(m[1])});
+            }
+            return out;
         }
         Plugin surefire = project.getPlugin("org.apache.maven.plugins:maven-surefire-plugin");
         Xpp3Dom config = surefire == null || !(surefire.getConfiguration() instanceof Xpp3Dom) ? null
@@ -114,8 +143,15 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
         return out;
     }
 
+    /// Whether the run selects the class `binaryName`, or -- given as
+    /// `binaryName#method` -- that test method of a selected class.
     @Override
     public boolean test(String binaryName) {
+        int hash = binaryName.indexOf('#');
+        if (hash >= 0) {
+            String cls = binaryName.substring(0, hash);
+            return test(cls) && selectsMethod(cls, binaryName.substring(hash + 1));
+        }
         String path = binaryName.replace('.', '/') + ".java";
         boolean included = false;
         for (Pattern p : includes) {
@@ -133,6 +169,59 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
             }
         }
         return true;
+    }
+
+    /// Whether `-Dtest` lets test `method` of class `binaryName` run: every method
+    /// when the class was named whole or no method selector names it, else only the
+    /// methods its selectors name -- and never one a `!` selector names.
+    private boolean selectsMethod(String binaryName, String method) {
+        String path = binaryName.replace('.', '/') + ".java";
+        for (Pattern[] m : excludedMethods) {
+            if (m[0].matcher(path).matches() && m[1].matcher(method).matches()) {
+                return false;
+            }
+        }
+        for (Pattern p : wholeClasses) {
+            if (p.matcher(path).matches()) {
+                return true;
+            }
+        }
+        boolean narrowed = false;
+        for (Pattern[] m : methods) {
+            if (m[0].matcher(path).matches()) {
+                if (m[1].matcher(method).matches()) {
+                    return true;
+                }
+                narrowed = true;
+            }
+        }
+        return !narrowed;
+    }
+
+    /// A Surefire method selector as a regular expression: `+` separates
+    /// alternatives (`#one+two`), `*` matches anything and `?` one character.
+    static Pattern methodGlob(String pattern) {
+        StringBuilder re = new StringBuilder();
+        for (String alternative : pattern.split("\\+")) {
+            if (re.length() > 0) {
+                re.append('|');
+            }
+            re.append("(?:");
+            for (int i = 0 ; i < alternative.length() ; i++) {
+                char c = alternative.charAt(i);
+                if (c == '*') {
+                    re.append(".*");
+                } else if (c == '?') {
+                    re.append('.');
+                } else if ("\\.[]{}()+-^$|".indexOf(c) >= 0) {
+                    re.append('\\').append(c);
+                } else {
+                    re.append(c);
+                }
+            }
+            re.append(')');
+        }
+        return Pattern.compile(re.toString());
     }
 
     /// An Ant-style path pattern as a regular expression. A `.class` pattern is

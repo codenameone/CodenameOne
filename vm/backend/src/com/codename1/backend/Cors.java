@@ -77,10 +77,11 @@ final class Cors {
             int end = comma < 0 ? listed.length() : comma;
             String origin = listed.substring(pos, end).trim();
             if (origin.length() > 0) {
-                // An origin is scheme://host[:port] with nothing after it; a trailing
-                // slash never matches what a browser sends, so it is refused here
-                // rather than leaving a policy that silently allows no one.
-                if (!"*".equals(origin) && (origin.endsWith("/") || origin.indexOf("://") < 0)) {
+                // An origin is scheme://host[:port] with nothing after it; a path,
+                // query or fragment (a trailing slash included) never matches what a
+                // browser sends, so it is refused here rather than leaving a policy
+                // that silently allows no one.
+                if (!"*".equals(origin) && !isOrigin(origin)) {
                     throw new IOException(ALLOWED_ORIGINS + " names \"" + origin + "\"; an origin "
                             + "is scheme://host[:port], with no path");
                 }
@@ -197,5 +198,16 @@ final class Cors {
         if (credentials) {
             response.header("Access-Control-Allow-Credentials", "true");
         }
+    }
+
+    /// Whether `value` is scheme://authority and nothing more.
+    private static boolean isOrigin(String value) {
+        int scheme = value.indexOf("://");
+        if (scheme <= 0) {
+            return false;
+        }
+        String authority = value.substring(scheme + 3);
+        return authority.length() > 0 && authority.indexOf('/') < 0 && authority.indexOf('?') < 0
+                && authority.indexOf('#') < 0;
     }
 }

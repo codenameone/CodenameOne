@@ -24,6 +24,7 @@ package com.codename1.backend.test;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
@@ -43,7 +44,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 /// whose configuration is the same -- the same test beans, properties, profile
 /// and web environment -- share it, as Spring caches a context; a class that
 /// differs stops it and starts its own.
+///
+/// It is inherited, as `@SpringBootTest` is: an abstract base class can carry it,
+/// with the shared fields and tests, for concrete subclasses to run.
 @Documented
+@Inherited
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @ExtendWith(com.codename1.impl.backend.test.BackendTestExtension.class)

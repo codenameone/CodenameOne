@@ -1708,6 +1708,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         boolean any = false;
         for (int i = 0; i < route.params.size(); i++) {
             Param p = route.params.get(i);
+            if ("QUERY".equals(p.kind)) {
+                // A @RequestParam can be a multipart form field, and a field that is
+                // not UTF-8 throws from Request.param: refused here as the client's
+                // error, not left to surface as a 500 from the argument list.
+                sb.append(pad).append("if (!paramIsText(request, ").append(quote(p.name))
+                  .append(")) {\n");
+                sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("            utf8(").append(quote("The parameter " + p.name
+                        + " is not UTF-8 text")).append("));\n");
+                sb.append(pad).append("}\n");
+                continue;
+            }
             if (!"PART".equals(p.kind)) {
                 continue;
             }
@@ -2369,6 +2381,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("    private static boolean partIsText(com.codename1.backend.HttpServer.Part part) {\n");
         sb.append("        try {\n");
         sb.append("            return part == null || part.getText() != null;\n");
+        sb.append("        } catch (IllegalStateException binary) {\n");
+        sb.append("            return false;\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static boolean paramIsText(com.codename1.backend.HttpServer.Request request, "
+                + "String name) {\n");
+        sb.append("        try {\n");
+        sb.append("            request.param(name);\n");
+        sb.append("            return true;\n");
         sb.append("        } catch (IllegalStateException binary) {\n");
         sb.append("            return false;\n");
         sb.append("        }\n");

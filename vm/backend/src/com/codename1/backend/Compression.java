@@ -81,8 +81,12 @@ final class Compression {
 
     /// Compresses `response` in place when the rules above allow it.
     void apply(HttpServer.Request request, HttpServer.Response response) throws IOException {
+        // A 206 (or anything carrying Content-Range) is a range of the identity
+        // representation: compressing it would leave the offsets describing bytes
+        // the client never receives, and a resumed download assembled corrupt.
         if (response == null || response.fileFd >= 0 || !acceptsGzip(request)
-                || response.status == 204 || response.status == 304
+                || response.status == 204 || response.status == 304 || response.status == 206
+                || response.hasHeader("Content-Range")
                 || response.hasHeader("Content-Encoding") || !compressible(response.contentType)) {
             return;
         }

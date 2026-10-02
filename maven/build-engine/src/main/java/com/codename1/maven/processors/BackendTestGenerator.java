@@ -135,7 +135,8 @@ final class BackendTestGenerator {
     }
 
     /// Which test classes, by binary name, the compiled run runs: the ones the JVM
-    /// run discovers, so the two runs exercise one set. Null runs every class.
+    /// run discovers, so the two runs exercise one set. Asked `Class#method` too,
+    /// for each test of a selected class. Null runs every class.
     private final java.util.function.Predicate<String> selection;
 
     /// Runs the test pass over `ctx`, whose class index holds both the
@@ -161,7 +162,7 @@ final class BackendTestGenerator {
         List<Spec> specs = new ArrayList<Spec>();
         for (String name : new TreeSet<String>(testClasses)) {
             AnnotatedClass cls = ctx.lookup(name);
-            if (cls != null && cls.getClassAnnotation(BACKEND_TEST) != null && !cls.isAbstract()) {
+            if (cls != null && !cls.isAbstract() && backendTestOf(cls) != null) {
                 Spec spec = spec(cls);
                 if (spec != null) {
                     specs.add(spec);
@@ -220,7 +221,8 @@ final class BackendTestGenerator {
     private Spec spec(AnnotatedClass cls) {
         Spec spec = new Spec();
         spec.test = cls;
-        AnnotationValues a = cls.getClassAnnotation(BACKEND_TEST);
+        AnnotatedClass declaring = backendTestOf(cls);
+        AnnotationValues a = declaring.getClassAnnotation(BACKEND_TEST);
         Object env = a.get("webEnvironment");
         String envName = BackendBeans.enumName(env, "MOCK");
         for (int i = 0; i < WEB_ENVIRONMENTS.length; i++) {
@@ -257,13 +259,18 @@ final class BackendTestGenerator {
                 }
             }
         }
-        // Static nested @TestConfiguration classes apply to their test, as in Spring.
-        String prefix = cls.getInternalName() + "$";
-        for (String name : testClasses) {
-            AnnotatedClass nested = ctx.lookup(name);
-            if (name.startsWith(prefix) && nested != null
-                    && nested.getClassAnnotation(TEST_CONFIGURATION) != null) {
-                spec.configurations.add(name);
+        // Static nested @TestConfiguration classes apply to their test, as in Spring
+        // -- the class's own, and those of the base class that carries @BackendTest.
+        for (AnnotatedClass owner : declaring == cls
+                ? Collections.singletonList(cls) : java.util.Arrays.asList(cls, declaring)) {
+            String prefix = owner.getInternalName() + "$";
+            for (String name : new TreeSet<String>(testClasses)) {
+                AnnotatedClass nested = ctx.lookup(name);
+                if (name.startsWith(prefix) && nested != null
+                        && nested.getClassAnnotation(TEST_CONFIGURATION) != null
+                        && !spec.configurations.contains(name)) {
+                    spec.configurations.add(name);
+                }
             }
         }
         for (AnnotatedClass c : hierarchy(cls)) {
@@ -290,6 +297,17 @@ final class BackendTestGenerator {
         key.append(mockTypes);
         spec.key = key.toString();
         return spec;
+    }
+
+    /// The class in `cls`'s hierarchy that carries `@BackendTest` -- `cls` itself or
+    /// the nearest superclass, since the annotation is inherited -- or null.
+    private AnnotatedClass backendTestOf(AnnotatedClass cls) {
+        for (AnnotatedClass c : hierarchy(cls)) {
+            if (c.getClassAnnotation(BACKEND_TEST) != null) {
+                return c;
+            }
+        }
+        return null;
     }
 
     /// The class and its superclasses that the build can see, subclass first.
@@ -610,25 +628,26 @@ final class BackendTestGenerator {
         if (cls.isAbstract() || cls.isInterface() || cls.isSynthetic()) {
             return false;
         }
-        List<AnnotatedClass> chain = hierarchy(cls);
+        List<AnnotatedClass> chain = methodHierarchy(cls);
         List<MethodInfo> tests = new ArrayList<MethodInfo>();
-        Set<String> seen = new LinkedHashSet<String>();
+        Overrides seen = new Overrides();
         java.util.IdentityHashMap<MethodInfo, AnnotatedClass> owners =
                 new java.util.IdentityHashMap<MethodInfo, AnnotatedClass>();
         for (AnnotatedClass c : chain) {
             for (MethodInfo m : c.getMethods()) {
-                String signature = m.getName() + m.getDescriptor();
                 if (m.getAnnotation(JUNIT_TEST) != null) {
-                    if (seen.add(signature)) {
+                    // -Dtest=Class#method narrows the JVM run to that method; the
+                    // compiled run runs the same ones.
+                    if (!seen.covers(c, m) && (selection == null
+                            || selection.test(cls.getBinaryName() + "#" + m.getName()))) {
                         tests.add(m);
                         owners.put(m, c);
                     }
-                } else if (hides(m)) {
-                    // An override without @Test is not a test, and it hides the
-                    // superclass's: JUnit runs neither. Collected anyway, the
-                    // generated call dispatched to the override.
-                    seen.add(signature);
                 }
+                // An override without @Test is not a test, and it hides the
+                // superclass's: JUnit runs neither. Collected anyway, the
+                // generated call would dispatch to the override.
+                seen.declare(c, m);
             }
         }
         if (tests.isEmpty()) {
@@ -768,19 +787,19 @@ final class BackendTestGenerator {
                                        boolean isStatic, boolean superFirst,
                                        java.util.Map<MethodInfo, AnnotatedClass> owners) {
         List<MethodInfo> out = new ArrayList<MethodInfo>();
-        Set<String> seen = new LinkedHashSet<String>();
+        Overrides seen = new Overrides();
         for (AnnotatedClass c : chain) {
             List<MethodInfo> level = new ArrayList<MethodInfo>();
             for (MethodInfo m : c.getMethods()) {
                 if (m.getAnnotation(annotation) == null) {
                     // As for tests: an unannotated override or hiding method is
                     // what JUnit sees, and it is not a lifecycle method.
-                    if (hides(m)) {
-                        seen.add(m.getName() + m.getDescriptor());
-                    }
+                    seen.declare(c, m);
                     continue;
                 }
-                if (seen.add(m.getName() + m.getDescriptor())) {
+                boolean covered = seen.covers(c, m);
+                seen.declare(c, m);
+                if (!covered) {
                     owners.put(m, c);
                     if (m.isStatic() != isStatic) {
                         ctx.error(c, m.getName() + " is " + (isStatic ? "not " : "")
@@ -802,11 +821,66 @@ final class BackendTestGenerator {
         return out;
     }
 
-    /// Whether `m` hides an inherited method of the same signature from JUnit when
-    /// it carries no annotation of its own: any method but a private one or a
-    /// constructor.
-    private static boolean hides(MethodInfo m) {
-        return !m.isPrivate() && !m.isConstructor() && !m.isSynthetic();
+    /// The class, its superclasses and every interface they implement, for the
+    /// methods JUnit collects: classes subclass first, then the interfaces, whose
+    /// default `@Test` and lifecycle methods a test class inherits. Interfaces come
+    /// last because a class's method overrides theirs, and so that a "before" from
+    /// an interface runs ahead of the class's, as JUnit orders them.
+    private List<AnnotatedClass> methodHierarchy(AnnotatedClass cls) {
+        List<AnnotatedClass> out = new ArrayList<AnnotatedClass>(hierarchy(cls));
+        Set<String> visited = new LinkedHashSet<String>();
+        java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>();
+        for (AnnotatedClass c : out) {
+            pending.addAll(c.getInterfaceInternalNames());
+        }
+        List<AnnotatedClass> interfaces = new ArrayList<AnnotatedClass>();
+        while (!pending.isEmpty() && visited.size() < 64) {
+            String name = pending.removeFirst();
+            AnnotatedClass i = visited.add(name) ? ctx.lookup(name) : null;
+            if (i != null) {
+                interfaces.add(i);
+                pending.addAll(i.getInterfaceInternalNames());
+            }
+        }
+        out.addAll(interfaces);
+        return out;
+    }
+
+    /// The methods declared lower in a hierarchy, by signature, and what they
+    /// override or hide from JUnit when they carry no annotation of their own.
+    private static final class Overrides {
+        private final Map<String, List<String>> packages = new java.util.HashMap<String, List<String>>();
+
+        /// Records `m`, declared by `owner`: any method but a private one, a
+        /// constructor or a synthetic bridge can override or hide.
+        void declare(AnnotatedClass owner, MethodInfo m) {
+            if (m.isPrivate() || m.isConstructor() || m.isSynthetic()) {
+                return;
+            }
+            String signature = m.getName() + m.getDescriptor();
+            List<String> pkgs = packages.get(signature);
+            if (pkgs == null) {
+                pkgs = new ArrayList<String>();
+                packages.put(signature, pkgs);
+            }
+            pkgs.add(packageOf(owner.getBinaryName()));
+        }
+
+        /// Whether a method recorded so far overrides or hides `m`, declared higher
+        /// up by `owner`. A public or protected one is covered by any; a
+        /// package-private one only from its own package -- Java's rule, so a
+        /// same-signature method in a subclass elsewhere does not override it, and
+        /// JUnit still runs the base class's test.
+        boolean covers(AnnotatedClass owner, MethodInfo m) {
+            List<String> pkgs = packages.get(m.getName() + m.getDescriptor());
+            if (pkgs == null || m.isPrivate()) {
+                return false;
+            }
+            if (m.isPublic() || m.isProtected() || owner.isInterface()) {
+                return true;
+            }
+            return pkgs.contains(packageOf(owner.getBinaryName()));
+        }
     }
 
     /// The call to `m`, declared by `owner`, from a runner in package `runnerPkg`:

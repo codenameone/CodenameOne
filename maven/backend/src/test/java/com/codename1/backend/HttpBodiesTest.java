@@ -113,6 +113,15 @@ class HttpBodiesTest {
                         if (path.startsWith("/shared")) {
                             return SHARED;
                         }
+                        if (path.startsWith("/range")) {
+                            // Bytes 0-4999 of a larger JSON document, as a range answer.
+                            StringBuilder sb = new StringBuilder();
+                            while (sb.length() < 5000) {
+                                sb.append('x');
+                            }
+                            return HttpServer.Response.json(206, sb.toString())
+                                    .header("Content-Range", "bytes 0-4999/20000");
+                        }
                         if (path.startsWith("/big")) {
                             StringBuilder sb = new StringBuilder();
                             for (int iter = 0 ; iter < 500 ; iter++) {
@@ -289,6 +298,21 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("an allowed origin with a path, query or trailing slash is refused at start")
+    void anOriginWithAPathIsRefused() throws Exception {
+        for (String bad : new String[] {"https://app.example/", "https://app.example/ui",
+                "https://app.example?x=1", "https://app.example#top", "app.example", "https://"}) {
+            Properties p = new Properties();
+            p.setProperty("cn1.cors.allowedOrigins", bad);
+            assertThrows(IOException.class, () -> Cors.fromConfig(Config.of(p, "test")),
+                    "accepted " + bad + ", which no browser Origin can match");
+        }
+        Properties ok = new Properties();
+        ok.setProperty("cn1.cors.allowedOrigins", "https://app.example, http://127.0.0.1:8080, *");
+        assertTrue(Cors.fromConfig(Config.of(ok, "test")) != null);
+    }
+
+    @Test
     @DisplayName("without cn1.cors.allowedOrigins there is no CORS at all")
     void corsIsOffByDefault() throws Exception {
         start(null);
@@ -337,6 +361,21 @@ class HttpBodiesTest {
         assertEquals(null, encodingFor("*;q=1, gzip;q=0"), "gzip was refused explicitly");
         assertEquals("gzip", encodingFor("*;q=0, gzip"), "gzip was accepted explicitly");
         assertEquals("gzip", encodingFor("br, *"), "* accepts gzip when it is not named");
+    }
+
+    @Test
+    @DisplayName("a range answer is not compressed, so its Content-Range stays true")
+    void aRangeIsNotCompressed() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.server.compression.enabled", "true");
+        start(p);
+        HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/range")
+                .openConnection();
+        c.setRequestProperty("Accept-Encoding", "gzip");
+        assertEquals(206, c.getResponseCode());
+        assertNull(c.getHeaderField("Content-Encoding"), "a 206 was compressed");
+        assertEquals("bytes 0-4999/20000", c.getHeaderField("Content-Range"));
+        assertEquals(5000, read(c.getInputStream()).length);
     }
 
     @Test

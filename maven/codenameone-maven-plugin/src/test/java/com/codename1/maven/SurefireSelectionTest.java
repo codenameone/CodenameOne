@@ -66,6 +66,20 @@ class SurefireSelectionTest {
     }
 
     @Test
+    void aMethodSelectorNarrowsItsClassToThoseMethods() {
+        SurefireSelection s = SurefireSelection.of(project(null, null),
+                "ApiTest#greets+count*, Other*, !OtherTests#slow");
+        assertTrue(s.test("com.acme.ApiTest#greets"));
+        assertTrue(s.test("com.acme.ApiTest#countsVisits"), "a * in a method selector");
+        assertFalse(s.test("com.acme.ApiTest#deletes"), "a method the selector does not name");
+        assertTrue(s.test("com.acme.deep.OtherTests#fast"), "a class named whole runs every method");
+        assertFalse(s.test("com.acme.deep.OtherTests#slow"), "a ! method selector leaves it out");
+        assertFalse(s.test("com.acme.ServedApiTest#greets"), "a class the run does not select");
+        assertTrue(SurefireSelection.of(project(null, null), null).test("com.acme.ApiTest#anything"),
+                "with no -Dtest every method of a selected class runs");
+    }
+
+    @Test
     void aNegativeDashDTestEntryExcludes() {
         SurefireSelection s = SurefireSelection.of(project(null, null), "*Test, !SlowTest");
         assertTrue(s.test("com.acme.ApiTest"));

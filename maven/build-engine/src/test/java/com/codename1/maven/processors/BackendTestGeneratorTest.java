@@ -144,6 +144,47 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void anInheritedBackendTestGivesEachSubclassItsContext() throws Exception {
+        // As @SpringBootTest is: the annotation, the injected fields and the tests
+        // on an abstract base; the concrete subclass is what runs.
+        File classes = mainBuild(application());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.AbstractApiTest", "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "import static com.codename1.backend.test.MockMvcRequestBuilders.*;\n"
+                + "import static com.codename1.backend.test.MockMvcResultMatchers.*;\n"
+                + "@BackendTest\n"
+                + "public abstract class AbstractApiTest {\n"
+                + "    @Autowired protected MockMvc mvc;\n"
+                + "    @org.junit.jupiter.api.Test\n"
+                + "    void greets() throws Exception {\n"
+                + "        mvc.perform(get(\"/greet/{name}\", \"Ada\")).andExpect(content().string(\"Hello, Ada\"));\n"
+                + "    }\n"
+                + "}\n");
+        t.put("com.example.ConcreteApiTest", "package com.example;\n"
+                + "public class ConcreteApiTest extends AbstractApiTest {\n"
+                + "}\n");
+        File tests = testBuild(classes, t);
+        assertFalse("the abstract base got a context of its own",
+                new File(tests, "com/example/AbstractApiTestCn1TestContext.class").isFile());
+        URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
+                classes.toURI().toURL()}, getClass().getClassLoader());
+        try {
+            Object context = loader.loadClass("com.example.ConcreteApiTestCn1TestContext").newInstance();
+            TestEnvironment env = TestContexts.acquire((TestContext) context);
+            Object test = loader.loadClass("com.example.ConcreteApiTest").newInstance();
+            ((TestContext) context).inject(test, env);
+            java.lang.reflect.Method greets = loader.loadClass("com.example.AbstractApiTest")
+                    .getDeclaredMethod("greets");
+            greets.setAccessible(true);
+            greets.invoke(test);
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
     public void anAmbiguousInjectionIsABuildError() throws Exception {
         File classes = mainBuild(application());
         Map<String, String> t = new LinkedHashMap<String, String>();
@@ -183,6 +224,16 @@ public class BackendTestGeneratorTest {
                 + "    @BeforeEach void setUp() { calls.add(\"setUp\"); }\n"
                 + "    @Test void inherited() { calls.add(\"inherited\"); }\n"
                 + "    @Test public void overridden() { calls.add(\"base-overridden\"); }\n"
+                + "    @Test void packagePrivate() { calls.add(\"base-package-private\"); }\n"
+                + "}\n");
+        t.put("t.Checks", "package t;\n"
+                + "public interface Checks {\n"
+                + "    @org.junit.jupiter.api.Test default void fromInterface() {\n"
+                + "        base.Base.calls.add(\"interface\");\n"
+                + "    }\n"
+                + "}\n");
+        t.put("t.InterfaceOnlyTest", "package t;\n"
+                + "public class InterfaceOnlyTest implements Checks {\n"
                 + "}\n");
         t.put("t.GatedTest", "package t;\n"
                 + "public class GatedTest {\n"
@@ -194,6 +245,9 @@ public class BackendTestGeneratorTest {
         t.put("t.SubTest", "package t;\n"
                 + "public class SubTest extends base.Base {\n"
                 + "    @Override public void overridden() { calls.add(\"not-a-test\"); }\n"
+                // Not an override: Base.packagePrivate is package-private in another
+                // package, so JUnit still runs the base test.
+                + "    void packagePrivate() { calls.add(\"sub-package-private\"); }\n"
                 + "    @org.junit.jupiter.api.Test void own() { calls.add(\"own\"); }\n"
                 + "}\n");
         File classes = tmp.newFolder();
@@ -215,6 +269,7 @@ public class BackendTestGeneratorTest {
                 urls.toArray(new java.net.URL[0]), getClass().getClassLoader());
         try {
             loader.loadClass("t.SubTestCn1TestRunner").getMethod("run").invoke(null);
+            loader.loadClass("t.InterfaceOnlyTestCn1TestRunner").getMethod("run").invoke(null);
             java.lang.reflect.Field failed = com.codename1.impl.backend.test.TestRun.class
                     .getDeclaredField("failed");
             failed.setAccessible(true);
@@ -230,6 +285,10 @@ public class BackendTestGeneratorTest {
             assertFalse("an override without @Test ran as a test: " + calls,
                     calls.contains("not-a-test") || calls.contains("base-overridden"));
             assertFalse("a test ran although its @BeforeAll aborted: " + calls, calls.contains("gated"));
+            assertTrue("a package-private base test a same-signature method in another package "
+                    + "does not override was dropped: " + calls, calls.contains("base-package-private"));
+            assertTrue("a test inherited from an interface did not run: " + calls,
+                    calls.contains("interface"));
         } finally {
             loader.close();
         }

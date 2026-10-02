@@ -218,11 +218,18 @@ public class BackendConnectionRequestTest extends BackendClientTest {
         }
 
         @Override
-        protected void handleException(Exception err) {
-            if (!reported) {
-                reported = true;
-                failed(err);
-            }
+        protected void handleException(final Exception err) {
+            // Called on the NETWORK thread, unlike postResponse: the step runner
+            // and the test's completion belong on the EDT. Android tolerated the
+            // network-thread call; the browser port left the test unfinished.
+            com.codename1.ui.CN.callSerially(new Runnable() {
+                public void run() {
+                    if (!reported) {
+                        reported = true;
+                        failed(err);
+                    }
+                }
+            });
         }
 
         String text() {
