@@ -271,6 +271,13 @@ class CalibrationTest(unittest.TestCase):
         self.assertNotIn('calibrate', overlay)
         self.assertEqual(sorted(rows), ['macos-arm64'])
 
+    def test_an_undecodable_cpu_cannot_be_calibrated_beside_per_model_rows(self):
+        old = {'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1)}}}
+        with self.assertRaises(SystemExit) as caught:
+            self.run_calibration([('linux-x64', {'quicksort': (1.2, 0.1)}, 'unknown')],
+                                 existing=old)
+        self.assertIn('cpu_model', str(caught.exception))
+
     def test_a_row_inside_its_tolerance_is_left_alone(self):
         old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)},
                              'recursion': {'all': row(1.0, 0.1)}}}

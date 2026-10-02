@@ -97,6 +97,16 @@ def collect(paths, only=None, rows=None):
         cls = perf_gate.cpu_class(report.get('cpu'))
         key = perf_gate.baseline_key(rows or {}, report['platform'], report.get('cpu'))
         if key is None or key not in (rows or {}):
+            if cls is None and any(k.startswith(report['platform'] + '@') for k in rows or {}):
+                # An undecodable CPU on a platform with per-model rows: baseline_key() selects
+                # NO row for it (judging an unknown model by another model's ratios is what
+                # failed unchanged code), so a plain-platform row written here would never
+                # be read and the gate would stay uncalibrated forever. The fix is to teach
+                # perf-gate.cpu_model() to read this runner, not to calibrate.
+                raise SystemExit('%s: the runner reported no decodable CPU model (%r) on %s, '
+                                 'which has per-model rows; no baseline row can be selected '
+                                 'for it. Fix perf-gate.cpu_model() for this runner.'
+                                 % (path, report.get('cpu'), report['platform']))
             key = '%s@%s' % (report['platform'], cls) if cls else report['platform']
         for bench, by_cores in report['results'].items():
             if only and bench not in only:

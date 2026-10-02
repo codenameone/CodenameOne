@@ -104,6 +104,12 @@ jobs:
           echo "Could not push the fold after 3 attempts." >&2
           exit 1
 
+      # One-shot on purpose. If this dispatch fails after the fold was pushed, a re-run
+      # finds nothing to fold and skips it -- and that is acceptable: website-docs.yml
+      # also rebuilds on its own daily schedule (and port-status-nightly dispatches it),
+      # so the JDK 25 table, which shows gate baselines rather than live results, is at
+      # most a day behind. Persisting a "rebuild owed" flag to close that window would
+      # add state for no visible benefit.
       - name: Rebuild the Port Status page
         if: steps.fold.outputs.folded == 'true'
         env:
