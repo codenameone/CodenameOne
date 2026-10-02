@@ -338,8 +338,8 @@ The server comparison above puts CN1's peak RSS at **`57.8 MiB`**, against **`11
 
 {{< guide-block >}}
 <video controls playsinline preload="metadata" poster="/blog/ios27-measured-glass/dark-poster.jpg" style="width:100%;height:auto" aria-label="iOS 27 tab bars: UIKit above Codename One">
-<source src="/blog/ios27-measured-glass/dark.mp4" type="video/mp4">
-<a href="/blog/ios27-measured-glass/dark.mp4">Watch the tab bar comparison</a>.
+<source src="/blog/ios27-measured-glass/dark-tabs.mp4" type="video/mp4">
+<a href="/blog/ios27-measured-glass/dark-tabs.mp4">Watch the tab bar comparison</a>.
 </video>
 {{< /guide-block >}}
 

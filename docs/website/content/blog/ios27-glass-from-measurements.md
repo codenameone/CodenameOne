@@ -29,9 +29,9 @@ That is a more useful test than a still image. Your users feel the delay before 
 *UIKit is on top and Codename One below. These committed iOS 27 simulator recordings use the same touch sequence: six taps, a held press, a tap on the selected tab, a slow drag and a flick. Each gesture occupies a 4.2-second slot aligned on the touch.*
 
 {{< guide-block >}}
-<video controls playsinline preload="none" poster="/blog/ios27-measured-glass/dark-poster.jpg" style="width:100%;height:auto" aria-label="Dark iOS 27 tab bars, UIKit above Codename One">
-<source src="/blog/ios27-measured-glass/dark.mp4" type="video/mp4">
-<a href="/blog/ios27-measured-glass/dark.mp4">Download the dark comparison video</a>.
+<video controls playsinline preload="metadata" poster="/blog/ios27-measured-glass/dark-poster.jpg" style="width:100%;height:auto" aria-label="Dark iOS 27 tab bars, UIKit above Codename One">
+<source src="/blog/ios27-measured-glass/dark-tabs.mp4" type="video/mp4">
+<a href="/blog/ios27-measured-glass/dark-tabs.mp4">Download the dark comparison video</a>.
 </video>
 {{< /guide-block >}}
 
