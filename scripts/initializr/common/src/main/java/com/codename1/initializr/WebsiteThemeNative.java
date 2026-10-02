@@ -27,7 +27,13 @@ import com.codename1.system.NativeInterface;
 public interface WebsiteThemeNative extends NativeInterface {
     boolean isDarkMode();
     void notifyUiReady();
-    boolean downloadProject(String fileName, String dataUrl);
+    /// Saves the generated project through the browser and, once the save was
+    /// handed to the browser, tells the embedding website page. packageName and
+    /// template ride along in that message only so the page can send an
+    /// anonymous download beacon (a SHA-256 of the package name, never the name
+    /// itself) that BuildCloud can later join to the first cloud build of the
+    /// same package. They do not influence the download.
+    boolean downloadProject(String fileName, String dataUrl, String packageName, String template);
 
     /// Horizontal clearance, in CSS pixels, that the host page's chat launcher
     /// (Crisp) currently needs at the bottom-right, or 0 when it is hidden. The
