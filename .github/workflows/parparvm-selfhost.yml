@@ -141,7 +141,7 @@ jobs:
       #  - Keeping it in both places would pay for the expensive -O3 self-host build
       #    twice on any PR carrying the `selfhost` label.
       #
-      # The baselines and tolerance live in vm/selfhost/perf-baseline.json, the
+      # The baselines and tolerance live in vm/selfhost/perf-baseline/, the
       # measurement in vm/selfhost/perf-gate.py.
 
       # Both trees, so a divergence can be inspected rather than guessed at from

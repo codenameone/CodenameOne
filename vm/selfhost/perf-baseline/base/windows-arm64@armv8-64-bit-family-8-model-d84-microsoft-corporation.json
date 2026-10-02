@@ -1,0 +1,136 @@
+{
+ "arrayRandom": {
+  "all": {
+   "memory": 0.228,
+   "runs": 1,
+   "time": 0.941,
+   "tolerance": {
+    "time": 0.45
+   }
+  }
+ },
+ "arraySequential": {
+  "all": {
+   "memory": 0.386,
+   "runs": 1,
+   "time": 0.362,
+   "tolerance": {
+    "time": 0.3
+   }
+  }
+ },
+ "hashMapChurn": {
+  "all": {
+   "memory": 0.117,
+   "runs": 1,
+   "time": 0.814,
+   "tolerance": {
+    "memory": 0.25,
+    "time": 0.55
+   }
+  }
+ },
+ "hello": {
+  "all": {
+   "memory": 0.696,
+   "runs": 1,
+   "time": 1.217,
+   "tolerance": {
+    "memory": 0.2,
+    "time": 0.5
+   }
+  }
+ },
+ "intArithmetic": {
+  "all": {
+   "memory": 0.059,
+   "runs": 1,
+   "time": 0.997,
+   "tolerance": {
+    "memory": 0.55
+   }
+  }
+ },
+ "longArithmetic": {
+  "all": {
+   "memory": 0.059,
+   "runs": 1,
+   "time": 1.043,
+   "tolerance": {
+    "memory": 0.5
+   }
+  }
+ },
+ "mathTranscendental": {
+  "all": {
+   "memory": 0.064,
+   "runs": 1,
+   "time": 0.627,
+   "tolerance": {
+    "memory": 0.4,
+    "time": 0.3
+   }
+  }
+ },
+ "objectAllocation": {
+  "all": {
+   "memory": 0.284,
+   "runs": 1,
+   "time": 4.472,
+   "tolerance": {
+    "memory": 0.3,
+    "time": 0.5
+   }
+  }
+ },
+ "quicksort": {
+  "all": {
+   "memory": 0.122,
+   "runs": 1,
+   "time": 0.935,
+   "tolerance": {
+    "memory": 0.25
+   }
+  }
+ },
+ "recursion": {
+  "all": {
+   "memory": 0.064,
+   "runs": 1,
+   "time": 1.665,
+   "tolerance": {
+    "time": 0.2
+   }
+  }
+ },
+ "stringBuilding": {
+  "all": {
+   "memory": 0.269,
+   "runs": 1,
+   "time": 1.527,
+   "tolerance": {
+    "time": 0.2
+   }
+  }
+ },
+ "translator": {
+  "all": {
+   "memory": 0.57,
+   "runs": 1,
+   "time": 0.775,
+   "tolerance": {
+    "time": 0.2
+   }
+  }
+ },
+ "valueEscape": {
+  "all": {
+   "memory": 0.052,
+   "runs": 1,
+   "time": 0.762,
+   "tolerance": {
+    "memory": 0.55
+   }
+  }
+ }
+}

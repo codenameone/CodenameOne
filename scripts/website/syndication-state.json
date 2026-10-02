@@ -2256,6 +2256,16 @@
       "medium": {
         "url": "https://medium.com/p/2547af3e68f0/edit",
         "syndicated_at": "2026-09-22T19:02:29+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/native-drag-and-drop-meets-cross-device-continuity",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6abf07bae87026307e477fe6",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-02T06:02:00+00:00"
       }
     },
     "javadoc-hugo-markdown-doclet": {
@@ -2318,6 +2328,10 @@
         "id": 4766797,
         "url": "https://dev.to/codenameone/the-hard-part-of-invite-a-friend-is-the-install-5a72",
         "syndicated_at": "2026-09-28T20:07:10+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/d52c3e0840cc/edit",
+        "syndicated_at": "2026-10-02T06:00:38+00:00"
       }
     },
     "xcode-27-build-settings": {
@@ -2340,6 +2354,17 @@
       "medium": {
         "url": "https://medium.com/@Codename_One/a-desktop-theme-has-to-know-about-the-mouse-da9d21626fdf?postPublishedType=initial",
         "syndicated_at": "2026-09-30T19:02:23+00:00"
+      }
+    },
+    "parparvm-compiles-itself": {
+      "devto": {
+        "id": 4784158,
+        "url": "https://dev.to/codenameone/the-java-compiler-that-became-its-own-test-case-436c",
+        "syndicated_at": "2026-10-01T18:54:46+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/3504143f7a34/edit",
+        "syndicated_at": "2026-10-01T19:02:08+00:00"
       }
     }
   }

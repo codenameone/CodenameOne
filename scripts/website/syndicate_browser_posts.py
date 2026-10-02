@@ -253,12 +253,23 @@ def _hashnode_storage_from_firefox() -> Path | None:
     return path
 
 
+def _storage_file_logged_in(path: Path) -> bool:
+    """Whether a saved storage-state file still carries a live Hashnode session."""
+    try:
+        from export_storage_state import SITE_PROFILES  # noqa: E402
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 — unreadable/corrupt file is not a session
+        return False
+    return bool(SITE_PROFILES["hashnode"]["is_logged_in"](state.get("cookies", [])))
+
+
 def _resolve_hashnode_storage_state() -> Path | None:
     """Resolve a usable Hashnode storage-state file, in priority order:
 
       1. HASHNODE_STORAGE_STATE env var (base64) — used by CI / explicit override.
       2. A persistent JSON file at HASHNODE_STORAGE_FILE — captured once by
-         export_storage_state.py and reused across shell sessions.
+         export_storage_state.py and reused across shell sessions, as long
+         as its session cookie has not expired.
       3. The live Firefox profile — just stay logged in to Hashnode in Firefox.
 
     Returns the path to a storage-state JSON, or None when none is available.
@@ -269,10 +280,21 @@ def _resolve_hashnode_storage_state() -> Path | None:
         return _HASHNODE_STATE_PATH
     if os.environ.get("HASHNODE_STORAGE_STATE"):
         _HASHNODE_STATE_PATH = _load_base64_storage_state("HASHNODE_STORAGE_STATE")
-    elif HASHNODE_STORAGE_FILE.is_file():
+    elif HASHNODE_STORAGE_FILE.is_file() and _storage_file_logged_in(HASHNODE_STORAGE_FILE):
         _HASHNODE_STATE_PATH = HASHNODE_STORAGE_FILE
     else:
+        # A saved file whose session expired must not shadow Firefox: it
+        # used to win unconditionally, and every run then drove a
+        # signed-out page into a 30s "Write" button timeout.
         _HASHNODE_STATE_PATH = _hashnode_storage_from_firefox()
+        if HASHNODE_STORAGE_FILE.is_file() and _HASHNODE_STATE_PATH is not None:
+            print(f"  [hashnode] {HASHNODE_STORAGE_FILE} holds no live session; "
+                  "using the Firefox profile's session instead.", file=sys.stderr)
+        elif HASHNODE_STORAGE_FILE.is_file():
+            print(f"  [hashnode] {HASHNODE_STORAGE_FILE} holds no live session and Firefox "
+                  "has none either; sign in to Hashnode in Firefox, then run "
+                  "export_storage_state.py --site hashnode --from-firefox-profile.",
+                  file=sys.stderr)
     _HASHNODE_STATE_RESOLVED = True
     return _HASHNODE_STATE_PATH
 
@@ -449,7 +471,19 @@ class HashnodeAdapter:
         # in another tab), skip the click — wait_for_url would never
         # fire since the URL never changes.
         if "/draft/" not in page.url:
-            page.locator("button:has-text('Write')").first.click()
+            write = page.locator("button:has-text('Write')").first
+            try:
+                write.wait_for(state="visible", timeout=30000)
+            except Exception:
+                # A signed-out session lands on the marketing page, which
+                # has no Write button; say so instead of a bare timeout.
+                if page.get_by_text("Sign in", exact=True).first.is_visible():
+                    raise AdapterError(
+                        "Hashnode session is signed out; sign in to Hashnode in Firefox, "
+                        "then run export_storage_state.py --site hashnode --from-firefox-profile"
+                    ) from None
+                raise
+            write.click()
             page.wait_for_url("**/draft/*", timeout=30000)
         draft_url = page.url
         # Let the editor hydrate before typing into it — there are two

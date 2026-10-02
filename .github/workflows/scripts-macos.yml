@@ -257,6 +257,10 @@ jobs:
       # got it, and JDK 25 is fetched privately so no later step sees a different JDK.
       - name: ParparVM vs JDK 25 (performance gate)
         if: success() || failure()
+        # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
+        # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -u
           ENV_FILE="${TMPDIR%/}/codenameone-tools/tools/env.sh"

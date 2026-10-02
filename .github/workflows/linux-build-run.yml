@@ -386,6 +386,10 @@ jobs:
       # results travel with the screenshots.
       - name: ParparVM vs JDK 25 (performance gate)
         if: success() || failure()
+        # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
+        # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           vm/selfhost/ci-perf-gate.sh run linux-${{ matrix.arch }} artifacts/linux-port/raw/perf \
             --hello-workload "$GITHUB_WORKSPACE/artifacts/linux-port/raw/translation-record.jsonl" \

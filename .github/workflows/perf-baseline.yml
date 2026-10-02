@@ -1,0 +1,117 @@
+name: Performance baselines
+
+# The ParparVM performance gate's baselines live in vm/selfhost/perf-baseline/:
+# base/ holds the consolidated rows, and each pull request that changes a baseline
+# writes only its own pr/<number>.json, so baseline changes stay in the pull
+# request's diff without two branches ever editing the same file
+# (vm/selfhost/perf_baseline.py explains the layout).
+#
+#   check  every pull request: the overlays resolve against base/ without
+#          contradicting each other, and the pull request touched only its own
+#          overlay (base/ is the fold's alone). No paths filter: several of this
+#          repository's pull requests exceed GitHub's paths-filter diff limit, and a
+#          filtered check would silently not run on exactly those.
+#   fold   nightly on master: every overlay on master belongs to a merged pull
+#          request, so it is folded into base/ and deleted, in one commit that
+#          provably changes no verdict. Then the website is rebuilt, because the
+#          Port Status page's ParparVM vs JDK 25 table is rendered from these rows.
+#          A push made with GITHUB_TOKEN triggers no workflow, hence the dispatch.
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: '20 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The pull request's base commit has to be present for the diff.
+          fetch-depth: 0
+
+      - name: The gate's own unit tests
+        working-directory: vm/selfhost
+        run: python3 -m unittest test_perf_gate
+
+      - name: Check the baselines
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -n "${BASE_SHA}" ]; then
+            python3 vm/selfhost/perf_baseline.py check --base "${BASE_SHA}" --pr "${PR_NUMBER}"
+          else
+            python3 vm/selfhost/perf_baseline.py check
+          fi
+
+  fold:
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    concurrency:
+      group: perf-baseline-fold
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+
+      - name: Fold merged overlays into base/
+        id: fold
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # A merge landing while this runs makes the push non-fast-forward. Start over
+          # from the new master rather than rebasing: the fold is cheap, and redoing it
+          # folds the overlay that just arrived as well.
+          for attempt in 1 2 3; do
+            git fetch --quiet origin master
+            git reset --quiet --hard origin/master
+            python3 vm/selfhost/perf_baseline.py fold
+            git add -A vm/selfhost/perf-baseline
+            if git diff --staged --quiet; then
+              echo "No overlays to fold."
+              echo "folded=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git diff --staged --stat
+            git commit --quiet -m "ci: fold merged performance baselines into perf-baseline/base"
+            if git push origin HEAD:master; then
+              echo "folded=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "master moved during the fold (attempt ${attempt}); retrying."
+          done
+          echo "Could not push the fold after 3 attempts." >&2
+          exit 1
+
+      # One-shot on purpose. If this dispatch fails after the fold was pushed, a re-run
+      # finds nothing to fold and skips it -- and that is acceptable: website-docs.yml
+      # also rebuilds on its own daily schedule (and port-status-nightly dispatches it),
+      # so the JDK 25 table, which shows gate baselines rather than live results, is at
+      # most a day behind. Persisting a "rebuild owed" flag to close that window would
+      # add state for no visible benefit.
+      - name: Rebuild the Port Status page
+        if: steps.fold.outputs.folded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run website-docs.yml --ref master -f deploy_production=true

@@ -57,6 +57,24 @@ def default_storage_path(site: str) -> Path:
     later auto-discovered by the syndication script."""
     return STORAGE_STATE_DIR / f"{site}-storage-state.json"
 
+def _cookie_unexpired(cookie: dict, now: float | None = None) -> bool:
+    """True unless ``cookie`` carries an expiry that has already passed.
+
+    A saved storage state keeps its cookies after they expire, and a session
+    check that only looks for a cookie's presence keeps calling it signed in.
+    Hashnode's ``hashnode-session`` expired on 2026-09-21 inside the saved
+    file; every run after that drove a signed-out page and timed out looking
+    for the editor, while Firefox held a fresh session the resolver never
+    reached because the stale file came first. Playwright and Firefox both
+    write -1 (or omit the field) for a browser-session cookie, which has no
+    expiry to check.
+    """
+    expires = cookie.get("expires")
+    if not isinstance(expires, (int, float)) or expires <= 0:
+        return True
+    return expires > (time.time() if now is None else now)
+
+
 # Per-target site profile. Each entry knows where to land in a launched browser,
 # which cookie domain to filter from a Firefox profile, and how to recognize
 # a logged-in session (a function over the captured cookie list).
@@ -68,6 +86,7 @@ SITE_PROFILES: dict[str, dict] = {
         # value prefixed with `lo_`; a signed-in user gets one without it.
         "is_logged_in": lambda cookies: any(
             c.get("name") == "uid" and not (c.get("value") or "").startswith("lo_")
+            and _cookie_unexpired(c)
             for c in cookies
         ),
     },
@@ -78,8 +97,9 @@ SITE_PROFILES: dict[str, dict] = {
         # plus a per-session `dz<hash>` cookie. Either one signals a logged-in
         # session.
         "is_logged_in": lambda cookies: any(
-            c.get("name") == "remember-me" or (c.get("name") or "").startswith("dz")
-            and (c.get("name") or "") not in ("dzuuid",)  # dzuuid is anonymous
+            (c.get("name") == "remember-me" or (c.get("name") or "").startswith("dz")
+             and (c.get("name") or "") not in ("dzuuid",))  # dzuuid is anonymous
+            and _cookie_unexpired(c)
             for c in cookies
         ),
     },
@@ -88,9 +108,10 @@ SITE_PROFILES: dict[str, dict] = {
         "cookie_host_glob": "%hashnode.com",
         # Hashnode's web app authenticates the session with a single
         # `hashnode-session` cookie on hashnode.com. Its presence (and
-        # non-trivial length) signals a signed-in session.
+        # non-trivial length) signals a signed-in session, until it expires.
         "is_logged_in": lambda cookies: any(
             c.get("name") == "hashnode-session" and len(c.get("value") or "") > 32
+            and _cookie_unexpired(c)
             for c in cookies
         ),
     },

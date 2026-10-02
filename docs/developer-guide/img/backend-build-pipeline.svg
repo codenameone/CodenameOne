@@ -9,7 +9,7 @@
   <text x="125" y="115.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">@RestController</text>
   <text x="125" y="130.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">controllers</text>
   <rect x="30" y="150" width="190" height="42" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
-  <text x="125" y="167.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">@Service  @Component</text>
+  <text x="125" y="167.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">@Component</text>
   <text x="125" y="182.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">beans</text>
   <rect x="30" y="202" width="190" height="42" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="125" y="219.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">@Configuration + @Bean</text>

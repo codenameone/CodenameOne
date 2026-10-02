@@ -201,3 +201,6 @@ native-themes/*/target/
 # (scripts/website/sync_port_status_reports.sh); never committed, because
 # there is no checked-in fallback for it.
 docs/website/data/port_status_flutter_benchmark.json
+
+# Rendered from vm/selfhost/perf-baseline by scripts/website/build.sh; never committed.
+docs/website/data/port_status_jdk25.json
