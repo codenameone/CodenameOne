@@ -347,6 +347,19 @@ class CalibrationTest(unittest.TestCase):
                                  existing=moved, overlays={7: mine})
         self.assertIn('quicksort', str(caught.exception))
 
+    def test_a_superseded_own_calibration_becomes_a_rebaseline(self):
+        # Another pull request's calibration of the same CPU was folded into base/ first.
+        folded = {'linux-x64@new': {'quicksort': {'all': row(1.0, 0.1)}}}
+        mine = {'pr': 7, 'calibrate': {'linux-x64@new': {'quicksort': {'all': row(1.05, 0.1, 1)}}}}
+        overlay, rows = self.run_calibration([('linux-x64', {'quicksort': (2.0, 0.1)}, 'New')],
+                                             existing=folded, overlays={7: mine},
+                                             reason='quicksort got slower on purpose')
+        self.assertNotIn('calibrate', overlay)
+        r = overlay['rebaseline']['linux-x64@new']['quicksort']['all']
+        self.assertEqual((r['from']['time'], r['time']), (1.0, 2.0))
+        # ...and, unlike a second calibration, it actually moves the resolved baseline.
+        self.assertEqual(rows['linux-x64@new']['quicksort']['all']['time'], 2.0)
+
     def test_a_row_this_pull_request_calibrated_stays_a_calibration(self):
         mine = {'pr': 7, 'calibrate': {'linux-x64@new': {'quicksort': {'all': row(1.0, 0.1, 1)}}}}
         overlay, _ = self.run_calibration([('linux-x64', {'quicksort': (1.5, 0.1)}, 'New')],

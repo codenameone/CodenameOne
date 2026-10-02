@@ -164,7 +164,13 @@ def main(argv=None):
         for (bench, cores), metrics in sorted(benches.items()):
             current = judged.get(key, {}).get(bench, {}).get(cores)
             before = others.get(key, {}).get(bench, {}).get(cores)
-            new_row = current is None or cores in own.get('calibrate', {}).get(key, {}).get(bench, {})
+            # This pull request's own calibration counts only while it is the row: once
+            # another pull request's calibration of the same CPU has been folded into base/,
+            # resolve() supersedes ours, and writing a calibration again would be ignored
+            # just the same -- the gate would fail forever. Then the row is base/'s, and a
+            # move past it is a rebaseline FROM it (write_overlay drops the stale entry).
+            new_row = current is None or (
+                before is None and cores in own.get('calibrate', {}).get(key, {}).get(bench, {}))
             row = {} if current is None else copy.deepcopy(current)
             moved = []
             for metric in METRICS:
