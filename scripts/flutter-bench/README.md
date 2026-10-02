@@ -9,7 +9,8 @@ runtimes and nothing else.
 ```
 app/prepare.sh      materialises both projects from the installed Flutter SDK
 app/build_apps.sh   builds both, release, for one platform
-run_bench.py        measures, renders, and gates against a baseline
+run_bench.py        measures, renders, and gates
+flutter_baseline.py the regression gate's baselines (baseline/): check, fold, calibrate
 port_status.py      folds the results into the website's data
 ```
 
@@ -34,8 +35,9 @@ between releases, so a number from last week and a number from today would
 differ for reasons unrelated to this repository. It is not hypothetical:
 tracking `stable` broke outright when 3.47.5's tree resolved `google_fonts` to
 a version without `robotoCondensed` and three studies stopped compiling.
-Bumping the pin re-baselines the comparison, so expect every number to move and
-re-record `baselines/` in the same change.
+Bumping the pin re-baselines the comparison: expect every start-up and memory
+ratio to move, and rebaseline them in the same change's own overlay (see
+"Baselines" below).
 
 Lifting the gallery out of the SDK's pub workspace takes two things with it.
 Its **lockfile**, because the gallery pins almost nothing (`google_fonts: any`)
@@ -59,7 +61,8 @@ scripts/flutter-bench/app/measure.sh macos <cn1-artifact> <flutter-artifact> /tm
 ```
 
 `measure.sh` is what every CI leg runs, so a local run measures exactly what CI
-does. It writes `result-<platform>.json` and `baseline-<platform>.json`.
+does. It writes `result-<platform>.json` and `baseline-<platform>.json` (the
+candidate `flutter_baseline.py calibrate` reads).
 
 `run_bench.py --list` reports which platform adapters have been **exercised
 end to end**, which is deliberately not the same question as which ones exist.
@@ -67,6 +70,7 @@ end to end**, which is deliberately not the same question as which ones exist.
 ```bash
 python3 scripts/flutter-bench/test_benchlib.py    # the arithmetic and the gate
 python3 scripts/flutter-bench/test_platforms.py   # marker timing, artifacts, installs
+python3 scripts/flutter-bench/test_flutter_baseline.py  # the regression gate's baselines
 ```
 
 ## Why the numbers are shaped the way they are
@@ -88,9 +92,8 @@ result, and several were caught only after being measured the wrong way first.
   against 468, on the strength of a single round. The median of the per-round
   ratios is 1.11x. Memory is paired for the same reason: the emulator's first
   round read both apps half loaded (33 MB and 61 MB against 45 MB and 89 MB in
-  every later round), and best-of compared those. The baseline gate still
-  reads each side's best run, because every committed baseline was recorded
-  that way.
+  every later round), and best-of compared those. The regression gate reads
+  the same paired statistic (see "Baselines").
 
 - **Start-up compares the same event on both sides: the first content frame
   on screen.** Codename One's `FIRSTFRAME` fires once its first form has been
@@ -131,28 +134,89 @@ result, and several were caught only after being measured the wrong way first.
   are outside our control, so a Flutter SDK upgrade that grows their build
   must not turn our build red.
 
-- **A platform with no baseline FAILS.** The gate compares against
-  `baselines/<platform>.json`. Without one there is nothing to compare, and a
-  gate that passes in that state is indistinguishable from one that checked --
-  so the run fails, says the gate is not armed, and leaves the baseline it
-  recorded (`baseline-<platform>.json`) in the workflow artifact. Committing
-  a baseline arms the gate -- but take its timing and memory figures as the
-  UPPER edge across several runs' candidates, not one run's best (baselines
-  hold each run's best round, not its median): Android's
-  best-of-five moved 282-418 ms across runs of unchanged code, and a baseline
-  taken from a low run fired on noise; re-committing it after a deliberate change (a
-  Flutter SDK bump moves every number) re-baselines it. Each baseline carries
-  its own tolerances: 2% for sizes, 25% for start-up, 15% for memory. A metric
-  with no tolerance is recorded but not gated, and the file says why: macOS
-  start-up is one, because the hosted runner spread a single run from 465 to
-  2588 ms at a load of 12-32, and no band wide enough to ignore that catches
-  anything.
-
 - **Deadlines are enforced by the clock.** Output is read on a thread with a
   timeout, so a launch that hangs before its marker is abandoned at the launch
   timeout and a healthy application that goes quiet after its last marker is
   let go at the settle time. A blocking `readline()` waited for one more line
   in both cases, and the job sat until the workflow's own timeout.
+
+## Baselines: two gates, and only one of them is a baseline
+
+Every leg run with `--gate` answers two questions, and fails on either.
+
+**Is Codename One at least level with Flutter?** `benchlib.check_behind`: any
+measured metric with a ratio under 1.00x, a compute geometric mean under 1.00x,
+or a compute workload Codename One got wrong fails the leg. It needs no baseline
+and no tolerance: both sides come from the same Dart source and are measured
+interleaved on the same runner.
+
+**Did Codename One move against itself?** The regression gate, against
+`baseline/`. It uses the ParparVM performance gate's model and its code
+(`vm/selfhost/perf_baseline.py`, run by `flutter_baseline.py` with its own
+layout), so the rules are the same and are written down once:
+
+- `baseline/policy.json`: the global tolerance and floor per metric, and the
+  metrics a platform records without gating, each with its reason (macOS
+  start-up: one hosted-runner run spread from 465 to 2588 ms).
+- `baseline/base/<platform>[@<cpu-model>].json`: the consolidated rows. Only the
+  nightly fold (`.github/workflows/perf-baseline.yml`) writes them; a pull
+  request that edits them fails `flutter_baseline.py check --base`.
+- `baseline/pr/<number>.json`: one pull request's calibrations and rebaselines.
+  No other branch writes that file, so two pull requests never conflict on a
+  baseline; two that moved the same row are reported by name.
+
+What is judged, per platform:
+
+| Metric | Value | Keyed by | Policy tolerance |
+| --- | --- | --- | --- |
+| `code_bytes`, `install_bytes`, `wire_bytes` | Codename One's own size, absolute | platform | 0 |
+| `cold_start_ratio` | Codename One / Flutter, median of the per-round ratios | platform, or platform@CPU model | 25% |
+| `idle_memory_ratio` | the same, for memory at rest | platform, or platform@CPU model | 15% |
+
+- **Sizes are absolute** because they are deterministic for a source tree, so
+  any move is a real change. A row may carry its own tolerance: Android's code
+  size has 0.5%, because at 0 every change that added bytes failed the leg
+  while Android code stays 4.5x under Flutter's; Android's install and
+  download sizes have 0.1%, because two runs of identical sources differ by 4
+  bytes of APK packaging. Learned size tolerances round up in 0.1% steps, not
+  the timing gate's 5%.
+- **Start-up and memory are ratios to Flutter from the same run.** The pinned
+  Flutter build is the unit of measure, as JDK 25 is for the ParparVM gate. An
+  absolute figure moved with the runner: measured over the branch's seven
+  complete runs, Codename One's median start-up ranged -40% to +10% around its
+  median on Windows and -24% to +5% on Linux, while the ratio ranged -12% to +4%
+  and -11% to +9%. The ratio replaces the one-sided `runner_slowdown_discount`
+  and its `flutter_reference` yardstick, which corrected start-up only, only on
+  Android, and only when the runner was slower. One cost, measured: on the
+  Android emulator Flutter's own resting memory swings 83-93 MB, so the memory
+  ratio is noisier there (+12%) than Codename One's absolute memory (within 4%).
+- **Either direction fails.** A value past its tolerance below the row fails as
+  well as one above it: an improvement nobody wrote down lets a later change
+  give it back unseen. So does a measured metric with no row, and a row whose
+  metric the run did not produce.
+- **Only our own numbers are gated.** Flutter's enter only as the denominator
+  of a ratio; a Flutter SDK that grows its build cannot fail a size row.
+
+When the gate fails, the job prints (and the comment shows) the command that
+accepts the move. Download the leg's `baseline-<platform>.json` artifact and:
+
+```bash
+# a new row (a platform or CPU model with no row yet)
+python3 scripts/flutter-bench/flutter_baseline.py calibrate --pr 5931 baseline-android.json
+# a row that moved on purpose
+python3 scripts/flutter-bench/flutter_baseline.py calibrate --pr 5931 \
+    --reason "why it moved" baseline-*.json
+```
+
+`--all` re-measures every row the files cover (for learning a row's noise from
+several runs of unchanged code), `--metric code_bytes,...` limits it, and
+`--per-cpu` calibrates ratio rows for the runners' CPU models. Commit the
+overlay it writes with the pull request.
+
+The one-file-per-platform `baselines/` this replaced is retired, and `check`
+fails a pull request that changes it. A branch with edits to it converts them
+with `flutter_baseline.py import-legacy --pr N --legacy <its baselines/>
+--original <the baselines/ it branched from>`.
 
 ## Compute: the VM workloads on every platform
 
@@ -253,5 +317,8 @@ counted attributes.
   the `macos` recipe has been built from a prepared tree, and `prepare.sh`
   itself is verified; the native compile steps and every other platform are
   not. `run_bench.py --list` reports this rather than implying otherwise.
-- **No baseline is committed yet**, so every measured platform currently fails
-  its gate by design until its first recorded baseline is committed.
+- **Ratio rows are not keyed per runner CPU yet.** No run before the CPU was
+  recorded (every result now carries `cpu`), so each platform has one plain row
+  that judges every runner, with a tolerance learned across the mixed pool.
+  Android start-up needs 50% for that. Once runs show a CPU model's ratio sits
+  apart, `calibrate --per-cpu` gives it its own row.
