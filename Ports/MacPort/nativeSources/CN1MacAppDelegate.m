@@ -969,6 +969,52 @@ extern void CN1MacRefreshModifiers(void);
 
 @end
 
+/// Lets the event dispatch thread put its first frame on screen BEFORE [NSApp run].
+///
+/// [NSApp run] starts with finishLaunching, which is AppKit's own launch work --
+/// will/didFinishLaunching, state restoration, activation, the menu bar -- and it
+/// runs synchronously on the main thread before the run loop first turns. Every
+/// hop the event dispatch thread makes onto the main queue waits behind all of it,
+/// and the first frame is such a hop (the flush in CN1MacViewController). Measured
+/// on the GitHub macOS runner, per launch: the Java side had shown its first Form
+/// at ~175 ms and the window existed at ~197 ms, but the main thread then spent
+/// ~60-110 ms in finishLaunching and another ~50-80 ms in activation before it
+/// served the flush, so the frame went out at ~330-560 ms. The EDT sat blocked in
+/// dispatch_sync for that whole stretch (100-130 ms on a single geometry getter).
+///
+/// So the run loop is turned here, in the default mode, until the first frame
+/// has been presented. That services exactly what the EDT is waiting for -- the
+/// main dispatch queue -- and nothing that needs the launch to be finished: input
+/// events are not dequeued until NSApp does it, and the window was already
+/// ordered front by the build above, so the frame lands in a visible window.
+/// Anything the launch delivers later (activation, open-URL, notification
+/// responses) still goes through the delegate, which already copes with either
+/// order relative to the Java side being ready (see cn1_mac_runtime_markJavaReady).
+///
+/// Bounded, because an application is free to show nothing for a long time: past
+/// the deadline the launch simply proceeds as it did before, and the frame is
+/// served by [NSApp run] like any other hop. The bound is short enough that a
+/// slow first screen does not hold the menu bar and activation hostage, and long
+/// enough to cover a normal first frame on a slow machine.
+static void CN1MacServeFirstFrameBeforeRun(void) {
+    extern BOOL cn1MacFirstFramePresented;
+    CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 0.75;
+    while (!cn1MacFirstFramePresented) {
+        CFTimeInterval left = deadline - CFAbsoluteTimeGetCurrent();
+        if (left <= 0) {
+            break;
+        }
+        // returnAfterSourceHandled: come back after every serviced block, so the
+        // loop notices the frame as soon as the flush that presented it returns.
+        if (CFRunLoopRunInMode(kCFRunLoopDefaultMode, left, true) == kCFRunLoopRunFinished) {
+            // Nothing in the mode to wait on; never the case on the main run loop,
+            // which always services the main queue, but a spin is worse than leaving.
+            break;
+        }
+    }
+    cn1StartupPhase("firstFrameServedBeforeRun");
+}
+
 /// Builds the main window on the main thread before [NSApp run], called from the
 /// generated main right after it has dispatched the VM boot. The queued build in
 /// CN1MacInstallAppDelegate then finds the window already there, and stays only as
@@ -982,6 +1028,7 @@ extern void CN1MacRefreshModifiers(void);
 void CN1MacBuildMainWindowBeforeRun(void) {
     cn1StartupPhase("buildWindowBeforeRun");
     (void)[CN1MacHost sharedHost].renderingView;
+    CN1MacServeFirstFrameBeforeRun();
 }
 
 /// Installs the delegate and the menu bar. Called from the generated main,

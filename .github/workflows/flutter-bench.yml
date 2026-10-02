@@ -363,6 +363,37 @@ jobs:
               "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" \
               "${RUNNER_TEMP}/bench-out"
 
+      # DIAGNOSTIC BRANCH ONLY: Time Profiler traces of both launches.
+      - name: Profile launches (diag)
+        if: ${{ always() && matrix.platform == 'macos' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          out="${RUNNER_TEMP}/traces"; mkdir -p "$out"
+          for side in cn1 flutter; do
+            if [ "$side" = cn1 ]; then app="${{ steps.build.outputs.cn1 }}"; else app="${{ steps.build.outputs.flutter }}"; fi
+            exe=$(ls "$app/Contents/MacOS/" | head -1)
+            for i in 1 2 3; do
+              xcrun xctrace record --template 'Time Profiler' --time-limit 4s --no-prompt \
+                  --env CN1_STARTUP_PHASES=1 --env BENCH_MARKERS=1 \
+                  --output "$out/$side-$i.trace" --launch -- "$app/Contents/MacOS/$exe" \
+                  > "$out/$side-$i.log" 2>&1 || echo "xctrace $side $i failed: $?"
+              tail -5 "$out/$side-$i.log"
+              sleep 3
+            done
+          done
+          ditto -c -k --keepParent "${{ steps.build.outputs.cn1 }}" "$out/cn1-app.zip"
+          ditto -c -k --keepParent "${{ steps.build.outputs.flutter }}" "$out/flutter-app.zip"
+          ls -la "$out"
+
+      - name: Upload traces (diag)
+        if: ${{ always() && matrix.platform == 'macos' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: diag-traces
+          path: ${{ runner.temp }}/traces
+          retention-days: 3
+
       # Android needs a device. A hosted runner has none, so the adapter found no
       # emulator and recorded the whole platform as unavailable after building
       # both APKs. Same emulator, API level and image as the Android port's own
