@@ -1,135 +1,254 @@
 #!/usr/bin/env python3
-"""Writes perf-baseline.json from the perf-results.json of several CI runs of UNCHANGED code.
+"""Writes a pull request's baseline changes, pr/<number>.json, from CI runs' perf-results.json.
 
-    python3 vm/selfhost/calibrate-perf-baseline.py [--out perf-baseline.json] RESULTS.json ...
+    python3 vm/selfhost/calibrate-perf-baseline.py [--pr N] [--reason TEXT] [--all]
+                                                   [--only BENCH,...] [--metric time|memory]
+                                                   RESULTS.json ...
 
-Pass every perf-results.json you have -- several runs per platform, from the artifacts
+Pass the perf-results.json of the runs the gate failed on -- from the artifacts
 ci-perf-gate.sh leaves (linux-screenshot-raw-*/perf, windows-port-screenshot-raw-*/perf,
-macos-ui-tests/perf). The runs must all measure the same code: the point is to learn how
-far each ratio moves when nothing changed.
+macos-ui-tests/perf). The rows land in vm/selfhost/perf-baseline/pr/<N>.json, which only
+this pull request writes, so the change is in its diff and in nobody else's; the nightly
+fold moves it into base/ after the merge (see perf_baseline.py). --pr defaults to the pull
+request of the checked-out branch, asked of the GitHub CLI.
 
-For every platform, benchmark and core setting:
+What it writes, per platform, benchmark and core setting the runs measured:
+  calibrate   for a row the baseline does not have (a runner CPU model no run had met).
+  rebaseline  for a row the runs put outside its tolerance, either way: a change that
+              moved performance on purpose. Only the metric that moved is replaced, and
+              --reason is required -- the reason is what a reviewer reads beside the
+              number; a row this pull request already rebaselined keeps its reason when
+              re-measured. --all rebaselines every measured row instead, for recalibrating a
+              row's noise from several runs of unchanged code; --metric limits that to one
+              metric, so recalibrating a noisy RAM figure leaves a steady time alone.
+
+How a row is computed:
   baseline   the median of the runs' median ratios.
   tolerance  max(the global tolerance, SPREAD_MARGIN x the observed spread), where the spread
-             is how far the runs' ratios reach above that median. A handful of runs
-             under-samples the tail, hence the margin. Measured on this branch: across five
-             runs most rows moved under 5%, while objectAllocation moved 20-37% on every
-             platform and Windows x64's translation rows up to 48% -- one global tolerance
-             either fails those on noise or waves real regressions through the rest.
-A row measured fewer than MIN_RUNS_FOR_OWN_SPREAD times cannot estimate its own spread;
-it takes the larger of what it measured and the widest tolerance any other row needed
-for the same benchmark and metric.
+             is how far the runs' ratios reach from that median, in either direction --
+             an improvement fails the gate too, so a tolerance learned only from the high
+             side would fail unchanged code on its low runs. A handful of runs
+             under-samples the tail, hence the margin. Measured: across five runs most
+             rows moved under 5%, while objectAllocation moved 20-37% on every platform
+             and Windows x64's translation rows up to 48% -- one global tolerance either
+             fails those on noise or waves real regressions through the rest.
+A row measured fewer than MIN_RUNS_FOR_OWN_SPREAD times cannot estimate its own spread.
+A new row takes the larger of what it measured and the widest tolerance any row needed
+for the same benchmark and metric; a rebaselined row keeps at least its own.
 
-Runs record the runner's CPU, and rows are written per CPU MODEL (`platform@model`, the
-model as perf-gate.cpu_class names it): hosted pools mix microarchitectures whose ratios
-differ by more than any tolerance absorbs. A runner on a model with no rows is reported
-and FAILS the gate until a run of it is calibrated in -- which is what this script is
-for: pass that run's perf-results.json and commit the result. A run whose CPU is unknown
-feeds the plain `platform` rows instead.
-
-Only the rows these results measure are replaced; every other row in the file is kept,
-so adding one new CPU model from one run leaves the rest alone. A single-run row borrows
-the widest tolerance seen for its benchmark across these runs AND the existing file.
---fresh starts from an empty set of rows instead: a full recalibration after the code
-changed, where a kept row would be a baseline for code that no longer exists.
-
-The global tolerance and the absolute floor (which keeps the tiny memory ratios, 0.03x of
-the JDK, from failing on a few kilobytes) are kept from the existing file.
+Rows are per CPU MODEL (`platform@model`, the model as perf-gate.cpu_class names it):
+hosted pools mix microarchitectures whose ratios differ by more than any tolerance
+absorbs. A run whose CPU is unknown feeds the plain `platform` rows instead.
 """
 import argparse
+import copy
 import importlib.util
 import json
 import math
 import statistics
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-_spec = importlib.util.spec_from_file_location('perf_gate', HERE / 'perf-gate.py')
-perf_gate = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(perf_gate)
+
+
+def _load(name, file):
+    spec = importlib.util.spec_from_file_location(name, HERE / file)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+perf_gate = _load('perf_gate', 'perf-gate.py')
+perf_baseline = _load('perf_baseline', 'perf_baseline.py')
 SPREAD_MARGIN = 1.5
 # Fewer runs than this cannot estimate a row's spread: EPYC 7763's hello row, from two
 # runs, failed unchanged code at +15.7% against a 15% tolerance. Such a row takes the
 # widest tolerance its benchmark needed anywhere, as a single-run row always did.
 MIN_RUNS_FOR_OWN_SPREAD = 5
-METRICS = ('time', 'memory')
+METRICS = perf_baseline.METRICS
 
 
 def round_up(value, step=0.05):
     return round(math.ceil(value / step - 1e-9) * step, 2)
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    parser.add_argument('--out', default=str(HERE / 'perf-baseline.json'))
-    parser.add_argument('--fresh', action='store_true',
-                        help='drop every row these results do not re-measure')
-    parser.add_argument('results', nargs='+')
-    args = parser.parse_args(argv)
+def spread_tolerance(values, base, floor):
+    """The tolerance a set of runs needs to pass themselves, or `floor` if smaller."""
+    if len(values) < 2:
+        return floor
+    spread = max(max(values) / base - 1, 1 - min(values) / base)
+    return max(floor, round_up(spread * SPREAD_MARGIN))
 
-    existing = json.loads(Path(args.out).read_text())
-    tolerance = existing['tolerance']
-    # platform -> (benchmark, cores) -> metric -> [median ratio per run]
+
+def collect(paths, only=None, rows=None):
+    """platform-key -> (benchmark, cores) -> metric -> [median ratio per run].
+
+    A run feeds the row that JUDGED it, chosen exactly as the gate chooses
+    (perf_gate.baseline_key over `rows`): macOS reports "Apple M1 (Virtual)" yet is judged
+    by the plain macos-arm64 row, and keying it by model would have rebaselined nothing and
+    calibrated a new per-model row beside the one that failed. A run no row judged
+    calibrates its own CPU model's row."""
     runs = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    for path in args.results:
+    for path in paths:
         report = json.loads(Path(path).read_text())
         if report.get('error') or report.get('failures'):
             raise SystemExit('%s did not complete; calibrate only from complete runs' % path)
         cls = perf_gate.cpu_class(report.get('cpu'))
-        key = '%s@%s' % (report['platform'], cls) if cls else report['platform']
+        key = perf_gate.baseline_key(rows or {}, report['platform'], report.get('cpu'))
+        if key is None or key not in (rows or {}):
+            if cls is None and any(k.startswith(report['platform'] + '@') for k in rows or {}):
+                # An undecodable CPU on a platform with per-model rows: baseline_key() selects
+                # NO row for it (judging an unknown model by another model's ratios is what
+                # failed unchanged code), so a plain-platform row written here would never
+                # be read and the gate would stay uncalibrated forever. The fix is to teach
+                # perf-gate.cpu_model() to read this runner, not to calibrate.
+                raise SystemExit('%s: the runner reported no decodable CPU model (%r) on %s, '
+                                 'which has per-model rows; no baseline row can be selected '
+                                 'for it. Fix perf-gate.cpu_model() for this runner.'
+                                 % (path, report.get('cpu'), report['platform']))
+            key = '%s@%s' % (report['platform'], cls) if cls else report['platform']
         for bench, by_cores in report['results'].items():
+            if only and bench not in only:
+                continue
             for cores, entry in by_cores.items():
                 for metric in METRICS:
                     runs[key][(bench, cores)][metric].append(entry[metric]['median'])
+    return runs
 
-    rows = {}
-    widest = defaultdict(float)  # (benchmark, metric) -> widest tolerance any platform needed
-    kept = {} if args.fresh else {k: v for k, v in existing.get('platforms', {}).items()
-                                  if k not in runs}
-    for benches in kept.values():
-        for bench, by_cores in benches.items():
-            for row in by_cores.values():
-                for metric, tol in row.get('tolerance', {}).items():
-                    widest[(bench, metric)] = max(widest[(bench, metric)], tol)
-    for platform, benches in runs.items():
-        for key, metrics in benches.items():
-            row = {}
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    parser.add_argument('--root', default=str(perf_baseline.ROOT))
+    parser.add_argument('--pr', type=int, help='the pull request number (default: ask gh)')
+    parser.add_argument('--reason', help='why the rebaselined rows moved')
+    parser.add_argument('--all', action='store_true',
+                        help='rebaseline every measured row, not only those out of tolerance')
+    parser.add_argument('--only', help='comma-separated benchmark ids to take from the runs')
+    parser.add_argument('--metric', choices=METRICS,
+                        help='rebaseline only this metric (a new row always gets both)')
+    parser.add_argument('results', nargs='+')
+    args = parser.parse_args(argv)
+
+    root = Path(args.root)
+    number = args.pr or perf_baseline.pr_number()
+    if number is None:
+        raise SystemExit('No pull request number: pass --pr N (the overlay is named after it)')
+    policy = perf_baseline.load_policy(root)
+    tolerance, floor = policy['tolerance'], policy['floor']
+    base = perf_baseline.load_base(root)
+    overlays = perf_baseline.load_overlays(root)
+    own = dict(overlays).get(number, {})
+    # What the gate judged against (this pull request's earlier rows included), and the
+    # baseline as it stands without them -- which is what a rebaseline's "from" names,
+    # since this run replaces this pull request's earlier rebaseline rather than stacking.
+    # This raises when another overlay chains its rebaseline ON TOP of this pull request's
+    # (its "from" is our value), and that is deliberate rather than a gap: re-measuring a
+    # link something else was measured on would move the value that later link starts
+    # from and make IT stale. Recalibrate a pull request nothing has built on yet.
+    others, _ = perf_baseline.resolve(base, [o for o in overlays if o[0] != number], tolerance)
+    try:
+        judged, _ = perf_baseline.resolve(base, overlays, tolerance)
+    except perf_baseline.BaselineError:
+        # This pull request's own overlay went stale (another merged change moved a row it
+        # rebaselines), and perf-gate.py then judged the run without it. Do the same, and
+        # rewrite every stale row below from these fresh runs -- which is the recovery the
+        # stale-overlay message asks for.
+        judged = others
+    stale = set()
+    for key, bench, cores, row in perf_baseline._rows('own', own.get('rebaseline', {})):
+        now = others.get(key, {}).get(bench, {}).get(cores)
+        if now is None or not perf_baseline._same(row['from'], now):
+            stale.add((key, bench, cores))
+    runs = collect(args.results, set(args.only.split(',')) if args.only else None, judged)
+
+    widest = defaultdict(float)   # (benchmark, metric) -> widest tolerance any row has
+    for _, bench, _, row in perf_baseline._rows('baseline', judged):
+        for metric, tol in row.get('tolerance', {}).items():
+            widest[(bench, metric)] = max(widest[(bench, metric)], tol)
+    for benches in runs.values():
+        for (bench, _), metrics in benches.items():
             for metric, values in metrics.items():
-                base = statistics.median(values)
-                row[metric] = round(base, 3)
+                own_tol = spread_tolerance(values, statistics.median(values), tolerance[metric])
                 if len(values) > 1:
-                    spread = max(values) / base - 1
-                    tol = max(tolerance[metric], round_up(spread * SPREAD_MARGIN))
-                    row.setdefault('tolerance', {})[metric] = tol
-                    widest[(key[0], metric)] = max(widest[(key[0], metric)], tol)
-            rows[(platform, key)] = (row, min(len(v) for v in metrics.values()))
+                    widest[(bench, metric)] = max(widest[(bench, metric)], own_tol)
 
-    platforms = {}
-    for (platform, (bench, cores)), (row, count) in sorted(rows.items()):
-        if count < MIN_RUNS_FOR_OWN_SPREAD:
-            own = row.get('tolerance', {})
-            row['tolerance'] = {m: max(tolerance[m], own.get(m, 0.0),
-                                       widest.get((bench, m), tolerance[m]))
-                                for m in METRICS}
-        # A row whose tolerance is just the global one does not need to repeat it.
-        tol = {m: t for m, t in row.pop('tolerance', {}).items() if t > tolerance[m]}
-        if tol:
-            row['tolerance'] = tol
-        row['runs'] = count
-        platforms.setdefault(platform, {}).setdefault(bench, {})[cores] = row
+    calibrate, rebaseline = {}, {}
+    for key, benches in sorted(runs.items()):
+        for (bench, cores), metrics in sorted(benches.items()):
+            current = judged.get(key, {}).get(bench, {}).get(cores)
+            before = others.get(key, {}).get(bench, {}).get(cores)
+            # This pull request's own calibration counts only while it is the row: once
+            # another pull request's calibration of the same CPU has been folded into base/,
+            # resolve() supersedes ours, and writing a calibration again would be ignored
+            # just the same -- the gate would fail forever. Then the row is base/'s, and a
+            # move past it is a rebaseline FROM it (write_overlay drops the stale entry).
+            new_row = current is None or (
+                before is None and cores in own.get('calibrate', {}).get(key, {}).get(bench, {}))
+            row = {} if current is None else copy.deepcopy(current)
+            moved = []
+            for metric in METRICS:
+                values = metrics[metric]
+                if args.metric and metric != args.metric and not new_row:
+                    continue
+                if not (args.all or new_row or (key, bench, cores) in stale or any(
+                        perf_gate.verdict(v, current[metric],
+                                          current.get('tolerance', {}).get(metric, tolerance[metric]),
+                                          floor[metric]) != 'ok' for v in values)):
+                    continue
+                moved.append(metric)
+                median = statistics.median(values)
+                row[metric] = round(median, 3)
+                tol = spread_tolerance(values, median, tolerance[metric])
+                if len(values) < MIN_RUNS_FOR_OWN_SPREAD:
+                    kept = (current or {}).get('tolerance', {}).get(metric, 0.0)
+                    tol = max(tol, kept, widest.get((bench, metric), 0.0) if new_row else 0.0)
+                row.setdefault('tolerance', {})[metric] = tol
+            if not moved:
+                continue
+            # A row whose tolerance is just the global one does not need to repeat it.
+            tol = {m: t for m, t in row.pop('tolerance', {}).items() if t > tolerance[m]}
+            if tol:
+                row['tolerance'] = tol
+            row['runs'] = min(len(metrics[m]) for m in moved)
+            if new_row or before is None:
+                calibrate.setdefault(key, {}).setdefault(bench, {})[cores] = row
+            else:
+                row['from'] = perf_baseline.from_row(before)
+                rebaseline.setdefault(key, {}).setdefault(bench, {})[cores] = row
 
-    # Rows these results did not measure are kept (unless --fresh): a calibration that got
-    # no macOS runner must not leave macOS without a baseline, and adding one CPU model
-    # must not drop the platform's others.
-    platforms.update(kept)
-    existing['platforms'] = platforms
-    Path(args.out).write_text(json.dumps(existing, indent=1, sort_keys=True) + '\n')
-    for platform in sorted(platforms):
-        print('%-14s %d benchmarks from %d run(s)' % (
-            platform, len(platforms[platform]),
-            max(r['runs'] for b in platforms[platform].values() for r in b.values())))
+    left = sorted(stale - {(k, b, c) for k, benches in rebaseline.items()
+                           for b, per in benches.items() for c in per})
+    if left:
+        raise SystemExit('These rows of pr/%d.json are stale and these runs did not measure '
+                         'them; pass runs that do: %s' % (number, ', '.join(
+                             '%s %s/%s' % row for row in left)))
+    if not calibrate and not rebaseline:
+        print('Every measured row is inside its tolerance; nothing to write.')
+        return 0
+    if not args.reason:
+        # A row this overlay already rebaselined keeps its reason when re-measured; a row
+        # NEW to it needs its own -- never an earlier row's explanation by default.
+        unexplained = ['%s %s/%s' % (key, bench, cores)
+                       for key, bench, cores, _ in perf_baseline._rows('new', rebaseline)
+                       if not own.get('rebaseline', {}).get(key, {}).get(bench, {})
+                       .get(cores, {}).get('reason')]
+        if unexplained:
+            raise SystemExit('These rows moved past their tolerance and would be rebaselined; '
+                             'say why with --reason: %s\n%s' % (', '.join(unexplained),
+                                                              json.dumps(rebaseline, indent=1)))
+    try:
+        path = perf_baseline.write_overlay(root, number, calibrate, rebaseline, args.reason)
+        perf_baseline.load(root)   # the overlay must resolve against everything else
+    except perf_baseline.BaselineError as error:
+        raise SystemExit(str(error))
+    for kind, tree in (('calibrated', calibrate), ('rebaselined', rebaseline)):
+        for key, benches in sorted(tree.items()):
+            print('%s %s: %s' % (kind, key, ', '.join(sorted(benches))))
+    print('Wrote %s -- commit it with this pull request.' % path)
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

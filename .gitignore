@@ -196,3 +196,6 @@ cn1-build-hints.json
 # Concatenated CSS the native-theme build feeds the compiler. Regenerated on
 # every run; the parts under native-themes/<theme>/*.css are the source.
 native-themes/*/target/
+
+# Rendered from vm/selfhost/perf-baseline by scripts/website/build.sh; never committed.
+docs/website/data/port_status_jdk25.json

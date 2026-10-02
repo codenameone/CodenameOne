@@ -45,6 +45,11 @@ on:
       - 'vm/backend/src/**'
       - 'vm/backend/impl/**'
       - 'vm/backend/shared-sources.sh'
+      # build.sh renders the Port Status JDK 25 table with this script's `summary`, so a
+      # change to its output shape must go through the Hugo build and validate_port_status.
+      # The baseline DATA (vm/selfhost/perf-baseline/**) is left out on purpose: a row
+      # changes numbers, not shape, and the nightly fold dispatches a rebuild for it.
+      - 'vm/selfhost/perf_baseline.py'
       - '.github/workflows/website-docs.yml'
   push:
     branches: [main, master]
@@ -78,6 +83,8 @@ on:
       - 'vm/backend/src/**'
       - 'vm/backend/impl/**'
       - 'vm/backend/shared-sources.sh'
+      # As above: the JDK 25 table's renderer.
+      - 'vm/selfhost/perf_baseline.py'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
     inputs:

@@ -319,6 +319,63 @@
     </p>
   </section>
 
+  {{- /* Rendered by scripts/website/build.sh from vm/selfhost/perf-baseline: the ratios
+         every platform build's performance gate holds ParparVM to, so this table and the
+         gate cannot disagree. Absent from a bare `hugo` run, hence the guard. */ -}}
+  {{- with site.Data.port_status_jdk25 }}
+  {{- $jdk := . -}}
+  <section class="cn1-port-status__performance" data-jdk25-evidence aria-labelledby="jdk25-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Gated performance</p>
+      <h2 id="jdk25-title">ParparVM against JDK 25</h2>
+      <p>
+        Each value is ParparVM's time or peak memory divided by HotSpot JDK 25 running the same code on the same CI runner,
+        as the median of interleaved, paired runs; below 1.00x ParparVM is faster or smaller. These are the baselines every
+        platform build is gated on: a pull request that moves one past its tolerance, in either direction, fails until the new value is
+        recorded in the repository. A platform measured on several runner CPU models shows the median across them and, below it, the range.
+      </p>
+    </header>
+    <div class="cn1-port-status__matrix cn1-port-status__matrix--performance cn1-port-status__matrix--jdk25" aria-label="ParparVM to JDK 25 ratio matrix">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Workload</th>
+            {{- range $jdk.platforms }}<th scope="col" title="CPU models: {{ delimit .cpus ", " }}"><span>{{ .name }}</span></th>{{- end }}
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $jdk.benchmarks }}
+          {{- $benchmark := . -}}
+          <tr data-jdk25-row="{{ .id }}">
+            <th scope="row"><strong>{{ .name }}</strong><p>{{ .description }}</p><small>Time and RAM, ParparVM / JDK 25</small></th>
+            {{- range $jdk.platforms }}
+              {{- $platform := . -}}
+              {{- $cell := index .benchmarks $benchmark.id -}}
+              {{- $covered := 0 -}}{{- with $cell -}}{{- $covered = len .cpus -}}{{- end -}}
+              <td data-jdk25-cell data-platform="{{ .id }}" title="{{ .name }}: {{ $benchmark.name }}, ParparVM / JDK 25 across {{ $covered }} of {{ len .cpus }} CPU model{{ if ne (len .cpus) 1 }}s{{ end }}">
+                {{- with $cell -}}
+                  {{- range $metric := slice "time" "memory" -}}
+                    {{- $m := index $cell $metric -}}
+                    {{- $lo := printf "%.2f" (float $m.min) -}}
+                    {{- $hi := printf "%.2f" (float $m.max) -}}
+                    <span class="cn1-port-status__ratio">{{ if eq $metric "time" }}Time{{ else }}RAM{{ end }} {{ printf "%.2fx" (float $m.median) }}
+                      {{- if ne $lo $hi }}<small>{{ $lo }}-{{ $hi }}x</small>{{ end -}}
+                    </span>
+                  {{- end -}}
+                {{- else -}}Not measured{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+    <p class="cn1-port-status__source-note">
+      <a href="https://github.com/codenameone/CodenameOne/tree/master/vm/selfhost/perf-baseline" target="_blank" rel="noopener">Performance gate baselines</a>
+    </p>
+  </section>
+  {{- end }}
+
   <footer class="cn1-port-status__method">
     <h2>How to read this page</h2>
     <p>

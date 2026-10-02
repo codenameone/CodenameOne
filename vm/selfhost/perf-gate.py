@@ -38,11 +38,14 @@ and a slow one. A ratio below 1.00x means ParparVM is faster (time) or smaller (
 Every run is verified: translation output byte for byte against the first run, workload
 checksums across arms and rounds. A ratio can never come from doing less work.
 
-A ratio more than the tolerance above its baseline in perf-baseline.json is a regression
-and the exit status is 1. So is a MISSING baseline -- a benchmark with no row, or a runner
+A ratio more than the tolerance above its baseline in vm/selfhost/perf-baseline/ is a
+regression and the exit status is 1. So is a ratio more than the tolerance BELOW it: an
+improvement that is not written down as the new baseline lets a later change give it back
+without failing anything. So is a MISSING baseline -- a benchmark with no row, or a runner
 whose CPU model has none -- because a gate that goes quiet whenever it cannot judge stops
-preventing regressions without anyone noticing. The report carries the rows to add, and
-calibrate-perf-baseline.py adds them from the run's perf-results.json.
+preventing regressions without anyone noticing. Each of these is fixed in the pull
+request's own pr/<number>.json, which calibrate-perf-baseline.py writes from the run's
+perf-results.json; perf_baseline.py explains the layout.
 
 Core counts are enforced with CPU affinity on Linux and Windows (inherited by the child)
 and by CN1_GC_MARK_THREADS plus -XX:ActiveProcessorCount everywhere. macOS has no affinity
@@ -70,6 +73,9 @@ TARGET = HERE / 'target'
 _spec = importlib.util.spec_from_file_location('bench_selfhost', HERE / 'bench-selfhost.py')
 bench = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(bench)
+_spec = importlib.util.spec_from_file_location('perf_baseline', HERE / 'perf_baseline.py')
+perf_baseline = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(perf_baseline)
 
 HELLO_APP = 'com_codenameone_examples_hellocodenameone_HelloCodenameOneStub'
 HELLO_PKG = 'com.codenameone.examples.hellocodenameone'
@@ -147,7 +153,7 @@ def cpu_class(cpu):
 
 
 def baseline_key(platforms, platform, cpu):
-    """Which perf-baseline.json row set judges this runner, or None for none.
+    """Which perf-baseline/ row set judges this runner, or None for none.
 
     platform@model when this CPU model was calibrated. When the platform HAS per-model
     rows but none for this model, None: the runner is a microarchitecture no run has
@@ -372,12 +378,13 @@ def verdict(ratio, base, tolerance, floor=0.0):
     """A regression is a ratio more than `tolerance` above its baseline AND more than
     `floor` above it in absolute terms. The floor is for RAM: a workload whose ParparVM
     footprint is a few MB against the JVM's ~40MB sits at ratios near 0.05, where under a
-    megabyte of jitter is a +30% change that means nothing."""
+    megabyte of jitter is a +30% change that means nothing. An improvement is the mirror
+    image, floor included, and FAILS the gate as well until it is rebaselined."""
     if base is None:
         return 'uncalibrated'
     if ratio > base * (1 + tolerance) and ratio - base > floor:
         return 'regression'
-    if ratio < base * (1 - tolerance):
+    if ratio < base * (1 - tolerance) and base - ratio > floor:
         return 'improved'
     return 'ok'
 
@@ -425,9 +432,44 @@ def status_cell(entry):
     verdicts = {entry['time']['verdict'], entry['memory']['verdict']}
     if 'uncalibrated' in verdicts:
         return '**NO BASELINE**'
-    if 'improved' in verdicts:
-        return 'better than baseline'
+    improved = ['%s %+.1f%%' % ('time' if m == 'time' else 'RAM',
+                                (entry[m]['median'] / entry[m]['baseline'] - 1) * 100)
+                for m in ('time', 'memory') if entry[m]['verdict'] == 'improved']
+    if improved:
+        return '**IMPROVED: rebaseline** (%s)' % ', '.join(improved)
     return 'ok'
+
+
+def _moved(report, verdict_):
+    """Prose lines for every row whose metric got `verdict_` ('regression'/'improved')."""
+    tol = report['tolerance']
+    lines = []
+    for bench_id, per_cores in report['results'].items():
+        for cores, entry in per_cores.items():
+            if 'failed' in entry:
+                continue
+            for metric in ('time', 'memory'):
+                e = entry[metric]
+                if e['verdict'] == verdict_:
+                    lines.append('%s %s: %s %.2fx against a %.2fx baseline (%+.1f%%, '
+                                 'tolerance %d%%)'
+                                 % (report['labels'][bench_id], _where(report, cores),
+                                    'time' if metric == 'time' else 'RAM', e['median'],
+                                    e['baseline'], (e['median'] / e['baseline'] - 1) * 100,
+                                    round(e.get('tolerance', tol[metric]) * 100)))
+    return lines
+
+
+def overlay_name(report):
+    number = report.get('pr')
+    return 'vm/selfhost/perf-baseline/pr/%s.json' % (number if number else '<PR number>')
+
+
+def fix_command(report, rebaseline):
+    number = report.get('pr')
+    return ('python3 vm/selfhost/calibrate-perf-baseline.py --pr %s%s perf-results.json'
+            % (number if number else '<PR number>',
+               ' --reason "<why these benchmarks moved>"' if rebaseline else ''))
 
 
 def _where(report, key):
@@ -464,20 +506,8 @@ def render_markdown(report):
                   'see below'), '']
     if report.get('error'):
         lines += ['**The performance gate could not complete:** `%s`' % report['error'], '']
-    regressions = []
-    for bench_id, per_cores in report['results'].items():
-        for cores, entry in per_cores.items():
-            if 'failed' in entry:
-                continue
-            for metric in ('time', 'memory'):
-                e = entry[metric]
-                if e['verdict'] == 'regression':
-                    regressions.append('%s %s: %s %.2fx against a %.2fx baseline (%+.1f%%, '
-                                       'tolerance %d%%)'
-                                       % (report['labels'][bench_id], _where(report, cores),
-                                          'time' if metric == 'time' else 'RAM', e['median'],
-                                          e['baseline'], (e['median'] / e['baseline'] - 1) * 100,
-                                          round(e.get('tolerance', tol[metric]) * 100)))
+    regressions = _moved(report, 'regression')
+    improvements = _moved(report, 'improved')
     failures = report.get('failures') or []
     if failures:
         lines.append('**%d benchmark%s failed to run:**' % (len(failures),
@@ -490,12 +520,19 @@ def render_markdown(report):
                                                            '' if len(regressions) == 1 else 's'))
         lines += ['- ' + r for r in regressions]
         lines.append('')
+    if improvements:
+        lines.append('**%d improvement%s past the baseline, which fail%s until rebaselined:**'
+                     % (len(improvements), '' if len(improvements) == 1 else 's',
+                        's' if len(improvements) == 1 else ''))
+        lines += ['- ' + r for r in improvements]
+        lines.append('')
     lines += ['Ratios are **ParparVM / JDK 25**: below 1.00x ParparVM is faster (time) or '
               'smaller (RAM). Median of %d interleaved, paired rounds; every run\'s output '
-              'was verified. A regression is a ratio more than %d%% (time) / %d%% (RAM) above '
-              'its baseline in `vm/selfhost/perf-baseline.json` (more, for a row whose '
-              'calibration runs were noisier; the file records it), and for RAM also more '
-              'than 0.05x above it in absolute terms.%s'
+              'was verified. A ratio more than %d%% (time) / %d%% (RAM) away from its baseline in '
+              '`vm/selfhost/perf-baseline/` fails: above it is a regression, below it an '
+              'improvement that has to be rebaselined (a row whose calibration runs were '
+              'noisier carries a wider tolerance), and for RAM the change must also exceed '
+              '0.05x in absolute terms.%s'
               % (report['rounds'], round(tol['time'] * 100), round(tol['memory'] * 100),
                  ' Both run unpinned on all of the runner\'s CPUs, with their own default '
                  'thread counts.' if any('all' in per for per in report['results'].values())
@@ -522,21 +559,36 @@ def render_markdown(report):
                   + '(`CN1_GC_MARK_THREADS`, `-XX:ActiveProcessorCount`) but neither is confined to it.']
     if report.get('calibration'):
         target = report.get('calibration_key') or report['platform']
-        lines += ['', '**No baseline for %d row%s on `%s`, so this gate fails.** Add them from '
-                  'this job\'s `perf-results.json` (in its uploaded artifact) and commit the '
-                  'result:' % (sum(len(v) for v in report['calibration'].values()),
-                               '' if sum(len(v) for v in report['calibration'].values()) == 1
-                               else 's', target), '',
-                  '```', 'python3 vm/selfhost/calibrate-perf-baseline.py perf-results.json', '```',
+        count = sum(len(v) for v in report['calibration'].values())
+        lines += ['', '**No baseline for %d row%s on `%s`, so this gate fails.** Add %s to '
+                  '`%s` from this job\'s `perf-results.json` (in its uploaded artifact) and '
+                  'commit it with this pull request:'
+                  % (count, '' if count == 1 else 's', target, 'it' if count == 1 else 'them',
+                     overlay_name(report)), '',
+                  # The calibrator takes the whole file: if this run also moved a row,
+                  # that rebaseline needs a reason or the command is refused.
+                  '```', fix_command(report, bool(regressions or improvements)), '```',
                   '', '<details><summary>The rows it will add</summary>', '',
                   '```json', json.dumps({target: report['calibration']}, indent=1),
                   '```', '', '</details>']
+    if regressions or improvements:
+        lines += ['', 'A change that moves performance ON PURPOSE records the new baseline in '
+                  '`%s`, with the reason, from this job\'s `perf-results.json`. The rebaseline '
+                  'is then part of this pull request\'s diff:' % overlay_name(report), '',
+                  '```', fix_command(report, True), '```']
+    if report.get('stale_overlay'):
+        lines += ['', '**`%s` is stale, so this gate fails.** %s This run was judged against '
+                  'the baseline without it; re-measure from this job\'s `perf-results.json`, '
+                  'which rewrites the stale rows:' % (overlay_name(report), report['stale_overlay']),
+                  '', '```', fix_command(report, True), '```']
     lines += ['', '**Result: %s**' % (
         'performance regression' if report['regression'] else
         ('gate did not complete' if report.get('error') else
          ('benchmark failed' if report.get('failures') else
           ('no baseline: calibration required' if missing_baselines(report)
-           else 'no regression'))))]
+           else ('improved past the baseline: rebaseline required' if improvements
+                 else ('stale overlay: re-measure required' if report.get('stale_overlay')
+                       else 'no regression'))))))]
     return '\n'.join(lines) + '\n'
 
 
@@ -556,7 +608,8 @@ def main(argv):
     # allocator's steady state, where six processes agreed to 0.8%.
     parser.add_argument('--reps', type=int, default=25,
                         help='measured repetitions per workload process (Bench argv[0])')
-    parser.add_argument('--baseline', default=str(HERE / 'perf-baseline.json'))
+    parser.add_argument('--baseline', default=str(perf_baseline.ROOT),
+                        help='the perf-baseline directory (base/, pr/, policy.json)')
     parser.add_argument('--platform', default=platform_key())
     parser.add_argument('--out', default=None)
     parser.add_argument('--markdown', default=None)
@@ -573,7 +626,7 @@ def main(argv):
     exe = '.exe' if platform.system() == 'Windows' else ''
     report = {'platform': args.platform, 'rounds': args.rounds, 'results': {}, 'labels': {},
               'available_cores': available_cores(), 'skipped_cores': [], 'regression': False,
-              'cpu': cpu_model()}
+              'improved': False, 'cpu': cpu_model()}
     out = Path(args.out) if args.out else None
     markdown = Path(args.markdown) if args.markdown else None
 
@@ -585,8 +638,35 @@ def main(argv):
             markdown.parent.mkdir(parents=True, exist_ok=True)
             markdown.write_text(render_markdown(report))
 
-    baseline = json.loads(Path(args.baseline).read_text())
+    report['pr'] = perf_baseline.pr_number()
+    try:
+        baseline = perf_baseline.load(args.baseline)
+    except perf_baseline.BaselineError as error:
+        baseline = None
+        own = report['pr'] and (Path(args.baseline) / 'pr' / ('%d.json' % report['pr'])).is_file()
+        if own:
+            # This pull request's OWN overlay went stale: another merged change moved a row
+            # it rebaselines. The fix is to re-measure on top of that change, which needs a
+            # measurement -- so measure against the baseline without the stale overlay and
+            # fail afterwards, rather than refuse and leave nothing to recalibrate from.
+            try:
+                baseline = perf_baseline.load(args.baseline, exclude=report['pr'])
+                report['stale_overlay'] = str(error)
+                print('perf-gate: this pull request\'s overlay is stale; measuring against '
+                      'the baseline without it: %s' % error, flush=True)
+            except perf_baseline.BaselineError:
+                baseline = None
+        if baseline is None:
+            # Overlays that contradict each other leave nothing to judge against. Say which,
+            # in the comment, rather than measuring for ten minutes first.
+            report['tolerance'] = {'time': 0.0, 'memory': 0.0}
+            report['error'] = 'perf-baseline: %s' % error
+            write()
+            print('perf-gate: REFUSING: %s' % report['error'], flush=True)
+            return 2
     report['tolerance'] = baseline['tolerance']
+    for note in baseline['notes']:
+        print('perf-gate: baseline note: %s' % note, flush=True)
     try:
         binary = Path(args.binary or os.environ.get('CN1_SELFHOST_BIN') or
                       TARGET / ('parpar-O3' + exe)).resolve()
@@ -676,6 +756,8 @@ def main(argv):
                                                          floor))
                     if entry[metric]['verdict'] == 'regression':
                         report['regression'] = True
+                    if entry[metric]['verdict'] == 'improved':
+                        report['improved'] = True
                 report['results'].setdefault(spec['id'], {})[key] = entry
                 if base.get('time') is None or base.get('memory') is None:
                     calibration.setdefault(spec['id'], {})[key] = {
@@ -698,10 +780,14 @@ def main(argv):
     print(render_markdown(report))
     failed = bool(report.get('failures'))
     uncalibrated = bool(missing_baselines(report))
+    improved = bool(report.get('improved'))
+    stale = bool(report.get('stale_overlay'))
     print('perf-gate: %s' % ('REGRESSION' if report['regression'] else
                              ('FAILED' if failed else
-                              ('NO BASELINE' if uncalibrated else 'OK'))))
-    return 1 if report['regression'] or failed or uncalibrated else 0
+                              ('NO BASELINE' if uncalibrated else
+                               ('IMPROVED: REBASELINE' if improved else
+                                ('STALE OVERLAY' if stale else 'OK'))))))
+    return 1 if report['regression'] or failed or uncalibrated or improved or stale else 0
 
 
 if __name__ == '__main__':

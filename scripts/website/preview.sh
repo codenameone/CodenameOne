@@ -6,6 +6,9 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WEBSITE_DIR="${REPO_ROOT}/docs/website"
 
 python3 "${REPO_ROOT}/scripts/hellocodenameone/conformance/port_status.py" validate
+# Generated, never committed; see scripts/website/build.sh.
+python3 "${REPO_ROOT}/vm/selfhost/perf_baseline.py" summary \
+  --out "${WEBSITE_DIR}/data/port_status_jdk25.json"
 
 if [ ! -d "${WEBSITE_DIR}" ]; then
   echo "Website directory not found: ${WEBSITE_DIR}" >&2

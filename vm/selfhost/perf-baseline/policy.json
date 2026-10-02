@@ -1,0 +1,10 @@
+{
+ "floor": {
+  "memory": 0.05,
+  "time": 0.0
+ },
+ "tolerance": {
+  "memory": 0.15,
+  "time": 0.15
+ }
+}
