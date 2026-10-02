@@ -663,6 +663,10 @@ void CN1MacDeliverWindowMiniaturized(BOOL miniaturized) {
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     cn1StartupPhase("didFinishLaunching");
+    // Normally a no-op: CN1MacBuildMainWindowBeforeRun released it before
+    // [NSApp run]. This is the backstop for a generated main that never calls
+    // that, so held menu commands cannot stay held for good.
+    CN1MacReleaseStartupMenu();
     // Installed unconditionally, and this early. A scheduled notification is
     // delivered through this delegate whether it fires while the application is
     // frontmost or the user opens it from Notification Center, so without it a
@@ -1044,6 +1048,8 @@ void CN1MacBuildMainWindowBeforeRun(void) {
     cn1StartupPhase("buildWindowBeforeRun");
     (void)[CN1MacHost sharedHost].renderingView;
     CN1MacServeFirstFrameBeforeRun();
+    // The menu bar and any commands held back while the frame was served.
+    CN1MacReleaseStartupMenu();
 }
 
 /// Installs the delegate and the menu bar. Called from the generated main,
