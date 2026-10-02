@@ -37,11 +37,13 @@ AN OVERLAY (pr/<number>.json)
                superseded and ignored: once one branch's calibration is folded, a second
                branch's adds nothing and must not fail for it.
   rebaseline   a row that exists and moved: a deliberate change in performance, better
-               or worse. "from" is the baseline the pull request measured against. If
-               the row is no longer at "from" -- another merged change moved it first --
-               the overlay is rejected, naming both: two changes moved the same
-               benchmark, and someone has to re-measure. That is the conflict git used
-               to report as a JSON hunk, now reported as what it is.
+               or worse. "from" is the baseline the pull request measured against.
+               Rebaselines of one row chain, each from the value the last one left, so a
+               pull request measured on top of a merged one need not wait for the fold.
+               Two from the SAME value, or one whose "from" the row never reaches --
+               another merged change moved it first -- are rejected, naming them: two
+               changes moved the same benchmark, and someone has to re-measure. That is
+               the conflict git used to report as a JSON hunk, now reported as what it is.
 
 Every overlay on master belongs to a merged pull request, so `fold` needs no knowledge
 of GitHub: it writes the resolved rows into base/, deletes every overlay, and refuses to
@@ -321,23 +323,35 @@ def resolve(base, overlays, tolerance=None):
             rebaselines.setdefault((key, bench, cores), []).append((number, row))
     for (key, bench, cores), entries in sorted(rebaselines.items()):
         where = '%s %s/%s' % (key, bench, cores)
-        if len(entries) > 1:
-            raise BaselineError(
-                '%s is rebaselined by more than one pull request (%s): two changes moved the '
-                'same benchmark. Re-measure on top of both and keep one rebaseline.'
-                % (where, ', '.join('pr/%d.json' % n for n, _ in entries)))
-        number, row = entries[0]
-        current = rows.get(key, {}).get(bench, {}).get(cores)
-        if current is None:
-            raise BaselineError('pr/%d.json rebaselines %s, which has no row; a new row is a '
-                                '"calibrate" entry' % (number, where))
-        if not _same(row['from'], current):
-            raise BaselineError(
-                'pr/%d.json rebaselines %s from %s, but the row is now %s: another merged '
-                'change moved it first. Re-measure on top of it and update the rebaseline.'
-                % (number, where, json.dumps(row['from'], sort_keys=True),
-                   json.dumps(from_row(current), sort_keys=True)))
-        rows[key][bench][cores] = {k: v for k, v in row.items() if k != 'from'}
+        # Several rebaselines of one row are applied as a CHAIN, each from the value the
+        # previous one left: a pull request that measured on top of one merged but not yet
+        # folded names that one's result as its "from", and must not wait for the nightly
+        # fold. Two entries from the SAME value are two changes that each moved the row
+        # without seeing the other -- the real conflict. The order comes from the "from"
+        # values alone, so it does not depend on which merged first.
+        pending = list(entries)
+        while pending:
+            current = rows.get(key, {}).get(bench, {}).get(cores)
+            if current is None:
+                raise BaselineError('pr/%d.json rebaselines %s, which has no row; a new row is '
+                                    'a "calibrate" entry' % (pending[0][0], where))
+            ready = [(n, r) for n, r in pending if _same(r['from'], current)]
+            if len(ready) > 1:
+                raise BaselineError(
+                    '%s is rebaselined from the same value by more than one pull request (%s): '
+                    'two changes moved the same benchmark without seeing each other. '
+                    'Re-measure on top of both and keep one rebaseline.'
+                    % (where, ', '.join('pr/%d.json' % n for n, _ in ready)))
+            if not ready:
+                number, row = pending[0]
+                raise BaselineError(
+                    'pr/%d.json rebaselines %s from %s, but the row is now %s: another merged '
+                    'change moved it first. Re-measure on top of it and update the rebaseline.'
+                    % (number, where, json.dumps(row['from'], sort_keys=True),
+                       json.dumps(from_row(current), sort_keys=True)))
+            number, row = ready[0]
+            rows[key][bench][cores] = {k: v for k, v in row.items() if k != 'from'}
+            pending.remove(ready[0])
     return rows, notes
 
 

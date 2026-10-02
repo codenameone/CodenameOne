@@ -389,6 +389,13 @@ class OverlayTests(unittest.TestCase):
         rows, _ = self.resolve([self.rebase(12, 0.8)])
         self.assertEqual(rows['linux-x64@a']['quicksort']['all'], row(0.8, 0.1))
 
+    def test_a_rebaseline_measured_on_top_of_an_unfolded_one_chains(self):
+        # pr/12 merged (1.0 -> 0.8) and is not folded yet; pr/15 measured on top of it.
+        for order in ([self.rebase(12, 0.8), self.rebase(15, 0.6, frm=0.8)],
+                      [self.rebase(15, 0.6, frm=0.8), self.rebase(12, 0.8)]):
+            rows, _ = self.resolve(order)
+            self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 0.6)
+
     def test_two_rebaselines_of_one_row_are_a_conflict_naming_both(self):
         with self.assertRaises(baselines.BaselineError) as caught:
             self.resolve([self.rebase(12, 0.8), self.rebase(15, 0.9)])
