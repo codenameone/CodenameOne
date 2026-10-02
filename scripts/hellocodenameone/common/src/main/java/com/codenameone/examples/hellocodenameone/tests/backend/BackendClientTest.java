@@ -51,6 +51,16 @@ public abstract class BackendClientTest extends BaseTest {
     /// budget, and well over the slowest step (a deliberate four-second delay).
     static final long STEP_TIMEOUT_MILLIS = 12000;
 
+    /// Marks a request that reports its own failures through `handleException`.
+    /// The application's network error listener (`Lifecycle.handleNetworkError`)
+    /// consumes every error it sees, and `NetworkManager` calls a request's own
+    /// handler only when no listener consumed the error -- so a step expecting a
+    /// failure (the timeout probe) never heard back and a modal "Connection Error"
+    /// dialog was left over the screens of later tests. The application leaves
+    /// requests carrying this marker alone.
+    public interface ReportsOwnErrors {
+    }
+
     private final List<Runnable> steps = new ArrayList<Runnable>();
     private int current = -1;
     private java.util.Timer watchdog;

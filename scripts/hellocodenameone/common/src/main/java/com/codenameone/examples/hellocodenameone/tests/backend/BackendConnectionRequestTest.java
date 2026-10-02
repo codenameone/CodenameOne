@@ -170,7 +170,7 @@ public class BackendConnectionRequestTest extends BackendClientTest {
     /// A request that reads its answer whatever the status, and reports once. An
     /// inner class, so a request that fails reports through the test instead of
     /// throwing on a thread nothing catches -- which left the test hanging.
-    abstract class Probe extends ConnectionRequest {
+    abstract class Probe extends ConnectionRequest implements ReportsOwnErrors {
         int code;
         byte[] data;
         String probeHeader;
