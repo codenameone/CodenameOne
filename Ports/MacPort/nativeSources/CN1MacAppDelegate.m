@@ -1049,6 +1049,7 @@ void CN1MacBuildMainWindowBeforeRun(void) {
 /// Installs the delegate and the menu bar. Called from the generated main,
 /// before [NSApp run].
 void CN1MacInstallAppDelegate(void) {
+    if (getenv("CN1_DIAG_EARLY_MENU") != NULL) { CN1MacInstallMainMenu(); } /* DIAG A/B switch */
     static CN1MacAppDelegate *delegate = nil;
     if (delegate == nil) {
         delegate = [[CN1MacAppDelegate alloc] init];

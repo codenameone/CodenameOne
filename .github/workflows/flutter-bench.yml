@@ -420,7 +420,8 @@ jobs:
           BENCH_SETTLE: "3"
         run: |
           arms=(--arm "head=codenameone:${{ steps.build.outputs.cn1 }}"
-                --arm "headNoEarly=codenameone:${{ steps.build.outputs.cn1 }}:CN1_DIAG_NO_EARLY_FRAME=1")
+                --arm "headNoEarly=codenameone:${{ steps.build.outputs.cn1 }}:CN1_DIAG_NO_EARLY_FRAME=1"
+                --arm "earlyMenu=codenameone:${{ steps.build.outputs.cn1 }}:CN1_DIAG_EARLY_MENU=1")
           if [ -n "${{ steps.buildold.outputs.cn1 }}" ]; then
             arms+=(--arm "old0927=codenameone:${{ steps.buildold.outputs.cn1 }}")
           fi
