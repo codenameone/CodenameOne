@@ -53,6 +53,16 @@ Every overlay on master belongs to a merged pull request, so `fold` needs no kno
 of GitHub: it writes the resolved rows into base/, deletes every overlay, and refuses to
 commit unless the resolved baseline is identical before and after -- the fold changes no
 verdict, by construction and by check.
+
+OTHER GATES ON THE SAME MODEL
+Everything above is parameterised by a Layout: where the tree lives, what a row's
+metrics are called, what a key looks like, and which retired file a pull request may no
+longer touch. The module-level functions default to SELFHOST, the layout this file was
+written for, so `perf_baseline.resolve(...)` means exactly what it always did. The
+Flutter benchmark's regression gate (scripts/flutter-bench/flutter_baseline.py) is the
+second layout: its rows are one metric each, {platform[@cpu]: {app: {metric: row}}},
+and it shares the overlay rules, the fold, the check and the calibrator's arithmetic
+(calibration_context / plan_calibration) rather than keeping a copy that drifts.
 """
 import argparse
 import copy
@@ -119,6 +129,64 @@ class BaselineError(Exception):
     cannot read stops preventing regressions without anyone noticing."""
 
 
+def _same_default(tolerance, key, bench, cores):
+    """The policy value a row with none of its own is judged by: the policy's own map,
+    whose keys are the row's metrics."""
+    return tolerance
+
+
+class Layout(object):
+    """What differs between two gates that share this module's rules.
+
+    root               the directory holding policy.json, base/ and pr/
+    metrics            the value fields of one row (each needs a positive number)
+    key_re             what a base/ file name or overlay key may be
+    legacy             the retired path(s) a pull request may no longer change
+    migration_marker   a path under root whose ABSENCE on the base branch marks the one
+                       pull request that creates the layout (and so may write base/)
+    policy_metrics     the names policy.json gives a tolerance and floor for
+    zero_tolerance     whether a policy tolerance of 0 is allowed (deterministic sizes)
+    row_default        (policy map, key, bench, cores) -> {metric: value}: the policy
+                       values a row without its own is judged by
+    widest_key         (bench, cores, metric) -> what "the same benchmark" means when a
+                       thin calibration borrows the widest tolerance seen elsewhere
+    round_value        how a combined value is rounded
+    tolerance_step     (key, bench, cores) -> the step a learned tolerance is rounded up
+                       to: 5% for timing ratios, finer for a deterministic size
+    calibrate_command  what to run to write an overlay, as the messages print it
+    legacy_message     what `check` says when a pull request changed a retired path
+    """
+
+    def __init__(self, root, metrics, key_re, legacy, migration_marker='base',
+                 policy_metrics=None, policy_metrics_text=None, zero_tolerance=False,
+                 value_word='ratio', row_default=None, widest_key=None, round_value=None,
+                 tolerance_step=None, calibrate_command='calibrate-perf-baseline.py --pr N', legacy_message=None):
+        self.root = Path(root)
+        self.metrics = tuple(metrics)
+        self.row_fields = set(self.metrics) | {'runs', 'tolerance'}
+        self.key_re = key_re
+        self.legacy = legacy
+        self.migration_marker = migration_marker
+        self.policy_metrics = tuple(policy_metrics or self.metrics)
+        self.policy_metrics_text = policy_metrics_text or ', '.join(self.policy_metrics)
+        self.metrics_text = ' and '.join(self.metrics)
+        self.zero_tolerance = zero_tolerance
+        self.value_word = value_word
+        self.row_default = row_default or _same_default
+        self.widest_key = widest_key or (lambda bench, cores, metric: (bench, metric))
+        self.round_value = round_value or (lambda value: round(value, 3))
+        self.tolerance_step = tolerance_step or (lambda key, bench, cores: 0.05)
+        self.calibrate_command = calibrate_command
+        self.legacy_message = legacy_message
+
+
+SELFHOST = Layout(
+    ROOT, METRICS, KEY_RE, LEGACY_FILE, policy_metrics_text='time and memory',
+    legacy_message='%s changed: that file is retired and nothing reads it. Convert the '
+                   'branch\'s edits with `perf_baseline.py import-legacy --pr N --ref '
+                   '<branch>` and delete it.' % LEGACY_FILE)
+
+
 def _read_json(path):
     try:
         return json.loads(path.read_text())
@@ -137,35 +205,40 @@ def _number(value):
     return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
 
 
-def _check_ratios(where, row):
-    for metric in METRICS:
+def _check_ratios(where, row, layout=None):
+    layout = layout or SELFHOST
+    for metric in layout.metrics:
         value = row.get(metric)
         if not _number(value) or not value > 0:
-            raise BaselineError('%s: %s must be a positive ratio, not %r' % (where, metric, value))
+            raise BaselineError('%s: %s must be a positive %s, not %r'
+                                % (where, metric, layout.value_word, value))
     tolerance = row.get('tolerance', {})
-    if not isinstance(tolerance, dict) or set(tolerance) - set(METRICS):
-        raise BaselineError('%s: tolerance must map time/memory to a fraction' % where)
+    if not isinstance(tolerance, dict) or set(tolerance) - set(layout.metrics):
+        raise BaselineError('%s: tolerance must map %s to a fraction'
+                            % (where, '/'.join(layout.metrics)))
     for metric, value in tolerance.items():
         if not _number(value) or not 0 < value < 5:
             raise BaselineError('%s: %s tolerance %r is not a fraction' % (where, metric, value))
 
 
-def _check_row(where, row, extra=()):
-    unknown = set(row) - ROW_FIELDS - set(extra)
+def _check_row(where, row, extra=(), layout=None):
+    layout = layout or SELFHOST
+    unknown = set(row) - layout.row_fields - set(extra)
     if unknown:
         raise BaselineError('%s: unknown field(s) %s' % (where, ', '.join(sorted(unknown))))
-    _check_ratios(where, row)
+    _check_ratios(where, row, layout)
     runs = row.get('runs')
     if isinstance(runs, bool) or not isinstance(runs, int) or runs < 1:
         raise BaselineError('%s: runs must be a positive integer, not %r' % (where, runs))
 
 
-def _rows(where, tree):
+def _rows(where, tree, layout=None):
     """(key, benchmark, cores, row) for every row of a {key: {bench: {cores: row}}} tree."""
+    layout = layout or SELFHOST
     if not isinstance(tree, dict):
         raise BaselineError('%s must be an object' % where)
     for key, benches in sorted(tree.items()):
-        if not KEY_RE.match(key):
+        if not layout.key_re.match(key):
             raise BaselineError('%s: %r is not a platform or platform@cpu-model key' % (where, key))
         if not isinstance(benches, dict):
             raise BaselineError('%s: %s must be an object' % (where, key))
@@ -178,49 +251,53 @@ def _rows(where, tree):
                 yield key, bench, cores, row
 
 
-def load_policy(root=ROOT):
+def load_policy(root=ROOT, layout=None):
+    layout = layout or SELFHOST
     policy = _read_json(Path(root) / 'policy.json')
     for name in ('tolerance', 'floor'):
         values = policy.get(name)
-        if not isinstance(values, dict) or set(values) != set(METRICS):
-            raise BaselineError('policy.json: %s must give time and memory' % name)
+        if not isinstance(values, dict) or set(values) != set(layout.policy_metrics):
+            raise BaselineError('policy.json: %s must give %s' % (name, layout.policy_metrics_text))
         for metric, value in values.items():
             # A pull request may edit the policy, so a value verdict() would choke on --
             # or a negative tolerance, which inverts the gate -- is refused here, before
             # ten minutes of measurement per platform consume it.
             numeric = not isinstance(value, bool) and isinstance(value, (int, float))
-            if not numeric or not (value > 0 if name == 'tolerance' else value >= 0) or \
+            positive = name == 'tolerance' and not layout.zero_tolerance
+            if not numeric or not (value > 0 if positive else value >= 0) or \
                     not value < 5:
                 raise BaselineError('policy.json: %s %s %r is not a %s fraction' % (
-                    name, metric, value, 'positive' if name == 'tolerance' else 'non-negative'))
+                    name, metric, value, 'positive' if positive else 'non-negative'))
     return policy
 
 
-def load_base(root=ROOT):
+def load_base(root=ROOT, layout=None):
+    layout = layout or SELFHOST
     base = {}
     directory = Path(root) / 'base'
     for path in sorted(directory.glob('*')):
         if path.suffix != '.json':
             raise BaselineError('%s: only <key>.json files belong in base/' % path)
         key = path.stem
-        for _, bench, cores, row in _rows(str(path), {key: _read_json(path)}):
-            _check_row('%s %s/%s' % (path.name, bench, cores), row)
+        for _, bench, cores, row in _rows(str(path), {key: _read_json(path)}, layout):
+            _check_row('%s %s/%s' % (path.name, bench, cores), row, layout=layout)
             base.setdefault(key, {}).setdefault(bench, {})[cores] = row
     return base
 
 
-def load_overlays(root=ROOT):
+def load_overlays(root=ROOT, layout=None):
     overlays = []
     for path in sorted(Path(root).joinpath('pr').glob('*')):
         if not re.match(r'^[1-9][0-9]*\.json$', path.name):
             raise BaselineError('%s: an overlay is named <pull request number>.json' % path)
         overlay = _read_json(path)
-        validate_overlay(int(path.stem), overlay, path.name)
+        validate_overlay(int(path.stem), overlay, path.name, layout)
         overlays.append((int(path.stem), overlay))
     return sorted(overlays)
 
 
-def validate_overlay(number, overlay, where):
+def validate_overlay(number, overlay, where, layout=None):
+    layout = layout or SELFHOST
     if not isinstance(overlay, dict):
         raise BaselineError('%s must be an object' % where)
     if 'reason' in overlay:
@@ -232,45 +309,47 @@ def validate_overlay(number, overlay, where):
         raise BaselineError('%s: unknown field(s) %s' % (where, ', '.join(sorted(unknown))))
     if overlay.get('pr') != number:
         raise BaselineError('%s: "pr" must be %d, the number in its file name' % (where, number))
-    for _, bench, cores, row in _rows(where + ' calibrate', overlay.get('calibrate', {})):
-        _check_row('%s calibrate %s/%s' % (where, bench, cores), row)
-    rebaselines = list(_rows(where + ' rebaseline', overlay.get('rebaseline', {})))
+    for _, bench, cores, row in _rows(where + ' calibrate', overlay.get('calibrate', {}), layout):
+        _check_row('%s calibrate %s/%s' % (where, bench, cores), row, layout=layout)
+    rebaselines = list(_rows(where + ' rebaseline', overlay.get('rebaseline', {}), layout))
     for key, bench, cores, row in rebaselines:
         here = '%s rebaseline %s %s/%s' % (where, key, bench, cores)
-        _check_row(here, row, extra=('from', 'reason'))
+        _check_row(here, row, extra=('from', 'reason'), layout=layout)
         reason = row.get('reason')
         if not isinstance(reason, str) or not reason.strip() or \
                 reason.strip().upper().startswith('TODO'):
             raise BaselineError('%s: a rebaseline needs a "reason" saying why this row moved'
                                 % here)
         old = row.get('from')
-        if not isinstance(old, dict) or set(old) - {'tolerance'} != set(METRICS):
-            raise BaselineError('%s: "from" must give the time and memory baseline it '
-                                'replaces, and its tolerance if it had one' % here)
-        _check_ratios(here + ' from', old)
+        if not isinstance(old, dict) or set(old) - {'tolerance'} != set(layout.metrics):
+            raise BaselineError('%s: "from" must give the %s baseline it '
+                                'replaces, and its tolerance if it had one'
+                                % (here, layout.metrics_text))
+        _check_ratios(here + ' from', old, layout)
     if not overlay.get('calibrate') and not rebaselines:
         raise BaselineError('%s changes nothing; delete it' % where)
 
 
-def from_row(row):
+def from_row(row, layout=None):
     """What a rebaseline records as the row it replaces: the ratios AND the tolerance. A
     tolerance-only recalibration (an --all run whose ratios round to the old values) is a
     change too, and a later rebaseline that compared ratios alone would pass and then put
     the stale tolerance back."""
-    old = {m: row[m] for m in METRICS}
+    old = {m: row[m] for m in (layout or SELFHOST).metrics}
     if row.get('tolerance'):
         old['tolerance'] = dict(row['tolerance'])
     return old
 
 
-def _same(a, b):
+def _same(a, b, layout=None):
     """Whether the row a rebaseline was measured against (`a`, its "from") is still the
     row in the tree (`b`). No tolerance on either side means none."""
-    return all(math.isclose(a[m], b[m], rel_tol=0, abs_tol=5e-4) for m in METRICS) and \
+    return all(math.isclose(a[m], b[m], rel_tol=0, abs_tol=5e-4)
+               for m in (layout or SELFHOST).metrics) and \
         a.get('tolerance', {}) == b.get('tolerance', {})
 
 
-def _combine(rows, default=None):
+def _combine(rows, default=None, layout=None, step=0.05):
     """Several branches calibrating the same new row: one calibration from all of them.
 
     The baseline is the median of their ratios, and the tolerance is wide enough that every
@@ -283,17 +362,19 @@ def _combine(rows, default=None):
     that a plain median of the two is the honest summary."""
     if len(rows) == 1:
         return copy.deepcopy(rows[0])
+    layout = layout or SELFHOST
     default = default or {}
-    combined = {m: round(statistics.median(r[m] for r in rows), 3) for m in METRICS}
+    combined = {m: layout.round_value(statistics.median(r[m] for r in rows))
+                for m in layout.metrics}
     combined['runs'] = sum(r['runs'] for r in rows)
     tolerance = {}
-    for metric in METRICS:
+    for metric in layout.metrics:
         base = combined[metric]
         need = 0.0
         for r in rows:
             own = r.get('tolerance', {}).get(metric, default.get(metric, 0.0))
             need = max(need, own, r[metric] * (1 + own) / base - 1, 1 - r[metric] * (1 - own) / base)
-        need = round(math.ceil(need / 0.05 - 1e-9) * 0.05, 2)
+        need = round_up(need, step)
         if need > default.get(metric, 0.0):
             tolerance[metric] = need
     if tolerance:
@@ -301,24 +382,28 @@ def _combine(rows, default=None):
     return combined
 
 
-def resolve(base, overlays, tolerance=None):
+def resolve(base, overlays, tolerance=None, layout=None):
     """The rows the gate judges against: base with every overlay applied. `tolerance` is
     the policy's global one, which a row without its own is judged by.
 
     Returns (rows, notes). Raises BaselineError for overlays that contradict each other or
     the base, naming the pull requests involved."""
+    layout = layout or SELFHOST
     rows = copy.deepcopy(base)
     notes = []
     calibrations = {}
     for number, overlay in overlays:
-        for key, bench, cores, row in _rows('pr/%d.json' % number, overlay.get('calibrate', {})):
+        for key, bench, cores, row in _rows('pr/%d.json' % number, overlay.get('calibrate', {}),
+                                            layout):
             calibrations.setdefault((key, bench, cores), []).append((number, row))
     for (key, bench, cores), entries in sorted(calibrations.items()):
         if cores in rows.get(key, {}).get(bench, {}):
             notes.append('%s %s/%s: already calibrated; the calibration in %s is superseded'
                          % (key, bench, cores, ', '.join('pr/%d.json' % n for n, _ in entries)))
             continue
-        combined = _combine([r for _, r in entries], tolerance)
+        combined = _combine([r for _, r in entries],
+                            layout.row_default(tolerance, key, bench, cores), layout,
+                            layout.tolerance_step(key, bench, cores))
         # Calibrations of one CPU that disagree wildly combine into a tolerance past any
         # sane fraction: a row that gates nothing, which the fold would only refuse after
         # the fact. Refuse it here, naming the calibrations. There is deliberately no
@@ -327,11 +412,13 @@ def resolve(base, overlays, tolerance=None):
         # the same code is a broken measurement, and the fix is to delete that entry from
         # the pr/<number>.json this message names, not to re-measure around it.
         _check_row('%s %s/%s as combined from %s' % (
-            key, bench, cores, ', '.join('pr/%d.json' % n for n, _ in entries)), combined)
+            key, bench, cores, ', '.join('pr/%d.json' % n for n, _ in entries)), combined,
+            layout=layout)
         rows.setdefault(key, {}).setdefault(bench, {})[cores] = combined
     rebaselines = {}
     for number, overlay in overlays:
-        for key, bench, cores, row in _rows('pr/%d.json' % number, overlay.get('rebaseline', {})):
+        for key, bench, cores, row in _rows('pr/%d.json' % number, overlay.get('rebaseline', {}),
+                                            layout):
             rebaselines.setdefault((key, bench, cores), []).append((number, row))
     for (key, bench, cores), entries in sorted(rebaselines.items()):
         where = '%s %s/%s' % (key, bench, cores)
@@ -347,7 +434,7 @@ def resolve(base, overlays, tolerance=None):
             if current is None:
                 raise BaselineError('pr/%d.json rebaselines %s, which has no row; a new row is '
                                     'a "calibrate" entry' % (pending[0][0], where))
-            ready = [(n, r) for n, r in pending if _same(r['from'], current)]
+            ready = [(n, r) for n, r in pending if _same(r['from'], current, layout)]
             if len(ready) > 1:
                 raise BaselineError(
                     '%s is rebaselined from the same value by more than one pull request (%s): '
@@ -360,7 +447,7 @@ def resolve(base, overlays, tolerance=None):
                     'pr/%d.json rebaselines %s from %s, but the row is now %s: another merged '
                     'change moved it first. Re-measure on top of it and update the rebaseline.'
                     % (number, where, json.dumps(row['from'], sort_keys=True),
-                       json.dumps(from_row(current), sort_keys=True)))
+                       json.dumps(from_row(current, layout), sort_keys=True)))
             number, row = ready[0]
             rows[key][bench][cores] = {k: v for k, v in row.items()
                                        if k not in ('from', 'reason')}
@@ -368,14 +455,15 @@ def resolve(base, overlays, tolerance=None):
     return rows, notes
 
 
-def load(root=ROOT, exclude=None):
+def load(root=ROOT, exclude=None, layout=None):
     """Everything perf-gate.py needs: tolerance, floor and the resolved rows. `exclude` leaves
     one pull request's overlay out (see perf-gate.py: a stale overlay of one's own)."""
-    policy = load_policy(root)
-    rows, notes = resolve(load_base(root), [o for o in load_overlays(root) if o[0] != exclude],
-                          policy['tolerance'])
+    policy = load_policy(root, layout)
+    rows, notes = resolve(load_base(root, layout),
+                          [o for o in load_overlays(root, layout) if o[0] != exclude],
+                          policy['tolerance'], layout)
     return {'tolerance': policy['tolerance'], 'floor': policy['floor'], 'platforms': rows,
-            'notes': notes}
+            'notes': notes, 'policy': policy}
 
 
 def write_base(root, rows):
@@ -389,25 +477,25 @@ def write_base(root, rows):
         (directory / ('%s.json' % key)).write_text(dump(benches))
 
 
-def fold(root=ROOT):
+def fold(root=ROOT, layout=None):
     """Write the resolved rows into base/ and delete the overlays. Returns the overlays
     folded. Verifies the gate reads the same baseline afterwards."""
     root = Path(root)
-    overlays = load_overlays(root)
-    tolerance = load_policy(root)['tolerance']
-    before, _ = resolve(load_base(root), overlays, tolerance)
+    overlays = load_overlays(root, layout)
+    tolerance = load_policy(root, layout)['tolerance']
+    before, _ = resolve(load_base(root, layout), overlays, tolerance, layout)
     if not overlays:
         return []
     write_base(root, before)
     for number, _ in overlays:
         (root / 'pr' / ('%d.json' % number)).unlink()
-    after, _ = resolve(load_base(root), load_overlays(root), tolerance)
+    after, _ = resolve(load_base(root, layout), load_overlays(root, layout), tolerance, layout)
     if after != before:
         raise BaselineError('folding changed the resolved baseline; nothing may be committed')
     return [number for number, _ in overlays]
 
 
-def write_overlay(root, number, calibrate=None, rebaseline=None, reason=None):
+def write_overlay(root, number, calibrate=None, rebaseline=None, reason=None, layout=None):
     """Add rows to pr/<number>.json, creating it if needed. A row written again replaces
     the earlier one, so re-running the calibration after another CI round is safe.
 
@@ -418,7 +506,7 @@ def write_overlay(root, number, calibrate=None, rebaseline=None, reason=None):
     path = Path(root) / 'pr' / ('%d.json' % number)
     overlay = _read_json(path) if path.exists() else {'pr': number}
     for kind, tree in (('calibrate', calibrate), ('rebaseline', rebaseline)):
-        for key, bench, cores, row in _rows(kind, tree or {}):
+        for key, bench, cores, row in _rows(kind, tree or {}, layout):
             if kind == 'rebaseline' and 'reason' not in row:
                 earlier = overlay.get('rebaseline', {}).get(key, {}).get(bench, {}).get(cores, {})
                 if reason or earlier.get('reason'):
@@ -439,9 +527,189 @@ def write_overlay(root, number, calibrate=None, rebaseline=None, reason=None):
                 del tree[key]
         if kind in overlay and not tree:
             del overlay[kind]
-    validate_overlay(number, overlay, path.name)
+    validate_overlay(number, overlay, path.name, layout)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(dump(overlay))
+    return path
+
+
+# The calibrator's arithmetic, shared by every layout (calibrate-perf-baseline.py for this
+# one, scripts/flutter-bench/flutter_baseline.py for the Flutter benchmark), so the rules
+# for what a run writes cannot drift between two copies.
+SPREAD_MARGIN = 1.5
+# Fewer runs than this cannot estimate a row's spread: EPYC 7763's hello row, from two
+# runs, failed unchanged code at +15.7% against a 15% tolerance. Such a row takes the
+# widest tolerance its benchmark needed anywhere, as a single-run row always did.
+MIN_RUNS_FOR_OWN_SPREAD = 5
+
+
+def round_up(value, step=0.05):
+    return round(math.ceil(value / step - 1e-9) * step, max(2, -int(math.floor(math.log10(step)))))
+
+
+def spread_tolerance(values, base, floor, margin=SPREAD_MARGIN, step=0.05):
+    """The tolerance a set of runs needs to pass themselves, or `floor` if smaller."""
+    if len(values) < 2:
+        return floor
+    spread = max(max(values) / base - 1, 1 - min(values) / base)
+    return max(floor, round_up(spread * margin, step))
+
+
+def calibration_context(root, number, layout=None):
+    """What a calibration of pull request `number` measures against.
+
+    judged   the rows the gate judged the runs by (this pull request's overlay included)
+    others   the baseline without this pull request's overlay -- what a rebaseline's
+             "from" names, since a re-measurement replaces this pull request's earlier
+             rebaseline rather than stacking on it
+    stale    this pull request's own rebaselines whose "from" another merged change moved
+
+    Resolving `others` raises when another overlay chains its rebaseline ON TOP of this
+    pull request's (its "from" is our value), and that is deliberate rather than a gap:
+    re-measuring a link something else was measured on would move the value that later
+    link starts from and make IT stale. Recalibrate a pull request nothing has built on."""
+    layout = layout or SELFHOST
+    policy = load_policy(root, layout)
+    base = load_base(root, layout)
+    overlays = load_overlays(root, layout)
+    own = dict(overlays).get(number, {})
+    others, _ = resolve(base, [o for o in overlays if o[0] != number], policy['tolerance'],
+                        layout)
+    try:
+        judged, _ = resolve(base, overlays, policy['tolerance'], layout)
+    except BaselineError:
+        # This pull request's own overlay went stale (another merged change moved a row it
+        # rebaselines), and the gate then judged the run without it. Do the same, and
+        # rewrite every stale row from the fresh runs -- which is the recovery the
+        # stale-overlay message asks for.
+        judged = others
+    stale = set()
+    for key, bench, cores, row in _rows('own', own.get('rebaseline', {}), layout):
+        now = others.get(key, {}).get(bench, {}).get(cores)
+        if now is None or not _same(row['from'], now, layout):
+            stale.add((key, bench, cores))
+    return {'layout': layout, 'number': number, 'policy': policy, 'own': own,
+            'others': others, 'judged': judged, 'stale': stale}
+
+
+def plan_calibration(context, runs, verdict, everything=False, metric=None,
+                     margin=SPREAD_MARGIN, min_runs=MIN_RUNS_FOR_OWN_SPREAD):
+    """(calibrate, rebaseline) trees for `runs`, {key: {(bench, cores): {metric: [value
+    per run]}}}, each value the run's median. `verdict(value, base, tolerance, floor)`
+    is the gate's own judgement ('ok' or not).
+
+    A row the baseline lacks is calibrated; a row a run put outside its tolerance, either
+    way, is rebaselined (only the metric that moved, unless `everything`); `metric` limits
+    a re-measurement to one metric. A row's baseline is the median of the runs' values and
+    its tolerance max(the policy's, `margin` x the observed spread in either direction).
+    Fewer than `min_runs` runs cannot estimate a spread: a new row then takes the widest
+    tolerance the same benchmark needed anywhere, a re-measured one keeps at least its
+    own."""
+    layout = context['layout']
+    tolerance = context['policy']['tolerance']
+    floor = context['policy']['floor']
+    judged, others, own, stale = (context['judged'], context['others'], context['own'],
+                                  context['stale'])
+    widest = {}   # layout.widest_key(...) -> widest tolerance any row has
+    for _, bench, cores, row in _rows('baseline', judged, layout):
+        for name, tol in row.get('tolerance', {}).items():
+            where = layout.widest_key(bench, cores, name)
+            widest[where] = max(widest.get(where, 0.0), tol)
+    for key, benches in runs.items():
+        for (bench, cores), metrics in benches.items():
+            default = layout.row_default(tolerance, key, bench, cores)
+            step = layout.tolerance_step(key, bench, cores)
+            for name, values in metrics.items():
+                own_tol = spread_tolerance(values, statistics.median(values), default[name],
+                                           margin, step)
+                if len(values) > 1:
+                    where = layout.widest_key(bench, cores, name)
+                    widest[where] = max(widest.get(where, 0.0), own_tol)
+
+    calibrate, rebaseline = {}, {}
+    for key, benches in sorted(runs.items()):
+        for (bench, cores), metrics in sorted(benches.items()):
+            default = layout.row_default(tolerance, key, bench, cores)
+            lowest = layout.row_default(floor, key, bench, cores)
+            step = layout.tolerance_step(key, bench, cores)
+            current = judged.get(key, {}).get(bench, {}).get(cores)
+            before = others.get(key, {}).get(bench, {}).get(cores)
+            # This pull request's own calibration counts only while it is the row: once
+            # another pull request's calibration of the same CPU has been folded into base/,
+            # resolve() supersedes ours, and writing a calibration again would be ignored
+            # just the same -- the gate would fail forever. Then the row is base/'s, and a
+            # move past it is a rebaseline FROM it (write_overlay drops the stale entry).
+            new_row = current is None or (
+                before is None and cores in own.get('calibrate', {}).get(key, {}).get(bench, {}))
+            row = {} if current is None else copy.deepcopy(current)
+            moved = []
+            for name in layout.metrics:
+                values = metrics[name]
+                if metric and name != metric and not new_row:
+                    continue
+                if not (everything or new_row or (key, bench, cores) in stale or any(
+                        verdict(v, current[name],
+                                current.get('tolerance', {}).get(name, default[name]),
+                                lowest[name]) != 'ok' for v in values)):
+                    continue
+                moved.append(name)
+                median = statistics.median(values)
+                row[name] = layout.round_value(median)
+                tol = spread_tolerance(values, median, default[name], margin, step)
+                if len(values) < min_runs:
+                    kept = (current or {}).get('tolerance', {}).get(name, 0.0)
+                    tol = max(tol, kept, widest.get(layout.widest_key(bench, cores, name), 0.0)
+                              if new_row else 0.0)
+                row.setdefault('tolerance', {})[name] = tol
+            if not moved:
+                continue
+            # A row whose tolerance is just the global one does not need to repeat it.
+            tol = {m: t for m, t in row.pop('tolerance', {}).items() if t > default[m]}
+            if tol:
+                row['tolerance'] = tol
+            row['runs'] = min(len(metrics[m]) for m in moved)
+            if new_row or before is None:
+                calibrate.setdefault(key, {}).setdefault(bench, {})[cores] = row
+            else:
+                row['from'] = from_row(before, layout)
+                rebaseline.setdefault(key, {}).setdefault(bench, {})[cores] = row
+    return calibrate, rebaseline
+
+
+def finish_calibration(root, context, calibrate, rebaseline, reason=None):
+    """Write what plan_calibration decided into the pull request's overlay, refusing (with
+    SystemExit, naming the rows) what cannot be written. Returns the overlay's path, or
+    None when every measured row was inside its tolerance."""
+    layout, number, own = context['layout'], context['number'], context['own']
+    left = sorted(context['stale'] - {(k, b, c) for k, benches in rebaseline.items()
+                                      for b, per in benches.items() for c in per})
+    if left:
+        raise SystemExit('These rows of pr/%d.json are stale and these runs did not measure '
+                         'them; pass runs that do: %s' % (number, ', '.join(
+                             '%s %s/%s' % row for row in left)))
+    if not calibrate and not rebaseline:
+        print('Every measured row is inside its tolerance; nothing to write.')
+        return None
+    if not reason:
+        # A row this overlay already rebaselined keeps its reason when re-measured; a row
+        # NEW to it needs its own -- never an earlier row's explanation by default.
+        unexplained = ['%s %s/%s' % (key, bench, cores)
+                       for key, bench, cores, _ in _rows('new', rebaseline, layout)
+                       if not own.get('rebaseline', {}).get(key, {}).get(bench, {})
+                       .get(cores, {}).get('reason')]
+        if unexplained:
+            raise SystemExit('These rows moved past their tolerance and would be rebaselined; '
+                             'say why with --reason: %s\n%s' % (', '.join(unexplained),
+                                                              json.dumps(rebaseline, indent=1)))
+    try:
+        path = write_overlay(root, number, calibrate, rebaseline, reason, layout)
+        load(root, layout=layout)   # the overlay must resolve against everything else
+    except BaselineError as error:
+        raise SystemExit(str(error))
+    for kind, tree in (('calibrated', calibrate), ('rebaselined', rebaseline)):
+        for key, benches in sorted(tree.items()):
+            print('%s %s: %s' % (kind, key, ', '.join(sorted(benches))))
+    print('Wrote %s -- commit it with this pull request.' % path)
     return path
 
 
@@ -534,22 +802,24 @@ def exists_at(ref, path, root=ROOT):
                           capture_output=True, cwd=str(REPO)).returncode == 0
 
 
-def legacy_touched(base_ref):
-    """Whether the pull request changed the retired single-file baseline."""
+def legacy_touched(base_ref, path=None):
+    """Whether the pull request changed the retired single-file baseline (or, for another
+    layout, its retired path)."""
     out = subprocess.run(['git', 'diff', '--name-only', '%s...HEAD' % base_ref, '--',
-                          LEGACY_FILE], capture_output=True, text=True, cwd=str(REPO))
+                          path or LEGACY_FILE], capture_output=True, text=True, cwd=str(REPO))
     if out.returncode != 0:
         raise BaselineError('git diff against %s failed: %s' % (base_ref, out.stderr.strip()))
     return bool(out.stdout.strip())
 
 
-def check(root=ROOT, base_ref=None, number=None):
+def check(root=ROOT, base_ref=None, number=None, layout=None):
     """Problems with the baselines as a list of strings; empty when the gate can use them.
     With base_ref, also what a pull request may change: its own overlay and the policy,
     never base/ (fold's alone) and never another pull request's overlay."""
+    layout = layout or SELFHOST
     problems = []
     try:
-        data = load(root)
+        data = load(root, layout=layout)
         for note in data['notes']:
             print('note: ' + note)
     except BaselineError as error:
@@ -561,12 +831,12 @@ def check(root=ROOT, base_ref=None, number=None):
             return problems + [str(error)]
         # The change that introduced this layout creates base/; that is the one pull
         # request allowed to, and it is recognisable by base/ not existing before it.
-        migrating = not exists_at(base_ref, 'base', root)
+        migrating = not exists_at(base_ref, layout.migration_marker, root)
         for path in changed:
             if path.startswith('base/') and not migrating:
                 problems.append('%s changed: base/ is written only by the nightly fold. Put the '
                                 'rows in pr/<this pull request>.json instead '
-                                '(calibrate-perf-baseline.py --pr N writes it).' % path)
+                                '(%s writes it).' % (path, layout.calibrate_command))
             elif path.startswith('pr/') and number is not None and path != 'pr/%d.json' % number \
                     and not exists_at(base_ref, path, root):
                 # An overlay already on the base branch belongs to a MERGED pull request, and
@@ -577,13 +847,13 @@ def check(root=ROOT, base_ref=None, number=None):
                 # one this branch would be inventing -- is off limits.
                 problems.append('%s changed: a pull request writes only its own overlay, '
                                 'pr/%d.json, or repairs one already merged' % (path, number))
-        if not migrating and legacy_touched(base_ref):
+        touched = legacy_touched(base_ref) if layout is SELFHOST else \
+            legacy_touched(base_ref, layout.legacy)
+        if not migrating and touched:
             # A branch from before this layout that resolves its merge conflict by keeping
             # the old file would pass every other check, and the gate -- which reads only
             # perf-baseline/ -- would silently ignore the rows it meant to add.
-            problems.append('%s changed: that file is retired and nothing reads it. Convert '
-                            'the branch\'s edits with `perf_baseline.py import-legacy --pr N '
-                            '--ref <branch>` and delete it.' % LEGACY_FILE)
+            problems.append(layout.legacy_message)
     return problems
 
 
