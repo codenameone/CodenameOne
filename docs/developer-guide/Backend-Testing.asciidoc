@@ -277,6 +277,9 @@ A compiled run has these limits:
 * **Mockito.** A test class that imports Mockito is left out of the binary, and
   a class with a `@MockitoBean` field is reported as skipped. Pass
   `-Dcn1.backend.compiledTests.strict=true` to make either one fail the build.
+* **Java tests only.** The binary is compiled from Java test sources. A module
+  with Kotlin tests runs them on the JVM, and the compiled run reports them by
+  name and stops rather than running without them.
 * **Toolchain.** The binary needs what `cn1:backend-package` needs: clang, and
   the OpenSSL, libcurl and nghttp2 headers. It builds on Linux and macOS. On
   Windows, which has no native backend, the goal reports that and does nothing.

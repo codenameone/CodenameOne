@@ -59,8 +59,8 @@ typedef struct {
     BYTE* pendingBody;
     DWORD pendingLen;
     DWORD pendingCap;
-    /* ConnectionRequest.setHttpMethod: PUT, PATCH, DELETE, HEAD... NULL for the
-     * GET or POST the post flag selects. */
+    /* ConnectionRequest.setHttpMethod, as asked for -- GET and POST included,
+     * which override the post flag; NULL when the request named none. */
     WCHAR* verb;
     /* Every header line added, so a request handle recreated for a new verb
      * gets them again: ConnectionRequest sets the method AFTER the headers, and
@@ -136,13 +136,17 @@ static BOOL cn1NetEnsureSent(CN1Connection* conn) {
                            conn->readTimeout > 0 ? conn->readTimeout : 30000);
     }
 
-    ok = WinHttpSendRequest(conn->request,
-                            WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                            conn->pendingLen > 0 ? (LPVOID)conn->pendingBody
-                                                 : WINHTTP_NO_REQUEST_DATA,
-                            conn->pendingLen,
-                            conn->pendingLen,
-                            0);
+    {
+        /* An explicit GET sends no body, whatever the post flag buffered. */
+        DWORD bodyLen = (conn->verb != NULL && wcscmp(conn->verb, L"GET") == 0) ? 0 : conn->pendingLen;
+        ok = WinHttpSendRequest(conn->request,
+                                WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                                bodyLen > 0 ? (LPVOID)conn->pendingBody
+                                            : WINHTTP_NO_REQUEST_DATA,
+                                bodyLen,
+                                bodyLen,
+                                0);
+    }
     if (!ok) {
         conn->failure = GetLastError();
         cn1WindowsLog("cn1NetEnsureSent: WinHttpSendRequest failed");
@@ -332,12 +336,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_httpSetCustomMethod___long_ja
         return;
     }
     free(conn->verb);
-    if (wcscmp(verb, L"GET") == 0 || wcscmp(verb, L"POST") == 0) {
-        free(verb);
-        conn->verb = NULL;
-    } else {
-        conn->verb = verb;
-    }
+    /* Kept even for GET and POST: an explicit one overrides the post flag, which
+     * a request may have set only for how its arguments are sent. */
+    conn->verb = verb;
     cn1NetCreateRequest(conn);
 }
 

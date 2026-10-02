@@ -87,6 +87,9 @@ final class BackendPackageSupport {
             t.dependsOn(test.getClassesTaskName());
             t.getToolchain().from(testRuntime);
             t.getTestSources().from(test.getJava().getSrcDirs());
+            // The Kotlin test directory too, so the packager can refuse Kotlin
+            // tests by name instead of compiling the run without them.
+            t.getTestSources().from(new File(layout.projectDir(), "src/test/kotlin"));
             t.getTestResources().from(project.provider(() -> test.getOutput().getResourcesDir()));
             t.getTestResources().builtBy(test.getProcessResourcesTaskName());
             t.getStrict().set(project.getProviders().gradleProperty("cn1.backend.compiledTests.strict")

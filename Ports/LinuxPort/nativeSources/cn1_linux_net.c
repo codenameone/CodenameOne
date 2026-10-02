@@ -75,8 +75,8 @@ typedef struct {
     int performed;
     int contentLength;
 
-    /* ConnectionRequest.setHttpMethod: PUT, PATCH, DELETE, HEAD... NULL for the
-     * GET or POST the post flag already selects. */
+    /* ConnectionRequest.setHttpMethod, as asked for -- GET and POST included,
+     * which override the post flag; NULL when the request named none. */
     char* method;
     /* ConnectionRequest.setTimeout and setReadTimeout, in milliseconds; 0 is
      * none. Both were accepted and ignored, so a request to a server that never
@@ -165,13 +165,24 @@ static void cn1HttpPerform(CN1Http* c) {
     if (c->reqHeaders) {
         curl_easy_setopt(c->easy, CURLOPT_HTTPHEADER, c->reqHeaders);
     }
-    if (c->post) {
-        curl_easy_setopt(c->easy, CURLOPT_POST, 1L);
-        curl_easy_setopt(c->easy, CURLOPT_READFUNCTION, cn1HttpReadCb);
-        curl_easy_setopt(c->easy, CURLOPT_READDATA, c);
-        curl_easy_setopt(c->easy, CURLOPT_POSTFIELDSIZE, (long) c->reqLen);
+    {
+        /* An explicit GET or POST wins over the post flag: ConnectionRequest lets a
+         * request set setPost(true) for how its arguments are sent and then ask for
+         * GET, or the reverse, and the method it asked for is the one it means. */
+        int sendBody = c->post;
+        if (c->method != 0 && strcmp(c->method, "GET") == 0) {
+            sendBody = 0;
+        } else if (c->method != 0 && strcmp(c->method, "POST") == 0) {
+            sendBody = 1;
+        }
+        if (sendBody) {
+            curl_easy_setopt(c->easy, CURLOPT_POST, 1L);
+            curl_easy_setopt(c->easy, CURLOPT_READFUNCTION, cn1HttpReadCb);
+            curl_easy_setopt(c->easy, CURLOPT_READDATA, c);
+            curl_easy_setopt(c->easy, CURLOPT_POSTFIELDSIZE, (long) c->reqLen);
+        }
     }
-    if (c->method != 0) {
+    if (c->method != 0 && strcmp(c->method, "GET") != 0 && strcmp(c->method, "POST") != 0) {
         /* After the body setup: CUSTOMREQUEST replaces only the request line's
          * verb, so a PUT or PATCH still sends the body POST would have. */
         if (strcmp(c->method, "HEAD") == 0) {
@@ -235,7 +246,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetCustomMethod___long_java_l
     }
     m = stringToUTF8(threadStateData, method);
     free(c->method);
-    c->method = (m == 0 || strcmp(m, "GET") == 0 || strcmp(m, "POST") == 0) ? 0 : strdup(m);
+    /* Kept even for GET and POST: an explicit one overrides the post flag. */
+    c->method = m == 0 ? 0 : strdup(m);
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetConnectTimeout___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_INT millis) {

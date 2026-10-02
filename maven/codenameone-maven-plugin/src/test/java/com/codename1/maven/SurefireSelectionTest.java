@@ -65,6 +65,16 @@ class SurefireSelectionTest {
         assertFalse(s.test("com.acme.ServedApiTest"));
     }
 
+    @Test
+    void aNegativeDashDTestEntryExcludes() {
+        SurefireSelection s = SurefireSelection.of(project(null, null), "*Test, !SlowTest");
+        assertTrue(s.test("com.acme.ApiTest"));
+        assertFalse(s.test("com.acme.SlowTest"), "-Dtest excluded it");
+        SurefireSelection only = SurefireSelection.of(project(null, null), "!SlowTest");
+        assertTrue(only.test("com.acme.ApiTest"), "only exclusions keep the default includes");
+        assertFalse(only.test("com.acme.SlowTest"));
+    }
+
     private static MavenProject project(String[] includes, String[] excludes) {
         Model model = new Model();
         model.setBuild(new Build());

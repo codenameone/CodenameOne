@@ -275,6 +275,20 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("a part whose bytes contain the boundary followed by more is not cut there")
+    void aBoundaryPrefixInsideAPartIsData() throws Exception {
+        HttpServer.Request r = new HttpServer.Request("POST", "/x", "HTTP/1.1",
+                java.util.Collections.singletonMap("content-type", "multipart/form-data; boundary=x"),
+                null);
+        r.setBody(null, ("--x\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\n"
+                + "before\r\n--xsuffix after\r\n--x--\r\n").getBytes("UTF-8"));
+        java.util.List parts = r.getParts();
+        assertEquals(1, parts.size());
+        assertEquals("before\r\n--xsuffix after",
+                new String(((HttpServer.Part) parts.get(0)).getBytes(), "UTF-8"));
+    }
+
+    @Test
     @DisplayName("without cn1.cors.allowedOrigins there is no CORS at all")
     void corsIsOffByDefault() throws Exception {
         start(null);

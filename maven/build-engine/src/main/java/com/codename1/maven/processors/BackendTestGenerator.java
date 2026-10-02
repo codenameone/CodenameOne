@@ -744,7 +744,10 @@ final class BackendTestGenerator {
                 for (MethodInfo a : afterEach) {
                     sb.append("            try {\n                ").append(call(owners.get(a), a, pkg, "test"))
                       .append(";\n            } catch (Throwable err) {\n")
-                      .append("                if (failure == null) {\n")
+                      // A real teardown failure fails the test even after an
+                      // assumption aborted it, as JUnit reports it.
+                      .append("                if (failure == null || (com.codename1.impl.backend.test.TestRun"
+                              + ".isAbort(failure) && !com.codename1.impl.backend.test.TestRun.isAbort(err))) {\n")
                       .append("                    failure = err;\n                }\n")
                       .append("            }\n");
                 }

@@ -88,6 +88,13 @@ class ProbeApiTest {
     }
 
     @Test
+    void bodiesTheWireOmitsAreOmitted() throws Exception {
+        // A 205 carries no body on the wire, though this handler builds "status 205".
+        mvc.perform(get("/api/status/205")).andExpect(status().is(205))
+                .andExpect(content().string(""));
+    }
+
+    @Test
     void statusesAndRedirects() throws Exception {
         mvc.perform(get("/api/status/418")).andExpect(status().is(418))
                 .andExpect(content().string("status 418"));

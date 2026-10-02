@@ -119,6 +119,15 @@ public abstract class BackendTestPackager extends BackendPackager {
         File testClasses = new File(work, "test-classes");
         emptyDirs(testClasses);
         mkdirs(testClasses);
+        // The tests are compiled here with javac, so Kotlin ones cannot be: refused
+        // by name rather than left out, which ran a Kotlin project's compiled tests
+        // as "no test source" and a mixed one's without its Kotlin tests at all.
+        List<String> kotlin = kotlinTestSources();
+        if (!kotlin.isEmpty()) {
+            throw new BuildFailureException("The compiled backend test run compiles Java test "
+                    + "sources, and these are Kotlin: " + kotlin + ". Run them on the JVM, or "
+                    + "write the tests to run compiled in Java.");
+        }
         List<String> sources = new ArrayList<String>();
         for (File f : testSources()) {
             String text;
@@ -248,6 +257,28 @@ public abstract class BackendTestPackager extends BackendPackager {
         if (report.failed > 0 || status != 0) {
             throw new BuildFailureException(report.failed + " compiled test(s) failed:\n"
                     + report.failures());
+        }
+    }
+
+    private List<String> kotlinTestSources() {
+        List<String> out = new ArrayList<String>();
+        for (String root : testSourceRoots()) {
+            collectKotlin(new File(root), out);
+        }
+        return out;
+    }
+
+    private static void collectKotlin(File dir, List<String> out) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                collectKotlin(child, out);
+            } else if (child.getName().endsWith(".kt")) {
+                out.add(child.getName());
+            }
         }
     }
 

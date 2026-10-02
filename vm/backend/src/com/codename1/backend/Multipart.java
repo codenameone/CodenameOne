@@ -129,7 +129,7 @@ final class Multipart {
             closing[0] = '\r';
             closing[1] = '\n';
             System.arraycopy(delimiter, 0, closing, 2, delimiter.length);
-            int next = indexOf(body, closing, pos);
+            int next = closingDelimiter(body, closing, pos);
             if (next < 0) {
                 throw new IllegalArgumentException("a multipart part is never closed");
             }
@@ -143,6 +143,30 @@ final class Multipart {
                     headers, data));
             pos = next + 2;
         }
+    }
+
+    /// Where the delimiter that closes a part starts, searching from `from`, or -1.
+    /// A delimiter is complete only when `--` follows it (the last one) or
+    /// optional transport padding and CRLF (RFC 2046 5.1.1). A part's own bytes
+    /// may contain `CRLF--boundary` followed by anything else -- a binary file
+    /// can -- and taking that for the end of the part refused a legal upload.
+    private static int closingDelimiter(byte[] body, byte[] closing, int from) {
+        int at = indexOf(body, closing, from);
+        while (at >= 0) {
+            int after = at + closing.length;
+            if (after + 1 < body.length && body[after] == '-' && body[after + 1] == '-') {
+                return at;
+            }
+            int p = after;
+            while (p < body.length && (body[p] == ' ' || body[p] == '\t')) {
+                p++;
+            }
+            if (crlfAt(body, p)) {
+                return at;
+            }
+            at = indexOf(body, closing, at + 1);
+        }
+        return -1;
     }
 
     /// The value of `name` in a urlencoded form, or null. `+` is a space, as the

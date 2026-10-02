@@ -62,23 +62,34 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
     static SurefireSelection of(MavenProject project, String test) {
         if (test != null && test.trim().length() > 0) {
             List<String> named = new ArrayList<String>();
+            List<String> excluded = new ArrayList<String>(DEFAULT_EXCLUDES);
             for (String entry : test.split(",")) {
                 String e = entry.trim();
+                // A "!" entry excludes, as Surefire reads it: -Dtest='*Test,!SlowTest'
+                // must leave SlowTest out of the compiled run as it does the JVM's.
+                boolean negative = e.startsWith("!");
+                if (negative) {
+                    e = e.substring(1).trim();
+                }
                 int hash = e.indexOf('#');
                 if (hash >= 0) {
+                    // A method selector narrows a class; a class it excludes by
+                    // method is still run for its other methods.
+                    if (negative) {
+                        continue;
+                    }
                     e = e.substring(0, hash);
                 }
                 if (e.length() == 0) {
                     continue;
                 }
-                if (e.startsWith("!")) {
-                    continue;
-                }
                 // A bare class name pattern names a class in any package.
-                named.add(e.indexOf('/') >= 0 || e.endsWith(".java") ? e
-                        : "**/" + e.replace('.', '/') + ".java");
+                String pattern = e.indexOf('/') >= 0 || e.endsWith(".java") ? e
+                        : "**/" + e.replace('.', '/') + ".java";
+                (negative ? excluded : named).add(pattern);
             }
-            return new SurefireSelection(named, DEFAULT_EXCLUDES);
+            // Only exclusions: Surefire runs its usual includes minus those.
+            return new SurefireSelection(named.isEmpty() ? DEFAULT_INCLUDES : named, excluded);
         }
         Plugin surefire = project.getPlugin("org.apache.maven.plugins:maven-surefire-plugin");
         Xpp3Dom config = surefire == null || !(surefire.getConfiguration() instanceof Xpp3Dom) ? null

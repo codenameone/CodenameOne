@@ -54,8 +54,13 @@ public final class MockMvc {
         // developer guide's demos covers it).
         HttpServer.Response response = access.dispatch(backend, built.method, built.target,
                 built.headers, built.body);
-        MockResponse mock = new MockResponse(access.status(response), access.contentType(response),
-                access.headers(response), access.body(response));
+        int status = access.status(response);
+        // No body where the HTTP writers send none -- a HEAD, a 1xx, 204, 205 or
+        // 304 -- so a test cannot assert on content no client ever receives.
+        boolean bodiless = "HEAD".equalsIgnoreCase(built.method) || (status >= 100 && status < 200)
+                || status == 204 || status == 205 || status == 304;
+        MockResponse mock = new MockResponse(status, access.contentType(response),
+                access.headers(response), bodiless ? new byte[0] : access.body(response));
         return new ResultActions(new MvcResult(built.method, built.target, mock));
     }
 }
