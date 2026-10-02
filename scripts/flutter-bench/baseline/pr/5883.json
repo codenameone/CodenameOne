@@ -1,4 +1,56 @@
 {
+ "calibrate": {
+  "android": {
+   "gallery": {
+    "cold_start_ratio": {
+     "runs": 7,
+     "tolerance": {
+      "value": 0.5
+     },
+     "value": 0.271
+    },
+    "idle_memory_ratio": {
+     "runs": 7,
+     "tolerance": {
+      "value": 0.2
+     },
+     "value": 0.515
+    }
+   }
+  },
+  "linux": {
+   "gallery": {
+    "cold_start_ratio": {
+     "runs": 6,
+     "value": 0.671
+    },
+    "idle_memory_ratio": {
+     "runs": 6,
+     "value": 0.387
+    }
+   }
+  },
+  "macos": {
+   "gallery": {
+    "idle_memory_ratio": {
+     "runs": 6,
+     "value": 0.685
+    }
+   }
+  },
+  "windows": {
+   "gallery": {
+    "cold_start_ratio": {
+     "runs": 7,
+     "value": 0.632
+    },
+    "idle_memory_ratio": {
+     "runs": 7,
+     "value": 0.616
+    }
+   }
+  }
+ },
  "pr": 5883,
  "rebaseline": {
   "android": {
@@ -13,6 +65,168 @@
       "value": 0.005
      },
      "value": 4773504
+    },
+    "install_bytes": {
+     "from": {
+      "value": 91589516
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "tolerance": {
+      "value": 0.001
+     },
+     "value": 81949943
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 91589516
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "tolerance": {
+      "value": 0.001
+     },
+     "value": 81949943
+    }
+   }
+  },
+  "ios": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 38015576
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 19288088
+    },
+    "install_bytes": {
+     "from": {
+      "value": 145431213
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 114736933
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 110425140
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 84339699
+    }
+   }
+  },
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 12910326
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 12749524
+    },
+    "install_bytes": {
+     "from": {
+      "value": 110000963
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 108035821
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 80610118
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 79699243
+    }
+   }
+  },
+  "linux": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 18958610
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 1,
+     "value": 14375154
+    },
+    "install_bytes": {
+     "from": {
+      "value": 119594984
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 1,
+     "value": 116189664
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 95706942
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 1,
+     "value": 84650942
+    }
+   }
+  },
+  "macos": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 73212360
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 36742872
+    },
+    "install_bytes": {
+     "from": {
+      "value": 168810517
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 132268349
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 109700753
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 90621923
+    }
+   }
+  },
+  "windows": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 17088000
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 13228544
+    },
+    "install_bytes": {
+     "from": {
+      "value": 116684800
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 114205184
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 94685578
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "value": 82273541
     }
    }
   }
