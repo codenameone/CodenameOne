@@ -38,7 +38,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 /// `@Autowired`, [LocalServerPort] and [MockitoBean] fields. Nothing is looked up
 /// by reflection, so the same test runs translated, as a native binary.
 ///
-/// One application runs at a time, as one runs per server process. Test classes
+/// One application runs at a time, as one runs per server process, and JUnit runs
+/// no two classes carrying this concurrently, even with parallel execution on. Test classes
 /// whose configuration is the same -- the same test beans, properties, profile
 /// and web environment -- share it, as Spring caches a context; a class that
 /// differs stops it and starts its own.
@@ -46,6 +47,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @ExtendWith(com.codename1.impl.backend.test.BackendTestExtension.class)
+// One application runs per process, and a class whose configuration differs stops
+// it to start its own -- so under JUnit's parallel execution two such classes would
+// tear each other's server down mid-test. Holding one shared resource lock makes
+// JUnit run @BackendTest classes one at a time; other tests stay parallel.
+@org.junit.jupiter.api.parallel.ResourceLock("com.codename1.backend.test.BackendTest")
 public @interface BackendTest {
     /// How the application is reached. [WebEnvironment#MOCK], the default, calls it
     /// in the same process through [MockMvc]; [WebEnvironment#RANDOM_PORT] serves

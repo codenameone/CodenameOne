@@ -47,6 +47,13 @@ public final class MockMultipartRequestBuilder extends MockRequestBuilder {
         return file(new MockMultipartFile(name, content));
     }
 
+    /// Adds a query parameter, in the URL rather than the body.
+    @Override
+    public MockMultipartRequestBuilder queryParam(String name, String... values) {
+        super.queryParam(name, values);
+        return this;
+    }
+
     /// Adds form fields, as parts: what `@RequestParam` reads from a multipart body.
     @Override
     public MockMultipartRequestBuilder param(String name, String... values) {

@@ -184,6 +184,13 @@ public class BackendTestGeneratorTest {
                 + "    @Test void inherited() { calls.add(\"inherited\"); }\n"
                 + "    @Test public void overridden() { calls.add(\"base-overridden\"); }\n"
                 + "}\n");
+        t.put("t.GatedTest", "package t;\n"
+                + "public class GatedTest {\n"
+                + "    @org.junit.jupiter.api.BeforeAll static void gate() {\n"
+                + "        org.junit.jupiter.api.Assumptions.assumeTrue(false, \"no database here\");\n"
+                + "    }\n"
+                + "    @org.junit.jupiter.api.Test void gated() { base.Base.calls.add(\"gated\"); }\n"
+                + "}\n");
         t.put("t.SubTest", "package t;\n"
                 + "public class SubTest extends base.Base {\n"
                 + "    @Override public void overridden() { calls.add(\"not-a-test\"); }\n"
@@ -208,6 +215,13 @@ public class BackendTestGeneratorTest {
                 urls.toArray(new java.net.URL[0]), getClass().getClassLoader());
         try {
             loader.loadClass("t.SubTestCn1TestRunner").getMethod("run").invoke(null);
+            java.lang.reflect.Field failed = com.codename1.impl.backend.test.TestRun.class
+                    .getDeclaredField("failed");
+            failed.setAccessible(true);
+            int failuresBefore = failed.getInt(null);
+            loader.loadClass("t.GatedTestCn1TestRunner").getMethod("run").invoke(null);
+            assertEquals("an @BeforeAll assumption that does not hold is a skip, not a failure",
+                    failuresBefore, failed.getInt(null));
             @SuppressWarnings("unchecked")
             List<String> calls = (List<String>) loader.loadClass("base.Base").getField("calls").get(null);
             assertTrue(calls.toString(), calls.contains("inherited"));
@@ -215,6 +229,7 @@ public class BackendTestGeneratorTest {
             assertTrue(calls.toString(), calls.contains("setUp"));
             assertFalse("an override without @Test ran as a test: " + calls,
                     calls.contains("not-a-test") || calls.contains("base-overridden"));
+            assertFalse("a test ran although its @BeforeAll aborted: " + calls, calls.contains("gated"));
         } finally {
             loader.close();
         }

@@ -78,6 +78,16 @@ class ProbeApiTest {
     }
 
     @Test
+    void aMultipartRequestKeepsItsQueryParametersInTheUrl() throws Exception {
+        // queryParam on a multipart builder goes in the URL; param is a form field.
+        mvc.perform(multipart("/api/echo").queryParam("q", "inUrl").param("a", "inForm"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.target").value("/api/echo?q=inUrl"))
+                .andExpect(jsonPath("$.params.q").value("inUrl"))
+                .andExpect(jsonPath("$.params.a").value("inForm"));
+    }
+
+    @Test
     void statusesAndRedirects() throws Exception {
         mvc.perform(get("/api/status/418")).andExpect(status().is(418))
                 .andExpect(content().string("status 418"));

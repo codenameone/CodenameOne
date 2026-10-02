@@ -1008,7 +1008,15 @@ public final class HttpServer {
         /// router answers with a 400.
         public List getParts() {
             if (parts == null) {
-                String boundary = Multipart.boundary(getHeader("Content-Type"));
+                String type = getHeader("Content-Type");
+                String boundary = Multipart.boundary(type);
+                if (boundary == null && Multipart.isMultipart(type)) {
+                    // Declared multipart with no usable boundary: malformed, and
+                    // refused as such. Read as "not multipart", a route whose
+                    // @RequestPart values are optional ran on a body nothing parsed.
+                    throw new IllegalArgumentException("the multipart/form-data body names no "
+                            + "valid boundary");
+                }
                 byte[] data = boundary == null ? null : getBodyBytes();
                 parts = data == null ? new ArrayList() : Multipart.parse(data, boundary);
             }

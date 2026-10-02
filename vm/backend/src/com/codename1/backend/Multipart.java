@@ -58,6 +58,18 @@ final class Multipart {
         return value == null || value.length() == 0 || value.length() > 70 ? null : value;
     }
 
+    /// Whether a Content-Type declares `multipart/form-data`, whatever its
+    /// boundary -- so a declaration with a missing or invalid one can be told
+    /// from a body that is not multipart at all.
+    static boolean isMultipart(String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        int semi = contentType.indexOf(';');
+        String type = (semi < 0 ? contentType : contentType.substring(0, semi)).trim();
+        return "multipart/form-data".equalsIgnoreCase(type);
+    }
+
     /// Whether a Content-Type is a urlencoded form.
     static boolean isForm(String contentType) {
         if (contentType == null) {
@@ -94,9 +106,13 @@ final class Multipart {
                         + MAX_PARTS + " parts");
             }
             Map headers = new LinkedHashMap();
+            // The limit is on the whole header block, counted from its start. Per
+            // line, it let one part carry hundreds of thousands of short headers --
+            // each line parsed and stored -- inside the body limit.
+            int headersStart = pos;
             while (!crlfAt(body, pos)) {
                 int end = indexOfCrLf(body, pos);
-                if (end < 0 || end - pos > MAX_PART_HEADER_BYTES) {
+                if (end < 0 || end - headersStart > MAX_PART_HEADER_BYTES) {
                     throw new IllegalArgumentException("a multipart part's headers never end");
                 }
                 String line = latin1(body, pos, end - pos);

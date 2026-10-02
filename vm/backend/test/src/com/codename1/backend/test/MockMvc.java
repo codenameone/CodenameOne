@@ -48,6 +48,10 @@ public final class MockMvc {
     public ResultActions perform(MockRequestBuilder request) throws Exception {
         MockRequestBuilder.Built built = request.build();
         BackendAccess access = BackendAccess.get();
+        // Never null: Backend.dispatch answers a path nothing routes with the same
+        // 404 the HTTP/1 and HTTP/2 listeners send, so status().isNotFound() asserts
+        // what a real request gets (GreetingApiTest.unknownRoutesAreNotFound in the
+        // developer guide's demos covers it).
         HttpServer.Response response = access.dispatch(backend, built.method, built.target,
                 built.headers, built.body);
         MockResponse mock = new MockResponse(access.status(response), access.contentType(response),

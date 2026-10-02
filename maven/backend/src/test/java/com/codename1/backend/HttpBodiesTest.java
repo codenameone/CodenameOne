@@ -41,6 +41,7 @@ import java.util.zip.GZIPOutputStream;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Request bodies that are not UTF-8 text -- uploads, multipart forms, gzip --
@@ -230,6 +231,47 @@ class HttpBodiesTest {
         assertTrue(other.startsWith("HTTP/1.1 200"), other);
         assertTrue(!other.contains("Access-Control-Allow-Origin"),
                 "an origin the policy does not list was allowed to read: " + other);
+        // The answer still depends on Origin, so a shared cache must key on it --
+        // for a denied origin, for none at all, and for the preflights.
+        assertTrue(other.contains("Vary: Origin"), "a denied origin's answer did not vary: " + other);
+        String none = raw("POST /text HTTP/1.1\r\nHost: x\r\nContent-Type: text/plain\r\n"
+                + "Content-Length: 2\r\nConnection: close\r\n\r\nhi");
+        assertTrue(none.contains("Vary: Origin"), "an answer without Origin did not vary: " + none);
+        assertTrue(preflight.contains("Vary: Origin"), preflight);
+        assertTrue(refused.contains("Vary: Origin"), refused);
+    }
+
+    @Test
+    @DisplayName("with any origin allowed and no credentials, the answer does not vary by Origin")
+    void anyOriginDoesNotVary() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.cors.allowedOrigins", "*");
+        start(p);
+        String answer = raw("POST /text HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Content-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
+        assertTrue(answer.contains("Access-Control-Allow-Origin: *"), answer);
+        assertTrue(!answer.contains("Vary: Origin"), answer);
+    }
+
+    @Test
+    @DisplayName("a multipart declaration with no boundary, or endless part headers, is refused")
+    void malformedMultipartIsRefused() throws Exception {
+        HttpServer.Request noBoundary = new HttpServer.Request("POST", "/x", "HTTP/1.1",
+                java.util.Collections.singletonMap("content-type", "multipart/form-data"), null);
+        noBoundary.setBody(null, "--x\r\n\r\nhi\r\n--x--".getBytes("UTF-8"));
+        assertThrows(IllegalArgumentException.class, noBoundary::getParts,
+                "a multipart body with no boundary read as no parts at all");
+        // Short header lines, each under the limit, adding up past it.
+        StringBuilder headers = new StringBuilder();
+        while (headers.length() < 9000) {
+            headers.append("X-A: b\r\n");
+        }
+        HttpServer.Request many = new HttpServer.Request("POST", "/x", "HTTP/1.1",
+                java.util.Collections.singletonMap("content-type", "multipart/form-data; boundary=x"),
+                null);
+        many.setBody(null, ("--x\r\n" + headers + "\r\nhi\r\n--x--").getBytes("UTF-8"));
+        assertThrows(IllegalArgumentException.class, many::getParts,
+                "the part header block limit is per line, not for the block");
     }
 
     @Test

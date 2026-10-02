@@ -178,7 +178,10 @@ final class BackendTestGenerator {
                 return 0;
             }
             for (Spec spec : specs) {
-                sources.put(contextBinary(spec.test.getBinaryName()), context(spec));
+                String name = contextBinary(spec.test.getBinaryName());
+                if (claim(name, spec.test)) {
+                    sources.put(name, context(spec));
+                }
             }
             if (ctx.hasErrors()) {
                 return 0;
@@ -402,6 +405,29 @@ final class BackendTestGenerator {
     }
 
     /// `pkg.Name` to `pkg.NameCn1TestContext`, a nested class's `$` written `_`.
+    /// Generated class -> the test class it was named after, for [#claim].
+    private final Map<String, String> generatedNames = new TreeMap<String, String>();
+
+    /// Records that `generated` is named after `test`, or reports a build error
+    /// when another test class already has that name. `$` becomes `_` in a
+    /// generated name, so a nested `Outer.Inner` and a top-level `Outer_Inner` in
+    /// one package would otherwise both write `Outer_InnerCn1TestContext`, and one
+    /// would silently load the other's context. The JVM extension derives the same
+    /// name to find a context, so the scheme stays and the collision is refused.
+    private boolean claim(String generated, AnnotatedClass test) {
+        String previous = generatedNames.get(generated);
+        if (previous == null) {
+            generatedNames.put(generated, test.getBinaryName());
+            return true;
+        }
+        if (previous.equals(test.getBinaryName())) {
+            return true;
+        }
+        ctx.error(test, test.getSourceName() + " and " + previous.replace('$', '.')
+                + " would both generate " + generated + "; rename one of the two test classes.");
+        return false;
+    }
+
     static String contextBinary(String testBinary) {
         int dot = testBinary.lastIndexOf('.');
         String pkg = dot < 0 ? "" : testBinary.substring(0, dot + 1);
@@ -611,6 +637,9 @@ final class BackendTestGenerator {
         String testType = cls.getSourceName();
         String binary = cls.getBinaryName();
         String runnerBinary = binary.replace('$', '_') + "Cn1TestRunner";
+        if (!claim(runnerBinary, cls)) {
+            return false;
+        }
         int dot = runnerBinary.lastIndexOf('.');
         String pkg = dot < 0 ? "" : runnerBinary.substring(0, dot);
         String simple = runnerBinary.substring(dot + 1);
@@ -648,12 +677,21 @@ final class BackendTestGenerator {
         List<MethodInfo> beforeAll = lifecycle(chain, JUNIT_BEFORE_ALL, true, true, owners);
         List<MethodInfo> afterAll = lifecycle(chain, JUNIT_AFTER_ALL, true, false, owners);
         sb.append("        boolean ready = true;\n");
+        sb.append("        String notReady = \"@BeforeAll failed\";\n");
         for (MethodInfo m : beforeAll) {
+            // An assumption that does not hold aborts the class, as JUnit aborts the
+            // container: its tests are skipped, not failed, so an environment-gated
+            // class has the same result in both runs.
             sb.append("        if (ready) {\n            try {\n                ")
               .append(call(owners.get(m), m, pkg, testType)).append(";\n")
               .append("            } catch (Throwable err) {\n")
-              .append("                com.codename1.impl.backend.test.TestRun.lifecycleFailed(CLS, ")
+              .append("                if (com.codename1.impl.backend.test.TestRun.isAbort(err)) {\n")
+              .append("                    notReady = ").append(quote("@BeforeAll " + m.getName() + " aborted: "))
+              .append(" + err.getMessage();\n")
+              .append("                } else {\n")
+              .append("                    com.codename1.impl.backend.test.TestRun.lifecycleFailed(CLS, ")
               .append(quote("@BeforeAll " + m.getName())).append(", err);\n")
+              .append("                }\n")
               .append("                ready = false;\n            }\n        }\n");
         }
         int index = 0;
@@ -668,7 +706,7 @@ final class BackendTestGenerator {
                 sb.append("        if (ready) {\n            t").append(index).append("();\n")
                   .append("        } else {\n")
                   .append("            com.codename1.impl.backend.test.TestRun.skipped(CLS, ")
-                  .append(quote(m.getName())).append(", \"@BeforeAll failed\");\n        }\n");
+                  .append(quote(m.getName())).append(", notReady);\n        }\n");
             }
             index++;
         }

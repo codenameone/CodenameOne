@@ -60,15 +60,21 @@ public class MockRequestBuilder {
 
     /// Adds a request parameter: a query parameter, which `@RequestParam` reads.
     public MockRequestBuilder param(String name, String... values) {
+        return addQuery(name, values);
+    }
+
+    /// Adds a query parameter: the same as [#param], except on a multipart
+    /// builder, whose param() adds a form field instead and whose queryParam()
+    /// still puts the value in the URL.
+    public MockRequestBuilder queryParam(String name, String... values) {
+        return addQuery(name, values);
+    }
+
+    private MockRequestBuilder addQuery(String name, String... values) {
         for (String value : values) {
             params.add(new String[] {name, value});
         }
         return this;
-    }
-
-    /// The same as [#param].
-    public MockRequestBuilder queryParam(String name, String... values) {
-        return param(name, values);
     }
 
     /// The body, as UTF-8 text.

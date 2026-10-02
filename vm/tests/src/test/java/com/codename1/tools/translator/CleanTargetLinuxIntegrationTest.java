@@ -390,7 +390,14 @@ class CleanTargetLinuxIntegrationTest {
             });
             sreader.setDaemon(true);
             sreader.start();
-            assertTrue(ready.await(900, TimeUnit.SECONDS), "cn1ss server should start listening");
+            // With the server's own output when it does not: a build or start-up
+            // failure in it otherwise read as a bare timeout.
+            if (!ready.await(900, TimeUnit.SECONDS)) {
+                String log;
+                synchronized (serverLog) { log = serverLog.toString(); }
+                org.junit.jupiter.api.Assertions.fail("cn1ss server should start listening; it printed:\n"
+                        + (log.length() > 6000 ? log.substring(log.length() - 6000) : log));
+            }
 
             ProcessBuilder appPb = new ProcessBuilder(elf.toAbsolutePath().toString());
             appPb.directory(elf.getParent().toFile());

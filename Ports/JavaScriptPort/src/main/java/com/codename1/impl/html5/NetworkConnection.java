@@ -49,6 +49,7 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     private boolean read;
     private boolean write;
     private int timeout=5000;
+    private int readTimeout = -1;
     private XMLHttpRequest req;
     private ByteArrayOutputStream body;
     private boolean post;
@@ -156,12 +157,16 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
             req.setRequestHeader(h.name, h.value);
         }
         //req.setResponseType("arraybuffer");
-        if ( body != null ){
-            
-            //req.send(new String(body.toByteArray(), "UTF-8"));
-            ((XHRBlob)req).send(BlobUtil.createBlob(body.toByteArray(), "application/octet-stream"));
-        } else {
-            req.send();
+        // Through send(), which applies the request's timeout and turns the
+        // TimeoutError a synchronous XHR throws into this method's IOException --
+        // the error path a timed-out request takes on every other port. The
+        // timeouts were ignored here, so a request past its timeout simply waited
+        // for the answer; and NetworkManager's fallback timeout thread cannot run
+        // while a synchronous request holds the worker.
+        String failure = send(req, body == null ? null
+                : BlobUtil.createBlob(body.toByteArray(), "application/octet-stream"), requestTimeout());
+        if (failure != null) {
+            throw new IOException("Failed to load " + url + ": " + failure);
         }
 
         
@@ -276,6 +281,33 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
      * whatever Access-Control-Expose-Headers allowed. A @JSBody runs its
      * script verbatim, so the method is really invoked.
      */
+    /// The XHR timeout for this request, in milliseconds, or 0 for none. A
+    /// synchronous XHR has one deadline for the whole request, so it gets the
+    /// connect and the read timeout together; -1 for either means unset, which is
+    /// what a request that set neither passes.
+    int requestTimeout() {
+        if (timeout > 0 && readTimeout > 0) {
+            return timeout + readTimeout;
+        }
+        return Math.max(Math.max(timeout, readTimeout), 0);
+    }
+
+    /// ConnectionRequest.setReadTimeout, through HTML5Implementation.
+    public void setReadTimeout(int readTimeout) {
+        this.readTimeout = readTimeout;
+    }
+
+    /// Sends `xhr` with `body` (null for none) under a `timeoutMillis` deadline
+    /// (0 for none), answering why it failed or null. Setting the timeout is
+    /// inside the try, because a synchronous XHR on a window rather than a
+    /// worker refuses one outright.
+    @JSBody(params={"xhr", "body", "timeoutMillis"}, script="try {"
+            + " if (timeoutMillis > 0) { try { xhr.timeout = timeoutMillis; } catch (ignored) {} }"
+            + " if (body) { xhr.send(body); } else { xhr.send(); }"
+            + " return null;"
+            + " } catch (e) { return (e && e.name ? e.name : 'Error') + (e && e.message ? ': ' + e.message : ''); }")
+    static native String send(XMLHttpRequest xhr, Blob body, int timeoutMillis);
+
     @JSBody(params={"xhr"}, script="return (xhr && typeof xhr.getAllResponseHeaders === 'function') "
             + "? xhr.getAllResponseHeaders() : null;")
     static native String responseHeaders(XMLHttpRequest xhr);

@@ -112,6 +112,33 @@ class JavascriptNetworkBindingsTest {
         assertTrue(out.contains("NULL=null"), "the @JSBody must answer null without a request: " + out);
     }
 
+    /// The send `@JSBody` applies the request's timeout and reports a timeout -- which a
+    /// synchronous XHR throws -- as a failure string instead of letting it escape.
+    @Test
+    void sendScriptAppliesTheTimeoutAndReportsTimingOut() throws Exception {
+        String source = read(NETWORK_CONNECTION);
+        Matcher m = Pattern.compile("@JSBody\\(params=\\{\"xhr\", \"body\", \"timeoutMillis\"\\}, "
+                + "script=((?:\\s*\\+?\\s*\"[^\"]*\")+)\\)\\s*static native String send\\(").matcher(source);
+        assertTrue(m.find(), "the send @JSBody was not found in NetworkConnection.java");
+        StringBuilder script = new StringBuilder();
+        Matcher literal = Pattern.compile("\"([^\"]*)\"").matcher(m.group(1));
+        while (literal.find()) {
+            script.append(literal.group(1));
+        }
+        String out = runNode(""
+                + "const f = new Function('xhr', 'body', 'timeoutMillis', " + quoteJs(script.toString()) + ");\n"
+                + "const slow = { timeout: 0, send: function() {"
+                + " const e = new Error('took too long'); e.name = 'TimeoutError'; throw e; } };\n"
+                + "console.log('SLOW=' + f(slow, null, 2000) + ' TIMEOUT=' + slow.timeout);\n"
+                + "let sent = null;\n"
+                + "const fast = { timeout: 0, send: function(b) { sent = b === undefined ? 'none' : b; } };\n"
+                + "console.log('FAST=' + f(fast, 'payload', 0) + ' SENT=' + sent + ' TIMEOUT=' + fast.timeout);\n");
+        assertTrue(out.contains("SLOW=TimeoutError: took too long TIMEOUT=2000"),
+                "a timeout must be applied and reported: " + out);
+        assertTrue(out.contains("FAST=null SENT=payload TIMEOUT=0"),
+                "a request without a timeout is sent as it was: " + out);
+    }
+
     /// `ArrayBufferInputStream.read(byte[], int, int)` stores signed Java bytes. A raw 0..255
     /// value is a byte no Java code can produce: `b == (byte) 200` is false for it.
     @Test

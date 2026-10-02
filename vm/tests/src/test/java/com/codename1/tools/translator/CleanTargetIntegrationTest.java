@@ -1361,8 +1361,14 @@ class CleanTargetIntegrationTest {
             });
             sreader.setDaemon(true);
             sreader.start();
-            assertTrue(ready.await(900, java.util.concurrent.TimeUnit.SECONDS),
-                    "cn1ss server should start listening");
+            // With the server's own output when it does not: a build or start-up
+            // failure in it otherwise read as a bare timeout.
+            if (!ready.await(900, java.util.concurrent.TimeUnit.SECONDS)) {
+                String log;
+                synchronized (serverLog) { log = serverLog.toString(); }
+                org.junit.jupiter.api.Assertions.fail("cn1ss server should start listening; it printed:\n"
+                        + (log.length() > 6000 ? log.substring(log.length() - 6000) : log));
+            }
 
             // Launch the suite exe and watch its stdout for the end marker. The
             // exe never self-exits (it owns the Win32 message pump), so we kill it

@@ -57,6 +57,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -773,6 +774,24 @@ public class BackendBeansTest {
         // A profile file describes another deployment; compiling it in would make
         // the dev settings a production binary's defaults.
         assertFalse("a profile file was compiled in:\n" + bootstrap, bootstrap.contains(":memory:"));
+    }
+
+    @Test
+    public void propertiesFilesAreReadAsUtf8AndAProfileFileStandsAlone() throws Exception {
+        File classes = compile(sample());
+        // Only the profile's file: a test on that profile must still get it.
+        java.nio.file.Files.write(new File(classes, "application-test.properties").toPath(),
+                "greeting=Gr\u00fc\u00dfe\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        ProcessorContext ctx = process(classes, new RestControllerAnnotationProcessor());
+        assertNull("there is no base file", RestControllerAnnotationProcessor.baseApplicationProperties(ctx));
+        java.util.Properties profile = RestControllerAnnotationProcessor.profileApplicationProperties(ctx, "test");
+        assertNotNull("the profile file was not found without a base file", profile);
+        // Read as UTF-8, as Config reads it at run time, not as ISO-8859-1.
+        assertEquals("Gr\u00fc\u00dfe", profile.getProperty("greeting"));
+        java.nio.file.Files.write(new File(classes, "application.properties").toPath(),
+                "password=p\u00e4ss\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals("p\u00e4ss", RestControllerAnnotationProcessor.baseApplicationProperties(ctx)
+                .getProperty("password"));
     }
 
     @Test

@@ -81,7 +81,8 @@ public final class TestRun {
         return failed;
     }
 
-    private static boolean isAbort(Throwable failure) {
+    /// Whether `failure` is an assumption that did not hold -- a skip, not a failure.
+    public static boolean isAbort(Throwable failure) {
         // By name, so the same check holds against opentest4j on the JVM and the
         // translated shim; both define it under this name.
         for (Class c = failure.getClass(); c != null; c = c.getSuperclass()) {

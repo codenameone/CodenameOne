@@ -3043,47 +3043,35 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// The module's base `application.properties`, loaded, or null when it has
     /// none or it can't be read.
     static java.util.Properties baseApplicationProperties(ProcessorContext ctx) {
-        File f = applicationProperties(ctx);
+        return loadProperties(ctx, applicationProperties(ctx));
+    }
+
+    /// The module's `application-<profile>.properties`, loaded, or null when it
+    /// has none. Looked for where the base file is looked for, and independently
+    /// of it: a module may keep only `application-test.properties`, and a test on
+    /// that profile must still get its settings.
+    static java.util.Properties profileApplicationProperties(ProcessorContext ctx,
+                                                             String profile) {
+        if (profile == null || profile.length() == 0) {
+            return null;
+        }
+        return loadProperties(ctx, findProperties(ctx, "application-" + profile + ".properties"));
+    }
+
+    /// `f` loaded as UTF-8, or null when it is null or unreadable. As UTF-8
+    /// because that is how Config reads the same file at run time:
+    /// Properties.load(InputStream) decodes ISO-8859-1, so a value with an accent
+    /// in it -- a password -- was compiled in as different characters from the
+    /// ones the server reads from the file.
+    private static java.util.Properties loadProperties(ProcessorContext ctx, File f) {
         if (f == null) {
             return null;
         }
         java.util.Properties props = new java.util.Properties();
-        InputStream in = null;
+        java.io.Reader in = null;
         try {
-            in = new java.io.FileInputStream(f);
-            props.load(in);
-            return props;
-        } catch (IOException err) {
-            ctx.getLog().warn("Could not read " + f + ": " + err.getMessage());
-            return null;
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignored) {
-                    // Only read; nothing to lose.
-                }
-            }
-        }
-    }
-
-    /// The module's `application-<profile>.properties`, loaded, or null when it
-    /// has none.
-    static java.util.Properties profileApplicationProperties(ProcessorContext ctx,
-                                                             String profile) {
-        File base = applicationProperties(ctx);
-        File dir = base == null ? null : base.getParentFile();
-        if (dir == null || profile == null || profile.length() == 0) {
-            return null;
-        }
-        File f = new File(dir, "application-" + profile + ".properties");
-        if (!f.isFile()) {
-            return null;
-        }
-        java.util.Properties props = new java.util.Properties();
-        InputStream in = null;
-        try {
-            in = new java.io.FileInputStream(f);
+            in = new java.io.InputStreamReader(new java.io.FileInputStream(f),
+                    java.nio.charset.StandardCharsets.UTF_8);
             props.load(in);
             return props;
         } catch (IOException err) {
@@ -3109,6 +3097,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// in a multi-module application is `common`. The packaging goal does pass the
     /// module itself, which is the fallback.
     private static File applicationProperties(ProcessorContext ctx) {
+        return findProperties(ctx, "application.properties");
+    }
+
+    /// `name` in the places [#applicationProperties] searches, in its order.
+    private static File findProperties(ProcessorContext ctx, String name) {
         // Where a project keeps it, in the order Maven would see it. The copy in
         // the classes directory FIRST: the documented layout is
         // src/main/resources/application.properties, which process-resources has
@@ -3120,18 +3113,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         List<File> candidates = new ArrayList<File>();
         File classes = ctx.getOutputClassDir();
         if (classes != null) {
-            candidates.add(new File(classes, "application.properties"));
+            candidates.add(new File(classes, name));
             if (classes.getParentFile() != null
                     && "target".equals(classes.getParentFile().getName())) {
                 File module = classes.getParentFile().getParentFile();
-                candidates.add(new File(module, "src/main/resources/application.properties"));
-                candidates.add(new File(module, "application.properties"));
+                candidates.add(new File(module, "src/main/resources/" + name));
+                candidates.add(new File(module, name));
             }
         }
         File dir = ctx.getProjectDir();
         if (dir != null) {
-            candidates.add(new File(dir, "src/main/resources/application.properties"));
-            candidates.add(new File(dir, "application.properties"));
+            candidates.add(new File(dir, "src/main/resources/" + name));
+            candidates.add(new File(dir, name));
         }
         for (File file : candidates) {
             if (file.isFile()) {

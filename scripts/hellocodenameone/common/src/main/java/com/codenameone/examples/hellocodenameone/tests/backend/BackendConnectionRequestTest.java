@@ -181,7 +181,10 @@ public class BackendConnectionRequestTest extends BackendClientTest {
             setHttpMethod(method);
             setPost(!"GET".equals(method) && !"HEAD".equals(method) && !"DELETE".equals(method));
             setReadResponseForErrors(true);
-            setFailSilently(true);
+            // NOT fail-silent: NetworkManager hands a fail-silent request's exception
+            // to nobody -- not even an overridden handleException -- so a timeout or
+            // a refused connection ended the request with no callback at all. The
+            // overrides below are what keep the default error dialog away.
             setDuplicateSupported(true);
         }
 

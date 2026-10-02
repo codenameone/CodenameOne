@@ -10572,6 +10572,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void setReadTimeout(Object connection, int readTimeout) {
+        if (connection instanceof NetworkConnection) {
+            ((NetworkConnection) connection).setReadTimeout(readTimeout);
+        }
+    }
+
+    @Override
     public void setHttpMethod(Object connection, String method) throws IOException {
         JavaScriptNetworkAdapter.setHttpMethod((JavaScriptNetworkAdapter.Connection) connection, method);
     }

@@ -134,9 +134,9 @@ final class Cors {
             return null;
         }
         if (!allows(origin)) {
-            return HttpServer.Response.text(403, "origin not allowed");
+            return varyByOrigin(HttpServer.Response.text(403, "origin not allowed"));
         }
-        HttpServer.Response response = HttpServer.Response.empty(204, null, null);
+        HttpServer.Response response = varyByOrigin(HttpServer.Response.empty(204, null, null));
         allowOrigin(response, origin);
         response.header("Access-Control-Allow-Methods", methods);
         String requested = request.getHeader("Access-Control-Request-Headers");
@@ -156,9 +156,19 @@ final class Cors {
 
     /// Adds the headers a browser reads to a response for an allowed origin.
     void decorate(HttpServer.Request request, HttpServer.Response response) {
+        if (response == null || response.hasHeader("Access-Control-Allow-Origin")) {
+            return;
+        }
+        if (!anyOrigin || credentials) {
+            // The answer depends on Origin whenever the policy names origins -- the
+            // headers below or their absence -- so a shared cache must key on it even
+            // for a request with no Origin or a denied one. Without it, a cached copy
+            // with no CORS headers was served to an allowed origin, whose browser
+            // then blocked a permitted response.
+            response.appendToken("Vary", "Origin");
+        }
         String origin = request.getHeader("Origin");
-        if (response == null || origin == null || !allows(origin)
-                || response.hasHeader("Access-Control-Allow-Origin")) {
+        if (origin == null || !allows(origin)) {
             return;
         }
         allowOrigin(response, origin);
@@ -167,14 +177,22 @@ final class Cors {
         }
     }
 
+    /// `response`, with `Vary: Origin` when the policy names origins.
+    private HttpServer.Response varyByOrigin(HttpServer.Response response) {
+        if (!anyOrigin || credentials) {
+            response.appendToken("Vary", "Origin");
+        }
+        return response;
+    }
+
     private void allowOrigin(HttpServer.Response response, String origin) {
         // The origin itself rather than "*" whenever the answer depends on it, and
         // Vary so a cache does not hand one origin's answer to another.
         if (anyOrigin && !credentials) {
             response.header("Access-Control-Allow-Origin", "*");
         } else {
+            // Vary: Origin was added by decorate, for every answer of this policy.
             response.header("Access-Control-Allow-Origin", origin);
-            response.appendToken("Vary", "Origin");
         }
         if (credentials) {
             response.header("Access-Control-Allow-Credentials", "true");
