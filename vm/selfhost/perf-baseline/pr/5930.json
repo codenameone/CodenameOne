@@ -1,0 +1,42 @@
+{
+ "pr": 5930,
+ "reason": "stringBuilding RAM is bimodal on these runners with unchanged VM code: Windows x64 AMD Family 25 Model 1 reads 0.267x or 0.322x and macOS arm64 0.389x-0.54x across runs (CI runs 36824868723..36957766166). The rows were calibrated from runs that all landed on the upper mode, so the lower one failed as an improvement once improvements fail the gate. Recalibrated from all of each runner's runs; time is untouched.",
+ "rebaseline": {
+  "macos-arm64": {
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.54,
+      "time": 0.842,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.463,
+     "runs": 5,
+     "time": 0.842,
+     "tolerance": {
+      "memory": 0.25,
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.322,
+      "time": 1.216
+     },
+     "memory": 0.322,
+     "runs": 10,
+     "time": 1.216,
+     "tolerance": {
+      "memory": 0.3
+     }
+    }
+   }
+  }
+ }
+}

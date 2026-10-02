@@ -220,9 +220,10 @@ def validate_overlay(number, overlay, where):
         here = '%s rebaseline %s %s/%s' % (where, key, bench, cores)
         _check_row(here, row, extra=('from',))
         old = row.get('from')
-        if not isinstance(old, dict) or set(old) != set(METRICS):
+        if not isinstance(old, dict) or set(old) - {'tolerance'} != set(METRICS) or \
+                not isinstance(old.get('tolerance', {}), dict):
             raise BaselineError('%s: "from" must give the time and memory baseline it '
-                                'replaces' % here)
+                                'replaces, and its tolerance if it had one' % here)
     if rebaselines:
         reason = overlay.get('reason')
         if not isinstance(reason, str) or not reason.strip() or reason.strip().upper().startswith('TODO'):
@@ -232,8 +233,22 @@ def validate_overlay(number, overlay, where):
         raise BaselineError('%s changes nothing; delete it' % where)
 
 
+def from_row(row):
+    """What a rebaseline records as the row it replaces: the ratios AND the tolerance. A
+    tolerance-only recalibration (an --all run whose ratios round to the old values) is a
+    change too, and a later rebaseline that compared ratios alone would pass and then put
+    the stale tolerance back."""
+    old = {m: row[m] for m in METRICS}
+    if row.get('tolerance'):
+        old['tolerance'] = dict(row['tolerance'])
+    return old
+
+
 def _same(a, b):
-    return all(math.isclose(a[m], b[m], rel_tol=0, abs_tol=5e-4) for m in METRICS)
+    """Whether the row a rebaseline was measured against (`a`, its "from") is still the
+    row in the tree (`b`). No tolerance on either side means none."""
+    return all(math.isclose(a[m], b[m], rel_tol=0, abs_tol=5e-4) for m in METRICS) and \
+        a.get('tolerance', {}) == b.get('tolerance', {})
 
 
 def _combine(rows, default=None):
@@ -304,11 +319,10 @@ def resolve(base, overlays, tolerance=None):
                                 '"calibrate" entry' % (number, where))
         if not _same(row['from'], current):
             raise BaselineError(
-                'pr/%d.json rebaselines %s from time %.3fx / RAM %.3fx, but the row is now '
-                'time %.3fx / RAM %.3fx: another merged change moved it first. Re-measure '
-                'on top of it and update the rebaseline.'
-                % (number, where, row['from']['time'], row['from']['memory'],
-                   current['time'], current['memory']))
+                'pr/%d.json rebaselines %s from %s, but the row is now %s: another merged '
+                'change moved it first. Re-measure on top of it and update the rebaseline.'
+                % (number, where, json.dumps(row['from'], sort_keys=True),
+                   json.dumps(from_row(current), sort_keys=True)))
         rows[key][bench][cores] = {k: v for k, v in row.items() if k != 'from'}
     return rows, notes
 
@@ -548,6 +562,21 @@ def import_legacy(root, number, legacy, original=None, reason=None):
     current = load(root)['platforms']
     before = (original or {}).get('platforms')
     calibrate, rebaseline, notes, conflicts = {}, {}, [], []
+    if before is not None:
+        # The old calibrator's --fresh dropped every row a run did not re-measure, so a
+        # branch's file can DELETE rows. An overlay has no way to say that, and importing
+        # only the rows still present would report "no change" while the rows the branch
+        # meant to retire stay active. Refuse, and say what to do instead.
+        after = legacy.get('platforms', {})
+        dropped = ['%s %s/%s' % (key, bench, cores) for key, bench, cores, _ in _rows(
+            'the original perf-baseline.json', before)
+            if cores not in after.get(key, {}).get(bench, {})]
+        if dropped:
+            raise BaselineError(
+                'the branch deleted %d row(s) that overlays cannot delete: %s. Re-measure '
+                'them with calibrate-perf-baseline.py --all instead, or ask for a removal '
+                'from base/ in its own change.' % (len(dropped), ', '.join(dropped[:8]) +
+                                                   (' ...' if len(dropped) > 8 else '')))
     for key, bench, cores, row in _rows('the branch perf-baseline.json', legacy.get('platforms', {})):
         _check_row('%s %s/%s' % (key, bench, cores), row)
         if before is not None and before.get(key, {}).get(bench, {}).get(cores) == row:
@@ -566,7 +595,7 @@ def import_legacy(root, number, legacy, original=None, reason=None):
                                                            '%s %s/%s' % (key, bench, cores),
                                                            conflicts)
             if merged is not None and merged != existing:
-                moved = dict(merged, **{'from': {m: existing[m] for m in METRICS}})
+                moved = dict(merged, **{'from': from_row(existing)})
                 rebaseline.setdefault(key, {}).setdefault(bench, {})[cores] = moved
     if conflicts:
         raise BaselineError('the branch and master both changed these fields since the branch '

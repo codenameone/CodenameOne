@@ -179,7 +179,7 @@ class CalibrationTest(unittest.TestCase):
     into the pull request's own overlay."""
 
     def run_calibration(self, runs, existing=None, overlays=None, pr=7, reason=None,
-                        everything=False):
+                        everything=False, metric=None):
         import json
         tree = BaselineTree(existing, overlays)
         try:
@@ -196,7 +196,8 @@ class CalibrationTest(unittest.TestCase):
                 files.append(str(f))
             calibrate.main(['--root', str(tree.root), '--pr', str(pr)] +
                            (['--reason', reason] if reason else []) +
-                           (['--all'] if everything else []) + files)
+                           (['--all'] if everything else []) +
+                           (['--metric', metric] if metric else []) + files)
             return tree.overlay(pr), baselines.load(tree.root)['platforms']
         finally:
             tree.close()
@@ -260,6 +261,16 @@ class CalibrationTest(unittest.TestCase):
         self.assertEqual(sorted(b), ['macos-arm64'])
         self.assertEqual(gate.baseline_key(b, 'macos-arm64', 'Apple M1 (Virtual)'), 'macos-arm64')
 
+    def test_a_run_feeds_the_row_that_judged_it(self):
+        # macOS reports a CPU model but is judged by the plain platform row.
+        old = {'macos-arm64': {'quicksort': {'all': row(1.0, 0.1)}}}
+        overlay, rows = self.run_calibration(
+            [('macos-arm64', {'quicksort': (0.5, 0.1)}, 'Apple M1 (Virtual)')],
+            existing=old, reason='faster')
+        self.assertEqual(sorted(overlay['rebaseline']), ['macos-arm64'])
+        self.assertNotIn('calibrate', overlay)
+        self.assertEqual(sorted(rows), ['macos-arm64'])
+
     def test_a_row_inside_its_tolerance_is_left_alone(self):
         old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)},
                              'recursion': {'all': row(1.0, 0.1)}}}
@@ -276,7 +287,7 @@ class CalibrationTest(unittest.TestCase):
         overlay, rows = self.run_calibration([('linux-x64', {'quicksort': (0.7, 0.1)})],
                                              existing=old, reason='faster partitioning')
         r = overlay['rebaseline']['linux-x64']['quicksort']['all']
-        self.assertEqual(r['from'], {'time': 1.0, 'memory': 0.1})
+        self.assertEqual(r['from'], {'time': 1.0, 'memory': 0.1, 'tolerance': {'memory': 0.3}})
         self.assertEqual(r['time'], 0.7)
         # Only the metric that moved is replaced; RAM keeps its baseline and tolerance.
         self.assertEqual(r['memory'], 0.1)
@@ -291,6 +302,17 @@ class CalibrationTest(unittest.TestCase):
             existing=old, reason='five runs of unchanged code', everything=True)
         r = overlay['rebaseline']['linux-x64']['quicksort']['all']
         self.assertEqual((r['time'], r['runs']), (1.0, 5))
+
+    def test_metric_limits_a_recalibration_to_one_metric(self):
+        old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.3, time=0.4)}}}
+        overlay, _ = self.run_calibration(
+            [('linux-x64', {'quicksort': (t, m)}) for t, m in
+             ((1.1, 0.32), (0.9, 0.27), (1.05, 0.32), (0.95, 0.27), (1.0, 0.32))],
+            existing=old, reason='bimodal RAM', everything=True, metric='memory')
+        r = overlay['rebaseline']['linux-x64']['quicksort']['all']
+        self.assertEqual((r['time'], r['tolerance']['time']), (1.0, 0.4))   # untouched
+        self.assertEqual(r['memory'], 0.32)
+        self.assertGreaterEqual(r['tolerance']['memory'], 0.25)   # covers the 0.27 mode
 
     def test_rerunning_replaces_this_pull_requests_own_rows(self):
         old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)}}}
@@ -344,6 +366,16 @@ class OverlayTests(unittest.TestCase):
         with self.assertRaises(baselines.BaselineError) as caught:
             self.resolve([self.rebase(15, 0.9, frm=1.0)], base=moved)
         self.assertIn('another merged change moved it first', str(caught.exception))
+
+    def test_a_rebaseline_from_a_row_whose_tolerance_moved_is_rejected(self):
+        # An earlier --all recalibration changed only the tolerance; the ratios match.
+        retuned = {'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1, time=0.4)}}}
+        with self.assertRaises(baselines.BaselineError):
+            self.resolve([self.rebase(15, 0.8)], base=retuned)
+        number, overlay = self.rebase(15, 0.8)
+        overlay['rebaseline']['linux-x64@a']['quicksort']['all']['from']['tolerance'] = {'time': 0.4}
+        rows, _ = self.resolve([(number, overlay)], base=retuned)
+        self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 0.8)
 
     def test_a_rebaseline_needs_a_reason_and_a_from(self):
         number, overlay = self.rebase(12, 0.8, reason='TODO')
@@ -437,6 +469,21 @@ class OverlayTests(unittest.TestCase):
             with self.assertRaises(baselines.BaselineError) as caught:
                 baselines.import_legacy(tree.root, 34, clash, original, 'x')
             self.assertIn('tolerance.time', str(caught.exception))
+        finally:
+            tree.close()
+
+    def test_import_legacy_refuses_deleted_rows(self):
+        # The old calibrator's --fresh dropped rows a run did not re-measure.
+        tree = BaselineTree({'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1)},
+                                             'recursion': {'all': row(2.0, 0.1)}}})
+        try:
+            original = dict(POLICY, platforms={'linux-x64@a': {
+                'quicksort': {'all': row(1.0, 0.1)}, 'recursion': {'all': row(2.0, 0.1)}}})
+            legacy = dict(POLICY, platforms={'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1)}}})
+            with self.assertRaises(baselines.BaselineError) as caught:
+                baselines.import_legacy(tree.root, 35, legacy, original, 'x')
+            self.assertIn('linux-x64@a recursion/all', str(caught.exception))
+            self.assertIsNone(tree.overlay(35))
         finally:
             tree.close()
 

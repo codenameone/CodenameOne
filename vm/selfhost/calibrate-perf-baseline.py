@@ -2,7 +2,8 @@
 """Writes a pull request's baseline changes, pr/<number>.json, from CI runs' perf-results.json.
 
     python3 vm/selfhost/calibrate-perf-baseline.py [--pr N] [--reason TEXT] [--all]
-                                                   [--only BENCH,...] RESULTS.json ...
+                                                   [--only BENCH,...] [--metric time|memory]
+                                                   RESULTS.json ...
 
 Pass the perf-results.json of the runs the gate failed on -- from the artifacts
 ci-perf-gate.sh leaves (linux-screenshot-raw-*/perf, windows-port-screenshot-raw-*/perf,
@@ -17,7 +18,8 @@ What it writes, per platform, benchmark and core setting the runs measured:
               moved performance on purpose. Only the metric that moved is replaced, and
               --reason is required -- the reason is what a reviewer reads beside the
               number. --all rebaselines every measured row instead, for recalibrating a
-              row's noise from several runs of unchanged code.
+              row's noise from several runs of unchanged code; --metric limits that to one
+              metric, so recalibrating a noisy RAM figure leaves a steady time alone.
 
 How a row is computed:
   baseline   the median of the runs' median ratios.
@@ -79,15 +81,23 @@ def spread_tolerance(values, base, floor):
     return max(floor, round_up(spread * SPREAD_MARGIN))
 
 
-def collect(paths, only=None):
-    """platform-key -> (benchmark, cores) -> metric -> [median ratio per run]."""
+def collect(paths, only=None, rows=None):
+    """platform-key -> (benchmark, cores) -> metric -> [median ratio per run].
+
+    A run feeds the row that JUDGED it, chosen exactly as the gate chooses
+    (perf_gate.baseline_key over `rows`): macOS reports "Apple M1 (Virtual)" yet is judged
+    by the plain macos-arm64 row, and keying it by model would have rebaselined nothing and
+    calibrated a new per-model row beside the one that failed. A run no row judged
+    calibrates its own CPU model's row."""
     runs = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for path in paths:
         report = json.loads(Path(path).read_text())
         if report.get('error') or report.get('failures'):
             raise SystemExit('%s did not complete; calibrate only from complete runs' % path)
         cls = perf_gate.cpu_class(report.get('cpu'))
-        key = '%s@%s' % (report['platform'], cls) if cls else report['platform']
+        key = perf_gate.baseline_key(rows or {}, report['platform'], report.get('cpu'))
+        if key is None or key not in (rows or {}):
+            key = '%s@%s' % (report['platform'], cls) if cls else report['platform']
         for bench, by_cores in report['results'].items():
             if only and bench not in only:
                 continue
@@ -105,6 +115,8 @@ def main(argv=None):
     parser.add_argument('--all', action='store_true',
                         help='rebaseline every measured row, not only those out of tolerance')
     parser.add_argument('--only', help='comma-separated benchmark ids to take from the runs')
+    parser.add_argument('--metric', choices=METRICS,
+                        help='rebaseline only this metric (a new row always gets both)')
     parser.add_argument('results', nargs='+')
     args = parser.parse_args(argv)
 
@@ -122,7 +134,7 @@ def main(argv=None):
     # since this run replaces this pull request's earlier rebaseline rather than stacking.
     judged, _ = perf_baseline.resolve(base, overlays, tolerance)
     others, _ = perf_baseline.resolve(base, [o for o in overlays if o[0] != number], tolerance)
-    runs = collect(args.results, set(args.only.split(',')) if args.only else None)
+    runs = collect(args.results, set(args.only.split(',')) if args.only else None, judged)
 
     widest = defaultdict(float)   # (benchmark, metric) -> widest tolerance any row has
     for _, bench, _, row in perf_baseline._rows('baseline', judged):
@@ -145,6 +157,8 @@ def main(argv=None):
             moved = []
             for metric in METRICS:
                 values = metrics[metric]
+                if args.metric and metric != args.metric and not new_row:
+                    continue
                 if not (args.all or new_row or any(
                         perf_gate.verdict(v, current[metric],
                                           current.get('tolerance', {}).get(metric, tolerance[metric]),
@@ -168,7 +182,7 @@ def main(argv=None):
             if new_row or before is None:
                 calibrate.setdefault(key, {}).setdefault(bench, {})[cores] = row
             else:
-                row['from'] = {m: before[m] for m in METRICS}
+                row['from'] = perf_baseline.from_row(before)
                 rebaseline.setdefault(key, {}).setdefault(bench, {})[cores] = row
 
     if not calibrate and not rebaseline:
