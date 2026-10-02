@@ -815,6 +815,13 @@ if [ "${WEBSITE_REFRESH_PORT_STATUS}" = "true" ]; then
   "${REPO_ROOT}/scripts/website/sync_port_status_reports.sh"
 fi
 "${PYTHON_BIN}" "${REPO_ROOT}/scripts/hellocodenameone/conformance/port_status.py" validate
+# The ParparVM vs JDK 25 table is rendered from the performance gate's own baselines, the
+# ratios every platform build is held to. Generated here rather than committed: a copy in
+# the tree would go stale whenever a pull request rebaselines, and requiring each such
+# pull request to refresh it would bring back the merge conflicts the baseline layout
+# exists to avoid (vm/selfhost/perf_baseline.py).
+"${PYTHON_BIN}" "${REPO_ROOT}/vm/selfhost/perf_baseline.py" summary \
+  --out "${WEBSITE_DIR}/data/port_status_jdk25.json"
 
 build_javadocs_for_site
 build_developer_guide_for_site

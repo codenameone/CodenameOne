@@ -118,16 +118,35 @@ In a `--cores` sweep the count is pinned with CPU affinity on Linux and Windows.
 has no affinity API, so there it is logical: both arms are told it (`CN1_GC_MARK_THREADS`,
 `-XX:ActiveProcessorCount`) and neither is confined to it; the table marks those rows.
 
-**The gate compares against `perf-baseline.json`**: a ratio per platform and benchmark,
-and a tolerance per metric. A ratio more than the tolerance above its
-baseline fails the build, and the comment names the benchmark, the metric and the size
-of the change.
+**The gate compares against `perf-baseline/`**: a ratio per platform, runner CPU model
+and benchmark, and a tolerance per metric. A ratio more than the tolerance away from its
+baseline fails the build, in either direction -- above it is a regression, below it an
+improvement that has to be recorded, or a later change could give it back without
+failing anything. The comment names the benchmark, the metric and the size of the change.
 
-**Calibrating.** Baselines must come from the runners that enforce them: a ratio depends
-on the hardware, so one measured on a developer machine is not a baseline for CI. A
-benchmark with no entry is reported as "not gated", and the comment carries the entry to
-add. When a change moves performance on purpose, update the entries in the same pull
-request, from that pull request's own run.
+**Calibrating and rebaselining.** Baselines must come from the runners that enforce them:
+a ratio depends on the hardware, so one measured on a developer machine is not a baseline
+for CI. Both kinds of change go into the pull request's own
+`perf-baseline/pr/<number>.json`, written from the failing job's `perf-results.json`:
+
+```bash
+# a runner CPU model with no rows yet
+python3 vm/selfhost/calibrate-perf-baseline.py --pr 5931 perf-results.json
+# a change that moves performance on purpose
+python3 vm/selfhost/calibrate-perf-baseline.py --pr 5931 --reason "why" perf-results.json
+```
+
+No pull request edits `perf-baseline/base/`. The nightly `fold` job in
+`.github/workflows/perf-baseline.yml` moves merged overlays there. The one-file layout
+this replaced made unrelated branches conflict on every merge; `perf_baseline.py`
+explains how overlays combine and when two of them are a real conflict. A branch still
+carrying edits to the old `perf-baseline.json` converts them, from a checkout of this
+layout, with `perf_baseline.py import-legacy --pr N --reason "..." --ref origin/<branch>`.
+It reads the branch's copy and the copy at its merge base, so only the branch's own edits
+are imported.
+
+The Port Status page's ParparVM vs JDK 25 table is rendered from these same rows
+(`perf_baseline.py summary`, run by `scripts/website/build.sh`).
 
 ## Native collection and string implementation
 

@@ -583,6 +583,10 @@ jobs:
       # builds only ask javac for -source/-target 1.8 against an explicit bootclasspath.
       - name: ParparVM vs JDK 25 (performance gate, x64)
         if: success() || failure()
+        # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
+        # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           export JDK_8_HOME="${JDK_8_HOME:-$JAVA_HOME}"
@@ -795,6 +799,10 @@ jobs:
       # builds only ask javac for -source/-target 1.8 against an explicit bootclasspath.
       - name: ParparVM vs JDK 25 (performance gate, arm64)
         if: success() || failure()
+        # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
+        # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           export JDK_8_HOME="${JDK_8_HOME:-$JAVA_HOME}"

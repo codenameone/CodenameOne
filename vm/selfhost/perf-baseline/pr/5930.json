@@ -1,0 +1,73 @@
+{
+ "pr": 5930,
+ "rebaseline": {
+  "macos-arm64": {
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.54,
+      "time": 0.842,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.463,
+     "reason": "RAM reads 0.389x-0.54x on this runner with unchanged VM code across 5 CI runs, and the row was calibrated at the top of that range. RAM recalibrated from all 5; time untouched.",
+     "runs": 5,
+     "time": 0.842,
+     "tolerance": {
+      "memory": 0.25,
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.803,
+      "time": 1.241
+     },
+     "memory": 0.803,
+     "reason": "Time is wide on this runner with unchanged VM code: rounds 0.87x-1.57x, run medians 1.051x-1.352x across 11 runs, and a master run had already fallen outside the 15% band. Time recalibrated from all 11; RAM untouched.",
+     "runs": 11,
+     "time": 1.228,
+     "tolerance": {
+      "time": 0.25
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.322,
+      "time": 1.216
+     },
+     "memory": 0.322,
+     "reason": "RAM is bimodal on this runner with unchanged VM code: 0.267x or 0.322x across 10 CI runs, and the row was calibrated from runs on the upper mode. RAM recalibrated from all 10; time untouched.",
+     "runs": 10,
+     "time": 1.216,
+     "tolerance": {
+      "memory": 0.3
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.542,
+      "time": 0.606
+     },
+     "memory": 0.542,
+     "reason": "Time is bimodal on this runner with unchanged VM code: rounds alternate 0.42x-0.49x and 0.59x-0.64x inside single runs, so run medians land on either mode (0.467x-0.628x across 11 runs). Time recalibrated from all 11; RAM untouched.",
+     "runs": 11,
+     "time": 0.605,
+     "tolerance": {
+      "time": 0.35
+     }
+    }
+   }
+  }
+ }
+}
