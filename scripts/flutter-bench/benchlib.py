@@ -985,7 +985,12 @@ def render_gate(report):
         if gate.get("stale_overlay"):
             line += (" This pull request's own overlay is stale (%s); the run was judged "
                      "without it, and fails until it is re-measured." % gate["stale_overlay"])
-        if findings or gate.get("stale_overlay"):
+        advisories = report.get("advisories") or []
+        if advisories:
+            line += (" Smaller than its baseline, which does not fail the gate: %s -- "
+                     "rebaseline to tighten." % "; ".join(
+                         "%s %+.2f%%" % (a["label"], a["moved_by"]) for a in advisories))
+        if findings or gate.get("stale_overlay") or advisories:
             line += (" To accept the move, download this platform's `baseline-<platform>.json` "
                      "artifact and run `%s`, then commit the overlay it writes."
                      % gate.get("fix", "flutter_baseline.py calibrate"))

@@ -436,11 +436,21 @@ class GateArming(unittest.TestCase):
         self.assertEqual("armed", written["gate"]["status"])
         self.assertEqual([], written["regressions"])
 
-    def test_a_size_that_shrank_fails_until_it_is_rebaselined(self):
+    def test_a_size_that_shrank_passes_and_says_to_tighten(self):
         code, written, _ = self._main({"fake": {"gallery": {"install_bytes": {
             "value": 1200, "runs": 1}}}})
+        self.assertEqual(0, code)
+        self.assertEqual([], written["regressions"])
+        self.assertEqual("improved", written["advisories"][0]["verdict"])
+        line = benchlib.render_gate(written)
+        self.assertIn("rebaseline to tighten", line)
+        self.assertIn("calibrate --pr 9", line)
+
+    def test_a_size_that_grew_fails(self):
+        code, written, _ = self._main({"fake": {"gallery": {"install_bytes": {
+            "value": 800, "runs": 1}}}})
         self.assertEqual(1, code)
-        self.assertEqual("improved", written["regressions"][0]["verdict"])
+        self.assertEqual("regression", written["regressions"][0]["verdict"])
 
 
 class StartupBracket(unittest.TestCase):

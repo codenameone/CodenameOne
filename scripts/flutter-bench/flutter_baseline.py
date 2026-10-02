@@ -44,9 +44,11 @@ THE METRICS
       then one plain-platform row judges every CPU, as macos-arm64 does in the ParparVM
       gate.
 
-A run is judged per metric: a value more than its tolerance away from the row, in EITHER
-direction, fails (an improvement nobody wrote down can be given back unseen); so does a
-measured metric with no row (uncalibrated) and a row whose metric the run did not produce.
+A run is judged per metric. A RATIO more than its tolerance away from its row in EITHER
+direction fails (an improvement nobody wrote down can be given back unseen). A SIZE fails
+only by growing past its tolerance; a shrink past it is reported as "improved --
+rebaseline to tighten" and does not fail (see judge() for why). A measured metric with no
+row (uncalibrated) fails, and so does a row whose metric the run did not produce.
 """
 import argparse
 import importlib.util
@@ -270,11 +272,28 @@ def judge(report, data):
             continue
         outcome = perf_gate.verdict(value, row['value'], tolerance, data['floor'][metric])
         if outcome != 'ok':
-            findings.append({'metric': metric, 'label': LABELS[metric], 'baseline': row['value'],
-                             'actual': value, 'tolerance': tolerance, 'verdict': outcome,
-                             'key': key,
-                             'moved_by': round((value / float(row['value']) - 1.0) * 100.0, 2)})
+            finding = {'metric': metric, 'label': LABELS[metric], 'baseline': row['value'],
+                       'actual': value, 'tolerance': tolerance, 'verdict': outcome,
+                       'key': key,
+                       'moved_by': round((value / float(row['value']) - 1.0) * 100.0, 2)}
+            if outcome == 'improved' and metric in SIZE_METRICS:
+                # A SIZE judged one-sided, unlike the ParparVM gate and unlike the ratio
+                # rows here: a shrink is reported ("rebaseline to tighten") but does not
+                # fail. flutter-bench.yml's paths filter means the pull requests that
+                # shrink the app -- core changes -- mostly never run this benchmark, so a
+                # two-sided size row would turn the NIGHTLY run on master red for a good
+                # change nobody can rebaseline in their own pull request. Growth still
+                # fails. Ratios stay two-sided: they move with the runtimes being
+                # compared, not with every core edit, and an unrecorded speed-up there is
+                # what a later change could silently give back.
+                finding['advisory'] = True
+            findings.append(finding)
     return findings
+
+
+def failing(findings):
+    """The findings that fail the leg: all but an advisory (a shrunk size)."""
+    return [f for f in findings if not f.get('advisory')]
 
 
 def _calibration_key(rows, platform, cpu, metric, per_cpu=False):
@@ -311,12 +330,14 @@ def describe(item):
                 % (item['label'], fmt(item['baseline'])))
     return ('%s %s: %s against a baseline of %s (%+.2f%%, tolerance %s%%)'
             % (item['label'], 'REGRESSED' if item['verdict'] == 'regression'
+               else 'improved -- rebaseline to tighten (not a failure)' if item.get('advisory')
                else 'IMPROVED (rebaseline it)', fmt(item['actual']), fmt(item['baseline']),
                item['moved_by'], ('%g' % (item['tolerance'] * 100))))
 
 
 def fix_command(number, findings, artifact):
     moved = any(f['verdict'] in ('regression', 'improved') for f in findings)
+    # (an advisory shrink counts: tightening the row rebaselines it, which needs a reason)
     return ('python3 scripts/flutter-bench/flutter_baseline.py calibrate --pr %s%s %s'
             % (number or '<PR number>', ' --reason "<why these moved>"' if moved else '',
                artifact))

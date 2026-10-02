@@ -130,13 +130,29 @@ class JudgeTest(unittest.TestCase):
         report = result(code_bytes=1000, cn1_start=[110], fl_start=[200])
         self.assertEqual([], self.judge(report, base))
 
-    def test_a_size_moved_either_way_fails(self):
+    def test_a_grown_size_fails(self):
         base = rows(android={"code_bytes": row(1000)})
         grown = self.judge(result(code_bytes=1001), base)
-        shrunk = self.judge(result(code_bytes=999), base)
         self.assertEqual(["regression"], [f["verdict"] for f in grown])
+        self.assertEqual(grown, fb.failing(grown))
+
+    def test_a_shrunk_size_is_reported_but_does_not_fail(self):
+        """One-sided on purpose: core pull requests that shrink the app mostly never run
+        this benchmark (paths filter), so a failing shrink would turn the nightly master
+        run red for a good change."""
+        base = rows(android={"code_bytes": row(1000)})
+        shrunk = self.judge(result(code_bytes=999), base)
         self.assertEqual(["improved"], [f["verdict"] for f in shrunk])
-        self.assertIn("IMPROVED", fb.describe(shrunk[0]))
+        self.assertTrue(shrunk[0]["advisory"])
+        self.assertEqual([], fb.failing(shrunk))
+        self.assertIn("rebaseline to tighten", fb.describe(shrunk[0]))
+
+    def test_an_improved_ratio_still_fails(self):
+        base = rows(android={"cold_start_ratio": row(0.5)})
+        found = self.judge(result(cn1_start=[100], fl_start=[1000]), base)
+        self.assertEqual(["improved"], [f["verdict"] for f in found])
+        self.assertEqual(found, fb.failing(found))
+        self.assertIn("IMPROVED (rebaseline it)", fb.describe(found[0]))
 
     def test_a_row_tolerance_absorbs_small_growth(self):
         base = rows(android={"code_bytes": row(1000000, tolerance=0.005)})

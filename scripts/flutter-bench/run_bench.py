@@ -252,6 +252,10 @@ def main(argv=None):
     # job could not show whether it had compared against anything.
     print(benchlib.render_markdown([report]))
 
+    for line in benchlib.render_regressions(adapter.id, report.get("advisories") or []):
+        print("note: " + line)
+    if report.get("advisories"):
+        print("note: to tighten: %s" % report["gate"]["fix"])
     if findings or stale:
         print("\nGATE FAILED")
         for line in benchlib.render_regressions(adapter.id, findings):
@@ -291,13 +295,16 @@ def _judge(report, platform_id):
                        % error}
             report["regressions"] = [finding]
             return [finding], False
-    findings = flutter_baseline.judge(report, data)
+    found = flutter_baseline.judge(report, data)
+    findings = flutter_baseline.failing(found)
     for note in data.get("notes", []):
         print("flutter-baseline note: %s" % note)
+    # Advisory findings (a shrunk size) are recorded and shown, never returned as failures.
     report["regressions"] = findings
+    report["advisories"] = [f for f in found if f.get("advisory")]
     report["gate"] = {"status": "armed", "baseline": "scripts/flutter-bench/baseline",
                       "pr": number,
-                      "fix": flutter_baseline.fix_command(number, findings, artifact)}
+                      "fix": flutter_baseline.fix_command(number, found, artifact)}
     if stale:
         report["gate"]["stale_overlay"] = stale
     return findings, bool(stale)
