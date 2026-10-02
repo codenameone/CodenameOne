@@ -81,9 +81,12 @@ def measure(adapter, runs, workdir):
     for side in benchlib.SIDES:
         entry = {"artifact": adapter.artifact(side)}
         entry.update(adapter.sizes(side, workdir))
-        entry["cold_start_runs"] = []
-        entry["cold_start_lower_runs"] = []
-        entry["idle_memory_runs"] = []
+        # Each sample list carries the round it came from, so benchlib pairs
+        # the two sides' launches of the same round even when a launch failed
+        # on one side and the lists drifted out of step (paired_rounds).
+        for base in ("cold_start", "cold_start_lower", "idle_memory"):
+            entry[base + "_runs"] = []
+            entry[base + "_rounds"] = []
         sides[side] = entry
 
     notes = []
@@ -95,12 +98,11 @@ def measure(adapter, runs, workdir):
                 if str(err) not in notes:
                     notes.append(str(err))
                 continue
-            if upper is not None:
-                sides[side]["cold_start_runs"].append(upper)
-            if lower is not None:
-                sides[side]["cold_start_lower_runs"].append(lower)
-            if memory is not None:
-                sides[side]["idle_memory_runs"].append(memory)
+            for base, value in (("cold_start", upper), ("cold_start_lower", lower),
+                                ("idle_memory", memory)):
+                if value is not None:
+                    sides[side][base + "_runs"].append(value)
+                    sides[side][base + "_rounds"].append(index)
             print("  run %d/%d %-12s cold=%s memory=%s"
                   % (index + 1, runs, side,
                      "--" if upper is None else "%7.0fms" % upper,
@@ -145,8 +147,15 @@ def measure_compute(adapter, workdir=None):
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--platform")
+    # Interleaved rounds. Odd, so the per-round median benchlib judges start-up
+    # and memory by is one real round rather than the mean of two; nine rather
+    # than five so that two disturbed rounds -- a CI runner's first launch is
+    # routinely 2-3x the rest -- still leave the median among clean ones. A
+    # round cost 25-30 s on the hosted runners (two launches, each held
+    # SETTLE_S for its memory reading), so this adds about two minutes to legs
+    # that finish in 15-25 of their 120.
     parser.add_argument("--runs", type=int,
-                        default=int(os.environ.get("BENCH_RUNS", "5")))
+                        default=int(os.environ.get("BENCH_RUNS", "9")))
     parser.add_argument("--cn1-app")
     parser.add_argument("--flutter-app")
     parser.add_argument("--cn1-bundle")
@@ -202,7 +211,7 @@ def main(argv=None):
         # comment says why.
         return 1 if args.gate else 0
 
-    print("%s: best of %d interleaved runs" % (adapter.label, args.runs))
+    print("%s: %d interleaved rounds" % (adapter.label, args.runs))
     sides, notes = measure(adapter, args.runs, args.workdir)
     notes.extend(adapter.notes())
     if not adapter.exercised:

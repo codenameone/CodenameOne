@@ -561,6 +561,133 @@ class StartupBracket(unittest.TestCase):
         self.assertIn("260", text)
 
 
+class PairedRoundsTest(unittest.TestCase):
+    """Start-up and memory are judged by the median of the per-round ratios."""
+
+    # A real macOS run, five interleaved rounds. Codename One was faster in
+    # rounds 1, 3 and 5; best-of called it for Flutter (356 against 468).
+    CN1 = [1787, 707, 468, 584, 668]
+    FLUTTER = [2512, 617, 522, 356, 769]
+
+    def test_the_real_macos_rounds_are_a_codename_one_win(self):
+        report = _report({"cold_start_runs": self.CN1}, {"cold_start_runs": self.FLUTTER})
+        entry = report["verdict"]["cold_start_ms"]
+        self.assertEqual("paired_median", entry["statistic"])
+        self.assertEqual("codenameone", entry["winner"])
+        self.assertAlmostEqual(522.0 / 468.0, entry["ratio"], places=3)
+        self.assertEqual((3, 5), (entry["rounds_won"], entry["rounds"]))
+        self.assertEqual([], [f for f in benchlib.check_behind(report)
+                              if f["metric"] == "cold_start_ms"])
+        # The columns are each side's median; the baseline still reads best-of.
+        self.assertEqual((668, 617), (entry["codenameone"], entry["flutter"]))
+        self.assertEqual(468, report["codenameone"]["cold_start_ms"])
+        self.assertEqual(356, report["flutter"]["cold_start_ms"])
+
+    def test_one_lucky_flutter_round_does_not_decide(self):
+        report = _report({"cold_start_runs": [500, 500, 500, 500, 500]},
+                         {"cold_start_runs": [600, 600, 100, 600, 600]})
+        self.assertEqual("codenameone", report["verdict"]["cold_start_ms"]["winner"])
+
+    def test_one_lucky_codename_one_round_does_not_decide(self):
+        report = _report({"cold_start_runs": [600, 600, 100, 600, 600]},
+                         {"cold_start_runs": [500, 500, 500, 500, 500]})
+        entry = report["verdict"]["cold_start_ms"]
+        self.assertEqual("flutter", entry["winner"])
+        self.assertTrue(benchlib.check_behind(report))
+
+    def test_memory_is_paired_too(self):
+        report = _report({"idle_memory_runs": [33, 45, 46, 45, 46]},
+                         {"idle_memory_runs": [61, 89, 91, 88, 89]})
+        entry = report["verdict"]["idle_memory_bytes"]
+        self.assertEqual("paired_median", entry["statistic"])
+        self.assertEqual(45, entry["codenameone"])
+
+    def test_unequal_lengths_without_round_numbers_fall_back_to_best_of(self):
+        report = _report({"cold_start_runs": [500, 400, 450]},
+                         {"cold_start_runs": [450, 420]})
+        entry = report["verdict"]["cold_start_ms"]
+        self.assertEqual("best_of", entry["statistic"])
+        self.assertIn("3 and 2 rounds", entry["fallback"])
+        self.assertAlmostEqual(420.0 / 400.0, entry["ratio"], places=3)
+        body = benchlib.render_markdown([report])
+        self.assertIn("could not be paired round by round", body)
+
+    def test_round_numbers_pair_across_a_dropped_launch(self):
+        # Flutter's round 1 failed. Positionally every later pair would be one
+        # round out of step; by round number round 1 alone is dropped.
+        report = _report(
+            {"cold_start_runs": [500, 300, 500], "cold_start_rounds": [0, 1, 2]},
+            {"cold_start_runs": [600, 600], "cold_start_rounds": [0, 2]})
+        entry = report["verdict"]["cold_start_ms"]
+        self.assertEqual("paired_median", entry["statistic"])
+        self.assertEqual(2, entry["rounds"])
+        self.assertAlmostEqual(1.2, entry["ratio"], places=3)
+
+    def test_the_web_bracket_is_applied_per_round(self):
+        # Flutter's least favourable end differs by round: the lower end in
+        # rounds 0 and 2, the upper end in round 1 (a lower end is never above
+        # the upper in practice, but min() must not care).
+        cn1 = {"cold_start_runs": [400, 400, 400]}
+        flutter = {"cold_start_runs": [800, 300, 800],
+                   "cold_start_lower_runs": [500, 900, 300]}
+        entry = _report(cn1, flutter)["verdict"]["cold_start_ms"]
+        # Per-round Flutter figures 500, 300, 300 -> ratios 1.25, 0.75, 0.75.
+        self.assertAlmostEqual(0.75, entry["ratio"], places=3)
+        self.assertEqual("flutter", entry["winner"])
+        self.assertEqual(300, entry["flutter"])
+        self.assertEqual([500, 800], entry["flutter_bracket"])
+        body = benchlib.render_markdown([dict(_report(cn1, flutter), platform="javascript")])
+        self.assertIn("round by round", body)
+        self.assertIn("300 ms (500 ms-800 ms)", body)
+
+    def test_a_round_without_a_lower_end_is_dropped_not_judged_by_the_upper(self):
+        report = _report(
+            {"cold_start_runs": [400, 400], "cold_start_rounds": [0, 1]},
+            {"cold_start_runs": [800, 800], "cold_start_rounds": [0, 1],
+             "cold_start_lower_runs": [300], "cold_start_lower_rounds": [1]})
+        entry = report["verdict"]["cold_start_ms"]
+        self.assertEqual(1, entry["rounds"])
+        self.assertAlmostEqual(0.75, entry["ratio"], places=3)
+
+    def test_the_report_explains_the_ratio_is_not_the_medians_quotient(self):
+        report = dict(_report({"cold_start_runs": self.CN1},
+                              {"cold_start_runs": self.FLUTTER}), platform="macos")
+        body = benchlib.render_markdown([report])
+        self.assertIn("median of the per-round ratios", body)
+        # 522 / 468 = 1.115: the middle round's ratio, not 617 / 668.
+        self.assertIn("1.11x", body)
+        self.assertIn("3 of 5 rounds", body)
+
+    def test_the_harness_records_the_round_of_every_sample(self):
+        import run_bench
+
+        class Flaky(object):
+            def artifact(self, side):
+                return "x"
+
+            def sizes(self, side, workdir):
+                return {}
+
+            def launch_and_time(self, side):
+                self.calls = getattr(self, "calls", 0) + 1
+                if side == "flutter" and self.calls == 4:
+                    raise platforms.Unavailable("launch failed")
+                return (500.0 if side == "codenameone" else 600.0), None, 1000
+
+        sides, notes = run_bench.measure(Flaky(), 3, tempfile.gettempdir())
+        self.assertEqual([0, 1, 2], sides["codenameone"]["cold_start_rounds"])
+        self.assertEqual([0, 2], sides["flutter"]["cold_start_rounds"])
+        self.assertEqual([0, 2], sides["flutter"]["idle_memory_rounds"])
+        self.assertEqual([], sides["flutter"]["cold_start_lower_rounds"])
+        entry = _report(sides["codenameone"], sides["flutter"])["verdict"]["cold_start_ms"]
+        self.assertEqual(("paired_median", 2), (entry["statistic"], entry["rounds"]))
+
+    def test_median_of_an_even_count_averages_the_middle_two(self):
+        self.assertEqual(2.5, benchlib.median([4, 1, 3, 2]))
+        self.assertEqual(3, benchlib.median([5, 1, 3]))
+        self.assertIsNone(benchlib.median([]))
+
+
 class FlatAssetNames(unittest.TestCase):
     """Must agree with FlutterAssets and TranscodeFlutterMojo, name for name."""
 

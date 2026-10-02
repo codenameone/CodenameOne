@@ -74,11 +74,23 @@ python3 scripts/flutter-bench/test_platforms.py   # marker timing, artifacts, in
 Each of these exists because the obvious alternative produced a flattering
 result, and several were caught only after being measured the wrong way first.
 
-- **Interleaved runs, best of N, load recorded.** One run of each side,
-  alternating. A machine that gets busier halfway through then penalizes both
-  sides equally. On this project two walkthrough recordings desynchronised and
-  looked like a timing regression; the cause was a stray simulator holding the
-  machine at load 8.
+- **Interleaved rounds, load recorded.** Nine rounds, each one run of each
+  side, back to back. A machine that gets busier halfway through then penalizes
+  both sides equally. On this project two walkthrough recordings desynchronised
+  and looked like a timing regression; the cause was a stray simulator holding
+  the machine at load 8.
+
+- **Start-up and memory are judged round by round.** The ratio is the median
+  of the per-round ratios, and the figures shown are each side's median. Each
+  side's best run let one lucky round decide: on the macOS runner Codename One
+  was faster in three of five rounds (1787, 707, 468, 584, 668 ms against
+  Flutter's 2512, 617, 522, 356, 769), and best-of reported a Flutter win, 356
+  against 468, on the strength of a single round. The median of the per-round
+  ratios is 1.11x. Memory is paired for the same reason: the emulator's first
+  round read both apps half loaded (33 MB and 61 MB against 45 MB and 89 MB in
+  every later round), and best-of compared those. The baseline gate still
+  reads each side's best run, because every committed baseline was recorded
+  that way.
 
 - **Start-up compares the same event on both sides: the first content frame
   on screen.** Codename One's `FIRSTFRAME` fires once its first form has been
@@ -125,7 +137,8 @@ result, and several were caught only after being measured the wrong way first.
   so the run fails, says the gate is not armed, and leaves the baseline it
   recorded (`baseline-<platform>.json`) in the workflow artifact. Committing
   a baseline arms the gate -- but take its timing and memory figures as the
-  UPPER edge across several runs' candidates, not one run's best: Android's
+  UPPER edge across several runs' candidates, not one run's best (baselines
+  hold each run's best round, not its median): Android's
   best-of-five moved 282-418 ms across runs of unchanged code, and a baseline
   taken from a low run fired on noise; re-committing it after a deliberate change (a
   Flutter SDK bump moves every number) re-baselines it. Each baseline carries

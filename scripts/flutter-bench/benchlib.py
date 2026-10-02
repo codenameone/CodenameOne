@@ -8,8 +8,8 @@ in size, in start-up time or in memory is a difference between the two runtimes
 and nothing else.
 
 This module holds everything that is not platform specific: the metric list,
-the sizing helpers, the interleaving and best-of-N statistics, the rendering of
-the report, and the regression gate. Platform specific work -- how an
+the sizing helpers, the per-round statistics, the rendering of the report, and
+the regression gate. Platform specific work -- how an
 application is launched, and how its memory is read -- lives behind the adapter
 interface in `platforms.py`.
 
@@ -19,10 +19,16 @@ Rules the numbers have to obey, because it is easy to produce flattering ones:
   * The SAME SURFACE SIZE. Window or screen area drives the size of the GPU
     surfaces that dominate a UI application's resident memory, so two builds
     measured at different sizes cannot be compared on memory at all.
-  * INTERLEAVED runs, best-of-N, and the machine's load average recorded. A
-    ratio taken under different load twice is not a ratio -- a walkthrough
-    recording on this project desynchronised twice and looked like a timing
-    defect, and the cause was a stray simulator holding the machine at load 8.
+  * INTERLEAVED rounds, and the machine's load average recorded. A ratio
+    taken under different load twice is not a ratio -- a walkthrough recording
+    on this project desynchronised twice and looked like a timing defect, and
+    the cause was a stray simulator holding the machine at load 8.
+  * Head to head, start-up and memory at rest are judged PER ROUND: the ratio
+    is the median of the per-round ratios, each from two launches made back to
+    back, and the figures shown are each side's median. Not each side's best:
+    one undisturbed outlier on either side decided the verdict on its own (see
+    paired_rounds). The baseline gate still reads each side's best run, because
+    that is the statistic every committed baseline was recorded with.
   * The start-up clock runs OUTSIDE both processes: each application prints one
     marker on its first painted frame and the harness times from launch to that
     line, so neither runtime is trusted to time itself.
@@ -302,6 +308,117 @@ def best_of(values):
     return min(values) if values else None
 
 
+def median(values):
+    """The middle value; the mean of the two middle ones for an even count.
+
+    The round count defaults to an odd number so that the median is a real
+    round's figure rather than an average of two.
+    """
+    if not values:
+        return None
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+# The metrics judged head to head round by round, and the per-side sample
+# lists each one is read from: `<base>_runs` holds the values and, when the
+# harness recorded it, `<base>_rounds` the round each value came from.
+#
+# Memory at rest is here too, not left at best-of. The case for the minimum is
+# that it is the run least disturbed by the machine, which holds for a clock
+# and not for resident memory: a low reading is more often an app that had not
+# finished loading than an undisturbed one. Measured on the Android emulator:
+# the first round read 33.0 MB for Codename One against 45.0-45.7 MB in every
+# other round, and 60.7 MB for Flutter against 88.1-90.6 MB, so best-of compared
+# two half-loaded apps. The median of the per-round ratios ignores such a round
+# on either side, for the same reason it ignores a lucky start-up.
+PAIRED_METRICS = {
+    "cold_start_ms": "cold_start",
+    "idle_memory_bytes": "idle_memory",
+}
+BRACKET_LOWER_BASE = "cold_start_lower"
+
+
+def _samples(side, base):
+    """(values, rounds) for one sample list; rounds is None when not recorded."""
+    values = list(side.get(base + "_runs") or [])
+    rounds = side.get(base + "_rounds")
+    if rounds is not None and len(rounds) != len(values):
+        rounds = None
+    return values, (list(rounds) if rounds is not None else None)
+
+
+def paired_rounds(ours_side, theirs_side, key):
+    """[(ours, theirs)] for every round both sides measured, or (None, reason).
+
+    Why per round. The runs are INTERLEAVED, so the two launches of one round
+    are adjacent in time and share whatever the machine was doing; two
+    different rounds do not. Best-of-N compared each side's luckiest round
+    with the other's, so a single undisturbed launch on either side decided
+    the verdict alone. Real numbers from the macOS runner (ms, five rounds):
+    Codename One 1787, 707, 468, 584, 668 against Flutter 2512, 617, 522,
+    356, 769. Codename One was faster in three of the five rounds, yet
+    best-of reported a Flutter win (356 against 468, 0.76x), on the strength
+    of one Flutter round; each side's median flips the same way (668 against
+    617), because it too compares different rounds. The median of the five
+    per-round ratios is 522/468 = 1.115, and no single round can move it past the
+    middle one.
+
+    Rounds are matched by the round number the harness recorded with each
+    sample, so a launch that failed on one side drops that round only, rather
+    than shifting every later pair. Reports without round numbers are paired
+    by position, which is only sound when both lists are the same length;
+    otherwise this declines and the caller falls back to best-of.
+
+    For the bracketed start-up (BRACKET_METRIC), Flutter's figure in each
+    round is the end of ITS bracket least favourable to Codename One --
+    min(upper, lower) -- so the bracket rule holds round by round. A round
+    with no lower end is dropped rather than judged by the upper end alone,
+    which would flatter us.
+    """
+    base = PAIRED_METRICS[key]
+    ours, ours_rounds = _samples(ours_side, base)
+    theirs, theirs_rounds = _samples(theirs_side, base)
+    lower, lower_rounds = ([], None)
+    if key == BRACKET_METRIC:
+        lower, lower_rounds = _samples(theirs_side, BRACKET_LOWER_BASE)
+    if not ours or not theirs:
+        return None, "no per-round samples on both sides"
+    if ours_rounds is not None and theirs_rounds is not None \
+            and (not lower or lower_rounds is not None):
+        theirs_by_round = dict(zip(theirs_rounds, theirs))
+        lower_by_round = dict(zip(lower_rounds or [], lower))
+        pairs = []
+        for number, value in zip(ours_rounds, ours):
+            if number not in theirs_by_round:
+                continue
+            other = theirs_by_round[number]
+            if lower:
+                if number not in lower_by_round:
+                    continue
+                pairs.append((value, other, lower_by_round[number]))
+            else:
+                pairs.append((value, other, None))
+    else:
+        if len(ours) != len(theirs):
+            return None, ("the sides measured %d and %d rounds and carry no round "
+                          "numbers to match them by" % (len(ours), len(theirs)))
+        if lower and len(lower) != len(theirs):
+            return None, ("Flutter's bracket has %d lower ends for %d rounds and "
+                          "no round numbers to match them by" % (len(lower), len(theirs)))
+        pairs = [(a, b, lower[i] if lower else None)
+                 for i, (a, b) in enumerate(zip(ours, theirs))]
+    # A zero is a failed sample, not an infinitely fast one; verdict treats a
+    # zero summary the same way.
+    pairs = [p for p in pairs if p[0] and p[1] and (p[2] is None or p[2])]
+    if not pairs:
+        return None, "no round was measured by both sides"
+    return pairs, None
+
+
 def percentile(values, pct):
     """The `pct` percentile by nearest rank, with no interpolation.
 
@@ -334,7 +451,21 @@ def load_average():
 # ----------------------------------------------------------------------
 
 def summarise(side):
-    """Collapses a side's per-run samples into the reported figure."""
+    """Collapses a side's per-run samples into the figure the BASELINE reads.
+
+    Deliberately still the best run, not the median the head-to-head verdict
+    uses. These are the values check_regressions compares with, that
+    baseline_candidate records, and that runner_slowdown_discount holds
+    against flutter_reference -- and every committed baseline (cold start,
+    memory, the Flutter reference) was recorded as a best-of-N envelope.
+    Switching the summary to a median would compare a median with a minimum:
+    a gate that fires on a statistic change rather than a regression, with
+    every baseline silently re-meaning. The gate is Codename One against
+    itself across runs, not a comparison of two sides' rounds, so the
+    outlier-pairing problem paired_rounds fixes does not arise there; a lucky
+    round can only make it lenient, never fail a good build. To move the gate
+    to medians, re-record every baseline from medians in the same change.
+    """
     out = dict(side)
     out["cold_start_ms"] = best_of(side.get("cold_start_runs") or [])
     out["cold_start_lower_ms"] = best_of(side.get("cold_start_lower_runs") or [])
@@ -584,6 +715,11 @@ def verdict(report):
     """
     out = {}
     for key, _label, _unit in METRICS:
+        if key in PAIRED_METRICS:
+            pairs, reason = paired_rounds(report["codenameone"], report["flutter"], key)
+            if pairs:
+                out[key] = _paired_entry(pairs)
+                continue
         ours = report["codenameone"].get(key)
         theirs = report["flutter"].get(key)
         if key == BRACKET_METRIC:
@@ -602,7 +738,44 @@ def verdict(report):
             "ratio": round(float(theirs) / float(ours), 3),
             "winner": "codenameone" if ours < theirs else "flutter",
         }
+        if key in PAIRED_METRICS:
+            # Said in the report: a reader must not take this for the paired
+            # statistic. Only reached with per-side figures but no pairable
+            # rounds -- a report rendered from older JSON, or rounds lost.
+            out[key]["statistic"] = "best_of"
+            out[key]["fallback"] = reason
     return out
+
+
+def _paired_entry(pairs):
+    """The verdict entry for a metric judged round by round (paired_rounds)."""
+    ratios = []
+    theirs = []
+    for ours, upper, lower in pairs:
+        # The bracket's least favourable end, per round: see BRACKET_METRIC.
+        other = min(upper, lower) if lower is not None else upper
+        theirs.append(other)
+        ratios.append(float(other) / float(ours))
+    ratio = round(median(ratios), 3)
+    entry = {
+        "status": "measured",
+        "statistic": "paired_median",
+        # Each side's own median, for the magnitudes. The ratio is NOT their
+        # quotient: it is the median of the per-round ratios, and the two can
+        # disagree -- that disagreement is the whole reason for pairing.
+        "codenameone": median([p[0] for p in pairs]),
+        "flutter": median(theirs),
+        "ratio": ratio,
+        # By the ratio, so the winner, check_behind and the tally all read the
+        # same statistic. A tie goes to Flutter, as it does for a summary.
+        "winner": "codenameone" if ratio > 1.0 else "flutter",
+        "rounds": len(pairs),
+        "rounds_won": sum(1 for r in ratios if r > 1.0),
+    }
+    if any(p[2] is not None for p in pairs):
+        entry["flutter_bracket"] = [median([p[2] for p in pairs]),
+                                    median([p[1] for p in pairs])]
+    return entry
 
 
 def build_report(platform_id, sides, runs, notes=None):
@@ -656,7 +829,7 @@ def render_markdown(reports, title="Flutter vs Codename One"):
         lines.append("### %s" % report["platform"])
         lines.append("")
         load = report.get("load_average")
-        lines.append("_best of %d interleaved runs%s_" % (
+        lines.append("_%d interleaved rounds%s_" % (
             report.get("runs", 0),
             ("; host load %s" % ", ".join(str(x) for x in load)) if load else ""))
         lines.append("")
@@ -668,7 +841,12 @@ def render_markdown(reports, title="Flutter vs Codename One"):
                 lines.append("| %s | -- | -- | -- | not measured |" % label)
                 continue
             flutter_cell = format_value(key, entry["flutter"])
-            if key == BRACKET_METRIC:
+            if entry.get("flutter_bracket"):
+                # Medians of each end over the paired rounds.
+                flutter_cell = "%s (%s-%s)" % (
+                    flutter_cell, format_value(key, entry["flutter_bracket"][0]),
+                    format_value(key, entry["flutter_bracket"][1]))
+            elif key == BRACKET_METRIC and entry.get("statistic") != "paired_median":
                 lower = report["flutter"].get(BRACKET_LOWER)
                 if lower is not None:
                     # Both ends of the bracket, so the reader can see how much
@@ -683,12 +861,8 @@ def render_markdown(reports, title="Flutter vs Codename One"):
                 entry["ratio"],
                 "Codename One" if entry["winner"] == "codenameone" else "Flutter"))
         lines.append("")
-        if report["verdict"].get(BRACKET_METRIC, {}).get("status") == "measured" \
-                and report["flutter"].get(BRACKET_LOWER) is not None:
-            lines.append("> Start-up is bracketed: the two runtimes do not "
-                         "expose the same event, so Flutter's figure is given "
-                         "as a range and the ratio uses the end least "
-                         "favourable to Codename One.")
+        for note in statistics_notes(report):
+            lines.append("> %s" % note)
             lines.append("")
         compute_block = render_compute(report)
         if compute_block:
@@ -708,6 +882,45 @@ def render_markdown(reports, title="Flutter vs Codename One"):
                  % (wins, measured, len(reports)))
     lines.append("")
     return "\n".join(lines) + "\n"
+
+
+def statistics_notes(report):
+    """What the start-up and memory rows' numbers are, stated under the table.
+
+    Needed because the paired ratio is not the quotient of the two medians
+    shown beside it, and a reader who checks the arithmetic deserves to be
+    told why it does not divide out.
+    """
+    notes = []
+    verdict_ = report.get("verdict") or {}
+    paired = []
+    for key, label, _unit in METRICS:
+        entry = verdict_.get(key, {})
+        if entry.get("status") != "measured":
+            continue
+        if entry.get("statistic") == "paired_median":
+            paired.append("%d of %d rounds on %s" % (entry["rounds_won"], entry["rounds"], label.lower()))
+        elif entry.get("statistic") == "best_of":
+            notes.append("%s could not be paired round by round (%s), so its "
+                         "figures and ratio are each side's best run, and one "
+                         "undisturbed round can decide it." % (label, entry.get("fallback")))
+    if paired:
+        notes.append("Start-up and memory at rest are judged round by round: the "
+                     "ratio is the median of the per-round ratios, each from two "
+                     "launches made back to back, and the times and sizes shown "
+                     "are each side's median, so the ratio need not equal their "
+                     "quotient. Codename One was ahead in %s."
+                     % "; ".join(paired))
+    entry = verdict_.get(BRACKET_METRIC, {})
+    if entry.get("status") == "measured" and (
+            entry.get("flutter_bracket")
+            or (entry.get("statistic") != "paired_median"
+                and report["flutter"].get(BRACKET_LOWER) is not None)):
+        notes.append("Start-up is bracketed: the two runtimes do not expose the "
+                     "same event, so Flutter's figure is given as a range and "
+                     "the ratio uses the end least favourable to Codename One%s."
+                     % (", round by round" if entry.get("flutter_bracket") else ""))
+    return notes
 
 
 def tally(reports):
