@@ -2319,6 +2319,16 @@
       "medium": {
         "url": "https://medium.com/p/0eb6b7ea20b8/edit",
         "syndicated_at": "2026-09-26T15:01:39+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/we-didn-t-want-to-build-another-java-server",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6abfff9a5090f6893250aac9",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-02T19:03:11+00:00"
       }
     },
     "java-backend-shared-models": {
