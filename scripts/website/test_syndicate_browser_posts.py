@@ -6,6 +6,13 @@ import inspect
 import unittest
 from unittest.mock import MagicMock, patch
 
+import json
+import tempfile
+import time
+from pathlib import Path
+
+import syndicate_browser_posts
+from export_storage_state import SITE_PROFILES, _cookie_unexpired
 from syndicate_blog_posts import State
 from syndicate_browser_posts import (
     AdapterError,
@@ -112,6 +119,42 @@ class HashnodeCompletionTest(unittest.TestCase):
     def test_publish_requires_tags_and_canonical(self) -> None:
         source = inspect.getsource(HashnodeAdapter.submit_draft)
         self.assertIn("if tags_set and canonical_set", source)
+
+
+def _session_cookie(expires: float) -> dict:
+    return {"name": "hashnode-session", "value": "x" * 64, "domain": ".hashnode.com", "expires": expires}
+
+
+class HashnodeSessionExpiryTest(unittest.TestCase):
+    def test_expired_session_cookie_is_not_logged_in(self) -> None:
+        logged_in = SITE_PROFILES["hashnode"]["is_logged_in"]
+        self.assertFalse(logged_in([_session_cookie(time.time() - 60)]))
+        self.assertTrue(logged_in([_session_cookie(time.time() + 3600)]))
+        # Browser-session cookies carry -1 or no expiry at all.
+        self.assertTrue(logged_in([_session_cookie(-1)]))
+        self.assertTrue(_cookie_unexpired({"name": "hashnode-session"}))
+
+    def _resolve_with_file(self, cookies: list[dict], firefox: Path | None) -> Path | None:
+        with tempfile.TemporaryDirectory() as tmp:
+            saved = Path(tmp) / "hashnode-storage-state.json"
+            saved.write_text(json.dumps({"cookies": cookies, "origins": []}), encoding="utf-8")
+            with patch.object(syndicate_browser_posts, "HASHNODE_STORAGE_FILE", saved), \
+                    patch.object(syndicate_browser_posts, "_HASHNODE_STATE_RESOLVED", False), \
+                    patch.object(syndicate_browser_posts, "_hashnode_storage_from_firefox",
+                                 return_value=firefox), \
+                    patch.dict("os.environ", {"HASHNODE_STORAGE_STATE": ""}):
+                resolved = syndicate_browser_posts._resolve_hashnode_storage_state()
+                return None if resolved is None else (saved if resolved == saved else resolved)
+
+    def test_expired_saved_file_falls_through_to_firefox(self) -> None:
+        firefox = Path("/tmp/firefox-hashnode-state.json")
+        self.assertEqual(firefox, self._resolve_with_file([_session_cookie(time.time() - 60)], firefox))
+        self.assertIsNone(self._resolve_with_file([_session_cookie(time.time() - 60)], None))
+
+    def test_live_saved_file_still_wins(self) -> None:
+        resolved = self._resolve_with_file([_session_cookie(time.time() + 3600)],
+                                           Path("/tmp/firefox-hashnode-state.json"))
+        self.assertEqual("hashnode-storage-state.json", resolved.name)
 
 
 if __name__ == "__main__":
