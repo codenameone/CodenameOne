@@ -529,6 +529,7 @@ public final class Display extends CN1Constants {
     }
 
     public static void init(Object m) {
+        System.out.println("BENCH:T displayInit=" + System.currentTimeMillis());
         boolean startNewGeneration;
         synchronized (lock) {
             // The wait and the claim are ONE critical section. A teardown releases every waiter
@@ -558,7 +559,9 @@ public final class Display extends CN1Constants {
             INSTANCE.simd = null;
 
             impl.setDisplayLock(lock);
+            System.out.println("BENCH:T initImplStart=" + System.currentTimeMillis());
             impl.initImpl(m);
+            System.out.println("BENCH:T initImplEnd=" + System.currentTimeMillis());
             INSTANCE.codenameOneGraphics = new Graphics(impl.getNativeGraphics());
             // A monitor listener registered before this point could not start the
             // port watching for display changes, because there was no implementation
@@ -660,6 +663,7 @@ public final class Display extends CN1Constants {
                 impl.setThreadPriority(newEdt, impl.getEDTThreadPriority());
                 newEdt.start();
             }
+            System.out.println("BENCH:T postInit=" + System.currentTimeMillis());
             impl.postInit();
             INSTANCE.setCommandBehavior(commandBehaviour);
         } else {

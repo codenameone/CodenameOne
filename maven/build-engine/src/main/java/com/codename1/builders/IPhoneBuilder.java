@@ -4115,6 +4115,7 @@ public class IPhoneBuilder extends Executor {
                     delayPushCompletion = "        Display.getInstance().setProperty(\"ios.delayPushCompletion\", \"true\");\n";
                 }
                 stubSourceCode += "    public void run() {\n"
+                    + "        System.out.println(\"BENCH:T stubRun=\" + System.currentTimeMillis());\n"
                     + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
                     + delayPushCompletion
                     + "        Display.getInstance().setProperty(\"AppVersion\", APPLICATION_VERSION);\n"

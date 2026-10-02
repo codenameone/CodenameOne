@@ -1087,6 +1087,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
             // dirty for the next composite.
             presentLayer.contents = (id)presented;
             [CATransaction commit];
+            { static int firstC = 1; if (firstC) { firstC = 0; cn1StartupPhase("firstLayerContents"); } }
             // Reserved from here until a later frame takes its place, which is
             // what covers the window where the server does not own it yet.
             //
@@ -1147,6 +1148,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         }
         CFRelease(presented);
     }];
+    { static int firstP = 1; if (firstP) { firstP = 0; cn1StartupPhase("firstPresentCommit"); } }
     [self.commandBuffer commit];
     self.commandBuffer = nil;
     return YES;

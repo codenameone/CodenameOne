@@ -53,14 +53,18 @@ public final class FlutterUI {
     public static void runApp(Widget app) {
         assertEdt();
         long t0 = System.currentTimeMillis();
+        System.out.println("BENCH:T flutterRunApp=" + System.currentTimeMillis());
         installMaterialBaseTheme();
+        System.out.println("BENCH:T themeDone=" + System.currentTimeMillis());
         if (startupTrace()) {
             probeComponentCost();
         }
         long t1 = System.currentTimeMillis();
         RenderHost host = mountInNewForm(app);
         long t2 = System.currentTimeMillis();
+        System.out.println("BENCH:T mountDone=" + System.currentTimeMillis());
         host.form().show();
+        System.out.println("BENCH:T showDone=" + System.currentTimeMillis());
         long t3 = System.currentTimeMillis();
         // From here on, artwork is resolved in the frame that asks for it.
         com.codename1.flutter.widgets.ImageRenderElement.firstFrameShown();

@@ -54,6 +54,7 @@ public class Bench extends Lifecycle {
     /// Everything else Lifecycle.init does is kept.
     @Override
     public void init(Object context) {
+        System.out.println("BENCH:T benchInit=" + System.currentTimeMillis());
         // The device this build stands in for. defaultTargetPlatform decides the back
         // chevron against the arrow, page transitions, switches and scrollbars, and the
         // JavaSE simulator reports "SE", which falls through to android -- while the skin
@@ -172,6 +173,7 @@ public class Bench extends Lifecycle {
 
     @Override
     public void runApp() {
+        System.out.println("BENCH:T runApp=" + System.currentTimeMillis());
         if (computeRequested()) {
             runCompute();
             return;
@@ -215,7 +217,9 @@ public class Bench extends Lifecycle {
         com.codename1.flutter.FlutterErrorReport.install();
         long t1 = System.currentTimeMillis();
         markFirstFrame();
+        System.out.println("BENCH:T invokeMain=" + System.currentTimeMillis());
         com.codename1.generated.flutter.FlutterRegistry.invokeMain();
+        System.out.println("BENCH:T invokeMainEnd=" + System.currentTimeMillis());
         long t2 = System.currentTimeMillis();
         // Phase timings, so a slow start can be attributed instead of guessed
         // at. The harness's own clock still owns the headline number; these say

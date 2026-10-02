@@ -1853,6 +1853,7 @@ public class ByteCodeClass {
                         b.append("    CN1MacInstallMainMenu();\n");
                         b.append("    CN1MacInstallAppDelegate();\n");
                         b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");
+                        b.append("        cn1StartupPhase(\"javaMainThread\");\n");
                         // OPEN QUESTION, INHERITED AND DELIBERATELY NOT ANSWERED HERE.
                         // This dispatched block runs the application's main on a thread
                         // the runtime knows nothing about: its thread-local flags all
@@ -1895,6 +1896,7 @@ public class ByteCodeClass {
                         // still links and keeps the queued build in CN1MacInstallAppDelegate.
                         b.append("    { extern void CN1MacBuildMainWindowBeforeRun(void) __attribute__((weak_import));\n");
                         b.append("      if (CN1MacBuildMainWindowBeforeRun) CN1MacBuildMainWindowBeforeRun(); }\n");
+                        b.append("    cn1StartupPhase(\"nsAppRun\");\n");
                         b.append("    [NSApp run];\n}\n\n");
                     } else {
                         b.append("    ");

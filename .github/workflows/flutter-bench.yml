@@ -350,6 +350,10 @@ jobs:
       - name: Measure
         if: ${{ matrix.platform != 'android' }}
         shell: bash
+        env:
+          CN1_STARTUP_PHASES: "1"
+          BENCH_RUNS: "10"
+          BENCH_SETTLE: "3"
         run: |
           prefix=""
           if [ "$RUNNER_OS" = "Linux" ]; then

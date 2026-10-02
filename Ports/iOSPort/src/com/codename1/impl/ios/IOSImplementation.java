@@ -237,6 +237,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static Runnable callback;
     
     public static void callback() {
+        System.out.println("BENCH:T callback=" + System.currentTimeMillis());
         initialized = true;
         Display.getInstance().callSerially(callback);
     }

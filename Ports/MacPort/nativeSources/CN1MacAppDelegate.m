@@ -499,7 +499,9 @@ JAVA_VOID com_codename1_impl_mac_MacNative_replyToTermination__(CODENAME_ONE_THR
 }
 
 void cn1_mac_runtime_markJavaReady(void) {
+    cn1StartupPhase("markJavaReady");
     dispatch_async(dispatch_get_main_queue(), ^{
+        cn1StartupPhase("javaReadyOnMain");
         cn1MacJavaReady = YES;
         struct ThreadLocalData* threadStateData = getThreadLocalData();
         if (cn1MacPendingActive == 1) {
@@ -660,6 +662,7 @@ void CN1MacDeliverWindowMiniaturized(BOOL miniaturized) {
 // paint path reads, and it has to be right from the first frame.
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    cn1StartupPhase("didFinishLaunching");
     // Installed unconditionally, and this early. A scheduled notification is
     // delivered through this delegate whether it fires while the application is
     // frontmost or the user opens it from Notification Center, so without it a
@@ -773,6 +776,7 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 extern void CN1MacRefreshModifiers(void);
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
+    cn1StartupPhase("didBecomeActive");
     // Resync the held modifiers across the activation boundary, BEFORE the
     // early return below: the mask is native state and is wrong whether or not
     // Java has started yet. See CN1MacRefreshModifiers -- an inactive
