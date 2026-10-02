@@ -524,8 +524,9 @@ final class AppSupport {
         // engine skips a classpath element that does not exist. Beside the native
         // sources, the platform's resources -- a Maven platform module's
         // src/main/resources, which the conversion moves to src/<platform>/resources.
-        return java.util.Arrays.asList(layout.nativeSourceDir(p),
-                new File(layout.projectDir(), "src" + File.separator + p.id() + File.separator + "resources"));
+        // The Maven plugin uploads the same pair when common builds a platform
+        // that has no module of its own.
+        return layout.platformUploadDirs(p);
     }
 
     /// The native platform whose implementations a build platform needs; the

@@ -51,9 +51,15 @@ public class CN1DebugMojo extends AbstractCN1Mojo {
         if (commonDir == null) {
             return;
         }
+        if (!isFirstProjectOfTheBuild()) {
+            // Every module of the reactor resolves the same common directory; one nested
+            // run is the simulator, a second would be another window. The first project,
+            // not the execution root: `mvn -pl common cn1:run` selects common alone.
+            return;
+        }
         File rootMavenProjectDir = commonDir.getParentFile();
-        File javaSEDir = new File(rootMavenProjectDir, "javase");
-        if (!javaSEDir.exists()) {
+        // The javase module is optional: without one, common runs the simulator itself.
+        if (!new File(rootMavenProjectDir, "pom.xml").isFile()) {
             return;
         }
 

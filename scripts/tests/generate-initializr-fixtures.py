@@ -45,6 +45,42 @@ def check_gradle_fixture(archive, z, maven_settings):
             assert os.access(Path(extract) / 'gradlew', os.X_OK), 'gradlew must extract executable without chmod'
 
 
+PLATFORM_DIRS = ('android/', 'ios/', 'javase/', 'javascript/', 'linux/', 'win/')
+
+
+def check_maven_layout_fixture(archive, z):
+    """A Maven download with the layout choices: MAVEN-<layout>-<IDE>.zip."""
+    names = set(z.namelist())
+    layout = archive.name.split('-')[1]
+    root_pom = z.read('pom.xml').decode()
+    if layout == 'BACKEND_ONLY':
+        for name in names:
+            assert not name.startswith(('common/', 'backend/') + PLATFORM_DIRS), (archive.name, name)
+            assert name not in ('build.sh', 'run.sh', 'build.bat', 'run.bat', 'AGENTS.md'), (archive.name, name)
+            assert not (name.endswith('/pom.xml')), (archive.name, name)
+            if name.endswith(('.java', '.properties', '.md', '.xml', '.json')):
+                assert 'gradle' not in z.read(name).decode().lower(), (archive.name, name)
+        assert '<parent>' not in root_pom and '<artifactId>codenameone-backend</artifactId>' in root_pom, archive.name
+        for name in ['mvnw', 'mvnw.cmd', 'application.properties', 'application-dev.properties',
+                     'src/main/java/com/example/probe/Api.java', 'README.md']:
+            assert name in names, (archive.name, name)
+        assert './mvnw cn1:backend' in z.read('src/main/java/com/example/probe/Api.java').decode(), archive.name
+        return False
+    full = layout == 'FULL'
+    for name in names:
+        if not full:
+            assert not name.startswith(PLATFORM_DIRS), (archive.name, name)
+        if layout == 'APP':
+            assert not name.startswith('backend/'), (archive.name, name)
+    assert ('backend/pom.xml' in names) == (layout in ('APP_WITH_BACKEND', 'FULL')), archive.name
+    assert ('<activeByDefault>' in root_pom) == full, archive.name
+    assert '<exists>${basedir}/android/pom.xml</exists>' in root_pom, archive.name
+    common_pom = z.read('common/pom.xml').decode()
+    assert '<goal>compile-javase-natives</goal>' in common_pom, archive.name
+    assert common_pom.count('<id>simulator</id>') == 1, archive.name
+    return True
+
+
 with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
     work = Path(directory)
     deps = []
@@ -86,10 +122,12 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
             if archive.name.startswith('GRADLE-'):
                 check_gradle_fixture(archive, z, maven_settings)
                 continue
+            if archive.name.startswith('MAVEN-') and not check_maven_layout_fixture(archive, z):
+                continue
             readme = z.read('README.md').decode()
-            assert 'JDK ' + ('17' if 'JAVA_17' in archive.name else '8') + ' or newer' in readme
+            assert 'JDK ' + ('8' if 'JAVA_8' in archive.name else '17') + ' or newer' in readme
             assert '.\\build.bat javascript_cloud' in readme and './build.sh javascript_cloud' in readme
             if archive.name.startswith('ECLIPSE'):
                 assert 'Run/Debug > Launch Configurations' in readme
         subprocess.run([sys.executable, str(root / 'scripts/test-starter-launchers.py'), str(archive)], check=True)
-    print('PASS: real Initializr ZIPs across all IDEs, Java 8/17 Maven and every Gradle project type')
+    print('PASS: real Initializr ZIPs across all IDEs, Java 8/17 Maven, every Maven layout and every Gradle project type')

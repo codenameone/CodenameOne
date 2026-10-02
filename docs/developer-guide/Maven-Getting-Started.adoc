@@ -252,7 +252,7 @@ With Codename One projects, there are a few caveats (see <<compliance-check>>), 
 ==== Which `pom.xml` to add the `<dependency>` snippet to
 
 Suppose you have a Maven `<dependency>` snippet that you've copied from Maven central, and it's burning a hole in your clipboard while you're trying to figure out where to paste it into your project.
-Codename One application projects, being multi-module projects, have more than one `pom.xml` file; One per module.
+Codename One application projects are multi-module projects, so they have more than one `pom.xml` file: the root one, the `common` module's, and one per platform module the project has. A project generated with the defaults has no platform modules (see <<maven-minimal-layout>>).
 
 **Question:** Which pom.xml file should you paste the snippet into?
 
@@ -274,13 +274,15 @@ Here's an overview:
 %PROJECT_ROOT%/pom.xml::
 The root pom.xml file is the parent module of all other modules. Anything you add here will be inherited by all the modules. It can be helpful to use `<dependencyManagement>` and `<pluginManagement>` sections in this file to merge versions for dependencies and plugins project-wide. This is also a good place to add project meta-data like `<developers>`, `<scm>`.
 
-Java SE/pom.xml::
+javase/pom.xml (when the project has a javase module)::
 Any dependencies that are only required for native implementations on the Java SE platform can be added here. Dependencies added to this project aren't subject to <<compliance-check, the compliance check>>.
 +
 Additionally, this module handles the build toolchain for the Java SE platform. This includes Mac and Windows Desktop builds, as well as Java SE desktop builds. If you want to customize the build workflow for any of these targets, you would do so by adding plugin executions in this pom.xml file.
 
-android, ios, win, and JavaScript::
+android, ios, win, linux, and javascript (when the project has them)::
 These modules don't use Maven for their dependencies (Android may deserve a small asterisk here, but that's complicated), so the primary thing you'd want to *change* in these pom.xml files are the build toolchain for those targets. For example, you might add plugin executions for your CI workflow on builds targeting these particular platforms.
+
+A project without these modules builds every platform from the common module. To customize one platform's build, add its module: a `<platform>/pom.xml` copied from a project generated with `-DplatformModules=all`. The common module stops building that platform as soon as the module exists.
 
 ****
 

@@ -136,6 +136,71 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     
     protected Properties properties;
 
+    /**
+     * The platform whose module this goal stands in for, when it is bound in an
+     * application's {@code common/pom.xml} rather than in the platform module. Set only
+     * in the pom, never from the command line. The goal then runs only when the
+     * platform has no module of its own; see {@link HostedPlatforms}.
+     */
+    @Parameter
+    protected String hostedPlatform;
+
+    private boolean hosting;
+
+    /**
+     * Whether this goal is doing the work of a platform module the application does
+     * not have, from {@code common}.
+     */
+    protected boolean isHosting() {
+        return hosting;
+    }
+
+    /**
+     * Where {@code compile-javase-natives} compiles the JavaSE native sources of an
+     * application without a {@code javase} module.
+     */
+    protected File hostedNativesDir() {
+        return new File(project.getBuild().getDirectory(), HostedPlatforms.JAVASE_NATIVES_DIR);
+    }
+
+    /**
+     * Where {@code generate-desktop-app-wrapper} writes the desktop app's icons and
+     * properties for an application without a {@code javase} module.
+     */
+    protected File hostedDesktopResourcesDir() {
+        return new File(project.getBuild().getDirectory(), HostedPlatforms.DESKTOP_RESOURCES_DIR);
+    }
+
+    /**
+     * Applies {@link #hostedPlatform}: records the decision for the executions that
+     * read {@link HostedPlatforms#skipProperty(String)} and answers whether the goal
+     * should run at all.
+     */
+    private boolean decideHosting() {
+        if (hostedPlatform == null || hostedPlatform.trim().length() == 0) {
+            return true;
+        }
+        String platform = hostedPlatform.trim();
+        hosting = HostedPlatforms.shouldHost(project.getBasedir(), getCN1ProjectDir(), platform);
+        project.getProperties().setProperty(HostedPlatforms.skipProperty(platform), String.valueOf(!hosting));
+        if (!hosting) {
+            getLog().debug("Skipping: " + platform + " is built by its own module, not by " + project.getArtifactId());
+        }
+        return hosting;
+    }
+
+    /**
+     * Whether this module is the first of the projects this build runs, for goals that
+     * act on the whole application and must run once however many modules are selected.
+     */
+    protected boolean isFirstProjectOfTheBuild() {
+        MavenSession s = getSession();
+        if (s == null || s.getProjects() == null || s.getProjects().isEmpty()) {
+            return true;
+        }
+        return s.getProjects().get(0) == project;
+    }
+
     protected long getSourcesModificationTime() throws IOException {
         return getSourcesModificationTime(false);
     }
@@ -548,6 +613,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        if (!decideHosting()) {
+            return;
+        }
         if (getCN1ProjectDir() != null) {
             properties = new Properties();
             File cn1Properties = new File(getCN1ProjectDir(), "codenameone_settings.properties");

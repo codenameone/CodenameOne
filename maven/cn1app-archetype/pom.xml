@@ -122,6 +122,29 @@
                 <copy file="${project.basedir}/../../scripts/initializr/common/src/main/resources/agent-skill-claude-stub.md"
                       tofile="${project.build.outputDirectory}/archetype-resources/.claude/skills/codename-one/SKILL.md"
                       overwrite="true"/>
+                <!-- common/pom.xml carries the profiles that let common build any
+                     platform the project has no module for. The initializr injects the
+                     same file into its own templates, so both generators ship one copy. -->
+                <copy file="${project.basedir}/../../scripts/initializr/common/src/main/resources/backend-only-pom.xml"
+                      todir="${project.build.outputDirectory}/archetype-resources/.cn1-backend-only"
+                      overwrite="true"/>
+                <copy todir="${project.build.outputDirectory}/archetype-resources/.cn1-backend-only" overwrite="true">
+                  <fileset dir="${project.basedir}/../build-engine/src/main/resources/com/codename1/project/templates/gradle/backend"
+                           includes="Api.java.txt,Greeter.java.txt,application.properties.txt,application-dev.properties.txt"/>
+                </copy>
+                <loadfile property="cn1.hostedPlatformProfiles"
+                          srcFile="${project.basedir}/../../scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml"
+                          encoding="UTF-8"/>
+                <!-- From the source every time: an incremental build does not copy the
+                     resource again, and the copy in target has lost its marker. -->
+                <copy file="${project.basedir}/src/main/resources/archetype-resources/common/pom.xml"
+                      tofile="${project.build.outputDirectory}/archetype-resources/common/pom.xml"
+                      overwrite="true"/>
+                <replace file="${project.build.outputDirectory}/archetype-resources/common/pom.xml"
+                         token="        &lt;!-- @CN1_HOSTED_PLATFORM_PROFILES@ --&gt;&#10;"
+                         value="${cn1.hostedPlatformProfiles}"
+                         encoding="UTF-8"
+                         failOnNoReplacements="true"/>
               </target>
             </configuration>
           </execution>

@@ -137,6 +137,20 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
         if (newVersion != null && !newVersion.isEmpty() && (!newVersion.equals(existingCn1Version) || !newVersion.equals(existingCn1PluginVersion))) {
 
             getLog().info("Attempting to update project to version " + newVersion);
+            File commonPom = getCN1ProjectDir() == null ? null : new File(getCN1ProjectDir(), "pom.xml");
+            if (commonPom != null && commonPom.isFile()) {
+                String commonPomText;
+                try {
+                    commonPomText = new String(java.nio.file.Files.readAllBytes(commonPom.toPath()), "UTF-8");
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to read " + commonPom, ex);
+                }
+                if (tooOldForHostedPlatforms(newVersion, commonPomText)) {
+                    throw new MojoFailureException("This project builds its platforms from common (its pom binds "
+                            + "the hosted-platform goals), which plugin " + newVersion + " does not have. "
+                            + "Use " + HOSTED_PLATFORMS_SINCE + " or newer.");
+                }
+            }
             //MavenXpp3Reader pomReader = new MavenXpp3Reader();
 
             Model model = null;
@@ -288,6 +302,24 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
             return false;
         }
         return new ComparableVersion(candidate).compareTo(new ComparableVersion(current)) < 0;
+    }
+
+    /** The first plugin release with the goals a minimal project's common pom binds. */
+    static final String HOSTED_PLATFORMS_SINCE = "7.0.275";
+
+    /**
+     * @return true if {@code candidate} is a release too old for a common pom that binds the
+     * hosted-platform goals ({@code compile-javase-natives}, {@code hosted-platform}): that
+     * plugin would fail every build on an unknown goal. A -SNAPSHOT candidate is a
+     * development build and is not refused.
+     */
+    static boolean tooOldForHostedPlatforms(String candidate, String commonPom) {
+        if (candidate == null || candidate.endsWith("-SNAPSHOT") || commonPom == null
+                || (!commonPom.contains("<goal>compile-javase-natives</goal>")
+                && !commonPom.contains("<goal>hosted-platform</goal>"))) {
+            return false;
+        }
+        return new ComparableVersion(candidate).compareTo(new ComparableVersion(HOSTED_PLATFORMS_SINCE)) < 0;
     }
 
     /** Host of a metadata URL, for both the containment test and the message. */

@@ -68,6 +68,8 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
             return true;
         }
 
+        buildGeneratedMavenLayouts(java17, buildClient);
+
         if (java8Or11 == null) {
             System.out.println("[WARN] Skipping Java 8/11 integration build check. No JDK 8 or 11 found.");
         } else {
@@ -169,6 +171,97 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
             assertTrue(exit == 0, "Generated Gradle project should compile. Template=" + template + " Type="
                     + type.label + " | exitCode=" + exit);
         }
+    }
+
+    /// Builds the Maven layouts a download gets once the plugin is 7.0.275 or newer --
+    /// the minimal app, which builds every platform from common, and the backend-only
+    /// project -- against the plugin named by CN1_MAVEN_PLUGIN_VERSION (typically a
+    /// locally installed SNAPSHOT), resolved from CN1_MAVEN_REPO_LOCAL when set. The
+    /// generated poms name a released version that may not exist yet, so without the
+    /// variable the check is skipped, as the Gradle half is.
+    private void buildGeneratedMavenLayouts(Path java17, Path buildClient) throws Exception {
+        String version = System.getenv("CN1_MAVEN_PLUGIN_VERSION");
+        if (version == null || version.length() == 0) {
+            System.out.println("[WARN] Skipping Maven layout build checks. Set CN1_MAVEN_PLUGIN_VERSION to a "
+                    + "codenameone-maven-plugin version the build can resolve.");
+            return;
+        }
+        if (java17 == null) {
+            System.out.println("[WARN] Skipping Maven layout build checks. No JDK 17 found.");
+            return;
+        }
+        String repoLocal = System.getenv("CN1_MAVEN_REPO_LOCAL");
+        Path homeDir = Files.createTempDirectory("initializr-home-layouts-");
+        ensureCodenameOneHome(homeDir, buildClient);
+
+        ProjectOptions backendOnly = layoutOptions(ProjectOptions.ProjectType.BACKEND_ONLY);
+        Path server = generateLayoutProject(backendOnly, "LayoutServerApp", "com.acme.initializr.server", version);
+        int exit = runMaven(server, homeDir, java17, repoLocal, "process-classes");
+        assertTrue(exit == 0, "The backend-only Maven project should build | exitCode=" + exit);
+        assertTrue(Files.isRegularFile(server.resolve("target/classes/META-INF/cn1-backend-main")),
+                "The backend-only build should generate its entry point");
+
+        Path app = generateLayoutProject(layoutOptions(ProjectOptions.ProjectType.APP), "LayoutMinimalApp",
+                "com.acme.initializr.minimal", version);
+        assertTrue(!Files.exists(app.resolve("javase")) && !Files.exists(app.resolve("android")),
+                "The minimal layout should have no platform modules");
+        exit = runMaven(app, homeDir, java17, repoLocal, "package", "-DskipTests=true",
+                "-Dcodename1.platform=android", "-Dcodename1.buildTarget=android-device",
+                "-Dcodename1.stageOnly=true");
+        assertTrue(exit == 0, "The minimal app should stage an Android build from common | exitCode=" + exit);
+        File[] staged = app.resolve("common/target").toFile().listFiles(
+                (d, n) -> n.endsWith("-android-device-jar-with-dependencies.jar"));
+        assertTrue(staged != null && staged.length == 1, "common should stage the Android upload");
+        exit = runMaven(app, homeDir, java17, repoLocal, "package", "-DskipTests=true", "-Pexecutable-jar",
+                "-Dcodename1.platform=javase");
+        assertTrue(exit == 0, "The minimal app should package the desktop jar from common | exitCode=" + exit);
+        File[] desktop = app.resolve("common/target").toFile().listFiles(
+                (d, n) -> n.endsWith(".jar") && n.indexOf("-javase-") > 0);
+        assertTrue(desktop != null && desktop.length == 1, "common should write the desktop jar");
+    }
+
+    private ProjectOptions layoutOptions(ProjectOptions.ProjectType type) {
+        return new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
+                true, false, ProjectOptions.PreviewLanguage.ENGLISH, ProjectOptions.JavaVersion.JAVA_17, null,
+                ProjectOptions.BuildTool.MAVEN, type);
+    }
+
+    /// A project generated on the layouts side of the gate, with the poms pointed at `version`.
+    private Path generateLayoutProject(ProjectOptions options, String appName, String packageName, String version)
+            throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.BAREBONES, appName, packageName, options,
+                GeneratorModel.MAVEN_LAYOUTS_SINCE).writeProjectZip(output);
+        Path dir = Files.createTempDirectory("initializr-layout-" + appName + "-");
+        unzipProject(output.toByteArray(), dir);
+        Path pom = dir.resolve("pom.xml");
+        String text = new String(Files.readAllBytes(pom), "UTF-8");
+        text = text.replaceAll("<cn1\\.plugin\\.version>[^<]*</cn1\\.plugin\\.version>",
+                "<cn1.plugin.version>" + version + "</cn1.plugin.version>");
+        text = text.replaceAll("<cn1\\.version>[^<]*</cn1\\.version>", "<cn1.version>" + version + "</cn1.version>");
+        Files.write(pom, text.getBytes("UTF-8"));
+        return dir;
+    }
+
+    private int runMaven(Path projectDir, Path homeDir, Path javaHome, String repoLocal, String... args)
+            throws Exception {
+        List<String> command = new ArrayList<String>();
+        command.add("mvn");
+        command.add("-B");
+        command.add("-Duser.home=" + homeDir.toString());
+        if (repoLocal != null && repoLocal.length() > 0) {
+            command.add("-Dmaven.repo.local=" + repoLocal);
+        }
+        for (String a : args) {
+            command.add(a);
+        }
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(projectDir.toFile());
+        pb.redirectErrorStream(true);
+        Map<String, String> env = pb.environment();
+        env.put("JAVA_HOME", javaHome.toString());
+        env.put("PATH", javaHome.resolve("bin") + File.pathSeparator + env.get("PATH"));
+        return runAndReport(pb);
     }
 
     /// Puts `repoDir` first in the copy's pluginManagement repositories, so the

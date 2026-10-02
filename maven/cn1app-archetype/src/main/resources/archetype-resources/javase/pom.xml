@@ -23,6 +23,22 @@
     <testSourceDirectory>${project.basedir}/../common/src/test/java</testSourceDirectory>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <!--
+                  The root pom gives Surefire Codename One's provider, which runs nothing
+                  (cn1:test runs the AbstractTest classes). On its own it hid every JUnit
+                  test, so a failing @Test passed the build. This provider runs them.
+                -->
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.maven.surefire</groupId>
+                        <artifactId>surefire-junit-platform</artifactId>
+                        <version>3.0.0-M5</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <plugin>
                 <artifactId>codenameone-maven-plugin</artifactId>
                 <groupId>com.codenameone</groupId>
                 <version>${cn1.plugin.version}</version>
