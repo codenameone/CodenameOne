@@ -11,7 +11,7 @@ series: ["release-2026-10-02"]
 
 ![UIKit and Codename One tab bars from the simulator comparison](/blog/ios27-glass-from-measurements.jpg)
 
-Watch the two tab bars below. Tap, hold, drag across the bar, then change direction. Can you tell which one is UIKit and which one is drawn by Codename One?
+Watch how the two tab bars respond to the recorded taps, holds, drags and changes of direction. Can you tell which one is UIKit and which one is drawn by Codename One?
 
 That is a more useful test than a still image. Your users feel the delay before a selection moves, the way the glass follows a finger and the settling motion after release. A tab bar can have the right colors and still feel wrong in your hand.
 
@@ -20,7 +20,7 @@ That is a more useful test than a still image. Your users feel the delay before 
 ## Watch the same gestures twice
 
 {{< guide-block >}}
-<video controls playsinline preload="metadata" style="width:100%;height:auto" aria-label="Light iOS 27 tab bars, UIKit above Codename One">
+<video controls playsinline preload="metadata" poster="/blog/ios27-measured-glass/light-poster.jpg" style="width:100%;height:auto" aria-label="Light iOS 27 tab bars, UIKit above Codename One">
 <source src="/blog/ios27-measured-glass/light.mp4" type="video/mp4">
 <a href="/blog/ios27-measured-glass/light.mp4">Download the light comparison video</a>.
 </video>

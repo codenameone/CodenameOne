@@ -11,9 +11,9 @@ series: ["release-2026-10-02"]
 
 ![Four bytes of object metadata and the costs around them](/blog/parparvm-four-byte-header.jpg)
 
-The current Linux ARM64 performance baseline has ParparVM translating its own compiler in **37.5% less elapsed time and 45.8% less peak memory than JDK 25**. On the Linux x64 `Xeon Platinum 8370C` baseline, the same workload takes **56.6% less time and 49.1% less memory**. Your Java source does not need to change to benefit from a smaller runtime and a compiler that removes more work.
+The current Linux ARM64 performance baseline has ParparVM translating its own compiler in **37.5% less elapsed time and 45.8% less peak memory than JDK 25**. Across all 16 recorded machine configurations, self-translation takes **22.5% to 56.6% less elapsed time**. The gains vary by OS and processor; the chart and table include every configuration. Your Java source does not need to change to benefit from a smaller runtime and a compiler that removes more work.
 
-[![Self-translation elapsed time and peak memory relative to JDK 25 on three recorded platforms; lower is better](/blog/runtime-diagrams/translation-baselines.png)](/blog/runtime-diagrams/translation-baselines.png)
+[![Self-translation elapsed time and peak memory relative to JDK 25 on all sixteen recorded machine configurations; lower is better](/blog/runtime-diagrams/translation-baselines.png)](/blog/runtime-diagrams/translation-baselines.png)
 
 These are the repository's [checked-in performance baselines](https://github.com/codenameone/CodenameOne/blob/60c4f310bddcfc51e5acc75c63a57c43c73430d3/vm/selfhost/perf-baseline.json), read on October 1. They are recorded reference results used to detect regressions, not new measurements made for this article. Each comparison runs the same translator classes on the two runtimes and verifies the generated files byte for byte.
 
@@ -21,9 +21,22 @@ These are the repository's [checked-in performance baselines](https://github.com
 | --- | ---: | ---: | ---: |
 | Linux ARM64, Neoverse N2 | 0.625 | 0.542 | 7 |
 | Linux x64, EPYC 7763 | 0.484 | 0.519 | 3 |
+| Linux x64, EPYC 9V45 | 0.495 | 0.539 | 1 |
+| Linux x64, EPYC 9V74 | 0.516 | 0.522 | 2 |
+| Linux x64, Xeon 6973P-C | 0.537 | 0.520 | 1 |
 | Linux x64, Xeon Platinum 8370C | 0.434 | 0.509 | 3 |
+| Linux x64, Xeon Platinum 8573C | 0.505 | 0.517 | 1 |
+| macOS ARM64 | 0.539 | 0.739 | 1 |
+| Windows ARM64, model D49 | 0.751 | 0.539 | 7 |
+| Windows ARM64, model D84 | 0.775 | 0.570 | 1 |
+| Windows x64, AMD family 25/model 1 | 0.606 | 0.542 | 7 |
+| Windows x64, AMD family 25/model 17 | 0.636 | 0.551 | 2 |
+| Windows x64, AMD family 26/model 2 | 0.611 | 0.546 | 1 |
+| Windows x64, Intel family 6/model 106 | 0.627 | 0.536 | 1 |
+| Windows x64, Intel family 6/model 173 | 0.677 | 0.549 | 1 |
+| Windows x64, Intel family 6/model 207 | 0.602 | 0.526 | 1 |
 
-*Lower is better in both columns. JDK 25 is 1.0. Each baseline is the median of the recorded runs' median ratios, with each platform using its available CPUs and runtime defaults. Translation time includes the whole process; Linux memory is peak RSS. They are separate machines, not a core-count scaling test.*
+*Lower is better in both columns. JDK 25 is 1.0. Each baseline is the median of the recorded runs' median ratios, with each platform using its available CPUs and runtime defaults. Translation time includes the whole process; Linux and macOS memory is peak RSS; Windows memory is peak working set. Some configurations have only one calibration run, as shown. They are separate machines, not a core-count scaling test.*
 
 A couple of weeks ago I wrote about [making ParparVM compile itself](/blog/parparvm-compiles-itself/). HotSpot beat us on elapsed time. That was disappointing, though hardly surprising. Since then we have worked on object layout, collections, generated C and garbage collection. The results above are a much better place to be.
 
@@ -39,7 +52,7 @@ The complete Linux ARM64 baseline contains 13 workloads. ParparVM uses less peak
 
 *Each row combines seven calibration runs; each run compares the two runtimes in alternating order. Translation rows measure the complete process. The smaller workloads time repetitions inside the process after their own warmup, so JVM startup does not count against HotSpot. Memory is whole-process peak RSS in every row, not live heap.*
 
-The [performance harness](https://github.com/codenameone/CodenameOne/blob/master/vm/selfhost/perf-gate.py) checks workload results as well as time and memory. The current baseline is a different comparison from the earlier experiment using a warmed JDK 25 AOT cache. In that experiment, self-translation used 0.74, 0.76 and 0.84 times HotSpot's elapsed time at one, two and four logical cores. That cache is part of HotSpot's startup work, not a GraalVM native executable.
+The [performance harness](https://github.com/codenameone/CodenameOne/blob/master/vm/selfhost/perf-gate.py) checks workload results as well as time and memory. The original self-hosting post measured 1.56 seconds for HotSpot against 1.84 seconds for ParparVM. The opening charts show the later checked-in baselines after the optimization work; they are separate measurements, not a reinterpretation of that earlier result.
 
 Elapsed time and CPU time also answer different questions. Parallel JIT compilation and collection can reduce the wait while consuming more CPU across threads. That distinction helped guide the investigation, but it does not establish a battery saving: energy depends on the machine's power use over time. The current baseline records elapsed time and peak memory, so those are the claims we can make from it.
 
@@ -47,7 +60,7 @@ Elapsed time and CPU time also answer different questions. Parallel JIT compilat
 
 An object header is runtime metadata stored alongside your fields. It lets the runtime identify the object's class and track information needed for collection and other operations. On a typical 64-bit HotSpot configuration, the header occupies 12 bytes; without compressed class pointers it can occupy 16. JDK 25's optional compact object headers reduce that to 8 bytes. [Oracle's JDK 25 GC guide](https://docs.oracle.com/en/java/javase/25/gctuning/other-considerations.html) documents the sizes and the `-XX:+UseCompactObjectHeaders` switch.
 
-This is the work associated with **Project Lilliput**. **Project Leyden** addresses startup, warmup and footprint through ahead-of-time work, including the AOT cache used in the earlier comparison. The names are easy to mix up, but shrinking each object's header and caching class-loading work solve different problems. See the [Leyden project](https://openjdk.org/projects/leyden/) for that distinction.
+This is the work associated with **Project Lilliput**. **Project Leyden** addresses startup, warmup and footprint through ahead-of-time work, including AOT caches. The names are easy to mix up, but shrinking each object's header and caching class-loading work solve different problems. See the [Leyden project](https://openjdk.org/projects/leyden/) for that distinction.
 
 | Runtime layout | Object header metadata | What the number excludes |
 | --- | ---: | --- |
@@ -74,7 +87,7 @@ The translator packs eligible fields into the gap after the metadata. It stores 
 
 *Object sizes from the layout experiment. Backing storage is additional.*
 
-In the same five-run comparison, this layout change moved one-core container RSS from 618 MB to 605 MB. That is useful, but much smaller than “we halved the header” might suggest. The page allocator and native collection buffers still occupy memory.
+The [header-layout experiment](https://github.com/codenameone/CodenameOne/blob/60c4f310bddcfc51e5acc75c63a57c43c73430d3/vm/selfhost/experiments/REGISTRY.md#round-49-the-4-byte-header-and-why-it-is-worth-much-less-than-the-8-byte-one) measured one-core container RSS moving from 618 MB to 605 MB across five interleaved runs. That is useful, but much smaller than “we halved the header” might suggest. The page allocator and native collection buffers still occupy memory.
 
 There was a second trap. A static class table that named every class also kept those classes reachable to the native linker. The current implementation registers most entries as classes are used. Shrinking object metadata should not accidentally force otherwise unused classes into the executable.
 
@@ -141,7 +154,7 @@ The fix registers those large objects from allocation and rebuilds the relevant 
 | Four-byte header before reclamation change | 10.29 s | 608 MB |
 | With large-object reclamation change | 9.84 s | 503 MB |
 
-*Linux container experiment isolating the reclamation change: minimum elapsed and maximum RSS from five interleaved runs. Lower is better. These historical results explain the change; the opening charts show the current baseline.*
+*A separate Linux container experiment isolating the reclamation change: minimum elapsed and maximum RSS from five interleaved runs. Lower is better. Its four-byte-header control peaked at 608 MB; the header-layout experiment reported 605 MB in a different set of runs. The [reclamation experiment record](https://github.com/codenameone/CodenameOne/blob/60c4f310bddcfc51e5acc75c63a57c43c73430d3/vm/selfhost/experiments/REGISTRY.md#L6605-L6652) describes this later comparison. The opening charts show the current baseline.*
 
 We then reduced work in minor collections: skip an already-old page object before expensive conservative resolution, and consult the monitor table only for pages that have had monitors. The experiment record includes the unsuccessful alternatives too. Fewer object bytes help memory use. Avoiding thousands of unnecessary collector operations helps execution time too.
 

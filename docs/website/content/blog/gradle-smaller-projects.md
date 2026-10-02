@@ -45,12 +45,12 @@ pluginManagement {
     }
 }
 plugins {
-    id("com.codenameone") version "8.0-SNAPSHOT"
+    id("com.codenameone") version "7.0.274"
 }
 rootProject.name = "HelloCodenameOne"
 ```
 
-The sample conversion uses the development version. Select the release containing this support when it is available. The app's own dependencies and Kotlin plugin go in `build.gradle.kts`; the framework's platform builders come from the Codename One plugin.
+The example selects release `7.0.274`, which includes Gradle support. The app's own dependencies and Kotlin plugin go in `build.gradle.kts`; the framework's platform builders come from the Codename One plugin.
 
 
 ```text

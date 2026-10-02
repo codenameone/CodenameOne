@@ -15,7 +15,7 @@ What do you pay for Spring and Java's dynamic architecture? Can you deliver the 
 
 For a small service, you might want dependency injection, transactions and scheduled jobs without a long startup or a large deployment. That is the case our native Java backend is trying to make. Write a controller and a service, compile their wiring into the application, then deploy a native executable.
 
-In the two-core Linux HTTP test below, the CN1 executable occupies `5.17 MiB` and reaches its first verified response in `14.8 ms`. The same two endpoints in Spring/GraalVM occupy `88.31 MiB` and respond in `43.6 ms`. That is the sort of difference worth investigating for a small service.
+The HTTP runtime underneath that API is small. In the two-core Linux test below, its lower-level `Bench` handler occupies `5.17 MiB` and reaches its first verified response in `14.8 ms`. The same two endpoints in Spring/GraalVM occupy `88.31 MiB` and respond in `43.6 ms`. This handler uses no controller annotations or generated wiring, so those numbers measure the HTTP stacks, not the cost of the Spring-style API.
 
 This week's Spring-style API adds the parts that make that approach useful beyond a greeting endpoint: transaction propagation, scoped beans, background tasks, sessions, metrics and MCP tools. ParparVM supplies the native runtime, including virtual threads that can park while a handler waits for PostgreSQL, MySQL or another HTTP service.
 
@@ -130,7 +130,7 @@ For this example, the CN1 native build takes **53% less elapsed time** than Spri
 
 The CN1 development measurement compiles the repository's `Bench` handler, JavaSE backend runtime and shared sources with JDK 25. The native path compiles Java with JDK 8, translates it, then compiles and links the generated C with Clang at `-O3`; the translator and Java API dependencies are prebuilt. Spring uses Maven `clean package` on JDK 25; its native build adds Spring AOT processing and GraalVM `native:compile`. These are build-path timings for the HTTP examples, including their different build tools, rather than isolated `javac` or incremental-build timings.
 
-The [reproduction bundle](/blog/native-http-comparison.zip) includes sources, commands, artifact hashes, every raw sample, the matched longer-warmup comparison, clean-output build timings, and the generated Java example. The results make a small native backend worth trying for services with these constraints. Measure your own handlers and dependencies before using them to choose deployment capacity.
+The [reproduction bundle](/blog/native-http-comparison.zip) includes sources, commands, artifact hashes, every raw sample, the matched longer-warmup comparison, clean-output build timings, and the controller and transaction examples. The results make a small native backend worth trying for services with these constraints. Measure your own handlers and dependencies before using them to choose deployment capacity.
 
 ## Start your service with less runtime setup
 
@@ -159,7 +159,7 @@ After `javac` compiles your sources, the build reads the annotations and generat
 
 A generated `Router` holds the route as bytes and binds parameters according to their declared types. `BackendWiring` creates beans in dependency order. Missing dependencies, ambiguous candidates, constructor cycles and duplicate routes fail the build with the relevant class or injection point.
 
-Here is an excerpt of the wiring generated for this controller and the `Notes` service in the next section. Only line wrapping and the surrounding method have been omitted:
+The wiring constructs this controller and the `Notes` service in the next section with direct calls like these:
 
 ```java
 b_greetingApi = new example.GreetingApi();
@@ -205,26 +205,23 @@ public class Notes {
 }
 ```
 
-What does the annotation become? We ran this class through the current processor. It moves the original body into `add$cn1body_Notes` and makes `add` delegate to this generated helper. Package qualifiers are shortened below and line breaks added for readability; the control flow and rollback expression are the generated output:
+What does the annotation become? The build moves the original method body into a separate method and wraps its call in transaction handling. This pseudocode shows the control flow for `Notes.add`; helper names and generated class layouts are implementation details:
 
-```java
-static void add(example.Notes self, java.lang.String a0) throws Throwable {
-    Object cn1Tx = BackendAccess.get().begin(BackendAccess.REQUIRED, false, -1);
-    try {
-        self.add$cn1body_Notes(a0);
-    } catch (Throwable cn1Error) {
-        BackendAccess.get().afterThrow(cn1Tx,
-                cn1Error instanceof java.io.IOException ? true :
-                (cn1Error instanceof java.lang.RuntimeException
-                 || cn1Error instanceof java.lang.Error
-                 || cn1Error instanceof DataAccessException));
-        throw cn1Error;
-    }
-    BackendAccess.get().commit(cn1Tx);
-}
+```text
+transaction = begin(REQUIRED, readOnly = false, timeout = none)
+try:
+    call original add(body)
+catch error:
+    rollback = error is IOException
+            or error is RuntimeException
+            or error is Error
+            or error is DataAccessException
+    completeAfterFailure(transaction, rollback)
+    rethrow error
+commit(transaction)
 ```
 
-`BackendAccess` is an internal bridge used by generated code. Your service uses `@Transactional`; it does not call that bridge itself. The body runs inside a transaction boundary regardless of how you reached `add`. The generated helper asks the transaction manager to complete or roll back the appropriate boundary, then propagates a failure. There is no runtime annotation lookup or proxy dispatch for this method. The [processor source](https://github.com/codenameone/CodenameOne/blob/3d2db4eee774cf7d0d0a18fc3100d005ce108897/maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/processors/BackendSources.java) and [bytecode weaver](https://github.com/codenameone/CodenameOne/blob/3d2db4eee774cf7d0d0a18fc3100d005ce108897/maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/processors/BackendWeaver.java) show both halves.
+The body runs inside a transaction boundary regardless of how you reached `add`. On failure, the wrapper applies the rollback rule to that boundary and rethrows the error. Completing a joined transaction can mark the outer transaction for rollback; it does not necessarily commit or roll back the connection immediately. There is no runtime annotation lookup or proxy dispatch for this method. The [processor source](https://github.com/codenameone/CodenameOne/blob/master/maven/build-engine/src/main/java/com/codename1/maven/processors/BackendSources.java) and [bytecode weaver](https://github.com/codenameone/CodenameOne/blob/master/maven/build-engine/src/main/java/com/codename1/maven/processors/BackendWeaver.java) show how this is implemented.
 
 The database connection is borrowed lazily, at the first database operation. The method can return without touching the pool if it never accesses the database. `DataSource`, generated DAOs and managed ORM sessions join the transaction associated with the executing thread.
 
@@ -301,7 +298,7 @@ The Spring-style surface extends beyond the three annotations in a demo:
 
 The build catches unresolved wiring, but runtime configuration can still deactivate a required bean or omit a necessary value. Request, session and lazy stand-ins need a non-final class and an accessible no-argument constructor. That constructor runs for the stand-in too. The [beans chapter](/developer-guide/backend-beans/) explains the supported combinations and their restrictions.
 
-Sessions use an in-memory or database store. They are created on demand, so an API that never asks for a session does not set a session cookie. Rotate the identifier at sign-in with `changeSessionId()`, and use the database store when multiple instances need to share session state. Session-scoped destruction on expiry remains a documented limitation.
+Sessions use an in-memory or database store. They are created on demand, so an API that never asks for a session does not set a session cookie. Rotate the identifier at sign-in with `changeSessionId()`, and use the database store when multiple instances need to share session state. Session beans run their `@PreDestroy` or configured destroy method when the session is invalidated, found expired or closed at server shutdown. Expiry cleanup happens when a request encounters the expired session or triggers the periodic purge, rather than at the exact timeout instant.
 
 [![Session lifecycle with identifier rotation at sign-in, inactivity expiry, and memory or database storage](/developer-guide/img/backend-session-lifecycle.svg)](/developer-guide/img/backend-session-lifecycle.svg)
 

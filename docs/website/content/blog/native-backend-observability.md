@@ -75,6 +75,7 @@ import com.codename1.system.Lifecycle;
 
 @OpenTelemetry(
         relay = "https://api.example.com",
+        relayToken = "replace-with-your-relay-token",
         serviceName = "orders-app",
         sampleRatio = 0.2,
         requireAnalyticsConsent = true)
@@ -82,7 +83,7 @@ public class OrdersApp extends Lifecycle {
 }
 ```
 
-Replace the URL with your backend. Enable its relay as shown below, and wire the app's analytics-consent flow before collecting telemetry. The client instruments supported app operations and `ConnectionRequest` calls, including outgoing trace context. It sends its recorded spans through the backend rather than carrying your collector credentials.
+Replace the URL with your backend and the token placeholder with your relay token. Set the backend's `RELAY_TOKEN` environment variable to that same value. Enable its relay as shown below, and wire the app's analytics-consent flow before collecting telemetry. The client instruments supported app operations and `ConnectionRequest` calls, including outgoing trace context. It sends its recorded spans through the backend rather than carrying your collector credentials.
 
 For browser apps, context propagation is limited to the relay host and configured `propagateTo` hosts. A cross-origin service must allow the tracing headers in CORS. The [client tracing walkthrough](/blog/follow-a-tap-with-opentelemetry/) covers consent, propagation and the supported span types.
 
@@ -197,7 +198,7 @@ cn1.otel.relay.token=${RELAY_TOKEN}
 cn1.otel.relay.corsOrigin=https://app.example.com
 ```
 
-The CORS setting is for a web app on another origin. An app-carried relay token is not an unextractable secret; the collector's ingest credentials should remain on the backend. A full queue returns 503 so the client can back off.
+The relay requires the client's `relayToken` to match `RELAY_TOKEN`; a missing or different token returns HTTP 401. The CORS setting is for a web app on another origin. An app-carried relay token is not an unextractable secret; the collector's ingest credentials should remain on the backend. A full queue returns 503 so the client can back off.
 
 Start with one real app action that crosses the native backend and an existing enterprise service. Verify that its spans share a trace ID in your collector, then check consent, sampling, queue drops and access to the relay before expanding collection. The goal is to make the app and its native server observable parts of the system your operations team already runs.
 
