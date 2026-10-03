@@ -409,6 +409,8 @@ The implementation of this interface is identical for Android (Java/Kotlin) & Ja
 For iOS native interfaces you can implement the generated `...Impl` class in Objective-C _or_ Swift. +
 For Android native interfaces you can implement the generated `...Impl` class in Java _or_ Kotlin.
 
+In a Maven project the directories below hold the native code whether the project has a module for that platform or not. `mvn cn1:generate-native-interfaces` creates them as needed, and a project without the platform's module builds them from the `common` module (see <<maven-minimal-layout>>).
+
 [cols="1,3,3",options="header"]
 |===
 | Platform

@@ -118,6 +118,7 @@ public class Initializr extends Lifecycle {
         final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_17};
         final ProjectOptions.BuildTool[] buildTool = new ProjectOptions.BuildTool[]{ProjectOptions.BuildTool.MAVEN};
         final ProjectOptions.ProjectType[] projectType = new ProjectOptions.ProjectType[]{ProjectOptions.ProjectType.APP};
+        final boolean[] allPlatformModules = new boolean[]{false};
         // {Java 17, Java 8}: the build panel disables Java 8 while Gradle is selected.
         final RadioButton[] javaButtons = new RadioButton[2];
         final SpanLabel summaryLabel = new SpanLabel();
@@ -146,7 +147,8 @@ public class Initializr extends Lifecycle {
         final Runnable refresh = new Runnable() {
             public void run() {
                 ProjectOptions options = currentOptions(includeLocalizationBundles, previewLanguage, javaVersion)
-                        .withBuild(buildTool[0], projectType[0]);
+                        .withBuild(buildTool[0], projectType[0])
+                        .withPlatformModules(allPlatformModules[0]);
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
 
@@ -156,6 +158,7 @@ public class Initializr extends Lifecycle {
                         : "No bundles");
                 javaSubtitle.setText(javaVersion[0].label);
                 buildSubtitle.setText(buildTool[0] == ProjectOptions.BuildTool.GRADLE
+                        || GeneratorModel.isMavenLayoutChoiceOffered()
                         ? buildTool[0].label + " . " + projectType[0].label
                         : buildTool[0].label);
 
@@ -181,7 +184,8 @@ public class Initializr extends Lifecycle {
         Container javaPanel = makePanel("Java Version", javaSubtitle, true, false,
                 createJavaOptionsPanel(javaVersion, javaButtons, refresh), form);
         Container buildPanel = makePanel("Build Tool", buildSubtitle, true, false,
-                createBuildToolPanel(buildTool, projectType, javaVersion, javaButtons, refresh), form);
+                createBuildToolPanel(buildTool, projectType, allPlatformModules, javaVersion, javaButtons, refresh),
+                form);
         Container settingsPanel = makePanel("Current Settings", panelSubtitle("Generated artifacts"), true, true,
                 BoxLayout.encloseY(summaryLabel), form);
 
@@ -189,9 +193,11 @@ public class Initializr extends Lifecycle {
         Container previewWrap = createPreviewWrap(previewPanel);
 
         // Gradle is offered once the plugin is published at the version the
-        // generated projects use; until then the Maven default stands alone.
-        buildPanel.setHidden(!GeneratorModel.isGradleOffered());
-        buildPanel.setVisible(GeneratorModel.isGradleOffered());
+        // generated projects use, and the Maven project types once that plugin can
+        // build them; with neither, the Maven default stands alone.
+        boolean buildChoices = GeneratorModel.isGradleOffered() || GeneratorModel.isMavenLayoutChoiceOffered();
+        buildPanel.setHidden(!buildChoices);
+        buildPanel.setVisible(buildChoices);
         Container column = BoxLayout.encloseY(hero, essentials, idePanel, buildPanel, localePanel,
                 javaPanel, settingsPanel, previewWrap);
         column.setUIID("InitializrColumn");
@@ -217,7 +223,8 @@ public class Initializr extends Lifecycle {
             String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
             ProjectOptions options = downloadOptions(includeLocalizationBundles, previewLanguage, javaVersion)
-                    .withBuild(buildTool[0], projectType[0]);
+                    .withBuild(buildTool[0], projectType[0])
+                        .withPlatformModules(allPlatformModules[0]);
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
 
@@ -456,17 +463,41 @@ public class Initializr extends Lifecycle {
         return selector;
     }
 
-    /// Maven or Gradle, and for Gradle what the project holds. Gradle projects are
-    /// Java 17 only, so choosing Gradle selects Java 17 and disables Java 8. A
-    /// Maven project always carries the backend module behind a profile, so the
-    /// project type is only offered for Gradle.
+    /// Maven or Gradle, and what the project holds. Gradle projects are Java 17
+    /// only, so choosing Gradle selects Java 17 and disables Java 8. A Maven project
+    /// gets the project type, and the choice of every platform module over the
+    /// minimal layout, once the plugin it is generated against can build them
+    /// ([GeneratorModel#isMavenLayoutChoiceOffered()]); before that it always
+    /// carries the backend module behind a profile and the type is Gradle's alone.
     private Container createBuildToolPanel(ProjectOptions.BuildTool[] buildTool,
                                            ProjectOptions.ProjectType[] projectType,
+                                           boolean[] allPlatformModules,
                                            ProjectOptions.JavaVersion[] javaVersion,
                                            RadioButton[] javaButtons, Runnable onSelectionChanged) {
-        Container tools = new Container(new GridLayout(1, 2));
+        final boolean mavenLayouts = GeneratorModel.isMavenLayoutChoiceOffered();
+        Container tools = new Container(new GridLayout(1, GeneratorModel.isGradleOffered() ? 2 : 1));
         tools.setUIID("InitializrChoicesGrid");
         ButtonGroup toolGroup = new ButtonGroup();
+
+        final CheckBox allModules = new CheckBox("Include all platform modules (javase/, android/, ios/, ...)");
+        allModules.setUIID("InitializrChoice");
+        allModules.setSelected(allPlatformModules[0]);
+        allModules.addActionListener(evt -> {
+            allPlatformModules[0] = allModules.isSelected();
+            onSelectionChanged.run();
+        });
+        final Container modulesSection = BoxLayout.encloseY(allModules);
+        final Runnable updateModules = () -> {
+            boolean show = mavenLayouts && buildTool[0] == ProjectOptions.BuildTool.MAVEN
+                    && projectType[0] != ProjectOptions.ProjectType.BACKEND_ONLY;
+            modulesSection.setHidden(!show);
+            modulesSection.setVisible(show);
+            if (!show && allPlatformModules[0] && projectType[0] == ProjectOptions.ProjectType.BACKEND_ONLY) {
+                // A backend-only project has no platform modules to include.
+                allPlatformModules[0] = false;
+                allModules.setSelected(false);
+            }
+        };
 
         Container types = new Container(new GridLayout(3, 1));
         types.setUIID("InitializrChoicesGrid");
@@ -485,19 +516,28 @@ public class Initializr extends Lifecycle {
             button.addActionListener(evt -> {
                 if (button.isSelected()) {
                     projectType[0] = type;
+                    updateModules.run();
                     onSelectionChanged.run();
                 }
             });
         }
-        SpanLabel hint = new SpanLabel("Gradle projects target Java 17. Every Maven project already "
-                + "includes an optional backend module.");
+        SpanLabel hint = new SpanLabel(mavenLayouts
+                ? "Gradle projects target Java 17. A Maven app builds every platform from common/ "
+                        + "unless you include all platform modules."
+                : "Gradle projects target Java 17. Every Maven project already "
+                        + "includes an optional backend module.");
         hint.setUIID("InitializrTip");
         hint.setTextUIID("InitializrTip");
         final Container typeSection = BoxLayout.encloseY(labeledField("Project Type", types));
-        typeSection.setHidden(true);
-        typeSection.setVisible(false);
+        boolean typeShown = buildTool[0] == ProjectOptions.BuildTool.GRADLE || mavenLayouts;
+        typeSection.setHidden(!typeShown);
+        typeSection.setVisible(typeShown);
+        updateModules.run();
 
         for (ProjectOptions.BuildTool tool : ProjectOptions.BuildTool.values()) {
+            if (tool == ProjectOptions.BuildTool.GRADLE && !GeneratorModel.isGradleOffered()) {
+                continue;
+            }
             RadioButton button = new RadioButton(tool.label);
             button.setToggle(true);
             button.setUIID("InitializrChoice");
@@ -512,8 +552,8 @@ public class Initializr extends Lifecycle {
                 }
                 buildTool[0] = tool;
                 boolean gradle = tool == ProjectOptions.BuildTool.GRADLE;
-                typeSection.setHidden(!gradle);
-                typeSection.setVisible(gradle);
+                typeSection.setHidden(!gradle && !mavenLayouts);
+                typeSection.setVisible(gradle || mavenLayouts);
                 if (gradle) {
                     javaVersion[0] = ProjectOptions.JavaVersion.JAVA_17;
                     if (javaButtons[0] != null) {
@@ -523,17 +563,18 @@ public class Initializr extends Lifecycle {
                 if (javaButtons[1] != null) {
                     javaButtons[1].setEnabled(!gradle);
                 }
-                if (!gradle && projectType[0] == ProjectOptions.ProjectType.BACKEND_ONLY) {
+                if (!gradle && !mavenLayouts && projectType[0] == ProjectOptions.ProjectType.BACKEND_ONLY) {
                     // Maven has no backend-only project, and the type is hidden
                     // now, so a stale choice would fail generation with no way to
                     // correct it. Every Maven project carries the backend anyway.
                     projectType[0] = ProjectOptions.ProjectType.APP;
                     typeGroup.setSelected(typeButtons[ProjectOptions.ProjectType.APP.ordinal()]);
                 }
+                updateModules.run();
                 onSelectionChanged.run();
             });
         }
-        return BoxLayout.encloseY(tools, typeSection, hint);
+        return BoxLayout.encloseY(tools, typeSection, modulesSection, hint);
     }
 
     private Container createPreviewWrap(TemplatePreviewPanel previewPanel) {
@@ -771,7 +812,12 @@ public class Initializr extends Lifecycle {
                 + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"
                 + "IDE      " + ide.name() + "\n"
                 + "Build    " + options.buildTool.label
-                + (options.isGradle() ? " (" + options.projectType.label + ")" : "") + "\n"
+                + (options.isGradle() || GeneratorModel.isMavenLayoutChoiceOffered()
+                        ? " (" + options.projectType.label
+                                + (!options.isGradle() && options.allPlatformModules
+                                        && options.projectType != ProjectOptions.ProjectType.BACKEND_ONLY
+                                        ? ", all modules" : "") + ")"
+                        : "") + "\n"
                 + "Java     " + options.javaVersion.label + "\n"
                 + "Bundles  " + (options.includeLocalizationBundles ? "INCLUDED" : "NONE") + "\n"
                 + "Preview  " + options.previewLanguage.label;

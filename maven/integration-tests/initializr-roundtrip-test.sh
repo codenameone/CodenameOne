@@ -20,6 +20,7 @@ mkdir -p "$SOURCE_WORKDIR" "$GENERATED_WORKDIR"
 cd "$SOURCE_WORKDIR"
 
 mvn archetype:generate \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeVersion="$CN1_VERSION" \
@@ -38,6 +39,7 @@ EOF
 
 cd "$GENERATED_WORKDIR"
 mvn "com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project" \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeVersion="${CN1_VERSION}" \

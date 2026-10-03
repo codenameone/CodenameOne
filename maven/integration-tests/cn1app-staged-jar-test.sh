@@ -53,6 +53,7 @@ if [ -d $APP ]; then
   rm -rf $APP
 fi
 mvn -B -ntp archetype:generate \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeVersion=$CN1_VERSION \

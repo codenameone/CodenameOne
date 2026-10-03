@@ -49,6 +49,21 @@ public class GenerateInitializr {
      model.writeProjectZip(out);
     }
    }
+   // The Maven layouts, generated against the first plugin that has them whatever
+   // release this checkout is on. MAVEN-FULL is every platform module plus backend/.
+   String[] layouts = {"APP", "APP_WITH_BACKEND", "BACKEND_ONLY", "FULL"};
+   for (String layout : layouts) {
+    boolean full = "FULL".equals(layout);
+    ProjectOptions.ProjectType type = full ? ProjectOptions.ProjectType.APP_WITH_BACKEND
+      : ProjectOptions.ProjectType.valueOf(layout);
+    ProjectOptions options = ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN, type)
+      .withPlatformModules(full);
+    GeneratorModel model=GeneratorModel.createForPluginVersion(ide,Template.BAREBONES,"LauncherProbe",
+      "com.example.probe",options,GeneratorModel.MAVEN_LAYOUTS_SINCE);
+    try(OutputStream out=Files.newOutputStream(Paths.get(args[0],"MAVEN-"+layout+"-"+ide.name()+".zip"))) {
+     model.writeProjectZip(out);
+    }
+   }
   }
   System.exit(0);
  }

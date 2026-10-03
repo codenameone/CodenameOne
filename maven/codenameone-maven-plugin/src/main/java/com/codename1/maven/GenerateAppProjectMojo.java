@@ -88,6 +88,23 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     @Parameter(property = "cn1.buildTool", defaultValue = "maven")
     private String buildTool;
 
+    /**
+     * The platform modules to generate, passed to cn1app-archetype: {@code none} (its
+     * default, a root pom and {@code common/} only), {@code all}, or a comma-separated
+     * list such as {@code javase,android}. Native code from the source project lands in
+     * {@code <platform>/src/main/...} either way; without a module, {@code common}
+     * builds that platform and picks it up from there.
+     */
+    @Parameter(property = "platformModules")
+    private String platformModules;
+
+    /**
+     * {@code app} (the archetype's default) or {@code app-with-backend}, passed to
+     * cn1app-archetype.
+     */
+    @Parameter(property = "projectType")
+    private String projectType;
+
 
     private Properties loadSourceProjectProperties() throws IOException {
         Properties props = new Properties();
@@ -151,6 +168,17 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             } else if (eqpos < 0) {
                 props.setProperty(prop, "true");
             }
+        }
+
+        if (platformModules != null && platformModules.trim().length() > 0) {
+            props.setProperty("platformModules", platformModules.trim());
+        }
+        if (projectType != null && projectType.trim().length() > 0) {
+            if ("backend-only".equals(projectType.trim())) {
+                throw new MojoExecutionException("generate-app-project converts an application; "
+                        + "projectType=backend-only has nothing to convert.");
+            }
+            props.setProperty("projectType", projectType.trim());
         }
 
         if (getLog().isDebugEnabled()) {
@@ -704,7 +732,8 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 for (File child : resDir.listFiles()) {
                     if (child.getName().endsWith(".jar")) {
                         getLog().warn("Found jar file '" + child.getName() + "' in the native/javase directory.  This has been copied to " + child + ", but you should " +
-                                "remove this file and replace it with the equivalent Maven dependency inside your " + new File(targetJavaseDir(), "pom.xml") + " file.");
+                                "remove this file and replace it with the equivalent Maven dependency (in the javase module's pom.xml, "
+                                + "or in common/pom.xml when the project has no javase module).");
                     }
                 }
             }

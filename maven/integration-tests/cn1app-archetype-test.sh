@@ -16,6 +16,7 @@ if [ -d myapp1 ]; then
   rm -rf myapp1
 fi
 mvn archetype:generate \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeVersion=$CN1_VERSION \

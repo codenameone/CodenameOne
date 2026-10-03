@@ -2277,6 +2277,16 @@
       "medium": {
         "url": "https://medium.com/p/a8adab7ba554/edit",
         "syndicated_at": "2026-09-23T19:01:46+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/javadoc-that-feels-like-your-website",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6abfc7051a66f66f01b7fba7",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-02T15:01:17+00:00"
       }
     },
     "android-37-readiness-location-button": {
@@ -2288,6 +2298,16 @@
       "medium": {
         "url": "https://medium.com/p/c422f23fb3f4/edit",
         "syndicated_at": "2026-09-24T19:01:30+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/android-17-without-the-last-minute-scramble",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6abfe3231e74b99949915f0a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-02T17:01:18+00:00"
       }
     },
     "why-another-java-server": {
@@ -2299,6 +2319,16 @@
       "medium": {
         "url": "https://medium.com/p/0eb6b7ea20b8/edit",
         "syndicated_at": "2026-09-26T15:01:39+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/we-didn-t-want-to-build-another-java-server",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6abfff9a5090f6893250aac9",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-02T19:03:11+00:00"
       }
     },
     "java-backend-shared-models": {
@@ -2310,6 +2340,16 @@
       "medium": {
         "url": "https://medium.com/p/20c35c2393b9/edit",
         "syndicated_at": "2026-09-27T00:00:32+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/one-java-model-from-the-app-to-postgresql",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac04591b9d2f44082935723",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T00:01:15+00:00"
       }
     },
     "vault-encryption-browser-phone": {
@@ -2321,6 +2361,16 @@
       "medium": {
         "url": "https://medium.com/p/5379b1b7bc1c/edit",
         "syndicated_at": "2026-09-27T19:01:19+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/one-vault-from-your-phone-to-the-browser",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac099f7856857d935032eda",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T06:01:29+00:00"
       }
     },
     "invite-link-through-app-store": {
@@ -2332,6 +2382,16 @@
       "medium": {
         "url": "https://medium.com/p/d52c3e0840cc/edit",
         "syndicated_at": "2026-10-02T06:00:38+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/the-hard-part-of-invite-a-friend-is-the-install",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac11880b491e8e7138be719",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T15:01:10+00:00"
       }
     },
     "xcode-27-build-settings": {
@@ -2343,6 +2403,16 @@
       "medium": {
         "url": "https://medium.com/p/0563fc8a3a79/edit",
         "syndicated_at": "2026-09-30T00:00:58+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/xcode-27-the-build-settings-that-can-stop-a-release",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac134a3c0a97a0cc6ac603a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T17:01:15+00:00"
       }
     },
     "native-desktop-themes-experiment": {
@@ -2365,6 +2435,13 @@
       "medium": {
         "url": "https://medium.com/p/3504143f7a34/edit",
         "syndicated_at": "2026-10-01T19:02:08+00:00"
+      }
+    },
+    "who-decides-your-app-redesign": {
+      "devto": {
+        "id": 4792979,
+        "url": "https://dev.to/codenameone/apple-shouldnt-dictate-your-apps-redesign-schedule-igh",
+        "syndicated_at": "2026-10-03T17:35:08+00:00"
       }
     }
   }

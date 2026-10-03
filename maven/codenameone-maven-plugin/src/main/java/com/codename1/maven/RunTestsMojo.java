@@ -93,6 +93,10 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         List<File> cp = new ArrayList<File>();
         cp.add(new File(project.getBuild().getTestOutputDirectory()));
         cp.add(new File(project.getBuild().getOutputDirectory()));
+        if (isHosting()) {
+            // common stands in for a missing javase module: its JavaSE natives.
+            cp.add(hostedNativesDir());
+        }
         for (Artifact artifact : project.getArtifacts()) {
             if ("provided".equals(artifact.getScope())) {
                 continue;

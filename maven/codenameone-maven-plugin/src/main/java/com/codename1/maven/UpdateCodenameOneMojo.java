@@ -74,13 +74,28 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        if (!isCN1ProjectDir()) {
+        // A backend-only project is a single module at the root, with no app module to
+        // run from: its own pom carries the versions, and there are no app tools
+        // (designer, GUI builder) to refresh.
+        boolean backendRoot = isBackendOnlyRoot(project.getBasedir());
+        if (!backendRoot && !isCN1ProjectDir()) {
             return;
         }
-        updateCodenameOne(true);
+        if (!backendRoot) {
+            updateCodenameOne(true);
+        }
 
         String existingCn1Version = project.getModel().getProperties().getProperty("cn1.version");
         String existingCn1PluginVersion = project.getModel().getProperties().getProperty("cn1.plugin.version");
+        if (existingCn1Version == null || existingCn1PluginVersion == null) {
+            // Generated projects declare both; one edited to hard-code the versions in its
+            // dependencies has nothing for this goal to rewrite.
+            throw new MojoFailureException("cn1:update rewrites the cn1.version and cn1.plugin.version "
+                    + "properties, and this project does not declare "
+                    + (existingCn1Version == null ? "cn1.version" : "cn1.plugin.version")
+                    + ". Add them to " + (backendRoot ? "its pom.xml" : "the root pom.xml")
+                    + " and use them for the Codename One dependency and plugin versions.");
+        }
         boolean isAutoVersion = false;
         if (newVersion == null || newVersion.isEmpty()) {
             if (!existingCn1Version.endsWith("-SNAPSHOT")) {
@@ -137,11 +152,26 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
         if (newVersion != null && !newVersion.isEmpty() && (!newVersion.equals(existingCn1Version) || !newVersion.equals(existingCn1PluginVersion))) {
 
             getLog().info("Attempting to update project to version " + newVersion);
+            File commonPom = getCN1ProjectDir() == null ? null : new File(getCN1ProjectDir(), "pom.xml");
+            if (commonPom != null && commonPom.isFile()) {
+                String commonPomText;
+                try {
+                    commonPomText = new String(java.nio.file.Files.readAllBytes(commonPom.toPath()), "UTF-8");
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to read " + commonPom, ex);
+                }
+                if (tooOldForHostedPlatforms(newVersion, commonPomText)) {
+                    throw new MojoFailureException("This project builds its platforms from common (its pom binds "
+                            + "the hosted-platform goals), which plugin " + newVersion + " does not have. "
+                            + "Use " + HOSTED_PLATFORMS_SINCE + " or newer.");
+                }
+            }
             //MavenXpp3Reader pomReader = new MavenXpp3Reader();
 
             Model model = null;
             ModelETL modelETL;
-            File pomFile = new File(project.getParent().getBasedir(), "pom.xml");
+            File pomFile = backendRoot ? new File(project.getBasedir(), "pom.xml")
+                    : new File(project.getParent().getBasedir(), "pom.xml");
             /*
             try (FileInputStream fis = new FileInputStream(pomFile)) {
                 model = pomReader.read(new InputStreamReader(fis, "UTF-8"), false);
@@ -288,6 +318,44 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
             return false;
         }
         return new ComparableVersion(candidate).compareTo(new ComparableVersion(current)) < 0;
+    }
+
+    /**
+     * Whether {@code dir} is a backend-only project: the backend itself at the root of
+     * the build, not the backend module of an application.
+     */
+    static boolean isBackendOnlyRoot(File dir) {
+        com.codename1.project.ProjectLayout layout = dir == null ? null
+                : com.codename1.project.ProjectLayouts.detect(dir);
+        return layout != null && layout.kind() == com.codename1.project.ProjectKind.BACKEND
+                && layout.buildSystem() == com.codename1.project.BuildSystem.MAVEN
+                && canonical(layout.rootDir()).equals(canonical(dir));
+    }
+
+    private static File canonical(File f) {
+        try {
+            return f.getCanonicalFile();
+        } catch (IOException ex) {
+            return f.getAbsoluteFile();
+        }
+    }
+
+    /** The first plugin release with the goals a minimal project's common pom binds. */
+    static final String HOSTED_PLATFORMS_SINCE = "7.0.275";
+
+    /**
+     * @return true if {@code candidate} is a release too old for a common pom that binds the
+     * hosted-platform goals ({@code compile-javase-natives}, {@code hosted-platform}): that
+     * plugin would fail every build on an unknown goal. A -SNAPSHOT candidate is a
+     * development build and is not refused.
+     */
+    static boolean tooOldForHostedPlatforms(String candidate, String commonPom) {
+        if (candidate == null || candidate.endsWith("-SNAPSHOT") || commonPom == null
+                || (!commonPom.contains("<goal>compile-javase-natives</goal>")
+                && !commonPom.contains("<goal>hosted-platform</goal>"))) {
+            return false;
+        }
+        return new ComparableVersion(candidate).compareTo(new ComparableVersion(HOSTED_PLATFORMS_SINCE)) < 0;
     }
 
     /** Host of a metadata URL, for both the containment test and the message. */

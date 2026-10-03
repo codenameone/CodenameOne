@@ -52,6 +52,7 @@ mkdir nativeinterfacestest2
 cd nativeinterfacestest2
 
 mvn archetype:generate \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeVersion=$CN1_VERSION \

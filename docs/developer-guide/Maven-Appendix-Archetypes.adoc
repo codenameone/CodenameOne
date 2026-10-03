@@ -4,7 +4,34 @@
 [#cn1app-archetype]
 === Codename One application project archetype (cn1app-archetype)
 
-The `cn1app-archetype` is the basis for all maven Codename One application projects. It provides a multimodule project with the following modules:
+The `cn1app-archetype` is the basis for all Maven Codename One application projects. Two properties choose the shape of the project it generates:
+
+`platformModules`::
+The platform modules to generate. The default, `none`, is the minimal layout: the root `pom.xml` and the `common` module, and nothing else. `all` generates a module for each platform (`javase`, `android`, `ios`, `javascript`, `win` and `linux`), and a comma-separated list such as `javase,android` generates just those.
+
+`projectType`::
+`app` (the default), `app-with-backend`, which adds the `backend` module (see <<_server_side_backend,the backend chapter>>), or `backend-only`, which generates a server on its own: a single module at the root with no application.
+
+`-DplatformModules=all -DprojectType=app-with-backend` generates the full multi-module layout.
+
+[#maven-minimal-layout]
+==== Projects without platform modules
+
+The platform modules are optional. When a platform has no module, the `common` module builds it: `./build.sh android` and `mvn package -Dcodename1.platform=android` work the same with or without an `android` module, and so do the simulator, the desktop app and the unit tests. A platform has a module of its own exactly when `<platform>/pom.xml` exists, so you can add one later, for example to give that platform its own build plugins or dependencies, and from then on the module builds that platform instead of `common`.
+
+Native interface implementations live in the same directories either way. `mvn cn1:generate-native-interfaces` creates `android/src/main/java`, `ios/src/main/objectivec`, `javase/src/main/java` and the others as needed, without a `pom.xml`, and the build picks them up from there. The Java SE implementations are compiled into `common/target/cn1-javase/classes`, apart from the application's own classes, so they never reach a device build.
+
+A project without a `javase` module keeps the desktop app's native theme in `common/src/desktop/resources`. `mvn package -Pexecutable-jar -Dcodename1.platform=javase` writes the desktop jar to `common/target`.
+
+[#maven-backend-only]
+==== Backend-only projects
+
+A project generated with `-DprojectType=backend-only` is a server and nothing else: a `pom.xml`, `application.properties` and the sources under `src/main/java`, all at the root. The commands drop the module and the profile:
+
+----
+./mvnw cn1:backend           # run it on this JVM
+./mvnw cn1:backend-package   # build the native binary
+----
 
 See https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html[Getting Started with the Bare-Bones Java App Template] for details on using this archetype.
 

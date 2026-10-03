@@ -38,7 +38,7 @@ public class WebsiteThemeNativeImpl implements com.codename1.initializr.WebsiteT
      * generator never calls this - it exists to satisfy the interface, and answers
      * false so a caller that skips that check does not believe a download happened.
      */
-    public boolean downloadProject(String fileName, String dataUrl) {
+    public boolean downloadProject(String fileName, String dataUrl, String packageName, String template) {
         return false;
     }
 

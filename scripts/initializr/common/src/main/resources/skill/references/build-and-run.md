@@ -10,12 +10,12 @@ A Codename One project can produce four kinds of artifacts. Some build entirely 
 | --- | --- | --- | --- |
 | Desktop simulator | Local (your machine, JVM only) | `mvn -pl common cn1:run` / `cn1:debug` | `./gradlew run` / `debug` |
 | Unit tests | Local (the CN1 test runner inside a JVM) | `mvn -pl common cn1:test` | `./gradlew cn1Test` |
-| Standalone desktop app (`.jar` + bundled JRE for Mac/Win/Linux) | Cloud (build server packages a JRE for each OS) | `mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop` (or `windows-desktop`, `linux-desktop`) | `./gradlew buildMacDesktop` / `buildWindowsDesktop` |
-| Android APK / AAB | Cloud by default; **also** locally if you run `cn1:install-android-sdk` and use the local Android build path | `mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` | `./gradlew buildAndroid` (local project: `buildAndroidGradleProject`) |
-| iOS app | Cloud, **or** locally as an Xcode project via `ios-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (cloud) or `…-Dcodename1.buildTarget=ios-source` (local Xcode project) | `./gradlew buildIos` / `buildIosRelease` (local project: `buildIosXcodeProject`) |
-| Mac Native app (AOT-compiled, same pipeline as iOS) | Cloud, **or** locally as an Xcode project via `mac-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native` (cloud) or `…-Dcodename1.buildTarget=mac-source` (local Xcode project) | `./gradlew buildMacNative` |
+| Standalone desktop app (`.jar` + bundled JRE for Mac/Win/Linux) | Cloud (build server packages a JRE for each OS) | `mvn package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop` (or `windows-desktop`, `linux-desktop`) | `./gradlew buildMacDesktop` / `buildWindowsDesktop` |
+| Android APK / AAB | Cloud by default; **also** locally if you run `cn1:install-android-sdk` and use the local Android build path | `mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` | `./gradlew buildAndroid` (local project: `buildAndroidGradleProject`) |
+| iOS app | Cloud, **or** locally as an Xcode project via `ios-source` | `mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (cloud) or `…-Dcodename1.buildTarget=ios-source` (local Xcode project) | `./gradlew buildIos` / `buildIosRelease` (local project: `buildIosXcodeProject`) |
+| Mac Native app (AOT-compiled, same pipeline as iOS) | Cloud, **or** locally as an Xcode project via `mac-source` | `mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native` (cloud) or `…-Dcodename1.buildTarget=mac-source` (local Xcode project) | `./gradlew buildMacNative` |
 | Native Windows `.exe` (`win32`, ParparVM → clang-cl, no JVM) | Cloud (Linux build server cross-compiles); **also** locally on Windows, or as a project via `windows-source` | `mvn -pl common package -Dcodename1.platform=windows -Dcodename1.buildTarget=windows-device` (cloud) or `…-Dcodename1.buildTarget=local-windows-device` (local). A regular build returns x64 + arm64 release exes; add the `windows.debug` build hint for a single x64 debug exe. | `./gradlew buildWindowsDevice` |
-| JavaScript / web bundle | Local (ParparVM to JavaScript translator, available to all users). Cloud builds use ParparVM by default and accept `javascript.port=teavm` as a compatibility fallback. | `mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` | `./gradlew buildJavascriptLocal` (cloud: `buildJavascript`) |
+| JavaScript / web bundle | Local (ParparVM to JavaScript translator, available to all users). Cloud builds use ParparVM by default and accept `javascript.port=teavm` as a compatibility fallback. | `mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` | `./gradlew buildJavascriptLocal` (cloud: `buildJavascript`) |
 
 Any target without its own Gradle task (`linux-desktop`, `mac-source`, `local-windows-device`, ...) is `./gradlew cn1Build -Pcodename1.platform=<platform> -Pcodename1.buildTarget=<target>`.
 
@@ -56,7 +56,8 @@ mvn -pl common cn1:test
 mvn -pl common compile
 
 # Generate stubs for any com.codename1.system.NativeInterface in common/
-# (one per platform under android/, ios/, javase/, javascript/).
+# (one per platform under android/, ios/, javase/, javascript/; the directory is
+# created when needed, and is built from common/ when it has no pom.xml).
 mvn -pl common cn1:generate-native-interfaces
 
 # Generate a typed REST client from an OpenAPI 3.x spec. Writes
@@ -90,30 +91,30 @@ mvn -pl common cn1:generate-graphql \
 # --- Cloud builds (need a Codename One account; some need Enterprise tier) ---
 
 # Native iOS app (.ipa). Cloud-built.
-mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device
 
 # Local Xcode project, no cloud. See Xcode prerequisites below.
-mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
 
 # Native Mac app (AOT-compiled, shares the iOS pipeline so the Mac slice
 # is rendered + compiled the same way as the iOS one). Cloud-built.
-mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native
 
 # Local Xcode project for the Mac slice. Open the project in Xcode and
 # select the Mac Catalyst destination to run.
-mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source
 
 # Native Android APK/AAB. Cloud-built by default.
-mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
+mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
 
 # JavaScript / web bundle. Built locally via the ParparVM to JavaScript translator.
 # Append -Dcodename1.buildTarget=javascript instead to use the cloud builder.
-mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
+mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
 
 # Standalone Mac / Windows / Linux desktop app. Cloud-built.
-mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop
-mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=windows-desktop
-mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=linux-desktop
+mvn package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop
+mvn package -Dcodename1.platform=javase -Dcodename1.buildTarget=windows-desktop
+mvn package -Dcodename1.platform=javase -Dcodename1.buildTarget=linux-desktop
 ```
 
 ## Gradle task cheat sheet
@@ -195,8 +196,8 @@ You only need the cloud build path when you want to **produce a native artifact*
 `-Dautomated=true` on a cloud `package` goal switches the build into non-interactive mode: no browser prompt, no credential dialog, build failure becomes a non-zero exit code, and `result.zip` is downloaded directly into `target/`.
 
 ```bash
-mvn -pl ios     package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios-device     -Dautomated=true
-mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device -Dautomated=true
+mvn package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios-device     -Dautomated=true
+mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device -Dautomated=true
 
 # Gradle
 ./gradlew buildIos -Pautomated=true
