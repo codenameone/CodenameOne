@@ -109,6 +109,27 @@
       ]
     },
     {
+      "id": "android-compatibility",
+      "category": "Application runtime",
+      "name": "Android applications (android.* and AndroidX)",
+      "description": "Runs an unmodified Android Studio application -- XML layouts, themes, the framework widgets, fragments, SQLite, AppCompat, ConstraintLayout, RecyclerView, Material and Kotlin -- through the Android compatibility runtime.",
+      "tests": [
+        "AndroidCompatMainScreenshotTest",
+        "AndroidCompatDetailScreenshotTest",
+        "AndroidCompatWidgetsScreenshotTest",
+        "AndroidCompatListScreenshotTest",
+        "AndroidCompatFragmentsScreenshotTest",
+        "AndroidCompatInputsScreenshotTest",
+        "AndroidCompatDataScreenshotTest",
+        "AndroidCompatAppCompatScreenshotTest",
+        "AndroidCompatConstraintScreenshotTest",
+        "AndroidCompatJetpackScreenshotTest",
+        "AndroidCompatRecyclerScreenshotTest",
+        "AndroidCompatMaterialScreenshotTest",
+        "AndroidCompatKotlinScreenshotTest"
+      ]
+    },
+    {
       "id": "ads",
       "category": "Application runtime",
       "name": "Advertising components",
@@ -1478,6 +1499,58 @@
     {
       "pattern": "Window-Dialog*",
       "test": "WindowDialogTest"
+    },
+    {
+      "pattern": "AndroidCompatMain",
+      "test": "AndroidCompatMainScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatDetail",
+      "test": "AndroidCompatDetailScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatWidgets",
+      "test": "AndroidCompatWidgetsScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatList",
+      "test": "AndroidCompatListScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatFragments",
+      "test": "AndroidCompatFragmentsScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatInputs",
+      "test": "AndroidCompatInputsScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatData",
+      "test": "AndroidCompatDataScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatAppCompat",
+      "test": "AndroidCompatAppCompatScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatConstraint",
+      "test": "AndroidCompatConstraintScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatJetpack",
+      "test": "AndroidCompatJetpackScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatRecycler",
+      "test": "AndroidCompatRecyclerScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatMaterial",
+      "test": "AndroidCompatMaterialScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatKotlin",
+      "test": "AndroidCompatKotlinScreenshotTest"
     }
   ]
 }

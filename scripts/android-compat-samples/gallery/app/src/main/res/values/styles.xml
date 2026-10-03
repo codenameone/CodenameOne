@@ -1,0 +1,24 @@
+<resources>
+    <style name="AppTheme" parent="android:Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorAccent">@color/accent</item>
+    </style>
+    <style name="Title">
+        <item name="android:textSize">@dimen/title_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?android:attr/colorPrimary</item>
+    </style>
+    <style name="AppTheme.Compat" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary</item>
+        <item name="colorAccent">@color/accent</item>
+    </style>
+    <style name="AppTheme.Jetpack" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary</item>
+        <item name="colorAccent">@color/accent</item>
+    </style>
+    <style name="AppTheme.Material" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">#FF6750A4</item>
+    </style>
+</resources>

@@ -990,11 +990,14 @@ public class SimpleDateFormat extends DateFormat {
                 return readSubstring(source, ofs, ofs + month.length());
             }
         }
-        if (ds.isLocalized()) {
-            ds.setLocalized(false);
-            String s = readMonth(source, ofs, token, adjacent);
-            ds.setLocalized(true);
-            return s;
+        // The English names, long or abbreviated, as parseMonth accepts them.
+        for (String month : DateFormatSymbols.MONTHS) {
+            if (fragment.equalsIgnoreCase(month)) {
+                return readSubstring(source, ofs, ofs + month.length());
+            }
+            if (fragment.equalsIgnoreCase(month.substring(0, 3))) {
+                return readSubstring(source, ofs, ofs + 3);
+            }
         }
         return null;
     }
@@ -1043,17 +1046,15 @@ public class SimpleDateFormat extends DateFormat {
                 return i + Calendar.JANUARY;
             }
         }
-        if (ds.isLocalized()) {
-            ds.setLocalized(false);
-            int i = 0;
-            try {
-                i = parseMonth(month, offset);
-            } finally {
-                ds.setLocalized(true);
+        // The English names are always accepted, long or abbreviated, whatever
+        // the platform's language. This used to switch the shared symbols to
+        // unlocalized and retry, which the symbols' cached short names ignored.
+        String[] english = DateFormatSymbols.MONTHS;
+        for (int i = 0; i < english.length; i++) {
+            if (month.equalsIgnoreCase(english[i]) || month.equalsIgnoreCase(english[i].substring(0, 3))) {
+                return i + Calendar.JANUARY;
             }
-            return i;
         }
-
         return throwInvalid("month", offset);
     }
 

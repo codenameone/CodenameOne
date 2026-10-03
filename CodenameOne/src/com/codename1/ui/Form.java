@@ -1671,7 +1671,12 @@ public class Form extends Container implements TopLevelContainer {
         transitionOutAnimator = laf.getDefaultFormTransitionOut();
         transitionInAnimator = laf.getDefaultFormTransitionIn();
         focusScrolling = laf.isFocusScrolling();
-        if (menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass())) {
+        // A form with a toolbar uses the toolbar's own menu bar, whose class is
+        // never the look and feel's. Replacing it here disconnected the form
+        // from its toolbar on every theme refresh and dropped the back command
+        // the hardware back key runs.
+        boolean toolbarOwnsMenuBar = toolbar != null && menuBar != null && menuBar == toolbar.getMenuBar();
+        if (!toolbarOwnsMenuBar && (menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass()))) {
             try {
                 menuBar = (MenuBar) laf.getMenuBarClass().newInstance();
             } catch (Exception ex) {

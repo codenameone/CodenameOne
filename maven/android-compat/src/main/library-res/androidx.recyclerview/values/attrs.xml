@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- androidx.recyclerview: the RecyclerView attributes, as the library
+     declares them. -->
+<resources>
+    <attr name="recyclerViewStyle" format="reference"/>
+    <attr name="layoutManager" format="string"/>
+    <attr name="spanCount" format="integer"/>
+    <attr name="reverseLayout" format="boolean"/>
+    <attr name="stackFromEnd" format="boolean"/>
+    <attr name="fastScrollEnabled" format="boolean"/>
+    <attr name="fastScrollVerticalThumbDrawable" format="reference"/>
+    <attr name="fastScrollVerticalTrackDrawable" format="reference"/>
+    <attr name="fastScrollHorizontalThumbDrawable" format="reference"/>
+    <attr name="fastScrollHorizontalTrackDrawable" format="reference"/>
+    <declare-styleable name="RecyclerView">
+        <attr name="android:orientation"/>
+        <attr name="android:clipToPadding"/>
+        <attr name="layoutManager"/>
+        <attr name="spanCount"/>
+        <attr name="reverseLayout"/>
+        <attr name="stackFromEnd"/>
+        <attr name="fastScrollEnabled"/>
+        <attr name="fastScrollVerticalThumbDrawable"/>
+        <attr name="fastScrollVerticalTrackDrawable"/>
+        <attr name="fastScrollHorizontalThumbDrawable"/>
+        <attr name="fastScrollHorizontalTrackDrawable"/>
+    </declare-styleable>
+</resources>

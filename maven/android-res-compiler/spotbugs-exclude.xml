@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+        ManifestInfo is the parsed manifest handed to the build tools; it keeps
+        every value the manifest declares (minSdk, targetSdk, an activity's
+        windowSoftInputMode...) even where no current consumer reads it.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.android.rescompiler.ManifestInfo"/>
+            <Class name="com.codename1.android.rescompiler.ManifestInfo$Activity"/>
+        </Or>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+    <!--
+        The encoder resolves references against the compiler's symbol table,
+        which the compiler keeps filling while it encodes; sharing it is the
+        point, a copy would miss the symbols defined later.
+    -->
+    <Match>
+        <Class name="com.codename1.android.rescompiler.ValueEncoder"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

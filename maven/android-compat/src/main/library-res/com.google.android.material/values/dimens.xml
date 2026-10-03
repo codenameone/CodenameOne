@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Components' default dimensions. -->
+<resources>
+    <dimen name="m3_btn_corner">20dp</dimen>
+    <dimen name="m3_btn_inset">4dp</dimen>
+    <dimen name="m3_btn_min_height">48dp</dimen>
+    <dimen name="m3_btn_padding_horizontal">24dp</dimen>
+    <dimen name="m3_btn_text_padding_horizontal">12dp</dimen>
+    <dimen name="m3_btn_icon_size">18dp</dimen>
+    <dimen name="m3_btn_icon_padding">8dp</dimen>
+    <dimen name="m3_card_corner">12dp</dimen>
+    <dimen name="m3_card_elevated_elevation">1dp</dimen>
+    <dimen name="m3_fab_corner">16dp</dimen>
+    <dimen name="m3_fab_mini_corner">12dp</dimen>
+    <dimen name="m3_fab_elevation">6dp</dimen>
+    <dimen name="m3_extended_fab_min_height">56dp</dimen>
+    <dimen name="m3_chip_corner">8dp</dimen>
+    <dimen name="m3_chip_min_height">32dp</dimen>
+    <dimen name="m3_dialog_corner">28dp</dimen>
+    <dimen name="m3_bottom_nav_min_height">80dp</dimen>
+    <dimen name="m3_bottom_sheet_corner">28dp</dimen>
+    <dimen name="m3_snackbar_margin">8dp</dimen>
+    <dimen name="mtrl_btn_corner_radius">4dp</dimen>
+    <dimen name="mtrl_btn_inset">6dp</dimen>
+    <dimen name="mtrl_btn_min_height">48dp</dimen>
+    <dimen name="mtrl_btn_padding_horizontal">16dp</dimen>
+    <dimen name="mtrl_btn_text_btn_padding_horizontal">8dp</dimen>
+    <dimen name="mtrl_btn_elevation">2dp</dimen>
+    <dimen name="mtrl_card_corner">4dp</dimen>
+    <dimen name="mtrl_card_elevation">1dp</dimen>
+    <dimen name="mtrl_fab_elevation">6dp</dimen>
+    <dimen name="mtrl_chip_corner">16dp</dimen>
+    <dimen name="mtrl_bottom_nav_height">56dp</dimen>
+    <dimen name="mtrl_snackbar_corner">4dp</dimen>
+    <dimen name="design_fab_size_normal">56dp</dimen>
+    <dimen name="design_fab_size_mini">40dp</dimen>
+    <dimen name="design_fab_image_size">24dp</dimen>
+    <dimen name="mtrl_textinput_box_corner_radius">4dp</dimen>
+    <dimen name="mtrl_textinput_box_stroke_width_default">1dp</dimen>
+    <dimen name="mtrl_textinput_box_stroke_width_focused">2dp</dimen>
+    <dimen name="mtrl_progress_track_thickness">4dp</dimen>
+    <dimen name="mtrl_progress_circular_size">40dp</dimen>
+    <dimen name="material_divider_thickness">1dp</dimen>
+</resources>

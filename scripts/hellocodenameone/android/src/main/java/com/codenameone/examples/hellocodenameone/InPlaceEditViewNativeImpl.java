@@ -66,7 +66,15 @@ public class InPlaceEditViewNativeImpl {
                             // stopEdit removes Android views and requires Android's UI thread,
                             // not the CN1 EDT. The production wrapper performs that handoff
                             // and waits for teardown while queued relayouts can still race it.
-                            callOnEdtAndWait(() -> AndroidImplementation.stopEditing());
+                            //
+                            // The last stop closes the keyboard. In async edit mode (the
+                            // default) a plain stop leaves it up for the next field, so the
+                            // session outlived the test: every later test ran with the IME
+                            // open and a native editor caret in its capture. Forcing the
+                            // close after the session has ended does nothing, so it has to
+                            // be this stop.
+                            final boolean last = i == 49;
+                            callOnEdtAndWait(() -> AndroidImplementation.stopEditing(last));
                         }
                         Display.getInstance().callSerially(() -> InPlaceEditViewTest.onSuccess());
                     } catch (Throwable t) {

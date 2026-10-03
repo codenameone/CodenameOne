@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-android-compat</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-android-compat</name>
+    <description>
+        The android.* API (and, later, AndroidX core UI) implemented on top of
+        Codename One components, so a classic Android application compiles
+        unchanged against this jar. An application never ships these classes
+        under their android.* names: the remap-android goal of the Codename One
+        Maven plugin relocates them, together with the application's own
+        references to them, to com.codename1.androidcompat.*, which keeps them
+        clear of the real framework on an Android build.
+    </description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <framework.res.dir>${project.basedir}/src/main/framework-res</framework.res.dir>
+        <framework.java.dir>${project.build.directory}/generated-sources/android-framework</framework.java.dir>
+        <library.res.dir>${project.basedir}/src/main/library-res</library.res.dir>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>false</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+            <!-- The framework's own resources (default themes, widget styles,
+                 the attrs every view reads) are compiled by the same compiler
+                 an application build uses, run here in framework mode. It
+                 writes android.R, which the classes below are compiled
+                 against, and the symbols file application builds read so
+                 their @android: references agree with those ids. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>compile-framework-resources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.android.rescompiler.FrameworkMain</mainClass>
+                            <includeProjectDependencies>false</includeProjectDependencies>
+                            <includePluginDependencies>true</includePluginDependencies>
+                            <arguments combine.self="override">
+                                <argument>${framework.res.dir}</argument>
+                                <argument>${project.basedir}/src/main/framework-views.txt</argument>
+                                <argument>${framework.java.dir}</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                                <argument>${project.build.outputDirectory}/META-INF/android-compat/framework.symbols</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <!-- After the framework: the libraries' attrs and styles
+                         build on the framework's, read from the symbols the
+                         execution above wrote. The R classes go into the same
+                         generated source root. -->
+                    <execution>
+                        <id>compile-library-resources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.android.rescompiler.LibraryMain</mainClass>
+                            <includeProjectDependencies>false</includeProjectDependencies>
+                            <includePluginDependencies>true</includePluginDependencies>
+                            <arguments combine.self="override">
+                                <argument>${library.res.dir}</argument>
+                                <argument>${framework.java.dir}</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                                <argument>${project.build.outputDirectory}/META-INF/android-compat/library.symbols</argument>
+                                <argument>${project.build.outputDirectory}/META-INF/android-compat/framework.symbols</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-android-res-compiler</artifactId>
+                        <version>${project.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-framework-r</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${framework.java.dir}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Reactor ordering only: the exec plugin above needs the compiler
+             built first, and a plugin dependency does not order the reactor. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-android-res-compiler</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- A real SQLite engine for the android.database tests, behind a
+             JDBC-backed Codename One Database. -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.46.1.0</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The <fragment> layout tag's attributes and the ids of the list
+     fragment's standard layout. -->
+<resources>
+    <declare-styleable name="Fragment">
+        <attr name="name"/>
+        <attr name="id"/>
+        <attr name="tag"/>
+    </declare-styleable>
+    <item type="id" name="progressContainer"/>
+    <item type="id" name="listContainer"/>
+</resources>

@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Attributes of the animation resources: view animations (res/anim),
+     interpolators (res/interpolator), property animators (res/animator),
+     layout animations and the ViewAnimator widgets. Formats and enum values
+     follow the Android framework. -->
+<resources>
+    <attr name="duration" format="integer"/>
+    <attr name="startOffset" format="integer"/>
+    <attr name="fillBefore" format="boolean"/>
+    <attr name="fillAfter" format="boolean"/>
+    <attr name="fillEnabled" format="boolean"/>
+    <attr name="interpolator" format="reference"/>
+    <attr name="repeatCount" format="integer">
+        <enum name="infinite" value="-1"/>
+    </attr>
+    <attr name="repeatMode">
+        <enum name="restart" value="1"/>
+        <enum name="reverse" value="2"/>
+    </attr>
+    <attr name="zAdjustment">
+        <enum name="normal" value="0"/>
+        <enum name="top" value="1"/>
+        <enum name="bottom" value="-1"/>
+    </attr>
+    <attr name="detachWallpaper" format="boolean"/>
+    <attr name="shareInterpolator" format="boolean"/>
+    <attr name="fromAlpha" format="float"/>
+    <attr name="toAlpha" format="float"/>
+    <attr name="fromXScale" format="float|fraction|dimension"/>
+    <attr name="toXScale" format="float|fraction|dimension"/>
+    <attr name="fromYScale" format="float|fraction|dimension"/>
+    <attr name="toYScale" format="float|fraction|dimension"/>
+    <attr name="fromXDelta" format="float|fraction|dimension"/>
+    <attr name="toXDelta" format="float|fraction|dimension"/>
+    <attr name="fromYDelta" format="float|fraction|dimension"/>
+    <attr name="toYDelta" format="float|fraction|dimension"/>
+    <attr name="fromDegrees" format="float"/>
+    <attr name="toDegrees" format="float"/>
+
+    <attr name="factor" format="float"/>
+    <attr name="cycles" format="float"/>
+    <attr name="tension" format="float"/>
+    <attr name="extraTension" format="float"/>
+    <attr name="controlX1" format="float"/>
+    <attr name="controlY1" format="float"/>
+    <attr name="controlX2" format="float"/>
+    <attr name="controlY2" format="float"/>
+
+    <attr name="delay" format="float|fraction"/>
+    <attr name="animation" format="reference"/>
+    <attr name="animationOrder">
+        <enum name="normal" value="0"/>
+        <enum name="reverse" value="1"/>
+        <enum name="random" value="2"/>
+    </attr>
+    <attr name="layoutAnimation" format="reference"/>
+    <attr name="animateLayoutChanges" format="boolean"/>
+    <attr name="animationCache" format="boolean"/>
+    <attr name="persistentDrawingCache">
+        <flag name="none" value="0x0"/>
+        <flag name="animation" value="0x1"/>
+        <flag name="scrolling" value="0x2"/>
+        <flag name="all" value="0x3"/>
+    </attr>
+
+    <attr name="valueFrom" format="float|integer|color|dimension|string"/>
+    <attr name="valueTo" format="float|integer|color|dimension|string"/>
+    <attr name="valueType">
+        <enum name="floatType" value="0"/>
+        <enum name="intType" value="1"/>
+        <enum name="pathType" value="2"/>
+        <enum name="colorType" value="3"/>
+    </attr>
+    <attr name="propertyName" format="string"/>
+    <attr name="propertyXName" format="string"/>
+    <attr name="propertyYName" format="string"/>
+    <attr name="ordering">
+        <enum name="together" value="0"/>
+        <enum name="sequentially" value="1"/>
+    </attr>
+    <attr name="value" format="float|integer|color|dimension|string"/>
+    <attr name="fraction" format="float"/>
+
+    <attr name="inAnimation" format="reference"/>
+    <attr name="outAnimation" format="reference"/>
+    <attr name="animateFirstView" format="boolean"/>
+    <attr name="flipInterval" format="integer"/>
+    <attr name="autoStart" format="boolean"/>
+
+    <declare-styleable name="Animation">
+        <attr name="interpolator"/>
+        <attr name="fillEnabled"/>
+        <attr name="fillBefore"/>
+        <attr name="fillAfter"/>
+        <attr name="duration"/>
+        <attr name="startOffset"/>
+        <attr name="repeatCount"/>
+        <attr name="repeatMode"/>
+        <attr name="zAdjustment"/>
+        <attr name="detachWallpaper"/>
+    </declare-styleable>
+    <declare-styleable name="AnimationSet">
+        <attr name="shareInterpolator"/>
+        <attr name="fillBefore"/>
+        <attr name="fillAfter"/>
+        <attr name="duration"/>
+        <attr name="startOffset"/>
+        <attr name="repeatMode"/>
+    </declare-styleable>
+    <declare-styleable name="AlphaAnimation">
+        <attr name="fromAlpha"/>
+        <attr name="toAlpha"/>
+    </declare-styleable>
+    <declare-styleable name="ScaleAnimation">
+        <attr name="pivotX"/>
+        <attr name="pivotY"/>
+        <attr name="fromXScale"/>
+        <attr name="toXScale"/>
+        <attr name="fromYScale"/>
+        <attr name="toYScale"/>
+    </declare-styleable>
+    <declare-styleable name="RotateAnimation">
+        <attr name="fromDegrees"/>
+        <attr name="toDegrees"/>
+        <attr name="pivotX"/>
+        <attr name="pivotY"/>
+    </declare-styleable>
+    <declare-styleable name="TranslateAnimation">
+        <attr name="fromXDelta"/>
+        <attr name="toXDelta"/>
+        <attr name="fromYDelta"/>
+        <attr name="toYDelta"/>
+    </declare-styleable>
+    <declare-styleable name="LayoutAnimation">
+        <attr name="delay"/>
+        <attr name="animation"/>
+        <attr name="animationOrder"/>
+        <attr name="interpolator"/>
+    </declare-styleable>
+    <declare-styleable name="AccelerateInterpolator">
+        <attr name="factor"/>
+    </declare-styleable>
+    <declare-styleable name="DecelerateInterpolator">
+        <attr name="factor"/>
+    </declare-styleable>
+    <declare-styleable name="CycleInterpolator">
+        <attr name="cycles"/>
+    </declare-styleable>
+    <declare-styleable name="AnticipateInterpolator">
+        <attr name="tension"/>
+    </declare-styleable>
+    <declare-styleable name="OvershootInterpolator">
+        <attr name="tension"/>
+    </declare-styleable>
+    <declare-styleable name="AnticipateOvershootInterpolator">
+        <attr name="tension"/>
+        <attr name="extraTension"/>
+    </declare-styleable>
+    <declare-styleable name="PathInterpolator">
+        <attr name="controlX1"/>
+        <attr name="controlY1"/>
+        <attr name="controlX2"/>
+        <attr name="controlY2"/>
+        <attr name="pathData"/>
+    </declare-styleable>
+    <declare-styleable name="Animator">
+        <attr name="interpolator"/>
+        <attr name="duration"/>
+        <attr name="startOffset"/>
+        <attr name="repeatCount"/>
+        <attr name="repeatMode"/>
+        <attr name="valueFrom"/>
+        <attr name="valueTo"/>
+        <attr name="valueType"/>
+    </declare-styleable>
+    <declare-styleable name="PropertyAnimator">
+        <attr name="propertyName"/>
+        <attr name="pathData"/>
+        <attr name="propertyXName"/>
+        <attr name="propertyYName"/>
+    </declare-styleable>
+    <declare-styleable name="AnimatorSet">
+        <attr name="ordering"/>
+    </declare-styleable>
+    <declare-styleable name="PropertyValuesHolder">
+        <attr name="valueType"/>
+        <attr name="propertyName"/>
+        <attr name="valueFrom"/>
+        <attr name="valueTo"/>
+    </declare-styleable>
+    <declare-styleable name="Keyframe">
+        <attr name="value"/>
+        <attr name="interpolator"/>
+        <attr name="valueType"/>
+        <attr name="fraction"/>
+    </declare-styleable>
+    <declare-styleable name="ViewGroupAnimation">
+        <attr name="layoutAnimation"/>
+        <attr name="animateLayoutChanges"/>
+        <attr name="animationCache"/>
+        <attr name="persistentDrawingCache"/>
+    </declare-styleable>
+    <declare-styleable name="ViewAnimator">
+        <attr name="inAnimation"/>
+        <attr name="outAnimation"/>
+        <attr name="animateFirstView"/>
+    </declare-styleable>
+    <declare-styleable name="ViewFlipper">
+        <attr name="flipInterval"/>
+        <attr name="autoStart"/>
+    </declare-styleable>
+</resources>

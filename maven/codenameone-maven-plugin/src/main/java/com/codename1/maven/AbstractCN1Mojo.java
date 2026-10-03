@@ -195,6 +195,20 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (pomFile.exists()) {
                 mTime = Math.max(mTime, pomFile.lastModified());
             }
+            // The resolved dependencies too, as the Gradle host counts its
+            // classpath: a rebuilt common jar (which carries the relocated
+            // Android compatibility runtime) or an updated cn1lib edits no
+            // file above, and the generated project or cached APK kept the
+            // old classes.
+            java.util.Set<Artifact> artifacts = project.getArtifacts();
+            if (artifacts != null) {
+                for (Artifact a : artifacts) {
+                    File f = a.getFile();
+                    if (f != null && f.exists()) {
+                        mTime = Math.max(mTime, lastModifiedRecursive(f, ALL_FILES_FILTER));
+                    }
+                }
+            }
         }
         return mTime;
     }
@@ -1158,6 +1172,13 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
 
     protected void copyKotlinIncrementalCompileOutputToOutputDir() {
+        copyKotlinIncrementalCompileOutputToOutputDir(false);
+    }
+
+    /// Copies Kotlin's incremental output tree into the output directory:
+    /// what it compiled since the last copy, or with `overwrite` all of it,
+    /// replacing classes a later step rewrote.
+    protected void copyKotlinIncrementalCompileOutputToOutputDir(boolean overwrite) {
         if ("true".equals(project.getProperties().getProperty("kotlin.compiler.incremental"))) {
             File kotlinIncrementalOutputDir = new File(project.getBuild().getDirectory() + File.separator + "kotlin-ic" + File.separator + "compile" + File.separator + "classes");
             File outputDir = new File(project.getBuild().getOutputDirectory());
@@ -1169,7 +1190,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 files.setDir(kotlinIncrementalOutputDir);
                 files.setIncludes("**");
                 copy.addFileset(files);
-                copy.setOverwrite(true);
+                // Only what Kotlin compiled since the last copy. The classes in
+                // the output directory are rewritten after compiling (the
+                // compliance step's call-site rewrites, the Android remap), and
+                // an unconditional copy put the unrewritten Kotlin classes back
+                // over them every time a later goal ran.
+                copy.setOverwrite(overwrite);
                 copy.execute();
             }
 

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default styles of the list widgets. -->
+<resources>
+    <style name="Widget.Material.AbsListView">
+        <item name="scrollbars">vertical</item>
+        <item name="listSelector">?attr/selectableItemBackground</item>
+        <item name="drawSelectorOnTop">true</item>
+        <item name="cacheColorHint">@color/transparent</item>
+    </style>
+    <style name="Widget.Material.ListView" parent="Widget.Material.AbsListView">
+        <item name="divider">?attr/listDivider</item>
+        <item name="dividerHeight">1px</item>
+    </style>
+    <style name="Widget.Material.GridView" parent="Widget.Material.AbsListView">
+        <item name="numColumns">1</item>
+    </style>
+    <style name="Widget.Material.Spinner">
+        <item name="background">@drawable/spinner_background_material</item>
+        <item name="clickable">true</item>
+        <item name="focusable">true</item>
+        <item name="spinnerMode">dropdown</item>
+        <item name="gravity">start|center_vertical</item>
+        <item name="minHeight">48dp</item>
+        <item name="paddingStart">8dp</item>
+        <item name="paddingEnd">32dp</item>
+        <item name="dropDownWidth">wrap_content</item>
+        <item name="popupBackground">@drawable/popup_background_material</item>
+        <item name="popupElevation">@dimen/floating_window_z</item>
+    </style>
+    <style name="Widget.ListView" parent="Widget.Material.ListView"/>
+    <style name="Widget.GridView" parent="Widget.Material.GridView"/>
+    <style name="Widget.Spinner" parent="Widget.Material.Spinner"/>
+    <style name="Widget.DeviceDefault.ListView" parent="Widget.Material.ListView"/>
+    <style name="Widget.DeviceDefault.GridView" parent="Widget.Material.GridView"/>
+    <style name="Widget.DeviceDefault.Spinner" parent="Widget.Material.Spinner"/>
+</resources>

@@ -52,6 +52,12 @@
       </dependency>
       <dependency>
         <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-android-compat</artifactId>
+        <version>${cn1.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
         <artifactId>codenameone-buildclient</artifactId>
         <version>${cn1.version}</version>
         <scope>system</scope>

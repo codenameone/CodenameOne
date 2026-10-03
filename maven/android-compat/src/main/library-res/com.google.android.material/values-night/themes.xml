@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DayNight in dark mode: the dark Material themes. -->
+<resources>
+    <style name="Theme.MaterialComponents.DayNight" parent="Theme.MaterialComponents"/>
+    <style name="Theme.MaterialComponents.DayNight.DarkActionBar" parent="Theme.MaterialComponents"/>
+    <style name="Theme.MaterialComponents.DayNight.NoActionBar" parent="Theme.MaterialComponents.NoActionBar"/>
+    <style name="Theme.MaterialComponents.DayNight.Bridge" parent="Theme.MaterialComponents.Bridge"/>
+    <style name="Theme.MaterialComponents.DayNight.DarkActionBar.Bridge" parent="Theme.MaterialComponents.Bridge"/>
+    <style name="Theme.MaterialComponents.DayNight.NoActionBar.Bridge" parent="Theme.MaterialComponents.NoActionBar.Bridge"/>
+    <style name="Theme.Material3.DayNight" parent="Theme.Material3.Dark"/>
+    <style name="Theme.Material3.DayNight.NoActionBar" parent="Theme.Material3.Dark.NoActionBar"/>
+    <style name="Theme.Material3.DayNight.Dialog" parent="Theme.Material3.Dark.Dialog"/>
+    <style name="Theme.Material3.DynamicColors.DayNight" parent="Theme.Material3.Dark"/>
+    <style name="Theme.Material3.DynamicColors.DayNight.NoActionBar" parent="Theme.Material3.Dark.NoActionBar"/>
+</resources>

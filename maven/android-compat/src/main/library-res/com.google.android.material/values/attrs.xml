@@ -1,0 +1,622 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Components' attributes. The theme color roles and type scale of
+     both generations (MaterialComponents and Material 3), the shape
+     appearance, and the widgets' own attributes. Attributes AppCompat already
+     declares (colorPrimary, tint, backgroundTint, elevation, title, menu...)
+     are referenced, not redeclared: every library compiles into one
+     namespace. -->
+<resources>
+    <!-- Color roles. -->
+    <attr name="colorOnPrimary" format="color"/>
+    <attr name="colorPrimaryVariant" format="color"/>
+    <attr name="colorPrimaryContainer" format="color"/>
+    <attr name="colorOnPrimaryContainer" format="color"/>
+    <attr name="colorPrimaryInverse" format="color"/>
+    <attr name="colorSecondary" format="color"/>
+    <attr name="colorOnSecondary" format="color"/>
+    <attr name="colorSecondaryVariant" format="color"/>
+    <attr name="colorSecondaryContainer" format="color"/>
+    <attr name="colorOnSecondaryContainer" format="color"/>
+    <attr name="colorTertiary" format="color"/>
+    <attr name="colorOnTertiary" format="color"/>
+    <attr name="colorTertiaryContainer" format="color"/>
+    <attr name="colorOnTertiaryContainer" format="color"/>
+    <attr name="colorSurface" format="color"/>
+    <attr name="colorOnSurface" format="color"/>
+    <attr name="colorSurfaceVariant" format="color"/>
+    <attr name="colorOnSurfaceVariant" format="color"/>
+    <attr name="colorSurfaceInverse" format="color"/>
+    <attr name="colorOnSurfaceInverse" format="color"/>
+    <attr name="colorSurfaceContainerLowest" format="color"/>
+    <attr name="colorSurfaceContainerLow" format="color"/>
+    <attr name="colorSurfaceContainer" format="color"/>
+    <attr name="colorSurfaceContainerHigh" format="color"/>
+    <attr name="colorSurfaceContainerHighest" format="color"/>
+    <attr name="colorOnBackground" format="color"/>
+    <attr name="colorOnError" format="color"/>
+    <attr name="colorErrorContainer" format="color"/>
+    <attr name="colorOnErrorContainer" format="color"/>
+    <attr name="colorOutline" format="color"/>
+    <attr name="colorOutlineVariant" format="color"/>
+    <attr name="elevationOverlayEnabled" format="boolean"/>
+    <attr name="isMaterialTheme" format="boolean"/>
+    <attr name="isMaterial3Theme" format="boolean"/>
+
+    <!-- Type scale: Material 3 and MaterialComponents. -->
+    <attr name="textAppearanceDisplayLarge" format="reference"/>
+    <attr name="textAppearanceDisplayMedium" format="reference"/>
+    <attr name="textAppearanceDisplaySmall" format="reference"/>
+    <attr name="textAppearanceHeadlineLarge" format="reference"/>
+    <attr name="textAppearanceHeadlineMedium" format="reference"/>
+    <attr name="textAppearanceHeadlineSmall" format="reference"/>
+    <attr name="textAppearanceTitleLarge" format="reference"/>
+    <attr name="textAppearanceTitleMedium" format="reference"/>
+    <attr name="textAppearanceTitleSmall" format="reference"/>
+    <attr name="textAppearanceBodyLarge" format="reference"/>
+    <attr name="textAppearanceBodyMedium" format="reference"/>
+    <attr name="textAppearanceBodySmall" format="reference"/>
+    <attr name="textAppearanceLabelLarge" format="reference"/>
+    <attr name="textAppearanceLabelMedium" format="reference"/>
+    <attr name="textAppearanceLabelSmall" format="reference"/>
+    <attr name="textAppearanceHeadline1" format="reference"/>
+    <attr name="textAppearanceHeadline2" format="reference"/>
+    <attr name="textAppearanceHeadline3" format="reference"/>
+    <attr name="textAppearanceHeadline4" format="reference"/>
+    <attr name="textAppearanceHeadline5" format="reference"/>
+    <attr name="textAppearanceHeadline6" format="reference"/>
+    <attr name="textAppearanceSubtitle1" format="reference"/>
+    <attr name="textAppearanceSubtitle2" format="reference"/>
+    <attr name="textAppearanceBody1" format="reference"/>
+    <attr name="textAppearanceBody2" format="reference"/>
+    <attr name="textAppearanceCaption" format="reference"/>
+    <attr name="textAppearanceButton" format="reference"/>
+    <attr name="textAppearanceOverline" format="reference"/>
+
+    <!-- Shape. -->
+    <attr name="shapeAppearance" format="reference"/>
+    <attr name="shapeAppearanceOverlay" format="reference"/>
+    <attr name="shapeAppearanceSmallComponent" format="reference"/>
+    <attr name="shapeAppearanceMediumComponent" format="reference"/>
+    <attr name="shapeAppearanceLargeComponent" format="reference"/>
+    <attr name="shapeAppearanceCornerExtraSmall" format="reference"/>
+    <attr name="shapeAppearanceCornerSmall" format="reference"/>
+    <attr name="shapeAppearanceCornerMedium" format="reference"/>
+    <attr name="shapeAppearanceCornerLarge" format="reference"/>
+    <attr name="shapeAppearanceCornerExtraLarge" format="reference"/>
+    <attr name="cornerFamily">
+        <enum name="rounded" value="0"/>
+        <enum name="cut" value="1"/>
+    </attr>
+    <attr name="cornerSize" format="dimension|fraction"/>
+    <attr name="cornerSizeTopLeft" format="dimension|fraction"/>
+    <attr name="cornerSizeTopRight" format="dimension|fraction"/>
+    <attr name="cornerSizeBottomRight" format="dimension|fraction"/>
+    <attr name="cornerSizeBottomLeft" format="dimension|fraction"/>
+
+    <!-- Widget style attributes of the theme. -->
+    <attr name="materialButtonStyle" format="reference"/>
+    <attr name="materialButtonOutlinedStyle" format="reference"/>
+    <attr name="materialIconButtonStyle" format="reference"/>
+    <attr name="materialButtonToggleGroupStyle" format="reference"/>
+    <attr name="materialCardViewStyle" format="reference"/>
+    <attr name="floatingActionButtonStyle" format="reference"/>
+    <attr name="extendedFloatingActionButtonStyle" format="reference"/>
+    <attr name="textInputStyle" format="reference"/>
+    <attr name="textInputOutlinedStyle" format="reference"/>
+    <attr name="textInputFilledStyle" format="reference"/>
+    <attr name="chipStyle" format="reference"/>
+    <attr name="chipGroupStyle" format="reference"/>
+    <attr name="chipStandaloneStyle" format="reference"/>
+    <attr name="bottomNavigationStyle" format="reference"/>
+    <attr name="tabStyle" format="reference"/>
+    <attr name="snackbarStyle" format="reference"/>
+    <attr name="snackbarButtonStyle" format="reference"/>
+    <attr name="snackbarTextViewStyle" format="reference"/>
+    <attr name="materialAlertDialogTheme" format="reference"/>
+    <attr name="materialSwitchStyle" format="reference"/>
+    <attr name="sliderStyle" format="reference"/>
+    <attr name="linearProgressIndicatorStyle" format="reference"/>
+    <attr name="circularProgressIndicatorStyle" format="reference"/>
+    <attr name="bottomSheetDialogTheme" format="reference"/>
+    <attr name="bottomSheetStyle" format="reference"/>
+    <attr name="materialDividerStyle" format="reference"/>
+    <attr name="appBarLayoutStyle" format="reference"/>
+    <attr name="materialCalendarStyle" format="reference"/>
+
+    <!-- Widget attributes. -->
+    <attr name="cornerRadius" format="dimension"/>
+    <attr name="strokeColor" format="color"/>
+    <attr name="strokeWidth" format="dimension"/>
+    <attr name="rippleColor" format="color"/>
+    <attr name="icon" format="reference"/>
+    <attr name="iconTint" format="color"/>
+    <attr name="iconSize" format="dimension"/>
+    <attr name="iconPadding" format="dimension"/>
+    <attr name="iconGravity">
+        <flag name="start" value="0x1"/>
+        <flag name="textStart" value="0x2"/>
+        <flag name="end" value="0x3"/>
+        <flag name="textEnd" value="0x4"/>
+        <flag name="top" value="0x10"/>
+        <flag name="textTop" value="0x20"/>
+    </attr>
+    <attr name="singleSelection" format="boolean"/>
+    <attr name="selectionRequired" format="boolean"/>
+    <attr name="checkedButton" format="reference"/>
+    <attr name="cardForegroundColor" format="color"/>
+    <attr name="checkedIcon" format="reference"/>
+    <attr name="checkedIconTint" format="color"/>
+    <attr name="checkedIconVisible" format="boolean"/>
+    <attr name="checkedIconEnabled" format="boolean"/>
+    <attr name="fabSize">
+        <enum name="auto" value="-1"/>
+        <enum name="normal" value="0"/>
+        <enum name="mini" value="1"/>
+    </attr>
+    <attr name="fabCustomSize" format="dimension"/>
+    <attr name="maxImageSize" format="dimension"/>
+    <attr name="useCompatPadding" format="boolean"/>
+    <attr name="hideMotionSpec" format="reference"/>
+    <attr name="showMotionSpec" format="reference"/>
+    <attr name="boxBackgroundMode">
+        <enum name="none" value="0"/>
+        <enum name="filled" value="1"/>
+        <enum name="outline" value="2"/>
+    </attr>
+    <attr name="boxBackgroundColor" format="color"/>
+    <attr name="boxStrokeColor" format="color"/>
+    <attr name="boxStrokeErrorColor" format="color"/>
+    <attr name="boxStrokeWidth" format="dimension"/>
+    <attr name="boxStrokeWidthFocused" format="dimension"/>
+    <attr name="boxCornerRadiusTopStart" format="dimension"/>
+    <attr name="boxCornerRadiusTopEnd" format="dimension"/>
+    <attr name="boxCornerRadiusBottomStart" format="dimension"/>
+    <attr name="boxCornerRadiusBottomEnd" format="dimension"/>
+    <attr name="hintEnabled" format="boolean"/>
+    <attr name="hintAnimationEnabled" format="boolean"/>
+    <attr name="hintTextColor" format="color"/>
+    <attr name="hintTextAppearance" format="reference"/>
+    <attr name="helperText" format="string"/>
+    <attr name="helperTextEnabled" format="boolean"/>
+    <attr name="helperTextTextColor" format="color"/>
+    <attr name="helperTextTextAppearance" format="reference"/>
+    <attr name="errorEnabled" format="boolean"/>
+    <attr name="errorTextColor" format="color"/>
+    <attr name="errorTextAppearance" format="reference"/>
+    <attr name="errorIconDrawable" format="reference"/>
+    <attr name="errorIconTint" format="color"/>
+    <attr name="counterEnabled" format="boolean"/>
+    <attr name="counterMaxLength" format="integer"/>
+    <attr name="counterTextColor" format="color"/>
+    <attr name="counterOverflowTextColor" format="color"/>
+    <attr name="startIconDrawable" format="reference"/>
+    <attr name="startIconTint" format="color"/>
+    <attr name="startIconContentDescription" format="string"/>
+    <attr name="endIconMode">
+        <enum name="custom" value="-1"/>
+        <enum name="none" value="0"/>
+        <enum name="password_toggle" value="1"/>
+        <enum name="clear_text" value="2"/>
+        <enum name="dropdown_menu" value="3"/>
+    </attr>
+    <attr name="endIconDrawable" format="reference"/>
+    <attr name="endIconTint" format="color"/>
+    <attr name="endIconContentDescription" format="string"/>
+    <attr name="passwordToggleEnabled" format="boolean"/>
+    <attr name="placeholderText" format="string"/>
+    <attr name="prefixText" format="string"/>
+    <attr name="suffixText" format="string"/>
+    <attr name="chipBackgroundColor" format="color"/>
+    <attr name="chipStrokeColor" format="color"/>
+    <attr name="chipStrokeWidth" format="dimension"/>
+    <attr name="chipCornerRadius" format="dimension"/>
+    <attr name="chipMinHeight" format="dimension"/>
+    <attr name="chipIcon" format="reference"/>
+    <attr name="chipIconVisible" format="boolean"/>
+    <attr name="chipIconEnabled" format="boolean"/>
+    <attr name="chipIconTint" format="color"/>
+    <attr name="chipIconSize" format="dimension"/>
+    <attr name="closeIcon" format="reference"/>
+    <attr name="closeIconVisible" format="boolean"/>
+    <attr name="closeIconEnabled" format="boolean"/>
+    <attr name="closeIconTint" format="color"/>
+    <attr name="closeIconSize" format="dimension"/>
+    <attr name="chipStartPadding" format="dimension"/>
+    <attr name="chipEndPadding" format="dimension"/>
+    <attr name="textStartPadding" format="dimension"/>
+    <attr name="textEndPadding" format="dimension"/>
+    <attr name="chipSpacing" format="dimension"/>
+    <attr name="chipSpacingHorizontal" format="dimension"/>
+    <attr name="chipSpacingVertical" format="dimension"/>
+    <attr name="singleLine" format="boolean"/>
+    <attr name="checkedChip" format="reference"/>
+    <attr name="itemIconTint" format="color"/>
+    <attr name="itemTextColor" format="color"/>
+    <attr name="itemIconSize" format="dimension"/>
+    <attr name="itemBackground" format="reference"/>
+    <attr name="itemRippleColor" format="color"/>
+    <attr name="itemActiveIndicatorStyle" format="reference"/>
+    <attr name="itemTextAppearanceActive" format="reference"/>
+    <attr name="itemTextAppearanceInactive" format="reference"/>
+    <attr name="labelVisibilityMode">
+        <enum name="auto" value="-1"/>
+        <enum name="selected" value="0"/>
+        <enum name="labeled" value="1"/>
+        <enum name="unlabeled" value="2"/>
+    </attr>
+    <attr name="activeIndicatorColor" format="color"/>
+    <attr name="activeIndicatorWidth" format="dimension"/>
+    <attr name="activeIndicatorHeight" format="dimension"/>
+    <attr name="tabMode">
+        <enum name="scrollable" value="0"/>
+        <enum name="fixed" value="1"/>
+        <enum name="auto" value="2"/>
+    </attr>
+    <attr name="tabGravity">
+        <enum name="fill" value="0"/>
+        <enum name="center" value="1"/>
+        <enum name="start" value="2"/>
+    </attr>
+    <attr name="tabIndicatorColor" format="color"/>
+    <attr name="tabIndicatorHeight" format="dimension"/>
+    <attr name="tabIndicatorFullWidth" format="boolean"/>
+    <attr name="tabSelectedTextColor" format="color"/>
+    <attr name="tabTextColor" format="color"/>
+    <attr name="tabTextAppearance" format="reference"/>
+    <attr name="tabIconTint" format="color"/>
+    <attr name="tabRippleColor" format="color"/>
+    <attr name="tabMinWidth" format="dimension"/>
+    <attr name="tabMaxWidth" format="dimension"/>
+    <attr name="tabPaddingStart" format="dimension"/>
+    <attr name="tabPaddingEnd" format="dimension"/>
+    <attr name="tabInlineLabel" format="boolean"/>
+    <attr name="actionTextColorAlpha" format="float"/>
+    <attr name="backgroundOverlayColorAlpha" format="float"/>
+    <attr name="maxActionInlineWidth" format="dimension"/>
+    <attr name="trackDecorationTint" format="color"/>
+    <attr name="thumbIconTint" format="color"/>
+    <attr name="valueFrom" format="float"/>
+    <attr name="valueTo" format="float"/>
+    <attr name="stepSize" format="float"/>
+    <attr name="thumbColor" format="color"/>
+    <attr name="thumbRadius" format="dimension"/>
+    <attr name="trackColorActive" format="color"/>
+    <attr name="trackColorInactive" format="color"/>
+    <attr name="trackHeight" format="dimension"/>
+    <attr name="haloColor" format="color"/>
+    <attr name="labelBehavior">
+        <enum name="floating" value="0"/>
+        <enum name="withinBounds" value="3"/>
+        <enum name="gone" value="2"/>
+        <enum name="visible" value="4"/>
+    </attr>
+    <attr name="indicatorColor" format="color|reference"/>
+    <attr name="trackColor" format="color"/>
+    <attr name="trackThickness" format="dimension"/>
+    <attr name="trackCornerRadius" format="dimension"/>
+    <attr name="indicatorSize" format="dimension"/>
+    <attr name="indicatorInset" format="dimension"/>
+    <attr name="dividerColor" format="color"/>
+    <attr name="dividerThickness" format="dimension"/>
+    <attr name="dividerInsetStart" format="dimension"/>
+    <attr name="dividerInsetEnd" format="dimension"/>
+    <attr name="titleCentered" format="boolean"/>
+    <attr name="subtitleCentered" format="boolean"/>
+    <attr name="liftOnScroll" format="boolean"/>
+    <attr name="behavior_peekHeight" format="dimension">
+        <enum name="auto" value="-1"/>
+    </attr>
+    <attr name="behavior_hideable" format="boolean"/>
+    <attr name="behavior_skipCollapsed" format="boolean"/>
+    <attr name="behavior_draggable" format="boolean"/>
+    <attr name="layout_behavior" format="string"/>
+    <attr name="layout_scrollFlags">
+        <flag name="noScroll" value="0x0"/>
+        <flag name="scroll" value="0x1"/>
+        <flag name="exitUntilCollapsed" value="0x2"/>
+        <flag name="enterAlways" value="0x4"/>
+        <flag name="enterAlwaysCollapsed" value="0x8"/>
+        <flag name="snap" value="0x10"/>
+    </attr>
+    <attr name="layout_anchor" format="reference"/>
+    <attr name="layout_anchorGravity">
+        <flag name="top" value="0x30"/>
+        <flag name="bottom" value="0x50"/>
+        <flag name="left" value="0x03"/>
+        <flag name="right" value="0x05"/>
+        <flag name="center_vertical" value="0x10"/>
+        <flag name="center_horizontal" value="0x01"/>
+        <flag name="center" value="0x11"/>
+        <flag name="start" value="0x00800003"/>
+        <flag name="end" value="0x00800005"/>
+    </attr>
+
+    <!-- Styleables. -->
+    <declare-styleable name="MaterialComponentsTheme">
+        <attr name="colorPrimary"/>
+        <attr name="colorOnPrimary"/>
+        <attr name="colorSecondary"/>
+        <attr name="colorSurface"/>
+        <attr name="colorOnSurface"/>
+        <attr name="isMaterial3Theme"/>
+    </declare-styleable>
+    <declare-styleable name="ShapeAppearance">
+        <attr name="cornerFamily"/>
+        <attr name="cornerSize"/>
+        <attr name="cornerSizeTopLeft"/>
+        <attr name="cornerSizeTopRight"/>
+        <attr name="cornerSizeBottomRight"/>
+        <attr name="cornerSizeBottomLeft"/>
+    </declare-styleable>
+    <declare-styleable name="MaterialShape">
+        <attr name="shapeAppearance"/>
+        <attr name="shapeAppearanceOverlay"/>
+    </declare-styleable>
+    <declare-styleable name="MaterialButton">
+        <attr name="android:insetLeft"/>
+        <attr name="android:insetRight"/>
+        <attr name="android:insetTop"/>
+        <attr name="android:insetBottom"/>
+        <attr name="android:checkable"/>
+        <attr name="android:background"/>
+        <attr name="backgroundTint"/>
+        <attr name="cornerRadius"/>
+        <attr name="strokeColor"/>
+        <attr name="strokeWidth"/>
+        <attr name="rippleColor"/>
+        <attr name="icon"/>
+        <attr name="iconTint"/>
+        <attr name="iconSize"/>
+        <attr name="iconPadding"/>
+        <attr name="iconGravity"/>
+        <attr name="elevation"/>
+        <attr name="shapeAppearance"/>
+        <attr name="shapeAppearanceOverlay"/>
+    </declare-styleable>
+    <declare-styleable name="MaterialButtonToggleGroup">
+        <attr name="singleSelection"/>
+        <attr name="selectionRequired"/>
+        <attr name="checkedButton"/>
+    </declare-styleable>
+    <declare-styleable name="MaterialCardView">
+        <attr name="android:checkable"/>
+        <attr name="cardForegroundColor"/>
+        <attr name="strokeColor"/>
+        <attr name="strokeWidth"/>
+        <attr name="rippleColor"/>
+        <attr name="checkedIcon"/>
+        <attr name="checkedIconTint"/>
+        <attr name="shapeAppearance"/>
+        <attr name="shapeAppearanceOverlay"/>
+    </declare-styleable>
+    <declare-styleable name="FloatingActionButton">
+        <attr name="backgroundTint"/>
+        <attr name="rippleColor"/>
+        <attr name="fabSize"/>
+        <attr name="fabCustomSize"/>
+        <attr name="maxImageSize"/>
+        <attr name="elevation"/>
+        <attr name="useCompatPadding"/>
+        <attr name="tint"/>
+        <attr name="srcCompat"/>
+        <attr name="android:src"/>
+        <attr name="shapeAppearance"/>
+        <attr name="shapeAppearanceOverlay"/>
+    </declare-styleable>
+    <declare-styleable name="ExtendedFloatingActionButton">
+        <attr name="icon"/>
+        <attr name="iconTint"/>
+        <attr name="iconSize"/>
+        <attr name="iconPadding"/>
+        <attr name="backgroundTint"/>
+        <attr name="elevation"/>
+        <attr name="shapeAppearance"/>
+        <attr name="shapeAppearanceOverlay"/>
+    </declare-styleable>
+    <declare-styleable name="TextInputLayout">
+        <attr name="android:hint"/>
+        <attr name="android:textColorHint"/>
+        <attr name="android:enabled"/>
+        <attr name="hintEnabled"/>
+        <attr name="hintAnimationEnabled"/>
+        <attr name="hintTextColor"/>
+        <attr name="hintTextAppearance"/>
+        <attr name="helperText"/>
+        <attr name="helperTextEnabled"/>
+        <attr name="helperTextTextColor"/>
+        <attr name="helperTextTextAppearance"/>
+        <attr name="errorEnabled"/>
+        <attr name="errorTextColor"/>
+        <attr name="errorTextAppearance"/>
+        <attr name="errorIconDrawable"/>
+        <attr name="errorIconTint"/>
+        <attr name="counterEnabled"/>
+        <attr name="counterMaxLength"/>
+        <attr name="counterTextColor"/>
+        <attr name="counterOverflowTextColor"/>
+        <attr name="boxBackgroundMode"/>
+        <attr name="boxBackgroundColor"/>
+        <attr name="boxStrokeColor"/>
+        <attr name="boxStrokeErrorColor"/>
+        <attr name="boxStrokeWidth"/>
+        <attr name="boxStrokeWidthFocused"/>
+        <attr name="boxCornerRadiusTopStart"/>
+        <attr name="boxCornerRadiusTopEnd"/>
+        <attr name="boxCornerRadiusBottomStart"/>
+        <attr name="boxCornerRadiusBottomEnd"/>
+        <attr name="startIconDrawable"/>
+        <attr name="startIconTint"/>
+        <attr name="startIconContentDescription"/>
+        <attr name="endIconMode"/>
+        <attr name="endIconDrawable"/>
+        <attr name="endIconTint"/>
+        <attr name="endIconContentDescription"/>
+        <attr name="passwordToggleEnabled"/>
+        <attr name="placeholderText"/>
+        <attr name="prefixText"/>
+        <attr name="suffixText"/>
+        <attr name="shapeAppearance"/>
+        <attr name="shapeAppearanceOverlay"/>
+    </declare-styleable>
+    <declare-styleable name="Chip">
+        <attr name="android:text"/>
+        <attr name="android:checkable"/>
+        <attr name="android:textAppearance"/>
+        <attr name="chipBackgroundColor"/>
+        <attr name="chipStrokeColor"/>
+        <attr name="chipStrokeWidth"/>
+        <attr name="chipCornerRadius"/>
+        <attr name="chipMinHeight"/>
+        <attr name="chipIcon"/>
+        <attr name="chipIconVisible"/>
+        <attr name="chipIconEnabled"/>
+        <attr name="chipIconTint"/>
+        <attr name="chipIconSize"/>
+        <attr name="closeIcon"/>
+        <attr name="closeIconVisible"/>
+        <attr name="closeIconEnabled"/>
+        <attr name="closeIconTint"/>
+        <attr name="closeIconSize"/>
+        <attr name="checkedIcon"/>
+        <attr name="checkedIconTint"/>
+        <attr name="checkedIconVisible"/>
+        <attr name="checkedIconEnabled"/>
+        <attr name="chipStartPadding"/>
+        <attr name="chipEndPadding"/>
+        <attr name="textStartPadding"/>
+        <attr name="textEndPadding"/>
+        <attr name="rippleColor"/>
+        <attr name="shapeAppearance"/>
+        <attr name="shapeAppearanceOverlay"/>
+    </declare-styleable>
+    <declare-styleable name="ChipGroup">
+        <attr name="chipSpacing"/>
+        <attr name="chipSpacingHorizontal"/>
+        <attr name="chipSpacingVertical"/>
+        <attr name="singleLine"/>
+        <attr name="singleSelection"/>
+        <attr name="selectionRequired"/>
+        <attr name="checkedChip"/>
+    </declare-styleable>
+    <declare-styleable name="NavigationBarView">
+        <attr name="menu"/>
+        <attr name="backgroundTint"/>
+        <attr name="elevation"/>
+        <attr name="itemIconTint"/>
+        <attr name="itemTextColor"/>
+        <attr name="itemIconSize"/>
+        <attr name="itemBackground"/>
+        <attr name="itemRippleColor"/>
+        <attr name="itemActiveIndicatorStyle"/>
+        <attr name="itemTextAppearanceActive"/>
+        <attr name="itemTextAppearanceInactive"/>
+        <attr name="labelVisibilityMode"/>
+    </declare-styleable>
+    <declare-styleable name="NavigationBarActiveIndicator">
+        <attr name="android:color"/>
+        <attr name="android:width"/>
+        <attr name="android:height"/>
+        <attr name="activeIndicatorColor"/>
+        <attr name="activeIndicatorWidth"/>
+        <attr name="activeIndicatorHeight"/>
+        <attr name="shapeAppearance"/>
+    </declare-styleable>
+    <declare-styleable name="TabLayout">
+        <attr name="tabMode"/>
+        <attr name="tabGravity"/>
+        <attr name="tabIndicatorColor"/>
+        <attr name="tabIndicatorHeight"/>
+        <attr name="tabIndicatorFullWidth"/>
+        <attr name="tabSelectedTextColor"/>
+        <attr name="tabTextColor"/>
+        <attr name="tabTextAppearance"/>
+        <attr name="tabIconTint"/>
+        <attr name="tabRippleColor"/>
+        <attr name="tabMinWidth"/>
+        <attr name="tabMaxWidth"/>
+        <attr name="tabPaddingStart"/>
+        <attr name="tabPaddingEnd"/>
+        <attr name="tabInlineLabel"/>
+    </declare-styleable>
+    <declare-styleable name="TabItem">
+        <attr name="android:text"/>
+        <attr name="android:icon"/>
+        <attr name="android:layout"/>
+    </declare-styleable>
+    <declare-styleable name="SnackbarLayout">
+        <attr name="android:maxWidth"/>
+        <attr name="elevation"/>
+        <attr name="backgroundTint"/>
+        <attr name="actionTextColorAlpha"/>
+        <attr name="backgroundOverlayColorAlpha"/>
+        <attr name="maxActionInlineWidth"/>
+        <attr name="shapeAppearance"/>
+    </declare-styleable>
+    <declare-styleable name="MaterialSwitch">
+        <attr name="thumbTint"/>
+        <attr name="trackTint"/>
+        <attr name="trackDecorationTint"/>
+        <attr name="thumbIconTint"/>
+    </declare-styleable>
+    <declare-styleable name="Slider">
+        <attr name="android:value"/>
+        <attr name="android:valueFrom"/>
+        <attr name="android:valueTo"/>
+        <attr name="android:stepSize"/>
+        <attr name="android:enabled"/>
+        <attr name="valueFrom"/>
+        <attr name="valueTo"/>
+        <attr name="stepSize"/>
+        <attr name="thumbColor"/>
+        <attr name="thumbRadius"/>
+        <attr name="trackColorActive"/>
+        <attr name="trackColorInactive"/>
+        <attr name="trackHeight"/>
+        <attr name="haloColor"/>
+        <attr name="labelBehavior"/>
+    </declare-styleable>
+    <declare-styleable name="BaseProgressIndicator">
+        <attr name="android:indeterminate"/>
+        <attr name="indicatorColor"/>
+        <attr name="trackColor"/>
+        <attr name="trackThickness"/>
+        <attr name="trackCornerRadius"/>
+    </declare-styleable>
+    <declare-styleable name="CircularProgressIndicator">
+        <attr name="indicatorSize"/>
+        <attr name="indicatorInset"/>
+    </declare-styleable>
+    <declare-styleable name="MaterialDivider">
+        <attr name="dividerColor"/>
+        <attr name="dividerThickness"/>
+        <attr name="dividerInsetStart"/>
+        <attr name="dividerInsetEnd"/>
+    </declare-styleable>
+    <declare-styleable name="MaterialToolbar">
+        <attr name="navigationIconTint"/>
+        <attr name="titleCentered"/>
+        <attr name="subtitleCentered"/>
+    </declare-styleable>
+    <declare-styleable name="AppBarLayout">
+        <attr name="android:background"/>
+        <attr name="elevation"/>
+        <attr name="liftOnScroll"/>
+    </declare-styleable>
+    <declare-styleable name="AppBarLayout_Layout">
+        <attr name="layout_scrollFlags"/>
+    </declare-styleable>
+    <declare-styleable name="CoordinatorLayout_Layout">
+        <attr name="android:layout_gravity"/>
+        <attr name="layout_behavior"/>
+        <attr name="layout_anchor"/>
+        <attr name="layout_anchorGravity"/>
+    </declare-styleable>
+    <declare-styleable name="BottomSheetBehavior_Layout">
+        <attr name="behavior_peekHeight"/>
+        <attr name="behavior_hideable"/>
+        <attr name="behavior_skipCollapsed"/>
+        <attr name="behavior_draggable"/>
+        <attr name="backgroundTint"/>
+        <attr name="shapeAppearance"/>
+    </declare-styleable>
+</resources>

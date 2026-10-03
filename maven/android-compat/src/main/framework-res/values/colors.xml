@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material palette values the framework themes use, matching AOSP. -->
+<resources>
+    <color name="black">#ff000000</color>
+    <color name="white">#ffffffff</color>
+    <color name="transparent">#00000000</color>
+    <color name="darker_gray">#aaa</color>
+    <color name="holo_blue_light">#ff33b5e5</color>
+    <color name="holo_blue_dark">#ff0099cc</color>
+    <color name="holo_green_light">#ff99cc00</color>
+    <color name="holo_red_light">#ffff4444</color>
+    <color name="holo_orange_light">#ffffbb33</color>
+    <color name="background_light">#ffffffff</color>
+    <color name="background_dark">#ff000000</color>
+    <color name="primary_text_light">#de000000</color>
+    <color name="primary_text_dark">#ffffffff</color>
+    <color name="secondary_text_light">#8a000000</color>
+    <color name="secondary_text_dark">#b3ffffff</color>
+    <color name="tertiary_text_light">#61000000</color>
+    <color name="tertiary_text_dark">#80ffffff</color>
+
+    <color name="material_grey_50">#fffafafa</color>
+    <color name="material_grey_100">#fff5f5f5</color>
+    <color name="material_grey_600">#ff757575</color>
+    <color name="material_grey_800">#ff424242</color>
+    <color name="material_grey_850">#ff303030</color>
+    <color name="material_grey_900">#ff212121</color>
+    <color name="material_deep_teal_200">#ff80cbc4</color>
+    <color name="material_deep_teal_500">#ff009688</color>
+    <color name="background_material_light">@color/material_grey_50</color>
+    <color name="background_floating_material_light">@color/white</color>
+    <color name="background_floating_material_dark">@color/material_grey_800</color>
+    <color name="background_material_dark">@color/material_grey_850</color>
+    <color name="primary_material_dark">@color/material_grey_900</color>
+    <color name="primary_dark_material_dark">#ff000000</color>
+    <color name="accent_material_light">@color/material_deep_teal_500</color>
+    <color name="accent_material_dark">@color/material_deep_teal_200</color>
+    <color name="button_material_light">#ffd6d7d7</color>
+    <color name="button_material_dark">#ff5a595b</color>
+    <color name="ripple_material_light">#1f000000</color>
+    <color name="ripple_material_dark">#33ffffff</color>
+    <color name="primary_text_default_material_light">#de000000</color>
+    <color name="secondary_text_default_material_light">#8a000000</color>
+    <color name="hint_foreground_material_light">#61000000</color>
+    <color name="primary_text_default_material_dark">#ffffffff</color>
+    <color name="secondary_text_default_material_dark">#b3ffffff</color>
+    <color name="hint_foreground_material_dark">#80ffffff</color>
+    <color name="error_color_material">#fff4511e</color>
+</resources>

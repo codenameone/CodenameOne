@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <Button android:id="@+id/rv_grid" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:text="Grid"/>
+        <Button android:id="@+id/rv_shuffle" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:text="Shuffle"/>
+        <Button android:id="@+id/rv_top" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:text="Top"/>
+    </LinearLayout>
+    <TextView android:id="@+id/rv_status" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:paddingStart="16dp" android:paddingEnd="16dp"
+        android:text="Tap an item to star it, tap X to remove it"/>
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/rv_list"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
+</LinearLayout>

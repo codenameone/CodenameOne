@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- androidx.appcompat's attributes, in the application namespace: the theme
+     attributes AppCompat themes set and read, and the view attributes its
+     widgets and Toolbar declare. Formats and values follow AppCompat. -->
+<resources>
+    <!-- Theme attributes. -->
+    <attr name="isLightTheme" format="boolean"/>
+    <attr name="colorPrimary" format="color"/>
+    <attr name="colorPrimaryDark" format="color"/>
+    <attr name="colorAccent" format="color"/>
+    <attr name="colorControlNormal" format="color"/>
+    <attr name="colorControlActivated" format="color"/>
+    <attr name="colorControlHighlight" format="color"/>
+    <attr name="colorButtonNormal" format="color"/>
+    <attr name="colorSwitchThumbNormal" format="color"/>
+    <attr name="colorError" format="reference|color"/>
+    <attr name="colorBackgroundFloating" format="color"/>
+    <attr name="windowActionBar" format="boolean"/>
+    <attr name="windowNoTitle" format="boolean"/>
+    <attr name="windowActionBarOverlay" format="boolean"/>
+    <attr name="windowActionModeOverlay" format="boolean"/>
+    <attr name="actionBarSize" format="dimension">
+        <enum name="wrap_content" value="0"/>
+    </attr>
+    <attr name="actionBarStyle" format="reference"/>
+    <attr name="actionBarTheme" format="reference"/>
+    <attr name="actionBarPopupTheme" format="reference"/>
+    <attr name="actionBarItemBackground" format="reference"/>
+    <attr name="actionMenuTextColor" format="color|reference"/>
+    <attr name="actionOverflowButtonStyle" format="reference"/>
+    <attr name="actionOverflowMenuStyle" format="reference"/>
+    <attr name="actionButtonStyle" format="reference"/>
+    <attr name="toolbarStyle" format="reference"/>
+    <attr name="toolbarNavigationButtonStyle" format="reference"/>
+    <attr name="homeAsUpIndicator" format="reference"/>
+    <attr name="popupMenuStyle" format="reference"/>
+    <attr name="listPopupWindowStyle" format="reference"/>
+    <attr name="dropDownListViewStyle" format="reference"/>
+    <attr name="textAppearanceLargePopupMenu" format="reference"/>
+    <attr name="textAppearanceSmallPopupMenu" format="reference"/>
+    <attr name="textAppearanceListItem" format="reference"/>
+    <attr name="textAppearanceListItemSmall" format="reference"/>
+    <attr name="listPreferredItemHeight" format="dimension"/>
+    <attr name="listPreferredItemHeightSmall" format="dimension"/>
+    <attr name="listPreferredItemHeightLarge" format="dimension"/>
+    <attr name="listPreferredItemPaddingLeft" format="dimension"/>
+    <attr name="listPreferredItemPaddingRight" format="dimension"/>
+    <attr name="listPreferredItemPaddingStart" format="dimension"/>
+    <attr name="listPreferredItemPaddingEnd" format="dimension"/>
+    <attr name="selectableItemBackground" format="reference"/>
+    <attr name="selectableItemBackgroundBorderless" format="reference"/>
+    <attr name="controlBackground" format="reference"/>
+    <attr name="dividerHorizontal" format="reference"/>
+    <attr name="dividerVertical" format="reference"/>
+    <attr name="editTextStyle" format="reference"/>
+    <attr name="editTextBackground" format="reference"/>
+    <attr name="editTextColor" format="reference|color"/>
+    <attr name="buttonStyle" format="reference"/>
+    <attr name="buttonStyleSmall" format="reference"/>
+    <attr name="borderlessButtonStyle" format="reference"/>
+    <attr name="imageButtonStyle" format="reference"/>
+    <attr name="checkboxStyle" format="reference"/>
+    <attr name="radioButtonStyle" format="reference"/>
+    <attr name="switchStyle" format="reference"/>
+    <attr name="seekBarStyle" format="reference"/>
+    <attr name="ratingBarStyle" format="reference"/>
+    <attr name="ratingBarStyleIndicator" format="reference"/>
+    <attr name="ratingBarStyleSmall" format="reference"/>
+    <attr name="spinnerStyle" format="reference"/>
+    <attr name="autoCompleteTextViewStyle" format="reference"/>
+    <attr name="alertDialogTheme" format="reference"/>
+    <attr name="alertDialogStyle" format="reference"/>
+    <attr name="alertDialogCenterButtons" format="boolean"/>
+    <attr name="dialogTheme" format="reference"/>
+    <attr name="dialogPreferredPadding" format="dimension"/>
+    <attr name="dialogCornerRadius" format="dimension"/>
+    <attr name="viewInflaterClass" format="string"/>
+    <attr name="textAppearanceSearchResultTitle" format="reference"/>
+
+    <!-- View attributes. -->
+    <attr name="srcCompat" format="reference"/>
+    <attr name="tint" format="color"/>
+    <attr name="tintMode">
+        <enum name="src_over" value="3"/>
+        <enum name="src_in" value="5"/>
+        <enum name="src_atop" value="9"/>
+        <enum name="multiply" value="14"/>
+        <enum name="screen" value="15"/>
+        <enum name="add" value="16"/>
+    </attr>
+    <attr name="backgroundTint" format="color"/>
+    <attr name="backgroundTintMode">
+        <enum name="src_over" value="3"/>
+        <enum name="src_in" value="5"/>
+        <enum name="src_atop" value="9"/>
+        <enum name="multiply" value="14"/>
+        <enum name="screen" value="15"/>
+        <enum name="add" value="16"/>
+    </attr>
+    <attr name="buttonCompat" format="reference"/>
+    <attr name="buttonTint" format="color"/>
+    <attr name="buttonTintMode">
+        <enum name="src_over" value="3"/>
+        <enum name="src_in" value="5"/>
+        <enum name="src_atop" value="9"/>
+        <enum name="multiply" value="14"/>
+        <enum name="screen" value="15"/>
+        <enum name="add" value="16"/>
+    </attr>
+    <attr name="drawableTint" format="color"/>
+    <attr name="textAllCaps" format="reference|boolean"/>
+    <attr name="fontFamily" format="string"/>
+    <attr name="lineHeight" format="dimension"/>
+    <attr name="firstBaselineToTopHeight" format="dimension"/>
+    <attr name="lastBaselineToBottomHeight" format="dimension"/>
+    <attr name="autoSizeTextType">
+        <enum name="none" value="0"/>
+        <enum name="uniform" value="1"/>
+    </attr>
+    <attr name="autoSizeMinTextSize" format="dimension"/>
+    <attr name="autoSizeMaxTextSize" format="dimension"/>
+    <attr name="autoSizeStepGranularity" format="dimension"/>
+    <attr name="thumbTint" format="color"/>
+    <attr name="trackTint" format="color"/>
+    <attr name="track" format="reference"/>
+    <attr name="showText" format="boolean"/>
+    <attr name="switchPadding" format="dimension"/>
+    <attr name="switchMinWidth" format="dimension"/>
+    <attr name="switchTextAppearance" format="reference"/>
+    <attr name="thumbTextPadding" format="dimension"/>
+    <attr name="splitTrack" format="boolean"/>
+
+    <!-- Toolbar and action bar. -->
+    <attr name="title" format="string"/>
+    <attr name="subtitle" format="string"/>
+    <attr name="titleTextAppearance" format="reference"/>
+    <attr name="subtitleTextAppearance" format="reference"/>
+    <attr name="titleTextColor" format="color"/>
+    <attr name="subtitleTextColor" format="color"/>
+    <attr name="titleMargin" format="dimension"/>
+    <attr name="titleMarginStart" format="dimension"/>
+    <attr name="titleMarginEnd" format="dimension"/>
+    <attr name="titleMarginTop" format="dimension"/>
+    <attr name="titleMarginBottom" format="dimension"/>
+    <attr name="titleMargins" format="dimension"/>
+    <attr name="contentInsetStart" format="dimension"/>
+    <attr name="contentInsetEnd" format="dimension"/>
+    <attr name="contentInsetLeft" format="dimension"/>
+    <attr name="contentInsetRight" format="dimension"/>
+    <attr name="contentInsetStartWithNavigation" format="dimension"/>
+    <attr name="contentInsetEndWithActions" format="dimension"/>
+    <attr name="maxButtonHeight" format="dimension"/>
+    <attr name="buttonGravity">
+        <flag name="top" value="0x30"/>
+        <flag name="center_vertical" value="0x10"/>
+        <flag name="bottom" value="0x50"/>
+    </attr>
+    <attr name="collapseIcon" format="reference"/>
+    <attr name="collapseContentDescription" format="string"/>
+    <attr name="popupTheme" format="reference"/>
+    <attr name="navigationIcon" format="reference"/>
+    <attr name="navigationIconTint" format="color"/>
+    <attr name="navigationContentDescription" format="string"/>
+    <attr name="logo" format="reference"/>
+    <attr name="logoDescription" format="string"/>
+    <attr name="menu" format="reference"/>
+    <attr name="displayOptions">
+        <flag name="none" value="0"/>
+        <flag name="useLogo" value="0x1"/>
+        <flag name="showHome" value="0x2"/>
+        <flag name="homeAsUp" value="0x4"/>
+        <flag name="showTitle" value="0x8"/>
+        <flag name="showCustom" value="0x10"/>
+        <flag name="disableHome" value="0x20"/>
+    </attr>
+    <attr name="height" format="dimension"/>
+    <attr name="elevation" format="dimension"/>
+    <attr name="background" format="reference"/>
+    <attr name="titleTextStyle" format="reference"/>
+    <attr name="subtitleTextStyle" format="reference"/>
+
+    <!-- Menu items in the application namespace. -->
+    <attr name="showAsAction">
+        <flag name="never" value="0"/>
+        <flag name="ifRoom" value="1"/>
+        <flag name="always" value="2"/>
+        <flag name="withText" value="4"/>
+        <flag name="collapseActionView" value="8"/>
+    </attr>
+    <attr name="actionLayout" format="reference"/>
+    <attr name="actionViewClass" format="string"/>
+    <attr name="actionProviderClass" format="string"/>
+    <attr name="iconTint" format="color"/>
+    <attr name="contentDescription" format="string"/>
+    <attr name="tooltipText" format="string"/>
+
+    <declare-styleable name="AppCompatTheme">
+        <attr name="windowActionBar"/>
+        <attr name="windowNoTitle"/>
+        <attr name="windowActionBarOverlay"/>
+        <attr name="colorPrimary"/>
+        <attr name="colorPrimaryDark"/>
+        <attr name="colorAccent"/>
+        <attr name="colorControlNormal"/>
+        <attr name="colorControlActivated"/>
+        <attr name="colorControlHighlight"/>
+        <attr name="colorButtonNormal"/>
+        <attr name="colorError"/>
+        <attr name="actionBarSize"/>
+        <attr name="actionBarTheme"/>
+        <attr name="actionBarPopupTheme"/>
+        <attr name="homeAsUpIndicator"/>
+        <attr name="toolbarStyle"/>
+        <attr name="actionOverflowMenuStyle"/>
+        <attr name="isLightTheme"/>
+    </declare-styleable>
+    <declare-styleable name="Toolbar">
+        <attr name="android:gravity"/>
+        <attr name="android:minHeight"/>
+        <attr name="title"/>
+        <attr name="subtitle"/>
+        <attr name="titleTextAppearance"/>
+        <attr name="subtitleTextAppearance"/>
+        <attr name="titleTextColor"/>
+        <attr name="subtitleTextColor"/>
+        <attr name="titleMargin"/>
+        <attr name="titleMarginStart"/>
+        <attr name="titleMarginEnd"/>
+        <attr name="titleMarginTop"/>
+        <attr name="titleMarginBottom"/>
+        <attr name="titleMargins"/>
+        <attr name="contentInsetStart"/>
+        <attr name="contentInsetEnd"/>
+        <attr name="contentInsetLeft"/>
+        <attr name="contentInsetRight"/>
+        <attr name="contentInsetStartWithNavigation"/>
+        <attr name="contentInsetEndWithActions"/>
+        <attr name="maxButtonHeight"/>
+        <attr name="buttonGravity"/>
+        <attr name="collapseIcon"/>
+        <attr name="collapseContentDescription"/>
+        <attr name="popupTheme"/>
+        <attr name="navigationIcon"/>
+        <attr name="navigationIconTint"/>
+        <attr name="navigationContentDescription"/>
+        <attr name="logo"/>
+        <attr name="logoDescription"/>
+        <attr name="menu"/>
+    </declare-styleable>
+    <declare-styleable name="ActionBar">
+        <attr name="background"/>
+        <attr name="displayOptions"/>
+        <attr name="elevation"/>
+        <attr name="height"/>
+        <attr name="homeAsUpIndicator"/>
+        <attr name="title"/>
+        <attr name="subtitle"/>
+        <attr name="titleTextStyle"/>
+        <attr name="subtitleTextStyle"/>
+        <attr name="popupTheme"/>
+        <attr name="contentInsetStart"/>
+        <attr name="contentInsetEnd"/>
+    </declare-styleable>
+    <declare-styleable name="AppCompatImageView">
+        <attr name="android:src"/>
+        <attr name="srcCompat"/>
+        <attr name="tint"/>
+        <attr name="tintMode"/>
+    </declare-styleable>
+    <declare-styleable name="ViewBackgroundHelper">
+        <attr name="android:background"/>
+        <attr name="backgroundTint"/>
+        <attr name="backgroundTintMode"/>
+    </declare-styleable>
+    <declare-styleable name="AppCompatTextView">
+        <attr name="android:textAppearance"/>
+        <attr name="textAllCaps"/>
+        <attr name="fontFamily"/>
+        <attr name="lineHeight"/>
+        <attr name="drawableTint"/>
+        <attr name="firstBaselineToTopHeight"/>
+        <attr name="lastBaselineToBottomHeight"/>
+        <attr name="autoSizeTextType"/>
+        <attr name="autoSizeMinTextSize"/>
+        <attr name="autoSizeMaxTextSize"/>
+        <attr name="autoSizeStepGranularity"/>
+    </declare-styleable>
+    <declare-styleable name="CompoundButton">
+        <attr name="android:button"/>
+        <attr name="buttonCompat"/>
+        <attr name="buttonTint"/>
+        <attr name="buttonTintMode"/>
+    </declare-styleable>
+    <declare-styleable name="SwitchCompat">
+        <attr name="android:textOn"/>
+        <attr name="android:textOff"/>
+        <attr name="android:thumb"/>
+        <attr name="thumbTint"/>
+        <attr name="track"/>
+        <attr name="trackTint"/>
+        <attr name="showText"/>
+        <attr name="switchPadding"/>
+        <attr name="switchMinWidth"/>
+        <attr name="switchTextAppearance"/>
+        <attr name="thumbTextPadding"/>
+        <attr name="splitTrack"/>
+    </declare-styleable>
+    <declare-styleable name="MenuItem">
+        <attr name="showAsAction"/>
+        <attr name="actionLayout"/>
+        <attr name="actionViewClass"/>
+        <attr name="actionProviderClass"/>
+        <attr name="iconTint"/>
+        <attr name="contentDescription"/>
+        <attr name="tooltipText"/>
+    </declare-styleable>
+</resources>

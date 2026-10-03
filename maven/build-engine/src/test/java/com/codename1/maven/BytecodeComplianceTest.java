@@ -205,6 +205,27 @@ class BytecodeComplianceTest {
         assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
     }
 
+    /// Kotlin data classes hash each property through Java 8's static wrapper
+    /// methods, which the device runtime does not define.
+    @Test
+    void rewritesStaticWrapperHashAndCompare(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        writePrimitiveCaller(outputDir, "app/IntHash", "java/lang/Integer", "hashCode", "(I)I");
+        writePrimitiveCaller(outputDir, "app/DoubleHash", "java/lang/Double", "hashCode", "(D)I");
+        writePrimitiveCaller(outputDir, "app/BoolCompare", "java/lang/Boolean", "compare", "(ZZ)I");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        applyInvocationRewrites(mojo, outputDir.toFile());
+
+        assertTrue(containsMethodInsn(Files.readAllBytes(outputDir.resolve("app/IntHash.class")),
+                "com/codename1/impl/JdkApiRewriteHelper", "hashCode", "(I)I", Opcodes.INVOKESTATIC));
+        assertTrue(containsMethodInsn(Files.readAllBytes(outputDir.resolve("app/DoubleHash.class")),
+                "com/codename1/impl/JdkApiRewriteHelper", "hashCode", "(D)I", Opcodes.INVOKESTATIC));
+        assertTrue(containsMethodInsn(Files.readAllBytes(outputDir.resolve("app/BoolCompare.class")),
+                "com/codename1/impl/JdkApiRewriteHelper", "compare", "(ZZ)I", Opcodes.INVOKESTATIC));
+    }
+
     @Test
     void allowsRewriteHelperCallsAfterSplitRewrite(@TempDir Path tempDir) throws Exception {
         Path outputDir = tempDir.resolve("classes");
@@ -791,6 +812,39 @@ class BytecodeComplianceTest {
         run.visitMaxs(0, 1);
         run.visitEnd();
 
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    /// A class whose run() pushes zero for each primitive argument of a static
+    /// int-returning method, calls it and drops the result: valid bytecode.
+    private void writePrimitiveCaller(Path root, String className, String owner, String methodName,
+                                      String descriptor) throws Exception {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        for (org.objectweb.asm.Type arg : org.objectweb.asm.Type.getArgumentTypes(descriptor)) {
+            switch (arg.getSort()) {
+                case org.objectweb.asm.Type.LONG:
+                    run.visitInsn(Opcodes.LCONST_0);
+                    break;
+                case org.objectweb.asm.Type.DOUBLE:
+                    run.visitInsn(Opcodes.DCONST_0);
+                    break;
+                case org.objectweb.asm.Type.FLOAT:
+                    run.visitInsn(Opcodes.FCONST_0);
+                    break;
+                default:
+                    run.visitInsn(Opcodes.ICONST_0);
+                    break;
+            }
+        }
+        run.visitMethodInsn(Opcodes.INVOKESTATIC, owner, methodName, descriptor, false);
+        run.visitInsn(Opcodes.POP);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(0, 0);
+        run.visitEnd();
         writer.visitEnd();
         writeBytes(root, className, writer.toByteArray());
     }

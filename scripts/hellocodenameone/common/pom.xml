@@ -11,8 +11,19 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
+    <properties>
+        <!-- The Android compatibility gallery's Android Studio module, compiled
+             into this app so its screens run as screenshot tests on every port. -->
+        <android.gallery.dir>${project.basedir}/../../android-compat-samples/gallery/app/src/main</android.gallery.dir>
+    </properties>
+
     <!-- Add your cn1lib dependencies to this section -->
     <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-android-compat</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
@@ -143,6 +154,9 @@
                         <executions>
                             <execution>
                                 <id>compile</id>
+                                <!-- Ahead of javac: the generated Android factory (Java) names
+                                     the gallery's Kotlin activity. -->
+                                <phase>process-sources</phase>
                                 <goals>
                                     <goal>compile</goal>
                                 </goals>
@@ -150,6 +164,9 @@
                                     <sourceDirs>
                                         <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
                                         <sourceDir>${project.basedir}/src/main/java</sourceDir>
+                                        <sourceDir>${android.gallery.dir}/kotlin</sourceDir>
+                                        <sourceDir>${android.gallery.dir}/java</sourceDir>
+                                        <sourceDir>${project.build.directory}/generated-sources/android</sourceDir>
                                     </sourceDirs>
                                     <args>
                                         <arg>-no-reflect</arg>
@@ -380,6 +397,19 @@
                             <goal>transcode-svg</goal>
                         </goals>
                     </execution>
+                    <!-- The Android compatibility gallery
+                         (scripts/android-compat-samples/gallery), built from its own
+                         Android Studio module: its screens are screenshot tests too. -->
+                    <execution>
+                        <id>compile-android-res</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>compile-android-res</goal>
+                        </goals>
+                        <configuration>
+                            <androidSourceDir>${android.gallery.dir}</androidSourceDir>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
@@ -391,6 +421,7 @@
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
                         <goals>
+                            <goal>remap-android</goal>
                             <goal>bytecode-compliance</goal>
                             <goal>css</goal>
                             <goal>process-annotations</goal>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Public android.R.id values applications refer to. -->
+<resources>
+    <item type="id" name="content"/>
+    <item type="id" name="background"/>
+    <item type="id" name="button1"/>
+    <item type="id" name="button2"/>
+    <item type="id" name="button3"/>
+    <item type="id" name="checkbox"/>
+    <item type="id" name="custom"/>
+    <item type="id" name="edit"/>
+    <item type="id" name="empty"/>
+    <item type="id" name="home"/>
+    <item type="id" name="icon"/>
+    <item type="id" name="icon1"/>
+    <item type="id" name="icon2"/>
+    <item type="id" name="input"/>
+    <item type="id" name="list"/>
+    <item type="id" name="mask"/>
+    <item type="id" name="message"/>
+    <item type="id" name="primary"/>
+    <item type="id" name="progress"/>
+    <item type="id" name="secondaryProgress"/>
+    <item type="id" name="selectAll"/>
+    <item type="id" name="copy"/>
+    <item type="id" name="cut"/>
+    <item type="id" name="paste"/>
+    <item type="id" name="summary"/>
+    <item type="id" name="tabcontent"/>
+    <item type="id" name="tabhost"/>
+    <item type="id" name="tabs"/>
+    <item type="id" name="text1"/>
+    <item type="id" name="text2"/>
+    <item type="id" name="title"/>
+    <item type="id" name="toggle"/>
+    <item type="id" name="widget_frame"/>
+</resources>
