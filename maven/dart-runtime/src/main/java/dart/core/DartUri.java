@@ -791,7 +791,9 @@ public final class DartUri {
         }
         // Dart drops the scheme's default port and an empty one, and prints the
         // rest in decimal: http://a.com:80/x is http://a.com/x, so the two are
-        // equal and hash alike.
+        // equal and hash alike. That is the only change: Dart does NOT add "/" to
+        // an empty path after an authority (dart 3.9.3: Uri.parse('http://a.com')
+        // prints http://a.com and is not equal to http://a.com/), so neither does this.
         String digits = folded.substring(portColon + 1, portEnd);
         String port = canonicalPort(digits, scheme);
         if (port.length() > 0 && port.equals(digits)) {
