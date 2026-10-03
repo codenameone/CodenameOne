@@ -34,7 +34,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Behavioral execution tests: each dir under src/test/resources/behavior/
@@ -44,7 +43,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * expect.txt. Pins semantics: int math, double formatting, map ordering,
  * closure capture.
  *
- * <p>Skipped when JAVA17_HOME or the dart-runtime jar is unavailable.</p>
+ * <p>Skipped when JAVA17_HOME or the dart-runtime jar is unavailable, unless
+ * CN1_DART_TESTS_REQUIRED=1 (CI), which makes that a failure.</p>
  */
 public class BehaviorTest {
 
@@ -69,13 +69,18 @@ public class BehaviorTest {
         File java17 = TestSupport.java17Home();
         File dartRuntime = TestSupport.findJar("codenameone-dart-runtime");
         File core = TestSupport.findJar("codenameone-core");
-        assumeTrue(java17 != null, "JAVA17_HOME not set — skipping behavioral execution");
-        assumeTrue(dartRuntime != null && core != null, "runtime jars not built — skipping");
+        TestSupport.prerequisite(java17 != null, "JAVA17_HOME not set - skipping behavioral execution");
+        TestSupport.prerequisite(dartRuntime != null && core != null, "runtime jars not built - skipping");
         String rtClasspath = dartRuntime.getAbsolutePath() + File.pathSeparator + core.getAbsolutePath();
         // A case that touches a widget API needs the Flutter runtime to link against.
         // Cases that do not are unaffected by its presence, so this is unconditional
         // rather than another thing each case has to declare.
         File flutterRuntime = TestSupport.findJar("codenameone-flutter-runtime");
+        // Optional locally, but in CI a missing jar would fail only the widget cases,
+        // and with a less useful message than this.
+        if (TestSupport.required()) {
+            TestSupport.prerequisite(flutterRuntime != null, "flutter-runtime jar not built");
+        }
         if (flutterRuntime != null) {
             rtClasspath = rtClasspath + File.pathSeparator + flutterRuntime.getAbsolutePath();
         }
@@ -119,6 +124,10 @@ public class BehaviorTest {
         javac.add(new File(java17, "bin/javac").getAbsolutePath());
         javac.add("-cp");
         javac.add(rtClasspath);
+        // The sources were written as UTF-8; without this javac reads them in the
+        // platform charset, which is ASCII in a C-locale CI container.
+        javac.add("-encoding");
+        javac.add("UTF-8");
         javac.add("-d");
         javac.add(classes.getAbsolutePath());
         javac.addAll(javacArgs);
@@ -127,6 +136,9 @@ public class BehaviorTest {
 
         List<String> java = new ArrayList<String>();
         java.add(new File(java17, "bin/java").getAbsolutePath());
+        // stdout is read back as UTF-8 below, so it must be written as UTF-8.
+        java.add("-Dfile.encoding=UTF-8");
+        java.add("-Dstdout.encoding=UTF-8");
         java.add("-cp");
         java.add(classes.getAbsolutePath() + File.pathSeparator + rtClasspath);
         java.add("Runner");

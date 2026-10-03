@@ -102,11 +102,37 @@ public final class TestSupport {
         return null;
     }
 
+    /**
+     * Set in CI ({@code CN1_DART_TESTS_REQUIRED=1}): a missing JDK 17 or runtime jar then
+     * FAILS the compile/behavior tests instead of skipping them. Without it a CI leg that
+     * lacks JAVA17_HOME reports every behavior case "skipped" and the build stays green
+     * having executed nothing.
+     */
+    public static boolean required() {
+        return "1".equals(System.getenv("CN1_DART_TESTS_REQUIRED"));
+    }
+
+    /** assumeTrue locally, assertTrue when {@link #required()}. */
+    public static void prerequisite(boolean ok, String message) {
+        if (required()) {
+            org.junit.jupiter.api.Assertions.assertTrue(ok, message
+                    + " (CN1_DART_TESTS_REQUIRED=1 turns this skip into a failure)");
+        } else {
+            org.junit.jupiter.api.Assumptions.assumeTrue(ok, message);
+        }
+    }
+
     /** Locates a sibling-module or local-repo jar; null if not built yet. */
     public static File findJar(String artifactId) {
         String version = "8.0-SNAPSHOT";
+        File sibling = new File("../" + moduleDir(artifactId) + "/target/" + artifactId + "-" + version + ".jar");
+        if (required()) {
+            // Only this build's own jar: the fallbacks below are whatever some earlier
+            // build left in a shared repository, so a stale runtime would be tested.
+            return sibling.exists() ? sibling : null;
+        }
         File[] candidates = new File[] {
-                new File("../" + moduleDir(artifactId) + "/target/" + artifactId + "-" + version + ".jar"),
+                sibling,
                 new File("/tmp/cn1-local-repo/com/codenameone/" + artifactId + "/" + version + "/"
                         + artifactId + "-" + version + ".jar"),
                 new File(System.getProperty("user.home"),

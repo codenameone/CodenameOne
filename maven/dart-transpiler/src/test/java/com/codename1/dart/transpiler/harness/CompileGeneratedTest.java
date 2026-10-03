@@ -33,7 +33,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Compiles the transpiled counter app with the real JDK 17 javac against the
@@ -58,8 +57,8 @@ public class CompileGeneratedTest {
         File dartRuntime = TestSupport.findJar("codenameone-dart-runtime");
         File flutterRuntime = TestSupport.findJar("codenameone-flutter-runtime");
         File core = TestSupport.findJar("codenameone-core");
-        assumeTrue(java17 != null, "JAVA17_HOME not set — skipping compile check");
-        assumeTrue(dartRuntime != null && flutterRuntime != null && core != null,
+        TestSupport.prerequisite(java17 != null, "JAVA17_HOME not set - skipping compile check");
+        TestSupport.prerequisite(dartRuntime != null && flutterRuntime != null && core != null,
                 "runtime jars not built — skipping compile check");
 
         TestSupport.Result r = TestSupport.transpile(new String[][] {
@@ -82,6 +81,10 @@ public class CompileGeneratedTest {
         javac.add("-cp");
         javac.add(dartRuntime.getAbsolutePath() + File.pathSeparator
                 + flutterRuntime.getAbsolutePath() + File.pathSeparator + core.getAbsolutePath());
+        // The sources were written as UTF-8; without this javac reads them in the
+        // platform charset, which is ASCII in a C-locale CI container.
+        javac.add("-encoding");
+        javac.add("UTF-8");
         javac.add("-d");
         javac.add(classes.getAbsolutePath());
         javac.addAll(args);
