@@ -2854,7 +2854,10 @@ public class ByteCodeClass {
             return;
         }
         for(BytecodeMethod m : baseInterface.methods) {
-            if(m.isStatic() || m.isPrivate()) {
+            // An eliminated method has no virtual_ dispatcher (the vtable list leaves it
+            // out), so a forwarding wrapper for it would call an undeclared function.
+            // Nothing calls it either: the cull removed it for having no caller.
+            if(m.isStatic() || m.isPrivate() || m.isEliminated()) {
                 continue;
             }
             if(!bm.contains(m)) {
@@ -2883,7 +2886,7 @@ public class ByteCodeClass {
             return;
         }
         for(BytecodeMethod m : baseInterface.methods) {
-            if(m.isStatic() || m.isPrivate()) {
+            if(m.isStatic() || m.isPrivate() || m.isEliminated()) {
                 continue;
             }
             if(!bm.contains(m)) {

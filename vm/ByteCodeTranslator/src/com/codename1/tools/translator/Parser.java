@@ -957,6 +957,28 @@ public class Parser extends ClassVisitor {
         return classIndexMap;
     }
 
+    /**
+     * Whether any method in the program calls {@code cls.method} (by name, any
+     * signature). Answers before the cull too: a class that is merely loaded -- named
+     * by code that will itself be culled -- has no callers of its factory.
+     */
+    static boolean hasCallers(String cls, String method) {
+        ByteCodeClass c = getClassObject(cls);
+        if (c == null) {
+            return false;
+        }
+        for (BytecodeMethod m : c.getMethods()) {
+            if (method.equals(m.getMethodName()) && !m.isEliminated()) {
+                for (BytecodeMethod caller : dependencyGraph.getCallers(m.getLookupSignature())) {
+                    if (!caller.isEliminated() && caller != m) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     public static ByteCodeClass getClassObject(String name) {
         return classIndex().get(name);
     }
@@ -1724,7 +1746,13 @@ public class Parser extends ClassVisitor {
         int nfound = 0;
         for(ByteCodeClass bc : classes) {
             bc.unmark();
-            if(bc.isIsInterface() || bc.getBaseClass() == null) {
+            // java.lang.Object (no base class) is the dispatch root and stays whole. An
+            // interface is culled like a class, but only for the methods with a body --
+            // default and static ones -- since an abstract method has nothing to remove.
+            // Skipping interfaces outright kept every default method alive, and through
+            // it everything the body references: a default Collection.stream() put the
+            // whole stream implementation into every native application.
+            if(bc.getBaseClass() == null && !bc.isIsInterface()) {
                 continue;
             }
             // Open-world output: every method of a kept class may be called by code
@@ -1733,6 +1761,9 @@ public class Parser extends ClassVisitor {
                 continue;
             }
             for(BytecodeMethod mtd : bc.getMethods()) {
+                if(bc.isIsInterface() && mtd.isAbstract() && !mtd.isStatic()) {
+                    continue;
+                }
                 // Pure-Java twins that the JS runtime's bindNative delegates call
                 // (getImpl/putImpl/toStringImpl/valueOfHeap...): no bytecode call
                 // site exists, so without this keep they would be culled and the

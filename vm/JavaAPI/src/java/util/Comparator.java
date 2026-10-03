@@ -170,7 +170,10 @@ public interface Comparator<T> {
      */
     @SuppressWarnings("unchecked")
     static <T extends Comparable<? super T>> Comparator<T> reverseOrder() {
-        return Collections.<T>reverseOrder();
+        // Not Collections.reverseOrder(): naming Collections here makes the translator
+        // load it, and with it classes (Collections.SetFromMap) whose presence the native
+        // collection traversal keys on, in every application.
+        return (Comparator<T>) NaturalOrder.INSTANCE.reversed();
     }
 }
 
