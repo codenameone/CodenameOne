@@ -96,25 +96,25 @@
      "from": {
       "value": 38015576
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 19353616
+     "value": 19402888
     },
     "install_bytes": {
      "from": {
       "value": 145431213
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 114802461
+     "value": 114851733
     },
     "wire_bytes": {
      "from": {
       "value": 110425140
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 84356652
+     "value": 84377598
     }
    }
   },
@@ -124,25 +124,25 @@
      "from": {
       "value": 12910326
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 12755936
+     "value": 12803600
     },
     "install_bytes": {
      "from": {
       "value": 110000963
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 108042233
+     "value": 108089897
     },
     "wire_bytes": {
      "from": {
       "value": 80610118
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 79700879
+     "value": 79709886
     }
    }
   },
@@ -152,25 +152,25 @@
      "from": {
       "value": 18958610
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 14471954
+     "value": 14523602
     },
     "install_bytes": {
      "from": {
       "value": 119594984
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 116288608
+     "value": 116342496
     },
     "wire_bytes": {
      "from": {
       "value": 95706942
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 84659845
+     "value": 84685068
     }
    }
   },
@@ -180,25 +180,25 @@
      "from": {
       "value": 73212360
      },
-     "reason": "transpiler correctness fixes (taken-arm-only conditional lowering, unwind handler kept in the 29 lazy getters whose initialiser can throw); run 37108550256 at 290129e4f3",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 36891080
+     "value": 36989896
     },
     "install_bytes": {
      "from": {
       "value": 168810517
      },
-     "reason": "transpiler correctness fixes (taken-arm-only conditional lowering, unwind handler kept in the 29 lazy getters whose initialiser can throw); run 37108550256 at 290129e4f3",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 132416557
+     "value": 132515373
     },
     "wire_bytes": {
      "from": {
       "value": 109700753
      },
-     "reason": "transpiler correctness fixes (taken-arm-only conditional lowering, unwind handler kept in the 29 lazy getters whose initialiser can throw); run 37108550256 at 290129e4f3",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 90647305
+     "value": 90694082
     }
    }
   },
@@ -208,17 +208,17 @@
      "from": {
       "value": 17088000
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 13283328
+     "value": 13323264
     },
     "install_bytes": {
      "from": {
       "value": 116684800
      },
-     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
      "runs": 1,
-     "value": 114260992
+     "value": 114305024
     },
     "wire_bytes": {
      "from": {
