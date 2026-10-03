@@ -307,11 +307,7 @@ public class LocalForage {
     }
     
     public String getString(String key) throws IOException {
-        JSObject o = getItem(key);
-        if (o==null) {
-            return null;
-        }
-        return ((JSString)o).stringValue();
+        return JS.unwrapString(getItem(key));
     }
     
     public <T extends JSObject> T getItem(String key, Class<T> type) throws IOException {
