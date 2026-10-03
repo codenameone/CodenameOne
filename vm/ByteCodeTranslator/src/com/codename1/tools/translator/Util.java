@@ -24,13 +24,16 @@ package com.codename1.tools.translator;
 
 import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.TryCatch;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class Util {
 
@@ -411,6 +414,144 @@ public class Util {
         } finally {
             out.close();
         }
+    }
+
+    /** The whole content of {@code source}; stands in for {@code Files.readAllBytes}. */
+    public static byte[] readBytes(File source) throws IOException {
+        InputStream in = new FileInputStream(source);
+        try {
+            return readFully(in);
+        } finally {
+            in.close();
+        }
+    }
+
+    /** Every remaining byte of {@code in}, which is left open. */
+    public static byte[] readFully(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int n;
+        while ((n = in.read(buffer)) > 0) {
+            out.write(buffer, 0, n);
+        }
+        return out.toByteArray();
+    }
+
+    /** {@code source} decoded as UTF-8. */
+    public static String readUtf8(File source) throws IOException {
+        return utf8(readBytes(source));
+    }
+
+    /** Writes {@code text} to {@code target} as UTF-8, replacing it. */
+    public static void writeUtf8(File target, String text) throws IOException {
+        writeBytes(target, utf8(text));
+    }
+
+    /** UTF-8 bytes of {@code text}; JavaAPI's charset overloads declare a checked exception. */
+    public static byte[] utf8(String text) {
+        try {
+            return text.getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** {@code data} decoded as UTF-8. */
+    public static String utf8(byte[] data) {
+        try {
+            return new String(data, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * Copies a file, or a directory tree, from {@code source} to {@code target},
+     * replacing files that exist; does nothing when {@code source} does not exist.
+     * Entries whose name is in {@code skipNames} are left out at every level.
+     */
+    public static void copyIfPresent(File source, File target, java.util.Set<String> skipNames) throws IOException {
+        if (!source.exists()) {
+            return;
+        }
+        if (source.isDirectory()) {
+            if (!target.isDirectory() && !target.mkdirs()) {
+                throw new IOException("could not create " + target);
+            }
+            String[] names = source.list();
+            if (names == null) {
+                return;
+            }
+            for (String name : names) {
+                if (!skipNames.contains(name)) {
+                    copyIfPresent(new File(source, name), new File(target, name), skipNames);
+                }
+            }
+            return;
+        }
+        File parent = target.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            throw new IOException("could not create " + parent);
+        }
+        writeBytes(target, readBytes(source));
+    }
+
+    /**
+     * {@code System.getProperty(key, defaultValue)}, which ParparVM's JavaAPI lacks.
+     * Unlike {@link #getProperty} this does not fall back to the environment.
+     */
+    public static String systemProperty(String key, String defaultValue) {
+        String value = System.getProperty(key);
+        return value == null ? defaultValue : value;
+    }
+
+    /** {@code Integer.getInteger(key)}: the property decoded as an Integer, else null. */
+    public static Integer integerProperty(String key) {
+        String value = System.getProperty(key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(decodeInt(value));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** {@code Integer.getInteger(key, defaultValue)}. */
+    public static int integerProperty(String key, int defaultValue) {
+        Integer value = integerProperty(key);
+        return value == null ? defaultValue : value.intValue();
+    }
+
+    /** {@code Integer.decode}: an optional sign, then a 0x, 0X, # or 0 radix prefix. */
+    static int decodeInt(String s) {
+        if (s.length() == 0) {
+            throw new NumberFormatException("Zero length string");
+        }
+        int index = 0;
+        boolean negative = false;
+        char first = s.charAt(0);
+        if (first == '-' || first == '+') {
+            negative = first == '-';
+            index++;
+        }
+        int radix = 10;
+        if (s.startsWith("0x", index) || s.startsWith("0X", index)) {
+            index += 2;
+            radix = 16;
+        } else if (s.startsWith("#", index)) {
+            index++;
+            radix = 16;
+        } else if (s.startsWith("0", index) && s.length() > index + 1) {
+            index++;
+            radix = 8;
+        }
+        if (s.startsWith("-", index) || s.startsWith("+", index)) {
+            throw new NumberFormatException("Sign character in wrong position");
+        }
+        // Parsed with the sign attached so Integer.MIN_VALUE round-trips.
+        return Integer.parseInt(negative ? "-" + s.substring(index) : s.substring(index), radix);
     }
 
     /**

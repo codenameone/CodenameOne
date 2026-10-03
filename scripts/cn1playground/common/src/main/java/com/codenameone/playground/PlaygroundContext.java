@@ -1,9 +1,30 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.playground;
 
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
 import com.codename1.ui.util.Resources;
 
@@ -14,7 +35,6 @@ import java.util.List;
  * Host objects and helpers exposed to user scripts.
  */
 public class PlaygroundContext {
-    private static final ThreadLocal<PlaygroundContext> CURRENT = new ThreadLocal<PlaygroundContext>();
 
     public interface Logger {
         void log(String message);
@@ -63,49 +83,63 @@ public class PlaygroundContext {
         return theme;
     }
 
-    static void pushCurrent(PlaygroundContext context) {
-        CURRENT.set(context);
-    }
-
-    static void clearCurrent() {
-        CURRENT.remove();
-    }
-
+    /** The context of the current (or most recent) run. */
     public static PlaygroundContext getCurrent() {
-        return CURRENT.get();
+        return active;
     }
 
     public static void debug(String message) {
     }
 
-    public static void notifyConstructed(Object instance) {
-        if (!(instance instanceof Component)) {
-            return;
-        }
-        PlaygroundContext context = CURRENT.get();
-        if (context == null) {
-            return;
-        }
-        context.recordCreatedComponent((Component) instance);
+    /**
+     * The context of the most recent run. Compiled code calls {@link #showForm}
+     * (the compiler redirects {@code form.show()} there) long after the run that
+     * created it -- from a button's listener, say -- and that should still land in
+     * the preview rather than replace the Playground.
+     */
+    private static PlaygroundContext active;
+
+    /** Receives forms shown after the run finished (the Playground replaces its preview). */
+    public interface FormShownListener {
+        void formShown(Form form);
     }
 
-    public static boolean interceptMethodInvocation(Object target, String methodName, Object[] args) {
-        PlaygroundContext context = CURRENT.get();
-        if (context == null) {
-            return false;
+    private FormShownListener formShownListener;
+    private boolean runFinished;
+
+    static void activate(PlaygroundContext context) {
+        active = context;
+    }
+
+    public static PlaygroundContext getActive() {
+        return active;
+    }
+
+    public void setFormShownListener(FormShownListener listener) {
+        this.formShownListener = listener;
+    }
+
+    void markRunFinished() {
+        runFinished = true;
+    }
+
+    /**
+     * What {@code form.show()} and {@code form.showBack()} in Playground code
+     * compile to: the form becomes the preview instead of taking over the
+     * Playground. Outside a run (no active context) it just shows the form.
+     */
+    public static void showForm(Form form) {
+        PlaygroundContext context = active;
+        if (context == null || form == null) {
+            if (form != null) {
+                form.show();
+            }
+            return;
         }
-        if (!"show".equals(methodName) || (args != null && args.length != 0)) {
-            return false;
+        context.captureShownForm(form);
+        if (context.runFinished && context.formShownListener != null) {
+            context.formShownListener.formShown(form);
         }
-        if (target instanceof Dialog) {
-            context.log("Dialog opened modelessly in the playground.");
-            return true;
-        }
-        if (target instanceof Form) {
-            context.captureShownForm((Form) target);
-            return true;
-        }
-        return false;
     }
 
     public void log(String message) {

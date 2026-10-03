@@ -39,7 +39,7 @@ package com.codename1.ui.layouts.mig;
 /// E.g.:
 ///
 /// ```java
-/// `if (adjacentComp == null || adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.TOP)
+/// if (adjacentComp == null || adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.TOP)
 ///       return null;
 ///
 /// boolean isHor = (adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.RIGHT);
@@ -47,7 +47,7 @@ package com.codename1.ui.layouts.mig;
 /// if (adjacentComp.getComponentType(false) == ComponentWrapper.TYPE_LABEL && comp.getComponentType(false) == ComponentWrapper.TYPE_TEXT_FIELD)
 ///    return isHor ? UNRELATED_Y : UNRELATED_Y;
 ///
-/// return (adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.RIGHT) ? RELATED_X : RELATED_Y;`
+/// return (adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.RIGHT) ? RELATED_X : RELATED_Y;
 /// ```
 public interface InCellGapProvider {
     /// Returns the default gap between two components that **are in the same cell**.

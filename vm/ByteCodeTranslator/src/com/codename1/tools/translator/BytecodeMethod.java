@@ -58,8 +58,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Label;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class BytecodeMethod implements SignatureSet {
     // Initial native stack buffer in bytes; API-visible capacity remains unchanged.
@@ -4853,7 +4853,7 @@ public class BytecodeMethod implements SignatureSet {
     public void analyzeBuilderOwnership() {
         if (!desc.contains("Ljava/lang/StringBuilder;")) return;
         int slot = staticMethod ? 0 : 1;
-        for (org.objectweb.asm.Type type : org.objectweb.asm.Type.getArgumentTypes(desc)) {
+        for (com.codename1.tools.translator.classfile.Type type : com.codename1.tools.translator.classfile.Type.getArgumentTypes(desc)) {
             if ("Ljava/lang/StringBuilder;".equals(type.getDescriptor())) builderParameterIsBorrowed(slot);
             slot += type.getSize();
         }
@@ -4868,7 +4868,7 @@ public class BytecodeMethod implements SignatureSet {
         Boolean cached = borrowedBuilderParameters.get(slot);
         if (cached != null) return cached;
         borrowedBuilderParameters.put(slot, false);
-        Map<org.objectweb.asm.Label, Integer> labels = new HashMap<org.objectweb.asm.Label, Integer>();
+        Map<com.codename1.tools.translator.classfile.Label, Integer> labels = new HashMap<com.codename1.tools.translator.classfile.Label, Integer>();
         Set<Integer> aliases = new HashSet<Integer>();
         for (int i = 0; i < instructions.size(); i++) {
             Instruction in = instructions.get(i);
@@ -4898,10 +4898,10 @@ public class BytecodeMethod implements SignatureSet {
         BytecodeMethod target = call.getOwnershipTarget();
         if (target == null) return false;
         int slot = call.getOpcode() == Opcodes.INVOKESTATIC ? 0 : 1;
-        for (org.objectweb.asm.Type type : org.objectweb.asm.Type.getArgumentTypes(call.getDesc())) {
+        for (com.codename1.tools.translator.classfile.Type type : com.codename1.tools.translator.classfile.Type.getArgumentTypes(call.getDesc())) {
             remaining -= type.getSize();
             if (remaining == above) {
-                return (type.getSort() == org.objectweb.asm.Type.OBJECT)
+                return (type.getSort() == com.codename1.tools.translator.classfile.Type.OBJECT)
                         && target.builderParameterIsBorrowed(slot);
             }
             slot += type.getSize();
@@ -5062,7 +5062,7 @@ public class BytecodeMethod implements SignatureSet {
     private static final int SB_WALK_BAIL = Integer.MIN_VALUE;
 
     private int sbWalkUse(int startIdx, int above, int trackedLocal,
-            java.util.Map<org.objectweb.asm.Label, Integer> labelIndex,
+            java.util.Map<com.codename1.tools.translator.classfile.Label, Integer> labelIndex,
             java.util.Set<Integer> aliasStoresOut) {
         java.util.Map<Integer, Integer> stateAt = new java.util.HashMap<Integer, Integer>();
         java.util.ArrayDeque<int[]> work = new java.util.ArrayDeque<int[]>();
@@ -5222,8 +5222,8 @@ public class BytecodeMethod implements SignatureSet {
         // reference against each thread's C stack range, and run-gc-verify.sh's
         // self-test6 requires it to catch a deliberately escaped builder and to stay
         // quiet on correctly compiled code.
-        java.util.Map<org.objectweb.asm.Label, Integer> labelIndex =
-                new java.util.HashMap<org.objectweb.asm.Label, Integer>();
+        java.util.Map<com.codename1.tools.translator.classfile.Label, Integer> labelIndex =
+                new java.util.HashMap<com.codename1.tools.translator.classfile.Label, Integer>();
         for (int i = 0; i < instructions.size(); i++) {
             Instruction in = instructions.get(i);
             if (in instanceof LabelInstruction) {

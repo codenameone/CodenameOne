@@ -50,7 +50,7 @@ import java.util.Vector;
 ///   Image icon4 = URLImage.createToStorage(placeholder, "icon4", "http://www.georgerrmartin.com/wp-content/uploads/2012/08/feastforcrows.jpg");
 ///   Image icon5 = URLImage.createToStorage(placeholder, "icon5", "http://georgerrmartin.com/gallery/art/dragons05.jpg");
 ///
-///   ArrayList> data = new ArrayList<>();
+///   ArrayList<Map<String, Object>> data = new ArrayList<>();
 ///   data.add(createListEntry("A Game of Thrones", "1996", icon1));
 ///   data.add(createListEntry("A Clash Of Kings", "1998", icon2));
 ///   data.add(createListEntry("A Storm Of Swords", "2000", icon3));
@@ -59,7 +59,7 @@ import java.util.Vector;
 ///   data.add(createListEntry("The Winds of Winter", "2016 (please, please, please)", placeholder));
 ///   data.add(createListEntry("A Dream of Spring", "Ugh", placeholder));
 ///
-///   DefaultListModel> model = new DefaultListModel<>(data);
+///   DefaultListModel<Map<String, Object>> model = new DefaultListModel<>(data);
 ///   MultiList ml = new MultiList(model);
 ///   hi.add(BorderLayout.CENTER, ml);
 ///   hi.show();

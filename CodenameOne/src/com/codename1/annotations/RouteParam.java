@@ -37,12 +37,12 @@ import java.lang.annotation.Target;
 /// ```java
 /// @Route("/users/:id")
 /// public class ProfileForm extends Form {
-///     public ProfileForm(@RouteParam("id") String id) { ... }
+///     public ProfileForm(@RouteParam("id") String id) { /* ... */ }
 /// }
 ///
 /// @Route("/search")
 /// public static Form search(@RouteParam("q") String query,
-///                           @RouteParam(value = "page", required = false) String page) { ... }
+///                           @RouteParam(value = "page", required = false) String page) { /* ... */ }
 /// ```
 ///
 /// The `value` is matched first against named path variables (`:name`) and then

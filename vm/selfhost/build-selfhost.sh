@@ -1,12 +1,12 @@
 #!/bin/bash
-# Builds the ParparVM translator with ParparVM: its own bytecode, plus ASM's, is
-# translated to C and compiled into a native binary.
+# Builds the ParparVM translator with ParparVM: its own bytecode is translated to C
+# and compiled into a native binary.
 #
 #   build-selfhost.sh [-O1|-O3]        default -O1
 #
 # Requirements:
 #   JDK_8_HOME  a working JDK 8 (JavaAPI and the translator compile with it)
-#   clang, and maven on PATH the first time (to resolve ASM)
+#   clang, and maven on PATH the first time (to fetch the ASM corpus)
 #   Windows (Git Bash): cmake, ninja and clang-cl on PATH, i.e. an MSVC developer
 #   environment -- the same toolchain CleanTargetIntegrationTest builds with there
 #
@@ -49,7 +49,7 @@ CN1_BUILD_SOURCE_SNAPSHOT="$(native_path "$(mktemp "${TMPDIR:-/tmp}/cn1sources.X
 export CN1_BUILD_SOURCE_SNAPSHOT
 "$PYTHON" "$REPO/vm/selfhost/bench-selfhost.py" --snapshot-sources "$CN1_BUILD_SOURCE_SNAPSHOT"
 
-# 1. translator classes + ASM classpath, built once by maven and then cached.
+# 1. translator classes, built once by maven and then cached.
 TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
 # Rebuild when the classes are MISSING or STALE. Testing only for existence meant
 # that re-running this after editing a translator source silently self-hosted the
@@ -97,8 +97,7 @@ elif [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" -type f -newer "$TRANSLATOR"
     needs_build=1
 fi
 if [ "$needs_build" = 1 ]; then
-    # `clean` because the incremental check cannot be trusted here; it also removes
-    # selfhost-asm-classpath.txt, which the next block regenerates. The clean is what
+    # `clean` because the incremental check cannot be trusted here. The clean is what
     # actually evicts a deleted resource from target/classes, so the manifest test above
     # is only useful paired with it.
     (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am clean package -DskipTests)
@@ -110,12 +109,20 @@ fi
 # target/: the clean would otherwise remove it.
 mkdir -p "$(dirname "$TR_MANIFEST")"
 cp -f "$TR_MANIFEST_NOW" "$TR_MANIFEST"
-ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt"
-if [ ! -f "$ASM_CP_FILE" ]; then
-    (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator dependency:build-classpath \
-        -Dmdep.outputFile=target/selfhost-asm-classpath.txt)
-fi
-ASM_CP="$(cat "$ASM_CP_FILE")"
+# ASM is CORPUS, not a dependency. The translator reads class files with its own
+# com.codename1.tools.translator.classfile package; ASM stays here only because the
+# self-hosting benchmarks and Gate A translate it (asm-classes, step 6) -- a large,
+# fixed body of real Java that predates this tree -- and because a translator from
+# before that change (check-workload-neutral.sh, verify-output-neutral.sh vs-master)
+# still needs it on its classpath. Fetched by version, so the corpus cannot drift.
+ASM_VERSION="$(sed -n 's:.*<asm.version>\(.*\)</asm.version>.*:\1:p' "$REPO/vm/pom.xml")"
+ASM_JARS="$OUT/asm-jars"
+for artifact in asm asm-commons asm-tree asm-analysis; do
+    if [ ! -f "$ASM_JARS/$artifact-$ASM_VERSION.jar" ]; then
+        (cd "$REPO/vm" && mvn -q -B -N dependency:copy \
+            "-Dartifact=org.ow2.asm:$artifact:$ASM_VERSION" "-DoutputDirectory=$(native_path "$ASM_JARS")")
+    fi
+done
 
 # 2. the C runtime the translator emits from its own classpath resources.
 #
@@ -186,15 +193,16 @@ native_list "$SRCLIST" > "$SRCLIST.args"
 #    silently truncates and makes a large gap look small.
 rm -rf "$OUT/classes"; mkdir -p "$OUT/classes"
 "$J8/bin/javac" -nowarn -encoding UTF-8 -Xmaxerrs 100000 -source 1.8 -target 1.8 \
-    -bootclasspath "$(native_path "$JAVAAPI")" -cp "$ASM_CP" -d "$(native_path "$OUT/classes")" \
+    -bootclasspath "$(native_path "$JAVAAPI")" -d "$(native_path "$OUT/classes")" \
     "@$(native_path "$SRCLIST.args")"
 
-# 6. ASM as class files: the translator walks directories, never archives.
+# 6. ASM as class files, for the corpus: the translator walks directories, never
+#    archives.
 rm -rf "$OUT/asm-classes"; mkdir -p "$OUT/asm-classes"
 # `jar xf` rather than unzip, which Git Bash does not reliably ship. The same entries
 # are then dropped that the unzip excluded.
-echo "$ASM_CP" | tr "$CPSEP" '\n' | grep -E 'asm.*\.jar$' | while read -r jar; do
-    (cd "$OUT/asm-classes" && "$J8/bin/jar" xf "$jar")
+for jar in "$ASM_JARS"/asm*-"$ASM_VERSION".jar; do
+    (cd "$OUT/asm-classes" && "$J8/bin/jar" xf "$(native_path "$jar")")
 done
 rm -rf "$OUT/asm-classes/META-INF" "$OUT/asm-classes/module-info.class"
 
@@ -208,9 +216,9 @@ rm -rf "$OUT/out"; mkdir -p "$OUT/out"
 # every object reference onto threadObjectStack; with frameless codegen on (the default)
 # a live reference can exist ONLY in a C local, so any collector that scans the precise
 # stack alone will miss it. Word-split on purpose: this is a list of options.
-"$J8/bin/java" -Xmx4g $CN1_SELFHOST_JAVA_OPTS -cp "$(native_path "$TRANSLATOR")$CPSEP$ASM_CP" \
+"$J8/bin/java" -Xmx4g $CN1_SELFHOST_JAVA_OPTS -cp "$(native_path "$TRANSLATOR")" \
     com.codename1.tools.translator.ByteCodeTranslator \
-    clean "$(native_path "$JAVAAPI");$(native_path "$OUT/asm-classes");$(native_path "$OUT/classes")" \
+    clean "$(native_path "$JAVAAPI");$(native_path "$OUT/classes")" \
     "$(native_path "$OUT/out")" \
     "$APP" com.codename1.tools.translator "$APP" 1.0 clean none \
     > "$OUT/translate.log" 2>&1 \

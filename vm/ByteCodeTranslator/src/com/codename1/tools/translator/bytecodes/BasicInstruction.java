@@ -25,7 +25,7 @@ package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeTranslator;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class BasicInstruction extends Instruction implements AssignableExpression  {
     private final int value;

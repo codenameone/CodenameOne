@@ -340,4 +340,37 @@ public final class Float extends Number implements Comparable<Float> {
     public int compareTo(Float another) {
         return compare(cn1Value(), another.cn1Value());
     }
+
+    /**
+     * {@code a + b}; a method reference target for reductions ({@code Float::sum}).
+     *
+     * @param a an operand
+     * @param b an operand
+     * @return the sum
+     */
+    public static float sum(float a, float b) {
+        return a + b;
+    }
+
+    /**
+     * The greater of two values (Math.max), as a method reference target.
+     *
+     * @param a a value
+     * @param b a value
+     * @return the greater
+     */
+    public static float max(float a, float b) {
+        return Math.max(a, b);
+    }
+
+    /**
+     * The smaller of two values (Math.min), as a method reference target.
+     *
+     * @param a a value
+     * @param b a value
+     * @return the smaller
+     */
+    public static float min(float a, float b) {
+        return Math.min(a, b);
+    }
 }

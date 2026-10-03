@@ -49,7 +49,10 @@ try {
   }, null, {timeout: 30000});
   await wrapperFrame.dispose();
 
-  let appFrame = page.frames().find(frame => frame.url().includes('/playground-app/'));
+  // The website embeds the app in a /playground-app/ iframe; a bundle directory served on
+  // its own (as the README describes) runs it in the top-level page.
+  const embedded = await page.evaluate(() => !!document.querySelector('iframe[src*="playground-app"]'));
+  let appFrame = embedded ? page.frames().find(frame => frame.url().includes('/playground-app/')) : page.mainFrame();
   for (let i = 0; !appFrame && i < 150; i++) {
     await page.waitForTimeout(200);
     appFrame = page.frames().find(frame => frame.url().includes('/playground-app/'));

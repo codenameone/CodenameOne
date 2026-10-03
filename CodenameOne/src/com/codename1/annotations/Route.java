@@ -39,7 +39,7 @@ import java.lang.annotation.Target;
 /// ```java
 /// @Route("/users/:id")
 /// public class ProfileForm extends Form {
-///     public ProfileForm(@RouteParam("id") String id) { ... }
+///     public ProfileForm(@RouteParam("id") String id) { /* ... */ }
 /// }
 ///
 /// public class Routes {

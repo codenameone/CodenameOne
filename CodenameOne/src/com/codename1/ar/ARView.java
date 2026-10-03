@@ -38,7 +38,7 @@ import com.codename1.ui.layouts.BorderLayout;
 /// view.addPointerReleasedListener(e -> {
 ///     float xn = (e.getX() - view.getAbsoluteX()) / (float) view.getWidth();
 ///     float yn = (e.getY() - view.getAbsoluteY()) / (float) view.getHeight();
-///     session.hitTest(xn, yn).ready(hits -> { ... });
+///     session.hitTest(xn, yn).ready(hits -> { /* ... */ });
 /// });
 /// ```
 public final class ARView extends Container {

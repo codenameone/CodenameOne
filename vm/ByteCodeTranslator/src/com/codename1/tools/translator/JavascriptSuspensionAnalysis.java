@@ -36,7 +36,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * JavaScript-target-only suspension analysis. Classifies each surviving
@@ -504,6 +504,27 @@ final class JavascriptSuspensionAnalysis {
                 impls.add(m);
                 if (suspending.contains(m)) {
                     suspendingSigs.add(sig);
+                }
+            }
+        }
+        // Open-world output (JavascriptOpenWorld): a signature declared abstract on
+        // a kept class -- an interface the Playground's user code implements, say --
+        // and implemented NOWHERE in the bundle can only ever dispatch to code that
+        // arrives later. Nothing here can tell whether that code blocks, and code
+        // translated incrementally is always a generator, so such a call is
+        // suspending whatever the receiver: the same rule as a bridge-dispatched id.
+        if (JavascriptOpenWorld.isEnabled()) {
+            for (ByteCodeClass cls : classes) {
+                if (!JavascriptOpenWorld.keepsClass(cls.getClsName())) {
+                    continue;
+                }
+                for (BytecodeMethod m : cls.getMethods()) {
+                    if (m.isAbstract() && !m.isStatic() && !m.isEliminated()) {
+                        String sig = m.getMethodName() + m.getSignature();
+                        if (!sigImpls.containsKey(sig)) {
+                            bridgeDispatchSigs.add(sig);
+                        }
+                    }
                 }
             }
         }
@@ -1067,55 +1088,57 @@ final class JavascriptSuspensionAnalysis {
         List<String> causes = new ArrayList<String>(causeCount.keySet());
         Collections.sort(causes, new ByCountDescending(causeCount));
         Collections.sort(methodLines);
-        java.io.PrintWriter out = null;
+        // Built in memory and written once: JavaAPI, which a self-hosted translator
+        // runs on, has no PrintWriter. Lines end the way println ended them.
+        String nl = Util.systemProperty("line.separator", "\n");
+        StringBuilder out = new StringBuilder();
         try {
-            out = new java.io.PrintWriter(new java.io.OutputStreamWriter(
-                    new java.io.FileOutputStream(reportPath), "UTF-8"));
-            out.println("# ParparVM JavaScript suspension report");
-            out.println("# A suspending method is emitted ``function*`` and every call to it is");
-            out.println("# ``yield*``; a synchronous one is a plain function called directly.");
-            out.println("TOTAL " + total);
-            out.println("SYNC " + sync);
-            out.println("SUSPENDING " + (total - sync));
-            out.println("SUSPENDING_SIGS " + suspendingSigs.size());
-            out.println("#");
-            out.println("# Section 1: first-recorded cause, most common first.");
-            out.println("# CAUSE <methods> <cause>");
+            line(out, nl, "# ParparVM JavaScript suspension report");
+            line(out, nl, "# A suspending method is emitted ``function*`` and every call to it is");
+            line(out, nl, "# ``yield*``; a synchronous one is a plain function called directly.");
+            line(out, nl, "TOTAL " + total);
+            line(out, nl, "SYNC " + sync);
+            line(out, nl, "SUSPENDING " + (total - sync));
+            line(out, nl, "SUSPENDING_SIGS " + suspendingSigs.size());
+            line(out, nl, "#");
+            line(out, nl, "# Section 1: first-recorded cause, most common first.");
+            line(out, nl, "# CAUSE <methods> <cause>");
             for (String cause : causes) {
-                out.println("CAUSE " + causeCount.get(cause) + " " + cause);
+                line(out, nl, "CAUSE " + causeCount.get(cause) + " " + cause);
             }
-            out.println("#");
-            out.println("# Section 2: suspending signatures ranked by dispatch call sites.");
-            out.println("# dispatchSites counts every INVOKEVIRTUAL / INVOKEINTERFACE on the");
-            out.println("# signature, receiver-resolved and fallback alike -- NOT the number");
-            out.println("# that end up emitting yield*, which depends on each site's receiver.");
-            out.println("# firstCauseMethods aggregates BOTH cause spellings for the");
-            out.println("# signature: the receiver-resolved ``dispatch:<owner>.<sig>`` and the");
-            out.println("# fallback ``dispatch:<sig>``. Reading only the bare key counted the");
-            out.println("# fallback path alone, which is the minority under RTA.");
-            out.println("# SIG <dispatchSites> <firstCauseMethods> <name+descriptor>");
+            line(out, nl, "#");
+            line(out, nl, "# Section 2: suspending signatures ranked by dispatch call sites.");
+            line(out, nl, "# dispatchSites counts every INVOKEVIRTUAL / INVOKEINTERFACE on the");
+            line(out, nl, "# signature, receiver-resolved and fallback alike -- NOT the number");
+            line(out, nl, "# that end up emitting yield*, which depends on each site's receiver.");
+            line(out, nl, "# firstCauseMethods aggregates BOTH cause spellings for the");
+            line(out, nl, "# signature: the receiver-resolved ``dispatch:<owner>.<sig>`` and the");
+            line(out, nl, "# fallback ``dispatch:<sig>``. Reading only the bare key counted the");
+            line(out, nl, "# fallback path alone, which is the minority under RTA.");
+            line(out, nl, "# SIG <dispatchSites> <firstCauseMethods> <name+descriptor>");
             Map<String, Integer> dispatchCauseBySig = aggregateDispatchCauses(causeCount);
             for (String sig : sigs) {
                 Integer siteCount = sites.get(sig);
                 Integer firstCause = dispatchCauseBySig.get(sig);
-                out.println("SIG " + (siteCount == null ? 0 : siteCount.intValue())
+                line(out, nl, "SIG " + (siteCount == null ? 0 : siteCount.intValue())
                         + " " + (firstCause == null ? 0 : firstCause.intValue())
                         + " " + sig);
             }
-            out.println("#");
-            out.println("# Section 3: every live method.");
-            out.println("# M SYNC <owner.name+desc> | M SUSP <owner.name+desc> <cause>");
+            line(out, nl, "#");
+            line(out, nl, "# Section 3: every live method.");
+            line(out, nl, "# M SYNC <owner.name+desc> | M SUSP <owner.name+desc> <cause>");
             for (String line : methodLines) {
-                out.println(line);
+                line(out, nl, line);
             }
+            Util.writeUtf8(new java.io.File(reportPath), out.toString());
         } catch (java.io.IOException err) {
             // A diagnostic must never be the thing that breaks the build.
             System.out.println("JS suspension report could not be written to "
                     + reportPath + ": " + err.getMessage());
-        } finally {
-            if (out != null) {
-                out.close();
-            }
         }
+    }
+
+    private static void line(StringBuilder out, String nl, String text) {
+        out.append(text).append(nl);
     }
 }

@@ -273,6 +273,28 @@ used `ptr | 2`, which is now a valid tagged `Long`, so it uses the reserved code
 `cn1_debugger_class_of` resolves through `CN1_CLASS_OF` -- would have made every tagged
 assertion an assertion about nothing.
 
+## The translator must stay translatable -- by itself, to C AND to JavaScript
+
+The translator reads class files with its own `classfile` package (reader, tree,
+frame analysis, `JsrInliner`) and its JavaScript backend uses its own `regex`
+engine, `Sha256` and `java.io` -- because it compiles against `vm/JavaAPI`, which
+has no ASM, `java.util.regex` (a stub that throws), `java.security` or
+`java.nio.file`. Do not reintroduce any of them into
+`vm/ByteCodeTranslator/src`: `vm/selfhost/build-selfhost.sh` compiles the sources
+against JavaAPI alone and fails, and an API JavaAPI only *stubs* compiles fine and
+fails at run time on the self-hosted side. ASM remains only as the oracle in
+`ClassReaderConformanceTest` and as benchmark corpus. `verify-selfhost.sh` (gates
+D, A, J) and `verify-selfhost-js.sh` (gates C, S: the translator translated to
+JavaScript, run under Node) hold every host to byte-identical output.
+
+**A text pass over emitted JavaScript must never see a string literal.** The JS
+backend's peepholes are regex rewrites over the method text, and a literal is
+emitted inside it as `_L("...")`; `applyMethodPeephole` masks each one as `_L(n)`
+for the duration and restores it after. A new per-method pass belongs inside that
+bracket. Before it existed, a literal shaped like emitted code was rewritten with
+the code around it -- shipped apps included -- and the self-hosted translator,
+whose own pattern strings are such literals, was the first to notice.
+
 ## The self-hosting benchmark measures the translator, so it can be optimized instead of the VM
 
 The self-hosting benchmark times the translator translating a corpus. The program

@@ -29,7 +29,7 @@ import com.codename1.tools.translator.Parser;
 import com.codename1.tools.translator.Util;
 import java.util.ArrayList;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * FUSED OBJECTS (general, annotation-driven -- see the runtime side in
@@ -341,7 +341,7 @@ public final class FusedConstructor {
                 //   (b) branch OVER a throw block: the fall-through reaches ATHROW
                 //       and the first label after it is the branch target -> resume
                 //       scanning at that target.
-                org.objectweb.asm.Label target = ((Jump) in).getLabel();
+                com.codename1.tools.translator.classfile.Label target = ((Jump) in).getLabel();
                 int targetIdx = indexOfLabel(body, target);
                 if (targetIdx >= 0 && findAthrowByFallthrough(body, targetIdx + 1, 12) >= 0) {
                     i++;               // idiom (a)
@@ -390,7 +390,7 @@ public final class FusedConstructor {
         return -1;
     }
 
-    private static int indexOfLabel(List<Instruction> body, org.objectweb.asm.Label target) {
+    private static int indexOfLabel(List<Instruction> body, com.codename1.tools.translator.classfile.Label target) {
         for (int i = 0; i < body.size(); i++) {
             Instruction in = body.get(i);
             if (in instanceof LabelInstruction && ((LabelInstruction) in).getLabel() == target) {

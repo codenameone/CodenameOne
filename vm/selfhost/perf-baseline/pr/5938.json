@@ -1,0 +1,132 @@
+{
+ "pr": 5938,
+ "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.239,
+      "time": 3.043,
+      "tolerance": {
+       "time": 0.45
+      }
+     },
+     "memory": 0.239,
+     "reason": "Noise on this runner, not this change: two CI runs of byte-identical code (cc1b199 and b79ed09 differ only in this file) measured ParparVM at 75-81ms and 100-121ms, tracking its GC heap (98-101MB vs 85-94MB) while JDK held 22-24ms. objectAllocation is the gate's noisiest row (20-37% between runs of unchanged code); time recalibrated from both runs, RAM untouched. Same-machine bench of master vs this branch: objectAllocation median 29.1ms vs 27.6ms, checksums identical.",
+     "runs": 2,
+     "time": 4.003,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.542,
+      "time": 0.625
+     },
+     "memory": 0.447,
+     "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM and its JavaScript generator is no longer stubbed out of the self-hosted build, so 'translator (self)' now translates a corpus about twice as large (both arms take ~2x as long: ParparVM 955 -> 1890ms, JDK 1.8 -> 3.0-3.75s on linux-x64). Translating a real application did not slow down: the hello row stayed in band on linux and macOS, arm64 hello got faster (9.5 -> 8.7s), and Windows x64's out-of-band hello RAM was the JDK arm swinging 832-987MB between rounds while ParparVM held 835-857MB.",
+     "runs": 1,
+     "time": 0.625
+    }
+   }
+  },
+  "linux-x64@amd-epyc-7763-64-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.519,
+      "time": 0.484,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.519,
+     "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM and its JavaScript generator is no longer stubbed out of the self-hosted build, so 'translator (self)' now translates a corpus about twice as large (both arms take ~2x as long: ParparVM 955 -> 1890ms, JDK 1.8 -> 3.0-3.75s on linux-x64). Translating a real application did not slow down: the hello row stayed in band on linux and macOS, arm64 hello got faster (9.5 -> 8.7s), and Windows x64's out-of-band hello RAM was the JDK arm swinging 832-987MB between rounds while ParparVM held 835-857MB.",
+     "runs": 1,
+     "time": 0.607,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "macos-arm64": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.739,
+      "time": 0.539
+     },
+     "memory": 0.566,
+     "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM and its JavaScript generator is no longer stubbed out of the self-hosted build, so 'translator (self)' now translates a corpus about twice as large (both arms take ~2x as long: ParparVM 955 -> 1890ms, JDK 1.8 -> 3.0-3.75s on linux-x64). Translating a real application did not slow down: the hello row stayed in band on linux and macOS, arm64 hello got faster (9.5 -> 8.7s), and Windows x64's out-of-band hello RAM was the JDK arm swinging 832-987MB between rounds while ParparVM held 835-857MB.",
+     "runs": 1,
+     "time": 0.539
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.803,
+      "time": 1.228,
+      "tolerance": {
+       "time": 0.25
+      }
+     },
+     "memory": 0.968,
+     "reason": "The JDK arm, not ParparVM: across two runs on this runner ParparVM's hello translation held 818-857MB while JDK 25 read 804-987MB, at times within one run. The same hello workload on linux-x64 shows ParparVM unchanged from master in absolute terms (917-949MB vs 912-994MB) and passes. RAM recalibrated from both runs; time untouched (pr/5930 already widened this runner's hello time for the same reason).",
+     "runs": 2,
+     "time": 1.228,
+     "tolerance": {
+      "time": 0.25
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.26,
+      "time": 5.86,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.402,
+     "reason": "Noise, not this change: the row was calibrated from a single run and objectAllocation is the gate's noisiest row (20-37% between runs of unchanged code). On this runner ParparVM held 248-260MB in every round while the JDK arm read 575-671MB, so the ratio moved with the JDK. Peak phys_footprint of the bench's objectAllocation built from master and from this branch, 10 interleaved runs each: median 116.4MB vs 119.0MB with overlapping ranges. RAM only; time stayed in band.",
+     "runs": 1,
+     "time": 5.86,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.291,
+      "time": 1.386,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.223,
+     "reason": "The JDK arm, not ParparVM: on byte-identical code two runs on this runner measured ParparVM at 79-85MB in every round while JDK 25 read 247-300MB in one run and 446-506MB in the other. RAM recalibrated from both runs; time untouched.",
+     "runs": 2,
+     "time": 1.386,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.2
+     }
+    }
+   }
+  }
+ }
+}

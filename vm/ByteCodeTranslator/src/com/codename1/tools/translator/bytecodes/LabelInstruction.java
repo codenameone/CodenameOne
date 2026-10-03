@@ -31,8 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Label;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class LabelInstruction extends Instruction {
     private Label parent;
@@ -142,7 +142,7 @@ public class LabelInstruction extends Instruction {
     public static void setCatchDepthInstructions(List<Instruction> inst) {
         catchDepthInstructions = inst;
     }
-    public LabelInstruction(org.objectweb.asm.Label parent) {
+    public LabelInstruction(com.codename1.tools.translator.classfile.Label parent) {
         super(-1);
         this.parent = parent;
     }

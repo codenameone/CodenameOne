@@ -24,8 +24,8 @@
 package com.codename1.tools.translator.bytecodes;
 
 import java.util.List;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Label;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class Jump extends Instruction {
     private static int jsrCounter = 1;

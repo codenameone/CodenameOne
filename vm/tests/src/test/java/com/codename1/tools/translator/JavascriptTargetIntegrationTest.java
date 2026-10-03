@@ -128,9 +128,13 @@ class JavascriptTargetIntegrationTest {
                 "Translated bundle should not emit generic fallback stubs for DateFormat natives");
         assertTrue(!translatedApp.contains("__args.unshift(stack.pop())"),
                 "Translated invoke paths should avoid array unshift-based argument packing");
-        assertTrue(!translatedApp.contains("cn1_java_io_File_")
-                        || translatedApp.contains("java.io.File native filesystem access is not supported in javascript backend"),
-                "Unsupported filesystem natives should fail with an explicit JS-mode message when translated");
+        // java.io.File is bound by the runtime over a host-supplied jvm.fileSystem, so the
+        // bundle carries no per-native stub; with no file system installed the runtime
+        // binding throws the explicit JS-mode message instead.
+        assertTrue(runtime.contains("java.io.File native filesystem access is not supported in javascript backend"),
+                "Filesystem natives should fail with an explicit JS-mode message when no file system is installed");
+        assertTrue(!translatedApp.contains("cn1_java_io_File_existsImpl_java_lang_String_R_boolean = function*"),
+                "Runtime-bound filesystem natives should not get a generated fallback stub");
         assertTrue(worker.contains("importScripts('parparvm_runtime.js');"),
                 "Worker bootstrap should load the runtime first");
         assertTrue(worker.contains("importScripts('port.js');"),

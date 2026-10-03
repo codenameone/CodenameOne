@@ -24,21 +24,24 @@ package java.util.stream;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /** Lazy fallback for pipelines whose source or callbacks cannot be specialized. */
 final class StreamImpl<T> implements Stream<T> {
     private static final int SOURCE = 0, FILTER = 1, MAP = 2, SORTED = 3,
-            DISTINCT = 4, LIMIT = 5, SKIP = 6;
+            DISTINCT = 4, LIMIT = 5, SKIP = 6, FLATMAP = 7, PEEK = 8;
 
     private static final class Source {
         final List<?> values;
@@ -90,6 +93,20 @@ final class StreamImpl<T> implements Stream<T> {
     }
 
     public Stream<T> sorted() { return new StreamImpl<T>(this, SORTED, null, 0); }
+
+    public Stream<T> sorted(Comparator<? super T> comparator) {
+        return new StreamImpl<T>(this, SORTED, comparator, 0);
+    }
+
+    public <R> Stream<R> flatMap(Function<? super T, ? extends Stream<? extends R>> mapper) {
+        require(mapper);
+        return new StreamImpl<R>(this, FLATMAP, mapper, 0);
+    }
+
+    public Stream<T> peek(Consumer<? super T> action) {
+        require(action);
+        return new StreamImpl<T>(this, PEEK, action, 0);
+    }
     public Stream<T> distinct() { return new StreamImpl<T>(this, DISTINCT, null, 0); }
 
     public Stream<T> limit(long maxSize) {
@@ -113,6 +130,7 @@ final class StreamImpl<T> implements Stream<T> {
         private boolean ready;
         private boolean exhausted;
         private Object next;
+        private Iterator<?> inner;
 
         Cursor(Iterator<?> input, int operation, Object callback, long amount) {
             this.input = input;
@@ -132,7 +150,11 @@ final class StreamImpl<T> implements Stream<T> {
             if (operation == SORTED && !sorted) {
                 List<Object> values = new ArrayList<Object>();
                 while (input.hasNext()) values.add(input.next());
-                Collections.sort((List) values);
+                if (callback == null) {
+                    Collections.sort((List) values);
+                } else {
+                    Collections.sort(values, (Comparator<Object>) callback);
+                }
                 input = values.iterator();
                 sorted = true;
             }
@@ -142,8 +164,24 @@ final class StreamImpl<T> implements Stream<T> {
                     remaining--;
                 }
             }
+            if (operation == FLATMAP) {
+                while (true) {
+                    if (inner != null && inner.hasNext()) {
+                        next = inner.next();
+                        ready = true;
+                        return true;
+                    }
+                    if (!input.hasNext()) {
+                        exhausted = true;
+                        return false;
+                    }
+                    Stream<?> s = (Stream<?>) ((Function<Object, Object>) callback).apply(input.next());
+                    inner = s == null ? null : s.iterator();
+                }
+            }
             while (input.hasNext()) {
                 Object value = input.next();
+                if (operation == PEEK) ((Consumer<Object>) callback).accept(value);
                 if (operation == FILTER && !((Predicate<Object>) callback).test(value)) continue;
                 if (operation == DISTINCT) {
                     if (seen == null) seen = new HashSet<Object>();
@@ -233,6 +271,62 @@ final class StreamImpl<T> implements Stream<T> {
     }
 
     public boolean noneMatch(Predicate<? super T> predicate) { return !anyMatch(predicate); }
+
+    public Optional<T> findFirst() {
+        Iterator<T> values = iterator();
+        return values.hasNext() ? Optional.of(values.next()) : Optional.<T>empty();
+    }
+
+    public Optional<T> findAny() { return findFirst(); }
+
+    public Optional<T> min(Comparator<? super T> comparator) {
+        require(comparator);
+        Iterator<T> values = iterator();
+        if (!values.hasNext()) return Optional.<T>empty();
+        T best = values.next();
+        while (values.hasNext()) {
+            T v = values.next();
+            if (comparator.compare(v, best) < 0) best = v;
+        }
+        return Optional.of(best);
+    }
+
+    public Optional<T> max(Comparator<? super T> comparator) {
+        require(comparator);
+        Iterator<T> values = iterator();
+        if (!values.hasNext()) return Optional.<T>empty();
+        T best = values.next();
+        while (values.hasNext()) {
+            T v = values.next();
+            if (comparator.compare(v, best) > 0) best = v;
+        }
+        return Optional.of(best);
+    }
+
+    public Optional<T> reduce(BinaryOperator<T> accumulator) {
+        require(accumulator);
+        Iterator<T> values = iterator();
+        if (!values.hasNext()) return Optional.<T>empty();
+        T result = values.next();
+        while (values.hasNext()) result = accumulator.apply(result, values.next());
+        return Optional.of(result);
+    }
+
+    public <R> R collect(Supplier<R> supplier, BiConsumer<R, ? super T> accumulator, BiConsumer<R, R> combiner) {
+        require(supplier);
+        require(accumulator);
+        R container = supplier.get();
+        Iterator<T> values = iterator();
+        while (values.hasNext()) accumulator.accept(container, values.next());
+        return container;
+    }
+
+    public List<T> toList() {
+        List<T> result = new ArrayList<T>();
+        Iterator<T> values = iterator();
+        while (values.hasNext()) result.add(values.next());
+        return Collections.unmodifiableList(result);
+    }
     public Stream<T> sequential() { return this; }
     public Stream<T> parallel() { return this; }
     public void close() { source.closed = true; linkedOrConsumed = true; }

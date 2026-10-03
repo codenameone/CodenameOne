@@ -66,8 +66,8 @@ import java.util.Map;
 ///         String idTok = result.getIdentityToken();
 ///         // send idTok to your backend for verification
 ///     }
-///     public void onError(String error) { ... }
-///     public void onCancel() { ... }
+///     public void onError(String error) { /* ... */ }
+///     public void onCancel() { /* ... */ }
 /// });
 /// ```
 ///

@@ -39,13 +39,13 @@ import java.lang.annotation.Target;
 /// // Through the app's own Codename One backend (cn1.otel.relay=true there),
 /// // which holds the collector's credentials:
 /// @OpenTelemetry(relay = "https://api.example.com", serviceName = "shop-app")
-/// public class ShopApp extends Lifecycle { ... }
+/// public class ShopApp extends Lifecycle { /* ... */ }
 ///
 /// // Or straight to a collector. The header ships inside the app, so use a token
 /// // that can write traces and nothing else:
 /// @OpenTelemetry(endpoint = "https://collector.example.com:4318",
 ///         headers = "Authorization: Api-Token dt0c01.ingest-only")
-/// public class ShopApp extends Lifecycle { ... }
+/// public class ShopApp extends Lifecycle { /* ... */ }
 /// ```
 ///
 /// Exactly one of `relay` and `endpoint` is set. Without the annotation the

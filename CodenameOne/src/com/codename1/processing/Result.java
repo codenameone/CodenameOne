@@ -64,8 +64,8 @@ import java.util.Vector;
 ///
 /// Some sample expressions:
 ///
-/// ```java
-/// `Simple expression, get the title of the first photo element.
+/// ```text
+/// Simple expression, get the title of the first photo element.
 ///
 ///  /photos/photo[1]/title
 ///
@@ -84,7 +84,7 @@ import java.util.Vector;
 ///  Get the purchase order numbers of any order with a lineitem worth over $5
 ///
 ///  //order/lineitem[price > 5]/../@ponum
-/// etc`
+/// etc
 /// ```
 public final class Result {
 

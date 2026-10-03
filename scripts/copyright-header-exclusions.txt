@@ -30,6 +30,9 @@ Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js | SQLite3 Multiple Ciphers 
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js | SQLite3 Multiple Ciphers OPFS proxy worker, MIT over public-domain SQLite
 vm/JavaAPI/src/java/util/LinkedHashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Collections.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Calendar.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Collection.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Comparator.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/HashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Hashtable.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/IdentityHashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
@@ -234,8 +237,6 @@ maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarEntry.java | jtar 
 maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarInputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
 maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarOutputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
 maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarUtils.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
-scripts/cn1playground/common/src/main/java/bsh/BSHEnhancedForStatement.java | BeanShell source, Apache-2.0, retaining its original notice
-scripts/cn1playground/common/src/main/java/bsh/Primitive.java | BeanShell source, Apache-2.0, retaining its original notice
 vm/JavaAPI/src/java/net/URI.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/net/URIHelper.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/DateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
@@ -245,3 +246,4 @@ vm/JavaAPI/src/java/text/Format.java | Codename One contribution whose copyright
 vm/JavaAPI/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 maven/build-engine/src/main/java/com/codename1/builders/util/JSONSanitizer.java | Adapted from the OWASP JSON Sanitizer (Apache-2.0), whose documentation it keeps verbatim
+CodenameOne/src/com/codename1/ui/layouts/mig/InCellGapProvider.java | MiG Layout source (Mikael Grev, BSD) retaining its original notice

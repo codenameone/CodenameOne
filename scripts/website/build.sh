@@ -666,14 +666,12 @@ build_playground_for_site() {
     fi
 
     # The Playground builds the JavaScript app with the local ParparVM target
-    # (codename1.buildTarget=local-javascript, the module default). Its
-    # bean-shell registry keeps nearly the whole Codename One API reachable, so
-    # the JS Rapid Type Analysis tree-shaking pass cannot prune much yet runs
-    # for over an hour -- disable it (parparvm.js.rta.off). The un-pruned bundle
-    # is large, so raise the translator heap above the 512m default to avoid an
-    # OutOfMemoryError mid-emit. CN1_TRANSLATOR_OPTS reaches the forked
+    # (codename1.buildTarget=local-javascript, the module default). User code is
+    # compiled in the browser and loaded into the running VM, so the bundle is
+    # open-world for the API it may call; the settings live in one file shared
+    # with scripts/cn1playground/build.sh. CN1_TRANSLATOR_OPTS reaches the forked
     # translator JVM (the Maven process's -D properties do not).
-    export CN1_TRANSLATOR_OPTS="${CN1_TRANSLATOR_OPTS:--Dparparvm.js.rta.off -Xmx6g}"
+    export CN1_TRANSLATOR_OPTS="${CN1_TRANSLATOR_OPTS:-$(cat "${REPO_ROOT}/scripts/cn1playground/javascript/translator-opts.txt")}"
 
     run_playground_mvn -q -U -pl javascript -am \
       "${playground_workspace_args[@]}" \
