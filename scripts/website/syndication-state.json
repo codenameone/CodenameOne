@@ -2403,6 +2403,16 @@
       "medium": {
         "url": "https://medium.com/p/0563fc8a3a79/edit",
         "syndicated_at": "2026-09-30T00:00:58+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/xcode-27-the-build-settings-that-can-stop-a-release",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac134a3c0a97a0cc6ac603a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T17:01:15+00:00"
       }
     },
     "native-desktop-themes-experiment": {
