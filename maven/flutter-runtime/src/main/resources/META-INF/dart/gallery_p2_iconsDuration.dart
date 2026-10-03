@@ -29,4 +29,16 @@ class Duration {
   external bool get isNegative;
   external Duration abs();
   external int compareTo(Duration other);
+  // Dart's operators, as dart.core.Duration carries them under the mangled names
+  // ($plus, $minus, $times, $tdiv, $lt ...). Binary minus is declared before unary
+  // minus: both mangle to $minus, and a lookup by name takes the first.
+  external Duration operator +(Duration other);
+  external Duration operator -(Duration other);
+  external Duration operator -();
+  external Duration operator *(num factor);
+  external Duration operator ~/(int quotient);
+  external bool operator <(Duration other);
+  external bool operator >(Duration other);
+  external bool operator <=(Duration other);
+  external bool operator >=(Duration other);
 }
