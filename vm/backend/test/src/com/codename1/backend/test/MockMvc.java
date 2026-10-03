@@ -59,8 +59,17 @@ public final class MockMvc {
         // 304 -- so a test cannot assert on content no client ever receives.
         boolean bodiless = "HEAD".equalsIgnoreCase(built.method) || (status >= 100 && status < 200)
                 || status == 204 || status == 205 || status == 304;
+        byte[] body;
+        if (bodiless) {
+            // Released unread: a static file's response holds the file open, and
+            // only reading it closed it, so each HEAD assertion leaked a descriptor.
+            access.discard(response);
+            body = new byte[0];
+        } else {
+            body = access.body(response);
+        }
         MockResponse mock = new MockResponse(status, access.contentType(response),
-                access.headers(response), bodiless ? new byte[0] : access.body(response));
+                access.headers(response), body);
         return new ResultActions(new MvcResult(built.method, built.target, mock));
     }
 }

@@ -278,7 +278,8 @@ include::../demos/common/src/main/snippets/developer-guide/backend-web.propertie
   requests are refused while this is unset.
 
 | `cn1.cors.allowedMethods`
-| The methods a preflight allows. All the common ones by default.
+| The methods a cross-origin request may use, preflighted or not. All the
+  common ones by default.
 
 | `cn1.cors.allowedHeaders`
 | The request headers a preflight allows, `*` by default.
@@ -295,8 +296,11 @@ include::../demos/common/src/main/snippets/developer-guide/backend-web.propertie
 | How long a browser may cache a preflight answer, 1800 seconds by default.
 |===
 
-The server answers a preflight `OPTIONS` request itself, with a 403 for an origin
-not on the list, and adds the headers to every response to an allowed origin. A
+The server answers a preflight `OPTIONS` request itself, and adds the headers to
+every response to an allowed origin. A cross-origin request from an origin not on
+the list, or with a method not on it, is refused with a 403 before any handler
+runs, as Spring refuses it; a request whose `Origin` is the server itself isn't a
+cross-origin request. A
 handler that maps `OPTIONS` or sets `Access-Control-Allow-Origin` itself keeps its
 own policy, which is how the MCP endpoint keeps the stricter one it has.
 

@@ -666,8 +666,9 @@ final class BackendTestGenerator {
         String pkg = dot < 0 ? "" : runnerBinary.substring(0, dot);
         String simple = runnerBinary.substring(dot + 1);
         String skip = null;
-        if (cls.getClassAnnotation(JUNIT_DISABLED) != null) {
-            skip = "disabled: " + cls.getClassAnnotation(JUNIT_DISABLED).getStringOrDefault("value", "");
+        AnnotationValues classDisabled = annotation(cls.getClassAnnotations(), JUNIT_DISABLED);
+        if (classDisabled != null) {
+            skip = "disabled: " + classDisabled.getStringOrDefault("value", "");
         } else if (cls.getClassAnnotation(JUNIT_NESTED) != null || isInner(cls)) {
             skip = "a @Nested or inner test class does not run in a compiled test";
         } else if (spec != null && !spec.mocks.isEmpty()) {
@@ -718,7 +719,8 @@ final class BackendTestGenerator {
         }
         int index = 0;
         for (MethodInfo m : tests) {
-            AnnotationValues disabled = m.getAnnotation(JUNIT_DISABLED);
+            // Composed too, as JUnit finds it: @Fast @Disabled-meta skips on both runs.
+            AnnotationValues disabled = annotation(m.getAnnotations(), JUNIT_DISABLED);
             if (disabled != null) {
                 sb.append("        com.codename1.impl.backend.test.TestRun.skipped(CLS, ")
                   .append(quote(m.getName())).append(", ")
@@ -829,35 +831,47 @@ final class BackendTestGenerator {
     /// `@Test` and the lifecycle annotations. A composed annotation the build
     /// cannot see (from a library jar rather than this module) is not followed.
     private boolean carries(MethodInfo m, String annotation) {
-        if (m.getAnnotation(annotation) != null) {
-            return true;
-        }
-        for (String descriptor : m.getAnnotations().keySet()) {
-            if (composedOf(descriptor, annotation, new java.util.HashSet<String>())) {
-                return true;
-            }
-        }
-        return false;
+        return annotation(m.getAnnotations(), annotation) != null;
     }
 
-    private boolean composedOf(String descriptor, String annotation, Set<String> seen) {
+    /// `annotation` among `annotations`, directly or through a composed annotation
+    /// -- its values as the composing type declares them -- or null.
+    private AnnotationValues annotation(java.util.Map<String, AnnotationValues> annotations,
+                                        String annotation) {
+        AnnotationValues direct = annotations.get(annotation);
+        if (direct != null) {
+            return direct;
+        }
+        Set<String> seen = new java.util.HashSet<String>();
+        for (String descriptor : annotations.keySet()) {
+            AnnotationValues found = composedOf(descriptor, annotation, seen);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private AnnotationValues composedOf(String descriptor, String annotation, Set<String> seen) {
         if (!descriptor.startsWith("L") || !descriptor.endsWith(";") || !seen.add(descriptor)
                 || seen.size() > 16) {
-            return false;
+            return null;
         }
         AnnotatedClass type = ctx.lookup(descriptor.substring(1, descriptor.length() - 1));
         if (type == null || !type.isAnnotation()) {
-            return false;
+            return null;
         }
-        if (type.getClassAnnotation(annotation) != null) {
-            return true;
+        AnnotationValues meta = type.getClassAnnotation(annotation);
+        if (meta != null) {
+            return meta;
         }
-        for (String meta : type.getClassAnnotations().keySet()) {
-            if (composedOf(meta, annotation, seen)) {
-                return true;
+        for (String next : type.getClassAnnotations().keySet()) {
+            AnnotationValues found = composedOf(next, annotation, seen);
+            if (found != null) {
+                return found;
             }
         }
-        return false;
+        return null;
     }
 
     /// The class, its superclasses and every interface they implement, for the

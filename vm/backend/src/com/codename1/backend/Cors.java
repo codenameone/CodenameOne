@@ -123,6 +123,71 @@ final class Cors {
         return false;
     }
 
+    /// A cross-origin request the policy does not admit -- its origin is not
+    /// listed, or its method (the requested one, for a preflight) is not in
+    /// `cn1.cors.allowedMethods` -- answered 403 before any handler runs, as
+    /// Spring's CorsProcessor answers it; null otherwise. Checked only after the
+    /// response used to be: a simple request (a `text/plain` POST needs no
+    /// preflight) then ran its handler, side effects and all, and only the CORS
+    /// headers were withheld -- and the method list was never consulted for it.
+    /// A same-origin request carries an Origin too, and is not a CORS request.
+    HttpServer.Response reject(HttpServer.Request request) {
+        String origin = request.getHeader("Origin");
+        if (origin == null || sameOrigin(origin, request.getHeader("Host"))) {
+            return null;
+        }
+        String asked = request.getHeader("Access-Control-Request-Method");
+        String method = "OPTIONS".equals(request.getMethod()) && asked != null ? asked.trim()
+                : request.getMethod();
+        if (!allows(origin)) {
+            return varyByOrigin(HttpServer.Response.text(403, "origin not allowed"));
+        }
+        if (!allowsMethod(method)) {
+            return varyByOrigin(HttpServer.Response.text(403, "method not allowed"));
+        }
+        return null;
+    }
+
+    private boolean allowsMethod(String method) {
+        if ("*".equals(methods.trim())) {
+            return true;
+        }
+        int pos = 0;
+        while (pos <= methods.length()) {
+            int comma = methods.indexOf(',', pos);
+            int end = comma < 0 ? methods.length() : comma;
+            if (methods.substring(pos, end).trim().equals(method)) {
+                return true;
+            }
+            if (comma < 0) {
+                break;
+            }
+            pos = comma + 1;
+        }
+        return false;
+    }
+
+    /// Whether `origin` names the server the request was sent to: its host and
+    /// port equal the Host header's, a default port written or not.
+    private static boolean sameOrigin(String origin, String host) {
+        if (host == null) {
+            return false;
+        }
+        int scheme = origin.indexOf("://");
+        if (scheme < 0) {
+            return false;
+        }
+        String authority = origin.substring(scheme + 3);
+        boolean https = origin.regionMatches(true, 0, "https", 0, 5) && scheme == 5;
+        return withoutDefaultPort(authority, https).equalsIgnoreCase(withoutDefaultPort(host.trim(), https));
+    }
+
+    private static String withoutDefaultPort(String authority, boolean https) {
+        String port = https ? ":443" : ":80";
+        return authority.endsWith(port) ? authority.substring(0, authority.length() - port.length())
+                : authority;
+    }
+
     /// The answer to a preflight no handler took, or null when `request` is not
     /// one. A preflight from an origin the policy does not list is a 403.
     HttpServer.Response preflight(HttpServer.Request request) {

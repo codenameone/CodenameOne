@@ -338,6 +338,7 @@ public abstract class BackendTestPackager extends BackendPackager {
     /// it rather than a failed build.
     @Override
     public File execute() throws BuildExecutionException {
+        clearCompiledReports();
         if (!strict && kotlinTestSources().isEmpty() && !testSources().isEmpty()
                 && compilableSources().isEmpty()) {
             getLog().warn("cn1: no compiled backend tests to run"
@@ -350,17 +351,34 @@ public abstract class BackendTestPackager extends BackendPackager {
         return super.execute();
     }
 
+    /// Deletes the compiled-run reports an earlier run left in surefire-reports:
+    /// a targeted run (`-Dtest=ApiTest`) writes reports only for what it ran, and
+    /// the rest from a previous full run read as if they had run this time.
+    private void clearCompiledReports() {
+        File[] old = new File(host.buildDirectory(), "surefire-reports").listFiles();
+        if (old == null) {
+            return;
+        }
+        for (File f : old) {
+            String name = f.getName();
+            if (name.startsWith("TEST-") && name.endsWith("-compiled.xml") && !f.delete()) {
+                getLog().warn("cn1: could not remove the stale report " + f);
+            }
+        }
+    }
+
     /// The test sources the compiled run names to javac: the ones whose class the
     /// JVM run selects, less those that use Mockito, which go into [#excluded].
     private List<String> compilableSources() throws BuildExecutionException {
         List<String> sources = new ArrayList<String>();
+        Map<String, List<String>> declared = declaredClasses(testOutputDirectory());
         for (String root : testSourceRoots()) {
             File base = new File(root);
             List<String> found = new ArrayList<String>();
             collectJava(base, found);
             for (String path : found) {
                 File f = new File(path);
-                if (!selectsTestClass(binaryName(base, f))) {
+                if (!selects(declared.get(sourcePath(base, f)), binaryName(base, f))) {
                     continue;
                 }
                 String text;
@@ -377,6 +395,85 @@ public abstract class BackendTestPackager extends BackendPackager {
             }
         }
         return sources;
+    }
+
+    /// Whether the JVM run selects a source: by the top-level classes compiled
+    /// from it, which is what Surefire matches -- `Fixtures.java` may declare a
+    /// package-private `class ApiTest` -- or by its file name when those are not
+    /// known.
+    private boolean selects(List<String> classes, String byFileName) {
+        if (classes == null || classes.isEmpty()) {
+            return selectsTestClass(byFileName);
+        }
+        for (String name : classes) {
+            if (selectsTestClass(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The top-level classes compiled from each test source, keyed by the
+    /// source's path under its root (`com/acme/Fixtures.java`), read from the
+    /// JVM build's test classes; empty when there are none to read.
+    static Map<String, List<String>> declaredClasses(File testClasses) {
+        Map<String, List<String>> out = new LinkedHashMap<String, List<String>>();
+        if (testClasses == null || !testClasses.isDirectory()) {
+            return out;
+        }
+        List<File> files = new ArrayList<File>();
+        collectClasses(testClasses, files);
+        for (File f : files) {
+            final String[] found = new String[2];
+            try {
+                new org.objectweb.asm.ClassReader(Files.readAllBytes(f.toPath())).accept(
+                        new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                            @Override
+                            public void visit(int version, int access, String name, String signature,
+                                              String superName, String[] interfaces) {
+                                found[0] = name;
+                            }
+
+                            @Override
+                            public void visitSource(String source, String debug) {
+                                found[1] = source;
+                            }
+                        }, org.objectweb.asm.ClassReader.SKIP_CODE);
+            } catch (IOException | RuntimeException unreadable) {
+                continue;
+            }
+            if (found[0] == null || found[1] == null || found[0].indexOf('$') >= 0) {
+                continue;
+            }
+            int slash = found[0].lastIndexOf('/');
+            String key = (slash < 0 ? "" : found[0].substring(0, slash + 1)) + found[1];
+            List<String> classes = out.get(key);
+            if (classes == null) {
+                classes = new ArrayList<String>();
+                out.put(key, classes);
+            }
+            classes.add(found[0].replace('/', '.'));
+        }
+        return out;
+    }
+
+    private static void collectClasses(File dir, List<File> out) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                collectClasses(child, out);
+            } else if (child.getName().endsWith(".class")) {
+                out.add(child);
+            }
+        }
+    }
+
+    /// A source file's path under `root`, with `/` separators.
+    static String sourcePath(File root, File source) {
+        return root.toURI().relativize(source.toURI()).getPath();
     }
 
     /// The binary name of the class a source file under `root` declares.

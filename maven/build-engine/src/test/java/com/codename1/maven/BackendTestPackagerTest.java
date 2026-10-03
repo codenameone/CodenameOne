@@ -46,6 +46,28 @@ class BackendTestPackagerTest {
     }
 
     @Test
+    void aSourceIsKnownByTheClassesItDeclares(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        // Fixtures.java declares a package-private ApiTest, which Surefire runs as
+        // ApiTest; selecting the file by its own name lost it.
+        java.io.File src = new java.io.File(dir, "src/com/acme");
+        src.mkdirs();
+        java.io.File fixtures = new java.io.File(src, "Fixtures.java");
+        java.nio.file.Files.write(fixtures.toPath(), ("package com.acme;\n"
+                + "class ApiTest { class Inner {} }\n").getBytes("UTF-8"));
+        java.io.File out = new java.io.File(dir, "classes");
+        out.mkdirs();
+        javax.tools.JavaCompiler javac = javax.tools.ToolProvider.getSystemJavaCompiler();
+        assertTrue(javac.run(null, null, null, "-d", out.getAbsolutePath(),
+                fixtures.getAbsolutePath()) == 0, "the fixture did not compile");
+        java.util.Map<String, java.util.List<String>> declared =
+                BackendTestPackager.declaredClasses(out);
+        assertTrue(java.util.Collections.singletonList("com.acme.ApiTest")
+                .equals(declared.get("com/acme/Fixtures.java")), String.valueOf(declared));
+        assertTrue(BackendTestPackager.declaredClasses(new java.io.File(dir, "missing")).isEmpty());
+    }
+
+    @Test
     void theWordsInCommentsAndStringsAreNotAUse() {
         assertFalse(BackendTestPackager.usesMockito("// unlike org.mockito, this needs nothing\nclass A {}\n"));
         assertFalse(BackendTestPackager.usesMockito("/** Not org.mockito: a fake. */\nclass A {}\n"));

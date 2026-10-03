@@ -181,6 +181,11 @@ final class Access extends BackendAccess {
     }
 
     @Override
+    public void discard(HttpServer.Response response) {
+        response.discard();
+    }
+
+    @Override
     public String contentType(HttpServer.Response response) {
         return response.contentType;
     }

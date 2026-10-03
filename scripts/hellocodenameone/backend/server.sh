@@ -78,10 +78,19 @@ is_windows() {
 }
 
 # Installs the backend runtime, its test support and the plugin, unless this
-# exact source tree was installed already.
+# exact source tree was installed already. `native` adds the ParparVM toolchain --
+# the bundle cn1:backend-package translates with, compiled from vm/ByteCodeTranslator
+# and vm/JavaAPI -- so a translator change is what the native server is built with,
+# not whatever older bundle a restored Maven cache holds.
 install_runtime() {
   if [ "${CN1SS_BACKEND_SKIP_INSTALL:-0}" = "1" ]; then
     return 0
+  fi
+  local mode="${1:-jvm}" modules="backend,backend-test,project-model,build-engine,codenameone-maven-plugin"
+  local -a toolchain=()
+  if [ "$mode" = "native" ]; then
+    modules="$modules,parparvm"
+    toolchain=(vm/ByteCodeTranslator/src vm/JavaAPI/src maven/parparvm/pom.xml maven/parparvm/src)
   fi
   local digest stamp
   # Every module the server's build reads: the runtime and its test support, and
@@ -92,10 +101,10 @@ install_runtime() {
       maven/backend maven/backend-test maven/codenameone-maven-plugin/src/main \
       maven/build-engine/src/main maven/build-engine/pom.xml \
       maven/project-model/src/main maven/project-model/pom.xml \
-      maven/codenameone-maven-plugin/pom.xml maven/pom.xml \
+      maven/codenameone-maven-plugin/pom.xml maven/pom.xml ${toolchain[@]+"${toolchain[@]}"} \
       -type f -not -path '*/target/*' -print 2>/dev/null; vm/backend/shared-sources.sh 2>/dev/null; } \
       | LC_ALL=C sort | tr '\n' '\0' | xargs -0 cat 2>/dev/null | cksum | awk '{print $1}')"
-  stamp="$ROOT/maven/target/cn1ss-backend-installed-$digest"
+  stamp="$ROOT/maven/target/cn1ss-backend-installed-$mode-$digest"
   if [ -f "$stamp" ]; then
     return 0
   fi
@@ -107,11 +116,9 @@ install_runtime() {
   local -a install=(-B -q -f "$ROOT/maven/pom.xml" -Plocal-dev-javase install
       -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true
       -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true)
-  if ! JAVA_HOME="$(install_java_home)" "$(mvn_cmd)" "${install[@]}" \
-      -pl backend,backend-test,project-model,build-engine,codenameone-maven-plugin >&2; then
+  if ! JAVA_HOME="$(install_java_home)" "$(mvn_cmd)" "${install[@]}" -pl "$modules" >&2; then
     log "the plugin's dependencies are not installed; building them too (-am)"
-    JAVA_HOME="$(install_java_home)" "$(mvn_cmd)" "${install[@]}" \
-        -pl backend,backend-test,project-model,build-engine,codenameone-maven-plugin -am >&2
+    JAVA_HOME="$(install_java_home)" "$(mvn_cmd)" "${install[@]}" -pl "$modules" -am >&2
   fi
   mkdir -p "$(dirname "$stamp")"
   touch "$stamp"
@@ -127,7 +134,7 @@ build_jvm() {
 }
 
 build_native() {
-  install_runtime
+  install_runtime native
   log "translating the server to a native binary"
   JAVA_HOME="$(java_home)" "$(mvn_cmd)" -B -q -f "$APP/pom.xml" -Dcodename1.platform=backend \
       -pl backend -Dmaven.test.skip=true process-classes cn1:backend-package \

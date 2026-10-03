@@ -178,6 +178,11 @@ public final class Config {
     private final Properties overrides;
     private final String profile;
     private final List loadedFrom;
+    /// Where load() read the files, or null for a configuration with none.
+    private String directory;
+    /// Whether the process or the base file named the profile; when neither did,
+    /// a compiled-in `cn1.profile` is the one that applies.
+    private boolean profileChosen = true;
 
     private Config(Properties baseFile, Properties profileFile, String profile, List loadedFrom) {
         this(baseFile, profileFile, new Properties(), profile, loadedFrom);
@@ -201,7 +206,7 @@ public final class Config {
     /// This configuration over a bottom layer of compiled-in values: pairs of
     /// key and value, in that order, which every other layer overrides. The
     /// generated entry point passes what the settings annotations say.
-    Config withCompiledDefaults(String[] keysAndValues) {
+    Config withCompiledDefaults(String[] keysAndValues) throws IOException {
         if (keysAndValues == null || keysAndValues.length == 0) {
             return this;
         }
@@ -213,7 +218,28 @@ public final class Config {
         for (int iter = 0 ; iter < keysAndValues.length ; iter += 2) {
             merged.setProperty(keysAndValues[iter], keysAndValues[iter + 1]);
         }
-        return new Config(baseFile, profileFile, merged, overrides, profile, loadedFrom);
+        String active = profile;
+        Properties activeFile = profileFile;
+        String compiledProfile = merged.getProperty(PROFILE);
+        if (!profileChosen && compiledProfile != null) {
+            // The packaged server's committed application.properties names the
+            // profile, and nothing above it does: no CN1_PROFILE, no file beside
+            // the binary. load() had already settled on "default" by then, so the
+            // binary ran -- @Profile beans, datasource defaults, management -- as a
+            // profile its own settings never asked for. Expanded against the
+            // compiled layer, as a file's value is against its file.
+            String named = new Config(baseFile, new Properties(), merged, overrides, "default",
+                    new ArrayList()).expand(compiledProfile, PROFILE, 0);
+            if (named.length() > 0 && !named.equals(profile)) {
+                active = named;
+                activeFile = directory == null ? new Properties()
+                        : read(directory, "application-" + named + ".properties", loadedFrom);
+            }
+        }
+        Config out = new Config(baseFile, activeFile, merged, overrides, active, loadedFrom);
+        out.directory = directory;
+        out.profileChosen = profileChosen;
+        return out;
     }
 
     /// Reads the configuration for this process: the active profile, then the two
@@ -231,6 +257,7 @@ public final class Config {
         // file gets a vote: a project whose default is development says so once,
         // in the file, rather than in every developer's shell.
         String profile = fromProcess(PROFILE);
+        boolean chosen = profile != null || base.getProperty(PROFILE) != null;
         if (profile == null) {
             profile = base.getProperty(PROFILE);
             if (profile != null) {
@@ -255,7 +282,10 @@ public final class Config {
         }
         Properties profileFile = read(directory, "application-" + profile + ".properties",
                 loadedFrom);
-        return new Config(base, profileFile, profile, loadedFrom);
+        Config out = new Config(base, profileFile, profile, loadedFrom);
+        out.directory = directory;
+        out.profileChosen = chosen;
+        return out;
     }
 
     /// A configuration with no files behind it, holding exactly what it is given.

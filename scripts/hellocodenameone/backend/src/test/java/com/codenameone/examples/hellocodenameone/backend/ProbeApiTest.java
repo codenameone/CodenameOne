@@ -161,6 +161,14 @@ class ProbeApiTest {
     }
 
     @Test
+    void assertDoesNotThrowRethrowsAnOutOfMemoryError() {
+        org.junit.jupiter.api.Assertions.assertThrows(OutOfMemoryError.class,
+                () -> org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                        (org.junit.jupiter.api.function.Executable)
+                                () -> { throw new OutOfMemoryError("simulated"); }));
+    }
+
+    @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.
         assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});

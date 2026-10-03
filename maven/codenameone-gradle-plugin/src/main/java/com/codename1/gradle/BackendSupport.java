@@ -177,8 +177,12 @@ final class BackendSupport {
     /// `compile`: the build compiles them into the server, and into each test's
     /// context, so a settings-only edit must not leave the task up to date.
     private static void backendSettingsInputs(Project project, org.gradle.api.Task compile, ProjectLayout layout) {
+        // Both places the processor reads them from: the project directory, and the
+        // conventional src/main/resources, where most projects keep them.
         compile.getInputs().files(project.fileTree(layout.projectDir(), tree -> {
-            tree.include("application.properties", "application-*.properties");
+            tree.include("application.properties", "application-*.properties",
+                    "src/main/resources/application.properties",
+                    "src/main/resources/application-*.properties");
         })).withPropertyName("cn1BackendSettings")
                 .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE);
     }

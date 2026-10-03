@@ -166,6 +166,10 @@ public abstract class BackendAccess {
     /// The response's body, serialized; never null.
     public abstract byte[] body(HttpServer.Response response) throws IOException;
 
+    /// Releases what `response` holds without reading it -- the file a static file
+    /// response keeps open -- for a caller that sends no body, as a HEAD answer.
+    public abstract void discard(HttpServer.Response response);
+
     /// The response's content type, or null.
     public abstract String contentType(HttpServer.Response response);
 

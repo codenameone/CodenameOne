@@ -243,9 +243,11 @@ class HttpBodiesTest {
         assertTrue(allowed.contains("Access-Control-Expose-Headers: X-Total"), allowed);
         assertTrue(allowed.contains("Vary: Origin"), allowed);
 
+        // Refused before any handler runs, as Spring's CorsProcessor refuses it: a
+        // simple request needs no preflight, so the handler used to run anyway.
         String other = raw("POST /text HTTP/1.1\r\nHost: x\r\nOrigin: http://evil.example\r\n"
                 + "Content-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
-        assertTrue(other.startsWith("HTTP/1.1 200"), other);
+        assertTrue(other.startsWith("HTTP/1.1 403"), other);
         assertTrue(!other.contains("Access-Control-Allow-Origin"),
                 "an origin the policy does not list was allowed to read: " + other);
         // The answer still depends on Origin, so a shared cache must key on it --
@@ -256,6 +258,28 @@ class HttpBodiesTest {
         assertTrue(none.contains("Vary: Origin"), "an answer without Origin did not vary: " + none);
         assertTrue(preflight.contains("Vary: Origin"), preflight);
         assertTrue(refused.contains("Vary: Origin"), refused);
+    }
+
+    @Test
+    @DisplayName("a simple cross-origin request with a method the policy omits is refused")
+    void corsEnforcesAllowedMethodsOnSimpleRequests() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.cors.allowedOrigins", "http://app.example");
+        p.setProperty("cn1.cors.allowedMethods", "GET");
+        start(p);
+        String post = raw("POST /text HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Content-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
+        assertTrue(post.startsWith("HTTP/1.1 403"), "a POST passed a GET-only policy: " + post);
+        String preflight = raw("OPTIONS /text HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Access-Control-Request-Method: DELETE\r\nConnection: close\r\n\r\n");
+        assertTrue(preflight.startsWith("HTTP/1.1 403"), preflight);
+        String get = raw("GET /text HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Connection: close\r\n\r\n");
+        assertTrue(get.startsWith("HTTP/1.1 200"), get);
+        // A same-origin request carries Origin too, and is not a CORS request.
+        String same = raw("POST /text HTTP/1.1\r\nHost: 127.0.0.1:" + port + "\r\nOrigin: http://127.0.0.1:"
+                + port + "\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
+        assertTrue(same.startsWith("HTTP/1.1 200"), "a same-origin POST was refused: " + same);
     }
 
     @Test

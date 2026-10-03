@@ -990,11 +990,11 @@ public final class Backend {
                 HttpServer.Response response = null;
                 List attempted = new ArrayList(2);
                 try {
-                    for (HttpServer.Handler element : chain) {
-                        response = element.handle(request);
-                        if (response != null) {
-                            break;
-                        }
+                    // A cross-origin request the CORS policy does not admit never
+                    // reaches a handler.
+                    response = cors == null ? null : cors.reject(request);
+                    for (int i = 0 ; response == null && i < chain.length ; i++) {
+                        response = chain[i].handle(request);
                     }
                     if (response == null && cors != null) {
                         // A preflight no handler took: the policy answers it.

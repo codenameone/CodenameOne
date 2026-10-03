@@ -367,6 +367,13 @@ public class BackendTestGeneratorTest {
                 + "@org.junit.jupiter.api.Test\n"
                 + "public @interface Fast {\n"
                 + "}\n");
+        t.put("t.Skipped", "package t;\n"
+                + "@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)\n"
+                + "@java.lang.annotation.Target(java.lang.annotation.ElementType.METHOD)\n"
+                + "@org.junit.jupiter.api.Test\n"
+                + "@org.junit.jupiter.api.Disabled(\"not on this target\")\n"
+                + "public @interface Skipped {\n"
+                + "}\n");
         t.put("t.InterfaceOnlyTest", "package t;\n"
                 + "public class InterfaceOnlyTest implements Checks {\n"
                 + "}\n");
@@ -385,6 +392,7 @@ public class BackendTestGeneratorTest {
                 + "    void packagePrivate() { calls.add(\"sub-package-private\"); }\n"
                 + "    @org.junit.jupiter.api.Test void own() { calls.add(\"own\"); }\n"
                 + "    @Fast void composed() { calls.add(\"composed\"); }\n"
+                + "    @Skipped void composedDisabled() { calls.add(\"ran-disabled\"); }\n"
                 + "}\n");
         File classes = tmp.newFolder();
         File tests = tmp.newFolder();
@@ -427,6 +435,8 @@ public class BackendTestGeneratorTest {
                     calls.contains("interface"));
             assertTrue("a test marked with a composed @Test annotation did not run: " + calls,
                     calls.contains("composed"));
+            assertFalse("a test disabled through a composed annotation ran: " + calls,
+                    calls.contains("ran-disabled"));
         } finally {
             loader.close();
         }

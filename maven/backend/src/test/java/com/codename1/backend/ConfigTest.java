@@ -166,6 +166,24 @@ class ConfigTest {
     }
 
     @Test
+    @DisplayName("a compiled-in cn1.profile applies when nothing above it names one")
+    void aCompiledProfileApplies(@TempDir File dir) throws Exception {
+        // A packaged server with no file beside it: the committed
+        // application.properties, compiled in, chooses the profile.
+        write(dir, "application-staging.properties", "cn1.stage=yes\n");
+        Config config = Config.load(dir.getAbsolutePath())
+                .withCompiledDefaults(new String[] {Config.PROFILE, "staging"});
+        assertEquals("staging", config.getProfile());
+        assertEquals("yes", config.get("cn1.stage"), "the compiled profile's file was not read");
+        // A base file on disk that names a profile still wins over the compiled one.
+        File other = new File(dir, "named");
+        other.mkdirs();
+        write(other, "application.properties", "cn1.profile=dev\n");
+        assertEquals("dev", Config.load(other.getAbsolutePath())
+                .withCompiledDefaults(new String[] {Config.PROFILE, "staging"}).getProfile());
+    }
+
+    @Test
     @DisplayName("no files at all is a configuration, not a failure")
     void missingFilesAreNotAnError(@TempDir File dir) throws Exception {
         // The normal shape of a FROM scratch container: there is nothing next to

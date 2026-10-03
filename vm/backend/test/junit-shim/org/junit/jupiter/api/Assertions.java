@@ -633,6 +633,7 @@ public final class Assertions {
                 T matched = (T) actual;
                 return matched;
             }
+            rethrowIfUnrecoverable(actual);
             throw new AssertionFailedError(prefix(message) + "Unexpected exception type thrown, "
                     + "expected: <" + expectedType.getName() + "> but was: <"
                     + actual.getClass().getName() + ">", actual);
@@ -653,6 +654,7 @@ public final class Assertions {
                 T matched = (T) actual;
                 return matched;
             }
+            rethrowIfUnrecoverable(actual);
             throw new AssertionFailedError(prefix(text(message)) + "Unexpected exception type "
                     + "thrown, expected: <" + expectedType.getName() + "> but was: <"
                     + actual.getClass().getName() + ">", actual);
@@ -679,6 +681,7 @@ public final class Assertions {
                     + " to be thrown, but nothing was thrown.");
         }
         if (actual.getClass() != expectedType) {
+            rethrowIfUnrecoverable(actual);
             throw new AssertionFailedError(prefix(message) + "Unexpected exception type thrown, "
                     + "expected: <" + expectedType.getName() + "> but was: <"
                     + actual.getClass().getName() + ">", actual);
@@ -696,6 +699,7 @@ public final class Assertions {
         try {
             executable.execute();
         } catch (Throwable thrown) {
+            rethrowIfUnrecoverable(thrown);
             throw new AssertionFailedError(prefix(message) + "Unexpected exception thrown: "
                     + thrown, thrown);
         }
@@ -709,6 +713,7 @@ public final class Assertions {
         try {
             return supplier.get();
         } catch (Throwable thrown) {
+            rethrowIfUnrecoverable(thrown);
             throw new AssertionFailedError(prefix(message) + "Unexpected exception thrown: "
                     + thrown, thrown);
         }
@@ -763,6 +768,15 @@ public final class Assertions {
     }
 
     // --------------------------------------------------------------- helpers
+
+    /// Rethrows an OutOfMemoryError unchanged, as JUnit's UnrecoverableExceptions
+    /// does wherever an assertion catches what it runs: wrapping it would allocate
+    /// while memory is gone and hide that the VM is compromised.
+    private static void rethrowIfUnrecoverable(Throwable thrown) {
+        if (thrown instanceof OutOfMemoryError) {
+            throw (OutOfMemoryError) thrown;
+        }
+    }
 
     private static boolean same(Object expected, Object actual) {
         return expected == actual || (expected != null && expected.equals(actual));
