@@ -1,0 +1,69 @@
+{
+ "pr": 5940,
+ "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.239,
+      "time": 3.043,
+      "tolerance": {
+       "time": 0.45
+      }
+     },
+     "memory": 0.378,
+     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25).",
+     "runs": 1,
+     "time": 3.043,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   }
+  },
+  "linux-x64@amd-epyc-7763-64-core-processor": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.37,
+      "time": 5.011,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.37,
+     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25).",
+     "runs": 1,
+     "time": 1.649,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.4,
+      "time": 4.932,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.294,
+     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25).",
+     "runs": 1,
+     "time": 1.559,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  }
+ }
+}
