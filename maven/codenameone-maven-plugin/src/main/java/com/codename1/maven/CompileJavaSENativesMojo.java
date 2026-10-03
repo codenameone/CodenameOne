@@ -79,6 +79,11 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
 
         List<String> classpath = new ArrayList<String>();
         File cn1libSources = new File(buildDir, path("generated-sources", "cn1libs-javase"));
+        // Rebuilt from the current archives every time, so a library that was upgraded
+        // or removed leaves none of its old native sources behind to be compiled. The
+        // archives keep their entries' timestamps, so an unchanged library still reads
+        // as unchanged below.
+        FileUtils.deleteQuietly(cn1libSources);
         try {
             String testOutput = new File(project.getBuild().getTestOutputDirectory()).getAbsolutePath();
             for (String element : project.getTestClasspathElements()) {
@@ -118,7 +123,10 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
 
         String[] level = sourceLevel();
         File stamp = new File(out.getParentFile(), "inputs.txt");
-        String inputs = describeInputs(sources, classpath, level);
+        List<File> resourceFiles = new ArrayList<File>();
+        collectFiles(resources, resourceFiles);
+        Collections.sort(resourceFiles);
+        String inputs = describeInputs(sources, resourceFiles, classpath, level);
         if (isUpToDate(stamp, inputs, sources, resources)) {
             getLog().debug("JavaSE native code is up to date at " + out);
             return;
@@ -221,7 +229,12 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
         return v.length() == 0 || v.startsWith("${") ? fallback : v;
     }
 
-    static String describeInputs(List<File> sources, List<String> classpath, String[] level) {
+    /**
+     * Everything the compile read, by name: the level, the classpath, the sources and the
+     * resources. Names catch what timestamps cannot, a file that was deleted.
+     */
+    static String describeInputs(List<File> sources, List<File> resources, List<String> classpath,
+                                 String[] level) {
         StringBuilder sb = new StringBuilder();
         sb.append("level=").append(level[0]).append('/').append(level[1]).append('/').append(level[2]).append('\n');
         for (String element : classpath) {
@@ -229,6 +242,9 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
         }
         for (File source : sources) {
             sb.append("src=").append(source.getAbsolutePath()).append('\n');
+        }
+        for (File resource : resources) {
+            sb.append("res=").append(resource.getAbsolutePath()).append('\n');
         }
         return sb.toString();
     }
@@ -275,6 +291,20 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
         unzip.setSrc(zip);
         unzip.setDest(dest);
         unzip.execute();
+    }
+
+    private static void collectFiles(File dir, List<File> out) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                collectFiles(child, out);
+            } else {
+                out.add(child);
+            }
+        }
     }
 
     private static void collectJavaFiles(File dir, List<File> out) {

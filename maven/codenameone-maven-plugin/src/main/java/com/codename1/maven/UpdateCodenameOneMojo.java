@@ -74,10 +74,16 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        if (!isCN1ProjectDir()) {
+        // A backend-only project is a single module at the root, with no app module to
+        // run from: its own pom carries the versions, and there are no app tools
+        // (designer, GUI builder) to refresh.
+        boolean backendRoot = isBackendOnlyRoot(project.getBasedir());
+        if (!backendRoot && !isCN1ProjectDir()) {
             return;
         }
-        updateCodenameOne(true);
+        if (!backendRoot) {
+            updateCodenameOne(true);
+        }
 
         String existingCn1Version = project.getModel().getProperties().getProperty("cn1.version");
         String existingCn1PluginVersion = project.getModel().getProperties().getProperty("cn1.plugin.version");
@@ -155,7 +161,8 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
             Model model = null;
             ModelETL modelETL;
-            File pomFile = new File(project.getParent().getBasedir(), "pom.xml");
+            File pomFile = backendRoot ? new File(project.getBasedir(), "pom.xml")
+                    : new File(project.getParent().getBasedir(), "pom.xml");
             /*
             try (FileInputStream fis = new FileInputStream(pomFile)) {
                 model = pomReader.read(new InputStreamReader(fis, "UTF-8"), false);
@@ -302,6 +309,26 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
             return false;
         }
         return new ComparableVersion(candidate).compareTo(new ComparableVersion(current)) < 0;
+    }
+
+    /**
+     * Whether {@code dir} is a backend-only project: the backend itself at the root of
+     * the build, not the backend module of an application.
+     */
+    static boolean isBackendOnlyRoot(File dir) {
+        com.codename1.project.ProjectLayout layout = dir == null ? null
+                : com.codename1.project.ProjectLayouts.detect(dir);
+        return layout != null && layout.kind() == com.codename1.project.ProjectKind.BACKEND
+                && layout.buildSystem() == com.codename1.project.BuildSystem.MAVEN
+                && canonical(layout.rootDir()).equals(canonical(dir));
+    }
+
+    private static File canonical(File f) {
+        try {
+            return f.getCanonicalFile();
+        } catch (IOException ex) {
+            return f.getAbsoluteFile();
+        }
     }
 
     /** The first plugin release with the goals a minimal project's common pom binds. */

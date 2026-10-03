@@ -117,6 +117,24 @@ class HostedPlatformsTest {
     }
 
     @Test
+    void updateRecognisesABackendOnlyRootButNotAnAppsBackendModule() throws IOException {
+        String backendPom = "<project><dependencies><dependency><artifactId>codenameone-backend</artifactId>"
+                + "</dependency></dependencies></project>";
+        File server = new File(tmp, "server");
+        write(new File(server, "pom.xml"), backendPom);
+        write(new File(server, "application.properties"), "");
+        assertTrue(UpdateCodenameOneMojo.isBackendOnlyRoot(server));
+
+        File root = app();
+        File backend = new File(root, "backend");
+        write(new File(backend, "pom.xml"), backendPom);
+        write(new File(backend, "application.properties"), "");
+        assertFalse(UpdateCodenameOneMojo.isBackendOnlyRoot(backend),
+                "an app's backend module is updated through the app's root pom");
+        assertFalse(UpdateCodenameOneMojo.isBackendOnlyRoot(new File(root, "common")));
+    }
+
+    @Test
     void theDesktopJarKeepsTheJavaseModulesName() {
         assertEquals("myapp-javase-1.0", JavaSEExecutableJarMojo.javaseFinalName("myapp-common", "1.0"));
         assertEquals("other-javase-1.0", JavaSEExecutableJarMojo.javaseFinalName("other", "1.0"));
@@ -148,7 +166,10 @@ class HostedPlatformsTest {
         cp.mkdirs();
         File resources = new File(tmp, "resources");
         List<File> sources = Collections.singletonList(src);
-        String inputs = CompileJavaSENativesMojo.describeInputs(sources,
+        File resource = new File(resources, "native.properties");
+        write(resource, "x=1");
+        List<File> resourceFiles = Collections.singletonList(resource);
+        String inputs = CompileJavaSENativesMojo.describeInputs(sources, resourceFiles,
                 Collections.singletonList(cp.getAbsolutePath()), new String[] {null, "1.8", "1.8"});
         File stamp = new File(tmp, "inputs.txt");
         assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources), "never compiled");
@@ -157,12 +178,18 @@ class HostedPlatformsTest {
         stamp.setLastModified(now);
         src.setLastModified(now - 10000);
         cp.setLastModified(now - 10000);
+        resource.setLastModified(now - 10000);
+        resources.setLastModified(now - 10000);
         assertTrue(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources));
         src.setLastModified(now + 10000);
         assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources), "an edited source");
         src.setLastModified(now - 10000);
-        String moreSources = CompileJavaSENativesMojo.describeInputs(Arrays.asList(src, new File(tmp, "B.java")),
+        String noResources = CompileJavaSENativesMojo.describeInputs(sources, Collections.<File>emptyList(),
                 Collections.singletonList(cp.getAbsolutePath()), new String[] {null, "1.8", "1.8"});
+        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, noResources, sources, resources),
+                "a deleted resource, which no timestamp shows, must still rebuild the output");
+        String moreSources = CompileJavaSENativesMojo.describeInputs(Arrays.asList(src, new File(tmp, "B.java")),
+                resourceFiles, Collections.singletonList(cp.getAbsolutePath()), new String[] {null, "1.8", "1.8"});
         assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, moreSources, sources, resources), "a new source");
         File appClass = new File(cp, "App.class");
         write(appClass, "x");
@@ -231,6 +258,64 @@ class HostedPlatformsTest {
                 StandardCharsets.UTF_8);
         assertTrue(common.contains("<!-- @CN1_HOSTED_PLATFORM_PROFILES@ -->"));
         assertFalse(common.contains("<id>simulator</id>"));
+    }
+
+    /**
+     * Every dependency in the fragment resolves under BOTH root poms that carry it: the
+     * archetype's and the initializr's (common.zip). A dependency without a version needs
+     * a dependencyManagement entry in each, and the initializr's root pom manages fewer
+     * artifacts than the archetype's -- cn1-binaries-javase without a version broke the
+     * effective model of every initializr project's simulator profile.
+     */
+    @Test
+    void everyFragmentDependencyResolvesUnderBothRootPoms() throws Exception {
+        File fragment = new File("../../scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml");
+        String xml = new String(Files.readAllBytes(fragment.toPath()), StandardCharsets.UTF_8);
+        Element profiles = parse("<profiles>" + xml + "</profiles>");
+
+        Set<String> archetypeManaged = managedArtifactIds(parse(new String(Files.readAllBytes(new File(
+                "../cn1app-archetype/src/main/resources/archetype-resources/pom.xml").toPath()), StandardCharsets.UTF_8)));
+        Set<String> initializrManaged;
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(
+                "../../scripts/initializr/common/src/main/resources/common.zip")) {
+            java.io.InputStream in = zip.getInputStream(zip.getEntry("pom.xml"));
+            initializrManaged = managedArtifactIds(DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                    .parse(in).getDocumentElement());
+        }
+        int checked = 0;
+        NodeList deps = profiles.getElementsByTagName("dependency");
+        for (int i = 0; i < deps.getLength(); i++) {
+            Element dep = (Element) deps.item(i);
+            if (!"dependencies".equals(((Element) dep.getParentNode()).getTagName())
+                    || !"profile".equals(((Element) dep.getParentNode().getParentNode()).getTagName())) {
+                continue; // a plugin's own dependency
+            }
+            checked++;
+            String artifact = text(dep, "artifactId");
+            if (text(dep, "version") != null) {
+                continue;
+            }
+            assertTrue(archetypeManaged.contains(artifact), artifact + " has no version and the archetype's root pom does not manage it");
+            assertTrue(initializrManaged.contains(artifact), artifact + " has no version and the initializr's root pom does not manage it");
+        }
+        assertTrue(checked > 0, "found no profile dependencies to check");
+    }
+
+    private static Element parse(String xml) throws Exception {
+        return DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))).getDocumentElement();
+    }
+
+    private static Set<String> managedArtifactIds(Element project) {
+        Set<String> out = new HashSet<String>();
+        Element management = child(project, "dependencyManagement");
+        Element deps = management == null ? null : child(management, "dependencies");
+        if (deps != null) {
+            for (Element dep : children(deps, "dependency")) {
+                out.add(text(dep, "artifactId"));
+            }
+        }
+        return out;
     }
 
     private static List<Element> children(Element parent, String name) {

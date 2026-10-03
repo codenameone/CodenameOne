@@ -218,6 +218,12 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         File[] desktop = app.resolve("common/target").toFile().listFiles(
                 (d, n) -> n.endsWith(".jar") && n.indexOf("-javase-") > 0);
         assertTrue(desktop != null && desktop.length == 1, "common should write the desktop jar");
+        // The simulator profile's model: every dependency it adds must resolve under this
+        // download's own root pom, which manages fewer artifacts than the archetype's.
+        exit = runMaven(app, homeDir, java17, repoLocal, "initialize", "-Psimulator", "-Dcodename1.platform=javase");
+        assertTrue(exit == 0, "The minimal app's simulator profile should resolve | exitCode=" + exit);
+        assertTrue(Files.isRegularFile(app.resolve("common/target/codenameone/simulator-classpath.args")),
+                "The simulator should be prepared from common");
     }
 
     private ProjectOptions layoutOptions(ProjectOptions.ProjectType type) {

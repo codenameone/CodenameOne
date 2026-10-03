@@ -627,6 +627,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 }
             }
             overlayCommandLineBuildHints(properties);
+        } else if (project.getBasedir() != null
+                && new File(project.getBasedir(), com.codename1.project.ProjectLayout.BACKEND_SETTINGS_FILE).isFile()) {
+            // A backend: it has application.properties, never an app's settings file.
+            getLog().debug("A backend project; there is no codenameone_settings.properties to load");
         } else {
             getLog().warn("Failed to find CN1 Project directory.  codenameone_settings.properties will not be loaded");
             if (project.getCompileSourceRoots() != null && !project.getCompileSourceRoots().isEmpty()) {

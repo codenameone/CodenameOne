@@ -7,6 +7,10 @@
           later never builds a platform twice. Requires codenameone-maven-plugin
           7.0.275 or newer.
 
+          Each dependency here either has a version or is one the root pom manages
+          (codenameone-core, codenameone-javase); not every root pom manages
+          cn1-binaries-javase, so it carries ${cn1.version} itself.
+
           Native interface implementations go where they always have, for example
           ../android/src/main/java -  cn1:generate-native-interfaces creates the
           directory - and are picked up from there whether or not a pom sits beside
@@ -380,6 +384,7 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
                     <type>pom</type>
                     <scope>runtime</scope>
                 </dependency>
@@ -457,6 +462,7 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
                     <type>pom</type>
                     <scope>runtime</scope>
                 </dependency>
@@ -549,6 +555,7 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
                     <type>pom</type>
                     <scope>runtime</scope>
                 </dependency>
@@ -625,6 +632,7 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
                     <type>pom</type>
                     <scope>runtime</scope>
                 </dependency>
@@ -697,6 +705,7 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
                     <type>pom</type>
                     <scope>runtime</scope>
                 </dependency>

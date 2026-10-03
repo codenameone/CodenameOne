@@ -136,15 +136,33 @@
                           srcFile="${project.basedir}/../../scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml"
                           encoding="UTF-8"/>
                 <!-- From the source every time: an incremental build does not copy the
-                     resource again, and the copy in target has lost its marker. -->
+                     resource again, and the copy in target has lost its marker. A filtered
+                     copy, not <replace>: that task rewrites through a temp file, which Ant
+                     creates owner-only (0600), and an unreadable pom.xml in the workspace
+                     fails every later hashFiles('**/pom.xml') on CI. -->
+                <!-- Deleted first: a copy over an existing file keeps that file's mode. -->
+                <delete file="${project.build.outputDirectory}/archetype-resources/common/pom.xml"/>
                 <copy file="${project.basedir}/src/main/resources/archetype-resources/common/pom.xml"
                       tofile="${project.build.outputDirectory}/archetype-resources/common/pom.xml"
-                      overwrite="true"/>
-                <replace file="${project.build.outputDirectory}/archetype-resources/common/pom.xml"
-                         token="        &lt;!-- @CN1_HOSTED_PLATFORM_PROFILES@ --&gt;&#10;"
-                         value="${cn1.hostedPlatformProfiles}"
-                         encoding="UTF-8"
-                         failOnNoReplacements="true"/>
+                      overwrite="true" encoding="UTF-8">
+                  <filterchain>
+                    <tokenfilter>
+                      <replacestring from="        &lt;!-- @CN1_HOSTED_PLATFORM_PROFILES@ --&gt;"
+                                     to="${cn1.hostedPlatformProfiles}"/>
+                    </tokenfilter>
+                  </filterchain>
+                </copy>
+                <loadfile property="cn1.hostedPlatformProfilesMarker"
+                          srcFile="${project.build.outputDirectory}/archetype-resources/common/pom.xml"
+                          encoding="UTF-8">
+                  <filterchain>
+                    <linecontains>
+                      <contains value="@CN1_HOSTED_PLATFORM_PROFILES@"/>
+                    </linecontains>
+                  </filterchain>
+                </loadfile>
+                <fail if="cn1.hostedPlatformProfilesMarker"
+                      message="common/pom.xml still carries the hosted platform profiles marker"/>
               </target>
             </configuration>
           </execution>
