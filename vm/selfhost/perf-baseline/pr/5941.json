@@ -11,11 +11,12 @@
        "time": 0.25
       }
      },
-     "memory": 0.979,
-     "reason": "hello's translation input now includes the Android compatibility gallery, its relocated android-compat runtime and the Kotlin stdlib, so the self-hosted translator holds more classes while translating it",
-     "runs": 2,
+     "memory": 1.025,
+     "reason": "hello's translation input now includes the Android compatibility gallery, its relocated android-compat runtime and the Kotlin stdlib (about 60% more translation time on both VMs); ParparVM's peak follows the larger live set while JDK 25's stays near its heap-policy floor, and JDK's own rounds swing to 1.6-2 GB, so the ratio rose and widened",
+     "runs": 3,
      "time": 1.228,
      "tolerance": {
+      "memory": 0.25,
       "time": 0.25
      }
     }
