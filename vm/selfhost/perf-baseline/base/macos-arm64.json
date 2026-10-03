@@ -99,10 +99,11 @@
  },
  "stringBuilding": {
   "all": {
-   "memory": 0.54,
-   "runs": 1,
+   "memory": 0.463,
+   "runs": 5,
    "time": 0.842,
    "tolerance": {
+    "memory": 0.25,
     "time": 0.2
    }
   }
