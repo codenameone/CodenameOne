@@ -25,6 +25,8 @@ package dart.core;
 
 import com.codename1.util.regex.RE;
 import com.codename1.util.regex.RESyntaxException;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
  * Dart's {@code dart:core} {@code RegExp}.
@@ -144,26 +146,52 @@ public final class RegExp {
         return m == null ? null : m.group(0);
     }
 
-    /** Dart's {@code RegExp.allMatches(input)}. */
-    public DartIterable<RegExpMatch> allMatches(String input) {
-        DartList<RegExpMatch> out = new DartList<RegExpMatch>();
-        if (input != null) {
-            int from = 0;
-            RegExpMatch m;
-            while ((m = matchFrom(input, from)) != null) {
-                out.add(m);
-                int start = (int) m.start();
-                int end = (int) m.end();
-                // An empty match must still advance, or this never terminates -- and
-                // it must advance past ITS OWN position, not the previous search
-                // offset. Comparing the end with `from` let an empty match found
-                // later than `from` (RegExp(r'$') on "abc", found at 3 from 0) set
-                // `from` to 3 and be found again there.
-                from = end > start ? end : end + 1;
+    /**
+     * Dart's {@code RegExp.allMatches(input)}: lazy, as Dart's is. Each match is
+     * searched for when the iteration reaches it, so {@code allMatches(s).first}
+     * or {@code .take(1)} does one search, not one per match in the whole input,
+     * and every iteration searches afresh.
+     */
+    public DartIterable<RegExpMatch> allMatches(final String input) {
+        return new DartIterable<RegExpMatch>(() -> new Iterator<RegExpMatch>() {
+            private int from;
+            private RegExpMatch pending;
+            private boolean exhausted = input == null;
+
+            @Override
+            public boolean hasNext() {
+                if (pending == null && !exhausted) {
+                    pending = matchFrom(input, from);
+                    if (pending == null) {
+                        exhausted = true;
+                    } else {
+                        int start = (int) pending.start();
+                        int end = (int) pending.end();
+                        // An empty match must still advance, or this never terminates -- and
+                        // it must advance past ITS OWN position, not the previous search
+                        // offset. Comparing the end with `from` let an empty match found
+                        // later than `from` (RegExp(r'$') on "abc", found at 3 from 0) set
+                        // `from` to 3 and be found again there.
+                        from = end > start ? end : end + 1;
+                    }
+                }
+                return pending != null;
             }
-        }
-        return out.asIterable();
+
+            @Override
+            public RegExpMatch next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                RegExpMatch m = pending;
+                pending = null;
+                return m;
+            }
+        });
     }
+
+    /** Runs before every search; a seam for tests that count them. */
+    static Runnable searchHook;
 
     /**
      * The first match that starts at or after {@code from}, or null. Searching
@@ -175,6 +203,10 @@ public final class RegExp {
     RegExpMatch matchFrom(String input, int from) {
         if (input == null || from < 0 || from > input.length()) {
             return null;
+        }
+        Runnable hook = searchHook;
+        if (hook != null) {
+            hook.run();
         }
         RE re = engine();
         return re.match(input, from) ? snapshot(re, input) : null;

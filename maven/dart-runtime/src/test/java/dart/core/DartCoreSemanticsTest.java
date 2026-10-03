@@ -157,6 +157,53 @@ public class DartCoreSemanticsTest {
     }
 
     @Test
+    public void allMatchesSearchesOnlyAsFarAsTheIterationGoes() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 100000; i++) {
+            sb.append('a');
+        }
+        final int[] searches = new int[1];
+        RegExp.searchHook = new Runnable() {
+            @Override
+            public void run() {
+                searches[0]++;
+            }
+        };
+        try {
+            DartIterable<RegExpMatch> all = new RegExp("a").allMatches(sb.toString());
+            assertEquals(0, searches[0], "creating the iterable searches nothing");
+            int seen = 0;
+            for (RegExpMatch m : all.take(1)) {
+                seen++;
+                assertEquals(0, m.start());
+                assertEquals(1, m.end());
+            }
+            assertEquals(1, seen);
+            assertEquals(1, searches[0], "take(1) is one search, not one per match");
+            assertEquals(5, new RegExp("a").allMatches("aaaaa").length());
+        } finally {
+            RegExp.searchHook = null;
+        }
+    }
+
+    @Test
+    public void allMatchesIteratesAfreshAndKeepsItsOrder() {
+        DartIterable<RegExpMatch> all = new RegExp("[0-9]+").allMatches("a1 b22 c333");
+        StringBuilder first = new StringBuilder();
+        for (RegExpMatch m : all) {
+            first.append(m.group(0)).append(',');
+        }
+        StringBuilder second = new StringBuilder();
+        for (RegExpMatch m : all) {
+            second.append(m.group(0)).append(',');
+        }
+        assertEquals("1,22,333,", first.toString());
+        assertEquals(first.toString(), second.toString());
+        assertFalse(new RegExp("x").allMatches("abc").iterator().hasNext());
+        assertFalse(new RegExp("x").allMatches(null).iterator().hasNext());
+    }
+
+    @Test
     public void portDefaultsToTheSchemes() {
         assertEquals(443, DartUri.parse("https://example.com/path").port());
         assertEquals(80, DartUri.parse("http://example.com/").port());
