@@ -283,12 +283,12 @@ public final class DartUri {
                 port = hostPort.substring(pc + 1);
             }
         }
-        if (port != null && port.length() > 0) {
-            try {
-                Long.parseLong(port);
-            } catch (NumberFormatException e) {
-                return "Invalid port";
-            }
+        // Dart reads the port with int.parse, so a sign and a 0x prefix are legal --
+        // dart 3.9.3 parses http://a.com:+80/ (port 80) and http://a.com:-1/ (port -1)
+        // and does NOT reject them. What it rejects is what int.parse does: '+',
+        // http://a.com:8 0/, and non-ASCII digits, which the Long parse accepted.
+        if (port != null && port.length() > 0 && portValue(port) == null) {
+            return "Invalid port";
         }
         return null;
     }
@@ -330,21 +330,15 @@ public final class DartUri {
                 host = bracketHost(authority.substring(1, close));
                 if (pc >= 0) {
                     explicitPort = pc + 1 < authority.length();
-                    try {
-                        port = Long.parseLong(authority.substring(pc + 1));
-                    } catch (NumberFormatException ignored) {
-                        port = 0;
-                    }
+                    Long v = portValue(authority.substring(pc + 1));
+                    port = v == null ? 0 : v.longValue();
                 }
             } else if (pc >= 0) {
                 // http://a.com: names no port; Dart answers the default for it.
                 explicitPort = pc + 1 < authority.length();
                 host = authority.substring(0, pc);
-                try {
-                    port = Long.parseLong(authority.substring(pc + 1));
-                } catch (NumberFormatException ignored) {
-                    port = 0;
-                }
+                Long v = portValue(authority.substring(pc + 1));
+                port = v == null ? 0 : v.longValue();
             } else {
                 host = authority;
             }
@@ -816,23 +810,22 @@ public final class DartUri {
     }
 
     /// The port text Dart prints: empty for the scheme's default, otherwise the
-    /// value in decimal. Text that is not a plain number is left as written.
+    /// value in decimal (+80 is the default, 0x10 prints as 16). Text that is not
+    /// a number is left as written.
     private static String canonicalPort(String digits, String scheme) {
         if (digits.length() == 0) {
             return digits;
         }
-        if (digits.length() > 18) {
+        Long v = portValue(digits);
+        if (v == null) {
             return digits;
         }
-        long v = 0;
-        for (int i = 0; i < digits.length(); i++) {
-            char c = digits.charAt(i);
-            if (c < '0' || c > '9') {
-                return digits;
-            }
-            v = v * 10 + (c - '0');
-        }
-        return v == defaultPort(scheme) ? "" : String.valueOf(v);
+        return v.longValue() == defaultPort(scheme) ? "" : String.valueOf(v.longValue());
+    }
+
+    /// The port Dart reads from the text after the colon: int.parse's syntax.
+    private static Long portValue(String text) {
+        return DString.tryParseInt(text);
     }
 
     private static char[] foldRange(String t, char[] out, int from, int to) {

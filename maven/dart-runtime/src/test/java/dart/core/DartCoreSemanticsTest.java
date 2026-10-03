@@ -1083,4 +1083,29 @@ public class DartCoreSemanticsTest {
         }
         assertEquals("22", seen.toString(), "an element write is not a length change");
     }
+
+    // --- Uri reads a port as int.parse does --------------------------------------
+
+    @Test
+    public void aSignedOrHexPortIsAcceptedAsDartAcceptsIt() {
+        // Recorded from dart 3.9.3, which takes these rather than rejecting them.
+        DartUri plus = DartUri.parse("http://a.com:+80/");
+        assertEquals(80L, plus.port());
+        assertEquals("http://a.com/", plus.toString());
+        DartUri minus = DartUri.tryParse("http://a.com:-1/");
+        assertEquals(-1L, minus.port());
+        assertEquals("http://a.com:-1/", minus.toString());
+        assertEquals("http://a.com:16/", DartUri.parse("http://a.com:0x10/").toString());
+        assertEquals("foo://a.com:5/", DartUri.parse("foo://a.com:+5/").toString());
+        assertEquals(80L, DartUri.parse("http://[::1]:+0x50/").port());
+    }
+
+    @Test
+    public void aPortThatIsNotAnIntIsRejected() {
+        assertNull(DartUri.tryParse("http://a.com:+/"));
+        assertNull(DartUri.tryParse("http://a.com:-/"));
+        assertNull(DartUri.tryParse("http://a.com:+-1/"));
+        assertNull(DartUri.tryParse("http://a.com:\u0663/"));
+        assertThrows(FormatException.class, () -> DartUri.parse("http://a.com:+/"));
+    }
 }
