@@ -353,7 +353,9 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     public void removeWhere(Funcs.Func2<Long, Long, Boolean> test) {
         // Collected first, then removed: this map's views do not support removal
-        // through their iterators.
+        // through their iterators. A test that modifies the map breaks Dart's
+        // contract; as in DartMap.removeWhere, detecting that is left to the JDK
+        // iterator rather than paid for on every mutation.
         java.util.List<Long> doomed = new java.util.ArrayList<Long>();
         for (Map.Entry<Long, Long> e : entrySet()) {
             if (Boolean.TRUE.equals(test.call(e.getKey(), e.getValue()))) {

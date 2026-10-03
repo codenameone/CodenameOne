@@ -365,6 +365,12 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
 
     /** Dart's {@code Map.removeWhere(test)}. */
     public void removeWhere(Funcs.Func2<K, V, Boolean> test) {
+        // Dart's contract is that the test must not modify the map. A test that
+        // does is reported here only as far as the JDK iterator's fail-fast check
+        // reaches -- not after the last entry. Catching that too would mean a
+        // modification counter bumped on every mutation of every map, paid by all
+        // correct programs, to sharpen the error of an already-broken one. Not done
+        // on purpose.
         java.util.Iterator<Map.Entry<K, V>> it = entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<K, V> e = it.next();
