@@ -36,8 +36,13 @@ public final class Timer {
 
     private volatile boolean cancelled;
     private volatile boolean fired;
+    /** Cleared by cancel(), so a cancelled timer no longer keeps its callback reachable. */
+    volatile Funcs.VoidFunc0 callback;
+    /** The scheduled task on the Display path, so cancel() can unschedule it. */
+    private Timers.Handle handle;
 
-    public Timer(Duration duration, final Funcs.VoidFunc0 callback) {
+    public Timer(Duration duration, Funcs.VoidFunc0 callback) {
+        this.callback = callback;
         // Dart fires a negative delay as soon as possible, as though it were zero.
         // Passed through, it made the Display path throw from the scheduler and
         // the headless thread die in Thread.sleep -- a timer that stayed active
@@ -50,13 +55,15 @@ public final class Timer {
                     return;
                 }
                 fired = true;
-                if (callback != null) {
-                    callback.call();
+                Funcs.VoidFunc0 cb = Timer.this.callback;
+                Timer.this.callback = null;
+                if (cb != null) {
+                    cb.call();
                 }
             }
         };
         if (com.codename1.ui.Display.isInitialized()) {
-            Timers.schedule(ms, r);
+            handle = Timers.schedule(ms, r);
         } else {
             final long delay = ms;
             worker = new Thread(new Runnable() {
@@ -79,6 +86,12 @@ public final class Timer {
 
     public void cancel() {
         cancelled = true;
+        callback = null;
+        Timers.Handle h = handle;
+        handle = null;
+        if (h != null) {
+            h.cancel();
+        }
         // Headless, a timer is a (non-daemon) thread asleep until the deadline. Only
         // setting the flag left a cancelled hours-long timer holding the JVM open and
         // its callback reachable until then; interrupting ends the thread now.

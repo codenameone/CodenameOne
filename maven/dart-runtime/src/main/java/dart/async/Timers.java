@@ -33,18 +33,64 @@ package dart.async;
  */
 final class Timers {
 
+    /**
+     * Schedules one link: {@code CN.setTimeout} on the EDT. A seam only so the
+     * handle bookkeeping can be tested without a Display.
+     */
+    interface Scheduler {
+        java.util.Timer schedule(int ms, Runnable r);
+    }
+
+    static Scheduler scheduler = new Scheduler() {
+        @Override
+        public java.util.Timer schedule(int ms, Runnable r) {
+            return com.codename1.ui.CN.setTimeout(ms, r);
+        }
+    };
+
+    /**
+     * Cancels a scheduled task. CN.setTimeout answers the java.util.Timer that
+     * holds the task; dropping it left a cancelled task -- and the callback it
+     * reaches -- scheduled until its deadline, hours or days away. For a chained
+     * wait this tracks the link currently scheduled, and once cancelled no further
+     * link is scheduled. Every link runs on the EDT, as does a Dart cancel(), so
+     * the fields need no synchronization.
+     */
+    static final class Handle {
+        private java.util.Timer current;
+        private boolean cancelled;
+
+        void cancel() {
+            cancelled = true;
+            java.util.Timer t = current;
+            current = null;
+            if (t != null) {
+                t.cancel();
+            }
+        }
+    }
+
     private Timers() {
     }
 
-    static void schedule(final long ms, final Runnable r) {
-        if (ms <= Integer.MAX_VALUE) {
-            com.codename1.ui.CN.setTimeout((int) Math.max(0L, ms), r);
+    static Handle schedule(long ms, Runnable r) {
+        Handle h = new Handle();
+        schedule(ms, r, h);
+        return h;
+    }
+
+    private static void schedule(final long ms, final Runnable r, final Handle h) {
+        if (h.cancelled) {
             return;
         }
-        com.codename1.ui.CN.setTimeout(Integer.MAX_VALUE, new Runnable() {
+        if (ms <= Integer.MAX_VALUE) {
+            h.current = scheduler.schedule((int) Math.max(0L, ms), r);
+            return;
+        }
+        h.current = scheduler.schedule(Integer.MAX_VALUE, new Runnable() {
             @Override
             public void run() {
-                schedule(ms - Integer.MAX_VALUE, r);
+                schedule(ms - Integer.MAX_VALUE, r, h);
             }
         });
     }
