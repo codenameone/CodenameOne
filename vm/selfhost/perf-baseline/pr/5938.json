@@ -1,6 +1,20 @@
 {
  "pr": 5938,
  "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.542,
+      "time": 0.625
+     },
+     "memory": 0.447,
+     "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM and its JavaScript generator is no longer stubbed out of the self-hosted build, so 'translator (self)' now translates a corpus about twice as large (both arms take ~2x as long: ParparVM 955 -> 1890ms, JDK 1.8 -> 3.0-3.75s on linux-x64). Translating a real application did not slow down: the hello row stayed in band on linux and macOS, arm64 hello got faster (9.5 -> 8.7s), and Windows x64's out-of-band hello RAM was the JDK arm swinging 832-987MB between rounds while ParparVM held 835-857MB.",
+     "runs": 1,
+     "time": 0.625
+    }
+   }
+  },
   "linux-x64@amd-epyc-7763-64-core-processor": {
    "translator": {
     "all": {
@@ -32,6 +46,28 @@
      "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM and its JavaScript generator is no longer stubbed out of the self-hosted build, so 'translator (self)' now translates a corpus about twice as large (both arms take ~2x as long: ParparVM 955 -> 1890ms, JDK 1.8 -> 3.0-3.75s on linux-x64). Translating a real application did not slow down: the hello row stayed in band on linux and macOS, arm64 hello got faster (9.5 -> 8.7s), and Windows x64's out-of-band hello RAM was the JDK arm swinging 832-987MB between rounds while ParparVM held 835-857MB.",
      "runs": 1,
      "time": 0.539
+    }
+   }
+  },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.26,
+      "time": 5.86,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.402,
+     "reason": "Noise, not this change: the row was calibrated from a single run and objectAllocation is the gate's noisiest row (20-37% between runs of unchanged code). On this runner ParparVM held 248-260MB in every round while the JDK arm read 575-671MB, so the ratio moved with the JDK. Peak phys_footprint of the bench's objectAllocation built from master and from this branch, 10 interleaved runs each: median 116.4MB vs 119.0MB with overlapping ranges. RAM only; time stayed in band.",
+     "runs": 1,
+     "time": 5.86,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
     }
    }
   }
