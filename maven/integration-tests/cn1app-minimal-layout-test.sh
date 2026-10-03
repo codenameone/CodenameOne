@@ -130,13 +130,25 @@ grep -q 'tests="1"' "$REPORT" || fail "the JUnit test did not run exactly once"
 grep -q 'failures="0"' "$REPORT" || fail "the JUnit test failed"
 
 echo "== The simulator classpath"
-# The simulator needs JDK 11 or newer, and preparing it says so on an older one; CI
-# runs this script on JDK 8 and names a newer JDK for the native backend step.
+# The simulator needs JDK 11 or newer. A leg that names a newer JDK for the native
+# backend step prepares it on that one; on an older JDK the check is that preparing
+# it refuses, with the reason, instead of launching something that cannot start.
 SIMULATOR_JDK="${CN1_BACKEND_PACKAGE_JDK:-$JAVA_HOME}"
-JAVA_HOME="$SIMULATOR_JDK" mvn -B -ntp initialize -Psimulator -Dcodename1.platform=javase
+SIMULATOR_JAVA_MAJOR="$("$SIMULATOR_JDK/bin/java" -version 2>&1 | sed -n 's/.*version "\(1\.\)\{0,1\}\([0-9]*\).*/\2/p' | head -1)"
 ARGS=common/target/codenameone/simulator-classpath.args
-[ -f "$ARGS" ] || fail "prepare-simulator-classpath wrote no $ARGS"
-grep -q 'cn1-javase' "$ARGS" || fail "the simulator classpath has no JavaSE natives"
+if [ "${SIMULATOR_JAVA_MAJOR:-0}" -lt 11 ]; then
+  if JAVA_HOME="$SIMULATOR_JDK" mvn -B -ntp initialize -Psimulator -Dcodename1.platform=javase \
+      > ../simulator-old-jdk.log 2>&1; then
+    fail "preparing the simulator on Java $SIMULATOR_JAVA_MAJOR should refuse"
+  fi
+  grep -q 'supports JDK 11' ../simulator-old-jdk.log \
+    || { tail -30 ../simulator-old-jdk.log; fail "the simulator refused Java $SIMULATOR_JAVA_MAJOR without saying why"; }
+  echo "NOTE the simulator needs JDK 11+; Java $SIMULATOR_JAVA_MAJOR was refused with the reason"
+else
+  JAVA_HOME="$SIMULATOR_JDK" mvn -B -ntp initialize -Psimulator -Dcodename1.platform=javase
+  [ -f "$ARGS" ] || fail "prepare-simulator-classpath wrote no $ARGS"
+  grep -q 'cn1-javase' "$ARGS" || fail "the simulator classpath has no JavaSE natives"
+fi
 
 echo "== The desktop jar"
 mvn -B -ntp package -Pexecutable-jar -DskipTests -Dcodename1.platform=javase
