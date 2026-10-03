@@ -107,6 +107,25 @@
       "time": 0.5
      }
     }
+   },
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.291,
+      "time": 1.386,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.223,
+     "reason": "The JDK arm, not ParparVM: on byte-identical code two runs on this runner measured ParparVM at 79-85MB in every round while JDK 25 read 247-300MB in one run and 446-506MB in the other. RAM recalibrated from both runs; time untouched.",
+     "runs": 2,
+     "time": 1.386,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.2
+     }
+    }
    }
   }
  }
