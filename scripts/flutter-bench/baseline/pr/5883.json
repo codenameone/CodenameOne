@@ -180,25 +180,25 @@
      "from": {
       "value": 73212360
      },
-     "reason": "Re-measured at 604b8ee2e5 (flutter-bench run 37015988276). The armed value predates the native ports' size work on this branch; the latest +224 bytes of code are the macOS first-frame and menu-bar commits (bebca11b6f, 604b8ee2e5).",
+     "reason": "transpiler correctness fixes (taken-arm-only conditional lowering, unwind handler kept in the 29 lazy getters whose initialiser can throw); run 37108550256 at 290129e4f3",
      "runs": 1,
-     "value": 36743096
+     "value": 36891080
     },
     "install_bytes": {
      "from": {
       "value": 168810517
      },
-     "reason": "Re-measured at 604b8ee2e5 (flutter-bench run 37015988276). The armed value predates the native ports' size work on this branch; the latest +224 bytes of code are the macOS first-frame and menu-bar commits (bebca11b6f, 604b8ee2e5).",
+     "reason": "transpiler correctness fixes (taken-arm-only conditional lowering, unwind handler kept in the 29 lazy getters whose initialiser can throw); run 37108550256 at 290129e4f3",
      "runs": 1,
-     "value": 132268573
+     "value": 132416557
     },
     "wire_bytes": {
      "from": {
       "value": 109700753
      },
-     "reason": "Re-measured at 604b8ee2e5 (flutter-bench run 37015988276). The armed value predates the native ports' size work on this branch; the latest +224 bytes of code are the macOS first-frame and menu-bar commits (bebca11b6f, 604b8ee2e5).",
+     "reason": "transpiler correctness fixes (taken-arm-only conditional lowering, unwind handler kept in the 29 lazy getters whose initialiser can throw); run 37108550256 at 290129e4f3",
      "runs": 1,
-     "value": 90622729
+     "value": 90647305
     }
    }
   },
