@@ -950,4 +950,21 @@ class ToolbarTest extends UITestBase {
         assertEquals(DARK_COLOR, b.getUnselectedStyle().getFgColor(),
                 "A permanent side menu must pick up the new theme");
     }
+
+    /// Form.initLaf used to swap the menu bar for the look and feel's own
+    /// class whenever the classes differed, and a toolbar's menu bar always
+    /// differs. A theme refresh after setToolbar therefore disconnected the
+    /// form from its toolbar and dropped the back command the hardware back
+    /// key runs.
+    @FormTest
+    void refreshThemeKeepsTheToolbarMenuBarAndBackCommand() {
+        Form form = new Form("Back", new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        Command back = new Command("Back");
+        form.setBackCommand(back);
+        form.refreshTheme(true);
+        assertSame(toolbar.getMenuBar(), form.getMenuBar(), "the toolbar's menu bar is the form's");
+        assertSame(back, form.getBackCommand(), "the back command survives the refresh");
+    }
 }

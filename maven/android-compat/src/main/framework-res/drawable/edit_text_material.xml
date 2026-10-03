@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AOSP draws the field with a tinted nine-patch underline; this is the same
+     geometry as shapes: inset 4/10/4/7dp, a 1dp line at rest and a 2dp line
+     in the activated colour while focused. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+       android:insetLeft="4dp"
+       android:insetTop="10dp"
+       android:insetRight="4dp"
+       android:insetBottom="7dp">
+    <selector>
+        <item android:state_enabled="false">
+            <layer-list>
+                <item android:gravity="bottom|fill_horizontal" android:height="1dp">
+                    <shape android:shape="rectangle">
+                        <solid android:color="?attr/colorControlNormal"/>
+                    </shape>
+                </item>
+                <item>
+                    <shape android:shape="rectangle">
+                        <padding android:left="4dp" android:top="3dp" android:right="4dp" android:bottom="6dp"/>
+                    </shape>
+                </item>
+            </layer-list>
+        </item>
+        <item android:state_focused="true">
+            <layer-list>
+                <item android:gravity="bottom|fill_horizontal" android:height="2dp">
+                    <shape android:shape="rectangle">
+                        <solid android:color="?attr/colorControlActivated"/>
+                    </shape>
+                </item>
+                <item>
+                    <shape android:shape="rectangle">
+                        <padding android:left="4dp" android:top="3dp" android:right="4dp" android:bottom="6dp"/>
+                    </shape>
+                </item>
+            </layer-list>
+        </item>
+        <item>
+            <layer-list>
+                <item android:gravity="bottom|fill_horizontal" android:height="1dp">
+                    <shape android:shape="rectangle">
+                        <solid android:color="?attr/colorControlNormal"/>
+                    </shape>
+                </item>
+                <item>
+                    <shape android:shape="rectangle">
+                        <padding android:left="4dp" android:top="3dp" android:right="4dp" android:bottom="6dp"/>
+                    </shape>
+                </item>
+            </layer-list>
+        </item>
+    </selector>
+</inset>

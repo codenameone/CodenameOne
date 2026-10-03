@@ -23,6 +23,7 @@ on:
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/test-javascript-weak-refs.mjs'
+      - 'scripts/test-javascript-native-stub-bindings.mjs'
       - 'scripts/test-javascript-vault-bridge.mjs'
       - 'scripts/test-javascript-composited-rendering.mjs'
       - 'scripts/javascript/composited-app/**'
@@ -67,6 +68,7 @@ on:
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/test-javascript-weak-refs.mjs'
+      - 'scripts/test-javascript-native-stub-bindings.mjs'
       - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
@@ -176,6 +178,12 @@ jobs:
       # strong edge and made every "weak" cache in the framework unreclaimable.
       - name: Weak reference guards
         run: node scripts/test-javascript-weak-refs.mjs
+
+      # A static interop factory (JSString.valueOf, Int32Array.create, ...) runs
+      # its Java body -- `return null;` -- unless port.js binds it; an unbound
+      # JSString.valueOf made every directory marker a delete.
+      - name: Interop stub bindings
+        run: node scripts/test-javascript-native-stub-bindings.mjs
 
       - name: Cache codenameone-tools
         uses: actions/cache@v5

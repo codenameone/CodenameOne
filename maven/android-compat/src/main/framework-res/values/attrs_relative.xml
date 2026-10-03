@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Attributes of RelativeLayout, TableLayout/TableRow and GridLayout, with the
+  names, formats and enum values of the Android framework's attrs.xml.
+-->
+<resources>
+    <!-- RelativeLayout -->
+    <attr name="ignoreGravity" format="reference"/>
+    <attr name="layout_toLeftOf" format="reference"/>
+    <attr name="layout_toRightOf" format="reference"/>
+    <attr name="layout_above" format="reference"/>
+    <attr name="layout_below" format="reference"/>
+    <attr name="layout_alignBaseline" format="reference"/>
+    <attr name="layout_alignLeft" format="reference"/>
+    <attr name="layout_alignTop" format="reference"/>
+    <attr name="layout_alignRight" format="reference"/>
+    <attr name="layout_alignBottom" format="reference"/>
+    <attr name="layout_toStartOf" format="reference"/>
+    <attr name="layout_toEndOf" format="reference"/>
+    <attr name="layout_alignStart" format="reference"/>
+    <attr name="layout_alignEnd" format="reference"/>
+    <attr name="layout_alignParentLeft" format="boolean"/>
+    <attr name="layout_alignParentTop" format="boolean"/>
+    <attr name="layout_alignParentRight" format="boolean"/>
+    <attr name="layout_alignParentBottom" format="boolean"/>
+    <attr name="layout_alignParentStart" format="boolean"/>
+    <attr name="layout_alignParentEnd" format="boolean"/>
+    <attr name="layout_centerInParent" format="boolean"/>
+    <attr name="layout_centerHorizontal" format="boolean"/>
+    <attr name="layout_centerVertical" format="boolean"/>
+    <attr name="layout_alignWithParentIfMissing" format="boolean"/>
+
+    <!-- TableLayout / TableRow -->
+    <attr name="stretchColumns" format="string"/>
+    <attr name="shrinkColumns" format="string"/>
+    <attr name="collapseColumns" format="string"/>
+    <attr name="layout_column" format="integer"/>
+    <attr name="layout_span" format="integer"/>
+
+    <!-- GridLayout -->
+    <attr name="rowCount" format="integer"/>
+    <attr name="columnCount" format="integer"/>
+    <attr name="useDefaultMargins" format="boolean"/>
+    <attr name="alignmentMode">
+        <enum name="alignBounds" value="0"/>
+        <enum name="alignMargins" value="1"/>
+    </attr>
+    <attr name="rowOrderPreserved" format="boolean"/>
+    <attr name="columnOrderPreserved" format="boolean"/>
+    <attr name="layout_row" format="integer"/>
+    <attr name="layout_rowSpan" format="integer"/>
+    <attr name="layout_columnSpan" format="integer"/>
+    <attr name="layout_rowWeight" format="float"/>
+    <attr name="layout_columnWeight" format="float"/>
+
+    <declare-styleable name="RelativeLayout">
+        <attr name="gravity"/>
+        <attr name="ignoreGravity"/>
+    </declare-styleable>
+    <declare-styleable name="RelativeLayout_Layout">
+        <attr name="layout_toLeftOf"/>
+        <attr name="layout_toRightOf"/>
+        <attr name="layout_above"/>
+        <attr name="layout_below"/>
+        <attr name="layout_alignBaseline"/>
+        <attr name="layout_alignLeft"/>
+        <attr name="layout_alignTop"/>
+        <attr name="layout_alignRight"/>
+        <attr name="layout_alignBottom"/>
+        <attr name="layout_toStartOf"/>
+        <attr name="layout_toEndOf"/>
+        <attr name="layout_alignStart"/>
+        <attr name="layout_alignEnd"/>
+        <attr name="layout_alignParentLeft"/>
+        <attr name="layout_alignParentTop"/>
+        <attr name="layout_alignParentRight"/>
+        <attr name="layout_alignParentBottom"/>
+        <attr name="layout_alignParentStart"/>
+        <attr name="layout_alignParentEnd"/>
+        <attr name="layout_centerInParent"/>
+        <attr name="layout_centerHorizontal"/>
+        <attr name="layout_centerVertical"/>
+        <attr name="layout_alignWithParentIfMissing"/>
+    </declare-styleable>
+    <declare-styleable name="TableLayout">
+        <attr name="stretchColumns"/>
+        <attr name="shrinkColumns"/>
+        <attr name="collapseColumns"/>
+    </declare-styleable>
+    <declare-styleable name="TableRow_Cell">
+        <attr name="layout_column"/>
+        <attr name="layout_span"/>
+    </declare-styleable>
+    <declare-styleable name="GridLayout">
+        <attr name="orientation"/>
+        <attr name="rowCount"/>
+        <attr name="columnCount"/>
+        <attr name="useDefaultMargins"/>
+        <attr name="alignmentMode"/>
+        <attr name="rowOrderPreserved"/>
+        <attr name="columnOrderPreserved"/>
+    </declare-styleable>
+    <declare-styleable name="GridLayout_Layout">
+        <attr name="layout_row"/>
+        <attr name="layout_rowSpan"/>
+        <attr name="layout_rowWeight"/>
+        <attr name="layout_column"/>
+        <attr name="layout_columnSpan"/>
+        <attr name="layout_columnWeight"/>
+        <attr name="layout_gravity"/>
+    </declare-styleable>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<fruits>
+    <fruit name="Apple" color="red"/>
+    <fruit name="Banana" color="yellow"/>
+    <fruit name="Kiwi" color="green"/>
+</fruits>

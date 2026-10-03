@@ -1,0 +1,16 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/action_star" android:title="Star" android:icon="@drawable/ic_star"
+        android:showAsAction="ifRoom"/>
+    <item android:id="@+id/action_reset" android:title="Reset"/>
+    <item android:id="@+id/action_list" android:title="List"/>
+    <item android:id="@+id/action_fragments" android:title="Fragments"/>
+    <item android:id="@+id/action_inputs" android:title="Inputs"/>
+    <item android:id="@+id/action_data" android:title="Data"/>
+    <item android:id="@+id/action_anim" android:title="Animation"/>
+    <item android:id="@+id/action_compat" android:title="AppCompat"/>
+    <item android:id="@+id/action_constraint" android:title="Constraint"/>
+    <item android:id="@+id/action_jetpack" android:title="Jetpack"/>
+    <item android:id="@+id/action_recycler" android:title="Recycler"/>
+    <item android:id="@+id/action_material" android:title="Material"/>
+    <item android:id="@+id/action_kotlin" android:title="Kotlin"/>
+</menu>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppCompat's dimensions for phones. -->
+<resources>
+    <dimen name="abc_action_bar_default_height_material">56dp</dimen>
+    <dimen name="abc_action_bar_content_inset_material">16dp</dimen>
+    <dimen name="abc_action_bar_content_inset_with_nav">72dp</dimen>
+    <dimen name="abc_action_bar_default_padding_start_material">0dp</dimen>
+    <dimen name="abc_action_bar_default_padding_end_material">0dp</dimen>
+    <dimen name="abc_action_bar_elevation_material">4dp</dimen>
+    <dimen name="abc_action_bar_title_margin">4dp</dimen>
+    <dimen name="abc_action_button_min_width_material">48dp</dimen>
+    <dimen name="abc_action_button_min_height_material">48dp</dimen>
+    <dimen name="abc_action_button_min_width_overflow_material">36dp</dimen>
+    <dimen name="abc_text_size_title_material_toolbar">20dp</dimen>
+    <dimen name="abc_text_size_subtitle_material_toolbar">16dp</dimen>
+    <dimen name="abc_dialog_padding_material">24dp</dimen>
+    <dimen name="abc_control_corner_material">2dp</dimen>
+    <dimen name="abc_list_item_height_material">64dp</dimen>
+    <dimen name="abc_list_item_height_small_material">48dp</dimen>
+    <dimen name="abc_list_item_height_large_material">80dp</dimen>
+    <dimen name="abc_list_item_padding_horizontal_material">16dp</dimen>
+</resources>

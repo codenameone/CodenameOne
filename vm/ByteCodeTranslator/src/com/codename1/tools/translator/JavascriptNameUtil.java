@@ -33,7 +33,7 @@ final class JavascriptNameUtil {
     }
 
     static String sanitizeClassName(String owner) {
-        return owner.replace('/', '_').replace('$', '_').replace('.', '_');
+        return owner.replace('/', '_').replace('$', '_').replace('-', '_').replace('.', '_');
     }
 
     static String runtimeTypeName(String typeName) {

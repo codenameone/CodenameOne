@@ -556,7 +556,7 @@ public class ByteCodeClass {
 
     private static ByteCodeClass superclassOf(ByteCodeClass c) {
         String base = c.getBaseClass();
-        return base == null ? null : Parser.getClassObject(base.replace('/', '_').replace('$', '_'));
+        return base == null ? null : Parser.getClassObject(base.replace('/', '_').replace('$', '_').replace('-', '_'));
     }
 
     private static String packageOf(ByteCodeClass c) {
@@ -680,7 +680,7 @@ public class ByteCodeClass {
             dependsClassesInterfaces.add("java_lang_annotation_Annotation");
         }
         for(String s : baseInterfaces) {
-            s = s.replace('/', '_').replace('$', '_');
+            s = s.replace('/', '_').replace('$', '_').replace('-', '_');
             if(!dependsClassesInterfaces.contains(s)) {
                 dependsClassesInterfaces.add(s);
             }
@@ -725,7 +725,7 @@ public class ByteCodeClass {
         for (String dep : dependsClassesInterfaces) {
             ByteCodeClass depClass = Parser.getClassObject(dep);
             if (depClass != null && depClass.getConcreteClass() != null) {
-                String concrete = depClass.getConcreteClass().replace('/', '_').replace('$', '_');
+                String concrete = depClass.getConcreteClass().replace('/', '_').replace('$', '_').replace('-', '_');
                 if (!dependsClassesInterfaces.contains(concrete) && !concreteExtras.contains(concrete)) {
                     concreteExtras.add(concrete);
                 }
@@ -1024,7 +1024,7 @@ public class ByteCodeClass {
             }
             first = false;
             b.append("&class__");
-            b.append(ints.replace('/', '_').replace('$', '_'));
+            b.append(ints.replace('/', '_').replace('$', '_').replace('-', '_'));
         }
         b.append("};\n");
         
@@ -1085,7 +1085,7 @@ public class ByteCodeClass {
         // reference to the base class
         if(baseClass != null) {
             b.append("&class__");
-            b.append(baseClass.replace('/', '_').replace('$', '_'));
+            b.append(baseClass.replace('/', '_').replace('$', '_').replace('-', '_'));
         } else {
             b.append("(const struct clazz*)0");
         }
@@ -1202,7 +1202,7 @@ public class ByteCodeClass {
         // static fields for the class
         for(ByteCodeField bf : staticFieldList) {
             if(bf.isStaticField() && bf.getClsName().equals(clsName)) {
-                if (isEnum && ("_VALUES".equals(bf.getFieldName().replace('$','_')) || "ENUM_VALUES".equals(bf.getFieldName().replace('$','_')))) {
+                if (isEnum && ("_VALUES".equals(bf.getFieldName().replace('$','_').replace('-', '_')) || "ENUM_VALUES".equals(bf.getFieldName().replace('$','_').replace('-', '_')))) {
                     enumValuesField = bf.getFieldName();
                 }
                 if(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName())) {
@@ -1211,7 +1211,7 @@ public class ByteCodeClass {
                     b.append(" get_static_");
                     b.append(clsName);
                     b.append("_");
-                    b.append(bf.getFieldName().replace('$', '_'));
+                    b.append(bf.getFieldName().replace('$', '_').replace('-', '_'));
                     b.append("() {\n    return ");
                     if(bf.getValue() instanceof String) {
                         b.append("STRING_FROM_CONSTANT_POOL_OFFSET(");
@@ -1295,7 +1295,7 @@ public class ByteCodeClass {
                     b.append(" get_static_");
                     b.append(clsName);
                     b.append("_");
-                    b.append(bf.getFieldName().replace('$', '_'));
+                    b.append(bf.getFieldName().replace('$', '_').replace('-', '_'));
                     // Match the initializer's acquire/release completion check.
                     // TLS lookup and initialization are cold after the first access.
                     // No guard at all for an eagerly initialized class: it was
@@ -1326,7 +1326,7 @@ public class ByteCodeClass {
                     b.append("CN1_SETTER_INLINE void set_static_");
                     b.append(clsName);
                     b.append("_");
-                    b.append(bf.getFieldName().replace('$', '_'));
+                    b.append(bf.getFieldName().replace('$', '_').replace('-', '_'));
                     b.append("(");
                     if (bf.isObjectType()) {
                         b.append("CODENAME_ONE_THREAD_STATE, ");
@@ -1390,7 +1390,7 @@ public class ByteCodeClass {
             // A conditionally-declared field has no accessor on a target that does
             // not declare it; see targetGuardFor. The guard has to wrap the WHOLE
             // getter/setter pair, so it opens here and closes after the setter.
-            String fldGuard = targetGuardFor(fld.getClsName().replace('/', '_').replace('$', '_'),
+            String fldGuard = targetGuardFor(fld.getClsName().replace('/', '_').replace('$', '_').replace('-', '_'),
                     fld.getFieldName());
             if(fldGuard == null) {
                 fldGuard = targetGuardFor(clsName, fld.getFieldName());
@@ -1938,7 +1938,7 @@ public class ByteCodeClass {
             b.append("(CODENAME_ONE_THREAD_STATE, void** vtable) {\n    ");
             if(baseClass != null) {
                 b.append("    __INIT_VTABLE_");
-                b.append(baseClass.replace('/', '_').replace('$', '_'));
+                b.append(baseClass.replace('/', '_').replace('$', '_').replace('-', '_'));
                 b.append("(threadStateData, vtable);\n");
             }
             for(int iter = 0 ; iter < virtualMethodList.size() ; iter++) {
@@ -1966,7 +1966,7 @@ public class ByteCodeClass {
             
             b.append("JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value) {\n    ");
             if (enumValuesField != null) {
-                b.append("    JAVA_ARRAY values = (JAVA_ARRAY)get_static_").append(clsName).append("_").append(enumValuesField.replace('$', '_')).append("();\n");
+                b.append("    JAVA_ARRAY values = (JAVA_ARRAY)get_static_").append(clsName).append("_").append(enumValuesField.replace('$', '_').replace('-', '_')).append("();\n");
                 b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(values);\n");
                 b.append("    int len = values->length;\n");
                 b.append("    for (int i=0; i<len; i++) {\n");
@@ -2214,7 +2214,7 @@ public class ByteCodeClass {
         b.append("#import \"cn1_debugger.h\"\n");
         b.append("static const cn1_field_entry __cn1_dbg_fields_").append(clsName).append("[] = {\n");
         for (ByteCodeField bf : instance) {
-            String declCls = bf.getClsName().replace('/', '_').replace('$', '_');
+            String declCls = bf.getClsName().replace('/', '_').replace('$', '_').replace('-', '_');
             int fid = Parser.getOrAssignFieldId(declCls, bf.getFieldName());
             char tc = onDeviceDebugTypeCharFor(bf);
             // A conditionally-declared field has no offsetof on a target that does
@@ -2734,7 +2734,7 @@ public class ByteCodeClass {
         }
 
         for(ByteCodeField fld : fullFieldList) {
-            String declGuard = targetGuardFor(fld.getClsName().replace('/', '_').replace('$', '_'),
+            String declGuard = targetGuardFor(fld.getClsName().replace('/', '_').replace('$', '_').replace('-', '_'),
                     fld.getFieldName());
             if(declGuard == null) {
                 declGuard = targetGuardFor(clsName, fld.getFieldName());
@@ -2900,7 +2900,7 @@ public class ByteCodeClass {
     public void setBaseClass(String baseClass) {
         this.baseClass = baseClass;
         if(baseClass != null) {
-            String b = baseClass.replace('/', '_').replace('$', '_');
+            String b = baseClass.replace('/', '_').replace('$', '_').replace('-', '_');
             if(!dependsClassesInterfaces.contains(b)) {
                 dependsClassesInterfaces.add(b);
             }
@@ -2912,7 +2912,7 @@ public class ByteCodeClass {
         baseInterfaces = Arrays.asList(interfaces);
         if(baseInterfaces != null) {
             for(String s : interfaces) {
-                s = s.replace('/', '_').replace('$', '_');
+                s = s.replace('/', '_').replace('$', '_').replace('-', '_');
                 if(!dependsClassesInterfaces.contains(s)) {
                     dependsClassesInterfaces.add(s);
                 }
@@ -3190,7 +3190,7 @@ public class ByteCodeClass {
                         }
                     }
                     if (owner != null) {
-                        ByteCodeClass oc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                        ByteCodeClass oc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_').replace('-', '_'));
                         if (oc != null) {
                             oc.initReferenced = true;
                         }
@@ -3398,7 +3398,7 @@ public class ByteCodeClass {
                 if (t.equals(getOriginalClassName())) {
                     return null;
                 }
-                ByteCodeClass tc = Parser.getClassObject(t.replace('/', '_').replace('$', '_'));
+                ByteCodeClass tc = Parser.getClassObject(t.replace('/', '_').replace('$', '_').replace('-', '_'));
                 return (tc != null && tc.isEagerInitEligible()) ? null : "new-noneager";
             }
             return "type-" + op;
@@ -3410,7 +3410,7 @@ public class ByteCodeClass {
                 if (owner.equals("java/lang/Object")) {
                     return null;
                 }
-                ByteCodeClass oc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                ByteCodeClass oc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_').replace('-', '_'));
                 BytecodeMethod target = oc == null ? null : oc.findMethod("__INIT__", inv.getDesc());
                 if (target == null) {
                     return "ctor-unresolved";

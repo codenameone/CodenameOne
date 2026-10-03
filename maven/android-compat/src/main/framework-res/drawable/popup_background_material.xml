@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The surface of a floating window: the floating background color with
+     slightly rounded corners and the Material menu's 8dp vertical inset. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="2dp"/>
+    <solid android:color="?attr/colorBackgroundFloating"/>
+    <padding android:top="8dp" android:bottom="8dp"/>
+</shape>

@@ -56,15 +56,15 @@ final class LocalReceiverTypes {
         final String owner, name, desc;
         final int opcode;
         Call(MethodInsnNode instruction) {
-            owner = instruction.owner.replace('/', '_').replace('$', '_');
+            owner = instruction.owner.replace('/', '_').replace('$', '_').replace('-', '_');
             name = instruction.name; desc = instruction.desc; opcode = instruction.getOpcode();
         }
     }
     private static final class FieldKey {
         final String owner, name, desc;
         FieldKey(FieldInsnNode field) {
-            owner = field.owner.replace('/', '_').replace('$', '_');
-            name = field.name.replace('$', '_'); desc = field.desc;
+            owner = field.owner.replace('/', '_').replace('$', '_').replace('-', '_');
+            name = field.name.replace('$', '_').replace('-', '_'); desc = field.desc;
         }
         @Override public int hashCode() { return 31 * owner.hashCode() + name.hashCode(); }
         @Override public boolean equals(Object other) {
@@ -107,7 +107,7 @@ final class LocalReceiverTypes {
         for (ByteCodeField field : owner.getFields()) {
             if (field.getFieldName().equals(key.name)
                     && field.getRuntimeDescriptor().equals(key.desc.substring(1, key.desc.length() - 1)
-                            .replace('/', '_').replace('$', '_'))) return field.isPrivate();
+                            .replace('/', '_').replace('$', '_').replace('-', '_'))) return field.isPrivate();
         }
         return false;
     }
@@ -314,7 +314,7 @@ final class LocalReceiverTypes {
                     if (returned.insns.isEmpty()) factoryExact = false;
                     for (AbstractInsnNode source : returned.insns) {
                         if (source.getOpcode() != Opcodes.NEW) { factoryExact = false; break; }
-                        String type = ((TypeInsnNode) source).desc.replace('/', '_').replace('$', '_');
+                        String type = ((TypeInsnNode) source).desc.replace('/', '_').replace('$', '_').replace('-', '_');
                         if (fresh != null && !fresh.equals(type)) factoryExact = false;
                         fresh = type;
                     }
@@ -326,7 +326,7 @@ final class LocalReceiverTypes {
                     if (value.insns.isEmpty()) writes.unknown = true;
                     for (AbstractInsnNode source : value.insns) {
                         if (source.getOpcode() == Opcodes.NEW) {
-                            writes.types.add(((TypeInsnNode) source).desc.replace('/', '_').replace('$', '_'));
+                            writes.types.add(((TypeInsnNode) source).desc.replace('/', '_').replace('$', '_').replace('-', '_'));
                         } else if (source instanceof MethodInsnNode) {
                             writes.calls.add(new Call((MethodInsnNode) source));
                         } else if (source.getOpcode() != Opcodes.ACONST_NULL) {
@@ -357,7 +357,7 @@ final class LocalReceiverTypes {
                         // the type is still known.
                         types.add(lambda);
                     } else if (source.getOpcode() == Opcodes.NEW) {
-                        types.add(((TypeInsnNode) source).desc.replace('/', '_').replace('$', '_'));
+                        types.add(((TypeInsnNode) source).desc.replace('/', '_').replace('$', '_').replace('-', '_'));
                     } else if (source instanceof MethodInsnNode) {
                         nonNull = false;
                         calls.add(new Call((MethodInsnNode) source));

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ids of the views Material Components creates, which applications look up. -->
+<resources>
+    <item type="id" name="snackbar_text"/>
+    <item type="id" name="snackbar_action"/>
+    <item type="id" name="design_bottom_sheet"/>
+    <item type="id" name="textinput_helper_text"/>
+    <item type="id" name="textinput_error"/>
+    <item type="id" name="textinput_counter"/>
+    <item type="id" name="text_input_end_icon"/>
+    <item type="id" name="text_input_start_icon"/>
+</resources>

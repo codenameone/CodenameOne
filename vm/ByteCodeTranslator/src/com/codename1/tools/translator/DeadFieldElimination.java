@@ -119,7 +119,12 @@ final class DeadFieldElimination {
         if (dead.isEmpty()) {
             return;
         }
-        Set<BytecodeMethod> edited = new HashSet<BytecodeMethod>();
+        // By identity: BytecodeMethod.equals compares name and signature only (it
+        // serves override matching), so a HashSet kept one of two edited
+        // constructors with the same signature in different classes, and the
+        // other's inlining plan went on storing the field removed below.
+        Set<BytecodeMethod> edited = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<BytecodeMethod, Boolean>());
         for (ByteCodeClass bc : classes) {
             for (BytecodeMethod m : bc.getMethods()) {
                 List<Instruction> ins = m.getInstructions();

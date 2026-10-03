@@ -111,8 +111,9 @@ To use locally-built version, edit the generated `pom.xml`:
 PR CI (`.github/workflows/pr.yml`, Java 8 leg) runs SpotBugs over
 `core-unittests`, `android`, `ios`, `ByteCodeTranslator`,
 `codenameone-maven-plugin`, `build-engine` (the Maven-free build logic both
-build plugins share), `project-model` (the project-layout API) and
-`codenameone-gradle-plugin`, then enforces the result in
+build plugins share), `project-model` (the project-layout API),
+`android-res-compiler` and `android-compat` (the Android compatibility
+runtime) and `codenameone-gradle-plugin`, then enforces the result in
 `.github/scripts/generate-quality-report.py`.
 
 - **SpotBugs is a zero-findings gate.** *Any* finding of *any* pattern in *any*
@@ -123,6 +124,7 @@ build plugins share), `project-model` (the project-layout API) and
   (`maven/core-unittests/`, `Ports/Android/`, `Ports/iOSPort/`,
   `vm/ByteCodeTranslator/`, `maven/codenameone-maven-plugin/`,
   `maven/build-engine/`, `maven/project-model/`,
+  `maven/android-res-compiler/`, `maven/android-compat/`,
   `maven/codenameone-gradle-plugin/`), scoped to the
   class or method it applies to and with a comment explaining why. Keep the
   generated report at zero rather than tolerating known noise.
@@ -133,7 +135,7 @@ To reproduce the SpotBugs gate locally:
 ```bash
 source tools/env.sh   # JDK 8
 cd maven && mvn -B -DskipTests=true -Pcompile-android \
-  -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin -am verify
+  -pl android,ios,project-model,android-res-compiler,android-compat,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin -am verify
 mvn -B -DunitTests -DskipTests=true -pl core-unittests verify
 mvn -B -DskipTests=true -f ../vm/ByteCodeTranslator/pom.xml verify
 ```
@@ -302,8 +304,9 @@ recognized and never reported. Note the rule is about the *cast*: a
 `catch (ClassCastException)` with no cast under it is fine, because an
 *explicitly thrown* ClassCastException propagates normally.
 
-The scope is what a translation actually sees -- `maven/core`, `maven/ios` and
-`vm/JavaAPI`. **The Android port is not covered**, and adding it back would be a
+The scope is what a translation actually sees -- `maven/core`, `maven/ios`,
+`vm/JavaAPI` and `maven/android-compat`, whose runtime an application with
+Android sources ships relocated inside its own classes. **The Android port is not covered**, and adding it back would be a
 mistake: ART implements `CHECKCAST` to spec, so a `catch (Throwable)` around a
 `(NotificationManager) getSystemService(...)` there is live, correct code, and
 `Ports/Android` is never translated. That is the same reason `Ports/CLDC11` is
@@ -697,6 +700,48 @@ scripts/check-ios-private-api.py --binary <Release-iphoneos/App.app>
 scripts/check-ios-private-api.py --sdk appletvos --project-dir <...-src>
 scripts/check-builder-define-toggles.py
 ```
+
+### Android compatibility: classic Android apps as Codename One apps
+
+An Android Studio module's `src/main` dropped into `common/src/main/android`
+(or imported with `cn1:import-android-project`) builds unmodified:
+
+- **`maven/android-res-compiler`** compiles the manifest and `res/` at build
+  time into `R`, a binary resource table (`cn1_android_res.bin`) and a generated
+  `com.codename1.generated.android.AndroidAppImpl` that `new`s every activity and
+  view class. Nothing on device parses XML or uses reflection.
+- **`maven/android-compat`** is the `android.*` API written over Codename One
+  (views are peers, layouts run Android's measure/layout). Apps compile against
+  it under the real names; its own framework resources live in
+  `src/main/framework-res`.
+- **The remap step** (`build-engine/.../AndroidRemapper`, goal `remap-android`)
+  relocates `android/`, `androidx/` and `com/google/android/material/` to
+  `com/codename1/androidcompat/...`, copies the relocated runtime into the app's
+  classes, maps the JDK classes CLDC lacks (`java.io.File`, the file streams,
+  `BufferedReader`, `PrintWriter`, `Closeable`) to `com.codename1.androidcompat.jdk`,
+  and generates the `android:onClick`, fragment-factory and WebView JS-bridge
+  dispatchers from the compiled classes.
+
+Traps that have already cost a fix:
+
+- **`Object.clone()` returns null on ParparVM** (and in `Ports/CLDC11`); only
+  array clones work. Runtime classes copy explicitly; never `super.clone()`.
+- **The runtime source names JDK classes the device lacks on purpose** -- they
+  are shimmed by the remap, so compiling `android-compat` against CLDC11 reports
+  `java.io.File`/`BufferedReader`; every other CLDC error is real.
+- **Kotlin compiles before javac and is relocated after it.** Java (and the
+  generated factory) refers to Kotlin classes, so the archetype's Kotlin
+  profile compiles in `process-resources` (after the `process-sources`
+  generators, before javac); javac must then see Kotlin's classes
+  *unrelocated*. Maven restores them from `target/kotlin-ic` in
+  `compile-android-res`, and copies that tree back only when newer
+  (`copyKotlinIncrementalCompileOutputToOutputDir`); Gradle relocates
+  Kotlin's directory in `compileJava`'s actions. Kotlin's `@Metadata` strings
+  are remapped too.
+- **`maven/integration-tests/android-compat-test.sh`** imports
+  `scripts/android-compat-samples/*` and stages every target's upload jar
+  (`.github/workflows/android-compat.yml`); it fails if any shipped class still
+  names `android/`.
 
 ### Integration Tests
 

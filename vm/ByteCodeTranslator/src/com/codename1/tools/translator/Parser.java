@@ -91,7 +91,7 @@ public class Parser extends ClassVisitor {
         cn1SubclassIndex = new java.util.HashMap<String, java.util.List<ByteCodeClass>>();
         for (ByteCodeClass c : classes) {
             if (c.getBaseClass() != null) {
-                String b = c.getBaseClass().replace('/', '_').replace('$', '_');
+                String b = c.getBaseClass().replace('/', '_').replace('$', '_').replace('-', '_');
                 java.util.List<ByteCodeClass> l = cn1SubclassIndex.get(b);
                 if (l == null) {
                     l = new java.util.ArrayList<ByteCodeClass>();
@@ -146,12 +146,12 @@ public class Parser extends ClassVisitor {
                     cn1TaggedReachable.add(c.getClsName());
                     if (c.getBaseInterfaces() != null) {
                         for (String i : c.getBaseInterfaces()) {
-                            cn1TaggedReachable.add(i.replace('/', '_').replace('$', '_'));
+                            cn1TaggedReachable.add(i.replace('/', '_').replace('$', '_').replace('-', '_'));
                         }
                     }
                     String base = c.getBaseClass();
                     c = base == null ? null
-                            : getClassObject(base.replace('/', '_').replace('$', '_'));
+                            : getClassObject(base.replace('/', '_').replace('$', '_').replace('-', '_'));
                 }
             }
             // Belt and braces: a class we could not resolve must not become "safe".
@@ -393,7 +393,7 @@ public class Parser extends ClassVisitor {
                 break;
             }
             String b = c.getBaseClass();
-            c = b == null ? null : getClassObject(b.replace('/', '_').replace('$', '_'));
+            c = b == null ? null : getClassObject(b.replace('/', '_').replace('$', '_').replace('-', '_'));
         }
         // Plus every override below it.
         java.util.ArrayDeque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
@@ -446,7 +446,7 @@ public class Parser extends ClassVisitor {
             if (b == null) {
                 return null;
             }
-            c = getClassObject(b.replace('/', '_').replace('$', '_'));
+            c = getClassObject(b.replace('/', '_').replace('$', '_').replace('-', '_'));
         }
         return null;
     }
@@ -515,7 +515,7 @@ public class Parser extends ClassVisitor {
         }
         Parser p = new Parser();
         
-        p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
+        p.clsName = r.getClassName().replace('/', '_').replace('$', '_').replace('-', '_');
         p.cls = new ByteCodeClass(p.clsName, r.getClassName());
         readingClassDepth++;
         try {
@@ -528,7 +528,7 @@ public class Parser extends ClassVisitor {
     }
     
     private static ByteCodeClass getClassByName(String name) {
-        return classIndex().get(name.replace('/', '_').replace('$', '_'));
+        return classIndex().get(name.replace('/', '_').replace('$', '_').replace('-', '_'));
     }
 
     /**
@@ -1158,7 +1158,7 @@ public class Parser extends ClassVisitor {
 
         for(ByteCodeClass bc : classes) {
             bldM.append("extern struct clazz class__");
-            bldM.append(bc.getClsName().replace('/', '_').replace('$', '_'));
+            bldM.append(bc.getClsName().replace('/', '_').replace('$', '_').replace('-', '_'));
             bldM.append(";\n");
         }
         // cn1ClazzById: the object header's class INDEX (classId + 1) -> descriptor, for
@@ -1176,7 +1176,7 @@ public class Parser extends ClassVisitor {
         String[] primitives = {"JAVA_BOOLEAN", "JAVA_CHAR", "JAVA_BYTE", "JAVA_SHORT", "JAVA_INT",
                 "JAVA_LONG", "JAVA_FLOAT", "JAVA_DOUBLE"};
         for (ByteCodeClass bc : classes) {
-            String n = bc.getClsName().replace('/', '_').replace('$', '_');
+            String n = bc.getClsName().replace('/', '_').replace('$', '_').replace('-', '_');
             for (int dim = 1; dim <= 3; dim++) {
                 if (ByteCodeClass.emitsArrayClass(n, dim)) {
                     bldM.append("extern struct clazz class_array").append(dim).append("__").append(n).append(";\n");
@@ -1197,7 +1197,7 @@ public class Parser extends ClassVisitor {
                 "java_lang_Integer", "java_lang_Long", "java_lang_Double", "java_lang_Float",
                 "java_lang_Character", "java_lang_Short"};
         for (ByteCodeClass bc : classes) {
-            String n = bc.getClsName().replace('/', '_').replace('$', '_');
+            String n = bc.getClsName().replace('/', '_').replace('$', '_').replace('-', '_');
             if (java.util.Arrays.asList(alwaysPresent).contains(n)) {
                 bldM.append(",\n    [cn1_class_id_").append(n).append(" + 1] = &class__").append(n);
             }
@@ -1225,7 +1225,7 @@ public class Parser extends ClassVisitor {
             }
             first = false;
             bldM.append("    &class__");
-            bldM.append(bc.getClsName().replace('/', '_').replace('$', '_'));
+            bldM.append(bc.getClsName().replace('/', '_').replace('$', '_').replace('-', '_'));
         }
         bldM.append("};\n\n\n");
         

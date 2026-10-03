@@ -1,0 +1,729 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package android.graphics;
+
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.Transform;
+import com.codename1.ui.geom.GeneralPath;
+
+import java.util.ArrayList;
+
+/// Android's drawing surface over a Codename One `Graphics`.
+///
+/// Coordinates are local to the view (or bitmap) being drawn; the canvas maps
+/// them through its current matrix onto the graphics context. Translation and
+/// scale are applied to the geometry directly, which every port supports;
+/// rotation and skew go through the context's transform, which is skipped on
+/// a port without transform support rather than drawn wrongly.
+public class Canvas {
+
+    public static final int ALL_SAVE_FLAG = 0x1F;
+
+    private Graphics g;
+    private float originX;
+    private float originY;
+    private int width;
+    private int height;
+    private final Matrix matrix = new Matrix();
+    private final ArrayList<float[]> stack = new ArrayList<float[]>();
+    private int alphaLayer = 255;
+
+    public Canvas() {
+    }
+
+    public Canvas(Bitmap bitmap) {
+        setBitmap(bitmap);
+    }
+
+    /// A canvas drawing into `g` with its local origin at (`x`, `y`) in the
+    /// context's coordinates.
+    public Canvas(Graphics g, int x, int y, int width, int height) {
+        bind(g, x, y, width, height);
+    }
+
+    /// Re-targets this canvas; used by the view system to reuse one canvas.
+    public void bind(Graphics g, int x, int y, int width, int height) {
+        this.g = g;
+        this.originX = x;
+        this.originY = y;
+        this.width = width;
+        this.height = height;
+        matrix.reset();
+        stack.clear();
+        alphaLayer = 255;
+    }
+
+    public Graphics getGraphics() {
+        return g;
+    }
+
+    public void setBitmap(Bitmap bitmap) {
+        if (bitmap != null) {
+            Image img = bitmap.getImage();
+            bind(img.getGraphics(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+        } else {
+            g = null;
+        }
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
+    public int getDensity() {
+        return Bitmap.DENSITY_NONE;
+    }
+
+    public void setDensity(int density) {
+    }
+
+    public boolean isHardwareAccelerated() {
+        return false;
+    }
+
+    public boolean isOpaque() {
+        return false;
+    }
+
+    // ------------------------------------------------------------ state
+
+    public int save() {
+        float[] m = new float[9];
+        matrix.getValues(m);
+        // The clip is saved in the same record as the matrix rather than with
+        // Graphics.pushClip, so restoreToCount unwinds both together and a
+        // save the application never restores cannot unbalance the port's
+        // own clip stack.
+        float[] state = new float[14];
+        System.arraycopy(m, 0, state, 0, 9);
+        state[9] = alphaLayer;
+        state[10] = g.getClipX();
+        state[11] = g.getClipY();
+        state[12] = g.getClipWidth();
+        state[13] = g.getClipHeight();
+        stack.add(state);
+        return stack.size();
+    }
+
+    public int save(int saveFlags) {
+        return save();
+    }
+
+    public int saveLayer(RectF bounds, Paint paint) {
+        int c = save();
+        if (paint != null) {
+            alphaLayer = alphaLayer * paint.getAlpha() / 255;
+        }
+        return c;
+    }
+
+    public int saveLayer(float left, float top, float right, float bottom, Paint paint) {
+        return saveLayer(new RectF(left, top, right, bottom), paint);
+    }
+
+    public int saveLayerAlpha(RectF bounds, int alpha) {
+        int c = save();
+        alphaLayer = alphaLayer * alpha / 255;
+        return c;
+    }
+
+    public int saveLayerAlpha(float left, float top, float right, float bottom, int alpha) {
+        return saveLayerAlpha(null, alpha);
+    }
+
+    public void restore() {
+        if (stack.isEmpty()) {
+            throw new IllegalStateException("Underflow in restore - more restores than saves");
+        }
+        float[] state = stack.remove(stack.size() - 1);
+        float[] m = new float[9];
+        System.arraycopy(state, 0, m, 0, 9);
+        matrix.setValues(m);
+        alphaLayer = (int) state[9];
+        g.setClip((int) state[10], (int) state[11], (int) state[12], (int) state[13]);
+    }
+
+    public int getSaveCount() {
+        return stack.size() + 1;
+    }
+
+    public void restoreToCount(int saveCount) {
+        while (stack.size() >= saveCount && !stack.isEmpty()) {
+            restore();
+        }
+    }
+
+    public void translate(float dx, float dy) {
+        matrix.preTranslate(dx, dy);
+    }
+
+    public void scale(float sx, float sy) {
+        matrix.preScale(sx, sy);
+    }
+
+    public final void scale(float sx, float sy, float px, float py) {
+        matrix.preScale(sx, sy, px, py);
+    }
+
+    public void rotate(float degrees) {
+        matrix.preRotate(degrees);
+    }
+
+    public final void rotate(float degrees, float px, float py) {
+        matrix.preRotate(degrees, px, py);
+    }
+
+    public void skew(float sx, float sy) {
+        Matrix s = new Matrix();
+        s.setSkew(sx, sy);
+        matrix.preConcat(s);
+    }
+
+    public void concat(Matrix m) {
+        if (m != null) {
+            matrix.preConcat(m);
+        }
+    }
+
+    public void setMatrix(Matrix m) {
+        matrix.set(m);
+    }
+
+    public void getMatrix(Matrix out) {
+        out.set(matrix);
+    }
+
+    public final Matrix getMatrix() {
+        return new Matrix(matrix);
+    }
+
+    // ------------------------------------------------------------ clip
+
+    public boolean clipRect(float left, float top, float right, float bottom) {
+        RectF r = new RectF(left, top, right, bottom);
+        matrix.mapRect(r);
+        int x = (int) Math.floor(originX + r.left);
+        int y = (int) Math.floor(originY + r.top);
+        g.clipRect(x, y, (int) Math.ceil(originX + r.right) - x, (int) Math.ceil(originY + r.bottom) - y);
+        return g.getClipWidth() > 0 && g.getClipHeight() > 0;
+    }
+
+    public boolean clipRect(Rect rect) {
+        return clipRect(rect.left, rect.top, rect.right, rect.bottom);
+    }
+
+    public boolean clipRect(RectF rect) {
+        return clipRect(rect.left, rect.top, rect.right, rect.bottom);
+    }
+
+    public boolean clipRect(int left, int top, int right, int bottom) {
+        return clipRect((float) left, (float) top, (float) right, (float) bottom);
+    }
+
+    public boolean clipOutRect(float left, float top, float right, float bottom) {
+        // Codename One clips are rectangles or shapes, never "everything but".
+        return true;
+    }
+
+    public boolean clipPath(Path path) {
+        if (g.isShapeClipSupported()) {
+            RectF b = new RectF();
+            path.computeBounds(b, true);
+            Path p = new Path(path);
+            p.transform(matrix);
+            g.setClip(p.toGeneralPath(originX, originY));
+            return true;
+        }
+        RectF b = new RectF();
+        path.computeBounds(b, true);
+        return clipRect(b);
+    }
+
+    public boolean getClipBounds(Rect bounds) {
+        Matrix inv = new Matrix();
+        RectF r = new RectF(g.getClipX() - originX, g.getClipY() - originY,
+                g.getClipX() + g.getClipWidth() - originX, g.getClipY() + g.getClipHeight() - originY);
+        if (matrix.invert(inv)) {
+            inv.mapRect(r);
+        }
+        r.roundOut(bounds);
+        return !bounds.isEmpty();
+    }
+
+    public final Rect getClipBounds() {
+        Rect r = new Rect();
+        getClipBounds(r);
+        return r;
+    }
+
+    public boolean quickReject(float left, float top, float right, float bottom) {
+        Rect clip = new Rect();
+        getClipBounds(clip);
+        return !clip.intersects((int) left, (int) top, (int) Math.ceil(right), (int) Math.ceil(bottom));
+    }
+
+    public boolean quickReject(RectF rect) {
+        return quickReject(rect.left, rect.top, rect.right, rect.bottom);
+    }
+
+    // ------------------------------------------------------------ paint setup
+
+    private boolean rotated() {
+        return !matrix.isScaleTranslate();
+    }
+
+    /// When the matrix rotates or skews, installs it on the context and
+    /// returns the transform to restore; geometry is then drawn untransformed.
+    private Transform pushRotation() {
+        if (!rotated() || !g.isTransformSupported()) {
+            return null;
+        }
+        Transform saved = Transform.makeIdentity();
+        g.getTransform(saved);
+        float[] v = new float[9];
+        matrix.getValues(v);
+        Transform t = saved.copy();
+        t.translate(originX, originY);
+        Transform m = Transform.makeAffine(v[0], v[3], v[1], v[4], v[2], v[5]);
+        t.concatenate(m);
+        g.setTransform(t);
+        return saved;
+    }
+
+    private void popRotation(Transform saved) {
+        if (saved != null) {
+            g.setTransform(saved);
+        }
+    }
+
+    private float ax(float x, float y) {
+        float[] v = values();
+        return originX + v[0] * x + v[1] * y + v[2];
+    }
+
+    private float ay(float x, float y) {
+        float[] v = values();
+        return originY + v[3] * x + v[4] * y + v[5];
+    }
+
+    private final float[] tmp = new float[9];
+
+    private float[] values() {
+        matrix.getValues(tmp);
+        return tmp;
+    }
+
+    private int apply(Paint paint) {
+        int color = paint == null ? 0xff000000 : paint.getColor();
+        ColorFilter cf = paint == null ? null : paint.getColorFilter();
+        if (cf instanceof PorterDuffColorFilter) {
+            PorterDuffColorFilter p = (PorterDuffColorFilter) cf;
+            PorterDuff.Mode mode = p.getMode();
+            if (mode == PorterDuff.Mode.SRC_IN || mode == PorterDuff.Mode.SRC_ATOP || mode == PorterDuff.Mode.SRC) {
+                color = (p.getColor() & 0xffffff) | ((((p.getColor() >>> 24) * (color >>> 24)) / 255) << 24);
+            }
+        }
+        int oldAlpha = g.getAlpha();
+        g.setColor(color & 0xffffff);
+        g.setAlpha(((color >>> 24) * alphaLayer / 255) * oldAlpha / 255);
+        if (paint != null) {
+            g.setAntiAliased(paint.isAntiAlias());
+        }
+        return oldAlpha;
+    }
+
+    private void unapply(int oldAlpha) {
+        g.setAlpha(oldAlpha);
+    }
+
+    private Stroke stroke(Paint p, float scale) {
+        int cap = p.getStrokeCap() == Paint.Cap.ROUND ? Stroke.CAP_ROUND
+                : p.getStrokeCap() == Paint.Cap.SQUARE ? Stroke.CAP_SQUARE : Stroke.CAP_BUTT;
+        int join = p.getStrokeJoin() == Paint.Join.ROUND ? Stroke.JOIN_ROUND
+                : p.getStrokeJoin() == Paint.Join.BEVEL ? Stroke.JOIN_BEVEL : Stroke.JOIN_MITER;
+        return new Stroke(Math.max(1f, p.getStrokeWidth() * scale), cap, join, p.getStrokeMiter());
+    }
+
+    private float scaleFactor() {
+        float[] v = values();
+        return (float) Math.sqrt(Math.abs(v[0] * v[4] - v[1] * v[3]));
+    }
+
+    private boolean fills(Paint p) {
+        return p == null || p.getStyle() != Paint.Style.STROKE;
+    }
+
+    private boolean strokes(Paint p) {
+        return p != null && p.getStyle() != Paint.Style.FILL;
+    }
+
+    // ------------------------------------------------------------ primitives
+
+    public void drawColor(int color) {
+        int old = g.getAlpha();
+        g.setColor(color & 0xffffff);
+        g.setAlpha((color >>> 24) * alphaLayer / 255 * old / 255);
+        g.fillRect(g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());
+        g.setAlpha(old);
+    }
+
+    public void drawColor(int color, PorterDuff.Mode mode) {
+        if (mode == PorterDuff.Mode.CLEAR) {
+            return;
+        }
+        drawColor(color);
+    }
+
+    public void drawARGB(int a, int r, int gr, int b) {
+        drawColor((a << 24) | (r << 16) | (gr << 8) | b);
+    }
+
+    public void drawRGB(int r, int gr, int b) {
+        drawColor(0xff000000 | (r << 16) | (gr << 8) | b);
+    }
+
+    public void drawPaint(Paint paint) {
+        drawColor(paint.getColor());
+    }
+
+    public void drawRect(float left, float top, float right, float bottom, Paint paint) {
+        if (rotated()) {
+            Path p = new Path();
+            p.addRect(left, top, right, bottom, Path.Direction.CW);
+            drawPath(p, paint);
+            return;
+        }
+        Shader sh = paint == null ? null : paint.getShader();
+        float x0 = ax(left, top);
+        float y0 = ay(left, top);
+        float x1 = ax(right, bottom);
+        float y1 = ay(right, bottom);
+        int x = Math.round(Math.min(x0, x1));
+        int y = Math.round(Math.min(y0, y1));
+        int w = Math.round(Math.max(x0, x1)) - x;
+        int h = Math.round(Math.max(y0, y1)) - y;
+        int old = apply(paint);
+        if (fills(paint)) {
+            if (sh instanceof LinearGradient && ((LinearGradient) sh).getColors().length >= 2) {
+                LinearGradient lg = (LinearGradient) sh;
+                g.fillLinearGradient(lg.getColors()[0] & 0xffffff, lg.getColors()[lg.getColors().length - 1] & 0xffffff,
+                        x, y, w, h, lg.isHorizontal());
+            } else {
+                g.fillRect(x, y, w, h);
+            }
+        }
+        if (strokes(paint)) {
+            float sw = paint.getStrokeWidth() * scaleFactor();
+            if (sw <= 1) {
+                g.drawRect(x, y, w - 1, h - 1);
+            } else {
+                GeneralPath gp = new GeneralPath();
+                gp.moveTo(x, y);
+                gp.lineTo(x + w, y);
+                gp.lineTo(x + w, y + h);
+                gp.lineTo(x, y + h);
+                gp.closePath();
+                g.drawShape(gp, stroke(paint, scaleFactor()));
+            }
+        }
+        unapply(old);
+    }
+
+    public void drawRect(RectF rect, Paint paint) {
+        drawRect(rect.left, rect.top, rect.right, rect.bottom, paint);
+    }
+
+    public void drawRect(Rect r, Paint paint) {
+        drawRect(r.left, r.top, r.right, r.bottom, paint);
+    }
+
+    public void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, Paint paint) {
+        if (rx <= 0 && ry <= 0) {
+            drawRect(left, top, right, bottom, paint);
+            return;
+        }
+        Path p = new Path();
+        p.addRoundRect(left, top, right, bottom, rx, ry, Path.Direction.CW);
+        drawPath(p, paint);
+    }
+
+    public void drawRoundRect(RectF rect, float rx, float ry, Paint paint) {
+        drawRoundRect(rect.left, rect.top, rect.right, rect.bottom, rx, ry, paint);
+    }
+
+    public void drawOval(float left, float top, float right, float bottom, Paint paint) {
+        Path p = new Path();
+        p.addOval(left, top, right, bottom, Path.Direction.CW);
+        drawPath(p, paint);
+    }
+
+    public void drawOval(RectF oval, Paint paint) {
+        drawOval(oval.left, oval.top, oval.right, oval.bottom, paint);
+    }
+
+    public void drawCircle(float cx, float cy, float radius, Paint paint) {
+        drawOval(cx - radius, cy - radius, cx + radius, cy + radius, paint);
+    }
+
+    public void drawArc(RectF oval, float startAngle, float sweepAngle, boolean useCenter, Paint paint) {
+        drawArc(oval.left, oval.top, oval.right, oval.bottom, startAngle, sweepAngle, useCenter, paint);
+    }
+
+    public void drawArc(float left, float top, float right, float bottom, float startAngle, float sweepAngle,
+                        boolean useCenter, Paint paint) {
+        Path p = new Path();
+        if (useCenter) {
+            p.moveTo((left + right) / 2, (top + bottom) / 2);
+            p.arcTo(left, top, right, bottom, startAngle, sweepAngle, false);
+            p.close();
+        } else {
+            p.arcTo(left, top, right, bottom, startAngle, sweepAngle, true);
+        }
+        drawPath(p, paint);
+    }
+
+    public void drawLine(float startX, float startY, float stopX, float stopY, Paint paint) {
+        Transform saved = pushRotation();
+        try {
+            float x0 = saved != null ? startX : ax(startX, startY);
+            float y0 = saved != null ? startY : ay(startX, startY);
+            float x1 = saved != null ? stopX : ax(stopX, stopY);
+            float y1 = saved != null ? stopY : ay(stopX, stopY);
+            int old = apply(paint);
+            float sw = paint.getStrokeWidth() * (saved != null ? 1 : scaleFactor());
+            if (sw <= 1) {
+                g.drawLine(Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1));
+            } else {
+                GeneralPath gp = new GeneralPath();
+                gp.moveTo(x0, y0);
+                gp.lineTo(x1, y1);
+                g.drawShape(gp, stroke(paint, saved != null ? 1 : scaleFactor()));
+            }
+            unapply(old);
+        } finally {
+            popRotation(saved);
+        }
+    }
+
+    public void drawLines(float[] pts, Paint paint) {
+        drawLines(pts, 0, pts.length, paint);
+    }
+
+    public void drawLines(float[] pts, int offset, int count, Paint paint) {
+        for (int i = offset; i + 3 < offset + count; i += 4) {
+            drawLine(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], paint);
+        }
+    }
+
+    public void drawPoint(float x, float y, Paint paint) {
+        float r = Math.max(0.5f, paint.getStrokeWidth() / 2);
+        if (paint.getStrokeCap() == Paint.Cap.ROUND) {
+            Paint p = new Paint(paint);
+            p.setStyle(Paint.Style.FILL);
+            drawCircle(x, y, r, p);
+        } else {
+            Paint p = new Paint(paint);
+            p.setStyle(Paint.Style.FILL);
+            drawRect(x - r, y - r, x + r, y + r, p);
+        }
+    }
+
+    public void drawPoints(float[] pts, Paint paint) {
+        for (int i = 0; i + 1 < pts.length; i += 2) {
+            drawPoint(pts[i], pts[i + 1], paint);
+        }
+    }
+
+    public void drawPath(Path path, Paint paint) {
+        Transform saved = pushRotation();
+        try {
+            Path p = path;
+            if (saved == null && !matrix.isIdentity()) {
+                p = new Path(path);
+                p.transform(matrix);
+            }
+            float dx = saved != null ? 0 : originX;
+            float dy = saved != null ? 0 : originY;
+            GeneralPath gp = p.toGeneralPath(dx, dy);
+            int old = apply(paint);
+            if (fills(paint)) {
+                g.fillShape(gp);
+            }
+            if (strokes(paint)) {
+                g.drawShape(gp, stroke(paint, saved != null ? 1 : scaleFactor()));
+            }
+            unapply(old);
+        } finally {
+            popRotation(saved);
+        }
+    }
+
+    // ------------------------------------------------------------ text
+
+    public void drawText(String text, float x, float y, Paint paint) {
+        drawText(text, 0, text.length(), x, y, paint);
+    }
+
+    public void drawText(CharSequence text, int start, int end, float x, float y, Paint paint) {
+        drawText(text.toString(), start, end, x, y, paint);
+    }
+
+    public void drawText(char[] text, int index, int count, float x, float y, Paint paint) {
+        drawText(new String(text, index, count), x, y, paint);
+    }
+
+    public void drawText(String text, int start, int end, float x, float y, Paint paint) {
+        if (start >= end) {
+            return;
+        }
+        String s = start == 0 && end == text.length() ? text : text.substring(start, end);
+        Transform saved = pushRotation();
+        try {
+            float scale = saved != null ? 1 : Math.abs(values()[4]);
+            Paint p = paint;
+            if (scale != 1) {
+                p = new Paint(paint);
+                p.setTextSize(paint.getTextSize() * scale);
+            }
+            Font f = p.cn1Font();
+            float w = p.measureText(s);
+            float ox = x;
+            if (paint.getTextAlign() == Paint.Align.CENTER) {
+                ox -= w / (2 * (scale == 0 ? 1 : scale));
+            } else if (paint.getTextAlign() == Paint.Align.RIGHT) {
+                ox -= w / (scale == 0 ? 1 : scale);
+            }
+            float px = saved != null ? ox : ax(ox, y);
+            float py = saved != null ? y : ay(ox, y);
+            int tx = Math.round(px);
+            int top = Math.round(py) - f.getAscent();
+            int old = apply(paint);
+            g.setFont(f);
+            if (paint.getLetterSpacing() != 0) {
+                float cx = px;
+                float extra = paint.getLetterSpacing() * p.getTextSize();
+                for (int i = 0; i < s.length(); i++) {
+                    char c = s.charAt(i);
+                    g.drawChar(c, Math.round(cx), top);
+                    cx += f.charWidth(c) + extra;
+                }
+            } else {
+                g.drawString(s, tx, top);
+            }
+            if (paint.isUnderlineText()) {
+                int uy = Math.round(py) + Math.max(1, f.getDescent() / 3);
+                g.fillRect(tx, uy, Math.round(w), Math.max(1, Math.round(p.getTextSize() / 18f)));
+            }
+            if (paint.isStrikeThruText()) {
+                int sy = Math.round(py) - f.getAscent() / 3;
+                g.fillRect(tx, sy, Math.round(w), Math.max(1, Math.round(p.getTextSize() / 18f)));
+            }
+            unapply(old);
+        } finally {
+            popRotation(saved);
+        }
+    }
+
+    // ------------------------------------------------------------ bitmaps
+
+    public void drawBitmap(Bitmap bitmap, float left, float top, Paint paint) {
+        drawBitmap(bitmap, null, new RectF(left, top, left + bitmap.getWidth(), top + bitmap.getHeight()), paint);
+    }
+
+    public void drawBitmap(Bitmap bitmap, Rect src, Rect dst, Paint paint) {
+        drawBitmap(bitmap, src, new RectF(dst), paint);
+    }
+
+    public void drawBitmap(Bitmap bitmap, Rect src, RectF dst, Paint paint) {
+        Image img = bitmap.getImage();
+        if (src != null && !(src.left == 0 && src.top == 0 && src.right == bitmap.getWidth()
+                && src.bottom == bitmap.getHeight())) {
+            img = img.subImage(src.left, src.top, src.width(), src.height(), true);
+        }
+        drawImage(img, dst, paint);
+    }
+
+    public void drawBitmap(Bitmap bitmap, Matrix m, Paint paint) {
+        Matrix save = new Matrix(matrix);
+        matrix.preConcat(m);
+        drawBitmap(bitmap, 0, 0, paint);
+        matrix.set(save);
+    }
+
+    /// Draws a Codename One image into `dst` (local coordinates).
+    public void drawImage(Image img, RectF dst, Paint paint) {
+        Transform saved = pushRotation();
+        try {
+            float l;
+            float t;
+            float r;
+            float b;
+            if (saved != null) {
+                l = dst.left;
+                t = dst.top;
+                r = dst.right;
+                b = dst.bottom;
+            } else {
+                l = ax(dst.left, dst.top);
+                t = ay(dst.left, dst.top);
+                r = ax(dst.right, dst.bottom);
+                b = ay(dst.right, dst.bottom);
+            }
+            int x = Math.round(Math.min(l, r));
+            int y = Math.round(Math.min(t, b));
+            int w = Math.round(Math.max(l, r)) - x;
+            int h = Math.round(Math.max(t, b)) - y;
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            int old = g.getAlpha();
+            int a = paint == null ? 255 : paint.getAlpha();
+            g.setAlpha(a * alphaLayer / 255 * old / 255);
+            Image toDraw = img;
+            ColorFilter cf = paint == null ? null : paint.getColorFilter();
+            if (cf instanceof PorterDuffColorFilter) {
+                toDraw = com.codename1.androidcompat.runtime.ImageTint.tint(img, (PorterDuffColorFilter) cf);
+            }
+            if (w == toDraw.getWidth() && h == toDraw.getHeight()) {
+                g.drawImage(toDraw, x, y);
+            } else {
+                g.drawImage(toDraw, x, y, w, h);
+            }
+            g.setAlpha(old);
+        } finally {
+            popRotation(saved);
+        }
+    }
+
+    public void drawBitmap(int[] colors, int offset, int stride, float x, float y, int width, int height,
+                           boolean hasAlpha, Paint paint) {
+        drawBitmap(Bitmap.createBitmap(colors, offset, stride, width, height, Bitmap.Config.ARGB_8888), x, y, paint);
+    }
+}

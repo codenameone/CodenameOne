@@ -1,0 +1,682 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Components' text appearances, shape appearances and widget
+     styles, for MaterialComponents and Material 3, with the library's own
+     default values. -->
+<resources>
+    <!-- Material 3 type scale. -->
+    <style name="TextAppearance.Material3.DisplayLarge"><item name="android:textSize">57sp</item><item name="android:fontFamily">sans-serif</item><item name="android:letterSpacing">-0.0044</item></style>
+    <style name="TextAppearance.Material3.DisplayMedium"><item name="android:textSize">45sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.Material3.DisplaySmall"><item name="android:textSize">36sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.Material3.HeadlineLarge"><item name="android:textSize">32sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.Material3.HeadlineMedium"><item name="android:textSize">28sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.Material3.HeadlineSmall"><item name="android:textSize">24sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.Material3.TitleLarge"><item name="android:textSize">22sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.Material3.TitleMedium"><item name="android:textSize">16sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:letterSpacing">0.009375</item></style>
+    <style name="TextAppearance.Material3.TitleSmall"><item name="android:textSize">14sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:letterSpacing">0.0071428</item></style>
+    <style name="TextAppearance.Material3.BodyLarge"><item name="android:textSize">16sp</item><item name="android:fontFamily">sans-serif</item><item name="android:letterSpacing">0.03125</item></style>
+    <style name="TextAppearance.Material3.BodyMedium"><item name="android:textSize">14sp</item><item name="android:fontFamily">sans-serif</item><item name="android:letterSpacing">0.0178571</item></style>
+    <style name="TextAppearance.Material3.BodySmall"><item name="android:textSize">12sp</item><item name="android:fontFamily">sans-serif</item><item name="android:letterSpacing">0.0333333</item></style>
+    <style name="TextAppearance.Material3.LabelLarge"><item name="android:textSize">14sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:letterSpacing">0.0071428</item><item name="android:textAllCaps">false</item></style>
+    <style name="TextAppearance.Material3.LabelMedium"><item name="android:textSize">12sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:letterSpacing">0.0416666</item></style>
+    <style name="TextAppearance.Material3.LabelSmall"><item name="android:textSize">11sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:letterSpacing">0.0454545</item></style>
+
+    <!-- MaterialComponents type scale. -->
+    <style name="TextAppearance.MaterialComponents.Headline1"><item name="android:textSize">96sp</item><item name="android:fontFamily">sans-serif-light</item></style>
+    <style name="TextAppearance.MaterialComponents.Headline2"><item name="android:textSize">60sp</item><item name="android:fontFamily">sans-serif-light</item></style>
+    <style name="TextAppearance.MaterialComponents.Headline3"><item name="android:textSize">48sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.MaterialComponents.Headline4"><item name="android:textSize">34sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.MaterialComponents.Headline5"><item name="android:textSize">24sp</item><item name="android:fontFamily">sans-serif</item></style>
+    <style name="TextAppearance.MaterialComponents.Headline6"><item name="android:textSize">20sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:letterSpacing">0.0125</item></style>
+    <style name="TextAppearance.MaterialComponents.Subtitle1"><item name="android:textSize">16sp</item><item name="android:fontFamily">sans-serif</item><item name="android:letterSpacing">0.009375</item></style>
+    <style name="TextAppearance.MaterialComponents.Subtitle2"><item name="android:textSize">14sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:letterSpacing">0.0071428</item></style>
+    <style name="TextAppearance.MaterialComponents.Body1"><item name="android:textSize">16sp</item><item name="android:fontFamily">sans-serif</item><item name="android:letterSpacing">0.03125</item></style>
+    <style name="TextAppearance.MaterialComponents.Body2"><item name="android:textSize">14sp</item><item name="android:fontFamily">sans-serif</item><item name="android:letterSpacing">0.0178571</item></style>
+    <style name="TextAppearance.MaterialComponents.Button"><item name="android:textSize">14sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:textAllCaps">true</item><item name="android:letterSpacing">0.0892857</item></style>
+    <style name="TextAppearance.MaterialComponents.Caption"><item name="android:textSize">12sp</item><item name="android:fontFamily">sans-serif</item><item name="android:letterSpacing">0.0333333</item></style>
+    <style name="TextAppearance.MaterialComponents.Overline"><item name="android:textSize">10sp</item><item name="android:fontFamily">sans-serif-medium</item><item name="android:textAllCaps">true</item><item name="android:letterSpacing">0.166666</item></style>
+    <style name="TextAppearance.Design.Snackbar.Message"><item name="android:textSize">14sp</item></style>
+
+    <!-- Shape appearances. -->
+    <style name="ShapeAppearance.MaterialComponents"><item name="cornerFamily">rounded</item></style>
+    <style name="ShapeAppearance.MaterialComponents.SmallComponent"><item name="cornerSize">4dp</item></style>
+    <style name="ShapeAppearance.MaterialComponents.MediumComponent"><item name="cornerSize">4dp</item></style>
+    <style name="ShapeAppearance.MaterialComponents.LargeComponent"><item name="cornerSize">0dp</item></style>
+    <style name="ShapeAppearance.Material3.Corner.None"><item name="cornerFamily">rounded</item><item name="cornerSize">0dp</item></style>
+    <style name="ShapeAppearance.Material3.Corner.ExtraSmall"><item name="cornerFamily">rounded</item><item name="cornerSize">4dp</item></style>
+    <style name="ShapeAppearance.Material3.Corner.Small"><item name="cornerFamily">rounded</item><item name="cornerSize">8dp</item></style>
+    <style name="ShapeAppearance.Material3.Corner.Medium"><item name="cornerFamily">rounded</item><item name="cornerSize">12dp</item></style>
+    <style name="ShapeAppearance.Material3.Corner.Large"><item name="cornerFamily">rounded</item><item name="cornerSize">16dp</item></style>
+    <style name="ShapeAppearance.Material3.Corner.ExtraLarge"><item name="cornerFamily">rounded</item><item name="cornerSize">28dp</item></style>
+    <style name="ShapeAppearance.Material3.Corner.Full"><item name="cornerFamily">rounded</item><item name="cornerSize">50%</item></style>
+    <style name="ShapeAppearance.Material3.SmallComponent" parent="ShapeAppearance.Material3.Corner.Small"/>
+    <style name="ShapeAppearance.Material3.MediumComponent" parent="ShapeAppearance.Material3.Corner.Medium"/>
+    <style name="ShapeAppearance.Material3.LargeComponent" parent="ShapeAppearance.Material3.Corner.Large"/>
+
+    <!-- Buttons. -->
+    <style name="Widget.Material3.Button" parent="android:Widget.Material.Button">
+        <item name="android:background">@null</item>
+        <item name="android:insetTop">@dimen/m3_btn_inset</item>
+        <item name="android:insetBottom">@dimen/m3_btn_inset</item>
+        <item name="android:minHeight">@dimen/m3_btn_min_height</item>
+        <item name="android:minWidth">64dp</item>
+        <item name="android:paddingLeft">@dimen/m3_btn_padding_horizontal</item>
+        <item name="android:paddingRight">@dimen/m3_btn_padding_horizontal</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">?attr/textAppearanceLabelLarge</item>
+        <item name="android:textColor">?attr/colorOnPrimary</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="backgroundTint">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/colorOnPrimary</item>
+        <item name="iconSize">@dimen/m3_btn_icon_size</item>
+        <item name="iconPadding">@dimen/m3_btn_icon_padding</item>
+        <item name="rippleColor">?attr/colorOnPrimary</item>
+        <item name="cornerRadius">@dimen/m3_btn_corner</item>
+        <item name="elevation">0dp</item>
+    </style>
+    <style name="Widget.Material3.Button.UnelevatedButton"/>
+    <style name="Widget.Material3.Button.Icon"/>
+    <style name="Widget.Material3.Button.OutlinedButton">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/colorPrimary</item>
+        <item name="rippleColor">?attr/colorPrimary</item>
+        <item name="strokeColor">?attr/colorOutline</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+    <style name="Widget.Material3.Button.OutlinedButton.Icon"/>
+    <style name="Widget.Material3.Button.TextButton">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/colorPrimary</item>
+        <item name="rippleColor">?attr/colorPrimary</item>
+        <item name="android:paddingLeft">@dimen/m3_btn_text_padding_horizontal</item>
+        <item name="android:paddingRight">@dimen/m3_btn_text_padding_horizontal</item>
+        <item name="android:minWidth">48dp</item>
+    </style>
+    <style name="Widget.Material3.Button.TextButton.Icon"/>
+    <style name="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:minWidth">64dp</item>
+    </style>
+    <style name="Widget.Material3.Button.TextButton.Snackbar">
+        <item name="android:textColor">?attr/colorPrimaryInverse</item>
+        <item name="rippleColor">?attr/colorPrimaryInverse</item>
+    </style>
+    <style name="Widget.Material3.Button.TonalButton">
+        <item name="backgroundTint">?attr/colorSecondaryContainer</item>
+        <item name="android:textColor">?attr/colorOnSecondaryContainer</item>
+        <item name="iconTint">?attr/colorOnSecondaryContainer</item>
+        <item name="rippleColor">?attr/colorOnSecondaryContainer</item>
+    </style>
+    <style name="Widget.Material3.Button.ElevatedButton">
+        <item name="backgroundTint">?attr/colorSurfaceContainerLow</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/colorPrimary</item>
+        <item name="rippleColor">?attr/colorPrimary</item>
+        <item name="elevation">1dp</item>
+    </style>
+    <style name="Widget.Material3.Button.IconButton">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="iconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="iconSize">24dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="rippleColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+    <style name="Widget.Material3.Button.IconButton.Filled">
+        <item name="backgroundTint">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/colorOnPrimary</item>
+    </style>
+    <style name="Widget.Material3.Button.IconButton.Outlined">
+        <item name="strokeColor">?attr/colorOutline</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.Button" parent="android:Widget.Material.Button">
+        <item name="android:background">@null</item>
+        <item name="android:insetTop">@dimen/mtrl_btn_inset</item>
+        <item name="android:insetBottom">@dimen/mtrl_btn_inset</item>
+        <item name="android:minHeight">@dimen/mtrl_btn_min_height</item>
+        <item name="android:minWidth">64dp</item>
+        <item name="android:paddingLeft">@dimen/mtrl_btn_padding_horizontal</item>
+        <item name="android:paddingRight">@dimen/mtrl_btn_padding_horizontal</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">?attr/textAppearanceButton</item>
+        <item name="android:textColor">?attr/colorOnPrimary</item>
+        <item name="backgroundTint">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/colorOnPrimary</item>
+        <item name="iconSize">18dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="rippleColor">?attr/colorOnPrimary</item>
+        <item name="cornerRadius">@dimen/mtrl_btn_corner_radius</item>
+        <item name="elevation">@dimen/mtrl_btn_elevation</item>
+    </style>
+    <style name="Widget.MaterialComponents.Button.Icon"/>
+    <style name="Widget.MaterialComponents.Button.UnelevatedButton">
+        <item name="elevation">0dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/colorPrimary</item>
+        <item name="rippleColor">?attr/colorPrimary</item>
+        <item name="strokeColor">@color/mtrl_outline_light</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="elevation">0dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.Button.TextButton">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/colorPrimary</item>
+        <item name="rippleColor">?attr/colorPrimary</item>
+        <item name="android:paddingLeft">@dimen/mtrl_btn_text_btn_padding_horizontal</item>
+        <item name="android:paddingRight">@dimen/mtrl_btn_text_btn_padding_horizontal</item>
+        <item name="elevation">0dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.Button.TextButton.Dialog"/>
+    <style name="Widget.MaterialComponents.Button.TextButton.Snackbar">
+        <item name="android:textColor">?attr/colorPrimaryInverse</item>
+    </style>
+
+    <!-- Cards. -->
+    <style name="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainerLow</item>
+        <item name="cardCornerRadius">@dimen/m3_card_corner</item>
+        <item name="cardElevation">@dimen/m3_card_elevated_elevation</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="rippleColor">?attr/colorOnSurface</item>
+        <item name="checkedIconTint">?attr/colorPrimary</item>
+    </style>
+    <style name="Widget.Material3.CardView.Filled" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainerHighest</item>
+        <item name="cardElevation">0dp</item>
+    </style>
+    <style name="Widget.Material3.CardView.Outlined" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">?attr/colorSurface</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">?attr/colorOutlineVariant</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">?attr/colorSurface</item>
+        <item name="cardCornerRadius">@dimen/mtrl_card_corner</item>
+        <item name="cardElevation">@dimen/mtrl_card_elevation</item>
+        <item name="rippleColor">?attr/colorPrimary</item>
+        <item name="checkedIconTint">?attr/colorPrimary</item>
+    </style>
+
+    <!-- Floating action buttons. -->
+    <style name="Widget.Material3.FloatingActionButton.Primary">
+        <item name="backgroundTint">?attr/colorPrimaryContainer</item>
+        <item name="tint">?attr/colorOnPrimaryContainer</item>
+        <item name="rippleColor">?attr/colorOnPrimaryContainer</item>
+        <item name="elevation">@dimen/m3_fab_elevation</item>
+        <item name="fabSize">auto</item>
+        <item name="maxImageSize">24dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Large</item>
+    </style>
+    <style name="Widget.Material3.FloatingActionButton.Secondary" parent="Widget.Material3.FloatingActionButton.Primary">
+        <item name="backgroundTint">?attr/colorSecondaryContainer</item>
+        <item name="tint">?attr/colorOnSecondaryContainer</item>
+    </style>
+    <style name="Widget.Material3.FloatingActionButton.Tertiary" parent="Widget.Material3.FloatingActionButton.Primary">
+        <item name="backgroundTint">?attr/colorTertiaryContainer</item>
+        <item name="tint">?attr/colorOnTertiaryContainer</item>
+    </style>
+    <style name="Widget.Material3.FloatingActionButton.Surface" parent="Widget.Material3.FloatingActionButton.Primary">
+        <item name="backgroundTint">?attr/colorSurfaceContainerHigh</item>
+        <item name="tint">?attr/colorPrimary</item>
+    </style>
+    <style name="Widget.Material3.ExtendedFloatingActionButton.Primary">
+        <item name="backgroundTint">?attr/colorPrimaryContainer</item>
+        <item name="android:textColor">?attr/colorOnPrimaryContainer</item>
+        <item name="iconTint">?attr/colorOnPrimaryContainer</item>
+        <item name="rippleColor">?attr/colorOnPrimaryContainer</item>
+        <item name="android:textAppearance">?attr/textAppearanceLabelLarge</item>
+        <item name="android:minHeight">@dimen/m3_extended_fab_min_height</item>
+        <item name="android:minWidth">80dp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">20dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="iconSize">24dp</item>
+        <item name="iconPadding">12dp</item>
+        <item name="elevation">@dimen/m3_fab_elevation</item>
+        <item name="cornerRadius">@dimen/m3_fab_corner</item>
+    </style>
+    <style name="Widget.Material3.ExtendedFloatingActionButton.Icon.Primary" parent="Widget.Material3.ExtendedFloatingActionButton.Primary"/>
+    <style name="Widget.Material3.ExtendedFloatingActionButton.Secondary" parent="Widget.Material3.ExtendedFloatingActionButton.Primary">
+        <item name="backgroundTint">?attr/colorSecondaryContainer</item>
+        <item name="android:textColor">?attr/colorOnSecondaryContainer</item>
+        <item name="iconTint">?attr/colorOnSecondaryContainer</item>
+    </style>
+    <style name="Widget.MaterialComponents.FloatingActionButton">
+        <item name="backgroundTint">?attr/colorSecondary</item>
+        <item name="tint">?attr/colorOnSecondary</item>
+        <item name="rippleColor">?attr/colorOnSecondary</item>
+        <item name="elevation">@dimen/mtrl_fab_elevation</item>
+        <item name="fabSize">auto</item>
+        <item name="maxImageSize">24dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
+    </style>
+    <style name="Widget.MaterialComponents.ExtendedFloatingActionButton">
+        <item name="backgroundTint">?attr/colorSecondary</item>
+        <item name="android:textColor">?attr/colorOnSecondary</item>
+        <item name="iconTint">?attr/colorOnSecondary</item>
+        <item name="rippleColor">?attr/colorOnSecondary</item>
+        <item name="android:textAppearance">?attr/textAppearanceButton</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:minWidth">88dp</item>
+        <item name="android:paddingLeft">20dp</item>
+        <item name="android:paddingRight">20dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="iconSize">24dp</item>
+        <item name="iconPadding">12dp</item>
+        <item name="elevation">@dimen/mtrl_fab_elevation</item>
+        <item name="cornerRadius">24dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.ExtendedFloatingActionButton.Icon">
+        <item name="android:paddingLeft">12dp</item>
+    </style>
+
+    <!-- Text fields. -->
+    <style name="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundMode">outline</item>
+        <item name="boxStrokeColor">?attr/colorOutline</item>
+        <item name="boxStrokeErrorColor">?attr/colorError</item>
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxStrokeWidthFocused">2dp</item>
+        <item name="boxCornerRadiusTopStart">4dp</item>
+        <item name="boxCornerRadiusTopEnd">4dp</item>
+        <item name="boxCornerRadiusBottomStart">4dp</item>
+        <item name="boxCornerRadiusBottomEnd">4dp</item>
+        <item name="hintTextColor">?attr/colorPrimary</item>
+        <item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
+        <item name="helperTextTextColor">?attr/colorOnSurfaceVariant</item>
+        <item name="errorTextColor">?attr/colorError</item>
+        <item name="counterTextColor">?attr/colorOnSurfaceVariant</item>
+        <item name="counterOverflowTextColor">?attr/colorError</item>
+        <item name="startIconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="endIconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="errorIconTint">?attr/colorError</item>
+        <item name="boxBackgroundColor">@android:color/transparent</item>
+    </style>
+    <style name="Widget.Material3.TextInputLayout.FilledBox" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundMode">filled</item>
+        <item name="boxBackgroundColor">?attr/colorSurfaceContainerHighest</item>
+        <item name="boxStrokeColor">?attr/colorOnSurfaceVariant</item>
+        <item name="boxCornerRadiusBottomStart">0dp</item>
+        <item name="boxCornerRadiusBottomEnd">0dp</item>
+    </style>
+    <style name="Widget.Material3.TextInputLayout.OutlinedBox.Dense"/>
+    <style name="Widget.Material3.TextInputLayout.FilledBox.Dense"/>
+    <style name="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="endIconMode">dropdown_menu</item>
+    </style>
+    <style name="Widget.Material3.TextInputLayout.FilledBox.ExposedDropdownMenu">
+        <item name="endIconMode">dropdown_menu</item>
+    </style>
+    <style name="Widget.Material3.TextInputEditText.OutlinedBox" parent="android:Widget.Material.EditText">
+        <item name="android:background">@null</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingBottom">16dp</item>
+        <item name="android:textAppearance">?attr/textAppearanceBodyLarge</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+    <style name="Widget.Material3.TextInputEditText.FilledBox">
+        <item name="android:paddingTop">24dp</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.TextInputLayout.OutlinedBox" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">#6B000000</item>
+        <item name="hintTextColor">?attr/colorPrimary</item>
+        <item name="android:textColorHint">@color/mtrl_on_surface_emphasis_medium</item>
+        <item name="helperTextTextColor">@color/mtrl_on_surface_emphasis_medium</item>
+        <item name="counterTextColor">@color/mtrl_on_surface_emphasis_medium</item>
+        <item name="startIconTint">@color/mtrl_on_surface_emphasis_medium</item>
+        <item name="endIconTint">@color/mtrl_on_surface_emphasis_medium</item>
+    </style>
+    <style name="Widget.MaterialComponents.TextInputLayout.FilledBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundMode">filled</item>
+        <item name="boxBackgroundColor">#0A000000</item>
+        <item name="boxStrokeColor">#6B000000</item>
+        <item name="boxCornerRadiusBottomStart">0dp</item>
+        <item name="boxCornerRadiusBottomEnd">0dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="endIconMode">dropdown_menu</item>
+    </style>
+    <style name="Widget.MaterialComponents.TextInputLayout.FilledBox.ExposedDropdownMenu">
+        <item name="endIconMode">dropdown_menu</item>
+    </style>
+    <style name="Widget.MaterialComponents.TextInputEditText.OutlinedBox" parent="Widget.Material3.TextInputEditText.OutlinedBox">
+        <item name="android:textAppearance">?attr/textAppearanceSubtitle1</item>
+        <item name="android:textColor">@color/mtrl_on_surface_emphasis_high_type</item>
+    </style>
+    <style name="Widget.MaterialComponents.TextInputEditText.FilledBox">
+        <item name="android:paddingTop">24dp</item>
+        <item name="android:paddingBottom">10dp</item>
+    </style>
+
+    <!-- Chips. -->
+    <style name="Widget.Material3.Chip.Assist">
+        <item name="chipBackgroundColor">@android:color/transparent</item>
+        <item name="chipStrokeColor">?attr/colorOutline</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipCornerRadius">@dimen/m3_chip_corner</item>
+        <item name="chipMinHeight">@dimen/m3_chip_min_height</item>
+        <item name="chipIconSize">18dp</item>
+        <item name="chipIconTint">?attr/colorPrimary</item>
+        <item name="closeIconSize">18dp</item>
+        <item name="closeIconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="checkedIconTint">?attr/colorOnSecondaryContainer</item>
+        <item name="chipStartPadding">8dp</item>
+        <item name="chipEndPadding">8dp</item>
+        <item name="textStartPadding">8dp</item>
+        <item name="textEndPadding">8dp</item>
+        <item name="android:textAppearance">?attr/textAppearanceLabelLarge</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:checkable">false</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="closeIconVisible">false</item>
+        <item name="rippleColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+    <style name="Widget.Material3.Chip.Filter" parent="Widget.Material3.Chip.Assist">
+        <item name="android:checkable">true</item>
+        <item name="checkedIconVisible">true</item>
+        <item name="chipIconVisible">false</item>
+    </style>
+    <style name="Widget.Material3.Chip.Input" parent="Widget.Material3.Chip.Assist">
+        <item name="android:checkable">true</item>
+        <item name="closeIconVisible">true</item>
+        <item name="checkedIconVisible">false</item>
+    </style>
+    <style name="Widget.Material3.Chip.Suggestion" parent="Widget.Material3.Chip.Assist">
+        <item name="android:checkable">true</item>
+        <item name="checkedIconVisible">false</item>
+    </style>
+    <style name="Widget.Material3.ChipGroup">
+        <item name="chipSpacingHorizontal">8dp</item>
+        <item name="chipSpacingVertical">8dp</item>
+        <item name="singleLine">false</item>
+        <item name="singleSelection">false</item>
+    </style>
+    <style name="Widget.MaterialComponents.Chip.Action">
+        <item name="chipBackgroundColor">#FFE0E0E0</item>
+        <item name="chipStrokeWidth">0dp</item>
+        <item name="chipCornerRadius">@dimen/mtrl_chip_corner</item>
+        <item name="chipMinHeight">32dp</item>
+        <item name="chipIconSize">24dp</item>
+        <item name="closeIconSize">18dp</item>
+        <item name="closeIconTint">#DE000000</item>
+        <item name="checkedIconTint">#DE000000</item>
+        <item name="chipStartPadding">4dp</item>
+        <item name="chipEndPadding">6dp</item>
+        <item name="textStartPadding">8dp</item>
+        <item name="textEndPadding">6dp</item>
+        <item name="android:textAppearance">?attr/textAppearanceBody2</item>
+        <item name="android:textColor">#DE000000</item>
+        <item name="android:checkable">false</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="closeIconVisible">false</item>
+        <item name="rippleColor">#1F000000</item>
+    </style>
+    <style name="Widget.MaterialComponents.Chip.Entry" parent="Widget.MaterialComponents.Chip.Action">
+        <item name="android:checkable">true</item>
+        <item name="closeIconVisible">true</item>
+    </style>
+    <style name="Widget.MaterialComponents.Chip.Filter" parent="Widget.MaterialComponents.Chip.Action">
+        <item name="android:checkable">true</item>
+        <item name="checkedIconVisible">true</item>
+    </style>
+    <style name="Widget.MaterialComponents.Chip.Choice" parent="Widget.MaterialComponents.Chip.Action">
+        <item name="android:checkable">true</item>
+    </style>
+    <style name="Widget.MaterialComponents.ChipGroup">
+        <item name="chipSpacingHorizontal">8dp</item>
+        <item name="chipSpacingVertical">4dp</item>
+    </style>
+
+    <!-- Navigation. -->
+    <style name="Widget.Material3.BottomNavigationView">
+        <item name="backgroundTint">?attr/colorSurfaceContainer</item>
+        <item name="android:minHeight">@dimen/m3_bottom_nav_min_height</item>
+        <item name="itemIconSize">24dp</item>
+        <item name="itemIconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="itemTextColor">?attr/colorOnSurfaceVariant</item>
+        <item name="itemTextAppearanceActive">?attr/textAppearanceLabelMedium</item>
+        <item name="itemTextAppearanceInactive">?attr/textAppearanceLabelMedium</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="activeIndicatorColor">?attr/colorSecondaryContainer</item>
+        <item name="activeIndicatorWidth">64dp</item>
+        <item name="activeIndicatorHeight">32dp</item>
+        <item name="elevation">0dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.BottomNavigationView">
+        <item name="backgroundTint">?attr/colorSurface</item>
+        <item name="android:minHeight">@dimen/mtrl_bottom_nav_height</item>
+        <item name="itemIconSize">24dp</item>
+        <item name="itemIconTint">#99000000</item>
+        <item name="itemTextColor">#99000000</item>
+        <item name="itemTextAppearanceActive">?attr/textAppearanceCaption</item>
+        <item name="itemTextAppearanceInactive">?attr/textAppearanceCaption</item>
+        <item name="labelVisibilityMode">auto</item>
+        <item name="activeIndicatorColor">@android:color/transparent</item>
+        <item name="activeIndicatorWidth">0dp</item>
+        <item name="activeIndicatorHeight">0dp</item>
+        <item name="elevation">8dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.BottomNavigationView.Colored">
+        <item name="backgroundTint">?attr/colorPrimary</item>
+        <item name="itemIconTint">#B3FFFFFF</item>
+        <item name="itemTextColor">#B3FFFFFF</item>
+    </style>
+    <style name="Widget.Material3.TabLayout">
+        <item name="tabMode">fixed</item>
+        <item name="tabGravity">fill</item>
+        <item name="tabIndicatorColor">?attr/colorPrimary</item>
+        <item name="tabIndicatorHeight">3dp</item>
+        <item name="tabIndicatorFullWidth">false</item>
+        <item name="tabSelectedTextColor">?attr/colorPrimary</item>
+        <item name="tabTextColor">?attr/colorOnSurfaceVariant</item>
+        <item name="tabIconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="tabTextAppearance">?attr/textAppearanceTitleSmall</item>
+        <item name="tabRippleColor">?attr/colorPrimary</item>
+        <item name="tabPaddingStart">12dp</item>
+        <item name="tabPaddingEnd">12dp</item>
+        <item name="tabMinWidth">72dp</item>
+        <item name="android:background">?attr/colorSurface</item>
+    </style>
+    <style name="Widget.Material3.TabLayout.Secondary">
+        <item name="tabIndicatorHeight">2dp</item>
+        <item name="tabIndicatorFullWidth">true</item>
+        <item name="tabSelectedTextColor">?attr/colorOnSurface</item>
+    </style>
+    <style name="Widget.MaterialComponents.TabLayout">
+        <item name="tabMode">fixed</item>
+        <item name="tabGravity">fill</item>
+        <item name="tabIndicatorColor">?attr/colorPrimary</item>
+        <item name="tabIndicatorHeight">2dp</item>
+        <item name="tabIndicatorFullWidth">true</item>
+        <item name="tabSelectedTextColor">?attr/colorPrimary</item>
+        <item name="tabTextColor">#99000000</item>
+        <item name="tabIconTint">#99000000</item>
+        <item name="tabTextAppearance">?attr/textAppearanceButton</item>
+        <item name="tabRippleColor">?attr/colorPrimary</item>
+        <item name="tabPaddingStart">12dp</item>
+        <item name="tabPaddingEnd">12dp</item>
+        <item name="tabMinWidth">72dp</item>
+        <item name="android:background">?attr/colorSurface</item>
+    </style>
+    <style name="Widget.MaterialComponents.TabLayout.Colored">
+        <item name="tabIndicatorColor">?attr/colorOnPrimary</item>
+        <item name="tabSelectedTextColor">?attr/colorOnPrimary</item>
+        <item name="tabTextColor">#B3FFFFFF</item>
+        <item name="tabIconTint">#B3FFFFFF</item>
+        <item name="android:background">?attr/colorPrimary</item>
+    </style>
+    <style name="Widget.Material3.Toolbar" parent="Widget.AppCompat.Toolbar">
+        <item name="titleTextAppearance">?attr/textAppearanceTitleLarge</item>
+        <item name="subtitleTextAppearance">?attr/textAppearanceTitleMedium</item>
+        <item name="titleTextColor">?attr/colorOnSurface</item>
+        <item name="subtitleTextColor">?attr/colorOnSurfaceVariant</item>
+        <item name="navigationIconTint">?attr/colorOnSurface</item>
+        <item name="android:minHeight">64dp</item>
+        <item name="maxButtonHeight">48dp</item>
+        <item name="contentInsetStartWithNavigation">0dp</item>
+    </style>
+    <style name="Widget.Material3.Toolbar.Surface">
+        <item name="android:background">?attr/colorSurface</item>
+    </style>
+    <style name="Widget.Material3.Toolbar.OnSurface"/>
+    <style name="Widget.MaterialComponents.Toolbar" parent="Widget.AppCompat.Toolbar">
+        <item name="titleTextAppearance">?attr/textAppearanceHeadline6</item>
+        <item name="subtitleTextAppearance">?attr/textAppearanceSubtitle1</item>
+        <item name="android:minHeight">?attr/actionBarSize</item>
+    </style>
+    <style name="Widget.MaterialComponents.Toolbar.Primary">
+        <item name="android:background">?attr/colorPrimary</item>
+        <item name="titleTextColor">?attr/colorOnPrimary</item>
+        <item name="subtitleTextColor">?attr/colorOnPrimary</item>
+        <item name="navigationIconTint">?attr/colorOnPrimary</item>
+    </style>
+    <style name="Widget.MaterialComponents.Toolbar.Surface">
+        <item name="android:background">?attr/colorSurface</item>
+        <item name="titleTextColor">@color/mtrl_on_surface_emphasis_high_type</item>
+        <item name="subtitleTextColor">@color/mtrl_on_surface_emphasis_medium</item>
+        <item name="navigationIconTint">@color/mtrl_on_surface_emphasis_medium</item>
+    </style>
+    <style name="Widget.Material3.AppBarLayout">
+        <item name="android:background">?attr/colorSurface</item>
+        <item name="elevation">0dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.AppBarLayout.Primary">
+        <item name="android:background">?attr/colorPrimary</item>
+        <item name="elevation">4dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.AppBarLayout.Surface">
+        <item name="android:background">?attr/colorSurface</item>
+        <item name="elevation">4dp</item>
+    </style>
+
+    <!-- Snackbar. -->
+    <style name="Widget.Material3.Snackbar">
+        <item name="backgroundTint">?attr/colorSurfaceInverse</item>
+        <item name="elevation">6dp</item>
+        <item name="android:maxWidth">600dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.ExtraSmall</item>
+    </style>
+    <style name="Widget.Material3.Snackbar.TextView">
+        <item name="android:textAppearance">?attr/textAppearanceBodyMedium</item>
+        <item name="android:textColor">?attr/colorOnSurfaceInverse</item>
+    </style>
+    <style name="Widget.MaterialComponents.Snackbar">
+        <item name="backgroundTint">@color/design_snackbar_background_color</item>
+        <item name="elevation">6dp</item>
+        <item name="android:maxWidth">600dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.MaterialComponents.SmallComponent</item>
+    </style>
+    <style name="Widget.MaterialComponents.Snackbar.TextView">
+        <item name="android:textAppearance">?attr/textAppearanceBody2</item>
+        <item name="android:textColor">#DEFFFFFF</item>
+    </style>
+
+    <!-- Selection controls, sliders, progress and dividers. -->
+    <style name="Widget.Material3.CompoundButton.MaterialSwitch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="thumbTint">?attr/colorOutline</item>
+        <item name="trackTint">?attr/colorSurfaceContainerHighest</item>
+        <item name="trackDecorationTint">?attr/colorOutline</item>
+    </style>
+    <style name="Widget.Material3.CompoundButton.CheckBox" parent="Widget.AppCompat.CompoundButton.CheckBox">
+        <item name="buttonTint">?attr/colorPrimary</item>
+    </style>
+    <style name="Widget.Material3.CompoundButton.RadioButton" parent="Widget.AppCompat.CompoundButton.RadioButton">
+        <item name="buttonTint">?attr/colorPrimary</item>
+    </style>
+    <style name="Widget.MaterialComponents.CompoundButton.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="thumbTint">?attr/colorSecondary</item>
+    </style>
+    <style name="Widget.MaterialComponents.CompoundButton.CheckBox" parent="Widget.AppCompat.CompoundButton.CheckBox">
+        <item name="buttonTint">?attr/colorSecondary</item>
+    </style>
+    <style name="Widget.MaterialComponents.CompoundButton.RadioButton" parent="Widget.AppCompat.CompoundButton.RadioButton">
+        <item name="buttonTint">?attr/colorSecondary</item>
+    </style>
+    <style name="Widget.Material3.Slider">
+        <item name="thumbColor">?attr/colorPrimary</item>
+        <item name="thumbRadius">10dp</item>
+        <item name="trackColorActive">?attr/colorPrimary</item>
+        <item name="trackColorInactive">?attr/colorSecondaryContainer</item>
+        <item name="trackHeight">4dp</item>
+        <item name="haloColor">?attr/colorPrimary</item>
+        <item name="labelBehavior">floating</item>
+    </style>
+    <style name="Widget.MaterialComponents.Slider">
+        <item name="thumbColor">?attr/colorPrimary</item>
+        <item name="thumbRadius">10dp</item>
+        <item name="trackColorActive">?attr/colorPrimary</item>
+        <item name="trackColorInactive">#3D6200EE</item>
+        <item name="trackHeight">4dp</item>
+        <item name="haloColor">?attr/colorPrimary</item>
+        <item name="labelBehavior">floating</item>
+    </style>
+    <style name="Widget.Material3.LinearProgressIndicator">
+        <item name="indicatorColor">?attr/colorPrimary</item>
+        <item name="trackColor">?attr/colorSecondaryContainer</item>
+        <item name="trackThickness">@dimen/mtrl_progress_track_thickness</item>
+        <item name="trackCornerRadius">2dp</item>
+    </style>
+    <style name="Widget.Material3.CircularProgressIndicator">
+        <item name="indicatorColor">?attr/colorPrimary</item>
+        <item name="trackColor">@android:color/transparent</item>
+        <item name="trackThickness">@dimen/mtrl_progress_track_thickness</item>
+        <item name="indicatorSize">@dimen/mtrl_progress_circular_size</item>
+        <item name="indicatorInset">4dp</item>
+        <item name="trackCornerRadius">2dp</item>
+    </style>
+    <style name="Widget.MaterialComponents.LinearProgressIndicator">
+        <item name="indicatorColor">?attr/colorPrimary</item>
+        <item name="trackColor">#3D6200EE</item>
+        <item name="trackThickness">@dimen/mtrl_progress_track_thickness</item>
+    </style>
+    <style name="Widget.MaterialComponents.CircularProgressIndicator">
+        <item name="indicatorColor">?attr/colorPrimary</item>
+        <item name="trackColor">@android:color/transparent</item>
+        <item name="trackThickness">@dimen/mtrl_progress_track_thickness</item>
+        <item name="indicatorSize">@dimen/mtrl_progress_circular_size</item>
+        <item name="indicatorInset">4dp</item>
+    </style>
+    <style name="Widget.Material3.MaterialDivider">
+        <item name="dividerColor">?attr/colorOutlineVariant</item>
+        <item name="dividerThickness">@dimen/material_divider_thickness</item>
+    </style>
+    <style name="Widget.MaterialComponents.MaterialDivider">
+        <item name="dividerColor">#1F000000</item>
+        <item name="dividerThickness">@dimen/material_divider_thickness</item>
+    </style>
+    <style name="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">?attr/colorSurfaceContainerLow</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.ExtraLarge</item>
+        <item name="behavior_peekHeight">auto</item>
+        <item name="behavior_hideable">true</item>
+    </style>
+    <style name="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="backgroundTint">?attr/colorSurface</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.MaterialComponents.LargeComponent</item>
+        <item name="behavior_peekHeight">auto</item>
+        <item name="behavior_hideable">true</item>
+    </style>
+</resources>

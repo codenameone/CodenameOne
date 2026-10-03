@@ -291,7 +291,11 @@ public class LocalForage {
     }
     
     public String setItem(String key, String value) throws IOException {
-        return ((JSString)setItem(key, JSString.valueOf(value))).stringValue();
+        // What is stored is the value given, so answer it rather than unwrap
+        // the host's echo: that crosses back as a plain string (or nothing),
+        // and a plain string has no stringValue member to call.
+        setItem(key, JSString.valueOf(value));
+        return value;
     }
     
     public JSObject setItem(String key, JSObject value) throws IOException {
