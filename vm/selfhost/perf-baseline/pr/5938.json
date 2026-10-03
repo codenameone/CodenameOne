@@ -2,6 +2,24 @@
  "pr": 5938,
  "rebaseline": {
   "linux-arm64@neoverse-n2": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.239,
+      "time": 3.043,
+      "tolerance": {
+       "time": 0.45
+      }
+     },
+     "memory": 0.239,
+     "reason": "Noise on this runner, not this change: two CI runs of byte-identical code (cc1b199 and b79ed09 differ only in this file) measured ParparVM at 75-81ms and 100-121ms, tracking its GC heap (98-101MB vs 85-94MB) while JDK held 22-24ms. objectAllocation is the gate's noisiest row (20-37% between runs of unchanged code); time recalibrated from both runs, RAM untouched. Same-machine bench of master vs this branch: objectAllocation median 29.1ms vs 27.6ms, checksums identical.",
+     "runs": 2,
+     "time": 4.003,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   },
    "translator": {
     "all": {
      "from": {
