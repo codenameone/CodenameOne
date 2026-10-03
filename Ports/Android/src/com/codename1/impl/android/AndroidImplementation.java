@@ -6988,6 +6988,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
+        /// Set on the UI thread when destroy() runs, and read only there. A WebView
+        /// used after destroy() is undefined: Chromium answered loadDataWithBaseURL on
+        /// one with a native null dereference that killed the whole app (SIGSEGV in
+        /// NavigationControllerImpl, seen on CI when a page was set after the peer was
+        /// destroyed). Every call into the WebView checks it.
+        private boolean webDestroyed;
+
+        /// Runs `r` on the UI thread unless the WebView has been destroyed by then.
+        private void onWebThread(final Runnable r) {
+            act.runOnUiThread(new Runnable() {
+                public void run() {
+                    if (!webDestroyed) {
+                        r.run();
+                    }
+                }
+            });
+        }
+
 
         private Activity act;
         private WebView web;
@@ -7279,7 +7297,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         protected void initComponent() {
             if(android.os.Build.VERSION.SDK_INT == 21 && web.getLayerType() != layerType){
-                act.runOnUiThread(new Runnable() {
+                onWebThread(new Runnable() {
                     @Override
                     public void run() {
                         web.setLayerType(layerType, null); //setting layer type to original state
@@ -7298,7 +7316,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 final Bitmap nativeBuffer = Bitmap.createBitmap(
                         getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
                 Image image = new AndroidImplementation.NativeImage(nativeBuffer);
-                getActivity().runOnUiThread(new Runnable() {
+                onWebThread(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -7332,7 +7350,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public void setScrollingEnabled(final boolean enabled){
             this.scrollingEnabled = enabled;
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.setHorizontalScrollBarEnabled(enabled);
                     web.setVerticalScrollBarEnabled(enabled);
@@ -7358,7 +7376,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void setProperty(final String key, final Object value) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     WebSettings s = web.getSettings();
                     if(key.equalsIgnoreCase("useragent")) {
@@ -7391,6 +7409,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
+                        if (webDestroyed) {
+                            return;
+                        }
 
                         retVal[0] = web.getTitle();
                     } finally {
@@ -7420,6 +7441,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
+                        if (webDestroyed) {
+                            return;
+                        }
                         retVal[0] = web.getUrl();
                     } finally {
                         complete[0] = true;
@@ -7443,7 +7467,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void setURL(final String url, final Map<String, String> headers) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     if(headers != null) {
                         web.loadUrl(url, headers);
@@ -7455,7 +7479,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void reload() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.reload();
                 }
@@ -7469,6 +7493,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
+                        if (webDestroyed) {
+                            return;
+                        }
                         retVal[0] = web.canGoBack();
                     } finally {
                         complete[0] = true;
@@ -7498,6 +7525,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
+                        if (webDestroyed) {
+                            return;
+                        }
                         retVal[0] = web.canGoForward();
                     } finally {
                         complete[0] = true;
@@ -7522,7 +7552,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void back() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.goBack();
                 }
@@ -7530,7 +7560,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void forward() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.goForward();
                 }
@@ -7538,7 +7568,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void clearHistory() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.clearHistory();
                 }
@@ -7546,7 +7576,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void stop() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.stopLoading();
                 }
@@ -7556,13 +7586,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void destroy() {
             act.runOnUiThread(new Runnable() {
                 public void run() {
+                    if (webDestroyed) {
+                        return;
+                    }
+                    webDestroyed = true;
                     web.destroy();
                 }
             });
         }
 
         public void setPage(final String html, final String baseUrl) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null);
                 }
@@ -7570,7 +7604,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void exposeInJavaScript(final Object o, final String name) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.addJavascriptInterface(o, name);
                 }
@@ -7578,7 +7612,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public  void setPinchZoomEnabled(final boolean e) {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 public void run() {
                     web.getSettings().setSupportZoom(e);
                     web.getSettings().setBuiltInZoomControls(e);
@@ -7588,7 +7622,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected void deinitialize() {
-            act.runOnUiThread(new Runnable() {
+            onWebThread(new Runnable() {
                 @Override
                 public void run() {
                     if(android.os.Build.VERSION.SDK_INT == 21) { // bugfix for Android 5.0.x
