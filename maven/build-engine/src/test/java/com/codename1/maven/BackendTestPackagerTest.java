@@ -37,6 +37,15 @@ class BackendTestPackagerTest {
     }
 
     @Test
+    void aSourceIsSelectedByTheClassItsPathNames() {
+        java.io.File root = new java.io.File("/tmp/project/src/test/java");
+        assertTrue("com.acme.ApiTest".equals(BackendTestPackager.binaryName(root,
+                new java.io.File(root, "com/acme/ApiTest.java"))));
+        assertTrue("TopLevelTest".equals(BackendTestPackager.binaryName(root,
+                new java.io.File(root, "TopLevelTest.java"))), "the default package");
+    }
+
+    @Test
     void theWordsInCommentsAndStringsAreNotAUse() {
         assertFalse(BackendTestPackager.usesMockito("// unlike org.mockito, this needs nothing\nclass A {}\n"));
         assertFalse(BackendTestPackager.usesMockito("/** Not org.mockito: a fake. */\nclass A {}\n"));

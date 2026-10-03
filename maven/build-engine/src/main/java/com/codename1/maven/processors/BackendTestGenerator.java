@@ -406,7 +406,7 @@ final class BackendTestGenerator {
                     }
                 }
             }
-            model.weaveTests(ctx.getOutputClassDir());
+            model.weaveTests(ctx.getOutputClassDir(), ctx.getClassIndex());
             String pkg = entryPackage != null ? entryPackage : model.entryPackage == null ? ""
                     : model.entryPackage;
             String base = first.test.getBinaryName();
@@ -638,7 +638,7 @@ final class BackendTestGenerator {
                 new java.util.IdentityHashMap<MethodInfo, AnnotatedClass>();
         for (AnnotatedClass c : chain) {
             for (MethodInfo m : c.getMethods()) {
-                if (m.getAnnotation(JUNIT_TEST) != null) {
+                if (carries(m, JUNIT_TEST)) {
                     // -Dtest=Class#method narrows the JVM run to that method; the
                     // compiled run runs the same ones.
                     if (!seen.covers(c, m) && (selection == null
@@ -794,7 +794,7 @@ final class BackendTestGenerator {
         for (AnnotatedClass c : chain) {
             List<MethodInfo> level = new ArrayList<MethodInfo>();
             for (MethodInfo m : c.getMethods()) {
-                if (m.getAnnotation(annotation) == null) {
+                if (!carries(m, annotation)) {
                     // As for tests: an unannotated override or hiding method is
                     // what JUnit sees, and it is not a lifecycle method.
                     seen.declare(c, m);
@@ -822,6 +822,42 @@ final class BackendTestGenerator {
             }
         }
         return out;
+    }
+
+    /// Whether `m` carries `annotation` directly or through a composed annotation
+    /// -- one whose own type is annotated with it, at any depth -- as JUnit finds
+    /// `@Test` and the lifecycle annotations. A composed annotation the build
+    /// cannot see (from a library jar rather than this module) is not followed.
+    private boolean carries(MethodInfo m, String annotation) {
+        if (m.getAnnotation(annotation) != null) {
+            return true;
+        }
+        for (String descriptor : m.getAnnotations().keySet()) {
+            if (composedOf(descriptor, annotation, new java.util.HashSet<String>())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean composedOf(String descriptor, String annotation, Set<String> seen) {
+        if (!descriptor.startsWith("L") || !descriptor.endsWith(";") || !seen.add(descriptor)
+                || seen.size() > 16) {
+            return false;
+        }
+        AnnotatedClass type = ctx.lookup(descriptor.substring(1, descriptor.length() - 1));
+        if (type == null || !type.isAnnotation()) {
+            return false;
+        }
+        if (type.getClassAnnotation(annotation) != null) {
+            return true;
+        }
+        for (String meta : type.getClassAnnotations().keySet()) {
+            if (composedOf(meta, annotation, seen)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The class, its superclasses and every interface they implement, for the

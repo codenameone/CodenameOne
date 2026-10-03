@@ -24,8 +24,8 @@
         <Field name="compileClasspath"/>
     </Match>
     <!-- The same lazy, deliberately shared FileCollections: the test compile's
-         classpath and the main source set's class directories, resolved only when
-         the test pass runs. -->
+         classpath, the main source set's class directories, and the other test
+         compiler's output and sources, resolved only when the test pass runs. -->
     <Match>
         <Class name="com.codename1.gradle.tasks.ProcessTestAnnotationsAction"/>
         <Method name="&lt;init&gt;"/>
@@ -33,6 +33,8 @@
         <Or>
             <Field name="testClasspath"/>
             <Field name="mainClassDirs"/>
+            <Field name="otherTestClasses"/>
+            <Field name="deferTo"/>
         </Or>
     </Match>
     <!-- The source set's classes directories, the same lazy, deliberately shared

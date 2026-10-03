@@ -5656,39 +5656,22 @@ public class SelfTest {
         }
         check("a plain throw is caught in the same method", "caught", plain);
 
-        // 3. BOTH IN ONE METHOD: the catch encloses a try/finally. THIS ONE IS
-        // BROKEN on the packaged binary, which is why it does not run by default.
-        //
-        // Measured: it does not reach the catch at all. The binary prints
-        // "Uncaught exception java.io.IOException: thrown in the inner try" and
-        // exits 1, so it does not fail an assertion -- it takes the process with
-        // it, and every check after it in this file with it. A finally compiles to
-        // a catch-any that rethrows, and that rethrow is evidently not matched
-        // against the handlers enclosing it in the SAME method. Case 1 above is
-        // the same construct with the finally one frame down, and it is fine,
-        // which is why this is not visible in ordinary code: the usual shape puts
-        // the cleanup in the method that owns the resource.
-        //
-        // It is left here, runnable, because the reduced case is the whole bug
-        // report: set CN1_SELFTEST_VM_PROBE=1 to watch it die. Fixing it belongs
-        // in the translator's handler ranges, not here.
-        if("1".equals(System.getenv("CN1_SELFTEST_VM_PROBE"))) {
-            String sameMethod;
+        // 3. BOTH IN ONE METHOD: the catch encloses a try/finally. This was skipped
+        // by default as the case that killed the binary -- the finally's rethrow
+        // escaped the enclosing catch -- until the translator's catch-depth fix.
+        // vm/tests CatchRethrowIntegrationTest now covers it on every compiler
+        // configuration, so it runs here as an ordinary check.
+        String sameMethod;
+        try {
             try {
-                try {
-                    throw new IOException("thrown in the inner try");
-                } finally {
-                    touched++;      // the finally must run, and must not swallow
-                }
-            } catch (Exception caught) {
-                sameMethod = "caught";
+                throw new IOException("thrown in the inner try");
+            } finally {
+                touched++;      // the finally must run, and must not swallow
             }
-            check("an enclosing catch sees a throw from a nested finally", "caught",
-                    sameMethod);
-        } else {
-            note("nested-finally VM probe skipped: set CN1_SELFTEST_VM_PROBE=1 "
-                    + "to run the case that kills the process");
+        } catch (Exception caught) {
+            sameMethod = "caught";
         }
+        check("an enclosing catch sees a throw from a nested finally", "caught", sameMethod);
     }
 
     /**

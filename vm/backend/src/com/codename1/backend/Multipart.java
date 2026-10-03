@@ -91,6 +91,10 @@ final class Multipart {
         while (true) {
             pos += delimiter.length;
             if (pos + 1 < body.length && body[pos] == '-' && body[pos + 1] == '-') {
+                if (!closeEnds(body, pos + 2)) {
+                    throw new IllegalArgumentException("the closing multipart boundary is "
+                            + "followed by more than padding and CRLF");
+                }
                 return parts;
             }
             // Transport padding (RFC 2046) is allowed between a boundary and its CRLF.
@@ -154,7 +158,8 @@ final class Multipart {
         int at = indexOf(body, closing, from);
         while (at >= 0) {
             int after = at + closing.length;
-            if (after + 1 < body.length && body[after] == '-' && body[after + 1] == '-') {
+            if (after + 1 < body.length && body[after] == '-' && body[after + 1] == '-'
+                    && closeEnds(body, after + 2)) {
                 return at;
             }
             int p = after;
@@ -167,6 +172,17 @@ final class Multipart {
             at = indexOf(body, closing, at + 1);
         }
         return -1;
+    }
+
+    /// Whether the close delimiter whose `--` ends just before `pos` really ends
+    /// there: transport padding, then the end of the body or the CRLF that starts
+    /// the epilogue (RFC 2046 5.1.1). `--b--garbage` is not a close delimiter.
+    private static boolean closeEnds(byte[] body, int pos) {
+        int p = pos;
+        while (p < body.length && (body[p] == ' ' || body[p] == '\t')) {
+            p++;
+        }
+        return p == body.length || crlfAt(body, p);
     }
 
     /// The value of `name` in a urlencoded form, or null. `+` is a space, as the
@@ -210,8 +226,15 @@ final class Multipart {
             } else if (c < 0x80) {
                 out[n++] = (byte) c;
             } else {
-                // Already text: re-encode it so the decode below reads it back.
-                byte[] utf = utf8(String.valueOf(c));
+                // Already text: re-encode it so the decode below reads it back. A
+                // surrogate pair is one character and is encoded together; one
+                // surrogate at a time came out as two replacement characters.
+                boolean pair = c >= 0xD800 && c <= 0xDBFF && iter + 1 < value.length()
+                        && value.charAt(iter + 1) >= 0xDC00 && value.charAt(iter + 1) <= 0xDFFF;
+                byte[] utf = utf8(pair ? value.substring(iter, iter + 2) : String.valueOf(c));
+                if (pair) {
+                    iter++;
+                }
                 if (n + utf.length > out.length) {
                     byte[] grown = new byte[out.length + utf.length + 16];
                     System.arraycopy(out, 0, grown, 0, n);
@@ -314,19 +337,33 @@ final class Multipart {
         return -1;
     }
 
+    /// Where `needle` first occurs in `data` at or after `from`, or -1, in linear
+    /// time (Knuth-Morris-Pratt). The boundary is the client's, up to 70 bytes:
+    /// a naive search restarted the comparison at every matching first byte, so a
+    /// boundary of dashes over a body of dashes cost hundreds of millions of
+    /// comparisons per request before it was refused.
     private static int indexOf(byte[] data, byte[] needle, int from) {
-        int last = data.length - needle.length;
-        byte first = needle[0];
-        for (int iter = from ; iter <= last ; iter++) {
-            if (data[iter] != first) {
-                continue;
+        int[] fallback = new int[needle.length];
+        int k = 0;
+        for (int iter = 1 ; iter < needle.length ; iter++) {
+            while (k > 0 && needle[iter] != needle[k]) {
+                k = fallback[k - 1];
             }
-            int k = 1;
-            while (k < needle.length && data[iter + k] == needle[k]) {
+            if (needle[iter] == needle[k]) {
+                k++;
+            }
+            fallback[iter] = k;
+        }
+        k = 0;
+        for (int iter = Math.max(from, 0) ; iter < data.length ; iter++) {
+            while (k > 0 && data[iter] != needle[k]) {
+                k = fallback[k - 1];
+            }
+            if (data[iter] == needle[k]) {
                 k++;
             }
             if (k == needle.length) {
-                return iter;
+                return iter - needle.length + 1;
             }
         }
         return -1;

@@ -77,6 +77,19 @@ public final class BackendTests {
                               List<String> sourceRoots, String encoding, List<String> classpath,
                               boolean compiled, java.util.function.Predicate<String> selection, Log log)
             throws BuildExecutionException, BuildFailureException {
+        return process(mainClassDirs, testClasses, java.util.Collections.<File>emptyList(), stubs,
+                projectDir, sourceRoots, encoding, classpath, compiled, selection, log);
+    }
+
+    /// As above, with `otherTestClassDirs` -- the other compiler's output of a mixed
+    /// Java and Kotlin test set -- read as part of the same tests: a Kotlin test
+    /// whose `@BackendTest` base or `@TestConfiguration` is Java, or the reverse,
+    /// is one hierarchy. What the pass generates goes into `testClasses`.
+    public static int process(List<File> mainClassDirs, File testClasses, List<File> otherTestClassDirs,
+                              File stubs, File projectDir,
+                              List<String> sourceRoots, String encoding, List<String> classpath,
+                              boolean compiled, java.util.function.Predicate<String> selection, Log log)
+            throws BuildExecutionException, BuildFailureException {
         Map<String, AnnotatedClass> main = new LinkedHashMap<String, AnnotatedClass>();
         Map<String, AnnotatedClass> tests;
         // The main build's wiring record is in one of them; read from that one.
@@ -90,7 +103,13 @@ public final class BackendTests {
                     }
                 }
             }
-            tests = ClassScanner.scan(testClasses);
+            tests = new LinkedHashMap<String, AnnotatedClass>();
+            for (File dir : otherTestClassDirs) {
+                if (dir != null && dir.isDirectory() && !dir.equals(testClasses)) {
+                    tests.putAll(ClassScanner.scan(dir));
+                }
+            }
+            tests.putAll(ClassScanner.scan(testClasses));
         } catch (ProcessingException err) {
             throw new BuildExecutionException("Could not scan the compiled classes: "
                     + err.getMessage(), err);

@@ -601,7 +601,11 @@ public final class Assertions {
         while (e.hasNext() && a.hasNext()) {
             Object x = e.next();
             Object y = a.next();
-            if (!same(x, y)) {
+            if (x != y && x instanceof Iterable && y instanceof Iterable) {
+                // Nested iterables compare by iteration, as JUnit's do: a List and
+                // a Set holding the same elements in order are equal here.
+                assertIterableEquals((Iterable<?>) x, (Iterable<?>) y, message);
+            } else if (!same(x, y)) {
                 throw new AssertionFailedError(prefix(message) + "iterable contents differ at index ["
                         + index + "], expected: <" + x + "> but was: <" + y + ">");
             }
@@ -639,7 +643,22 @@ public final class Assertions {
 
     public static <T extends Throwable> T assertThrows(Class<T> expectedType, Executable executable,
                                                        Supplier<String> message) {
-        return assertThrows(expectedType, executable, text(message));
+        // The message is built only for a failure, as JUnit's is: a passing
+        // assertion must not depend on the supplier, nor run its side effects.
+        try {
+            executable.execute();
+        } catch (Throwable actual) {
+            if (expectedType.isInstance(actual)) {
+                @SuppressWarnings("unchecked")
+                T matched = (T) actual;
+                return matched;
+            }
+            throw new AssertionFailedError(prefix(text(message)) + "Unexpected exception type "
+                    + "thrown, expected: <" + expectedType.getName() + "> but was: <"
+                    + actual.getClass().getName() + ">", actual);
+        }
+        throw new AssertionFailedError(prefix(text(message)) + "Expected " + expectedType.getName()
+                + " to be thrown, but nothing was thrown.");
     }
 
     public static <T extends Throwable> T assertThrowsExactly(Class<T> expectedType,
@@ -723,6 +742,10 @@ public final class Assertions {
         for (int iter = 0 ; iter < executables.length ; iter++) {
             try {
                 executables[iter].execute();
+            } catch (OutOfMemoryError unrecoverable) {
+                // Rethrown at once, as JUnit does: running the rest after it is
+                // unsafe and the report would hide what really failed.
+                throw unrecoverable;
             } catch (Throwable thrown) {
                 if (first == null) {
                     first = thrown;

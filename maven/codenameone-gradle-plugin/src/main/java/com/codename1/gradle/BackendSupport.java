@@ -141,6 +141,13 @@ final class BackendSupport {
             return all;
         });
         final File stubs = new File(layout.buildDir(), "generated/sources/cn1-test-stubs");
+        // A mixed Java and Kotlin test set is one hierarchy -- a Kotlin test can
+        // extend a Java @BackendTest base -- so the pass reads both outputs at once.
+        // Kotlin compiles first and Java after it, against the Kotlin classes: the
+        // pass runs after the Java compile, over both, and after the Kotlin one only
+        // when there is no Java test source (compileTestJava is then NO-SOURCE and
+        // runs no action).
+        final org.gradle.api.file.ConfigurableFileCollection kotlinTestClasses = project.files();
         project.getTasks().named(test.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             // The generated contexts embed application.properties and the profile's
             // file, so a change to either alone must recompile and regenerate them.
@@ -148,18 +155,17 @@ final class BackendSupport {
             compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
                     main.getOutput().getClassesDirs(), compile.getDestinationDirectory().getAsFile(),
                     stubs, layout.projectDir(), roots, AppSupport.javaEncoding(project, main),
-                    compile.getClasspath()));
+                    compile.getClasspath(), kotlinTestClasses, null));
         });
-        // Kotlin tests: compileTestJava is NO-SOURCE for a Kotlin-only test tree, so
-        // the pass runs after compileTestKotlin too, over the Kotlin test output.
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileTestKotlin").configure(compile -> {
                     backendSettingsInputs(project, compile, layout);
+                    Provider<File> kotlinOut = AppSupport.kotlinDestinationProvider(compile, layout);
+                    kotlinTestClasses.from(kotlinOut);
                     compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
-                            main.getOutput().getClassesDirs(),
-                            AppSupport.kotlinDestinationProvider(compile, layout), stubs,
+                            main.getOutput().getClassesDirs(), kotlinOut, stubs,
                             layout.projectDir(), roots, AppSupport.javaEncoding(project, main),
-                            test.getCompileClasspath()));
+                            test.getCompileClasspath(), null, test.getJava()));
                 }));
         project.getTasks().withType(org.gradle.api.tasks.testing.Test.class).configureEach(t -> {
             t.useJUnitPlatform();

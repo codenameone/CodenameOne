@@ -90,6 +90,14 @@ final class Compression {
                 || response.hasHeader("Content-Encoding") || !compressible(response.contentType)) {
             return;
         }
+        // A strong ETag names these exact bytes, and the gzip variant is other
+        // bytes under the same tag, which breaks If-Range and revalidation across
+        // the two. Left uncompressed, as Tomcat (Spring Boot's default server)
+        // leaves it: its noCompressionStrongETag is on by default.
+        String etag = response.headerValue("ETag");
+        if (etag != null && !etag.trim().startsWith("W/")) {
+            return;
+        }
         response.serializeDeferredJson();
         byte[] body = response.body;
         if (body == null || body.length < minSize) {

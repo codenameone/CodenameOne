@@ -50,10 +50,24 @@ public final class ProcessTestAnnotationsAction implements Action<Task> {
     private final Provider<List<String>> sourceRoots;
     private final Provider<String> encoding;
     private final FileCollection testClasspath;
+    private final FileCollection otherTestClasses;
+    private final FileCollection deferTo;
 
     public ProcessTestAnnotationsAction(FileCollection mainClassDirs, Provider<File> testClasses, File stubDir,
                                         File projectDir, Provider<List<String>> sourceRoots,
                                         Provider<String> encoding, FileCollection testClasspath) {
+        this(mainClassDirs, testClasses, stubDir, projectDir, sourceRoots, encoding, testClasspath, null, null);
+    }
+
+    /// `otherTestClasses`: the other compiler's test output, read as part of the
+    /// same tests -- a Kotlin test can extend a Java `@BackendTest` base, or use a
+    /// Java `@TestConfiguration`. `deferTo`: sources whose compile runs after this
+    /// one and repeats the pass over both outputs, so this one does nothing while
+    /// they exist (the Java tests, for the pass after the Kotlin compile).
+    public ProcessTestAnnotationsAction(FileCollection mainClassDirs, Provider<File> testClasses, File stubDir,
+                                        File projectDir, Provider<List<String>> sourceRoots,
+                                        Provider<String> encoding, FileCollection testClasspath,
+                                        FileCollection otherTestClasses, FileCollection deferTo) {
         this.mainClassDirs = mainClassDirs;
         this.testClasses = testClasses;
         this.stubDir = stubDir;
@@ -61,21 +75,27 @@ public final class ProcessTestAnnotationsAction implements Action<Task> {
         this.sourceRoots = sourceRoots;
         this.encoding = encoding;
         this.testClasspath = testClasspath;
+        this.otherTestClasses = otherTestClasses;
+        this.deferTo = deferTo;
     }
 
     @Override
     public void execute(Task task) {
         File tests = testClasses.get();
-        if (!tests.isDirectory()) {
+        if (!tests.isDirectory() || (deferTo != null && !deferTo.isEmpty())) {
             return;
+        }
+        List<File> others = new ArrayList<File>();
+        if (otherTestClasses != null) {
+            others.addAll(otherTestClasses.getFiles());
         }
         List<String> classpath = new ArrayList<String>();
         for (File f : testClasspath) {
             classpath.add(f.getAbsolutePath());
         }
         try {
-            int generated = BackendTests.process(new ArrayList<File>(mainClassDirs.getFiles()), tests, stubDir,
-                    projectDir,
+            int generated = BackendTests.process(new ArrayList<File>(mainClassDirs.getFiles()), tests, others,
+                    stubDir, projectDir,
                     new ArrayList<String>(sourceRoots.get()), encoding.get(), classpath, false, null,
                     new GradleLog(task.getLogger()));
             if (generated > 0) {

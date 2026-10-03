@@ -1329,22 +1329,57 @@ public final class HttpServer {
         }
 
         /// Adds `token` to a comma-separated header such as Vary, keeping what is
-        /// there, and setting it under the name it already has.
+        /// there, and setting it under the name it already has. A value the
+        /// handler gave as a List is joined element by element -- its toString()
+        /// would send "[Origin, Cookie]", brackets a cache cannot read as field
+        /// names -- and a token already listed is not added twice.
         void appendToken(String name, String token) {
             String key = name;
-            String existing = null;
+            StringBuilder existing = new StringBuilder();
             if (extraHeaders != null) {
                 java.util.Iterator it = extraHeaders.entrySet().iterator();
                 while (it.hasNext()) {
                     Map.Entry e = (Map.Entry) it.next();
                     if (name.equalsIgnoreCase(String.valueOf(e.getKey()))) {
                         key = String.valueOf(e.getKey());
-                        existing = e.getValue() == null ? null : String.valueOf(e.getValue());
+                        Object value = e.getValue();
+                        if (value instanceof List) {
+                            for (Object item : (List) value) {
+                                joinToken(existing, item);
+                            }
+                        } else {
+                            joinToken(existing, value);
+                        }
                     }
                 }
             }
-            header(key, existing == null || existing.trim().length() == 0 ? token
-                    : existing + ", " + token);
+            String current = existing.toString();
+            int start = 0;
+            while (start <= current.length()) {
+                int comma = current.indexOf(',', start);
+                int end = comma < 0 ? current.length() : comma;
+                if (current.substring(start, end).trim().equalsIgnoreCase(token)) {
+                    header(key, current);
+                    return;
+                }
+                if (comma < 0) {
+                    break;
+                }
+                start = comma + 1;
+            }
+            joinToken(existing, token);
+            header(key, existing.toString());
+        }
+
+        private static void joinToken(StringBuilder out, Object value) {
+            String text = value == null ? "" : String.valueOf(value).trim();
+            if (text.length() == 0) {
+                return;
+            }
+            if (out.length() > 0) {
+                out.append(", ");
+            }
+            out.append(text);
         }
 
         private static byte[] bytes(String s) {

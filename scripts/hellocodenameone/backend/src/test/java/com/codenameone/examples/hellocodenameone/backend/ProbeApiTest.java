@@ -136,6 +136,31 @@ class ProbeApiTest {
     }
 
     @Test
+    void aPassingAssertThrowsNeverAsksForItsMessage() {
+        // JUnit builds the message only for a failure; compiled must too.
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> { throw new IllegalStateException("expected"); },
+                () -> { throw new AssertionError("the message supplier ran for a passing assertion"); });
+    }
+
+    @Test
+    void nestedIterablesCompareByIteration() {
+        java.util.List<Object> lists = new java.util.ArrayList<Object>();
+        lists.add(java.util.Arrays.asList("a", "b"));
+        java.util.List<Object> sets = new java.util.ArrayList<Object>();
+        sets.add(new java.util.LinkedHashSet<Object>(java.util.Arrays.asList("a", "b")));
+        org.junit.jupiter.api.Assertions.assertIterableEquals(lists, sets);
+    }
+
+    @Test
+    void assertAllRethrowsAnOutOfMemoryError() {
+        org.junit.jupiter.api.Assertions.assertThrows(OutOfMemoryError.class,
+                () -> org.junit.jupiter.api.Assertions.assertAll(
+                        () -> { throw new OutOfMemoryError("simulated"); },
+                        () -> { throw new AssertionError("ran after an unrecoverable error"); }));
+    }
+
+    @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.
         assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});

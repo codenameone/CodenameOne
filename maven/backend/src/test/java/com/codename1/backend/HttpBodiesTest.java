@@ -113,6 +113,14 @@ class HttpBodiesTest {
                         if (path.startsWith("/shared")) {
                             return SHARED;
                         }
+                        if (path.startsWith("/etag")) {
+                            StringBuilder sb = new StringBuilder();
+                            while (sb.length() < 5000) {
+                                sb.append("{\"n\":1},");
+                            }
+                            return HttpServer.Response.json(200, "[" + sb + "{}]")
+                                    .header("ETag", path.endsWith("weak") ? "W/\"v1\"" : "\"v1\"");
+                        }
                         if (path.startsWith("/range")) {
                             // Bytes 0-4999 of a larger JSON document, as a range answer.
                             StringBuilder sb = new StringBuilder();
@@ -379,6 +387,56 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("a close delimiter followed by anything but padding and CRLF is malformed")
+    void aCloseDelimiterMustEnd() throws Exception {
+        String part = "--x\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nv\r\n";
+        assertThrows(IllegalArgumentException.class,
+                () -> Multipart.parse((part + "--x--garbage").getBytes("UTF-8"), "x"));
+        assertThrows(IllegalArgumentException.class,
+                () -> Multipart.parse("--x--garbage".getBytes("UTF-8"), "x"));
+        assertEquals(1, Multipart.parse((part + "--x--").getBytes("UTF-8"), "x").size());
+        assertEquals(1, Multipart.parse((part + "--x-- \r\nan epilogue").getBytes("UTF-8"), "x")
+                .size(), "padding, CRLF and an epilogue may follow");
+    }
+
+    @Test
+    @DisplayName("a boundary search over a body of dashes is linear")
+    void aDashBoundaryOverDashesIsLinear() throws Exception {
+        StringBuilder boundary = new StringBuilder();
+        while (boundary.length() < 69) {
+            boundary.append('-');
+        }
+        boundary.append('z');
+        byte[] body = new byte[8 * 1024 * 1024];
+        java.util.Arrays.fill(body, (byte) '-');
+        long started = System.nanoTime();
+        assertThrows(IllegalArgumentException.class,
+                () -> Multipart.parse(body, boundary.toString()));
+        long ms = (System.nanoTime() - started) / 1000000L;
+        assertTrue(ms < 3000, "searching 8 MB of dashes took " + ms + "ms");
+    }
+
+    @Test
+    @DisplayName("a form value keeps a supplementary character beside + and %")
+    void aFormValueKeepsSupplementaryCharacters() {
+        String emoji = "\ud83d\ude00";
+        assertEquals(emoji + " ok%", Multipart.formValue("v=" + emoji + "+ok%25", "v"));
+    }
+
+    @Test
+    @DisplayName("a Vary the handler gave as a list is extended, not stringified")
+    void aListValuedVaryIsJoined() {
+        java.util.Map headers = new java.util.LinkedHashMap();
+        headers.put("Vary", java.util.Arrays.asList("Origin", "Cookie"));
+        HttpServer.Response r = HttpServer.Response.empty(200, "text/plain", headers);
+        r.appendToken("Vary", "Accept-Encoding");
+        assertEquals("Origin, Cookie, Accept-Encoding", r.headerValue("Vary"));
+        r.appendToken("vary", "origin");
+        assertEquals("Origin, Cookie, Accept-Encoding", r.headerValue("Vary"),
+                "a token already listed was added again");
+    }
+
+    @Test
     @DisplayName("a gzip body of several members is decoded whole, and trailing junk refused")
     void everyGzipMemberIsDecoded() throws Exception {
         java.io.ByteArrayOutputStream both = new java.io.ByteArrayOutputStream();
@@ -400,6 +458,24 @@ class HttpBodiesTest {
         gz.write(data);
         gz.close();
         return out.toByteArray();
+    }
+
+    @Test
+    @DisplayName("a strong ETag keeps its response uncompressed; a weak one does not")
+    void aStrongETagIsNotCompressed() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.server.compression.enabled", "true");
+        start(p);
+        HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/etag")
+                .openConnection();
+        c.setRequestProperty("Accept-Encoding", "gzip");
+        assertNull(c.getHeaderField("Content-Encoding"), "a strong ETag was compressed");
+        assertEquals("\"v1\"", c.getHeaderField("ETag"));
+        read(c.getInputStream());
+        c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/etag-weak").openConnection();
+        c.setRequestProperty("Accept-Encoding", "gzip");
+        assertEquals("gzip", c.getHeaderField("Content-Encoding"));
+        read(new GZIPInputStream(c.getInputStream()));
     }
 
     @Test

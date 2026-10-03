@@ -260,6 +260,60 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void testsSplitOverTwoOutputDirectoriesAreOneHierarchy() throws Exception {
+        // A mixed Java and Kotlin Gradle test set: the @BackendTest base in one
+        // compiler's output, the concrete test in the other's. The base's private
+        // injected field is woven where its class file is.
+        File classes = mainBuild(application());
+        List<File> cp = new ArrayList<File>(classpath());
+        cp.add(0, classes);
+        File javaOut = tmp.newFolder();
+        Map<String, String> base = new LinkedHashMap<String, String>();
+        base.put("com.example.AbstractServedTest", "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "import static com.codename1.backend.test.MockMvcRequestBuilders.*;\n"
+                + "import static com.codename1.backend.test.MockMvcResultMatchers.*;\n"
+                + "@BackendTest\n"
+                + "public abstract class AbstractServedTest {\n"
+                + "    @Autowired private MockMvc mvc;\n"
+                + "    public void greets() throws Exception {\n"
+                + "        mvc.perform(get(\"/greet/{name}\", \"Bo\")).andExpect(content().string(\"Hello, Bo\"));\n"
+                + "    }\n"
+                + "}\n");
+        JavaSourceCompiler.compile(base, javaOut, cp);
+        File kotlinOut = tmp.newFolder();
+        Map<String, String> sub = new LinkedHashMap<String, String>();
+        sub.put("com.example.ConcreteServedTest", "package com.example;\n"
+                + "public class ConcreteServedTest extends AbstractServedTest {\n"
+                + "}\n");
+        List<File> subCp = new ArrayList<File>(cp);
+        subCp.add(0, javaOut);
+        JavaSourceCompiler.compile(sub, kotlinOut, subCp);
+        List<String> elements = new ArrayList<String>();
+        elements.add(javaOut.getAbsolutePath());
+        for (File f : cp) {
+            elements.add(f.getAbsolutePath());
+        }
+        BackendTests.process(Collections.singletonList(classes), kotlinOut,
+                Collections.singletonList(javaOut), tmp.newFolder(), tmp.newFolder(),
+                Collections.<String>emptyList(), "UTF-8", elements, false, null, new SystemStreamLog());
+        assertTrue("the concrete test in the other directory got no context",
+                new File(kotlinOut, "com/example/ConcreteServedTestCn1TestContext.class").isFile());
+        URLClassLoader loader = new URLClassLoader(new URL[] {kotlinOut.toURI().toURL(),
+                javaOut.toURI().toURL(), classes.toURI().toURL()}, getClass().getClassLoader());
+        try {
+            Object context = loader.loadClass("com.example.ConcreteServedTestCn1TestContext").newInstance();
+            TestEnvironment env = TestContexts.acquire((TestContext) context);
+            Object test = loader.loadClass("com.example.ConcreteServedTest").newInstance();
+            ((TestContext) context).inject(test, env);
+            loader.loadClass("com.example.AbstractServedTest").getMethod("greets").invoke(test);
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
     public void anAmbiguousInjectionIsABuildError() throws Exception {
         File classes = mainBuild(application());
         Map<String, String> t = new LinkedHashMap<String, String>();
@@ -307,6 +361,12 @@ public class BackendTestGeneratorTest {
                 + "        base.Base.calls.add(\"interface\");\n"
                 + "    }\n"
                 + "}\n");
+        t.put("t.Fast", "package t;\n"
+                + "@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)\n"
+                + "@java.lang.annotation.Target(java.lang.annotation.ElementType.METHOD)\n"
+                + "@org.junit.jupiter.api.Test\n"
+                + "public @interface Fast {\n"
+                + "}\n");
         t.put("t.InterfaceOnlyTest", "package t;\n"
                 + "public class InterfaceOnlyTest implements Checks {\n"
                 + "}\n");
@@ -324,6 +384,7 @@ public class BackendTestGeneratorTest {
                 // package, so JUnit still runs the base test.
                 + "    void packagePrivate() { calls.add(\"sub-package-private\"); }\n"
                 + "    @org.junit.jupiter.api.Test void own() { calls.add(\"own\"); }\n"
+                + "    @Fast void composed() { calls.add(\"composed\"); }\n"
                 + "}\n");
         File classes = tmp.newFolder();
         File tests = tmp.newFolder();
@@ -364,6 +425,8 @@ public class BackendTestGeneratorTest {
                     + "does not override was dropped: " + calls, calls.contains("base-package-private"));
             assertTrue("a test inherited from an interface did not run: " + calls,
                     calls.contains("interface"));
+            assertTrue("a test marked with a composed @Test annotation did not run: " + calls,
+                    calls.contains("composed"));
         } finally {
             loader.close();
         }

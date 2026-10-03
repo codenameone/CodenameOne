@@ -183,20 +183,7 @@ public abstract class BackendTestPackager extends BackendPackager {
                     + "sources, and these are Kotlin: " + kotlin + ". Run them on the JVM, or "
                     + "write the tests to run compiled in Java.");
         }
-        List<String> sources = new ArrayList<String>();
-        for (File f : testSources()) {
-            String text;
-            try {
-                text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-            } catch (IOException err) {
-                throw new BuildExecutionException("Could not read " + f, err);
-            }
-            if (usesMockito(text)) {
-                excluded.put(f.getName(), "imports Mockito, which runs only on the JVM");
-                continue;
-            }
-            sources.add(f.getAbsolutePath());
-        }
+        List<String> sources = compilableSources();
         if (!excluded.isEmpty()) {
             String list = excluded.toString();
             if (strict) {
@@ -216,6 +203,13 @@ public abstract class BackendTestPackager extends BackendPackager {
                 "-bootclasspath", javaApi.getAbsolutePath(),
                 "-source", "1.8", "-target", "1.8",
                 "-classpath", join(classpath, File.pathSeparator),
+                // The selected tests are named; whatever else of the test sources
+                // they use -- a helper, a base class, a configuration -- javac
+                // finds here and compiles too. A test the run did not select is
+                // not compiled at all, so one using an API the server runtime
+                // lacks cannot fail a run that never executes it.
+                "-sourcepath", join(testSourceRoots(), File.pathSeparator),
+                "-implicit:class",
                 "-d", testClasses.getAbsolutePath()));
         command.addAll(sources);
         run(command, host.baseDir(), "compile the tests against the backend's class "
@@ -335,6 +329,63 @@ public abstract class BackendTestPackager extends BackendPackager {
                 out.add(child.getName());
             }
         }
+    }
+
+    /// Runs the compiled tests -- or, when nothing selected can be compiled and
+    /// strict is off, says so and returns null. Leaving out a Mockito test is a
+    /// warning in that mode, so a module whose tests all use Mockito, or a
+    /// selection that names none of the module's tests, is a run with nothing in
+    /// it rather than a failed build.
+    @Override
+    public File execute() throws BuildExecutionException {
+        if (!strict && kotlinTestSources().isEmpty() && !testSources().isEmpty()
+                && compilableSources().isEmpty()) {
+            getLog().warn("cn1: no compiled backend tests to run"
+                    + (excluded.isEmpty() ? ": the selection names none of this module's tests"
+                    : "; left out: " + excluded));
+            excluded.clear();
+            return null;
+        }
+        excluded.clear();
+        return super.execute();
+    }
+
+    /// The test sources the compiled run names to javac: the ones whose class the
+    /// JVM run selects, less those that use Mockito, which go into [#excluded].
+    private List<String> compilableSources() throws BuildExecutionException {
+        List<String> sources = new ArrayList<String>();
+        for (String root : testSourceRoots()) {
+            File base = new File(root);
+            List<String> found = new ArrayList<String>();
+            collectJava(base, found);
+            for (String path : found) {
+                File f = new File(path);
+                if (!selectsTestClass(binaryName(base, f))) {
+                    continue;
+                }
+                String text;
+                try {
+                    text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+                } catch (IOException err) {
+                    throw new BuildExecutionException("Could not read " + f, err);
+                }
+                if (usesMockito(text)) {
+                    excluded.put(f.getName(), "imports Mockito, which runs only on the JVM");
+                    continue;
+                }
+                sources.add(f.getAbsolutePath());
+            }
+        }
+        return sources;
+    }
+
+    /// The binary name of the class a source file under `root` declares.
+    static String binaryName(File root, File source) {
+        String relative = root.toURI().relativize(source.toURI()).getPath();
+        if (relative.endsWith(".java")) {
+            relative = relative.substring(0, relative.length() - ".java".length());
+        }
+        return relative.replace('/', '.');
     }
 
     private List<File> testSources() {

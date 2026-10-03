@@ -570,12 +570,16 @@ final class BackendBeans {
         }
     }
 
-    /// Weaves the test classes this pass planned, and nothing else.
-    int weaveTests(File out) throws ProcessingException {
+    /// Weaves the test classes this pass planned, and nothing else, each where its
+    /// class file is: a mixed Java and Kotlin test set has two output directories.
+    int weaveTests(File out, Map<String, AnnotatedClass> index) throws ProcessingException {
         int woven = 0;
         try {
             for (BackendWeaver.Plan plan : plans.values()) {
-                if (BackendWeaver.weave(out, plan)) {
+                AnnotatedClass cls = index.get(plan.internalName);
+                File file = cls != null && cls.getClassFile() != null ? cls.getClassFile()
+                        : new File(out, plan.internalName + ".class");
+                if (BackendWeaver.weaveFile(file, plan)) {
                     woven++;
                 }
             }
