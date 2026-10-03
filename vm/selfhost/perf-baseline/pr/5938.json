@@ -67,6 +67,26 @@
     }
    }
   },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.803,
+      "time": 1.228,
+      "tolerance": {
+       "time": 0.25
+      }
+     },
+     "memory": 0.968,
+     "reason": "The JDK arm, not ParparVM: across two runs on this runner ParparVM's hello translation held 818-857MB while JDK 25 read 804-987MB, at times within one run. The same hello workload on linux-x64 shows ParparVM unchanged from master in absolute terms (917-949MB vs 912-994MB) and passes. RAM recalibrated from both runs; time untouched (pr/5930 already widened this runner's hello time for the same reason).",
+     "runs": 2,
+     "time": 1.228,
+     "tolerance": {
+      "time": 0.25
+     }
+    }
+   }
+  },
   "windows-x64@amd64-family-26-model-2-authenticamd": {
    "objectAllocation": {
     "all": {
