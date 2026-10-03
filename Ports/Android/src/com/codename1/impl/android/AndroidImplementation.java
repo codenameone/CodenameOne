@@ -6987,12 +6987,82 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
     
+    /// Java types Chromium passes as arguments when it calls back into Java during
+    /// a navigation (NavigationHandle.initialize and friends). JNI looks these up by
+    /// name, so R8 keeps them unobfuscated in every WebView build.
+    private static final String[] WEBVIEW_JNI_ARGUMENT_TYPES = {
+        "org.chromium.url.GURL",
+        "org.chromium.url.Origin",
+        "org.chromium.content_public.browser.NavigationHandle"
+    };
+
+    private static boolean webViewJniTypesPreloaded;
+
+    /// Loads [#WEBVIEW_JNI_ARGUMENT_TYPES] through the WebView provider's class
+    /// loader, so they are resolved before the first navigation calls back into
+    /// Java with them.
+    ///
+    /// This works around a bug in ART's CheckJNI, which is forced on for every
+    /// debuggable process. CheckMethodArguments (art/runtime/reflection.cc, which
+    /// carries a "compaction bug" TODO for exactly this) resolves each parameter
+    /// type of a JNI upcall while it holds the raw argument pointers. Resolving a
+    /// class that was never loaded suspends the thread. When a concurrent
+    /// mark-compact GC moves the arguments in that window, the check dereferences
+    /// a stale one and the whole app dies with a SIGSEGV at fault address 0xc in
+    /// CheckMethodArguments, under WebView.loadDataWithBaseURL. Only the first
+    /// navigation in a process is exposed: a browser-initiated load passes a null
+    /// Origin, so nothing has loaded that class yet. Once the types are loaded,
+    /// resolving them is a table lookup that cannot suspend. Release builds run
+    /// without CheckJNI and never take this path.
+    ///
+    /// Returns the names that did not resolve, or null when the platform has no
+    /// public WebView class loader (API 27 and older). The device suite asserts the
+    /// list is empty, so a rename on Chromium's side fails CI instead of silently
+    /// reopening the window.
+    public static List<String> preloadWebViewJniArgumentTypes() {
+        ClassLoader cl;
+        try {
+            // WebView.getWebViewClassLoader is API 28; the port compiles against an
+            // older android.jar.
+            cl = (ClassLoader) WebView.class.getMethod("getWebViewClassLoader").invoke(null);
+        } catch (Throwable t) {
+            return null;
+        }
+        if (cl == null) {
+            return null;
+        }
+        List<String> missing = new ArrayList<String>();
+        for (String name : WEBVIEW_JNI_ARGUMENT_TYPES) {
+            try {
+                Class.forName(name, false, cl);
+            } catch (Throwable t) {
+                missing.add(name);
+            }
+        }
+        return missing;
+    }
+
+    /// Runs [#preloadWebViewJniArgumentTypes] once per process, and only when the
+    /// application is debuggable, the only case where CheckJNI is on.
+    static void preloadWebViewJniArgumentTypesIfDebuggable(android.content.Context ctx) {
+        if (webViewJniTypesPreloaded) {
+            return;
+        }
+        webViewJniTypesPreloaded = true;
+        if ((ctx.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+            return;
+        }
+        List<String> missing = preloadWebViewJniArgumentTypes();
+        if (missing != null && !missing.isEmpty()) {
+            Log.w("CodenameOne", "WebView JNI argument types not found: " + missing);
+        }
+    }
+
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
         /// Set on the UI thread when destroy() runs, and read only there. A WebView
-        /// used after destroy() is undefined: Chromium answered loadDataWithBaseURL on
-        /// one with a native null dereference that killed the whole app (SIGSEGV in
-        /// NavigationControllerImpl, seen on CI when a page was set after the peer was
-        /// destroyed). Every call into the WebView checks it.
+        /// used after destroy() is undefined per the Android documentation, so every
+        /// call into the WebView checks it. (The NavigationControllerImpl SIGSEGV
+        /// once blamed on this is ART's CheckJNI; see preloadWebViewJniArgumentTypes.)
         private boolean webDestroyed;
 
         /// Runs `r` on the UI thread unless the WebView has been destroyed by then.
@@ -7025,6 +7095,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             parent = (BrowserComponent) p;
             this.web = web;
+            // Before any load call; see preloadWebViewJniArgumentTypes.
+            preloadWebViewJniArgumentTypesIfDebuggable(act);
             layerType = web.getLayerType();
             web.getSettings().setJavaScriptEnabled(true);
             web.getSettings().setSupportZoom(parent.isPinchToZoomEnabled());
