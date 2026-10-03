@@ -162,7 +162,7 @@ public class ListViewRenderElement extends ScrollRenderElement {
         double s = scale > 0 ? scale : 1;
         double content = h ? pane.getScrollDimension().getWidth() : pane.getScrollDimension().getHeight();
         double viewport = h ? pane.getWidth() : pane.getHeight();
-        controller.userScrolled(scrollPx / s, Math.max(0, content - viewport) / s, viewport / s);
+        controller.userScrolled(client, scrollPx / s, Math.max(0, content - viewport) / s, viewport / s);
     }
 
     /** Recomputes the visible window on scroll and rebuilds when it changed. */

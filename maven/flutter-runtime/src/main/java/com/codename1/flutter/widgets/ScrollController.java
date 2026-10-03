@@ -43,12 +43,39 @@ import java.util.List;
  */
 public class ScrollController {
 
+    /// The controller's own position: what offset/position report with no scrollable
+    /// attached, and the position the first scrollable to attach takes over.
     private final ScrollPosition scrollPosition = new ScrollPosition();
     private final List<Funcs.VoidFunc0> listeners = new ArrayList<Funcs.VoidFunc0>();
     private double initialScrollOffset;
     private boolean keepScrollOffset = true;
     private String debugLabel;
+    /// Set by the client-less {@link #attach()}.
     private boolean attached;
+
+    /// One attached scrollable and its position. Flutter's controller keeps a LIST of
+    /// positions -- a controller shared by two lists drives both -- and this used to keep
+    /// one client, so attaching a second silently detached the first.
+    private static final class Attachment {
+        final Client client;
+        final ScrollPosition position;
+        /// Whether the animateTo in flight is still driving this one.
+        boolean driven;
+        /// Where that animateTo started this one from.
+        double from;
+        /// True while the controller itself is moving the client, so the scroll the
+        /// list reports back for that move is told apart from the user's.
+        boolean moving;
+        /// The last offset the controller moved the client to.
+        double lastDriven = Double.NaN;
+
+        Attachment(Client client, ScrollPosition position) {
+            this.client = client;
+            this.position = position;
+        }
+    }
+
+    private final List<Attachment> attachments = new ArrayList<Attachment>();
 
     public ScrollController() {
     }
@@ -67,16 +94,29 @@ public class ScrollController {
         this.debugLabel = v;
     }
 
+    /// The offset of the one attached scrollable. As in Flutter, which reads
+    /// `positions.single`, it is an error with more than one attached: there is no
+    /// single answer, and picking one silently is how a bug hides.
     public double offset() {
-        return scrollPosition.pixels();
+        return position().pixels();
     }
 
+    /// The position of the one attached scrollable; see {@link #offset()}. With none
+    /// attached it is the controller's own, which Flutter would assert on; answering
+    /// keeps a read before the first layout harmless.
     public ScrollPosition position() {
-        return scrollPosition;
+        int n = attachments.size();
+        if (n == 0) {
+            return scrollPosition;
+        }
+        if (n > 1) {
+            throw new dart.core.StateError("ScrollController attached to multiple scroll views.");
+        }
+        return attachments.get(0).position;
     }
 
     public boolean hasClients() {
-        return attached;
+        return attached || !attachments.isEmpty();
     }
 
     /** The animateTo in progress, or null. */
@@ -84,19 +124,24 @@ public class ScrollController {
     private dart.async.Completer<Object> motionDone;
 
     /**
-     * Scrolls the attached list to {@code offset} over {@code duration}, following
-     * {@code curve}, and completes when it arrives -- or when the motion is interrupted
-     * by a jump, another animateTo or dispose, as Flutter's does. It used to assign the
-     * target at once and return a completed future, so the list jumped and a caller
-     * awaiting the scroll resumed before any motion could have run.
+     * Scrolls every attached list to {@code offset} over {@code duration}, following
+     * {@code curve}, and completes when they arrive -- or when the motion is interrupted
+     * by a jump, another animateTo, dispose, or the user scrolling the lists themselves,
+     * as Flutter's does. It used to assign the target at once and return a completed
+     * future, so the list jumped and a caller awaiting the scroll resumed before any
+     * motion could have run.
      */
     public Future<Object> animateTo(final double offset, Duration duration, final Curve curve) {
         interruptMotion();
-        if (client == null || duration == null || duration.inMilliseconds() <= 0) {
-            moveTo(offset);
+        if (attachments.isEmpty() || duration == null || duration.inMilliseconds() <= 0) {
+            moveAll(offset);
             return Future.value(null);
         }
-        final double from = scrollPosition.pixels();
+        for (int i = 0; i < attachments.size(); i++) {
+            Attachment a = attachments.get(i);
+            a.from = a.position.pixels();
+            a.driven = true;
+        }
         final com.codename1.flutter.animation.AnimationController run =
                 new com.codename1.flutter.animation.AnimationController();
         run.duration(duration);
@@ -108,7 +153,13 @@ public class ScrollController {
                 }
                 double v = run.value();
                 double t = curve == null ? v : curve.transform(v);
-                moveTo(from + (offset - from) * t);
+                for (int i = 0; i < attachments.size(); i++) {
+                    Attachment a = attachments.get(i);
+                    if (a.driven) {
+                        moveOne(a, a.from + (offset - a.from) * t);
+                    }
+                }
+                notifyListeners();
             }
         });
         final dart.async.Completer<Object> done = new dart.async.Completer<Object>();
@@ -118,11 +169,14 @@ public class ScrollController {
             @Override
             public Object call(Object ignored) {
                 if (motion == run) {
-                    moveTo(offset);
-                    motion = null;
-                    motionDone = null;
-                    run.dispose();
-                    done.complete(null);
+                    for (int i = 0; i < attachments.size(); i++) {
+                        Attachment a = attachments.get(i);
+                        if (a.driven) {
+                            moveOne(a, offset);
+                        }
+                    }
+                    notifyListeners();
+                    interruptMotion();
                 }
                 return null;
             }
@@ -130,12 +184,15 @@ public class ScrollController {
         return done.future();
     }
 
-    /** Stops an animateTo in progress where it is, completing its future. */
+    /** Ends an animateTo in progress where it is, completing its future. */
     private void interruptMotion() {
         com.codename1.flutter.animation.AnimationController run = motion;
         dart.async.Completer<Object> done = motionDone;
         motion = null;
         motionDone = null;
+        for (int i = 0; i < attachments.size(); i++) {
+            attachments.get(i).driven = false;
+        }
         if (run != null) {
             run.dispose();
         }
@@ -144,21 +201,38 @@ public class ScrollController {
         }
     }
 
-    private void moveTo(double px) {
-        scrollPosition.jumpTo(px);
-        if (client != null) {
-            client.scrollToOffset(px);
+    /// Moves one attached list, marking the move as the controller's own.
+    private static void moveOne(Attachment a, double px) {
+        a.position.jumpTo(px);
+        drive(a, px);
+    }
+
+    /// Tells the list to move, leaving its position to what the list reports back.
+    private static void drive(Attachment a, double px) {
+        a.lastDriven = px;
+        a.moving = true;
+        try {
+            a.client.scrollToOffset(px);
+        } finally {
+            a.moving = false;
+        }
+    }
+
+    /// Moves every attached list (or, with none, the controller's own position) and
+    /// notifies once.
+    private void moveAll(double px) {
+        if (attachments.isEmpty()) {
+            scrollPosition.jumpTo(px);
+        }
+        for (int i = 0; i < attachments.size(); i++) {
+            moveOne(attachments.get(i), px);
         }
         notifyListeners();
     }
 
     public void jumpTo(double value) {
         interruptMotion();
-        scrollPosition.jumpTo(value);
-        if (client != null) {
-            client.scrollToOffset(value);
-        }
-        notifyListeners();
+        moveAll(value);
     }
 
     public void addListener(Funcs.VoidFunc0 listener) {
@@ -174,6 +248,7 @@ public class ScrollController {
     public void dispose() {
         interruptMotion();
         listeners.clear();
+        attachments.clear();
         attached = false;
     }
 
@@ -193,42 +268,125 @@ public class ScrollController {
         void scrollToOffset(double offset);
     }
 
-    private Client client;
-
     void attach() {
         this.attached = true;
     }
 
-    /** Attaches the scrollable this controller drives. */
+    /** Attaches a scrollable this controller drives, alongside any already attached. */
     void attach(Client c) {
-        this.client = c;
-        this.attached = true;
-        // The position this controller already holds -- its initialScrollOffset, or
-        // where an earlier list left it -- is where the newly attached one starts.
-        // Recording it only here left the list at zero while offset reported it.
-        if (c != null && scrollPosition.pixels() != 0) {
-            c.scrollToOffset(scrollPosition.pixels());
+        if (c == null || find(c) != null) {
+            return;
+        }
+        // The first one takes over the controller's own position: the offset it already
+        // holds -- its initialScrollOffset, or where an earlier list left it -- is where
+        // the newly attached one starts. Another one gets a position of its own at the
+        // initial offset, as each of Flutter's positions does.
+        ScrollPosition p;
+        if (attachments.isEmpty()) {
+            p = scrollPosition;
+        } else {
+            p = new ScrollPosition();
+            p.setPixels(initialScrollOffset);
+        }
+        Attachment a = new Attachment(c, p);
+        attachments.add(a);
+        if (p.pixels() != 0) {
+            // Not moveOne: before the list has reported its extents the position would
+            // clamp the offset to zero.
+            drive(a, p.pixels());
         }
     }
 
     void detach() {
         this.attached = false;
-        this.client = null;
+        interruptMotion();
+        attachments.clear();
     }
 
-    /** Detaches {@code c}, if it is still the one attached. */
+    /** Detaches {@code c}, if it is attached. */
     void detach(Client c) {
-        if (client == c) {
-            detach();
+        Attachment a = find(c);
+        if (a == null) {
+            return;
+        }
+        attachments.remove(a);
+        if (a.driven) {
+            a.driven = false;
+            stopIfNothingDriven();
+        }
+        if (attachments.isEmpty() && a.position != scrollPosition) {
+            // The controller's own position keeps where the LAST list was, so the next
+            // list to attach starts there.
+            scrollPosition.setPixels(a.position.pixels());
         }
     }
 
-    /** The user scrolled the attached list to {@code offset} logical pixels. */
+    private Attachment find(Client c) {
+        for (int i = 0; i < attachments.size(); i++) {
+            if (attachments.get(i).client == c) {
+                return attachments.get(i);
+            }
+        }
+        return null;
+    }
+
+    /// Ends the animateTo once it drives nothing -- every list it was moving has been
+    /// taken over by the user or detached -- so its future completes, as Flutter's
+    /// does once the last of its scroll activities is disposed.
+    private void stopIfNothingDriven() {
+        if (motion == null) {
+            return;
+        }
+        for (int i = 0; i < attachments.size(); i++) {
+            if (attachments.get(i).driven) {
+                return;
+            }
+        }
+        interruptMotion();
+    }
+
+    /** The first attached list (or, with none, the controller) scrolled to {@code offset}. */
     void userScrolled(double offset, double maxExtent, double viewport) {
-        scrollPosition.applyViewportDimension(viewport);
-        scrollPosition.applyContentDimensions(0, maxExtent);
-        if (scrollPosition.pixels() != offset) {
-            scrollPosition.setPixels(offset);
+        if (attachments.isEmpty()) {
+            scrollPosition.applyViewportDimension(viewport);
+            scrollPosition.applyContentDimensions(0, maxExtent);
+            if (scrollPosition.pixels() != offset) {
+                scrollPosition.setPixels(offset);
+                notifyListeners();
+            }
+            return;
+        }
+        userScrolled(attachments.get(0).client, offset, maxExtent, viewport);
+    }
+
+    /**
+     * The attached list {@code c} reports it is at {@code offset} logical pixels.
+     *
+     * <p>That is either the echo of a move the controller made -- the list reports every
+     * scroll, including the ones it was told to do -- or the user's own scroll. Only the
+     * second interrupts an animateTo, as a drag does in Flutter; the first must not, or
+     * the animation would stop itself on its first frame. A report made while the
+     * controller is moving the list, or one that lands where it put it (within a pixel
+     * of rounding), is the echo.</p>
+     */
+    void userScrolled(Client c, double offset, double maxExtent, double viewport) {
+        Attachment a = find(c);
+        if (a == null) {
+            return;
+        }
+        ScrollPosition p = a.position;
+        p.applyViewportDimension(viewport);
+        p.applyContentDimensions(0, maxExtent);
+        if (a.moving) {
+            p.setPixels(offset);   // the controller notifies once it has moved them all
+            return;
+        }
+        if (a.driven && !(Math.abs(offset - a.lastDriven) <= 1.0)) {
+            a.driven = false;
+            stopIfNothingDriven();
+        }
+        if (p.pixels() != offset) {
+            p.setPixels(offset);
             notifyListeners();
         }
     }
