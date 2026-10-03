@@ -255,9 +255,16 @@ jobs:
       - name: Install zig toolchain (portable old-glibc build)
         run: |
           set -e
-          ZV=0.13.0
+          # 0.14.1 is built on LLVM 19, matching the LLVM 19 toolchain the cloud
+          # builders provision next to zig. 0.13.0 (LLVM 18) silently dropped
+          # -fprofile-generate, and its instrumentation cannot link against LLVM 19's
+          # profile runtime ("version mismatch: expected 10, but get 9"), so it could
+          # not build profile-guided-optimized binaries. This leg is the coverage that
+          # the production zig can be moved to 0.14.1 for every Linux build.
+          # 0.14 renamed the release tarballs from zig-linux-<arch> to zig-<arch>-linux.
+          ZV=0.14.1
           A=$(uname -m)
-          curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZV}/zig-linux-${A}-${ZV}.tar.xz"
+          curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZV}/zig-${A}-linux-${ZV}.tar.xz"
           sudo mkdir -p /opt/zig && sudo tar -xf /tmp/zig.tar.xz -C /opt/zig --strip-components=1
           sudo ln -sf /opt/zig/zig /usr/local/bin/zig
           sudo tee /usr/local/bin/cn1-zig-cc >/dev/null << 'WRAP'
