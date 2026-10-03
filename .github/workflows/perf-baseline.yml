@@ -63,6 +63,15 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          # A pull_request run checks out GitHub's merge of the pull request into
+          # the CURRENT base branch, while base.sha can be an older base commit.
+          # Diffed from that, every base/ row the nightly fold wrote since was
+          # charged to this pull request. The merge commit's first parent is the
+          # base branch it was merged into, so HEAD^1...HEAD is exactly the
+          # pull request's own change.
+          if git rev-parse -q --verify HEAD^2 >/dev/null; then
+            BASE_SHA=$(git rev-parse HEAD^1)
+          fi
           # Both, even when the first fails, so one comment shows every problem.
           status=0
           if [ -n "${BASE_SHA}" ]; then
