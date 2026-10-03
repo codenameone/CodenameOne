@@ -104,11 +104,14 @@ public class JavaSEExecutableJarMojo extends AbstractCN1Mojo {
 
         File root = getCN1ProjectDir().getParentFile();
         List<File> contents = new ArrayList<File>();
-        contents.add(new File(project.getBuild().getOutputDirectory()));
+        // Earlier wins, in the order a full layout's desktop app resolves them: the javase
+        // module's jar (its natives, resources, generated icons and desktop resources)
+        // comes before the common jar on its classpath.
         contents.add(hostedNativesDir());
         contents.add(hostedDesktopResourcesDir());
-        contents.add(new File(getCN1ProjectDir(), path("src", "desktop", "resources")));
         contents.add(new File(root, path("javase", "src", "desktop", "resources")));
+        contents.add(new File(getCN1ProjectDir(), path("src", "desktop", "resources")));
+        contents.add(new File(project.getBuild().getOutputDirectory()));
 
         Manifest manifest = new Manifest();
         Attributes attributes = manifest.getMainAttributes();

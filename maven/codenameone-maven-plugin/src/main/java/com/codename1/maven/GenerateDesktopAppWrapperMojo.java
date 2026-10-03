@@ -181,13 +181,19 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         // registerCustomStubSourceRoot adds will pick it up.
         String packagePath = packageName.replace('.', File.separatorChar);
         File customStub = new File(customStubSourceRoot(), path(packagePath, mainName + "Stub.java"));
-        if (customStub.exists()) {
-            getLog().info("Custom desktop stub found at " + customStub.getAbsolutePath() + " - skipping generation.");
-            return;
-        }
-
         File generatedRoot = new File(project.getBuild().getDirectory(),
                 path("generated-sources", GENERATED_SOURCES_DIR));
+        if (customStub.exists()) {
+            getLog().info("Custom desktop stub found at " + customStub.getAbsolutePath() + " - skipping generation.");
+            // A stub generated before the custom one appeared would otherwise still be
+            // compiled beside it (compile-javase-natives reads the generated directory),
+            // two definitions of one class, until a clean.
+            File stale = new File(generatedRoot, path(packagePath, mainName + "Stub.java"));
+            if (stale.isFile() && !stale.delete()) {
+                throw new MojoExecutionException("Could not delete the obsolete generated stub " + stale);
+            }
+            return;
+        }
         File generatedPkgDir = new File(generatedRoot, packagePath);
         generatedPkgDir.mkdirs();
         File generatedStub = new File(generatedPkgDir, mainName + "Stub.java");

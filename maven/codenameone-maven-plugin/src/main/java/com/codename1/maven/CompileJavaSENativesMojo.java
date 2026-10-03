@@ -73,6 +73,14 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
             }
             return;
         }
+        String platform = requestedPlatform();
+        if (platform != null && !"javase".equals(platform)) {
+            // A device build uploads none of this, and a desktop-only compile error must
+            // not stop it. The simulator, the tests and the desktop builds name javase,
+            // and a build that names no platform (plain `mvn test`) compiles it too.
+            getLog().debug("Not compiling the JavaSE natives for a " + platform + " build");
+            return;
+        }
         ProjectLayout layout = projectHost().layout();
         File out = hostedNativesDir();
         File buildDir = new File(project.getBuild().getDirectory());
@@ -121,6 +129,8 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
             if (out.exists()) {
                 FileUtils.deleteQuietly(out);
             }
+            // With the output gone, its stamp would vouch for classes that no longer exist.
+            FileUtils.deleteQuietly(new File(out.getParentFile(), "inputs.txt"));
             getLog().debug("No JavaSE native sources to compile");
             return;
         }
@@ -131,7 +141,7 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
         collectFiles(resources, resourceFiles);
         Collections.sort(resourceFiles);
         String inputs = describeInputs(sources, resourceFiles, archives, classpath, level);
-        if (isUpToDate(stamp, inputs, sources, resources)) {
+        if (isUpToDate(stamp, out, inputs, sources, resources)) {
             getLog().debug("JavaSE native code is up to date at " + out);
             return;
         }
@@ -263,8 +273,8 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
      * changed since: no source or resource is newer than the stamp, and no classpath
      * element either (a rebuilt {@code target/classes} changes what the natives link to).
      */
-    static boolean isUpToDate(File stamp, String inputs, List<File> sources, File resources) {
-        if (!stamp.isFile()) {
+    static boolean isUpToDate(File stamp, File out, String inputs, List<File> sources, File resources) {
+        if (!stamp.isFile() || !out.isDirectory()) {
             return false;
         }
         try {
@@ -293,6 +303,19 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
             }
         }
         return true;
+    }
+
+    /**
+     * The platform this build is for: the command line's {@code -Dcodename1.platform}, else
+     * the one a profile set, else null when the build names none.
+     */
+    private String requestedPlatform() {
+        java.util.Properties user = userProperties();
+        String p = user == null ? null : user.getProperty("codename1.platform");
+        if (p == null || p.trim().length() == 0) {
+            p = project.getProperties().getProperty("codename1.platform");
+        }
+        return p == null || p.trim().length() == 0 ? null : p.trim();
     }
 
     static String sha256(File f) throws MojoExecutionException {

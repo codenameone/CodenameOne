@@ -172,7 +172,9 @@ class HostedPlatformsTest {
         String inputs = CompileJavaSENativesMojo.describeInputs(sources, resourceFiles, Collections.<String>emptyList(),
                 Collections.singletonList(cp.getAbsolutePath()), new String[] {null, "1.8", "1.8"});
         File stamp = new File(tmp, "inputs.txt");
-        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources), "never compiled");
+        File out = new File(tmp, "out");
+        out.mkdirs();
+        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, out, inputs, sources, resources), "never compiled");
         write(stamp, inputs);
         long now = System.currentTimeMillis();
         stamp.setLastModified(now);
@@ -180,22 +182,26 @@ class HostedPlatformsTest {
         cp.setLastModified(now - 10000);
         resource.setLastModified(now - 10000);
         resources.setLastModified(now - 10000);
-        assertTrue(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources));
+        assertTrue(CompileJavaSENativesMojo.isUpToDate(stamp, out, inputs, sources, resources));
+        out.delete();
+        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, out, inputs, sources, resources),
+                "a stamp is no proof of output that is not there");
+        out.mkdirs();
         src.setLastModified(now + 10000);
-        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources), "an edited source");
+        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, out, inputs, sources, resources), "an edited source");
         src.setLastModified(now - 10000);
         String noResources = CompileJavaSENativesMojo.describeInputs(sources, Collections.<File>emptyList(), Collections.<String>emptyList(),
                 Collections.singletonList(cp.getAbsolutePath()), new String[] {null, "1.8", "1.8"});
-        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, noResources, sources, resources),
+        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, out, noResources, sources, resources),
                 "a deleted resource, which no timestamp shows, must still rebuild the output");
         String moreSources = CompileJavaSENativesMojo.describeInputs(Arrays.asList(src, new File(tmp, "B.java")),
                 resourceFiles, Collections.<String>emptyList(), Collections.singletonList(cp.getAbsolutePath()),
                 new String[] {null, "1.8", "1.8"});
-        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, moreSources, sources, resources), "a new source");
+        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, out, moreSources, sources, resources), "a new source");
         File appClass = new File(cp, "App.class");
         write(appClass, "x");
         appClass.setLastModified(now + 10000);
-        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources),
+        assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, out, inputs, sources, resources),
                 "the application classes the natives link against changed");
     }
 
