@@ -390,12 +390,52 @@ public class GraphicsCanvas extends Canvas {
         restore();
     }
 
+    /// Clips to {@code rect} as the current transform maps it.
+    ///
+    /// This used to place an upright box at the mapped top-left corner and size it by the
+    /// transform's AVERAGE scale, so under scale(2, 1) a 20x10 clip came out 30x15, a
+    /// mirroring scale put it on the wrong side, and a rotation got an upright box of
+    /// the wrong size. Now all four corners are mapped. With no rotation or skew -- the
+    /// common case, and the cheap one -- their bounds ARE the clip, exactly. Otherwise
+    /// the clip is the turned quad, as a shape, re-intersected with the bounds so it
+    /// still holds where a port's shape clip does not (see clipPath).
     @Override
     public void clipRect(Rect rect) {
-        g.clipRect((int) Math.floor(mapX(rect.left(), rect.top())),
-                (int) Math.floor(mapY(rect.left(), rect.top())),
-                (int) Math.ceil(rect.width() * avgScale()),
-                (int) Math.ceil(rect.height() * avgScale()));
+        double l = rect.left();
+        double t = rect.top();
+        double r = rect.right();
+        double btm = rect.bottom();
+        float x0 = mapX(l, t);
+        float y0 = mapY(l, t);
+        float x1 = mapX(r, t);
+        float y1 = mapY(r, t);
+        float x2 = mapX(r, btm);
+        float y2 = mapY(r, btm);
+        float x3 = mapX(l, btm);
+        float y3 = mapY(l, btm);
+        int left = (int) Math.floor(Math.min(Math.min(x0, x1), Math.min(x2, x3)));
+        int top = (int) Math.floor(Math.min(Math.min(y0, y1), Math.min(y2, y3)));
+        int right = (int) Math.ceil(Math.max(Math.max(x0, x1), Math.max(x2, x3)));
+        int bottom = (int) Math.ceil(Math.max(Math.max(y0, y1), Math.max(y2, y3)));
+        if ((b == 0 && c == 0) || !g.isShapeClipSupported()) {
+            g.clipRect(left, top, right - left, bottom - top);
+            return;
+        }
+        // setClip(Shape) REPLACES the clip, so the clip in force is read first and put
+        // back by intersection -- the same idiom as EffectRenderElement's shaped clips.
+        int cx = g.getClipX();
+        int cy = g.getClipY();
+        int cw = g.getClipWidth();
+        int ch = g.getClipHeight();
+        GeneralPath quad = new GeneralPath();
+        quad.moveTo(x0, y0);
+        quad.lineTo(x1, y1);
+        quad.lineTo(x2, y2);
+        quad.lineTo(x3, y3);
+        quad.closePath();
+        g.setClip(quad);
+        g.clipRect(cx, cy, cw, ch);
+        g.clipRect(left, top, right - left, bottom - top);
     }
 
     @Override
