@@ -34,6 +34,7 @@ import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.Token;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -48,6 +49,8 @@ public final class AstBuilder {
 
     private final Diagnostics diags;
     private String file;
+    /** The `import ... as p` prefixes of the library being built (imports come first). */
+    private List<String> importPrefixes = new ArrayList<String>();
 
     public AstBuilder(Diagnostics diags) {
         this.diags = diags;
@@ -75,6 +78,7 @@ public final class AstBuilder {
         Dart2Parser.CompilationUnitContext unit = parser.compilationUnit();
         Library lib = new Library();
         lib.fileName = fileName;
+        importPrefixes = lib.importPrefixes;
         pos(lib, unit);
         if (unit.libraryDeclaration() != null) {
             buildLibrary(unit.libraryDeclaration(), lib);
@@ -1938,13 +1942,20 @@ public final class AstBuilder {
         if (d.typeIdentifier() != null) {
             cc.type = new TypeRef(d.typeIdentifier().getText());
         } else if (d.qualifiedName() != null) {
-            // X.named — type X, named ctor
-            String text = d.qualifiedName().getText();
+            // X.named -- type X, named ctor; p.X or p.X.named through an import prefix.
+            // The prefix only selects the library, and the emitter resolves the bare class
+            // name against the library's imports. Kept, `new p.X()` looked for a
+            // constructor X on a class p and failed to resolve.
+            String text = withoutImportPrefix(d.qualifiedName().getText());
             int dot = text.indexOf('.');
-            cc.type = new TypeRef(text.substring(0, dot));
-            cc.ctorName = text.substring(dot + 1);
+            if (dot < 0) {
+                cc.type = new TypeRef(text);
+            } else {
+                cc.type = new TypeRef(text.substring(0, dot));
+                cc.ctorName = text.substring(dot + 1);
+            }
         } else {
-            cc.type = new TypeRef(d.typeName().getText());
+            cc.type = new TypeRef(withoutImportPrefix(d.typeName().getText()));
             if (d.typeArguments() != null) {
                 for (Dart2Parser.TypeContext t : d.typeArguments().typeList().type()) {
                     cc.type.args.add(buildType(t));
@@ -1956,6 +1967,15 @@ public final class AstBuilder {
         }
         buildArgs(args, cc.args);
         return cc;
+    }
+
+    /** {@code p.X...} with a leading import prefix {@code p.} removed. */
+    private String withoutImportPrefix(String text) {
+        int dot = text.indexOf('.');
+        if (dot > 0 && importPrefixes.contains(text.substring(0, dot))) {
+            return text.substring(dot + 1);
+        }
+        return text;
     }
 
     private Expr buildLambda(Dart2Parser.FunctionExpressionContext ctx) {

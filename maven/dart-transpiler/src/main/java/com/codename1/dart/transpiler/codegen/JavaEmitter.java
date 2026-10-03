@@ -4192,11 +4192,12 @@ public final class JavaEmitter {
                 if (target.code.equals("this") && !isLateChecked(f, pc)) {
                     return new Out("this." + name, fieldType(f, ctx));
                 }
-                return new Out(target.code + ".get$" + name + "()", fieldType(f, ctx));
+                return new Out(target.code + ".get$" + name + "()",
+                        asSeenFrom(fieldType(f, ctx), pc, tt));
             }
             MethodDecl g = pc.getter(name);
             if (g != null) {
-                return new Out(target.code + "." + name + "()", g.returnType);
+                return new Out(target.code + "." + name + "()", asSeenFrom(g.returnType, pc, tt));
             }
             Object mixF = findMixinMember(pc, name, true);
             if (mixF instanceof FieldDecl) {
@@ -7617,6 +7618,30 @@ public final class JavaEmitter {
     }
 
     /** Recursively replaces type-parameter names (e.g. {@code T}, {@code A}) with concrete args. */
+    /**
+     * A member type of the generic program class {@code pc} read through a receiver of
+     * type {@code receiver}: {@code T? get v} on a {@code Box<String>} is a
+     * {@code String?}. Left as T, {@code box.v!.length} did not resolve. A raw receiver,
+     * or one whose argument count does not match, keeps the declared type.
+     */
+    private TypeRef asSeenFrom(TypeRef t, ClassDecl pc, TypeRef receiver) {
+        if (t == null || pc.typeParams.isEmpty() || receiver == null
+                || receiver.args.size() != pc.typeParams.size()) {
+            return t;
+        }
+        Map<String, TypeRef> subst = new LinkedHashMap<String, TypeRef>();
+        for (int i = 0; i < pc.typeParams.size(); i++) {
+            subst.put(pc.typeParams.get(i), receiver.args.get(i));
+        }
+        TypeRef out = substituteTypeParams(t, subst);
+        if (out != t && t.nullable && out != null && !out.nullable) {
+            // `T?` with T := String is String?, which the substitution of the bare
+            // name does not carry over.
+            out = boxType(out);
+        }
+        return out;
+    }
+
     private TypeRef substituteTypeParams(TypeRef t, Map<String, TypeRef> subst) {
         if (t == null) {
             return null;
@@ -8546,8 +8571,94 @@ public final class JavaEmitter {
                 MapLit m = (MapLit) f.initializer;
                 return TypeRef.of("Map", m.keyType, m.valueType);
             }
+            // `final x = Foo(1);`, `static const k = Foo.named();`, `var b = Box<int>();`:
+            // the class constructed, as a local initialised the same way already gets.
+            // Left dynamic, the field was declared Object and `x.member` did not compile.
+            TypeRef constructed = constructedType(f.initializer, ctx);
+            if (constructed != null) {
+                return constructed;
+            }
         }
         return TypeRef.DYNAMIC;
+    }
+
+    /**
+     * dart:core and dart:async types whose constructors the emitter routes to intrinsic
+     * factories with element-specialised results (a {@code List<int>.filled} is a
+     * DartLongList); a field initialised by one keeps its old, dynamic type.
+     */
+    private static final java.util.Set<String> INTRINSIC_CONSTRUCTED = new java.util.HashSet<String>(
+            java.util.Arrays.asList("List", "Map", "Set", "Iterable", "Future", "Stream",
+                    "int", "double", "num", "String", "bool", "Object", "Function"));
+
+    /**
+     * The type a constructor invocation produces, when {@code e} is one the emitter
+     * dispatches as such: {@code new}/{@code const} {@code C(...)} or {@code C.named(...)},
+     * a bare {@code C(...)} or {@code C<T>(...)}, an import-prefixed {@code p.C(...)}, or
+     * an unprefixed {@code C.named(...)} naming a declared constructor. Null otherwise.
+     * Mirrors the result type the constructor emission reports, plus the written type
+     * arguments.
+     */
+    private TypeRef constructedType(Expr e, Ctx ctx) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        String cls = null;
+        List<TypeRef> typeArgs = null;
+        if (e instanceof CtorCall) {
+            CtorCall cc = (CtorCall) e;
+            if (cc.type == null) {
+                return null;
+            }
+            cls = cc.type.name;
+            typeArgs = cc.type.args;
+            if (cc.ctorName != null && !hasNamedCtor(cls, cc.ctorName)) {
+                return null;
+            }
+        } else if (e instanceof Call) {
+            Call c = (Call) e;
+            if (c.name == null) {
+                return null;
+            }
+            if (c.target == null || isImportPrefix(c.target, ctx)) {
+                // A top-level function of the same name wins, as it does in emitBareCall.
+                if (program.functions.containsKey(c.name) || stubs.functions.containsKey(c.name)) {
+                    return null;
+                }
+                cls = c.name;
+                typeArgs = c.typeArgs;
+            } else if (c.target instanceof Ident && c.typeArgs.isEmpty()
+                    && hasNamedCtor(((Ident) c.target).name, c.name)) {
+                cls = ((Ident) c.target).name;
+                typeArgs = java.util.Collections.<TypeRef>emptyList();
+            } else {
+                return null;
+            }
+        } else {
+            return null;
+        }
+        if (cls == null || INTRINSIC_CONSTRUCTED.contains(cls)
+                || (!program.classes.containsKey(cls) && !stubs.classes.containsKey(cls))) {
+            return null;
+        }
+        return TypeRef.of(cls, typeArgs.toArray(new TypeRef[0]));
+    }
+
+    /** A program or stub class {@code cls} declaring a constructor named {@code name}. */
+    private boolean hasNamedCtor(String cls, String name) {
+        Ast.ClassDecl cd = program.classes.get(cls);
+        if (cd == null) {
+            cd = stubs.classes.get(cls);
+        }
+        if (cd == null) {
+            return false;
+        }
+        for (CtorDecl ct : cd.ctors) {
+            if (name.equals(ct.name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private TypeRef typeOfField(ClassDecl c, String name, Ctx ctx) {

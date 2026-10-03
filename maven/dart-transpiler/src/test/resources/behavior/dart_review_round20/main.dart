@@ -2,6 +2,10 @@
 // null -- an assignment through it, an index after it, later selectors -- so
 // nothing to its right is evaluated. And an assignment through a setter is an
 // expression whose value is the assigned value, compound and ++/-- included.
+// The library imports itself under a prefix so that section 8 can construct
+// through one.
+import 'main.dart' as self;
+
 final log = <String>[];
 
 int side(int v) {
@@ -78,6 +82,38 @@ class Statics {
   static const String label = 'k';
   static final cache = <String, int>{};
   static final names = <String>['a', 'b'];
+}
+
+// An untyped variable initialised by a constructor call has the constructed
+// class's type, whatever form the call takes.
+class Pt {
+  final int x;
+  Pt(this.x);
+  Pt.origin() : x = 0;
+  const Pt.fixed(this.x);
+  int twice() => x * 2;
+}
+
+class Box<T> {
+  T? value;
+  Box();
+  T? get v => value;
+}
+
+final topPt = Pt(1);
+var topNamed = Pt.origin();
+const topFixed = Pt.fixed(5);
+final topBox = Box<int>();
+final topNew = new Pt(2);
+final topPrefixed = self.Pt(3);
+const topConstPrefixed = const self.Pt.fixed(4);
+
+class Inferred {
+  static const k = Pt.fixed(7);
+  static final s = Pt(8);
+  static var n = new Pt.origin();
+  final i = Pt(9);
+  var b = Box<String>();
 }
 
 void show(String what) {
@@ -216,4 +252,15 @@ void main() {
   final pick2 = log.isEmpty ? 'empty' : fresh?.maybe ?? side(13);
   print('$pick $pick2');
   show('statics');
+
+  // 8. untyped variables initialised by constructor calls
+  print('${topPt.x} ${topNamed.x} ${topFixed.twice()} ${topNew.x} ${topPrefixed.x} ${topConstPrefixed.x}');
+  topBox.value = 6;
+  print(topBox.v! + 1);
+  print('${Inferred.k.x} ${Inferred.s.twice()} ${Inferred.n.x}');
+  final inf = Inferred();
+  inf.b.value = 'box';
+  print('${inf.i.x} ${inf.b.v!.length}');
+  topNamed = Pt(10);
+  print(topNamed.x);
 }

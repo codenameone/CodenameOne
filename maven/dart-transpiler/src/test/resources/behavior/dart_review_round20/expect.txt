@@ -62,3 +62,8 @@ callbacks [tapped, side 7, side 9]
 {x: 10} [a, b]
 11 12
 statics [side 10, side 11]
+1 0 10 2 3 4
+7
+7 16 0
+9 3
+10
