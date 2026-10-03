@@ -32,7 +32,7 @@ import java.util.List;
 
 /// DIAGNOSTIC ONLY (diag branch, never merged).
 final class WebViewNavDiag {
-    static final boolean STORM = false;
+    static final boolean STORM = true;
     private static final String TAG = "CN1WVDIAG";
     private static boolean done;
     private static List<String> names;
