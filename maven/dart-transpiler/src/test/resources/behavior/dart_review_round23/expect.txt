@@ -67,3 +67,12 @@ http://a.com:-/ -> null
 http://a.com:+-1/ -> null
 http://a.com:٣/ -> null
 parse: FormatException
+http://a.com:99999999999999999999/ -> http://a.com:99999999999999999999/ a.com true
+port: FormatException: Positive input exceeds the limit of integer
+99999999999999999999
+foo://a.com:9223372036854775808 -> foo://a.com:9223372036854775808 a.com true
+port: FormatException: Positive input exceeds the limit of integer
+9223372036854775808
+http://A.com:99999999999999999999/ -> null
+http://u@a.com:99999999999999999999/ -> null
+http://a.com:99999999999999999999/x/../y -> null

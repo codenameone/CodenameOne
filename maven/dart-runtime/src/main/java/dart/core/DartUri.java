@@ -41,6 +41,9 @@ public final class DartUri {
     /// Whether the authority named a port. Without one, port() answers the
     /// scheme's default, as Dart's Uri.port does.
     private boolean explicitPort;
+    /// The text of a port too large for an int, which Dart parses and keeps but
+    /// refuses to read (see needsNoNormalizing); null otherwise.
+    private String oversizedPort;
     private String path = "";
     private String query = "";
     private String fragment = "";
@@ -287,10 +290,94 @@ public final class DartUri {
         // dart 3.9.3 parses http://a.com:+80/ (port 80) and http://a.com:-1/ (port -1)
         // and does NOT reject them. What it rejects is what int.parse does: '+',
         // http://a.com:8 0/, and non-ASCII digits, which the Long parse accepted.
-        if (port != null && port.length() > 0 && portValue(port) == null) {
+        if (port != null && port.length() > 0 && portValue(port) == null
+                && !(oversizedPort(port) && !hostPort.startsWith("[") && needsNoNormalizing(text, colon < end ? colon : -1))) {
             return "Invalid port";
         }
         return null;
+    }
+
+    /// A plain decimal port past 2^63-1: no sign, no leading zero, ASCII digits only.
+    private static boolean oversizedPort(String port) {
+        if (port.length() < 19 || port.charAt(0) == '0') {
+            return false;
+        }
+        for (int i = 0; i < port.length(); i++) {
+            char c = port.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return portValue(port) == null;
+    }
+
+    /// Whether dart 3.9.3 parses {@code text} on its fast path, which keeps the text
+    /// and reads the port only when Uri.port is asked for -- so an oversized port
+    /// parses and port throws. Everything else goes through int.parse at parse time
+    /// and is rejected. Recorded case by case from the SDK rather than ported from its
+    /// scanner table: a lower-case scheme and host, no userinfo, no '%', ':' or '@'
+    /// after the authority, no dot segment in the path and no '/' in the query or
+    /// fragment.
+    private static boolean needsNoNormalizing(String text, int schemeColon) {
+        for (int i = 0; i < schemeColon; i++) {
+            char c = text.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                return false;
+            }
+        }
+        int authStart = (schemeColon < 0 ? 0 : schemeColon + 1) + 2;
+        int i = authStart;
+        int portColon = -1;
+        for (; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                break;
+            }
+            if (portColon >= 0) {
+                if (c < '0' || c > '9') {
+                    return false;   // a second ':' or a host like a:b.com
+                }
+            } else if (c == ':') {
+                portColon = i;
+            } else if (!(simpleChar(c) && !(c >= 'A' && c <= 'Z') || c == '\\')) {
+                return false;   // userinfo ('@'), an upper-case or escaped host
+            }
+        }
+        int section = 0;   // 0 path, 1 query, 2 fragment
+        int segStart = i;
+        for (; i <= text.length(); i++) {
+            char c = i < text.length() ? text.charAt(i) : '/';
+            if (section == 0 && (c == '/' || c == '?' || c == '#')) {
+                // Measured: '..' anywhere, '.' only before a '/' or at the very end
+                // (http://a.com:N/x/.?q and /x/.#f do parse).
+                String seg = text.substring(segStart, i);
+                if (seg.equals("..") || (seg.equals(".") && (c == '/' || i == text.length()))) {
+                    return false;
+                }
+                segStart = i + 1;
+            }
+            if (i == text.length()) {
+                break;
+            }
+            if (c == '?' && section == 0) {
+                section = 1;
+            } else if (c == '#' && section < 2) {
+                section = 2;
+            } else if (c == '/') {
+                if (section != 0) {
+                    return false;
+                }
+            } else if (c != '?' && !simpleChar(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The characters dart 3.9.3 leaves alone on its fast path.
+    private static boolean simpleChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || "!$&'()*+,;=~-._".indexOf(c) >= 0;
     }
 
     private void parse() {
@@ -339,6 +426,9 @@ public final class DartUri {
                 host = authority.substring(0, pc);
                 Long v = portValue(authority.substring(pc + 1));
                 port = v == null ? 0 : v.longValue();
+                if (v == null && explicitPort) {
+                    oversizedPort = authority.substring(pc + 1);
+                }
             } else {
                 host = authority;
             }
@@ -621,6 +711,10 @@ public final class DartUri {
     /// https://example.com/path sent code that splits a URL into host and port
     /// to port 0 unless every URL spelled out :443.
     public long port() {
+        if (oversizedPort != null) {
+            // Dart's own int.parse message for it.
+            throw new FormatException("Positive input exceeds the limit of integer\n" + oversizedPort);
+        }
         return explicitPort ? port : defaultPort(scheme);
     }
 

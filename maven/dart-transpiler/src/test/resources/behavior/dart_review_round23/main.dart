@@ -140,6 +140,26 @@ void uris() {
   } on FormatException {
     print('parse: FormatException');
   }
+  // An oversized decimal port in a URI Dart need not normalise parses; reading it throws.
+  for (final s in [
+    'http://a.com:99999999999999999999/',
+    'foo://a.com:9223372036854775808',
+    'http://A.com:99999999999999999999/',
+    'http://u@a.com:99999999999999999999/',
+    'http://a.com:99999999999999999999/x/../y',
+  ]) {
+    final u = Uri.tryParse(s);
+    if (u == null) {
+      print('$s -> null');
+      continue;
+    }
+    print('$s -> $u ${u.host} ${u == Uri.parse(s)}');
+    try {
+      print(u.port);
+    } on FormatException catch (e) {
+      print('port: $e');
+    }
+  }
 }
 
 void main() {

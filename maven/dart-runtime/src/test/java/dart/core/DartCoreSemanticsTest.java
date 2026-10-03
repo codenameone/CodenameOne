@@ -1108,4 +1108,33 @@ public class DartCoreSemanticsTest {
         assertNull(DartUri.tryParse("http://a.com:\u0663/"));
         assertThrows(FormatException.class, () -> DartUri.parse("http://a.com:+/"));
     }
+
+    @Test
+    public void anOversizedPortParsesButReadingItThrows() {
+        // dart 3.9.3: a decimal port past 2^63-1 in an otherwise plain URI parses, keeps
+        // its text, and only Uri.port throws.
+        String text = "http://a.com:99999999999999999999/";
+        DartUri u = DartUri.tryParse(text);
+        assertTrue(u != null);
+        assertEquals(text, u.toString());
+        assertEquals(DartUri.parse(text), u);
+        assertEquals(DartUri.parse(text).hashCode(), u.hashCode());
+        assertEquals("a.com", u.host());
+        FormatException e = assertThrows(FormatException.class, u::port);
+        assertEquals("FormatException: Positive input exceeds the limit of integer\n99999999999999999999",
+                e.toString());
+        assertTrue(DartUri.tryParse("foo://a.com:9223372036854775808") != null);
+        assertTrue(DartUri.tryParse("http://a.com:99999999999999999999?q") != null);
+        // A URI Dart has to normalise goes through int.parse instead, and fails.
+        assertNull(DartUri.tryParse("http://A.com:99999999999999999999/"));
+        assertNull(DartUri.tryParse("HTTP://a.com:99999999999999999999/"));
+        assertNull(DartUri.tryParse("http://u@a.com:99999999999999999999/"));
+        assertNull(DartUri.tryParse("http://[::1]:99999999999999999999/"));
+        assertNull(DartUri.tryParse("http://a.com:99999999999999999999/%7e"));
+        assertNull(DartUri.tryParse("http://a.com:99999999999999999999/x/../y"));
+        assertNull(DartUri.tryParse("http://a.com:099999999999999999999/"));
+        assertNull(DartUri.tryParse("http://a.com:-99999999999999999999/"));
+        assertNull(DartUri.tryParse("http://a.com:0x10000000000000000/"));
+        assertThrows(FormatException.class, () -> DartUri.parse("http://A.com:99999999999999999999/"));
+    }
 }
