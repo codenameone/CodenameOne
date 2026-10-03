@@ -253,6 +253,16 @@ public abstract class EffectRenderElement extends RenderElement {
     /// reports the child's footprint with the axes swapped, so a layer the size of the
     /// pane would cut the child in half before it was ever turned.
     protected final com.codename1.ui.Image layer(Container pane, Subtree subtree, int w, int h) {
+        return layer(pane, subtree, 0, 0, w, h);
+    }
+
+    /// As {@link #layer(Container, Subtree, int, int)}, rendering only the {@code w} x
+    /// {@code h} window of the pane whose top-left is at ({@code ox}, {@code oy}) in pane
+    /// coordinates. An effect that draws its layer back unmoved -- Opacity -- needs only
+    /// the part of the pane the clip lets through, and a tall faded column inside a scroll
+    /// view would otherwise allocate a buffer the size of the whole column.
+    protected final com.codename1.ui.Image layer(Container pane, Subtree subtree, int ox, int oy,
+            int w, int h) {
         if (w <= 0 || h <= 0 || !(pane instanceof EffectPane)) {
             return null;
         }
@@ -263,7 +273,11 @@ public abstract class EffectRenderElement extends RenderElement {
         }
         // The subtree paints with the pane parked at the origin, so what lands in the
         // image is exactly the pane's own box -- no translate to unwind afterwards.
-        ((EffectPane) pane).paintAtOrigin(layerImage.getGraphics());
+        Graphics lg = layerImage.getGraphics();
+        if (ox != 0 || oy != 0) {
+            lg.translate(-ox, -oy);
+        }
+        ((EffectPane) pane).paintAtOrigin(lg);
         return layerImage;
     }
 
