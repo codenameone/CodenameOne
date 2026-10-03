@@ -2382,6 +2382,16 @@
       "medium": {
         "url": "https://medium.com/p/d52c3e0840cc/edit",
         "syndicated_at": "2026-10-02T06:00:38+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/the-hard-part-of-invite-a-friend-is-the-install",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac11880b491e8e7138be719",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T15:01:10+00:00"
       }
     },
     "xcode-27-build-settings": {
