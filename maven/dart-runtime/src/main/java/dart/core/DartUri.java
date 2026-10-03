@@ -425,9 +425,19 @@ public final class DartUri {
             if (isUnreserved(ch)) {
                 out.append(ch);
             } else {
-                int cp = c.codePointAt(i);
+                // Decoded by hand: ParparVM's String has no codePointAt, and a
+                // call to it compiles on the JVM and then fails the native link.
+                int cp = ch;
+                int width = 1;
+                if (ch >= 0xD800 && ch <= 0xDBFF && i + 1 < c.length()) {
+                    char low = c.charAt(i + 1);
+                    if (low >= 0xDC00 && low <= 0xDFFF) {
+                        cp = ((ch - 0xD800) << 10) + (low - 0xDC00) + 0x10000;
+                        width = 2;
+                    }
+                }
                 utf8(cp, out);
-                i += Character.charCount(cp);
+                i += width;
                 continue;
             }
             i++;
