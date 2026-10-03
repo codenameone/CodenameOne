@@ -71,7 +71,12 @@ public final class TestEnvironment {
 
     public TestRestTemplate restTemplate() {
         if (restTemplate == null) {
-            restTemplate = new TestRestTemplate("http://127.0.0.1:" + port());
+            // The scheme and address the server really listens on: https when it
+            // speaks TLS, and a DEFINED_PORT test's cn1.server.address when that
+            // binds one interface (a wildcard bind is reached at loopback).
+            String scheme = backend.getServer() != null && backend.getServer().isSecure()
+                    ? "https" : "http";
+            restTemplate = new TestRestTemplate(scheme + "://" + backend.getListenAddress() + ":" + port());
         }
         return restTemplate;
     }

@@ -64,6 +64,15 @@ final class Cors {
         this.maxAge = maxAge;
     }
 
+    /// Whether the server speaks TLS; set once, before it serves anything.
+    private boolean tls;
+
+    /// Records whether requests arrive over TLS, which decides the scheme of the
+    /// server's own origin.
+    void servedOverTls(boolean value) {
+        this.tls = value;
+    }
+
     /// The configured policy, or null when CORS is off.
     static Cors fromConfig(Config config) throws IOException {
         String listed = config.get(ALLOWED_ORIGINS, null);
@@ -133,7 +142,7 @@ final class Cors {
     /// A same-origin request carries an Origin too, and is not a CORS request.
     HttpServer.Response reject(HttpServer.Request request) {
         String origin = request.getHeader("Origin");
-        if (origin == null || sameOrigin(origin, request.getHeader("Host"))) {
+        if (origin == null || sameOrigin(origin, requestScheme(request), request.getHeader("Host"))) {
             return null;
         }
         String asked = request.getHeader("Access-Control-Request-Method");
@@ -167,18 +176,38 @@ final class Cors {
         return false;
     }
 
-    /// Whether `origin` names the server the request was sent to: its host and
-    /// port equal the Host header's, a default port written or not.
-    private static boolean sameOrigin(String origin, String host) {
+    /// The scheme the request was sent with: X-Forwarded-Proto when a TLS
+    /// terminating proxy names it -- the server itself then sees plain HTTP for a
+    /// page served over https -- else whether this server speaks TLS. A page
+    /// cannot put that header on a simple request, and a preflight carries only
+    /// the names of the headers to come.
+    private String requestScheme(HttpServer.Request request) {
+        String forwarded = request.getHeader("X-Forwarded-Proto");
+        if (forwarded != null) {
+            int comma = forwarded.indexOf(',');
+            String first = (comma < 0 ? forwarded : forwarded.substring(0, comma)).trim();
+            if (first.length() > 0) {
+                return first;
+            }
+        }
+        return tls ? "https" : "http";
+    }
+
+    /// Whether `origin` names the server the request was sent to: the same scheme,
+    /// and a host and port equal to the Host header's, a default port written or
+    /// not. Without the scheme, `http://api.example` calling the TLS server at
+    /// `https://api.example` -- a cross-origin request to a browser -- skipped
+    /// the policy altogether.
+    private static boolean sameOrigin(String origin, String requestScheme, String host) {
         if (host == null) {
             return false;
         }
         int scheme = origin.indexOf("://");
-        if (scheme < 0) {
+        if (scheme < 0 || !origin.substring(0, scheme).equalsIgnoreCase(requestScheme)) {
             return false;
         }
         String authority = origin.substring(scheme + 3);
-        boolean https = origin.regionMatches(true, 0, "https", 0, 5) && scheme == 5;
+        boolean https = "https".equalsIgnoreCase(requestScheme);
         return withoutDefaultPort(authority, https).equalsIgnoreCase(withoutDefaultPort(host.trim(), https));
     }
 

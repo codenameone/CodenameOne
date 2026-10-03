@@ -1886,9 +1886,15 @@ public final class Backend {
                         }
                     };
                 }
+                Cors cors = Cors.fromConfig(config);
+                if (cors != null) {
+                    // Whether a request arrives over TLS, for telling a same-origin
+                    // request from a cross-origin one: the scheme is part of an origin.
+                    cors.servedOverTls(context != null);
+                }
                 serving = new Serving(chain, sessions, tasks, requestLog, instrumented, app,
                         track, active != null ? active : Tracing.NONE, inFlight,
-                        Cors.fromConfig(config), Compression.fromConfig(config));
+                        cors, Compression.fromConfig(config));
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         serving, context, routes, active != null ? active : Tracing.NONE);
                 bound = true;

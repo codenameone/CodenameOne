@@ -999,6 +999,11 @@ final class BackendTestGenerator {
         if (!m.getDescriptor().startsWith("()")) {
             ctx.error(owner, owner.getSourceName() + "." + m.getName() + " takes parameters, "
                     + "which a compiled test cannot supply.");
+        } else if (!m.getDescriptor().endsWith("V")) {
+            // JUnit does not run a test or lifecycle method that returns a value; the
+            // runner would call it and report a pass the JVM run never gave.
+            ctx.error(owner, owner.getSourceName() + "." + m.getName() + " returns a value; a "
+                    + "test or lifecycle method is void, as JUnit requires.");
         }
     }
 

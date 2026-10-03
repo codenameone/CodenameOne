@@ -113,7 +113,10 @@ public abstract class BackendTestPackager extends BackendPackager {
 
     /// Whether the module has any test source to compile.
     public boolean hasTests() {
-        return !testSources().isEmpty();
+        // Kotlin sources count: a suite of only Kotlin tests is one the compiled run
+        // cannot compile, and must say so -- reported as "no test sources" it was
+        // silently left out, strict mode or not.
+        return !testSources().isEmpty() || !kotlinTestSources().isEmpty();
     }
 
     @Override

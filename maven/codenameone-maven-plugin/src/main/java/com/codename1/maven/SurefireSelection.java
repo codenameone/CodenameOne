@@ -81,7 +81,8 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
                     e = e.substring(1).trim();
                 }
                 String method = null;
-                int hash = e.indexOf('#');
+                boolean regex = e.startsWith(REGEX_PREFIX);
+                int hash = e.indexOf('#', regex ? Math.max(e.indexOf(']'), 0) : 0);
                 if (hash >= 0) {
                     method = e.substring(hash + 1).trim();
                     e = e.substring(0, hash);
@@ -89,8 +90,9 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
                 if (e.length() == 0) {
                     continue;
                 }
-                // A bare class name pattern names a class in any package.
-                String pattern = e.indexOf('/') >= 0 || e.endsWith(".java") ? e
+                // A bare class name pattern names a class in any package; a regex is
+                // Surefire's own syntax and is kept as written.
+                String pattern = regex || e.indexOf('/') >= 0 || e.endsWith(".java") ? e
                         : "**/" + e.replace('.', '/') + ".java";
                 if (method != null && method.length() > 0) {
                     // A method selector narrows a class rather than excluding it:
@@ -152,10 +154,9 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
             String cls = binaryName.substring(0, hash);
             return test(cls) && selectsMethod(cls, binaryName.substring(hash + 1));
         }
-        String path = binaryName.replace('.', '/') + ".java";
         boolean included = false;
         for (Pattern p : includes) {
-            if (p.matcher(path).matches()) {
+            if (matches(p, binaryName)) {
                 included = true;
                 break;
             }
@@ -164,7 +165,7 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
             return false;
         }
         for (Pattern p : excludes) {
-            if (p.matcher(path).matches()) {
+            if (matches(p, binaryName)) {
                 return false;
             }
         }
@@ -175,20 +176,19 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
     /// when the class was named whole or no method selector names it, else only the
     /// methods its selectors name -- and never one a `!` selector names.
     private boolean selectsMethod(String binaryName, String method) {
-        String path = binaryName.replace('.', '/') + ".java";
         for (Pattern[] m : excludedMethods) {
-            if (m[0].matcher(path).matches() && m[1].matcher(method).matches()) {
+            if (matches(m[0], binaryName) && m[1].matcher(method).matches()) {
                 return false;
             }
         }
         for (Pattern p : wholeClasses) {
-            if (p.matcher(path).matches()) {
+            if (matches(p, binaryName)) {
                 return true;
             }
         }
         boolean narrowed = false;
         for (Pattern[] m : methods) {
-            if (m[0].matcher(path).matches()) {
+            if (matches(m[0], binaryName)) {
                 if (m[1].matcher(method).matches()) {
                     return true;
                 }
@@ -226,7 +226,25 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
 
     /// An Ant-style path pattern as a regular expression. A `.class` pattern is
     /// read as its `.java` counterpart, as Surefire treats the two alike.
+    /// Whether `pattern` selects the class `binaryName`. A glob is matched against
+    /// the class's `.java` path, as Surefire matches it; a `%regex[...]` pattern
+    /// against its `.class` path, as Surefire documents for regex selection. A glob
+    /// always ends in `.java` (a `.class` one is read as such), so trying both
+    /// forms cannot widen what it selects.
+    private static boolean matches(Pattern pattern, String binaryName) {
+        String path = binaryName.replace('.', '/');
+        return pattern.matcher(path + ".java").matches() || pattern.matcher(path + ".class").matches();
+    }
+
+    private static final String REGEX_PREFIX = "%regex[";
+
     static Pattern glob(String pattern) {
+        if (pattern.startsWith(REGEX_PREFIX) && pattern.endsWith("]")) {
+            // Surefire's regex selection: the pattern between the brackets is a Java
+            // regular expression over the class's path. Fed to the glob converter its
+            // operators were literal characters, and it selected nothing at all.
+            return Pattern.compile(pattern.substring(REGEX_PREFIX.length(), pattern.length() - 1));
+        }
         String p = pattern.replace('\\', '/');
         if (p.endsWith(".class")) {
             p = p.substring(0, p.length() - ".class".length()) + ".java";

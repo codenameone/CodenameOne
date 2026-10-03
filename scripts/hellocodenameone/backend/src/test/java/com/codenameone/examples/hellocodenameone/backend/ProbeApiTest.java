@@ -169,6 +169,17 @@ class ProbeApiTest {
     }
 
     @Test
+    void anInvalidDeltaIsRefusedBeforeComparing() {
+        // Both runs fail on the delta itself, equal operands or not.
+        org.opentest4j.AssertionFailedError negative = org.junit.jupiter.api.Assertions.assertThrows(
+                org.opentest4j.AssertionFailedError.class,
+                () -> org.junit.jupiter.api.Assertions.assertEquals(1.0, 1.0, -1.0));
+        assertTrue(negative.getMessage().indexOf("positive delta expected") >= 0, negative.getMessage());
+        org.junit.jupiter.api.Assertions.assertThrows(org.opentest4j.AssertionFailedError.class,
+                () -> org.junit.jupiter.api.Assertions.assertEquals(1.0f, 1.0f, Float.NaN));
+    }
+
+    @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.
         assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});

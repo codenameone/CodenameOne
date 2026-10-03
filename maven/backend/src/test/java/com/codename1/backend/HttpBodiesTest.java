@@ -280,6 +280,16 @@ class HttpBodiesTest {
         String same = raw("POST /text HTTP/1.1\r\nHost: 127.0.0.1:" + port + "\r\nOrigin: http://127.0.0.1:"
                 + port + "\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
         assertTrue(same.startsWith("HTTP/1.1 200"), "a same-origin POST was refused: " + same);
+        // The same authority under another scheme is another origin: this server
+        // is plain HTTP, so an https page calling it is a CORS request.
+        String otherScheme = raw("POST /text HTTP/1.1\r\nHost: 127.0.0.1:" + port + "\r\nOrigin: https://127.0.0.1:"
+                + port + "\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
+        assertTrue(otherScheme.startsWith("HTTP/1.1 403"), "another scheme passed as same-origin: " + otherScheme);
+        // Behind a TLS terminating proxy that says so, the https page is the server itself.
+        String proxied = raw("POST /text HTTP/1.1\r\nHost: 127.0.0.1:" + port + "\r\nX-Forwarded-Proto: https\r\n"
+                + "Origin: https://127.0.0.1:" + port + "\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n"
+                + "Connection: close\r\n\r\nhi");
+        assertTrue(proxied.startsWith("HTTP/1.1 200"), "a proxied same-origin POST was refused: " + proxied);
     }
 
     @Test

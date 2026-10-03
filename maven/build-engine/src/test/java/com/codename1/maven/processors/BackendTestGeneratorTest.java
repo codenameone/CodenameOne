@@ -314,6 +314,30 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void aTestThatReturnsAValueIsABuildError() throws Exception {
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("t.ValueTest", "package t;\n"
+                + "public class ValueTest {\n"
+                + "    @org.junit.jupiter.api.Test int counts() { return 1; }\n"
+                + "}\n");
+        File tests = tmp.newFolder();
+        List<File> cp = new ArrayList<File>(classpath());
+        JavaSourceCompiler.compile(t, tests, cp);
+        List<String> elements = new ArrayList<String>();
+        elements.add(tests.getAbsolutePath());
+        for (File f : cp) {
+            elements.add(f.getAbsolutePath());
+        }
+        try {
+            BackendTests.process(tmp.newFolder(), tests, tmp.newFolder(), tmp.newFolder(),
+                    Collections.<String>emptyList(), "UTF-8", elements, true, new SystemStreamLog());
+            fail("a value-returning test was accepted for the compiled run");
+        } catch (BuildFailureException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("returns a value"));
+        }
+    }
+
+    @Test
     public void anAmbiguousInjectionIsABuildError() throws Exception {
         File classes = mainBuild(application());
         Map<String, String> t = new LinkedHashMap<String, String>();

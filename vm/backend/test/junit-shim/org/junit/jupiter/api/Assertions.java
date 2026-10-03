@@ -251,6 +251,7 @@ public final class Assertions {
     }
 
     public static void assertEquals(float expected, float actual, float delta, String message) {
+        checkDelta(delta);
         if (!Float.valueOf(expected).equals(Float.valueOf(actual))
                 && !(Math.abs(expected - actual) <= delta)) {
             notEqual(Float.valueOf(expected), Float.valueOf(actual), message);
@@ -279,6 +280,7 @@ public final class Assertions {
     }
 
     public static void assertEquals(double expected, double actual, double delta, String message) {
+        checkDelta(delta);
         if (!Double.valueOf(expected).equals(Double.valueOf(actual))
                 && !(Math.abs(expected - actual) <= delta)) {
             notEqual(Double.valueOf(expected), Double.valueOf(actual), message);
@@ -768,6 +770,16 @@ public final class Assertions {
     }
 
     // --------------------------------------------------------------- helpers
+
+    /// Refuses a negative or NaN delta before comparing, with JUnit 5.9's own
+    /// failure (measured: an AssertionFailedError, "positive delta expected but
+    /// was: <-1.0>"). Unchecked, equal operands passed and unequal ones reported a
+    /// mismatch, where the JVM run fails on the delta itself.
+    private static void checkDelta(double delta) {
+        if (Double.isNaN(delta) || delta < 0.0) {
+            throw new AssertionFailedError("positive delta expected but was: <" + delta + ">");
+        }
+    }
 
     /// Rethrows an OutOfMemoryError unchanged, as JUnit's UnrecoverableExceptions
     /// does wherever an assertion catches what it runs: wrapping it would allocate

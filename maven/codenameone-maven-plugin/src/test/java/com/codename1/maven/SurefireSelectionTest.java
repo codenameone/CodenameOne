@@ -80,6 +80,19 @@ class SurefireSelectionTest {
     }
 
     @Test
+    void aRegexIncludeSelectsAsSurefireDoes() {
+        SurefireSelection s = SurefireSelection.of(
+                project(new String[] {"%regex[.*(Cat|Dog).*Test.*]"}, null), null);
+        assertTrue(s.test("com.acme.CatFoodTest"));
+        assertTrue(s.test("com.acme.deep.DogWalkTest"));
+        assertFalse(s.test("com.acme.BirdTest"), "a class the regex does not match");
+        SurefireSelection dashD = SurefireSelection.of(project(null, null), "%regex[.*Cat.*]#feeds");
+        assertTrue(dashD.test("com.acme.CatTest#feeds"));
+        assertFalse(dashD.test("com.acme.CatTest#sleeps"));
+        assertFalse(dashD.test("com.acme.DogTest#feeds"));
+    }
+
+    @Test
     void aNegativeDashDTestEntryExcludes() {
         SurefireSelection s = SurefireSelection.of(project(null, null), "*Test, !SlowTest");
         assertTrue(s.test("com.acme.ApiTest"));
