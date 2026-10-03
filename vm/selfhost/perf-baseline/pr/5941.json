@@ -1,6 +1,23 @@
 {
  "pr": 5941,
  "rebaseline": {
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.9,
+      "time": 1.107
+     },
+     "memory": 1.167,
+     "reason": "hello's translation input now includes the Android compatibility gallery, its relocated android-compat runtime and the Kotlin stdlib, so both VMs translate a much larger app; ParparVM's peak follows the larger live set while JDK 25's stays near its heap-policy floor and swings 40-70% between its own rounds, so the ratio rose and widened",
+     "runs": 1,
+     "time": 1.107,
+     "tolerance": {
+      "memory": 0.25
+     }
+    }
+   }
+  },
   "windows-x64@amd64-family-25-model-1-authenticamd": {
    "hello": {
     "all": {
@@ -12,7 +29,7 @@
       }
      },
      "memory": 1.025,
-     "reason": "hello's translation input now includes the Android compatibility gallery, its relocated android-compat runtime and the Kotlin stdlib (about 60% more translation time on both VMs); ParparVM's peak follows the larger live set while JDK 25's stays near its heap-policy floor, and JDK's own rounds swing to 1.6-2 GB, so the ratio rose and widened",
+     "reason": "hello's translation input now includes the Android compatibility gallery, its relocated android-compat runtime and the Kotlin stdlib, so both VMs translate a much larger app; ParparVM's peak follows the larger live set while JDK 25's stays near its heap-policy floor and swings 40-70% between its own rounds, so the ratio rose and widened",
      "runs": 3,
      "time": 1.228,
      "tolerance": {
