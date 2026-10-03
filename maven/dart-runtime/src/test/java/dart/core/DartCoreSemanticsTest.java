@@ -27,6 +27,7 @@ import dart.math.DartMath;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -142,6 +143,24 @@ public class DartCoreSemanticsTest {
         assertEquals("/path", u.path());
         DartUri noPort = DartUri.parse("http://[2001:db8::7]/x");
         assertEquals("2001:db8::7", noPort.host());
+    }
+
+    @Test
+    public void aBracketedHostMustBeAnIpLiteral() {
+        // Expected values recorded from the Dart SDK (3.9).
+        assertNull(DartUri.tryParse("http://[not-an-ip]/"));
+        assertNull(DartUri.tryParse("http://[1::2::3]/"));
+        assertNull(DartUri.tryParse("http://[1:2:3:4:5:6:7::]/"), "the wildcard counts as a part");
+        assertNull(DartUri.tryParse("http://[12345::]/"));
+        assertNull(DartUri.tryParse("http://[::256.1.1.1]/"));
+        assertNull(DartUri.tryParse("http://[]/"));
+        assertNull(DartUri.tryParse("http://[::1%25a%zz]/"));
+        assertNull(DartUri.tryParse("http://[v1.]/"));
+        assertThrows(FormatException.class, () -> DartUri.parse("http://[bad]/"));
+        assertEquals("::ffff:192.168.1.1", DartUri.parse("http://[::ffff:192.168.1.1]/").host());
+        assertEquals("fe80::1%25en0", DartUri.parse("http://[FE80::1%en0]:80/").host());
+        assertEquals("::1%25Eth0", DartUri.parse("http://[::1%25Eth%30]/").host());
+        assertEquals("[vA.x]", DartUri.parse("http://[vA.x]/").host());
     }
 
     // --- RegExp.allMatches of an empty pattern --------------------------------

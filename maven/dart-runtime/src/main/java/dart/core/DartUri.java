@@ -265,6 +265,12 @@ public final class DartUri {
             if (close < 0) {
                 return "Missing end `]` to match `[` in host";
             }
+            // The brackets hold an IP literal, never a name: Dart rejects
+            // http://[not-an-ip]/ and this accepted anything between them.
+            String bad = bracketHostError(hostPort.substring(1, close));
+            if (bad != null) {
+                return bad;
+            }
             if (close + 1 < hostPort.length()) {
                 if (hostPort.charAt(close + 1) != ':') {
                     return "Invalid end of authority";
@@ -319,8 +325,9 @@ public final class DartUri {
             // without its brackets, and the port follows the closing bracket.
             int close = authority.startsWith("[") ? authority.indexOf(']') : -1;
             int pc = close >= 0 ? authority.indexOf(':', close) : authority.indexOf(':');
-            if (close >= 0) {
-                host = authority.substring(1, close);
+            boolean literal = close >= 0;
+            if (literal) {
+                host = bracketHost(authority.substring(1, close));
                 if (pc >= 0) {
                     explicitPort = true;
                     try {
@@ -343,9 +350,219 @@ public final class DartUri {
             // Dart canonicalises a registered name to lower case, so
             // https://EXAMPLE.COM/ and https://example.com/ have the same host --
             // host allowlists, route matches and host-keyed caches depend on it.
-            host = asciiLower(host);
+            if (!literal) {
+                host = asciiLower(host);
+            }
         }
         path = s;
+    }
+
+    /**
+     * Why the text between a host's brackets is not an address Dart's Uri accepts, or
+     * null. Mirrors the SDK's parser: an IPvFuture literal ({@code v1.x}), else an IPv6
+     * address -- at most one {@code ::}, groups of up to four hex digits, an optional
+     * dotted IPv4 tail -- optionally followed by a {@code %} zone ID.
+     */
+    static String bracketHostError(String c) {
+        if (c.startsWith("v")) {
+            int i = 1;
+            while (i < c.length() && hexValue(c.charAt(i)) >= 0) {
+                i++;
+            }
+            if (i == 1 || i >= c.length() || c.charAt(i) != '.' || i + 1 == c.length()) {
+                return "Invalid IPvFuture address";
+            }
+            for (int k = i + 1; k < c.length(); k++) {
+                char ch = c.charAt(k);
+                if (!isUnreserved(ch) && "!$&'()*+,;=:".indexOf(ch) < 0) {
+                    return "Invalid IPvFuture address character";
+                }
+            }
+            return null;
+        }
+        int zone = c.indexOf('%');
+        String bad = ipv6Error(c, zone >= 0 ? zone : c.length());
+        if (bad != null || zone < 0) {
+            return bad;
+        }
+        int z = c.startsWith("25", zone + 1) ? zone + 3 : zone + 1;
+        for (int i = z; i < c.length(); i++) {
+            if (c.charAt(i) == '%' && (i + 2 >= c.length() || hexValue(c.charAt(i + 1)) < 0
+                    || hexValue(c.charAt(i + 2)) < 0)) {
+                return "ZoneID should not contain % anymore";
+            }
+        }
+        return null;
+    }
+
+    /** The host Dart reports for a valid bracketed literal (see {@link #bracketHostError}). */
+    static String bracketHost(String c) {
+        if (c.startsWith("v")) {
+            // IPvFuture keeps its brackets and its case, as Dart's does.
+            return "[" + c + "]";
+        }
+        int zone = c.indexOf('%');
+        if (zone < 0) {
+            return asciiLower(c);
+        }
+        // The zone ID is introduced by an encoded '%' ("%25"); an escape of an
+        // unreserved character is decoded (lower case), others are upper-cased, and a
+        // character that is not unreserved is encoded.
+        StringBuilder out = new StringBuilder(asciiLower(c.substring(0, zone))).append("%25");
+        int i = c.startsWith("25", zone + 1) ? zone + 3 : zone + 1;
+        while (i < c.length()) {
+            char ch = c.charAt(i);
+            if (ch == '%' && i + 2 < c.length()) {
+                int v = hexValue(c.charAt(i + 1)) * 16 + hexValue(c.charAt(i + 2));
+                if (isUnreserved(v)) {
+                    out.append(v >= 'A' && v <= 'Z' ? (char) (v + ('a' - 'A')) : (char) v);
+                } else {
+                    percent(v, out);
+                }
+                i += 3;
+                continue;
+            }
+            if (isUnreserved(ch)) {
+                out.append(ch);
+            } else {
+                int cp = c.codePointAt(i);
+                utf8(cp, out);
+                i += Character.charCount(cp);
+                continue;
+            }
+            i++;
+        }
+        return out.toString();
+    }
+
+    /** Dart's parseIPv6Address over {@code c[0, end)}: an error message, or null when valid. */
+    private static String ipv6Error(String c, int end) {
+        int parts = 0;
+        boolean wildcard = false;
+        boolean lastWildcard = false;
+        boolean seenDot = false;
+        int partStart = 0;
+        for (int i = 0; i < end; i++) {
+            char ch = c.charAt(i);
+            if (ch == ':') {
+                if (i == 0) {
+                    // a leading ':' must open a "::"
+                    i++;
+                    if (i >= end || c.charAt(i) != ':') {
+                        return "Illegal IPv6 address, invalid start colon.";
+                    }
+                    partStart = i;
+                }
+                if (i == partStart) {
+                    if (wildcard) {
+                        return "Illegal IPv6 address, only one wildcard `::` is allowed";
+                    }
+                    wildcard = true;
+                    lastWildcard = true;
+                } else {
+                    if (!hexGroup(c, partStart, i)) {
+                        return "Illegal IPv6 address, invalid part";
+                    }
+                    lastWildcard = false;
+                }
+                parts++;
+                partStart = i + 1;
+            } else if (ch == '.') {
+                seenDot = true;
+            }
+        }
+        if (parts == 0) {
+            return "Illegal IPv6 address, too few parts";
+        }
+        boolean atEnd = partStart == end;
+        if (atEnd && !lastWildcard) {
+            return "Illegal IPv6 address, expected a part after last `:`";
+        }
+        if (!atEnd) {
+            if (!seenDot) {
+                if (!hexGroup(c, partStart, end)) {
+                    return "Illegal IPv6 address, invalid part";
+                }
+                parts++;
+            } else {
+                if (!ipv4(c, partStart, end)) {
+                    return "Illegal IPv4 address";
+                }
+                parts += 2;
+            }
+        }
+        // Dart counts the wildcard itself as a part.
+        if (wildcard ? parts > 7 : parts != 8) {
+            return "Illegal IPv6 address, wrong number of parts";
+        }
+        return null;
+    }
+
+    /**
+     * One IPv6 group as Dart reads it: at most four characters parsed by
+     * int.parse(radix: 16), which takes a sign, in 0..0xFFFF.
+     */
+    private static boolean hexGroup(String c, int from, int to) {
+        if (to - from > 4 || to <= from) {
+            return false;
+        }
+        boolean negative = false;
+        int i = from;
+        if (c.charAt(i) == '+' || c.charAt(i) == '-') {
+            negative = c.charAt(i) == '-';
+            i++;
+        }
+        if (i == to) {
+            return false;
+        }
+        int v = 0;
+        for (; i < to; i++) {
+            int d = hexValue(c.charAt(i));
+            if (d < 0) {
+                return false;
+            }
+            v = v * 16 + d;
+        }
+        return !negative || v == 0;
+    }
+
+    /** Dart's dotted IPv4 tail: exactly four decimal parts, each 0..255. */
+    private static boolean ipv4(String c, int from, int to) {
+        int dots = 0;
+        int partStart = from;
+        for (int i = from; i <= to; i++) {
+            if (i == to || c.charAt(i) == '.') {
+                if (i == partStart || i - partStart > 3 && !leadingZeros(c, partStart, i - 3)) {
+                    return false;
+                }
+                int v = 0;
+                for (int k = Math.max(partStart, i - 3); k < i; k++) {
+                    v = v * 10 + (c.charAt(k) - '0');
+                }
+                if (v > 255) {
+                    return false;
+                }
+                if (i < to) {
+                    dots++;
+                    if (dots > 3) {
+                        return false;
+                    }
+                }
+                partStart = i + 1;
+            } else if (c.charAt(i) < '0' || c.charAt(i) > '9') {
+                return false;
+            }
+        }
+        return dots == 3;
+    }
+
+    private static boolean leadingZeros(String c, int from, int to) {
+        for (int i = from; i < to; i++) {
+            if (c.charAt(i) != '0') {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
