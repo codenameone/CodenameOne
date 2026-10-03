@@ -96,25 +96,25 @@
      "from": {
       "value": 38015576
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
-     "runs": 2,
-     "value": 19288088
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "runs": 1,
+     "value": 19353616
     },
     "install_bytes": {
      "from": {
       "value": 145431213
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
-     "runs": 2,
-     "value": 114736933
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "runs": 1,
+     "value": 114802461
     },
     "wire_bytes": {
      "from": {
       "value": 110425140
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
-     "runs": 2,
-     "value": 84339699
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "runs": 1,
+     "value": 84356652
     }
    }
   },
@@ -124,25 +124,25 @@
      "from": {
       "value": 12910326
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
-     "runs": 2,
-     "value": 12749524
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "runs": 1,
+     "value": 12755936
     },
     "install_bytes": {
      "from": {
       "value": 110000963
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
-     "runs": 2,
-     "value": 108035821
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "runs": 1,
+     "value": 108042233
     },
     "wire_bytes": {
      "from": {
       "value": 80610118
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
-     "runs": 2,
-     "value": 79699243
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "runs": 1,
+     "value": 79700879
     }
    }
   },
@@ -152,25 +152,25 @@
      "from": {
       "value": 18958610
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
      "runs": 1,
-     "value": 14375154
+     "value": 14471954
     },
     "install_bytes": {
      "from": {
       "value": 119594984
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
      "runs": 1,
-     "value": 116189664
+     "value": 116288608
     },
     "wire_bytes": {
      "from": {
       "value": 95706942
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
      "runs": 1,
-     "value": 84650942
+     "value": 84659845
     }
    }
   },
@@ -208,17 +208,17 @@
      "from": {
       "value": 17088000
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
-     "runs": 2,
-     "value": 13228544
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "runs": 1,
+     "value": 13283328
     },
     "install_bytes": {
      "from": {
       "value": 116684800
      },
-     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
-     "runs": 2,
-     "value": 114205184
+     "reason": "transpiler correctness fixes (lazy operands evaluated where Dart evaluates them, a failing lazy initialiser re-runs, null-aware writes short, setter writes as values): the gallery builds only the taken conditional arm and keeps an unwind handler in the 29 lazy getters whose initialiser can throw; run 37100770442 at 33c52ee2c8, compiled classes identical at e028a96b3d",
+     "runs": 1,
+     "value": 114260992
     },
     "wire_bytes": {
      "from": {
