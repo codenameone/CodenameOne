@@ -1587,13 +1587,19 @@ public final class JavaEmitter {
             // statement, so lower it to an if/else.
             if (ex instanceof Conditional) {
                 Conditional c = (Conditional) ex;
-                Out thenO = emitExpr(c.thenExpr, null, ctx);
-                Out elseO = emitExpr(c.elseExpr, null, ctx);
+                // Each arm's lifted statements are kept apart and placed inside its own
+                // branch; when the arms are not void they are discarded, since the
+                // conditional is emitted again below as an ordinary expression.
+                Lazy thenL = emitLazyOperand(c.thenExpr, null, ctx, 1);
+                Lazy elseL = emitLazyOperand(c.elseExpr, null, ctx, 1);
+                Out thenO = thenL.out;
+                Out elseO = elseL.out;
                 boolean voidArms = (thenO.type != null && thenO.type.is("void"))
                         || (elseO.type != null && elseO.type.is("void"));
                 if (voidArms) {
                     Out cond = emitExpr(c.condition, TypeRef.BOOL, ctx);
                     w.line("if (" + cond.code + ") {");
+                    w.raw(thenL.lifted);
                     ctx.indent(1);
                     String tc = statementize(thenO.code);
                     if (!tc.isEmpty()) {
@@ -1601,6 +1607,7 @@ public final class JavaEmitter {
                     }
                     ctx.indent(-1);
                     w.line("} else {");
+                    w.raw(elseL.lifted);
                     ctx.indent(1);
                     String ec = statementize(elseO.code);
                     if (!ec.isEmpty()) {
@@ -1715,9 +1722,20 @@ public final class JavaEmitter {
             w.line("}");
         } else if (s instanceof WhileStmt) {
             WhileStmt wh = (WhileStmt) s;
-            Out c = emitExpr(wh.condition, TypeRef.BOOL, ctx);
-            w.line("while (" + c.code + ") {");
-            ctx.indent(1);
+            Lazy c = emitLazyOperand(wh.condition, TypeRef.BOOL, ctx, 1);
+            if (!c.lifts()) {
+                w.line("while (" + c.out.code + ") {");
+                ctx.indent(1);
+            } else {
+                // The condition's lifted statements belong to every test, not to the
+                // first one only: run them at the top of each pass, then test.
+                w.line("while (true) {");
+                w.raw(c.lifted);
+                ctx.indent(1);
+                w.line("if (!(" + c.out.code + ")) {");
+                w.line("    break;");
+                w.line("}");
+            }
             ctx.pushScope();
             ctx.pushBreakTarget(null);
             emitStatement(unwrapBlock(wh.body), ctx);
@@ -1747,30 +1765,26 @@ public final class JavaEmitter {
             } else if (f.init instanceof ExprStmt) {
                 initCode = statementize(emitExpr(((ExprStmt) f.init).expr, null, ctx).code);
             }
-            String cond = f.condition != null ? emitExpr(f.condition, TypeRef.BOOL, ctx).code : "";
-            StringBuilder updates = new StringBuilder();
-            for (int i = 0; i < f.updates.size(); i++) {
-                if (i > 0) {
-                    updates.append(", ");
+            final String forVarDart$ = forVarDart;
+            final String forVarJava$ = forVarJava;
+            final TypeRef forVarType$ = forVarType;
+            final ForStmt f$ = f;
+            emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
+                public void run() {
+                    // Dart binds the loop variable fresh each iteration, so a closure in the
+                    // body captures a distinct value per pass. The Java loop variable is
+                    // reassigned by the update clause (not effectively final), so emit a
+                    // per-iteration final alias and route body references through it.
+                    if (forVarDart$ != null && CaptureScan.readInLambda(f$.body, forVarDart$)) {
+                        String alias = ctx.declareShadowSafe(forVarDart$, forVarType$);
+                        ctx.writer().line("final " + javaType(forVarType$, false, ctx) + " " + alias
+                                + " = " + forVarJava$ + ";");
+                    }
+                    ctx.pushBreakTarget(null);
+                    emitStatement(unwrapBlock(f$.body), ctx);
+                    ctx.popBreakTarget();
                 }
-                updates.append(statementize(emitExpr(f.updates.get(i), null, ctx).code));
-            }
-            w.line("for (" + initCode + "; " + cond + "; " + updates + ") {");
-            ctx.indent(1);
-            // Dart binds the loop variable fresh each iteration, so a closure in the
-            // body captures a distinct value per pass. The Java loop variable is
-            // reassigned by the update clause (not effectively final), so emit a
-            // per-iteration final alias and route body references through it.
-            if (forVarDart != null && CaptureScan.readInLambda(f.body, forVarDart)) {
-                String alias = ctx.declareShadowSafe(forVarDart, forVarType);
-                w.line("final " + javaType(forVarType, false, ctx) + " " + alias
-                        + " = " + forVarJava + ";");
-            }
-            ctx.pushBreakTarget(null);
-            emitStatement(unwrapBlock(f.body), ctx);
-            ctx.popBreakTarget();
-            ctx.indent(-1);
-            w.line("}");
+            });
             ctx.popScope();
         } else if (s instanceof ForInStmt
                 && isIndexedRecordFor(((ForInStmt) s).pattern, ((ForInStmt) s).iterable)) {
@@ -2891,14 +2905,42 @@ public final class JavaEmitter {
             Out cond = emitExpr(c.condition, TypeRef.BOOL, ctx);
             // `x is T ? x.member : ...` promotes x to T in the then-branch.
             List<Object[]> undo = applyGuardPromotions(c.condition, ctx);
-            Out a = emitExpr(c.thenExpr, expected, ctx);
+            Lazy la = emitLazyOperand(c.thenExpr, expected, ctx, 1);
             restorePromotions(undo, ctx);
-            Out b = emitExpr(c.elseExpr, expected, ctx);
+            Lazy lb = emitLazyOperand(c.elseExpr, expected, ctx, 1);
+            Out a = la.out;
+            Out b = lb.out;
             TypeRef t = conditionalType(a.type, b.type, expected);
             boolean mixedNumeric = a.type != null && b.type != null
                     && ((a.type.is("int") && b.type.is("double")) || (a.type.is("double") && b.type.is("int")))
                     && expected != null
                     && (expected.is("Object") || expected.is("num") || expected.is("dynamic"));
+            if (la.lifts() || lb.lifts()) {
+                // An arm lifted statements: they belong to that arm alone, so the
+                // conditional becomes an if/else assigning a temp.
+                String jt = mixedNumeric ? "Number" : declarableType(t, false, ctx);
+                Ctx.Writer w = ctx.writer();
+                if (jt == null) {
+                    // No temp can hold the value; keep the old, eager form.
+                    w.raw(la.lifted);
+                    w.raw(lb.lifted);
+                } else {
+                    String r = ctx.newTemp();
+                    w.line(jt + " " + r + ";");
+                    w.line("if (" + cond.code + ") {");
+                    w.raw(la.lifted);
+                    ctx.indent(1);
+                    w.line(r + " = " + (mixedNumeric ? "(Number) " + paren(a.code) : coerce(a, t, ctx)) + ";");
+                    ctx.indent(-1);
+                    w.line("} else {");
+                    w.raw(lb.lifted);
+                    ctx.indent(1);
+                    w.line(r + " = " + (mixedNumeric ? "(Number) " + paren(b.code) : coerce(b, t, ctx)) + ";");
+                    ctx.indent(-1);
+                    w.line("}");
+                    return new Out(r, t);
+                }
+            }
             if (mixedNumeric) {
                 // An int arm and a double arm STORED as num or Object: Java's ternary
                 // would promote the int to double even when that arm is chosen, so
@@ -3071,6 +3113,13 @@ public final class JavaEmitter {
         }
         if (structured) {
             if (elem == null) {
+                // No type argument and no context: Dart infers the element type from
+                // the elements. Built as List<dynamic> instead, `x == null ? <int>[] :
+                // [...x]` held a DartList where its int type promised a DartLongList,
+                // and the cast to it failed.
+                elem = structuredElementTypeQuiet(l.elements, ctx);
+            }
+            if (elem == null) {
                 elem = TypeRef.DYNAMIC;
             }
             String tmp = ctx.newTemp();
@@ -3121,6 +3170,62 @@ public final class JavaEmitter {
         }
         sb.append(')');
         return new Out(sb.toString(), TypeRef.of("List", elem));
+    }
+
+    /**
+     * The element type every element of an untyped collection literal agrees on --
+     * a spread of a typed variable, a literal, a typed variable, an if-element whose
+     * branches agree -- or null when any of them cannot be told without emitting it.
+     */
+    private TypeRef structuredElementTypeQuiet(List<Expr> elements, Ctx ctx) {
+        TypeRef common = null;
+        for (Expr e : elements) {
+            TypeRef t = elementTypeQuiet(e, ctx);
+            if (t == null || isDynamicType(t)) {
+                return null;
+            }
+            if (common == null) {
+                common = t;
+            } else if (!common.toString().equals(t.toString())) {
+                return null;
+            }
+        }
+        return common;
+    }
+
+    private TypeRef elementTypeQuiet(Expr e, Ctx ctx) {
+        if (e instanceof SpreadElement) {
+            TypeRef st = inferExprTypeQuiet(((SpreadElement) e).expr, ctx);
+            if (st != null && (st.is("List") || st.is("Set") || st.is("Iterable")) && st.args.size() == 1) {
+                return st.arg(0);
+            }
+            return null;
+        }
+        if (e instanceof IfElement) {
+            IfElement i = (IfElement) e;
+            TypeRef a = elementTypeQuiet(i.thenElement, ctx);
+            if (i.elseElement == null || a == null) {
+                return a;
+            }
+            TypeRef b = elementTypeQuiet(i.elseElement, ctx);
+            return b != null && a.toString().equals(b.toString()) ? a : null;
+        }
+        if (e instanceof IntLit) {
+            return TypeRef.INT;
+        }
+        if (e instanceof DoubleLit) {
+            return TypeRef.DOUBLE;
+        }
+        if (e instanceof BoolLit) {
+            return TypeRef.BOOL;
+        }
+        if (e instanceof StringLit) {
+            return TypeRef.STRING;
+        }
+        if (e instanceof Ident) {
+            return inferExprTypeQuiet(e, ctx);
+        }
+        return null;
     }
 
     /** Lowers one collection element (plain / spread / if / for) to adds on the builder list. */
@@ -3212,19 +3317,11 @@ public final class JavaEmitter {
                 } else if (f.init instanceof ExprStmt) {
                     initCode = statementize(emitExpr(((ExprStmt) f.init).expr, null, ctx).code);
                 }
-                String cond = f.condition != null ? emitExpr(f.condition, TypeRef.BOOL, ctx).code : "";
-                StringBuilder updates = new StringBuilder();
-                for (int i = 0; i < f.updates.size(); i++) {
-                    if (i > 0) {
-                        updates.append(", ");
+                emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
+                    public void run() {
+                        emitListElementInto(list$, f.body, elem$, ctx);
                     }
-                    updates.append(statementize(emitExpr(f.updates.get(i), null, ctx).code));
-                }
-                w.line("for (" + initCode + "; " + cond + "; " + updates + ") {");
-                ctx.indent(1);
-                emitListElementInto(list, f.body, elem, ctx);
-                ctx.indent(-1);
-                w.line("}");
+                });
             }
             ctx.popScope();
             return;
@@ -3369,19 +3466,11 @@ public final class JavaEmitter {
                 } else if (f.init instanceof ExprStmt) {
                     initCode = statementize(emitExpr(((ExprStmt) f.init).expr, null, ctx).code);
                 }
-                String cond = f.condition != null ? emitExpr(f.condition, TypeRef.BOOL, ctx).code : "";
-                StringBuilder updates = new StringBuilder();
-                for (int i = 0; i < f.updates.size(); i++) {
-                    if (i > 0) {
-                        updates.append(", ");
+                emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
+                    public void run() {
+                        emitSetElementInto(set$, f.body, elem$, ctx);
                     }
-                    updates.append(statementize(emitExpr(f.updates.get(i), null, ctx).code));
-                }
-                w.line("for (" + initCode + "; " + cond + "; " + updates + ") {");
-                ctx.indent(1);
-                emitSetElementInto(set, f.body, elem, ctx);
-                ctx.indent(-1);
-                w.line("}");
+                });
             }
             ctx.popScope();
             return;
@@ -3555,19 +3644,11 @@ public final class JavaEmitter {
                 } else if (f.init instanceof ExprStmt) {
                     initCode = statementize(emitExpr(((ExprStmt) f.init).expr, null, ctx).code);
                 }
-                String cond = f.condition != null ? emitExpr(f.condition, TypeRef.BOOL, ctx).code : "";
-                StringBuilder updates = new StringBuilder();
-                for (int i = 0; i < f.updates.size(); i++) {
-                    if (i > 0) {
-                        updates.append(", ");
+                emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
+                    public void run() {
+                        emitMapElementInto(map$, f.body, kt$, vt$, ctx);
                     }
-                    updates.append(statementize(emitExpr(f.updates.get(i), null, ctx).code));
-                }
-                w.line("for (" + initCode + "; " + cond + "; " + updates + ") {");
-                ctx.indent(1);
-                emitMapElementInto(map, f.body, kt, vt, ctx);
-                ctx.indent(-1);
-                w.line("}");
+                });
             }
             ctx.popScope();
             return;
@@ -4373,7 +4454,9 @@ public final class JavaEmitter {
         String cur = ctx.newTemp();
         ctx.writer().line(javaType(rt, true, ctx) + " " + cur + ";");
         inline.add(cur + " = " + read.code);
+        ctx.pushWriter(ctx.currentIndent() + 1);
         Out write = emitAssign(plainAssign(a, lhs), ctx);
+        String writeLifted = ctx.popWriter();
         boolean yieldsValue = write.code.startsWith(read.code + " = ");
         if (lhs instanceof IndexGet) {
             String receiver = emitExpr(((IndexGet) lhs).target, null, ctx).code;
@@ -4388,6 +4471,19 @@ public final class JavaEmitter {
         for (int k = inline.size() - 1; k >= 0; k--) {
             chain = "DartRuntime.seq(" + inline.get(k) + ", " + chain + ")";
         }
+        if (!writeLifted.isEmpty()) {
+            // The written value lifted statements (`m[k] ??= [...load()]`), which must
+            // run only when the slot is null: an if, which the enclosing operand's own
+            // handling (emitLazyOperand) places wherever this value is evaluated.
+            Ctx.Writer w = ctx.writer();
+            w.line("if (!(" + chain + " && " + cur + " != null)) {");
+            w.raw(writeLifted);
+            ctx.indent(1);
+            w.line(cur + " = " + write.code + ";");
+            ctx.indent(-1);
+            w.line("}");
+            return new Out(cur, rt);
+        }
         return new Out("(" + chain + " && " + cur + " != null ? " + cur + " : (" + write.code + "))", rt);
     }
 
@@ -4398,8 +4494,30 @@ public final class JavaEmitter {
         // ??= on a variable: a local or field is a valid Java assignment target.
         if (a.op.equals("??=")) {
             Out lhs = emitExpr(a.lhs, null, ctx);
-            Out rhs = emitExpr(a.rhs, lhs.type, ctx);
-            if (lhs.code.endsWith("()") && lhs.code.contains(".get$")) {
+            Lazy rl = emitLazyOperand(a.rhs, lhs.type, ctx, 1);
+            Out rhs = rl.out;
+            boolean accessor = lhs.code.endsWith("()") && lhs.code.contains(".get$");
+            if (rl.lifts()) {
+                // The value lifted statements (`cache ??= [...load()]`); they run only
+                // when the variable is null, so the write becomes an if.
+                String write;
+                if (accessor) {
+                    String base = lhs.code.substring(0, lhs.code.lastIndexOf(".get$"));
+                    String prop = lhs.code.substring(lhs.code.lastIndexOf(".get$") + 5, lhs.code.length() - 2);
+                    write = base + ".set$" + prop + "(" + coerce(rhs, lhs.type, ctx) + ")";
+                } else {
+                    write = lhs.code + " = " + rhs.code;
+                }
+                Ctx.Writer w = ctx.writer();
+                w.line("if (" + lhs.code + " == null) {");
+                w.raw(rl.lifted);
+                ctx.indent(1);
+                w.line(write + ";");
+                ctx.indent(-1);
+                w.line("}");
+                return new Out("(" + lhs.code + ")", lhs.type);
+            }
+            if (accessor) {
                 // A lazily initialised static or top-level is an accessor pair; its
                 // setter answers the stored value.
                 String base = lhs.code.substring(0, lhs.code.lastIndexOf(".get$"));
@@ -4649,6 +4767,195 @@ public final class JavaEmitter {
         return null;
     }
 
+    /** An operand emitted by {@link #emitLazyOperand}, and the statements it lifted. */
+    private static final class Lazy {
+        final Out out;
+        /** Already indented; empty when the operand lifted nothing. */
+        final String lifted;
+
+        Lazy(Out out, String lifted) {
+            this.out = out;
+            this.lifted = lifted;
+        }
+
+        boolean lifts() {
+            return !lifted.isEmpty();
+        }
+    }
+
+    /**
+     * Emits an operand Java evaluates only sometimes, or more than once -- a
+     * conditional's arm, the right side of {@code && || ??}, a null-short's call, a
+     * loop condition or update -- keeping apart whatever statements its emission
+     * lifts (a compound index assignment's receiver temps, a spread list's builder,
+     * a cascade, a named-argument constructor). Lifted into the enclosing statement
+     * they ran once and unconditionally: {@code while ((xs[next()] += 1) < 10)} called
+     * next() once, {@code false && (a[f()] += 1) > 0} still called f(), and
+     * {@code xs == null ? <int>[] : [...xs]} spread a null list before the test.
+     * The caller must run {@code lifted} exactly where the operand is evaluated; with
+     * nothing lifted the operand is emitted exactly as it always was.
+     *
+     * @param depth how many blocks deeper than the current statement the caller will
+     *              place the lifted lines, for their indentation
+     */
+    private Lazy emitLazyOperand(Expr e, TypeRef expected, Ctx ctx, int depth) {
+        ctx.pushWriter(ctx.currentIndent() + depth);
+        Out o = emitExpr(e, expected, ctx);
+        return new Lazy(o, ctx.popWriter());
+    }
+
+    /** A Java type a temp can be declared with for {@code t}, or null when there is none. */
+    private String declarableType(TypeRef t, boolean boxed, Ctx ctx) {
+        if (t == null || t.is("var") || t.is("void") || t.funcParams != null || t.is("Function")) {
+            return null;
+        }
+        return javaType(t, boxed, ctx);
+    }
+
+    /**
+     * {@code called}, whose emission lifted {@code lifted}, evaluated only while
+     * {@code guard} is non-null: the tail of a null-short ({@code a?.add([...xs])}),
+     * whose arguments Dart never evaluates when {@code a} is null. Returns null --
+     * after appending the lines unguarded, as before -- when no temp can hold the
+     * result.
+     */
+    private Out guardLifted(String guard, String lifted, Out called, Ctx ctx) {
+        Ctx.Writer w = ctx.writer();
+        if (called.type == null || called.type.is("void") || called.code == null || called.code.isEmpty()) {
+            w.line("if (" + guard + " != null) {");
+            w.raw(lifted);
+            String code = called.code == null ? "" : statementize(called.code);
+            if (!code.isEmpty()) {
+                ctx.indent(1);
+                w.line(code + ";");
+                ctx.indent(-1);
+            }
+            w.line("}");
+            return new Out("", TypeRef.VOID);
+        }
+        TypeRef bt = boxType(called.type);
+        String jt = declarableType(bt, true, ctx);
+        if (jt == null) {
+            w.raw(lifted);
+            return null;
+        }
+        String r = ctx.newTemp();
+        w.line(jt + " " + r + " = null;");
+        w.line("if (" + guard + " != null) {");
+        w.raw(lifted);
+        ctx.indent(1);
+        w.line(r + " = " + called.code + ";");
+        ctx.indent(-1);
+        w.line("}");
+        return new Out(r, bt, called.fromError, guard);
+    }
+
+    /**
+     * Writes a C-style {@code for} loop -- statement or collection element -- and runs
+     * {@code body} inside it. A condition or update that lifts statements (see
+     * {@link #emitLazyOperand}) has them run on every evaluation: the condition moves
+     * into the body as {@code if (!(cond)) break;}, after its lines, and lifting
+     * updates run at the top of every pass but the first. A {@code continue} still
+     * reaches both, since each sits where the loop restarts.
+     */
+    private void emitCForLoop(String initCode, Expr condition, List<Expr> updates, Ctx ctx, Runnable body) {
+        Ctx.Writer w = ctx.writer();
+        Lazy cond = condition != null ? emitLazyOperand(condition, TypeRef.BOOL, ctx, 1) : null;
+        List<Lazy> ups = new ArrayList<Lazy>();
+        boolean updatesLift = false;
+        for (Expr u : updates) {
+            Lazy l = emitLazyOperand(u, null, ctx, 2);
+            ups.add(l);
+            updatesLift |= l.lifts();
+        }
+        boolean condLifts = cond != null && cond.lifts();
+        if (!condLifts && !updatesLift) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < ups.size(); i++) {
+                if (i > 0) {
+                    sb.append(", ");
+                }
+                sb.append(statementize(ups.get(i).out.code));
+            }
+            w.line("for (" + initCode + "; " + (cond != null ? cond.out.code : "") + "; " + sb + ") {");
+            ctx.indent(1);
+        } else {
+            if (updatesLift) {
+                String first = ctx.newTemp();
+                w.line("boolean " + first + " = true;");
+                w.line("for (" + initCode + "; ; ) {");
+                ctx.indent(1);
+                w.line("if (!" + first + ") {");
+                for (Lazy l : ups) {
+                    w.raw(l.lifted);
+                    String code = statementize(l.out.code);
+                    if (!code.isEmpty()) {
+                        ctx.indent(1);
+                        w.line(code + ";");
+                        ctx.indent(-1);
+                    }
+                }
+                w.line("}");
+                w.line(first + " = false;");
+            } else {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < ups.size(); i++) {
+                    if (i > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(statementize(ups.get(i).out.code));
+                }
+                w.line("for (" + initCode + "; ; " + sb + ") {");
+                ctx.indent(1);
+            }
+            if (cond != null) {
+                w.raw(cond.lifted);
+                w.line("if (!(" + cond.out.code + ")) {");
+                ctx.indent(1);
+                w.line("break;");
+                ctx.indent(-1);
+                w.line("}");
+            }
+        }
+        body.run();
+        ctx.indent(-1);
+        w.line("}");
+    }
+
+    /**
+     * {@code a ?? b} whose default lifted statements: {@code tmp = a; if (tmp == null)
+     * { <lifted>; tmp = b; }}. {@code jt} declares {@code tmp} here, or is null when
+     * the caller already declared it.
+     */
+    private Out nullCoalesceLifted(String jt, String tmp, Out left, Lazy right, Ctx ctx) {
+        Ctx.Writer w = ctx.writer();
+        w.line((jt != null ? jt + " " : "") + tmp + " = " + left.code + ";");
+        w.line("if (" + tmp + " == null) {");
+        w.raw(right.lifted);
+        ctx.indent(1);
+        w.line(tmp + " = " + right.out.code + ";");
+        ctx.indent(-1);
+        w.line("}");
+        return new Out(tmp, copyNonNull(left.type));
+    }
+
+    /**
+     * {@code l && r} (or {@code l || r}) whose right operand lifted statements: they
+     * run only when the left side does not decide the result, as Dart evaluates it.
+     */
+    private Out shortCircuitLifted(Out l, Lazy r, boolean and, Ctx ctx) {
+        Ctx.Writer w = ctx.writer();
+        String tmp = ctx.newTemp();
+        w.line("boolean " + tmp + " = " + logicalOperand(l, ctx) + ";");
+        w.line("if (" + (and ? tmp : "!" + tmp) + ") {");
+        w.raw(r.lifted);
+        ctx.indent(1);
+        w.line(tmp + " = " + logicalOperand(r.out, ctx) + ";");
+        ctx.indent(-1);
+        w.line("}");
+        return new Out(tmp, TypeRef.BOOL);
+    }
+
     private Out emitBinary(Binary b, Ctx ctx) {
         if (b.op.equals("??")) {
             // Peephole: (m[k] ?? literal) on a primitive Map<int,int> -> getLongOr(k, literal),
@@ -4670,15 +4977,23 @@ public final class JavaEmitter {
             // before the enclosing statement instead: `while (next() ?? false)` tested
             // one stale value forever, and `false && (f() ?? true)` still called f().
             // Only the temp's declaration is lifted now; the assignment stays inline.
+            // The default can lift statements of its own (`xs ?? [...fallback()]`); they
+            // must run only when the left side is null, so then the whole operator
+            // becomes `tmp = a; if (tmp == null) { <lifted>; tmp = b; }`.
             Out right;
+            TypeRef lt = left.type;
+            String jt = lt == null || lt.is("var") || lt.funcParams != null ? null : javaType(lt, true, ctx);
             if (b.left instanceof Ident || b.left instanceof ThisExpr) {
                 // A variable read has no effect and nothing to cache.
-                right = emitExpr(b.right, left.type, ctx);
+                Lazy rl = emitLazyOperand(b.right, left.type, ctx, 1);
+                if (rl.lifts() && jt != null) {
+                    return nullCoalesceLifted(jt, ctx.newTemp(), left, rl, ctx);
+                }
+                ctx.writer().raw(rl.lifted);
+                right = rl.out;
                 return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code + ")",
                         copyNonNull(left.type));
             }
-            TypeRef lt = left.type;
-            String jt = lt == null || lt.is("var") || lt.funcParams != null ? null : javaType(lt, true, ctx);
             String tmp = ctx.newTemp();
             if (jt == null) {
                 // A type javac infers but this emitter cannot name: no declaration can
@@ -4689,7 +5004,11 @@ public final class JavaEmitter {
                         copyNonNull(left.type));
             }
             ctx.writer().line(jt + " " + tmp + ";");
-            right = emitExpr(b.right, left.type, ctx);
+            Lazy rl = emitLazyOperand(b.right, left.type, ctx, 1);
+            if (rl.lifts()) {
+                return nullCoalesceLifted(null, tmp, left, rl, ctx);
+            }
+            right = rl.out;
             return new Out("((" + tmp + " = " + left.code + ") != null ? " + tmp + " : " + right.code + ")",
                     copyNonNull(left.type));
         }
@@ -4697,9 +5016,12 @@ public final class JavaEmitter {
             // `x is T && x.member`: the left `is` guard flow-promotes x to T for the right operand.
             Out l = emitExpr(b.left, null, ctx);
             List<Object[]> undo = applyGuardPromotions(b.left, ctx);
-            Out r = emitExpr(b.right, null, ctx);
+            Lazy r = emitLazyOperand(b.right, null, ctx, 1);
             restorePromotions(undo, ctx);
-            return new Out(logicalOperand(l, ctx) + " && " + logicalOperand(r, ctx), TypeRef.BOOL);
+            if (r.lifts()) {
+                return shortCircuitLifted(l, r, true, ctx);
+            }
+            return new Out(logicalOperand(l, ctx) + " && " + logicalOperand(r.out, ctx), TypeRef.BOOL);
         }
         if (b.op.equals("||")) {
             // `x is! T || x.member`: reaching the right operand means the left was false,
@@ -4707,9 +5029,12 @@ public final class JavaEmitter {
             Out l = emitExpr(b.left, null, ctx);
             List<Object[]> undo = new ArrayList<Object[]>();
             collectNegativePromotions(b.left, ctx, undo);
-            Out r = emitExpr(b.right, null, ctx);
+            Lazy r = emitLazyOperand(b.right, null, ctx, 1);
             restorePromotions(undo, ctx);
-            return new Out(logicalOperand(l, ctx) + " || " + logicalOperand(r, ctx), TypeRef.BOOL);
+            if (r.lifts()) {
+                return shortCircuitLifted(l, r, false, ctx);
+            }
+            return new Out(logicalOperand(l, ctx) + " || " + logicalOperand(r.out, ctx), TypeRef.BOOL);
         }
         Out l = emitExpr(b.left, null, ctx);
         Out r = emitExpr(b.right, null, ctx);
@@ -5331,8 +5656,18 @@ public final class JavaEmitter {
             Out mat = materializeShort(target);
             String tmp = ctx.newTemp();
             ctx.writer().line("var " + tmp + " = " + mat.code + ";");
+            // The arguments are evaluated only when the receiver is non-null, so any
+            // statements they lift (`a?.addAll([...xs])`) go inside the guard.
+            ctx.pushWriter(ctx.currentIndent() + 1);
             Out called = emitMethodCallOn(
                     new Out(tmp, copyNonNull(mat.type), mat.fromError), c, ctx);
+            String lifted = ctx.popWriter();
+            if (!lifted.isEmpty()) {
+                Out guarded = guardLifted(tmp, lifted, called, ctx);
+                if (guarded != null) {
+                    return guarded;
+                }
+            }
             if (called.code == null || called.code.isEmpty()) {
                 // The callee emitted its own guarded statement (the function-valued `call`
                 // path does this) - there is no expression left to short.
@@ -5346,9 +5681,21 @@ public final class JavaEmitter {
             }
             return new Out(called.code, boxType(called.type), called.fromError, tmp);
         }
-        Out result = emitMethodCallOn(target, c, ctx);
-        // a plain method call after a `?.` stays inside the short (a?.b.c())
-        return result.withShort(target.shortGuard);
+        if (target.shortGuard != null) {
+            // a plain method call after a `?.` stays inside the short (a?.b.c()), and so
+            // do any statements its arguments lift
+            ctx.pushWriter(ctx.currentIndent() + 1);
+            Out result = emitMethodCallOn(target, c, ctx);
+            String lifted = ctx.popWriter();
+            if (!lifted.isEmpty()) {
+                Out guarded = guardLifted(target.shortGuard, lifted, result, ctx);
+                if (guarded != null) {
+                    return guarded;
+                }
+            }
+            return result.withShort(target.shortGuard);
+        }
+        return emitMethodCallOn(target, c, ctx);
     }
 
     /**
@@ -5727,16 +6074,30 @@ public final class JavaEmitter {
             if (c.nullAware) {
                 String tmp = ctx.newTemp();
                 ctx.writer().line("var " + tmp + " = " + target.code + ";");
+                // Arguments run only for a non-null callback; what they lift goes
+                // inside the guard.
+                ctx.pushWriter(ctx.currentIndent() + 1);
+                String args = plainArgs(c.args, ctx);
+                String lifted = ctx.popWriter();
                 // A void (or untyped-`Function`, whose void return was erased) callback is
                 // fire-and-forget in statement position: guard with an `if` so a void SAM
                 // isn't illegally used as a ternary value.
                 if (ret.is("void") || ret.is("dynamic")) {
+                    if (!lifted.isEmpty()) {
+                        return guardLifted(tmp, lifted, new Out(tmp + ".call(" + args + ")", TypeRef.VOID), ctx);
+                    }
                     ctx.writer().line("if (" + tmp + " != null) { " + tmp + ".call("
-                            + plainArgs(c.args, ctx) + "); }");
+                            + args + "); }");
                     return new Out("", TypeRef.VOID);
                 }
+                if (!lifted.isEmpty()) {
+                    Out guarded = guardLifted(tmp, lifted, new Out(tmp + ".call(" + args + ")", ret), ctx);
+                    if (guarded != null) {
+                        return materializeShort(guarded);
+                    }
+                }
                 return new Out("(" + tmp + " == null ? null : " + tmp + ".call("
-                        + plainArgs(c.args, ctx) + "))", boxType(ret));
+                        + args + "))", boxType(ret));
             }
             return new Out(target.code + ".call(" + plainArgs(c.args, ctx) + ")", ret);
         }
@@ -8760,6 +9121,11 @@ public final class JavaEmitter {
 
             void line(String s) {
                 sb.append(indentStr(indent)).append(s).append('\n');
+            }
+
+            /** Appends lines another writer already indented (see {@link #emitLazyOperand}). */
+            void raw(String lines) {
+                sb.append(lines);
             }
         }
     }
