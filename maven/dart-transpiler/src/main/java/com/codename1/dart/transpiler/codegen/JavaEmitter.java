@@ -1626,11 +1626,11 @@ public final class JavaEmitter {
                     return;
                 }
             }
-            if (ex instanceof Assign && isNullAwareMemberAssign((Assign) ex)) {
+            if (ex instanceof Assign && isNullAwareMemberAssign((Assign) ex) && !needsShort((Assign) ex)) {
                 emitNullAwareAssignStatement((Assign) ex, ctx);
                 return;
             }
-            Out o = emitExpr(ex, null, ctx);
+            Out o = emitStatementExpr(ex, ctx);
             String code = statementize(o.code);
             if (!code.isEmpty()) {
                 w.line(code + ";");
@@ -1771,7 +1771,7 @@ public final class JavaEmitter {
                 initCode = javaType(t, false, ctx) + " " + loopVar + " = "
                         + (init != null ? coerce(init, t, ctx) : zeroValue(t));
             } else if (f.init instanceof ExprStmt) {
-                initCode = statementize(emitExpr(((ExprStmt) f.init).expr, null, ctx).code);
+                initCode = statementize(emitStatementExpr(((ExprStmt) f.init).expr, ctx).code);
             }
             final String forVarDart$ = forVarDart;
             final String forVarJava$ = forVarJava;
@@ -2739,15 +2739,24 @@ public final class JavaEmitter {
                 tmp = ctx.newTemp();
                 ctx.writer().line("var " + tmp + " = " + target.code + ";");
             }
-            ctx.pushCascadeTarget(new Out(tmp, target.type));
+            if (cas.nullAware && !tmp.equals("this")) {
+                // `a?..b()..c = v`: a null target skips every section, and the value is null.
+                ctx.writer().line("if (" + tmp + " != null) {");
+                ctx.indent(1);
+            }
+            ctx.pushCascadeTarget(new Out(tmp, cas.nullAware ? copyNonNull(target.type) : target.type));
             for (Expr section : cas.sections) {
-                Out o = emitExpr(section, null, ctx);
+                Out o = emitStatementExpr(section, ctx);
                 String code = statementize(o.code);
                 if (!code.isEmpty()) {
                     ctx.writer().line(code + ";");
                 }
             }
             ctx.popCascadeTarget();
+            if (cas.nullAware && !tmp.equals("this")) {
+                ctx.indent(-1);
+                ctx.writer().line("}");
+            }
             return new Out(tmp, target.type);
         }
         if (e instanceof ThrowExpr) {
@@ -2871,42 +2880,70 @@ public final class JavaEmitter {
         }
         if (e instanceof IncDec) {
             IncDec id = (IncDec) e;
-            Out target = emitExpr(id.operand, null, ctx);
-            if (id.operand instanceof PropertyGet
-                    && target.code.endsWith("." + ((PropertyGet) id.operand).name + "()")) {
-                // `x.prop++` through a getter/setter pair (an app or stub property): the
-                // read is a call, and `x.prop()++` is not Java. Lowered as `x.prop += 1`,
-                // which writes through the setter. Like any setter assignment it is a
-                // statement; its value is not available.
-                Assign inc = new Assign().at(id.file, id.line, id.col);
-                inc.lhs = id.operand;
-                inc.op = id.increment ? "+=" : "-=";
-                IntLit one = new IntLit().at(id.file, id.line, id.col);
-                one.value = 1;
-                inc.rhs = one;
-                Out write = emitAssign(inc, ctx);
-                // No setter found: emitAssign wrote the read back as an assignment
-                // target; keep the historical form rather than that.
-                if (!write.code.startsWith(target.code + " ")) {
-                    return write;
+            boolean statement = ctx.statementExpr == e;
+            Assign inc = new Assign().at(id.file, id.line, id.col);
+            inc.lhs = id.operand;
+            inc.op = id.increment ? "+=" : "-=";
+            IntLit one = new IntLit().at(id.file, id.line, id.col);
+            one.value = 1;
+            inc.rhs = one;
+            Expr savedStmt = ctx.statementExpr;
+            Assign savedPostfix = ctx.postfixAssign;
+            if (statement) {
+                ctx.statementExpr = inc;
+            } else if (!id.prefix) {
+                ctx.postfixAssign = inc;
+            }
+            try {
+                if (needsShort(inc)
+                        || (id.operand instanceof Ident && isTopLevelSetter(((Ident) id.operand).name, ctx))) {
+                    // `a?.b++` is shorted like every assignment behind a `?.`; `top++` on a
+                    // library-level getter/setter pair writes through the setter.
+                    return emitAssign(inc, ctx);
                 }
+                ctx.pushWriter(ctx.currentIndent());
+                Out target = emitExpr(id.operand, null, ctx);
+                String targetLifted = ctx.popWriter();
+                boolean accessor = target.code.endsWith("()") && target.code.contains(".get$");
+                if ((id.operand instanceof PropertyGet
+                        && target.code.endsWith("." + ((PropertyGet) id.operand).name + "()"))
+                        || (accessor && !statement)) {
+                    // `x.prop++` through a getter/setter pair (an app or stub property): the
+                    // read is a call, and `x.prop()++` is not Java. Lowered as `x.prop += 1`,
+                    // which writes through the setter, in its value form when the value is
+                    // used (the old value for a postfix). The read emitted above is dropped
+                    // with whatever it lifted, so its receiver is not evaluated twice.
+                    ctx.pushWriter(ctx.currentIndent());
+                    Out write = emitAssign(inc, ctx);
+                    String writeLifted = ctx.popWriter();
+                    // No setter found: emitAssign wrote the read back as an assignment
+                    // target; keep the historical form rather than that.
+                    if (!write.code.startsWith(target.code + " ")) {
+                        ctx.writer().raw(writeLifted);
+                        return write;
+                    }
+                }
+                ctx.writer().raw(targetLifted);
+                if (target.code.endsWith("()") && target.code.contains(".get$")) {
+                    String base = target.code.substring(0, target.code.lastIndexOf(".get$"));
+                    String prop = target.code.substring(target.code.lastIndexOf(".get$") + 5, target.code.length() - 2);
+                    String delta = id.increment ? " + 1" : " - 1";
+                    return new Out(base + ".set$" + prop + "(" + target.code + delta + ")", target.type);
+                }
+                if (isDynamic(target.type)) {
+                    // `x++` on a dynamic x: Java's ++ does not apply to Object.
+                    ctx.importClass("dart.runtime.DartRuntime");
+                    String write = target.code + " = DartRuntime.dynBinary(\"" + (id.increment ? "+" : "-")
+                            + "\", " + target.code + ", 1L)";
+                    return new Out(id.prefix ? write
+                            : "DartRuntime.dynPostfix(" + target.code + ", " + write + ")", target.type);
+                }
+                String op = id.increment ? "++" : "--";
+                return new Out(id.prefix ? op + target.code : target.code + op, target.type);
+            } finally {
+                ctx.statementExpr = savedStmt;
+                ctx.postfixAssign = savedPostfix;
             }
-            if (target.code.endsWith("()") && target.code.contains(".get$")) {
-                String base = target.code.substring(0, target.code.lastIndexOf(".get$"));
-                String prop = target.code.substring(target.code.lastIndexOf(".get$") + 5, target.code.length() - 2);
-                String delta = id.increment ? " + 1" : " - 1";
-                return new Out(base + ".set$" + prop + "(" + target.code + delta + ")", target.type);
-            }
-            if (isDynamic(target.type)) {
-                // `x++` on a dynamic x: Java's ++ does not apply to Object.
-                ctx.importClass("dart.runtime.DartRuntime");
-                String write = target.code + " = DartRuntime.dynBinary(\"" + (id.increment ? "+" : "-")
-                        + "\", " + target.code + ", 1L)";
-                return new Out(id.prefix ? write
-                        : "DartRuntime.dynPostfix(" + target.code + ", " + write + ")", target.type);
-            }
-            String op = id.increment ? "++" : "--";
-            return new Out(id.prefix ? op + target.code : target.code + op, target.type);
         }
         if (e instanceof Conditional) {
             Conditional c = (Conditional) e;
@@ -3323,7 +3360,7 @@ public final class JavaEmitter {
                     initCode = javaType(t, false, ctx) + " " + loopVar2 + " = "
                             + (init != null ? coerce(init, t, ctx) : zeroValue(t));
                 } else if (f.init instanceof ExprStmt) {
-                    initCode = statementize(emitExpr(((ExprStmt) f.init).expr, null, ctx).code);
+                    initCode = statementize(emitStatementExpr(((ExprStmt) f.init).expr, ctx).code);
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
@@ -3472,7 +3509,7 @@ public final class JavaEmitter {
                     initCode = javaType(t, false, ctx) + " " + loopVar2 + " = "
                             + (init != null ? coerce(init, t, ctx) : zeroValue(t));
                 } else if (f.init instanceof ExprStmt) {
-                    initCode = statementize(emitExpr(((ExprStmt) f.init).expr, null, ctx).code);
+                    initCode = statementize(emitStatementExpr(((ExprStmt) f.init).expr, ctx).code);
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
@@ -3650,7 +3687,7 @@ public final class JavaEmitter {
                     initCode = javaType(t, false, ctx) + " " + loopVar2 + " = "
                             + (init != null ? coerce(init, t, ctx) : zeroValue(t));
                 } else if (f.init instanceof ExprStmt) {
-                    initCode = statementize(emitExpr(((ExprStmt) f.init).expr, null, ctx).code);
+                    initCode = statementize(emitStatementExpr(((ExprStmt) f.init).expr, ctx).code);
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
@@ -4256,7 +4293,30 @@ public final class JavaEmitter {
     }
 
     private Out emitIndexGet(IndexGet ig, Ctx ctx) {
-        Out target = emitExpr(ig.target, null, ctx);
+        if (chainHasNullAware(ig.target)) {
+            // `a?.b[i]`: a null `a` shorts the index too, which is not evaluated, and
+            // anything after it. The target was materialized to `(a == null ? null :
+            // a.b)` and indexed, which threw. Index the guarded read inside the short
+            // instead, and keep what the index lifts behind the guard.
+            Out raw = emitExprRaw(ig.target, null, ctx);
+            if (raw.shortGuard != null) {
+                ctx.pushWriter(ctx.currentIndent() + 1);
+                Out r = emitIndexGetOn(new Out(raw.code, copyNonNull(raw.type), raw.fromError), ig, ctx);
+                String lifted = ctx.popWriter();
+                if (!lifted.isEmpty()) {
+                    Out g = guardLifted(raw.shortGuard, lifted, r, ctx);
+                    if (g != null) {
+                        return g;
+                    }
+                }
+                return new Out(r.code, boxType(r.type), r.fromError, raw.shortGuard);
+            }
+            return emitIndexGetOn(raw, ig, ctx);
+        }
+        return emitIndexGetOn(emitExpr(ig.target, null, ctx), ig, ctx);
+    }
+
+    private Out emitIndexGetOn(Out target, IndexGet ig, Ctx ctx) {
         Out idx = emitExpr(ig.index, null, ctx);
         TypeRef tt = target.type;
         ClassDecl opClass = program.classes.get(tt.name);
@@ -4405,14 +4465,26 @@ public final class JavaEmitter {
      * compound index assignment does with its receiver.
      */
     private String receiverOnce(Out tgt, Ctx ctx) {
-        if (tgt.code.matches("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*")
-                || (tgt.type != null && isClassRef(tgt.type))) {
+        if (isRepeatable(tgt)) {
             return tgt.code;
         }
         String tmp = ctx.newTemp();
         TypeRef t = tgt.type == null ? TypeRef.DYNAMIC : tgt.type;
         ctx.writer().line(javaType(t, false, ctx) + " " + tmp + " = " + tgt.code + ";");
         return tmp;
+    }
+
+    /** A name that a bare assignment writes through a library-level {@code set name(v)}. */
+    private boolean isTopLevelSetter(String nm, Ctx ctx) {
+        return ctx.lookup(nm) == null
+                && (ctx.currentClass == null || ctx.currentClass.field(nm) == null)
+                && program.topLevelSetters.containsKey(nm);
+    }
+
+    /** A receiver naming it again has no effect on: a local, {@code this}, a field chain, a class. */
+    private boolean isRepeatable(Out tgt) {
+        return tgt.code.matches("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*")
+                || (tgt.type != null && isClassRef(tgt.type));
     }
 
     private static Assign plainAssign(Assign a, Expr lhs) {
@@ -4437,7 +4509,7 @@ public final class JavaEmitter {
         Ctx.Writer w = ctx.writer();
         w.line("if (" + read.code + " == null) {");
         ctx.indent(1);
-        String write = statementize(emitAssign(plainAssign(a, lhs), ctx).code);
+        String write = statementize(emitStatementExpr(plainAssign(a, lhs), ctx).code);
         if (!write.isEmpty()) {
             ctx.writer().line(write + ";");
         }
@@ -4470,6 +4542,9 @@ public final class JavaEmitter {
             String receiver = emitExpr(((IndexGet) lhs).target, null, ctx).code;
             yieldsValue = write.code.startsWith(receiver + ".idxSet(");
         }
+        // A void setter or operator []= written in its value form lifts the write
+        // and yields a temp.
+        yieldsValue |= !writeLifted.isEmpty();
         if (!yieldsValue) {
             diags.error(a, "E0141", "'??=' on an operator []= or a setter is supported as a statement,"
                     + " not yet as a value. Assign first, then read the target.");
@@ -4496,7 +4571,15 @@ public final class JavaEmitter {
     }
 
     private Out emitAssign(Assign a, Ctx ctx) {
+        Out shorted = emitShortedAssign(a, ctx);
+        if (shorted != null) {
+            return shorted;
+        }
         if (isNullAwareMemberAssign(a)) {
+            if (ctx.statementExpr == a) {
+                emitNullAwareAssignStatement(a, ctx);
+                return new Out("", TypeRef.VOID);
+            }
             return emitNullAwareAssignValue(a, ctx);
         }
         // ??= on a variable: a local or field is a valid Java assignment target.
@@ -4541,7 +4624,10 @@ public final class JavaEmitter {
             Out target = emitExpr(ig.target, null, ctx);
             Out idx = emitExpr(ig.index, null, ctx);
             boolean compound = !a.op.equals("=");
-            if (compound) {
+            ClassDecl idxOpClass = program.classes.get(target.type.name);
+            boolean voidIndexSet = idxOpClass != null && findMethodInHierarchy(idxOpClass, "$indexSet") != null
+                    && ctx.statementExpr != a;
+            if (compound || voidIndexSet) {
                 // x[i] op= v -> x[i] = x[i] op v, evaluating x and i exactly once.
                 String tTmp = ctx.newTemp();
                 ctx.writer().line(javaType(target.type, false, ctx) + " " + tTmp + " = " + target.code + ";");
@@ -4553,9 +4639,32 @@ public final class JavaEmitter {
             ClassDecl opClass = program.classes.get(target.type.name);
             if (opClass != null && findMethodInHierarchy(opClass, "$indexSet") != null) {
                 TypeRef ivt = compound ? indexElementType(target.type) : null;
+                MethodDecl readOp = findMethodInHierarchy(opClass, "$index");
+                if (compound && readOp != null && readOp.returnType != null && !readOp.returnType.is("var")) {
+                    // A class's own `operator []` says what it reads: the receiver type
+                    // carries no type argument to take it from, and `grid[i] += 1` became
+                    // dynamic arithmetic passed to an int parameter.
+                    ivt = readOp.returnType;
+                }
+                Out rhsOut = compound ? null : emitExpr(a.rhs, null, ctx);
                 String rhsCode = compound
                         ? compoundValue(target.code + ".$index(" + idx.code + ")", ivt, a, ctx)
-                        : emitExpr(a.rhs, null, ctx).code;
+                        : rhsOut.code;
+                TypeRef rt = ivt != null ? ivt : compound ? TypeRef.DYNAMIC : rhsOut.type;
+                if (voidIndexSet) {
+                    // `operator []=` is void in Java; as a value, the value is a temp,
+                    // declared as the operator's value parameter.
+                    MethodDecl ism = findMethodInHierarchy(opClass, "$indexSet");
+                    if (ism.params.size() == 2 && ism.params.get(1).type != null
+                            && !isDynamicType(ism.params.get(1).type)) {
+                        rt = ism.params.get(1).type;
+                    }
+                    String jt = declarableType(rt, false, ctx);
+                    String v = ctx.newTemp();
+                    ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + rhsCode + ";");
+                    ctx.writer().line(target.code + ".$indexSet(" + idx.code + ", " + v + ");");
+                    return new Out(v, rt);
+                }
                 return new Out(target.code + ".$indexSet(" + idx.code + ", " + rhsCode + ")",
                         ivt != null ? ivt : TypeRef.DYNAMIC);
             }
@@ -4586,6 +4695,7 @@ public final class JavaEmitter {
         // assignment to a stub property that declares a Dart setter:
         // `x.value = v` -> the overloaded setter method `x.value(v)`. Compound forms
         // (`x.value -= d`) read through the getter: `x.value(x.value() - d)`.
+        Out lhsOnce = null;
         if (a.lhs instanceof PropertyGet) {
             PropertyGet pg = (PropertyGet) a.lhs;
             Out tgt = emitExpr(pg.target, null, ctx);
@@ -4593,11 +4703,11 @@ public final class JavaEmitter {
                 Ast.MethodDecl setter = stubs.findSetter(tgt.type.name, pg.name);
                 if (setter != null) {
                     TypeRef pt = setter.params.isEmpty() ? TypeRef.DYNAMIC : setter.params.get(0).type;
-                    String recv = a.op.equals("=") ? tgt.code : receiverOnce(tgt, ctx);
-                    String val = a.op.equals("=")
-                            ? coerce(emitExpr(a.rhs, pt, ctx), pt, ctx)
-                            : compoundValue(recv + "." + pg.name + "()", pt, a, ctx);
-                    return new Out(recv + "." + pg.name + "(" + val + ")", pt);
+                    // Used as a value the receiver is named twice (temp, then call), so
+                    // it is evaluated once first, ahead of the value, as Dart orders it.
+                    String recv = a.op.equals("=") && ctx.statementExpr == a ? tgt.code : receiverOnce(tgt, ctx);
+                    return voidSetterWrite(a, recv + "." + pg.name,
+                            a.op.equals("=") ? null : recv + "." + pg.name + "()", pt, ctx);
                 }
             }
             // App class (or its supers) declaring `set prop(v)` — emitted as the overloaded
@@ -4610,30 +4720,45 @@ public final class JavaEmitter {
                 Ast.MethodDecl setter = findAppSetter(tc, pg.name);
                 if (setter != null) {
                     TypeRef pt = setter.params.isEmpty() ? TypeRef.DYNAMIC : setter.params.get(0).type;
-                    if (!a.op.equals("=")) {
-                        String recv = receiverOnce(tgt, ctx);
-                        return new Out(recv + "." + pg.name + "("
-                                + compoundValue(recv + "." + pg.name + "()", pt, a, ctx) + ")", pt);
-                    }
-                    Out rhs = emitExpr(a.rhs, pt, ctx);
-                    return new Out(tgt.code + "." + pg.name + "(" + coerce(rhs, pt, ctx) + ")", pt);
+                    String recv = a.op.equals("=") && ctx.statementExpr == a ? tgt.code : receiverOnce(tgt, ctx);
+                    return voidSetterWrite(a, recv + "." + pg.name,
+                            a.op.equals("=") ? null : recv + "." + pg.name + "()", pt, ctx);
                 }
+            }
+            if ((ctx.statementExpr != a || !a.op.equals("=")) && !isRepeatable(tgt)) {
+                // A field reached through accessors names the receiver in the read and
+                // in the write (`make().v += 3` called make() twice), and a value form
+                // evaluates the value before the call: evaluate the receiver once, first.
+                String recv = receiverOnce(tgt, ctx);
+                lhsOnce = emitMemberGet(new Out(recv, tgt.type, tgt.fromError), pg.name, pg, ctx);
             }
         }
         // assignment to a top-level setter: `x = v` where `set x(v)` is declared at
         // library scope -> the static setter method `OwnerLib.x(v)`.
-        if (a.op.equals("=") && a.lhs instanceof Ident) {
+        if (a.lhs instanceof Ident && !a.op.equals("??=") && isTopLevelSetter(((Ident) a.lhs).name, ctx)) {
             String nm = ((Ident) a.lhs).name;
-            if (ctx.lookup(nm) == null
-                    && (ctx.currentClass == null || ctx.currentClass.field(nm) == null)
-                    && program.topLevelSetters.containsKey(nm)) {
+            {
                 Library owner = program.topLevelSetters.get(nm);
+                String call = Program.libClassName(owner.fileName) + "." + nm;
+                if (!a.op.equals("=")) {
+                    // `top += 2` reads through the top-level getter and writes through the
+                    // setter; it emitted `Lib.top() += 2`, which is not Java.
+                    Out read = emitExpr(a.lhs, null, ctx);
+                    return voidSetterWrite(a, call, read.code, read.type, ctx);
+                }
                 Out rhs = emitExpr(a.rhs, null, ctx);
-                return new Out(Program.libClassName(owner.fileName) + "." + nm
-                        + "(" + rhs.code + ")", rhs.type);
+                if (ctx.statementExpr == a) {
+                    return new Out(call + "(" + rhs.code + ")", rhs.type);
+                }
+                // The setter is void in Java: as a value, the value goes into a temp.
+                String jt = declarableType(rhs.type, false, ctx);
+                String v = ctx.newTemp();
+                ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + rhs.code + ";");
+                ctx.writer().line(call + "(" + v + ");");
+                return new Out(v, rhs.type);
             }
         }
-        Out lhs = emitExpr(a.lhs, null, ctx);
+        Out lhs = lhsOnce != null ? lhsOnce : emitExpr(a.lhs, null, ctx);
         String lcode = lhs.code;
         // setters through accessors: x.get$f() as assignment target -> x.set$f(v)
         if (lcode.endsWith("()") && lcode.contains(".get$")) {
@@ -4641,9 +4766,25 @@ public final class JavaEmitter {
             String prop = lcode.substring(lcode.lastIndexOf(".get$") + 5, lcode.length() - 2);
             // `x op= v` through an accessor pair -- a lazily initialised static or
             // top-level, or a mixin's field -- is set$x(get$x() op v).
+            if (ctx.statementExpr != a && ctx.postfixAssign == a) {
+                // `x.f++` as a value: the old value, read once.
+                String jt = declarableType(lhs.type, false, ctx);
+                String old = ctx.newTemp();
+                ctx.writer().line((jt != null ? jt : "var") + " " + old + " = " + lcode + ";");
+                ctx.writer().line(base + ".set$" + prop + "(" + compoundValue(old, lhs.type, a, ctx) + ");");
+                return new Out(old, lhs.type);
+            }
             String value = a.op.equals("=")
                     ? coerce(emitExpr(a.rhs, lhs.type, ctx), lhs.type, ctx)
                     : compoundValue(lcode, lhs.type, a, ctx);
+            if (ctx.statementExpr != a) {
+                // An instance field's set$ is void; as a value, the value is a temp.
+                String jt = declarableType(lhs.type, false, ctx);
+                String v = ctx.newTemp();
+                ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + value + ";");
+                ctx.writer().line(base + ".set$" + prop + "(" + v + ");");
+                return new Out(v, lhs.type);
+            }
             return new Out(base + ".set$" + prop + "(" + value + ")", lhs.type);
         }
         if (!a.op.equals("=") && (isDynamic(lhs.type)
@@ -4662,6 +4803,10 @@ public final class JavaEmitter {
             Out rhs = emitExpr(a.rhs, lhs.type, ctx);
             String fn = a.op.equals("~/=") ? "tdiv" : "mod";
             return new Out(lcode + " = DartRuntime." + fn + "(" + lcode + ", " + rhs.code + ")", lhs.type);
+        }
+        if (ctx.postfixAssign == a && a.rhs instanceof IntLit && (a.op.equals("+=") || a.op.equals("-="))) {
+            // `a?.b++` reaches here as `$t.b += 1` under the short; it yields the old value.
+            return new Out(lcode + (a.op.equals("+=") ? "++" : "--"), lhs.type);
         }
         Out rhs = emitExpr(a.rhs, lhs.type, ctx);
         return new Out(lcode + " " + jop + " " + coerce(rhs, lhs.type, ctx), lhs.type);
@@ -4775,6 +4920,168 @@ public final class JavaEmitter {
         return null;
     }
 
+    /**
+     * Emits {@code e} as a statement: its value is discarded, so an assignment through
+     * a void setter keeps its plain call form ({@link #voidSetterWrite}).
+     */
+    private Out emitStatementExpr(Expr e, Ctx ctx) {
+        Expr saved = ctx.statementExpr;
+        ctx.statementExpr = e;
+        try {
+            return emitExpr(e, null, ctx);
+        } finally {
+            ctx.statementExpr = saved;
+        }
+    }
+
+    /** True when some selector in the receiver chain of {@code e} is null-aware ({@code a?.b}). */
+    private static boolean chainHasNullAware(Expr e) {
+        while (e != null) {
+            if (e instanceof PropertyGet) {
+                if (((PropertyGet) e).nullAware) {
+                    return true;
+                }
+                e = ((PropertyGet) e).target;
+            } else if (e instanceof Call) {
+                if (((Call) e).nullAware) {
+                    return true;
+                }
+                e = ((Call) e).target;
+            } else if (e instanceof IndexGet) {
+                e = ((IndexGet) e).target;
+            } else {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /** An assignment whose target sits behind a null-aware selector, which shorts it. */
+    private static boolean needsShort(Assign a) {
+        if (a.lhs instanceof PropertyGet) {
+            PropertyGet pg = (PropertyGet) a.lhs;
+            return pg.nullAware || chainHasNullAware(pg.target);
+        }
+        return a.lhs instanceof IndexGet && chainHasNullAware(((IndexGet) a.lhs).target);
+    }
+
+    /**
+     * {@code a?.b = v}, {@code a?.b op= v}, {@code a?.b ??= v}, {@code a?.b[i] = v}: a
+     * null receiver shorts the whole assignment -- neither the index nor the value is
+     * evaluated, and its value is null. The assignment was emitted as though the
+     * {@code ?.} were a plain {@code .}, and threw on the null. The write is emitted
+     * against a temp holding the non-null receiver, inside {@code if (guard != null)}.
+     * Returns null when the target is not behind a null-aware selector.
+     */
+    private Out emitShortedAssign(Assign a, Ctx ctx) {
+        if (!needsShort(a)) {
+            return null;
+        }
+        Expr recvExpr = a.lhs instanceof PropertyGet ? ((PropertyGet) a.lhs).target : ((IndexGet) a.lhs).target;
+        boolean direct = a.lhs instanceof PropertyGet && ((PropertyGet) a.lhs).nullAware;
+        String guard;
+        String recvInit = null;
+        TypeRef recvType;
+        if (direct) {
+            Out mat = emitExpr(recvExpr, null, ctx);
+            guard = ctx.newTemp();
+            ctx.writer().line("var " + guard + " = " + mat.code + ";");
+            recvType = copyNonNull(mat.type);
+        } else {
+            Out raw = emitExprRaw(recvExpr, null, ctx);
+            guard = raw.shortGuard;
+            recvType = copyNonNull(raw.type);
+            recvInit = raw.code;
+        }
+        ctx.pushWriter(ctx.currentIndent() + 1);
+        String recv = guard;
+        if (recvInit != null) {
+            // The rest of the receiver chain, read where the guard says it may be.
+            recv = ctx.newTemp();
+            String jt = declarableType(recvType, false, ctx);
+            ctx.writer().line((jt != null ? jt : "var") + " " + recv + " = " + recvInit + ";");
+        }
+        ctx.declare(recv, recvType);
+        Ident id = new Ident().at(a.file, a.line, a.col);
+        id.name = recv;
+        Expr lhs;
+        if (a.lhs instanceof PropertyGet) {
+            PropertyGet copy = new PropertyGet().at(a.lhs.file, a.lhs.line, a.lhs.col);
+            copy.target = id;
+            copy.name = ((PropertyGet) a.lhs).name;
+            lhs = copy;
+        } else {
+            IndexGet copy = new IndexGet().at(a.lhs.file, a.lhs.line, a.lhs.col);
+            copy.target = id;
+            copy.index = ((IndexGet) a.lhs).index;
+            lhs = copy;
+        }
+        Assign inner = new Assign().at(a.file, a.line, a.col);
+        inner.lhs = lhs;
+        inner.op = a.op;
+        inner.rhs = a.rhs;
+        boolean statement = ctx.statementExpr == a;
+        Expr savedStmt = ctx.statementExpr;
+        Assign savedPostfix = ctx.postfixAssign;
+        if (statement) {
+            ctx.statementExpr = inner;
+        }
+        if (ctx.postfixAssign == a) {
+            ctx.postfixAssign = inner;
+        }
+        Out w = emitAssign(inner, ctx);
+        ctx.statementExpr = savedStmt;
+        ctx.postfixAssign = savedPostfix;
+        String lifted = ctx.popWriter();
+        if (guard == null) {
+            // No short reached the receiver after all (a parenthesized chain): plain.
+            ctx.writer().raw(lifted);
+            return w;
+        }
+        if (statement || w.type == null || w.type.is("void")) {
+            return guardLifted(guard, lifted, new Out(w.code, TypeRef.VOID), ctx);
+        }
+        Out g = guardLifted(guard, lifted, w, ctx);
+        return g != null ? g : w.withShort(guard);
+    }
+
+    /**
+     * A write through a setter, which Java declares void. As a statement it is the
+     * plain call; used as a value -- {@code (x.p += 3) > 0}, {@code print(x.p = 4)} --
+     * the new value goes into a temp first, the setter is called with it, and the
+     * value is the temp; for a postfix {@code x.p++} ({@link Ctx#postfixAssign}) the
+     * old value is read into the temp instead. The call as a value was
+     * {@code 'void' type not allowed here} from javac.
+     *
+     * @param recv  the receiver, already evaluated once when the write reads it too
+     * @param call  the setter call up to its argument, e.g. {@code recv.p}
+     * @param read  the getter read for a compound write, null for {@code =}
+     */
+    private Out voidSetterWrite(Assign a, String call, String read, TypeRef pt, Ctx ctx) {
+        boolean statement = ctx.statementExpr == a;
+        String jt = declarableType(pt, false, ctx);
+        if (jt == null) {
+            jt = "var";
+        }
+        Ctx.Writer w = ctx.writer();
+        if (!statement && ctx.postfixAssign == a && read != null) {
+            String old = ctx.newTemp();
+            w.line(jt + " " + old + " = " + read + ";");
+            w.line(call + "(" + compoundValue(old, pt, a, ctx) + ");");
+            return new Out(old, pt);
+        }
+        String value = read == null
+                ? coerce(emitExpr(a.rhs, pt, ctx), pt, ctx)
+                : compoundValue(read, pt, a, ctx);
+        if (statement) {
+            return new Out(call + "(" + value + ")", pt);
+        }
+        String v = ctx.newTemp();
+        w.line(jt + " " + v + " = " + value + ";");
+        w.line(call + "(" + v + ");");
+        return new Out(v, pt);
+    }
+
     /** An operand emitted by {@link #emitLazyOperand}, and the statements it lifted. */
     private static final class Lazy {
         final Out out;
@@ -4872,7 +5179,10 @@ public final class JavaEmitter {
         List<Lazy> ups = new ArrayList<Lazy>();
         boolean updatesLift = false;
         for (Expr u : updates) {
+            Expr savedStmt = ctx.statementExpr;
+            ctx.statementExpr = u;
             Lazy l = emitLazyOperand(u, null, ctx, 2);
+            ctx.statementExpr = savedStmt;
             ups.add(l);
             updatesLift |= l.lifts();
         }
@@ -5578,7 +5888,14 @@ public final class JavaEmitter {
             // Emit the arrow body against the lambda's SAM return type so a switch-expression /
             // conditional body unifies its arms to that type (e.g. an onGenerateRoute arrow whose
             // switch arms are Route values).
+            // A void callback's arrow body is a statement: `() => model.count = 5` keeps
+            // the plain setter call rather than a value form a void lambda cannot return.
+            Expr savedStmt = ctx.statementExpr;
+            if (lambdaReturn == null || lambdaReturn.is("void")) {
+                ctx.statementExpr = l.exprBody;
+            }
             Out o = emitExpr(l.exprBody, lambdaReturn, ctx);
+            ctx.statementExpr = savedStmt;
             if (lambdaReturn != null && o.type != null && o.type.is("num")
                     && (lambdaReturn.is("double") || lambdaReturn.is("int"))) {
                 // num arithmetic is a Number; a lambda typed to return a double or int
@@ -8103,6 +8420,19 @@ public final class JavaEmitter {
             if (f.initializer instanceof StringLit) {
                 return TypeRef.STRING;
             }
+            // A collection literal written with its type arguments names its own type:
+            // `final log = <String>[];` was dynamic, and `log.add(...)` did not resolve.
+            if (f.initializer instanceof ListLit && ((ListLit) f.initializer).elementType != null) {
+                return TypeRef.of("List", ((ListLit) f.initializer).elementType);
+            }
+            if (f.initializer instanceof SetLit && ((SetLit) f.initializer).elementType != null) {
+                return TypeRef.of("Set", ((SetLit) f.initializer).elementType);
+            }
+            if (f.initializer instanceof MapLit && ((MapLit) f.initializer).keyType != null
+                    && ((MapLit) f.initializer).valueType != null) {
+                MapLit m = (MapLit) f.initializer;
+                return TypeRef.of("Map", m.keyType, m.valueType);
+            }
         }
         return TypeRef.DYNAMIC;
     }
@@ -8947,6 +9277,14 @@ public final class JavaEmitter {
         /** Inside a hashCode/compareTo body: narrow each `return` value to Java int. */
         boolean narrowReturnToInt;
         String syncStarList;                  // non-null inside a sync* body: the result-list temp
+        /**
+         * The expression being emitted as a statement, whose value nobody reads (see
+         * {@link #emitStatementExpr}); an assignment through a void setter only needs a
+         * value form when it is not this.
+         */
+        Expr statementExpr;
+        /** An {@code x.p += 1} standing for {@code x.p++} used as a value: it yields the OLD value. */
+        Assign postfixAssign;
         TypeRef syncStarElem;                 // element type yielded by the enclosing sync* body
         private int tempCounter;
 

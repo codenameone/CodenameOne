@@ -1410,7 +1410,7 @@ public final class AstBuilder {
             a.lhs = buildAssignable(ctx.assignableExpression());
             a.op = ctx.assignmentOperator().getText();
             a.rhs = buildExpr(ctx.expr());
-            return a;
+            return arrowBodyAssign(a);
         }
         if (ctx.conditionalExpression() != null) {
             return buildConditional(ctx.conditionalExpression());
@@ -1442,11 +1442,9 @@ public final class AstBuilder {
             cur = cur.cascade();
         }
         sections.add(0, cur.cascadeSection());
-        if (cur.QUDD() != null) {
-            unsupported(ctx, "E0203", "Null-aware cascades (?..) are not supported yet");
-        }
         Cascade cas = new Cascade();
         pos(cas, ctx);
+        cas.nullAware = cur.QUDD() != null;
         cas.target = buildConditional(cur.conditionalExpression());
         for (Dart2Parser.CascadeSectionContext s : sections) {
             cas.sections.add(buildCascadeSection(s));
@@ -1492,6 +1490,48 @@ public final class AstBuilder {
         return base;
     }
 
+    /**
+     * {@code () => o.p = v} is a closure whose body assigns, but the grammar's
+     * {@code expr} alternatives are ambiguous there and ANTLR takes the first: an
+     * assignment whose target is {@code (() => o).p}. Re-associates that shape -- a
+     * selector chain rooted at an unparenthesized arrow closure -- into the closure
+     * with {@code o.p = v} as its body, which is the only reading Dart has.
+     */
+    private static Expr arrowBodyAssign(Assign a) {
+        Expr holder = null;
+        Expr e = a.lhs;
+        while (true) {
+            Expr next;
+            if (e instanceof PropertyGet) {
+                next = ((PropertyGet) e).target;
+            } else if (e instanceof IndexGet) {
+                next = ((IndexGet) e).target;
+            } else if (e instanceof Call) {
+                next = ((Call) e).target;
+            } else {
+                break;
+            }
+            if (next == null) {
+                return a;
+            }
+            holder = e;
+            e = next;
+        }
+        if (holder == null || !(e instanceof Lambda) || ((Lambda) e).exprBody == null) {
+            return a;
+        }
+        Lambda l = (Lambda) e;
+        if (holder instanceof PropertyGet) {
+            ((PropertyGet) holder).target = l.exprBody;
+        } else if (holder instanceof IndexGet) {
+            ((IndexGet) holder).target = l.exprBody;
+        } else {
+            ((Call) holder).target = l.exprBody;
+        }
+        l.exprBody = arrowBodyAssign(a);
+        return l;
+    }
+
     private Expr buildExprWithoutCascade(Dart2Parser.ExpressionWithoutCascadeContext ctx) {
         if (ctx.assignableExpression() != null && ctx.assignmentOperator() != null) {
             Assign a = new Assign();
@@ -1499,7 +1539,7 @@ public final class AstBuilder {
             a.lhs = buildAssignable(ctx.assignableExpression());
             a.op = ctx.assignmentOperator().getText();
             a.rhs = buildExprWithoutCascade(ctx.expressionWithoutCascade());
-            return a;
+            return arrowBodyAssign(a);
         }
         if (ctx.conditionalExpression() != null) {
             return buildConditional(ctx.conditionalExpression());

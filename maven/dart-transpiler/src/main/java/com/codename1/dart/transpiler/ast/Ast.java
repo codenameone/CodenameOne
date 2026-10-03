@@ -502,6 +502,8 @@ public final class Ast {
     /** target..a()..b = c — target evaluated once, sections applied to it. */
     public static class Cascade extends Expr {
         public Expr target;
+        /** {@code a?..b}: a null target skips every section. */
+        public boolean nullAware;
         /** Each section is an Expr tree rooted at a CascadeTarget marker. */
         public List<Expr> sections = new ArrayList<Expr>();
     }
