@@ -144,6 +144,17 @@ try {
   r = await waitFor(l => l.startsWith('PG-RUN'), 30000);
   check('a re-run redefines classes of the same name', r === 'PG-RUN v2', r);
 
+  // A class whose VM name is a host class's (java/lang/String is java_lang_String) must be
+  // refused before it is evaluated, and leave the running VM intact for the next run.
+  log.length = 0;
+  await setCode('class java_lang_String { }\nLabel l = new Label("clash");\nl\n');
+  r = await waitFor(l => l.startsWith('[playground]'), 30000);
+  check('a class clashing with a host class is refused', r && r.includes('failed') && r.includes('clashes'), r);
+  log.length = 0;
+  await setCode('System.out.println("PG-RUN after " + "x".length());\nLabel l = new Label("ok");\nl\n');
+  r = await waitFor(l => l.startsWith('PG-RUN'), 30000);
+  check('the VM still works after the refused class', r === 'PG-RUN after 1', r);
+
   log.length = 0;
   await setCode('Button b = new Button("Boom");\nb.addActionListener(e -> { String s = null; s.length(); });\n'
       + 'Container root = BoxLayout.encloseY(b);\nroot\n');

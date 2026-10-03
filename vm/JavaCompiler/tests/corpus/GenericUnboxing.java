@@ -20,21 +20,23 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.playground;
-
-/**
- * The JavaScript build's half of loading compiled code: classes translated by the
- * in-browser translator are evaluated in the VM worker's global scope, after which
- * they are ordinary classes ({@code Class.forName} finds them).
- */
-final class PlaygroundJs {
-    private PlaygroundJs() {
+import java.util.*;
+/** Generic values unboxed then widened: the value is an Integer, not a Long. */
+public class GenericUnboxing {
+    static <T> T id(T t) { return t; }
+    public static void main(String[] a) {
+        Map<Integer, Integer> m = new TreeMap<Integer, Integer>();
+        m.put(3, 4);
+        for (Map.Entry<Integer, Integer> r : m.entrySet()) {
+            long[] x = new long[]{ r.getKey(), r.getValue(), 0, -1 };
+            long y = r.getKey();
+            double d = r.getValue();
+            System.out.println(x[0] + " " + x[1] + " " + y + " " + d);
+        }
+        List<Short> s = new ArrayList<Short>();
+        s.add((short) 5);
+        int i = s.get(0);
+        long l = id(Integer.valueOf(7));
+        System.out.println(i + " " + l);
     }
-
-    /**
-     * Evaluates translated classes. {@code classNames} (comma separated, as the VM names
-     * them) lets the loader refuse a class that would replace one of the Playground's own.
-     */
-    @org.teavm.jso.JSBody(params = {"source", "classNames"}, script = "__cn1LoadClasses(source, classNames);")
-    static native void loadClasses(String source, String classNames);
 }

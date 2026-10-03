@@ -1,0 +1,39 @@
+{
+ "pr": 5938,
+ "rebaseline": {
+  "linux-x64@amd-epyc-7763-64-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.519,
+      "time": 0.484,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.519,
+     "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM and its JavaScript generator is no longer stubbed out of the self-hosted build, so 'translator (self)' now translates a corpus about twice as large (both arms take ~2x as long: ParparVM 955 -> 1890ms, JDK 1.8 -> 3.0-3.75s on linux-x64). Translating a real application did not slow down: the hello row stayed in band on linux and macOS, arm64 hello got faster (9.5 -> 8.7s), and Windows x64's out-of-band hello RAM was the JDK arm swinging 832-987MB between rounds while ParparVM held 835-857MB.",
+     "runs": 1,
+     "time": 0.607,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "macos-arm64": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.739,
+      "time": 0.539
+     },
+     "memory": 0.566,
+     "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM and its JavaScript generator is no longer stubbed out of the self-hosted build, so 'translator (self)' now translates a corpus about twice as large (both arms take ~2x as long: ParparVM 955 -> 1890ms, JDK 1.8 -> 3.0-3.75s on linux-x64). Translating a real application did not slow down: the hello row stayed in band on linux and macOS, arm64 hello got faster (9.5 -> 8.7s), and Windows x64's out-of-band hello RAM was the JDK arm swinging 832-987MB between rounds while ParparVM held 835-857MB.",
+     "runs": 1,
+     "time": 0.539
+    }
+   }
+  }
+ }
+}

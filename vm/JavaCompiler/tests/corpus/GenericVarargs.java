@@ -20,21 +20,29 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.playground;
-
-/**
- * The JavaScript build's half of loading compiled code: classes translated by the
- * in-browser translator are evaluated in the VM worker's global scope, after which
- * they are ordinary classes ({@code Class.forName} finds them).
- */
-final class PlaygroundJs {
-    private PlaygroundJs() {
+/** A variable-arity call allocates the inferred array type, as javac does. */
+import java.util.*;
+public class GenericVarargs {
+    @SafeVarargs
+    static <T> T[] of(T... values) { return values; }
+    @SafeVarargs
+    static <T> List<T> list(T... values) { return Arrays.asList(values); }
+    static class Box<T> {
+        final T[] items;
+        @SafeVarargs
+        Box(T... items) { this.items = items; }
     }
-
-    /**
-     * Evaluates translated classes. {@code classNames} (comma separated, as the VM names
-     * them) lets the loader refuse a class that would replace one of the Playground's own.
-     */
-    @org.teavm.jso.JSBody(params = {"source", "classNames"}, script = "__cn1LoadClasses(source, classNames);")
-    static native void loadClasses(String source, String classNames);
+    public static void main(String[] args) {
+        String[] s = of("a", "b");
+        System.out.println(s.getClass().getSimpleName() + " " + s.length + " " + s[1]);
+        Integer[] i = of(1, 2, 3);
+        System.out.println(i.getClass().getSimpleName() + " " + i[2]);
+        Number[] n = GenericVarargs.<Number>of(1, 2.5);
+        System.out.println(n.getClass().getSimpleName() + " " + n[1]);
+        System.out.println(list("x", "y").get(1));
+        Box<String> b = new Box<String>("p", "q");
+        System.out.println(b.items.getClass().getSimpleName() + " " + b.items[0]);
+        Object[] o = of();
+        System.out.println(o.getClass().getSimpleName() + " " + o.length);
+    }
 }

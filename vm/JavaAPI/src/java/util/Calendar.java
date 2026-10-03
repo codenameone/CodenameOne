@@ -90,7 +90,7 @@ public abstract class Calendar{
      * @see #getFirstDayOfWeek
      * @see #getMinimalDaysInFirstWeek
      */
-    static final int WEEK_OF_YEAR = 3;
+    public static final int WEEK_OF_YEAR = 3;
     
     /**
      * Field number for {@code get} and {@code set} indicating the

@@ -11,3 +11,8 @@ paths-ignore:
   # vm/ByteCodeTranslator/src/cn1_sqlite3_README.md.
   - 'vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h'
   - 'vm/ByteCodeTranslator/src/cn1_sqlite3.h'
+  # Test programs for the in-tree Java compiler. They exercise the language's
+  # corner cases on purpose -- narrowing compound assignments, overflow, odd
+  # casts -- so every program there must compile and behave exactly as javac's
+  # output does; "fixing" what CodeQL flags would remove the case under test.
+  - 'vm/JavaCompiler/tests/**'

@@ -184,6 +184,59 @@ public final class PlaygroundSyntaxMatrixHarness {
         addIntegrationCases(cases);
         addParseDiagnostics(cases);
         addExtendedCoverage(cases);
+        addEntriesAndJavacRules(cases);
+    }
+
+    // ------------------------------------------------------------------
+    // Category: entry shapes (a pasted source file with a package line, entry
+    // methods returning a Component subtype) and the javac rules the compiler
+    // enforces -- access, blank finals, overrides, literals.
+    // ------------------------------------------------------------------
+    private static void addEntriesAndJavacRules(List<Case> cases) {
+        String cat = "entries_and_rules";
+        cases.add(new Case(cat, "script_with_package_line", ""
+                + "package demo.app;\n"
+                + "Label l = new Label(\"in a package\");\n"
+                + "l\n", ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "packaged_lifecycle_class_package_private", ""
+                + "package demo.app;\n"
+                + "class App {\n"
+                + "    Form start() { Form f = new Form(\"Hi\", BoxLayout.y()); f.add(new Label(\"pkg\")); return f; }\n"
+                + "}\n", ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "start_returns_button", ""
+                + "public class App {\n"
+                + "    public Button start() { return new Button(\"b\"); }\n"
+                + "}\n", ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "build_returns_label", ""
+                + "public class App {\n"
+                + "    public Label build(PlaygroundContext ctx) { return new Label(\"x\"); }\n"
+                + "}\n", ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "protected_member_from_outside", ui(""
+                + "Object o = new Object().clone();\n"
+                + "root.add(new Label(\"\" + o));"),
+                ExpectedOutcome.PARSE_ERROR, "has protected access"));
+        cases.add(new Case(cat, "blank_final_never_assigned", ui(""
+                + "class Holder { final int x; }\n"
+                + "root.add(new Label(\"\" + new Holder().x));"),
+                ExpectedOutcome.PARSE_ERROR, "not initialized in the default constructor"));
+        cases.add(new Case(cat, "override_of_final_method", ui(""
+                + "class A { final String m() { return \"a\"; } }\n"
+                + "class B extends A { String m() { return \"b\"; } }\n"
+                + "root.add(new Label(new B().m()));"),
+                ExpectedOutcome.PARSE_ERROR, "overridden method is final"));
+        cases.add(new Case(cat, "float_literal_overflow", ui(""
+                + "double d = 1e400;\n"
+                + "root.add(new Label(\"\" + d));"),
+                ExpectedOutcome.PARSE_ERROR, "floating-point number too large"));
+        cases.add(new Case(cat, "misplaced_underscore", ui(""
+                + "int n = 0x_FF;\n"
+                + "root.add(new Label(\"\" + n));"),
+                ExpectedOutcome.PARSE_ERROR, "illegal underscore"));
+        cases.add(new Case(cat, "generic_varargs_array_type", ui(""
+                + "class U { @SafeVarargs static <T> T[] of(T... v) { return v; } }\n"
+                + "String[] s = U.of(\"a\", \"b\");\n"
+                + "root.add(new Label(s[1] + s.length));"),
+                ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------

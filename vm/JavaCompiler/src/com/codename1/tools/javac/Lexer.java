@@ -409,7 +409,17 @@ final class Lexer {
         while (i < n) {
             char c = s.charAt(i);
             if (c == '_') {
-                i++;
+                // Only between two digits (JLS 3.10.1): not after 0x, a dot or an
+                // exponent marker, and not at the end of the digits.
+                if (i == start || !isLiteralDigit(s.charAt(i - 1), hex)) {
+                    throw error(i, "illegal underscore");
+                }
+                while (i < n && s.charAt(i) == '_') {
+                    i++;
+                }
+                if (i >= n || !isLiteralDigit(s.charAt(i), hex)) {
+                    throw error(i - 1, "illegal underscore");
+                }
             } else if (Character.isDigit(c) || hex && (c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F')) {
                 digits.append(c);
                 i++;
@@ -435,6 +445,7 @@ final class Lexer {
             if (suffix == 'f' || suffix == 'F') {
                 i++;
                 float v = hex ? (float) parseHexDouble(text) : Float.parseFloat(text);
+                checkFloatRange(Float.isInfinite(v), v == 0f, text, hex, start);
                 return new Token(Token.Kind.FLOAT_LITERAL, start, i, s.substring(start, i), Float.valueOf(v));
             }
             if (suffix == 'd' || suffix == 'D' || floating) {
@@ -442,6 +453,7 @@ final class Lexer {
                     i++;
                 }
                 double v = hex ? parseHexDouble(text) : Double.parseDouble(text);
+                checkFloatRange(Double.isInfinite(v), v == 0d, text, hex, start);
                 return new Token(Token.Kind.DOUBLE_LITERAL, start, i, s.substring(start, i), Double.valueOf(v));
             }
             boolean isLong = suffix == 'l' || suffix == 'L';
@@ -460,6 +472,31 @@ final class Lexer {
             return new Token(Token.Kind.INT_LITERAL, start, i, s.substring(start, i), Integer.valueOf((int) value));
         } catch (NumberFormatException e) {
             throw error(start, "malformed number: " + s.substring(start, i));
+        }
+    }
+
+    private static boolean isLiteralDigit(char c, boolean hex) {
+        return c >= '0' && c <= '9' || hex && (c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F');
+    }
+
+    /**
+     * A floating literal must not round to infinity, nor to zero unless it is zero
+     * (JLS 3.10.2): {@code 1e400} and {@code 1e-4000} are errors, not values.
+     */
+    private void checkFloatRange(boolean infinite, boolean zero, String text, boolean hex, int pos) {
+        if (infinite) {
+            throw error(pos, "floating-point number too large");
+        }
+        if (zero) {
+            for (int k = 0; k < text.length(); k++) {
+                char c = text.charAt(k);
+                if (!hex && (c == 'e' || c == 'E') || hex && (c == 'p' || c == 'P')) {
+                    break;
+                }
+                if (c >= '1' && c <= '9' || hex && (c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F')) {
+                    throw error(pos, "floating-point number too small");
+                }
+            }
         }
     }
 

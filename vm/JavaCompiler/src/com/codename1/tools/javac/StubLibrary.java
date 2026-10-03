@@ -45,7 +45,8 @@ import java.util.Map;
  * members, annotations and debug attributes.
  *
  * <p>File format: {@code "CN1STUB1"}, a u4 class count, then per class a u2 name
- * length, the internal name (ASCII), a u4 length and the stub class file.
+ * length, the internal name (UTF-8, so an ASCII name is one byte a character), a u4
+ * length and the stub class file.
  */
 public final class StubLibrary implements ClassLibrary {
     private static final String MAGIC = "CN1STUB1";
@@ -68,11 +69,7 @@ public final class StubLibrary implements ClassLibrary {
         for (int i = 0; i < count; i++) {
             int nameLen = (data[p] & 0xFF) << 8 | data[p + 1] & 0xFF;
             p += 2;
-            char[] chars = new char[nameLen];
-            for (int k = 0; k < nameLen; k++) {
-                chars[k] = (char) (data[p + k] & 0xFF);
-            }
-            String name = new String(chars);
+            String name = decodeUtf8(data, p, nameLen);
             p += nameLen;
             int len = u4(data, p);
             p += 4;
@@ -106,6 +103,46 @@ public final class StubLibrary implements ClassLibrary {
         return names.size();
     }
 
+    /** UTF-8 by hand: the compiler is translated to run on ParparVM, so no charset lookup. */
+    static byte[] encodeUtf8(String s) {
+        ByteBuf b = new ByteBuf(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            int c = s.charAt(i);
+            if (Character.isHighSurrogate((char) c) && i + 1 < s.length() && Character.isLowSurrogate(s.charAt(i + 1))) {
+                c = Character.toCodePoint((char) c, s.charAt(++i));
+            }
+            if (c < 0x80) {
+                b.u1(c);
+            } else if (c < 0x800) {
+                b.u1(0xC0 | c >> 6).u1(0x80 | c & 0x3F);
+            } else if (c < 0x10000) {
+                b.u1(0xE0 | c >> 12).u1(0x80 | c >> 6 & 0x3F).u1(0x80 | c & 0x3F);
+            } else {
+                b.u1(0xF0 | c >> 18).u1(0x80 | c >> 12 & 0x3F).u1(0x80 | c >> 6 & 0x3F).u1(0x80 | c & 0x3F);
+            }
+        }
+        return b.toByteArray();
+    }
+
+    static String decodeUtf8(byte[] d, int p, int len) {
+        StringBuilder out = new StringBuilder(len);
+        int end = p + len;
+        while (p < end) {
+            int b0 = d[p++] & 0xFF;
+            if (b0 < 0x80) {
+                out.append((char) b0);
+            } else if (b0 < 0xE0) {
+                out.append((char) ((b0 & 0x1F) << 6 | d[p++] & 0x3F));
+            } else if (b0 < 0xF0) {
+                out.append((char) ((b0 & 0x0F) << 12 | (d[p++] & 0x3F) << 6 | d[p++] & 0x3F));
+            } else {
+                int cp = (b0 & 0x07) << 18 | (d[p++] & 0x3F) << 12 | (d[p++] & 0x3F) << 6 | d[p++] & 0x3F;
+                out.append(Character.highSurrogate(cp)).append(Character.lowSurrogate(cp));
+            }
+        }
+        return out.toString();
+    }
+
     // ------------------------------------------------------------------ writing
 
     /** Packs stubs (internal name to stub class file) into the library format. */
@@ -116,11 +153,11 @@ public final class StubLibrary implements ClassLibrary {
         }
         b.u4(stubs.size());
         for (Map.Entry<String, byte[]> e : stubs.entrySet()) {
-            String n = e.getKey();
-            b.u2(n.length());
-            for (int i = 0; i < n.length(); i++) {
-                b.u1(n.charAt(i));
-            }
+            // UTF-8: a Java class may be named in any script, and one byte a character
+            // would truncate everything above U+00FF.
+            byte[] n = encodeUtf8(e.getKey());
+            b.u2(n.length);
+            b.bytes(n, 0, n.length);
             b.u4(e.getValue().length);
             b.bytes(e.getValue(), 0, e.getValue().length);
         }

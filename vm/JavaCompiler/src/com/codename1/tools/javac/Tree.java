@@ -329,6 +329,12 @@ abstract class Tree {
         boolean varargsCall;
         /** {@code super.m()} or {@code X.super.m()}: an invokespecial. */
         boolean superCall;
+        /** Position of the '.' before the name of a qualified call, where javac reports it; -1 otherwise. */
+        int dotPos = -1;
+        /** For Outer.super.m() from an inner class: the static accessor in Outer that makes the call. */
+        MethodSymbol superAccessor;
+        /** For a variable-arity call: the inferred element type of the array the arguments go in. */
+        Type varargsElem;
     }
 
     static final class NewClass extends Tree {
@@ -341,6 +347,8 @@ abstract class Tree {
         ClassDecl body;
         MethodSymbol constructor;
         boolean varargsCall;
+        /** For a variable-arity call: the inferred element type of the array the arguments go in. */
+        Type varargsElem;
     }
 
     static final class NewArray extends Tree {

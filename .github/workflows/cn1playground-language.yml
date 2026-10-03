@@ -93,6 +93,14 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Ensure Xvfb is available
+        run: |
+          set -euo pipefail
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            bash scripts/ci/apt-get-update.sh
+            sudo apt-get install -y xvfb
+          fi
+
       - name: Bootstrap local Codename One snapshots
         run: SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
 
@@ -114,7 +122,9 @@ jobs:
           set -euo pipefail
           mkdir -p "$PLAYGROUND_BROWSER_ARTIFACT_DIR"
           cd scripts/cn1playground
-          bash tools/run-playground-browser-tests.sh
+          # The build compiles the theme CSS through the JavaSE port, which needs a
+          # display, as the language-smoke job's harnesses do.
+          xvfb-run -a bash tools/run-playground-browser-tests.sh
 
       - name: Upload screenshots
         if: always()

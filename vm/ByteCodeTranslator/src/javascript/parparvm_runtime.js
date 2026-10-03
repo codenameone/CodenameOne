@@ -4737,7 +4737,26 @@ function _GW(name) {
 }
 global._GW = _GW;
 // Evaluates incrementally translated classes in the VM's global scope.
-global.__cn1LoadClasses = function(source) {
+// ``names`` (comma separated) are the classes the chunk defines. A user class may
+// replace one an earlier chunk defined -- a Playground re-run -- but never one of the
+// running application's: its function declarations would be hoisted over the host's
+// before any check inside defineClass could run, so the check is made here, first.
+global.__cn1LoadClasses = function(source, names) {
+  if (names) {
+    const list = String(names).split(",");
+    const mine = jvm.__cn1LoadedClasses || (jvm.__cn1LoadedClasses = new Set());
+    for (let i = 0; i < list.length; i++) {
+      const n = list[i];
+      if (n && jvm.classes[n] && !mine.has(n)) {
+        throw new Error("Class " + n + " clashes with a class of the running application; rename it");
+      }
+    }
+    for (let i = 0; i < list.length; i++) {
+      if (list[i]) {
+        mine.add(list[i]);
+      }
+    }
+  }
   if (typeof importScripts === "function" && typeof Blob === "function" && typeof URL !== "undefined"
       && typeof URL.createObjectURL === "function") {
     const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));

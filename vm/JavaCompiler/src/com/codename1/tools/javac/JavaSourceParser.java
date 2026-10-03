@@ -2058,6 +2058,7 @@ final class JavaSourceParser {
                     Tree.MethodCall call = at(new Tree.MethodCall(), namePos);
                     call.receiver = e;
                     call.name = name;
+                    call.dotPos = t.pos;
                     arguments(call.args);
                     e = call;
                 } else {

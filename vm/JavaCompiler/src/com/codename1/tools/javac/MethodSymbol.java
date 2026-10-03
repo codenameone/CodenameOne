@@ -40,6 +40,13 @@ final class MethodSymbol extends Symbol {
     /** Default value present (annotation element). */
     /** For a constructor without an explicit this()/super() call: the superclass constructor it calls. */
     MethodSymbol superCtor;
+    /**
+     * For a synthetic accessor the compiler adds to a class so an inner class can call
+     * Outer.super.m(): the superclass method it invokes (with invokespecial), and the
+     * class that names it.
+     */
+    MethodSymbol superAccessTarget;
+    ClassSymbol superAccessQualifier;
     /** The anonymous class constructor's call to super was variable-arity. */
 
     MethodSymbol(String name, int flags, ClassSymbol owner) {

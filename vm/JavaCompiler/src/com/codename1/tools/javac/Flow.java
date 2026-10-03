@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Definite assignment (JLS 16) for local variables, plus unreachable-statement
+ * Definite assignment (JLS 16) for local variables and blank final fields, plus unreachable-statement
  * detection (JLS 14.22). A read of a local that is not definitely assigned would
  * otherwise reach the JVM verifier (or, translated, read garbage), so it is a
  * compile error here as in javac.
@@ -50,6 +50,13 @@ final class Flow {
     private List<Object[]> exits;
     /** Enclosing jump targets: {tree, label}. */
     private List<Object[]> targets;
+    /**
+     * The blank final fields a constructor body must assign before it returns
+     * (JLS 16.9); null outside such a body. A {@code return} checks them too.
+     */
+    private List<VarSymbol> ctorBlankFinals;
+    /** Where a constructor that falls off its end reports an unassigned field: its closing brace. */
+    private int ctorEndPos;
 
     Flow(Compiler compiler) {
         this.compiler = compiler;
@@ -60,27 +67,128 @@ final class Flow {
             return;
         }
         unit = c.unit;
+        // Blank finals (JLS 16.8, 16.9): a final field without an initializer must be
+        // assigned exactly once -- a static one by the static initializers, an instance
+        // one by the instance initializers or else by every constructor that does not
+        // delegate to this(...). Record fields are assigned by the canonical constructor
+        // the compiler completes, so records are left to it.
+        List<VarSymbol> staticBlanks = new ArrayList<VarSymbol>();
+        List<VarSymbol> instanceBlanks = new ArrayList<VarSymbol>();
+        List<Tree.VarDef> blankDecls = new ArrayList<Tree.VarDef>();
+        if (!c.isRecord()) {
+            for (Tree member : c.decl.members) {
+                if (member instanceof Tree.VarDef) {
+                    Tree.VarDef v = (Tree.VarDef) member;
+                    if (v.init == null && v.sym != null && v.sym.isFinal()) {
+                        (v.sym.isStatic() ? staticBlanks : instanceBlanks).add(v.sym);
+                        blankDecls.add(v);
+                    }
+                }
+            }
+        }
+
+        // Static initialization, in source order.
+        reset();
+        declareAll(staticBlanks);
         for (Tree member : c.decl.members) {
-            if (member instanceof Tree.MethodDecl) {
-                Tree.MethodDecl m = (Tree.MethodDecl) member;
-                if (m.body == null || m.sym == null) {
-                    continue;
-                }
-                reset();
-                for (VarSymbol p : m.sym.paramSyms) {
-                    declare(p);
-                    assign(p);
-                }
-                scanStat(m.body);
-            } else if (member instanceof Tree.VarDef) {
-                Tree.VarDef v = (Tree.VarDef) member;
-                if (v.init != null) {
-                    reset();
-                    scanExpr(v.init);
-                }
-            } else if (member instanceof Tree.Block) {
-                reset();
+            if (member instanceof Tree.VarDef && ((Tree.VarDef) member).sym != null
+                    && ((Tree.VarDef) member).sym.isStatic()) {
+                scanExpr(((Tree.VarDef) member).init);
+            } else if (member instanceof Tree.Block && ((Tree.Block) member).isStatic) {
                 scanStat(member);
+            }
+        }
+        if (alive) {
+            for (Tree.VarDef v : blankDecls) {
+                if (v.sym.isStatic() && !isAssigned(v.sym)) {
+                    error(v.pos, "variable " + v.name + " might not have been initialized");
+                }
+            }
+        }
+
+        // Instance initialization, in source order: its end state is where every
+        // constructor that calls super(...) starts.
+        reset();
+        declareAll(instanceBlanks);
+        for (Tree member : c.decl.members) {
+            if (member instanceof Tree.VarDef && ((Tree.VarDef) member).sym != null
+                    && !((Tree.VarDef) member).sym.isStatic()) {
+                scanExpr(((Tree.VarDef) member).init);
+            } else if (member instanceof Tree.Block && !((Tree.Block) member).isStatic) {
+                scanStat(member);
+            }
+        }
+        BitSet afterInit = copy(inits);
+        boolean initAlive = alive;
+        boolean hasCtor = false;
+        for (Tree member : c.decl.members) {
+            if (member instanceof Tree.MethodDecl && ((Tree.MethodDecl) member).sym != null
+                    && ((Tree.MethodDecl) member).sym.isConstructor()) {
+                hasCtor = true;
+            }
+        }
+        if (!hasCtor && initAlive) {
+            // The default constructor runs the instance initializers and nothing else.
+            for (Tree.VarDef v : blankDecls) {
+                if (!v.sym.isStatic() && !isAssigned(v.sym)) {
+                    error(v.pos, "variable " + v.name + " not initialized in the default constructor");
+                }
+            }
+        }
+
+        for (Tree member : c.decl.members) {
+            if (!(member instanceof Tree.MethodDecl)) {
+                continue;
+            }
+            Tree.MethodDecl m = (Tree.MethodDecl) member;
+            if (m.body == null || m.sym == null) {
+                continue;
+            }
+            reset();
+            boolean ctor = m.sym.isConstructor() && !m.compactConstructor;
+            if (ctor) {
+                declareAll(instanceBlanks);
+                Tree.MethodCall explicit = Attr.explicitConstructorCall(m.body);
+                if (explicit != null && !explicit.superCall) {
+                    // this(...) has assigned every one of them already.
+                    for (VarSymbol f : instanceBlanks) {
+                        assign(f);
+                    }
+                } else {
+                    inits = copy(afterInit);
+                    alive = initAlive;
+                    ctorBlankFinals = instanceBlanks;
+                    ctorEndPos = m.body.endPos;
+                }
+            }
+            for (VarSymbol p : m.sym.paramSyms) {
+                declare(p);
+                assign(p);
+            }
+            scanStat(m.body);
+            if (ctorBlankFinals != null && alive) {
+                checkBlankFinalsAssigned(ctorEndPos);
+            }
+            ctorBlankFinals = null;
+        }
+    }
+
+    private void declareAll(List<VarSymbol> vars) {
+        for (VarSymbol v : vars) {
+            declare(v);
+        }
+    }
+
+    private boolean isAssigned(VarSymbol v) {
+        Integer i = index.get(v);
+        return i == null || inits == null || inits.get(i.intValue());
+    }
+
+    /** At a constructor's normal exit: each blank final must be definitely assigned. */
+    private void checkBlankFinalsAssigned(int pos) {
+        for (VarSymbol f : ctorBlankFinals) {
+            if (!isAssigned(f)) {
+                error(pos, "variable " + f.name + " might not have been initialized");
             }
         }
     }
@@ -371,6 +479,9 @@ final class Flow {
             if (r.expr != null) {
                 scanExpr(r.expr);
             }
+            if (ctorBlankFinals != null && alive) {
+                checkBlankFinalsAssigned(r.pos);
+            }
             markDead();
         } else if (t instanceof Tree.Throw) {
             scanExpr(((Tree.Throw) t).expr);
@@ -549,7 +660,9 @@ final class Flow {
 
     private void scanCond(Tree c) {
         if (c.constant instanceof Boolean) {
-            scanExpr(c);
+            // Nothing to scan: a constant expression assigns nothing and reads only
+            // constant variables, which are initialized where declared. (Scanning it
+            // re-entered scanCond for a constant !X or X && Y, without end.)
             if (((Boolean) c.constant).booleanValue()) {
                 whenTrue = copy(inits);
                 whenFalse = null;
@@ -597,15 +710,42 @@ final class Flow {
         whenFalse = copy(inits);
     }
 
+    /**
+     * The variable an assignment target names, if this analysis tracks it: a local,
+     * or a blank final field being initialized, named as {@code x} or {@code this.x}
+     * (JLS 16: only those two forms count).
+     */
     private VarSymbol localOf(Tree t) {
         while (t instanceof Tree.Parens) {
             t = ((Tree.Parens) t).expr;
         }
         if (t instanceof Tree.Ident && ((Tree.Ident) t).sym instanceof VarSymbol) {
             VarSymbol v = (VarSymbol) ((Tree.Ident) t).sym;
-            return v.kind == VarSymbol.Kind.FIELD ? null : v;
+            return v.kind == VarSymbol.Kind.FIELD && !index.containsKey(v) ? null : v;
+        }
+        if (t instanceof Tree.Select && ((Tree.Select) t).sym instanceof VarSymbol && isThis(((Tree.Select) t).selected)) {
+            VarSymbol v = (VarSymbol) ((Tree.Select) t).sym;
+            return index.containsKey(v) ? v : null;
         }
         return null;
+    }
+
+    /** Where javac reports an assignment target: the name, or for this.x the dot before it. */
+    private static int targetPos(Tree t) {
+        while (t instanceof Tree.Parens) {
+            t = ((Tree.Parens) t).expr;
+        }
+        if (t instanceof Tree.Select && ((Tree.Select) t).dotPos >= 0) {
+            return ((Tree.Select) t).dotPos;
+        }
+        return t.pos;
+    }
+
+    private static boolean isThis(Tree t) {
+        while (t instanceof Tree.Parens) {
+            t = ((Tree.Parens) t).expr;
+        }
+        return t instanceof Tree.Ident && "this".equals(((Tree.Ident) t).name);
     }
 
     private void scanExpr(Tree t) {
@@ -614,7 +754,8 @@ final class Flow {
         }
         if (t instanceof Tree.Ident) {
             Symbol s = ((Tree.Ident) t).sym;
-            if (s instanceof VarSymbol && ((VarSymbol) s).kind != VarSymbol.Kind.FIELD) {
+            if (s instanceof VarSymbol) {
+                // A field is only in the index while it is a blank final being initialized.
                 checkRead((VarSymbol) s, t.pos);
             }
         } else if (t instanceof Tree.Assign) {
@@ -628,7 +769,7 @@ final class Flow {
                 if (v.isFinal() && !v.hasInitializer && alive && inits != null) {
                     Integer i = index.get(v);
                     if (i != null && inits.get(i.intValue())) {
-                        error(a.pos, "variable " + v.name + " might already have been assigned");
+                        error(targetPos(a.lhs), "variable " + v.name + " might already have been assigned");
                     }
                 }
                 assign(v);
@@ -659,6 +800,9 @@ final class Flow {
             boolean savedAlive = alive;
             List<Object[]> savedExits = exits;
             List<Object[]> savedTargets = targets;
+            // A return in the lambda leaves the lambda, not the enclosing constructor.
+            List<VarSymbol> savedCtorBlanks = ctorBlankFinals;
+            ctorBlankFinals = null;
             exits = new ArrayList<Object[]>();
             targets = new ArrayList<Object[]>();
             for (Tree.VarDef p : l.params) {
@@ -678,6 +822,7 @@ final class Flow {
             alive = savedAlive;
             exits = savedExits;
             targets = savedTargets;
+            ctorBlankFinals = savedCtorBlanks;
         } else if (t instanceof Tree.MethodRef) {
             Tree.MethodRef r = (Tree.MethodRef) t;
             if (r.lambda != null) {
@@ -698,7 +843,12 @@ final class Flow {
                 scanExpr(a);
             }
         } else if (t instanceof Tree.Select) {
-            scanExpr(((Tree.Select) t).selected);
+            Tree.Select sel = (Tree.Select) t;
+            if (sel.sym instanceof VarSymbol && isThis(sel.selected)) {
+                checkRead((VarSymbol) sel.sym, t.pos);
+            } else {
+                scanExpr(sel.selected);
+            }
         } else if (t instanceof Tree.Parens) {
             scanExpr(((Tree.Parens) t).expr);
         } else if (t instanceof Tree.Unary) {

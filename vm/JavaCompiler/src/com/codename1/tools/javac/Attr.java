@@ -438,21 +438,29 @@ final class Attr {
         if (e.tag != Type.Tag.CLASS) {
             return null;
         }
-        return findField(((Type.ClassType) e).sym, name, new LinkedHashSet<ClassSymbol>());
+        ClassSymbol origin = ((Type.ClassType) e).sym;
+        return findField(origin, origin, name, new LinkedHashSet<ClassSymbol>());
     }
 
-    private VarSymbol findField(ClassSymbol c, String name, Set<ClassSymbol> seen) {
+    /**
+     * A field that is a member of origin: declared there, or inherited (JLS 8.3). A
+     * superclass's private field is not inherited, nor is a package-private one from
+     * another package, so a simple name inside an anonymous Container subclass reaches
+     * past Component's private parent to the enclosing class's field.
+     */
+    private VarSymbol findField(ClassSymbol origin, ClassSymbol c, String name, Set<ClassSymbol> seen) {
         if (c == null || !seen.add(c)) {
             return null;
         }
         for (VarSymbol f : c.fields()) {
-            if (f.name.equals(name)) {
+            if (f.name.equals(name) && (c == origin || !f.isPrivate()
+                    && (!isPackagePrivate(f) || packageOf(c).equals(packageOf(origin))))) {
                 return f;
             }
         }
         for (Type i : c.interfaces()) {
             if (i.tag == Type.Tag.CLASS) {
-                VarSymbol f = findField(((Type.ClassType) i).sym, name, seen);
+                VarSymbol f = findField(origin, ((Type.ClassType) i).sym, name, seen);
                 if (f != null) {
                     return f;
                 }
@@ -460,7 +468,7 @@ final class Attr {
         }
         Type sup = c.superclass();
         if (sup != null && sup.tag == Type.Tag.CLASS) {
-            return findField(((Type.ClassType) sup).sym, name, seen);
+            return findField(origin, ((Type.ClassType) sup).sym, name, seen);
         }
         return null;
     }
@@ -654,11 +662,118 @@ final class Attr {
                 m.superCtor = resolveImplicitSuper(c, cenv, decl.pos);
             }
         }
+        checkOverrides(c, cenv);
         if (!c.isInterface() && !c.isAbstract() && !(c.isEnum() && !c.isFinal())) {
             checkAbstractImplemented(c, cenv);
         }
         for (ClassSymbol member : c.memberClasses.values()) {
             attribClass(member);
+        }
+    }
+
+    /**
+     * Each declared method against every inherited one it overrides or hides (JLS
+     * 8.4.8): javac refuses overriding a final method, mixing static and instance,
+     * weakening access, an incompatible return type and widening the checked
+     * exceptions. Unchecked, the class would fail to load (a final override is an
+     * IncompatibleClassChangeError) or dispatch differently once translated.
+     */
+    private void checkOverrides(ClassSymbol c, Env cenv) {
+        List<ClassSymbol> supers = new ArrayList<ClassSymbol>();
+        collectSupertypes(c, supers, new LinkedHashSet<ClassSymbol>());
+        for (MethodSymbol m : c.methods) {
+            if (m.decl == null || m.isConstructor() || m.isPrivate() || "<clinit>".equals(m.name)) {
+                continue;
+            }
+            for (ClassSymbol s : supers) {
+                for (MethodSymbol x : s.methods()) {
+                    if (!x.name.equals(m.name) || x.isConstructor() || x.isPrivate()
+                            || x.isStatic() && s.isInterface()
+                            || isPackagePrivate(x) && !packageOf(s).equals(packageOf(c))
+                            || !sameErasedParamsOrGeneric(m, x, c)) {
+                        continue;
+                    }
+                    String why = overrideProblem(m, x, c);
+                    if (why != null) {
+                        boolean implement = s.isInterface() && !c.isInterface();
+                        error(cenv, m.decl.pos, m + " in " + c.javaName() + " cannot "
+                                + (implement ? "implement " : "override ") + x + " in " + s.javaName() + "\n  " + why);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean isPackagePrivate(Symbol x) {
+        return (x.flags & (Symbol.ACC_PUBLIC | Symbol.ACC_PROTECTED | Symbol.ACC_PRIVATE)) == 0;
+    }
+
+    private static int accessRank(MethodSymbol m) {
+        return m.isPublic() ? 3 : m.isProtected() ? 2 : m.isPrivate() ? 0 : 1;
+    }
+
+    /** Why m may not override x, in javac's words; null when it may. */
+    private String overrideProblem(MethodSymbol m, MethodSymbol x, ClassSymbol c) {
+        if (m.isStatic() && !x.isStatic()) {
+            return "overriding method is static";
+        }
+        if (!m.isStatic() && x.isStatic()) {
+            return "overridden method is static";
+        }
+        if (x.isFinal()) {
+            return "overridden method is final";
+        }
+        if (accessRank(m) < accessRank(x)) {
+            return "attempting to assign weaker access privileges; was "
+                    + (x.isPublic() ? "public" : x.isProtected() ? "protected" : "package");
+        }
+        Type xr = Type.substitute(x.returnType, types.memberMapping(c.thisType(), x.owner));
+        Type mr = m.returnType;
+        if (xr != null && mr != null && !xr.isErroneous() && !mr.isErroneous()) {
+            boolean ok;
+            if (xr.isPrimitive() || xr.tag == Type.Tag.VOID || mr.isPrimitive() || mr.tag == Type.Tag.VOID) {
+                ok = xr.tag == mr.tag;
+            } else {
+                // Erased: an unchecked (raw) override is a warning in javac, not an error.
+                ok = types.isSubtype(types.erased(mr), types.erased(xr));
+            }
+            if (!ok) {
+                return "return type " + mr + " is not compatible with " + xr;
+            }
+        }
+        for (Type t : m.thrown) {
+            if (t.isErroneous() || !isChecked(t)) {
+                continue;
+            }
+            boolean covered = false;
+            for (Type xt : x.thrown) {
+                if (types.isSubtype(types.erased(t), types.erased(xt))) {
+                    covered = true;
+                }
+            }
+            if (!covered) {
+                return "overridden method does not throw " + t;
+            }
+        }
+        return null;
+    }
+
+    private void collectSupertypes(ClassSymbol c, List<ClassSymbol> out, Set<ClassSymbol> seen) {
+        Type sup = c.superclass();
+        if (sup != null && sup.tag == Type.Tag.CLASS && seen.add(((Type.ClassType) sup).sym)) {
+            out.add(((Type.ClassType) sup).sym);
+            collectSupertypes(((Type.ClassType) sup).sym, out, seen);
+        }
+        for (Type i : c.interfaces()) {
+            if (i.tag == Type.Tag.CLASS && seen.add(((Type.ClassType) i).sym)) {
+                out.add(((Type.ClassType) i).sym);
+                collectSupertypes(((Type.ClassType) i).sym, out, seen);
+            }
+        }
+        if (c.isInterface() && seen.add(syms.objectSym)) {
+            // An interface's methods may not clash with Object's public ones either.
+            out.add(syms.objectSym);
         }
     }
 
@@ -1989,6 +2104,12 @@ final class Attr {
         if (site == null || f.owner == null || f.isStatic()) {
             return f.type;
         }
+        Type r = types.resolveInference(site);
+        if (r.tag == Type.Tag.CLASS && ((Type.ClassType) r).isRaw()) {
+            // A raw type's members have their erased types (JLS 4.8): through a raw
+            // Promise, a Functor<Throwable, ?> field is a raw Functor.
+            return types.erased(f.type);
+        }
         java.util.Map<Type.TypeVar, Type> map = types.memberMapping(site, f.owner);
         return Type.substitute(f.type, map);
     }
@@ -2114,7 +2235,7 @@ final class Attr {
             if (!f.isStatic()) {
                 error(env, sel.pos, "non-static variable " + name + " cannot be referenced from a static context");
             }
-            checkAccess(f.flags, f.owner, env, sel.pos, name);
+            checkAccess(f.flags, f.owner, qt, env, sel.dotPos >= 0 ? sel.dotPos : sel.pos, name);
             ensureConstant(f);
             sel.constant = f.constValue;
             return f.type;
@@ -2144,7 +2265,7 @@ final class Attr {
             return Type.ERROR;
         }
         sel.sym = f;
-        checkAccess(f.flags, f.owner, env, sel.pos, name);
+        checkAccess(f.flags, f.owner, rst, env, sel.dotPos >= 0 ? sel.dotPos : sel.pos, name);
         ensureConstant(f);
         if (f.isStatic()) {
             sel.constant = f.constValue;
@@ -2169,13 +2290,70 @@ final class Attr {
     }
 
     /** Private members are accessible within the same top-level class only. */
-    private void checkAccess(int flags, ClassSymbol owner, Env env, int pos, String name) {
-        if ((flags & Symbol.ACC_PRIVATE) == 0 || owner == null) {
+    /** Reports a member the current class may not access (JLS 6.6), in javac's words. */
+    private void checkAccess(int flags, ClassSymbol owner, Type site, Env env, int pos, String name) {
+        if (isAccessible(flags, owner, site, env, false)) {
             return;
         }
-        if (outermost(owner) != outermost(env.enclClass)) {
-            error(env, pos, name + " has private access in " + owner.javaName());
+        error(env, pos, accessMessage(flags, owner, name));
+    }
+
+    private static String accessMessage(int flags, ClassSymbol owner, String name) {
+        if ((flags & Symbol.ACC_PRIVATE) != 0) {
+            return name + " has private access in " + owner.javaName();
         }
+        if ((flags & Symbol.ACC_PROTECTED) != 0) {
+            return name + " has protected access in " + owner.javaName();
+        }
+        return name + " is not public in " + owner.javaName() + "; cannot be accessed from outside package";
+    }
+
+    /**
+     * Whether code in the current class may use a member with these flags declared in
+     * owner, reached through an expression of type site (null when unqualified).
+     * Private: within the same top-level class. Package-private: within owner's
+     * package. Protected (JLS 6.6.2): also from a subclass of owner -- for an instance
+     * member only through that subclass (or super), so {@code new Object().clone()}
+     * is refused while {@code this.clone()} and an array's clone() are not.
+     */
+    boolean isAccessible(int flags, ClassSymbol owner, Type site, Env env, boolean viaSuper) {
+        if (owner == null || (flags & Symbol.ACC_PUBLIC) != 0) {
+            return true;
+        }
+        ClassSymbol from = env.enclClass;
+        if (from == null) {
+            return true;
+        }
+        if ((flags & Symbol.ACC_PRIVATE) != 0) {
+            return outermost(owner) == outermost(from);
+        }
+        if (packageOf(owner).equals(packageOf(from))) {
+            return true;
+        }
+        if ((flags & Symbol.ACC_PROTECTED) == 0) {
+            return false;
+        }
+        for (ClassSymbol k = from; k != null; k = k.outer) {
+            if (!types.isSubClass(k, owner)) {
+                continue;
+            }
+            if ((flags & Symbol.ACC_STATIC) != 0 || site == null || viaSuper) {
+                return true;
+            }
+            Type e = types.erased(types.resolveInference(site));
+            if (e.tag == Type.Tag.ARRAY) {
+                return true;
+            }
+            if (e.tag == Type.Tag.CLASS && types.isSubClass(((Type.ClassType) e).sym, k)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String packageOf(ClassSymbol c) {
+        int slash = c.internalName.lastIndexOf('/');
+        return slash < 0 ? "" : c.internalName.substring(0, slash);
     }
 
     static ClassSymbol outermost(ClassSymbol c) {
@@ -2210,7 +2388,7 @@ final class Attr {
         for (int i = 0; i < na.dims.size() + na.extraDims; i++) {
             t = new Type.ArrayType(t);
         }
-        if (elem.tag == Type.Tag.TYPEVAR || elem.tag == Type.Tag.CLASS && ((Type.ClassType) elem).isParameterized()) {
+        if (!isReifiable(elem)) {
             error(env, na.pos, "generic array creation");
         }
         return t;
@@ -2873,10 +3051,13 @@ final class Attr {
                 order.add(syms.objectSym);
             }
         }
+        ClassSymbol origin = firstClass(order);
         for (ClassSymbol k : order) {
             for (MethodSymbol m : k.methods()) {
                 if (m.name.equals(name) && !m.isConstructor() && !isOverridden(out, m, site)) {
-                    if (k == syms.objectSym && k != firstClass(order) && !m.isPublic() && !m.isProtected()) {
+                    // Only members (JLS 8.4.8): a supertype's private method is not
+                    // inherited, nor a package-private one from another package.
+                    if (k != origin && (m.isPrivate() || isPackagePrivate(m) && !packageOf(k).equals(packageOf(origin)))) {
                         continue;
                     }
                     out.add(m);
@@ -3041,6 +3222,17 @@ final class Attr {
                 if (!potentiallyCompatible(a, f, env)) {
                     return null;
                 }
+                // A call or similar target-sensitive argument in the variable-arity slot,
+                // tried as the array itself (phases 1 and 2): it is that array only if its
+                // own type says so, or setSameSize(getLabel()) would bind a Label to
+                // Component[] instead of going on to phase 3.
+                if (phase < 3 && m.isVarargs() && i == m.params.size() - 1 && !isLambdaLike(a)) {
+                    Type st = standaloneType(a, env);
+                    if (st != null && !st.isErroneous() && st.tag != Type.Tag.NULL
+                            && !types.isAssignable(types.erased(st), types.erased(f), true, null)) {
+                        return null;
+                    }
+                }
                 continue;
             }
             if (at.isErroneous()) {
@@ -3053,6 +3245,24 @@ final class Attr {
         }
         // A plain varargs call with an array in last position (phase 1/2) is not variable-arity.
         return r;
+    }
+
+    /** Standalone types of deferred arguments, computed once, quietly. */
+    private final java.util.Map<Tree, Type> standaloneTypes = new java.util.IdentityHashMap<Tree, Type>();
+
+    /** The type a target-sensitive argument has on its own (no target), attributed quietly. */
+    private Type standaloneType(Tree a, Env env) {
+        Type t = standaloneTypes.get(a);
+        if (t == null && !standaloneTypes.containsKey(a)) {
+            compiler.quiet++;
+            try {
+                t = attribExpr(a, env, null);
+            } finally {
+                compiler.quiet--;
+            }
+            standaloneTypes.put(a, t);
+        }
+        return t;
     }
 
     private static Tree strip(Tree t) {
@@ -3289,8 +3499,68 @@ final class Attr {
         return found[0];
     }
 
-    /** Picks the applicable candidate, phase by phase; null (after reporting unless quiet) when none. */
+    /**
+     * Picks the applicable candidate among the accessible ones (JLS 15.12.2.1: an
+     * inaccessible method is not even potentially applicable, so a public overload wins
+     * over a package-private one the receiver inherits). When only an inaccessible
+     * candidate applies, that is javac's "has private/protected access" error.
+     */
     private Resolution selectMethod(List<MethodSymbol> candidates, Type site, String name, List<Tree> args,
+            List<Type> argTypes, List<Type> typeArgs, Env env, int pos, boolean quiet, Type.ClassType diamondOf,
+            boolean isCtor, ClassSymbol where) {
+        boolean viaSuper = superQualified;
+        superQualified = false;
+        int accessPos = accessErrorPos >= 0 ? accessErrorPos : pos;
+        accessErrorPos = -1;
+        List<MethodSymbol> accessible = new ArrayList<MethodSymbol>();
+        for (MethodSymbol m : candidates) {
+            boolean ok;
+            if (isCtor) {
+                // A protected constructor is reachable from another package only as a
+                // superclass constructor -- super(...), or an anonymous subclass -- never
+                // by a plain new (JLS 6.6.2.2).
+                if ((m.flags & Symbol.ACC_PROTECTED) != 0) {
+                    ok = viaSuper || packageOf(m.owner).equals(packageOf(env.enclClass));
+                } else {
+                    ok = isAccessible(m.flags, m.owner, null, env, true);
+                }
+            } else {
+                ok = isAccessible(m.flags, m.owner, site, env, viaSuper);
+            }
+            if (ok) {
+                accessible.add(m);
+            }
+        }
+        if (accessible.size() == candidates.size()) {
+            return selectAmong(candidates, site, name, args, argTypes, typeArgs, env, pos, quiet, diamondOf, isCtor, where);
+        }
+        Resolution r;
+        compiler.quiet++;
+        try {
+            r = selectAmong(accessible, site, name, args, argTypes, typeArgs, env, pos, true, diamondOf, isCtor, where);
+        } finally {
+            compiler.quiet--;
+        }
+        if (r != null) {
+            // Attributed again, reporting, so diagnostics in the arguments are not lost.
+            return selectAmong(accessible, site, name, args, argTypes, typeArgs, env, pos, quiet, diamondOf, isCtor, where);
+        }
+        r = selectAmong(candidates, site, name, args, argTypes, typeArgs, env, pos, quiet, diamondOf, isCtor, where);
+        if (r != null && !quiet) {
+            MethodSymbol m = r.method;
+            error(env, accessPos, accessMessage(m.flags, m.owner,
+                    (m.isConstructor() ? m.owner.simpleName : m.name) + "(" + paramList(m) + ")"));
+        }
+        return r;
+    }
+
+    /** Set while resolving the method of a super.m(...) call: protected members are reachable through super. */
+    private boolean superQualified;
+    /** Where an access error on the call being resolved is reported (javac: the dot); -1 for the default. */
+    private int accessErrorPos = -1;
+
+    /** Picks the applicable candidate, phase by phase; null (after reporting unless quiet) when none. */
+    private Resolution selectAmong(List<MethodSymbol> candidates, Type site, String name, List<Tree> args,
             List<Type> argTypes, List<Type> typeArgs, Env env, int pos, boolean quiet, Type.ClassType diamondOf,
             boolean isCtor, ClassSymbol where) {
         for (int phase = 1; phase <= 3; phase++) {
@@ -4045,8 +4315,11 @@ final class Attr {
         // (deferred to instantiate()).
         boolean defer = arityMatches(candidates, n) == 1;
         List<Type> argTypes = attribArgsFor(call.args, env, defer);
+        superQualified = call.superCall;
+        accessErrorPos = call.dotPos >= 0 ? call.dotPos : call.pos;
         Resolution r = selectMethod(candidates, site, call.name, call.args, argTypes, typeArgs, env, call.pos, false,
                 null, false, where);
+        superQualified = false;
         if (r == null) {
             attribDeferredQuietly(call.args, argTypes, env);
             return Type.ERROR;
@@ -4054,6 +4327,9 @@ final class Attr {
         MethodSymbol m = r.method;
         call.sym = m;
         call.varargsCall = r.varargs;
+        if (call.superCall && call.site != null && call.site != env.enclClass && !call.site.isInterface() && !m.isStatic()) {
+            call.superAccessor = superAccessor(call.site, call.qualifier, m);
+        }
         if (staticOnly && !m.isStatic()) {
             error(env, call.pos, "non-static method " + m + " cannot be referenced from a static context");
         }
@@ -4066,7 +4342,6 @@ final class Attr {
         if (call.superCall && m.isAbstract()) {
             error(env, call.pos, "abstract method " + m + " in " + m.owner.javaName() + " cannot be accessed directly");
         }
-        checkAccess(m.flags, m.owner, env, call.pos, m.name + "(" + paramList(m) + ")");
         boolean arrayClone = m.name.equals("clone") && m.params.isEmpty() && site != null && types.erased(site).tag == Type.Tag.ARRAY;
         for (Type th : arrayClone ? new ArrayList<Type>() : m.thrown) {
             Type it = types.resolveInference(Type.substitute(th, r.map));
@@ -4074,6 +4349,7 @@ final class Attr {
         }
         Type declaredRet = m.returnType;
         Type result = instantiate(r, call.args, argTypes, env, pt, declaredRet);
+        call.varargsElem = varargsElem(r);
         // Thrown types that mention method type variables are checked after inference.
         if (m.name.equals("getClass") && m.params.isEmpty() && call.receiver != null) {
             ClassSymbol cls = syms.require("java/lang/Class");
@@ -4149,6 +4425,74 @@ final class Attr {
         return false;
     }
 
+    /**
+     * The element type of a variable-arity call's array after inference: for
+     * {@code <T> T[] f(T... v)} called with Strings it is String, so the array created
+     * is a String[] as javac's is -- an Object[] would fail the caller's cast. Null when
+     * the call is not variable-arity.
+     */
+    private Type varargsElem(Resolution r) {
+        if (!r.varargs || r.method.params.isEmpty()) {
+            return null;
+        }
+        Type f = types.resolveInference(Type.substitute(r.method.params.get(r.method.params.size() - 1), r.map));
+        Type e = types.erased(f);
+        return e.tag == Type.Tag.ARRAY ? ((Type.ArrayType) e).elem : null;
+    }
+
+    /**
+     * Outer.super.m() from an inner class: invokespecial must be issued from Outer
+     * itself, so -- as javac does -- Outer gets a static synthetic accessor taking the
+     * instance first, which the inner class calls. One per target method.
+     */
+    private MethodSymbol superAccessor(ClassSymbol outer, ClassSymbol qualifier, MethodSymbol target) {
+        for (MethodSymbol x : outer.methods) {
+            if (x.superAccessTarget == target) {
+                return x;
+            }
+        }
+        int n = 0;
+        for (MethodSymbol x : outer.methods) {
+            if (x.superAccessTarget != null) {
+                n++;
+            }
+        }
+        MethodSymbol acc = new MethodSymbol("access$super$" + n, Symbol.ACC_STATIC | Symbol.ACC_SYNTHETIC, outer);
+        acc.params.add(outer.erasure());
+        for (Type p : target.params) {
+            acc.params.add(types.erased(p));
+        }
+        acc.returnType = types.erased(target.returnType);
+        acc.thrown.addAll(target.thrown);
+        acc.superAccessTarget = target;
+        acc.superAccessQualifier = qualifier;
+        outer.methods.add(acc);
+        return acc;
+    }
+
+    /**
+     * Whether an array of t may be created (JLS 4.7): not a type variable, and a
+     * parameterized type only when every argument is an unbounded wildcard
+     * ({@code new List<?>[n]} is legal, {@code new List<String>[n]} is not).
+     */
+    private static boolean isReifiable(Type t) {
+        if (t.tag == Type.Tag.TYPEVAR) {
+            return false;
+        }
+        if (t.tag == Type.Tag.CLASS) {
+            Type.ClassType ct = (Type.ClassType) t;
+            if (ct.args != null) {
+                for (Type a : ct.args) {
+                    if (!(a instanceof Type.WildcardType) || ((Type.WildcardType) a).kind != Type.WildcardType.UNBOUND) {
+                        return false;
+                    }
+                }
+            }
+            return ct.outer == null || isReifiable(ct.outer);
+        }
+        return true;
+    }
+
     /** this(...) or super(...) as a constructor's first statement. */
     private Type attribConstructorCall(Tree.MethodCall call, Env env) {
         ClassSymbol c = env.enclClass;
@@ -4176,6 +4520,7 @@ final class Attr {
         List<MethodSymbol> ctors = constructorsOf(site.sym);
         boolean defer = arityMatches(ctors, call.args.size()) == 1;
         List<Type> argTypes = attribArgsFor(call.args, env, defer);
+        superQualified = true;
         Resolution r = selectMethod(ctors, site, "<init>", call.args, argTypes, attribTypeArgs(call.typeArgs, env),
                 env, call.pos, false, null, true, site.sym);
         if (r == null) {
@@ -4205,6 +4550,7 @@ final class Attr {
     /** Resolves a constructor of site for args already attributed (used for implicit super() and enum constants). */
     Resolution resolveConstructor(Type.ClassType site, List<Tree> args, List<Type> argTypes, Env env, int pos, boolean quiet) {
         List<MethodSymbol> ctors = constructorsOf(site.sym);
+        superQualified = true;
         return selectMethod(ctors, site, "<init>", args, argTypes, null, env, pos, quiet, null, true, site.sym);
     }
 
@@ -4304,6 +4650,8 @@ final class Attr {
         boolean defer = arityMatches(ctors, nc.args.size()) == 1;
         List<Type> argTypes = attribArgsFor(nc.args, env, defer);
         Type.ClassType diamondOf = diamond && !itf ? cct : null;
+        // An anonymous class calls the constructor as its superclass's (JLS 6.6.2.2).
+        superQualified = nc.body != null;
         Resolution r = selectMethod(ctors, ctorSite, "<init>", nc.args, argTypes, attribTypeArgs(nc.typeArgs, env),
                 env, nc.pos, false, diamondOf, true, ctorSite.sym);
         Type result = cct;
@@ -4313,6 +4661,7 @@ final class Attr {
             }
             Type declaredRet = r.diamondType != null ? r.diamondType : Type.VOID;
             Type inst = instantiate(r, nc.args, argTypes, env, pt, declaredRet);
+            nc.varargsElem = varargsElem(r);
             if (r.diamondType != null) {
                 result = inst;
             }

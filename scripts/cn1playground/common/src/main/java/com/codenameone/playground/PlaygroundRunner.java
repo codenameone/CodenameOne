@@ -287,9 +287,13 @@ final class PlaygroundRunner {
             throw new CompileFailure(toDiagnostics(r.getDiagnostics()), r.isWellFormed());
         }
         final Map<String, byte[]> classes = new LinkedHashMap<String, byte[]>(r.getClasses());
+        // A script may declare a package (a whole source file pasted in): its classes,
+        // and the launcher that must reach their package-private members, live there.
+        String pkg = scriptPackage(r.getClassInfos());
+        String prefix = pkg.length() == 0 ? "" : pkg.replace('/', '.') + ".";
         String launcher = launcherSource(r.getClassInfos());
         if (launcher == null) {
-            return new Compiled(classes, SCRIPT_CLASS);
+            return new Compiled(classes, prefix + SCRIPT_CLASS);
         }
         JavaCompiler lc = configure(new JavaCompiler(new ClassLibrary() {
             @Override
@@ -304,7 +308,7 @@ final class PlaygroundRunner {
             throw new CompileFailure(toDiagnostics(lr.getDiagnostics()), lr.isWellFormed());
         }
         classes.putAll(lr.getClasses());
-        return new Compiled(classes, LAUNCHER_CLASS);
+        return new Compiled(classes, prefix + LAUNCHER_CLASS);
     }
 
     private static JavaCompiler configure(JavaCompiler jc) {
@@ -337,14 +341,39 @@ final class PlaygroundRunner {
      * class declaring {@code start()} (with an optional {@code init}), then a class
      * declaring {@code build}.
      */
+    /** The package (internal form, "" for none) the script's statements were compiled into. */
+    static String scriptPackage(List<JavaCompiler.ClassInfo> infos) {
+        for (JavaCompiler.ClassInfo ci : infos) {
+            if (isScriptClass(ci)) {
+                int slash = ci.getName().lastIndexOf('/');
+                return slash < 0 ? "" : ci.getName().substring(0, slash);
+            }
+        }
+        return "";
+    }
+
+    private static boolean isScriptClass(JavaCompiler.ClassInfo ci) {
+        String n = ci.getName();
+        return ci.isTopLevel() && (n.equals(SCRIPT_CLASS) || n.endsWith("/" + SCRIPT_CLASS));
+    }
+
+    private static boolean isLauncherClass(JavaCompiler.ClassInfo ci) {
+        String n = ci.getName();
+        return n.equals(LAUNCHER_CLASS) || n.endsWith("/" + LAUNCHER_CLASS);
+    }
+
     static String launcherSource(List<JavaCompiler.ClassInfo> infos) {
         JavaCompiler.ClassInfo script = null;
         for (JavaCompiler.ClassInfo ci : infos) {
-            if (ci.getName().equals(SCRIPT_CLASS)) {
+            if (isScriptClass(ci)) {
                 script = ci;
             }
         }
         StringBuilder b = new StringBuilder();
+        String pkg = scriptPackage(infos);
+        if (pkg.length() > 0) {
+            b.append("package ").append(pkg.replace('/', '.')).append(";\n");
+        }
         b.append("public class ").append(LAUNCHER_CLASS).append(" implements com.codenameone.playground.PlaygroundEntry {\n");
         b.append("    public Object run(").append(CONTEXT).append(" ctx) throws Throwable {\n");
         b.append("        ").append(SCRIPT_CLASS).append(" script = new ").append(SCRIPT_CLASS).append("();\n");
@@ -393,14 +422,27 @@ final class PlaygroundRunner {
     }
 
     private static boolean isCandidate(JavaCompiler.ClassInfo ci) {
-        return ci.isTopLevel() && !ci.isAbstract() && !ci.getName().equals(SCRIPT_CLASS)
-                && !ci.getName().equals(LAUNCHER_CLASS) && ci.declares("<init>", "()V", false);
+        return ci.isTopLevel() && !ci.isAbstract() && !isScriptClass(ci)
+                && !isLauncherClass(ci) && ci.declares("<init>", "()V", false);
     }
 
+    /**
+     * A start() returning void, Object or any Component -- {@code Button start()} as much
+     * as {@code Component start()}.
+     */
     private static boolean declaresStart(JavaCompiler.ClassInfo ci) {
-        return ci.declares("start", "()V", false) || ci.declares("start", "()Lcom/codename1/ui/Component;", false)
-                || ci.declares("start", "()Lcom/codename1/ui/Form;", false)
-                || ci.declares("start", "()Ljava/lang/Object;", false);
+        return isEntryReturn(ci, "start", "()", false);
+    }
+
+    /**
+     * Whether a build()/start() overload is an entry: it returns void, Object or a
+     * Component subtype. Not any return type -- a helper class's {@code String build()}
+     * (a fluent builder) is not the program.
+     */
+    private static boolean isEntryReturn(JavaCompiler.ClassInfo ci, String name, String params, boolean isStatic) {
+        String ret = ci.returnDescriptor(name, params, isStatic);
+        return ret != null && ("V".equals(ret) || "Ljava/lang/Object;".equals(ret)
+                || ci.returnsSubtypeOf(name, params, isStatic, "com/codename1/ui/Component"));
     }
 
     private static String lifecycleCall(JavaCompiler.ClassInfo ci, String target) {
@@ -412,7 +454,7 @@ final class PlaygroundRunner {
         } else if (ci.declares("init", "()V", false)) {
             b.append("        ").append(target).append(".init();\n");
         }
-        if (ci.declares("start", "()V", false)) {
+        if ("V".equals(ci.returnDescriptor("start", "()", false))) {
             b.append("        ").append(target).append(".start();\n");
             b.append("        return null;\n");
         } else {
@@ -421,22 +463,17 @@ final class PlaygroundRunner {
         return b.toString();
     }
 
-    /** {@code return target.build(ctx);} for whichever build overload the class declares. */
+    /**
+     * {@code return target.build(ctx);} for whichever build overload the class declares
+     * that is an entry ({@code Button build(PlaygroundContext)} included).
+     */
     private static String buildCall(JavaCompiler.ClassInfo ci, String target, boolean isStatic) {
-        String[] returns = {"Ljava/lang/Object;", "Lcom/codename1/ui/Component;", "Lcom/codename1/ui/Form;",
-            "Lcom/codename1/ui/Container;", "V"};
-        for (String ret : returns) {
-            String arg = null;
-            if (ci.declares("build", "(" + CONTEXT_DESC + ")" + ret, isStatic)) {
-                arg = "ctx";
-            } else if (ci.declares("build", "(Ljava/lang/Object;)" + ret, isStatic)) {
-                arg = "(Object) ctx";
-            } else if (ci.declares("build", "()" + ret, isStatic)) {
-                arg = "";
-            }
-            if (arg != null) {
-                return "V".equals(ret) ? "        " + target + ".build(" + arg + ");\n        return null;\n"
-                        : "        return " + target + ".build(" + arg + ");\n";
+        String[][] forms = {{"(" + CONTEXT_DESC + ")", "ctx"}, {"(Ljava/lang/Object;)", "(Object) ctx"}, {"()", ""}};
+        for (String[] form : forms) {
+            String ret = ci.returnDescriptor("build", form[0], isStatic);
+            if (ret != null && isEntryReturn(ci, "build", form[0], isStatic)) {
+                return "V".equals(ret) ? "        " + target + ".build(" + form[1] + ");\n        return null;\n"
+                        : "        return " + target + ".build(" + form[1] + ");\n";
             }
         }
         return null;
@@ -458,7 +495,14 @@ final class PlaygroundRunner {
                     return api.classBytes(internalName);
                 }
             });
-            PlaygroundJs.loadClasses(js);
+            StringBuilder names = new StringBuilder();
+            for (String internal : compiled.classes.keySet()) {
+                if (names.length() > 0) {
+                    names.append(',');
+                }
+                names.append(JavascriptIncremental.jsClassName(internal));
+            }
+            PlaygroundJs.loadClasses(js, names.toString());
             return Class.forName(compiled.mainClass).newInstance();
         }
         PlaygroundClassDefiner definer = PlaygroundClassDefiner.Registry.get();

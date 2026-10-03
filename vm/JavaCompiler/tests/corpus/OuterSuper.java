@@ -20,21 +20,29 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.playground;
-
-/**
- * The JavaScript build's half of loading compiled code: classes translated by the
- * in-browser translator are evaluated in the VM worker's global scope, after which
- * they are ordinary classes ({@code Class.forName} finds them).
- */
-final class PlaygroundJs {
-    private PlaygroundJs() {
+/** Outer.super.m() from anonymous and local classes, through a synthetic accessor. */
+public class OuterSuper {
+    static class Base {
+        String who(int n, long l) { return "base " + n + " " + l; }
+        double twice(double d) { return d * 2; }
     }
-
-    /**
-     * Evaluates translated classes. {@code classNames} (comma separated, as the VM names
-     * them) lets the loader refuse a class that would replace one of the Playground's own.
-     */
-    @org.teavm.jso.JSBody(params = {"source", "classNames"}, script = "__cn1LoadClasses(source, classNames);")
-    static native void loadClasses(String source, String classNames);
+    static class Derived extends Base {
+        String who(int n, long l) { return "derived " + n; }
+        double twice(double d) { return -1; }
+        String viaInner() {
+            Runnable r = new Runnable() {
+                public void run() {
+                    System.out.println(Derived.super.who(3, 4L) + " / " + Derived.super.twice(1.5));
+                }
+            };
+            r.run();
+            class Local {
+                String go() { return Derived.super.who(7, 8L); }
+            }
+            return new Local().go() + " | " + who(1, 1L);
+        }
+    }
+    public static void main(String[] args) {
+        System.out.println(new Derived().viaInner());
+    }
 }

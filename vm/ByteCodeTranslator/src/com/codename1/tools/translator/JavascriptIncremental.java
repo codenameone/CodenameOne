@@ -78,6 +78,16 @@ public final class JavascriptIncremental {
     }
 
     /**
+     * The name a class is registered under in the running VM ({@code jvm.classes}).
+     * Distinct Java names can share one -- {@code java/lang/String} and a class named
+     * {@code java_lang_String} -- which is why the loader refuses a user class whose
+     * name the host already uses.
+     */
+    public static String jsClassName(String internalName) {
+        return JavascriptNameUtil.sanitizeClassName(internalName);
+    }
+
+    /**
      * Translates {@code userClasses} (internal name to class-file bytes) against the
      * host. Returns the JavaScript; throws on a class the host does not have.
      */

@@ -150,6 +150,36 @@ class JavaCompilerConformanceTest {
         });
     }
 
+    @Test
+    void stubLibraryKeepsNonAsciiClassNames() {
+        // The JavaSE Playground packs every run's classes through StubLibrary; a name
+        // above U+00FF used to be stored one byte a character and could not be found.
+        // Written as escapes: Java sources here are ASCII.
+        String[] names = {"p/\u7ec4\u4ef6", "p/Caf\u00e9", "p/Plain", "p/\ud83d\ude00Emoji"};
+        java.util.Map<String, byte[]> in = new java.util.LinkedHashMap<String, byte[]>();
+        for (int i = 0; i < names.length; i++) {
+            in.put(names[i], new byte[]{(byte) i, 42});
+        }
+        StubLibrary lib = new StubLibrary(StubLibrary.pack(in));
+        for (int i = 0; i < names.length; i++) {
+            byte[] got = lib.classBytes(names[i]);
+            assertTrue(got != null && got[0] == i && got[1] == 42, "lost class " + names[i]);
+        }
+    }
+
+    @Test
+    void aClassNamedInAnyScriptCompilesAndRuns() throws Exception {
+        String src = "public class Main {\n"
+                + "    static class \u7ec4\u4ef6 { String hi() { return \"ok\"; } }\n"
+                + "    public static void main(String[] a) { System.out.println(new \u7ec4\u4ef6().hi()); }\n"
+                + "}\n";
+        JavaCompiler.Result r = new JavaCompiler(RuntimeLibraryCompile.RUNTIME).addSource("Main.java", src).compile();
+        assertTrue(r.isSuccess(), String.valueOf(r.getDiagnostics()));
+        assertTrue(r.getClasses().containsKey("Main$\u7ec4\u4ef6"), String.valueOf(r.getClasses().keySet()));
+        StubLibrary packed = new StubLibrary(StubLibrary.pack(r.getClasses()));
+        assertTrue(packed.classBytes("Main$\u7ec4\u4ef6") != null, "the packed classes lost the nested class");
+    }
+
     private static Path jdkAtLeast(int major) {
         for (CompilerHelper.CompilerConfig c : CompilerHelper.getAvailableCompilers(String.valueOf(major))) {
             if (CompilerHelper.parseJavaMajor(c.jdkVersion) >= major) {

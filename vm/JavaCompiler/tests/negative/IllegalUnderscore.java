@@ -20,21 +20,10 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.playground;
-
-/**
- * The JavaScript build's half of loading compiled code: classes translated by the
- * in-browser translator are evaluated in the VM worker's global scope, after which
- * they are ordinary classes ({@code Class.forName} finds them).
- */
-final class PlaygroundJs {
-    private PlaygroundJs() {
+// expect: 27: illegal underscore
+public class IllegalUnderscore {
+    public static void main(String[] args) {
+        int ok = 1__000;
+        int bad = 0x_FF;
     }
-
-    /**
-     * Evaluates translated classes. {@code classNames} (comma separated, as the VM names
-     * them) lets the loader refuse a class that would replace one of the Playground's own.
-     */
-    @org.teavm.jso.JSBody(params = {"source", "classNames"}, script = "__cn1LoadClasses(source, classNames);")
-    static native void loadClasses(String source, String classNames);
 }

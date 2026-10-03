@@ -497,6 +497,8 @@ final class Gen {
             genRecordHashCode(m);
         } else if ((flags & Enter.SYNTH_RECORD_EQUALS) != 0) {
             genRecordEquals(m);
+        } else if (m.superAccessTarget != null) {
+            genSuperAccessor(m);
         } else if (m.decl == null && m.isConstructor() && cls.anonymous) {
             genConstructor(m, null);
         } else if (m.decl != null) {
@@ -817,7 +819,7 @@ final class Gen {
         code.ldc(pool.string(v.name));
         code.iconst(ordinal);
         if (ctor != null) {
-            genArgs(ctor, nc.args, nc.varargsCall);
+            genArgs(ctor, nc.args, nc.varargsCall, nc.varargsElem);
             code.op2(Code.INVOKESPECIAL, pool.method(k.internalName, "<init>", jvmDescriptor(ctor), false));
         }
         code.op2(Code.PUTSTATIC, pool.field(c.internalName, v.name, "L" + c.internalName + ";"));
@@ -856,6 +858,20 @@ final class Gen {
         code.op2(Code.CHECKCAST, pool.cls(cls.internalName));
         code.op(Code.ARETURN);
         endMethod(Symbol.ACC_PUBLIC | Symbol.ACC_STATIC, "valueOf", "(Ljava/lang/String;)L" + cls.internalName + ";", true, false);
+    }
+
+    /** A static accessor for Outer.super.m(): (Outer self, args...) -> invokespecial Super.m. */
+    private void genSuperAccessor(MethodSymbol acc) {
+        beginMethod(acc, true);
+        MethodSymbol target = acc.superAccessTarget;
+        for (Type p : acc.params) {
+            Type e = erased(p);
+            code.varOp(loadOp(e), code.newLocal(e));
+        }
+        ClassSymbol q = acc.superAccessQualifier != null ? acc.superAccessQualifier : target.owner;
+        invoke(Code.INVOKESPECIAL, q.internalName, target.name, target.descriptor(), q.isInterface());
+        code.op(returnOp(erased(target.returnType)));
+        endMethod(Symbol.ACC_STATIC | Symbol.ACC_SYNTHETIC, acc.name, acc.descriptor(), true, false);
     }
 
     private void genRecordAccessor(MethodSymbol m) {
@@ -2074,6 +2090,25 @@ final class Gen {
         coerce(from, erased(to));
     }
 
+    /**
+     * A generic member's value arrives as its erasure -- {@code Map.Entry<Integer, ?>.getKey()}
+     * leaves an Object -- while the expression's type is the substituted one. Cast to that,
+     * as javac does, so every later conversion starts from the real type: unboxing then
+     * widening an Integer into a long must not treat it as a Long.
+     */
+    private Type narrowToStatic(Type produced, Tree t) {
+        if (produced == null || produced.isPrimitive() || produced.tag == Type.Tag.VOID || t.type == null
+                || t.type.isErroneous() || t.type.isPrimitive()) {
+            return produced;
+        }
+        Type stat = erased(t.type);
+        if (stat.tag != Type.Tag.CLASS && stat.tag != Type.Tag.ARRAY || isSubclass(produced, stat)) {
+            return produced;
+        }
+        code.op2(Code.CHECKCAST, pool.cls(internalName(stat)));
+        return stat;
+    }
+
     /** Generates t; returns the erased type of the value it leaves on the stack (VOID when none). */
     Type genExpr(Tree t) {
         if (t.constant != null && t.type != null && Attr.isConstantType(t.type)) {
@@ -2094,13 +2129,13 @@ final class Gen {
             return lt;
         }
         if (t instanceof Tree.Ident) {
-            return genIdent((Tree.Ident) t);
+            return narrowToStatic(genIdent((Tree.Ident) t), t);
         }
         if (t instanceof Tree.Select) {
-            return genSelect((Tree.Select) t);
+            return narrowToStatic(genSelect((Tree.Select) t), t);
         }
         if (t instanceof Tree.MethodCall) {
-            return genCall((Tree.MethodCall) t);
+            return narrowToStatic(genCall((Tree.MethodCall) t), t);
         }
         if (t instanceof Tree.NewClass) {
             return genNew((Tree.NewClass) t);
@@ -2116,7 +2151,7 @@ final class Gen {
             genExprAs(a.index, Type.INT);
             Type elem = ((Type.ArrayType) arrType).elem;
             code.op(arrayLoadOp(elem));
-            return elem;
+            return narrowToStatic(elem, t);
         }
         if (t instanceof Tree.Assign) {
             return genAssign((Tree.Assign) t, true);
@@ -2352,6 +2387,13 @@ final class Gen {
             owner = m.owner.internalName;
             opcode = Code.INVOKESTATIC;
             itf = m.owner.isInterface();
+        } else if (c.superAccessor != null) {
+            // Outer.super.m() from an inner class: through Outer's static accessor.
+            loadInstance(c.site, c.pos);
+            genArgs(m, c.args, c.varargsCall, c.varargsElem);
+            MethodSymbol acc = c.superAccessor;
+            invoke(Code.INVOKESTATIC, acc.owner.internalName, acc.name, acc.descriptor(), false);
+            return erased(acc.returnType);
         } else if (c.superCall) {
             if (c.site != null && c.site != cls && !c.site.isInterface() && c.receiver != null) {
                 throw new CompileError("Outer.super.method() calls are not supported");
@@ -2389,7 +2431,7 @@ final class Gen {
                 opcode = itf ? Code.INVOKEINTERFACE : Code.INVOKEVIRTUAL;
             }
         }
-        genArgs(m, c.args, c.varargsCall);
+        genArgs(m, c.args, c.varargsCall, c.varargsElem);
         String d = jvmDescriptor(m);
         if (!m.isStatic() && !c.superCall) {
             for (String[] r : compiler.redirects) {
@@ -2442,6 +2484,10 @@ final class Gen {
 
     /** Pushes the arguments, packing variable-arity ones into an array. */
     private void genArgs(MethodSymbol m, List<Tree> args, boolean varargs) {
+        genArgs(m, args, varargs, null);
+    }
+
+    private void genArgs(MethodSymbol m, List<Tree> args, boolean varargs, Type inferredElem) {
         int n = m.params.size();
         int fixed = varargs ? n - 1 : args.size();
         for (int i = 0; i < fixed && i < args.size(); i++) {
@@ -2450,6 +2496,10 @@ final class Gen {
         if (varargs) {
             Type arr = erased(m.params.get(n - 1));
             Type elem = arr.tag == Type.Tag.ARRAY ? ((Type.ArrayType) arr).elem : syms.objectType;
+            if (inferredElem != null && !inferredElem.isErroneous() && !inferredElem.isPrimitive()
+                    && inferredElem.tag != Type.Tag.NULL) {
+                elem = inferredElem;
+            }
             code.iconst(args.size() - fixed);
             newArray(elem);
             for (int i = fixed; i < args.size(); i++) {
@@ -2486,7 +2536,7 @@ final class Gen {
                     loadInstance(sup.outer, nc.pos);
                 }
             }
-            genArgs(ctor, nc.args, nc.varargsCall);
+            genArgs(ctor, nc.args, nc.varargsCall, nc.varargsElem);
             for (VarSymbol v : c.capturedVars) {
                 loadVar(v);
             }
@@ -2500,7 +2550,7 @@ final class Gen {
                     loadInstance(c.outer, nc.pos);
                 }
             }
-            genArgs(ctor, nc.args, nc.varargsCall);
+            genArgs(ctor, nc.args, nc.varargsCall, nc.varargsElem);
         }
         code.op2(Code.INVOKESPECIAL, pool.method(c.internalName, "<init>", jvmDescriptor(ctor), false));
         return c.erasure();

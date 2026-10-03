@@ -109,6 +109,8 @@ public final class JavaCompiler {
         private final boolean isTopLevel;
         private final boolean isAbstract;
         private final List<String> methods = new ArrayList<String>();
+        /** Per method (as in {@link #methods}): its return type and every supertype of it, by internal name. */
+        private final Map<String, List<String>> returnSupertypes = new java.util.HashMap<String, List<String>>();
         private final List<String> interfaces = new ArrayList<String>();
         private final String superclass;
 
@@ -120,7 +122,14 @@ public final class JavaCompiler {
             for (MethodSymbol m : c.methods) {
                 // Non-private: a launcher compiled into the same package can call it.
                 if (!m.isPrivate()) {
-                    methods.add((m.isStatic() ? "static " : "") + m.name + descriptorOf(m));
+                    String key = (m.isStatic() ? "static " : "") + m.name + descriptorOf(m);
+                    methods.add(key);
+                    Type r = m.returnType == null ? null : Types.erasure(m.returnType);
+                    if (r != null && r.tag == Type.Tag.CLASS) {
+                        List<String> sups = new ArrayList<String>();
+                        collectSupertypes(((Type.ClassType) r).sym, sups);
+                        returnSupertypes.put(key, sups);
+                    }
                 }
             }
             for (Type i : c.interfaces()) {
@@ -130,6 +139,22 @@ public final class JavaCompiler {
             }
             Type sup = c.superclass();
             superclass = sup != null && sup.tag == Type.Tag.CLASS ? ((Type.ClassType) sup).sym.internalName : null;
+        }
+
+        private static void collectSupertypes(ClassSymbol c, List<String> out) {
+            if (c == null || out.contains(c.internalName)) {
+                return;
+            }
+            out.add(c.internalName);
+            Type sup = c.superclass();
+            if (sup != null && sup.tag == Type.Tag.CLASS) {
+                collectSupertypes(((Type.ClassType) sup).sym, out);
+            }
+            for (Type i : c.interfaces()) {
+                if (i.tag == Type.Tag.CLASS) {
+                    collectSupertypes(((Type.ClassType) i).sym, out);
+                }
+            }
         }
 
         private static String descriptorOf(MethodSymbol m) {
@@ -168,6 +193,35 @@ public final class JavaCompiler {
         /** Does the class declare a non-private method {@code name} with this descriptor ({@code (I)V})? */
         public boolean declares(String methodName, String descriptor, boolean isStatic) {
             return methods.contains((isStatic ? "static " : "") + methodName + descriptor);
+        }
+
+        /**
+         * Does the non-private method {@code name} taking these parameters ({@code (I)})
+         * return {@code internalName} or a subtype of it ({@code com/codename1/ui/Component})?
+         */
+        public boolean returnsSubtypeOf(String methodName, String paramsDescriptor, boolean isStatic, String internalName) {
+            String prefix = (isStatic ? "static " : "") + methodName + paramsDescriptor;
+            for (Map.Entry<String, List<String>> e : returnSupertypes.entrySet()) {
+                if (e.getKey().startsWith(prefix) && e.getKey().charAt(prefix.length() - 1) == ')'
+                        && e.getValue().contains(internalName)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * The return descriptor of the non-private method {@code name} taking these
+         * parameters ({@code (I)}), whatever it returns; null when there is none.
+         */
+        public String returnDescriptor(String methodName, String paramsDescriptor, boolean isStatic) {
+            String prefix = (isStatic ? "static " : "") + methodName + paramsDescriptor;
+            for (String m : methods) {
+                if (m.startsWith(prefix) && m.length() > prefix.length() && m.charAt(prefix.length() - 1) == ')') {
+                    return m.substring(prefix.length());
+                }
+            }
+            return null;
         }
     }
 
