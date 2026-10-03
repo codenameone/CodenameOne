@@ -2340,6 +2340,16 @@
       "medium": {
         "url": "https://medium.com/p/20c35c2393b9/edit",
         "syndicated_at": "2026-09-27T00:00:32+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/one-java-model-from-the-app-to-postgresql",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac04591b9d2f44082935723",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T00:01:15+00:00"
       }
     },
     "vault-encryption-browser-phone": {
