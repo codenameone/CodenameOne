@@ -5,11 +5,25 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'scripts/cn1playground/**'
+      # Playground code is compiled by the in-tree compiler and, in the browser,
+      # translated by ParparVM and loaded into the running VM.
+      - 'vm/JavaCompiler/**'
+      - 'maven/javac/**'
+      - 'vm/ByteCodeTranslator/src/javascript/**'
+      - 'vm/ByteCodeTranslator/src/com/codename1/tools/translator/Javascript*.java'
+      - 'Ports/JavaScriptPort/src/main/webapp/**'
       - '.github/workflows/cn1playground-language.yml'
   push:
     branches: [main, master]
     paths:
       - 'scripts/cn1playground/**'
+      # Playground code is compiled by the in-tree compiler and, in the browser,
+      # translated by ParparVM and loaded into the running VM.
+      - 'vm/JavaCompiler/**'
+      - 'maven/javac/**'
+      - 'vm/ByteCodeTranslator/src/javascript/**'
+      - 'vm/ByteCodeTranslator/src/com/codename1/tools/translator/Javascript*.java'
+      - 'Ports/JavaScriptPort/src/main/webapp/**'
       - '.github/workflows/cn1playground-language.yml'
   workflow_dispatch:
 
@@ -58,3 +72,54 @@ jobs:
           set -euo pipefail
           cd scripts/cn1playground
           xvfb-run -a bash tools/run-playground-smoke-tests.sh
+
+  browser-e2e:
+    name: Playground in the browser
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Bootstrap local Codename One snapshots
+        run: SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
+
+      - name: Install Playwright Chromium
+        run: |
+          set -euo pipefail
+          cd scripts
+          npm install playwright
+          bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
+          npx playwright install-deps chromium
+          npx playwright install chromium
+
+      # Builds the open-world JavaScript bundle, then compiles, translates and runs
+      # every sample and an editing session inside headless Chromium.
+      - name: Run playground browser tests
+        env:
+          PLAYGROUND_BROWSER_ARTIFACT_DIR: ${{ runner.temp }}/playground-browser
+        run: |
+          set -euo pipefail
+          mkdir -p "$PLAYGROUND_BROWSER_ARTIFACT_DIR"
+          cd scripts/cn1playground
+          bash tools/run-playground-browser-tests.sh
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playground-browser-screenshots
+          path: ${{ runner.temp }}/playground-browser
+          if-no-files-found: ignore

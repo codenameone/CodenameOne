@@ -105,27 +105,27 @@ public class BrowserComponent extends Container {
     /// in a cross-domain-safe way from the web page.  To send a message from the webpage, the page should
     /// include a function like:
     ///
-    /// ```java
-    /// `function postToCN1(msg) {
+    /// ```javascript
+    /// function postToCN1(msg) {
     /// if (window.cn1PostMessage) {
     /// // Case 1: Running inside native app in a WebView
-    /// window.cn1PostMessage(msg);` else {
+    /// window.cn1PostMessage(msg);
+    /// } else {
     /// // Case 2: Running inside a Javascript app in an iframe
     /// window.parent.postMessage(msg, '*');
     /// }
     ///   }
-    /// }
     /// ```
     ///
     /// Receiving a message:
     ///
     /// ```java
-    /// `myBrowserComponent.addWebEventListener(BrowserComponent.onMessage, e->{
+    /// myBrowserComponent.addWebEventListener(BrowserComponent.onMessage, e->{
     /// CN.callSerially(()->{
     /// Log.p("Message: "+e.getSource());
-    /// Dialog.show("Here", (String)e.getSource(), "OK", null);`);
+    /// Dialog.show("Here", (String)e.getSource(), "OK", null);
+    /// });
     ///   });
-    /// }
     /// ```
     public static final String onMessage = "onMessage";
     private static final String RETURN_URL_PREFIX = "/!cn1return/";
@@ -1352,29 +1352,29 @@ public class BrowserComponent extends Container {
     /// **Getting the window object.**
     ///
     /// ```java
-    /// `bc.execute("callback.onSuccess(window)", value -> {
+    /// bc.execute("callback.onSuccess(window)", value -> {
     /// System.out.println("value="+value+"; type="+value.getJSType());
-    /// // value=[object Window]; type=OBJECT`);
-    /// }
+    /// // value=[object Window]; type=OBJECT
+    /// });
     /// ```
     ///
     /// **Getting an Integer**
     ///
     /// ```java
-    /// `bc.execute("callback.onSuccess(1+2)", value -> {
+    /// bc.execute("callback.onSuccess(1+2)", value -> {
     /// System.out.println("value="+value.getInt()+"; type="+value.getJSType());
-    /// // value=3; type=NUMBER`);
-    /// }
+    /// // value=3; type=NUMBER
+    /// });
     /// ```
     ///
     /// **Getting a String**
     ///
     /// ```java
-    /// `bc.execute("callback.onSuccess('hello world')",value -> {
+    /// bc.execute("callback.onSuccess('hello world')",value -> {
     /// System.out.println("value="+value+"; type="+value.getJSType());
-    /// // value=hello world; type=STRING`
-    /// );
+    /// // value=hello world; type=STRING
     /// }
+    /// );
     /// ```
     ///
     /// **After a Javascript Timeout**
@@ -1385,13 +1385,12 @@ public class BrowserComponent extends Container {
     /// will be called at the appropriate time on the EDT.
     ///
     /// ```java
-    /// `bc.execute("setTimeout(function(){callback.onSuccess('hello world')`, 1500)",
+    /// bc.execute("setTimeout(function(){callback.onSuccess('hello world')}, 1500)",
     /// value -> {
     /// System.out.println("value="+value+"; type="+value.getJSType());
     /// // value=hello world; type=STRING
     /// }
     /// );
-    /// }
     /// ```
     ///
     /// **NOTE: The callback can only be called once, so you shouldn't use this method to register
@@ -1556,12 +1555,11 @@ public class BrowserComponent extends Container {
     /// **Register a Callback to be called whenever a button is clicked**
     ///
     /// ```java
-    /// `bc.addJSCallback("someButton.addEventListener('click', function(){callback.onSuccess('hello world')`)", new Callback() {
+    /// bc.addJSCallback("someButton.addEventListener('click', function(){callback.onSuccess('hello world')})", new Callback() {
     /// public void onSucess(JSRef value) {
     /// System.out.println("Received click: "+value);
     /// }
     /// });
-    /// }
     /// ```
     ///
     /// #### Parameters

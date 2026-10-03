@@ -32,7 +32,7 @@ import java.util.List;
 /// TraitReadRequest req = new TraitReadRequest()
 ///         .add(lamp, lamp.getPrimaryService(), Trait.ON_OFF)
 ///         .add(lamp, lamp.getPrimaryService(), Trait.BRIGHTNESS);
-/// SmartHome.getInstance().read(req).onResult((readings, err) -> { ... });
+/// SmartHome.getInstance().read(req).onResult((readings, err) -> { /* ... */ });
 /// ```
 ///
 /// #### Batch, because the boundary is the cost

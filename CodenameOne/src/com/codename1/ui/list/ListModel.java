@@ -37,7 +37,7 @@ import com.codename1.ui.events.SelectionListener;
 /// thus the data would get updated on the view.
 ///
 /// ```java
-/// class GRMMModel implements ListModel> {
+/// class GRMMModel implements ListModel<Map<String, Object>> {
 /// @Override
 ///     public Map getItemAt(int index) {
 ///         int idx = index % 7;

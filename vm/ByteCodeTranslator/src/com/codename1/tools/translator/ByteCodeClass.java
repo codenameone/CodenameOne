@@ -46,7 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * Parsed class file
@@ -365,6 +365,11 @@ public class ByteCodeClass {
                 continue;
             }
             if(bc.clsName.equals("java_lang_Boolean")) {
+                bc.markDependent(lst);
+                continue;
+            }
+            // Open-world output: classes code translated later may call are roots.
+            if(JavascriptOpenWorld.keepsClass(bc.clsName)) {
                 bc.markDependent(lst);
                 continue;
             }

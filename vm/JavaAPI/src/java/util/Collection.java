@@ -334,4 +334,14 @@ public interface Collection<E> extends java.lang.Iterable<E> {
         }
         return removed;
     }
+
+    /**
+     * A sequential stream over a snapshot of this collection's elements.
+     *
+     * @return a stream of the elements
+     */
+    @SuppressWarnings("unchecked")
+    default java.util.stream.Stream<E> stream() {
+        return (java.util.stream.Stream<E>) java.util.stream.Stream.of(toArray());
+    }
 }

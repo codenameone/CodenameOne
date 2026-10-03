@@ -54,7 +54,7 @@ import java.util.Timer;
 ///
 /// ```java
 /// @OpenTelemetry(relay = "https://api.example.com", serviceName = "shop-app")
-/// public class ShopApp extends Lifecycle { ... }
+/// public class ShopApp extends Lifecycle { /* ... */ }
 /// ```
 ///
 /// Every [ConnectionRequest] is covered, which is every REST, gRPC-Web and GraphQL

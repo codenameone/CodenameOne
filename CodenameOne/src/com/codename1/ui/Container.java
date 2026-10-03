@@ -4445,12 +4445,25 @@ public class Container extends Component implements Iterable<Component> {
     /// fall.addActionListener((e) -> {
     ///     if(hi.getContentPane().getComponentCount() == 1) {
     ///         fall.setText("Rise");
-    ///         for(int iter = 0 ; iter  {
+    ///         for(int iter = 0 ; iter < 10 ; iter++) {
+    ///             Label b = new Label("Label " + iter);
+    ///             b.setWidth(fall.getWidth());
+    ///             b.setHeight(fall.getHeight());
+    ///             b.setY(-fall.getHeight());
+    ///             hi.add(b);
+    ///         }
+    ///         hi.animateLayout(20000);
+    ///     } else {
+    ///         fall.setText("Fall");
+    ///         for(int iter = 1 ; iter < hi.getContentPane().getComponentCount() ; iter++) {
+    ///             Component c = hi.getContentPane().getComponentAt(iter);
+    ///             c.setY(-fall.getHeight());
+    ///         }
+    ///         hi.animateUnlayout(20000, 255, () -> {
     ///             hi.removeAll();
     ///             hi.add(fall);
     ///             hi.revalidate();
-    ///         });*/
-    ///
+    ///         });
     ///     }
     /// });
     /// hi.add(fall);
@@ -4477,12 +4490,24 @@ public class Container extends Component implements Iterable<Component> {
     /// fall.addActionListener((e) -> {
     ///     if(hi.getContentPane().getComponentCount() == 1) {
     ///         fall.setText("Rise");
-    ///         for(int iter = 0 ; iter  {
-    ///             hi.removeAll();
-    ///             hi.add(fall);
-    ///             hi.revalidate();
-    ///         });*/
-    ///
+    ///         for(int iter = 0 ; iter < 10 ; iter++) {
+    ///             Label b = new Label("Label " + iter);
+    ///             b.setWidth(fall.getWidth());
+    ///             b.setHeight(fall.getHeight());
+    ///             b.setY(-fall.getHeight());
+    ///             hi.add(b);
+    ///         }
+    ///         hi.animateLayout(20000);
+    ///     } else {
+    ///         fall.setText("Fall");
+    ///         for(int iter = 1 ; iter < hi.getContentPane().getComponentCount() ; iter++) {
+    ///             Component c = hi.getContentPane().getComponentAt(iter);
+    ///             c.setY(-fall.getHeight());
+    ///         }
+    ///         hi.animateUnlayoutAndWait(20000, 255);
+    ///         hi.removeAll();
+    ///         hi.add(fall);
+    ///         hi.revalidate();
     ///     }
     /// });
     /// hi.add(fall);

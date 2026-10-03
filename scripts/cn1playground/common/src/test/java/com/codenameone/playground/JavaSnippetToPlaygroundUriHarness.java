@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.playground;
 
 
@@ -15,6 +37,15 @@ public final class JavaSnippetToPlaygroundUriHarness {
     private JavaSnippetToPlaygroundUriHarness() {
     }
 
+    /// Validates a snippet with the compiler the Playground uses, against the
+    /// Playground's API, and prints its URI unless the snippet is not Java at all: a
+    /// syntax error, such as generics mangled by an HTML conversion (`ComboBox> c`),
+    /// an escaped `&lt;`, a CSS block in a `java` fence or a `{ ... }` placeholder.
+    ///
+    /// Semantic errors pass. Reference-documentation snippets are fragments: they use
+    /// the surrounding text's variables (`form`, `url`) and classes the Playground does
+    /// not import by default, which a reader supplies. Nothing is run -- whether the
+    /// code works at run time is the live Playground's business.
     public static void main(String[] args) {
         try {
             String source = loadSource(args);
@@ -22,114 +53,24 @@ public final class JavaSnippetToPlaygroundUriHarness {
                 emitError("UNEXPECTED_ERROR", "No snippet source provided", 1, 1);
                 return;
             }
-            currentSource = source;
-
-            // Best-effort: populate Display.impl so BeanShell can report undefined
-            // identifiers (e.g. "icon" in "setIcon(icon)") instead of NPE-ing inside
-            // a CN1 constructor. initImpl will throw HeadlessException in CI, but
-            // Display.impl is assigned before that point, which is enough for name
-            // resolution. If no port is on the classpath we silently fall back to
-            // parse-only validation. We mute stdout during init because JavaSEPort
-            // prints "Retina Scale: ..." which would corrupt the harness output.
-            java.io.PrintStream savedOut = System.out;
             try {
-                System.setOut(new java.io.PrintStream(new java.io.OutputStream() {
-                    public void write(int b) {
-                    }
-                }));
-                try {
-                    com.codename1.ui.Display.init(null);
-                } catch (Throwable ignored) {
-                }
-            } finally {
-                System.setOut(savedOut);
-            }
-
-            PlaygroundContext context = new PlaygroundContext(null, null, null, new PlaygroundContext.Logger() {
-                public void log(String message) {
-                }
-            });
-
-            PlaygroundRunner runner = new PlaygroundRunner();
-            PlaygroundRunner.RunResult result = runner.run(source, context);
-            if (result.getComponent() != null) {
-                System.out.println(PREFIX + encodeLikePlayground(source));
-                return;
-            }
-
-            PlaygroundRunner.Diagnostic diagnostic = result.getDiagnostics().isEmpty() ? null : result.getDiagnostics().get(0);
-            int line = diagnostic == null ? 1 : Math.max(1, diagnostic.line);
-            int column = diagnostic == null ? 1 : Math.max(1, diagnostic.column);
-            String message = diagnostic == null ? "Script execution failed" : diagnostic.message;
-            String errorType = classifyErrorType(message);
-            // Treat undefined-identifier eval errors as failures. CN1 runtime
-            // failures under the headless harness (NPE because Display.impl is
-            // null, HeadlessException, etc.) are not the snippet's fault and
-            // pass; an "Undefined argument" / "Typed variable declaration" eval
-            // error is a real symbol problem and fails.
-            if ("EVAL_ERROR".equals(errorType) && isUndefinedSymbolError(message)) {
-                emitError(errorType, message, line, column);
-                return;
-            }
-            if (!"PARSE_ERROR".equals(errorType) && !"LEXER_ERROR".equals(errorType)) {
-                System.out.println(PREFIX + encodeLikePlayground(source));
-                return;
-            }
-            emitError(errorType, message, line, column);
-        } catch (Throwable ex) {
-            // BeanShell parse/lex errors arrive as exceptions and are caught by
-            // PlaygroundRunner; anything reaching this catch is a runtime/init
-            // failure that did NOT trip the parser. CN1 classes have static
-            // initializers that touch Display.impl and blow up under the
-            // headless harness, but those snippets are still valid playground
-            // input - emit the URI and let the live playground decide.
-            if (isHeadlessRuntimeFailure(ex)) {
-                try {
-                    System.out.println(PREFIX + encodeLikePlayground(currentSource));
+                PlaygroundRunner.compile(source);
+            } catch (PlaygroundRunner.CompileFailure f) {
+                if (!f.wellFormed) {
+                    PlaygroundRunner.Diagnostic d = f.diagnostics.isEmpty() ? null : f.diagnostics.get(0);
+                    emitError("SYNTAX_ERROR", d == null ? "syntax error" : d.message,
+                            d == null ? 1 : d.line, d == null ? 1 : d.column);
                     return;
-                } catch (Throwable ignored) {
-                    // fall through to error emission
                 }
             }
+            System.out.println(PREFIX + encodeLikePlayground(source));
+        } catch (Throwable ex) {
             String message = ex.getMessage();
             if (message == null || message.length() == 0) {
                 message = ex.getClass().getName();
             }
             emitError("UNEXPECTED_ERROR", message, 1, 1);
         }
-    }
-
-    /// Heuristic: any Error subclass (or a wrapper carrying one as its cause)
-    /// is treated as a non-parse failure. ParseException/TokenMgrException are
-    /// already handled inside PlaygroundRunner.run, so anything reaching the
-    /// outer catch is by definition a runtime issue.
-    private static boolean isHeadlessRuntimeFailure(Throwable ex) {
-        Throwable t = ex;
-        while (t != null) {
-            if (t instanceof Error) {
-                return true;
-            }
-            t = t.getCause();
-        }
-        return false;
-    }
-
-    private static String currentSource = "";
-
-    /// BeanShell phrases unresolved identifiers a few different ways depending
-    /// on context (argument position, lhs of assignment, method call target).
-    /// We deliberately limit the match to "Undefined argument/variable" - those
-    /// fire for identifiers like the unbound 'icon' in SpanLabel's old sample.
-    /// "Class X not found in namespace" is intentionally ignored here: that
-    /// signals a missing import (e.g. Style, ConnectionRequest), which is the
-    /// snippet's responsibility to declare at the call site, and not a bug to
-    /// flag in the JavaDoc source.
-    private static boolean isUndefinedSymbolError(String message) {
-        if (message == null) {
-            return false;
-        }
-        return message.indexOf("Undefined argument") >= 0
-                || message.indexOf("Undefined variable") >= 0;
     }
 
     private static String loadSource(String[] args) throws IOException {
@@ -171,31 +112,6 @@ public final class JavaSnippetToPlaygroundUriHarness {
         }
         return Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(source.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static String classifyErrorType(String message) {
-        if (message == null) {
-            return "UNEXPECTED_ERROR";
-        }
-        if (message.startsWith("Parse error:")) {
-            return "PARSE_ERROR";
-        }
-        if (message.startsWith("Lexer error:")) {
-            return "LEXER_ERROR";
-        }
-        if (message.startsWith("Unexpected error:")) {
-            return "UNEXPECTED_ERROR";
-        }
-        if (message.indexOf("Lifecycle script defines init(Object) but is missing start().") >= 0
-                || message.indexOf("Lifecycle start() did not show a Form and did not return a Component.") >= 0) {
-            return "LIFECYCLE_CONTRACT_ERROR";
-        }
-        if (message.indexOf("Script did not produce a previewable Component.") >= 0
-                || message.indexOf("instead of a previewable Component.") >= 0
-                || message.indexOf("Script must return a com.codename1.ui.Component") >= 0) {
-            return "NO_PREVIEWABLE_COMPONENT";
-        }
-        return "EVAL_ERROR";
     }
 
     private static void emitError(String errorType, String message, int line, int column) {

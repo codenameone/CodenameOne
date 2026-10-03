@@ -26,8 +26,8 @@ import com.codename1.tools.translator.bytecodes.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import com.codename1.tools.translator.classfile.Opcodes;
+import com.codename1.tools.translator.classfile.Type;
 
 /** Immediate array pipelines. No stream, cursor or lambda allocation escapes this loop. */
 final class StreamFusion {

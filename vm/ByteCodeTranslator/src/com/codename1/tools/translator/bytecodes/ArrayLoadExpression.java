@@ -23,7 +23,7 @@
 package com.codename1.tools.translator.bytecodes;
 
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class ArrayLoadExpression extends Instruction implements AssignableExpression {
     private Instruction targetArrayInstruction;

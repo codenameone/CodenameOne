@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.playground;
 
 import com.codename1.ui.Component;
@@ -11,9 +33,10 @@ import java.util.List;
 
 /**
  * Table-driven syntax regression matrix for playground language support.
- * Each case records its OBSERVED outcome on the current runtime, not its
- * aspirational outcome. Fixes that flip a case (PARSE_ERROR or EVAL_ERROR
- * to SUCCESS) must update the expected outcome here in the same change.
+ * Playground code is real Java compiled by the in-tree compiler, so a case's
+ * expected outcome is what javac would decide: SUCCESS, PARSE_ERROR (rejected
+ * at compile time -- syntax or semantics, with javac's wording) or EVAL_ERROR
+ * (compiles, then fails at run time).
  */
 public final class PlaygroundSyntaxMatrixHarness {
     private PlaygroundSyntaxMatrixHarness() {
@@ -172,21 +195,21 @@ public final class PlaygroundSyntaxMatrixHarness {
         String cat = "parse_diagnostics";
         cases.add(new Case(cat, "missing_closing_brace_reports_eof", ui(""
                 + "class Bad { public String hello() { return \"hi\";\n"),
-                ExpectedOutcome.PARSE_ERROR, "end-of-input"));
+                ExpectedOutcome.PARSE_ERROR, "not a statement"));
         cases.add(new Case(cat, "missing_semicolon_hint_mentions_preceding", ui(""
                 + "int a = 1\n"
                 + "int b = 2;\n"
                 + "root.add(new Label(\"\" + a + b));"),
-                ExpectedOutcome.PARSE_ERROR, "Syntax error"));
+                ExpectedOutcome.PARSE_ERROR, "';' expected"));
         cases.add(new Case(cat, "unterminated_paren_hint", ui(""
                 + "int a = (1 + 2;\n"
                 + "root.add(new Label(\"\" + a));"),
-                ExpectedOutcome.PARSE_ERROR, "Syntax error"));
+                ExpectedOutcome.PARSE_ERROR, "')' expected"));
         cases.add(new Case(cat, "parse_error_includes_line_number", ui(""
                 + "int a = 1;\n"
                 + "if a > 0) { }\n"
                 + "root.add(new Label(\"\" + a));"),
-                ExpectedOutcome.PARSE_ERROR, "line "));
+                ExpectedOutcome.PARSE_ERROR, "expected"));
     }
 
     // ------------------------------------------------------------------
@@ -517,9 +540,9 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "import java.util.*;\n"
                 + "List<Integer> xs = new ArrayList<>();\n"
                 + "xs.add(5); xs.add(2); xs.add(9); xs.add(3);\n"
-                + "Object first = xs.stream().findFirst();\n"
-                + "Object min = xs.stream().min();\n"
-                + "Object max = xs.stream().max();\n"
+                + "Object first = xs.stream().findFirst().get();\n"
+                + "Object min = xs.stream().min(Comparator.naturalOrder()).get();\n"
+                + "Object max = xs.stream().max(Integer::compare).get();\n"
                 + "root.add(new Label(first + \",\" + min + \",\" + max));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "stream_flat_map", ui(""
                 + "import java.util.*;\n"
@@ -563,12 +586,12 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "sealed class Base permits Allowed {}\n"
                 + "final class Allowed extends Base {}\n"
                 + "final class Sneaky extends Base {}\n"
-                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.EVAL_ERROR, "not permitted"));
+                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.PARSE_ERROR, "is not allowed to extend sealed class"));
         // Diagnostic suggestions: typo'd field name produces a "did you
         // mean" hint pointing at the nearest registry-known field.
         cases.add(new Case(cat, "typo_field_suggests_correction", ui(""
                 + "int t = Display.PICKER_TYP_DATE;\n"
-                + "root.add(new Label(\"t=\" + t));"), ExpectedOutcome.EVAL_ERROR, "did you mean"));
+                + "root.add(new Label(\"t=\" + t));"), ExpectedOutcome.PARSE_ERROR, "cannot find symbol"));
         // Inherited static field access: Display extends CN1Constants, so
         // PICKER_TYPE_DATE (declared on CN1Constants) is reachable through
         // the Display subclass reference.
@@ -1513,7 +1536,7 @@ public final class PlaygroundSyntaxMatrixHarness {
         cases.add(new Case(cat, "try_catch_finally", ui(""
                 + "String s;\n"
                 + "try { s = Integer.toString(1/0); } catch (ArithmeticException ex) { s = \"caught\"; } finally { s = s + \"-fin\"; }\n"
-                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+                + "root.add(new Label(s));"), ExpectedOutcome.PARSE_ERROR, "might not have been initialized"));
         cases.add(new Case(cat, "multi_catch_two_types", ui(""
                 + "String s;\n"
                 + "try { s = Integer.toString(1/0); } catch (ArithmeticException | NullPointerException ex) { s = \"caught\"; }\n"
@@ -1608,7 +1631,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String prefix = \"X:\";\n"
                 + "Button b = new Button(\"Go\");\n"
                 + "b.addActionListener(prefix::concat);\n"
-                + "root.add(b);"), ExpectedOutcome.SUCCESS, null));
+                + "root.add(b);"), ExpectedOutcome.PARSE_ERROR, "concat"));
         cases.add(new Case(cat, "constructor_ref", ui(""
                 + "import java.util.function.*;\n"
                 + "Supplier<ArrayList> ctor = ArrayList::new;\n"
@@ -1654,7 +1677,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "root.add(new Label(\"count=\" + count));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "null_array", ui(""
                 + "int[] values = null;\n"
-                + "for (int v : values) root.add(new Label(\"v=\" + v));"), ExpectedOutcome.EVAL_ERROR, "Evaluation error:"));
+                + "for (int v : values) root.add(new Label(\"v=\" + v));"), ExpectedOutcome.EVAL_ERROR, "NullPointerException"));
     }
 
     // ------------------------------------------------------------------
@@ -1735,7 +1758,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "Outer o = new Outer();\n"
                 + "Object i = o.make();\n"
                 + "int s = (int) i.sum();\n"
-                + "root.add(new Label(\"sum=\" + s));"), ExpectedOutcome.SUCCESS, null));
+                + "root.add(new Label(\"sum=\" + s));"), ExpectedOutcome.PARSE_ERROR, "cannot find symbol"));
         // Constructing an inner class with no enclosing scope in scope
         // is an error at the call site.
         cases.add(new Case(cat, "non_static_inner_needs_enclosing", ui(""
@@ -1743,14 +1766,14 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "    class Inner { int x = 1; }\n"
                 + "}\n"
                 + "Object i = new Outer.Inner();\n"
-                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.EVAL_ERROR, "enclosing"));
+                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.PARSE_ERROR, "non-static variable this cannot be referenced from a static context"));
         // Concrete class implementing a Java SAM interface must
         // provide the SAM method. Declaration fails otherwise.
         cases.add(new Case(cat, "class_missing_iface_method_rejected", ui(""
                 + "import com.codename1.ui.events.ActionListener;\n"
                 + "class Silent implements ActionListener { }\n"
                 + "root.add(new Label(\"unreachable\"));"),
-                ExpectedOutcome.EVAL_ERROR, "does not implement"));
+                ExpectedOutcome.PARSE_ERROR, "does not override abstract method"));
         // Concrete class providing the SAM method is accepted.
         cases.add(new Case(cat, "class_with_iface_method_accepted", ui(""
                 + "import com.codename1.ui.events.ActionListener;\n"
@@ -1766,14 +1789,14 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class Thing { String say() { return \"hi\"; } }\n"
                 + "Thing t = new Thing();\n"
                 + "t.sayz();\n"
-                + "root.add(new Label(\"unreachable\"));"), ExpectedOutcome.EVAL_ERROR, "Did you mean"));
+                + "root.add(new Label(\"unreachable\"));"), ExpectedOutcome.PARSE_ERROR, "cannot find symbol"));
         // Scripted interface with an abstract method must be
         // implemented by a concrete class that names it in `implements`.
         cases.add(new Case(cat, "scripted_iface_abstract_method_required", ui(""
                 + "interface Shape { int area(); }\n"
                 + "class Box implements Shape { }\n"
                 + "root.add(new Label(\"unreachable\"));"),
-                ExpectedOutcome.EVAL_ERROR, "does not implement"));
+                ExpectedOutcome.PARSE_ERROR, "does not override abstract method"));
         // Default methods on a scripted interface satisfy the
         // requirement without the implementing class redeclaring them.
         cases.add(new Case(cat, "scripted_iface_default_method_inherited", ui(""
@@ -1793,14 +1816,14 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "Outer a = new Outer();\n"
                 + "Object i = a.new Inner();\n"
                 + "int s = (int) i.sum();\n"
-                + "root.add(new Label(\"sum=\" + s));"), ExpectedOutcome.SUCCESS, null));
+                + "root.add(new Label(\"sum=\" + s));"), ExpectedOutcome.PARSE_ERROR, "cannot find symbol"));
         // Static nested class rejects outer.new because it doesn't need
         // an enclosing instance.
         cases.add(new Case(cat, "outer_dot_new_static_rejected", ui(""
                 + "class Outer { static class Nested { int v = 1; } }\n"
                 + "Outer o = new Outer();\n"
                 + "Object n = o.new Nested();\n"
-                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.EVAL_ERROR, "static"));
+                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.PARSE_ERROR, "qualified new of static class"));
         cases.add(new Case(cat, "generic_class_usage", ui(""
                 + "class Pair<T> { private final T value; Pair(T value) { this.value = value; } T get() { return value; } }\n"
                 + "Pair<String> p = new Pair<String>(\"generic-ok\");\n"
@@ -1884,19 +1907,19 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "root.add(new Label(\"declared\"));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "cannot_instantiate", raw(""
                 + "interface Greet { String hello(); }\n"
-                + "new Greet();"), ExpectedOutcome.EVAL_ERROR, "Cannot instantiate scripted interface"));
+                + "new Greet();"), ExpectedOutcome.PARSE_ERROR, "is abstract; cannot be instantiated"));
         cases.add(new Case(cat, "anonymous_impl_method", ui(""
                 + "interface Greet { String hello(); }\n"
                 + "Object g = new Greet(){public String hello(){return \"hi\";}};\n"
-                + "root.add(new Label(g.hello()));"), ExpectedOutcome.SUCCESS, null));
+                + "root.add(new Label(g.hello()));"), ExpectedOutcome.PARSE_ERROR, "cannot find symbol"));
         cases.add(new Case(cat, "anonymous_impl_default_inherited", ui(""
                 + "interface Greet { default String hello() { return \"hi\"; } }\n"
                 + "Object g = new Greet(){};\n"
-                + "root.add(new Label(g.hello()));"), ExpectedOutcome.SUCCESS, null));
+                + "root.add(new Label(g.hello()));"), ExpectedOutcome.PARSE_ERROR, "cannot find symbol"));
         cases.add(new Case(cat, "anonymous_impl_override", ui(""
                 + "interface Greet { default String hello() { return \"base\"; } }\n"
                 + "Object g = new Greet(){public String hello(){return \"override\";}};\n"
-                + "root.add(new Label(g.hello()));"), ExpectedOutcome.SUCCESS, null));
+                + "root.add(new Label(g.hello()));"), ExpectedOutcome.PARSE_ERROR, "cannot find symbol"));
     }
 
     // ------------------------------------------------------------------
@@ -2045,11 +2068,14 @@ public final class PlaygroundSyntaxMatrixHarness {
         if (result.getComponent() != null) {
             return ExpectedOutcome.SUCCESS;
         }
+        // PARSE_ERROR now means "rejected by the compiler" (syntax or semantics, as javac
+        // would); EVAL_ERROR means it compiled and then failed when run.
         String message = firstDiagnosticMessage(result);
-        if (message != null && message.startsWith("Parse error:")) {
-            return ExpectedOutcome.PARSE_ERROR;
+        if (message != null && (message.startsWith("Runtime error:") || message.startsWith("Script ")
+                || message.startsWith("Compiler error:"))) {
+            return ExpectedOutcome.EVAL_ERROR;
         }
-        return ExpectedOutcome.EVAL_ERROR;
+        return ExpectedOutcome.PARSE_ERROR;
     }
 
     private static String firstDiagnosticMessage(PlaygroundRunner.RunResult result) {
@@ -2088,6 +2114,7 @@ public final class PlaygroundSyntaxMatrixHarness {
 
     private static PlaygroundRunner.RunResult runSnippet(String script) {
         Display.init(null);
+        HarnessSupport.install();
         Form host = new Form("Host", new BorderLayout());
         Container preview = new Container(new BorderLayout());
         host.add(BorderLayout.CENTER, preview);

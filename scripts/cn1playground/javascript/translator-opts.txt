@@ -1,0 +1,1 @@
+-Dparparvm.js.openWorld=java/,com/codename1/,com/codenameone/playground/,org/teavm/,!com/codename1/tools/,!com/codename1/impl/ -Xmx4g

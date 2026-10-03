@@ -4,35 +4,9 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
 cd "$ROOT"
-# The playground is pinned to the in-repo 8.0-SNAPSHOT (see pom.xml), so the
-# registry is generated from the LOCAL framework sources -- the same API the
-# playground builds against. Release-source mode would 404 on Central for a
-# SNAPSHOT version and would describe a different API anyway.
-echo "Regenerating CN1 access registry from local workspace sources..."
-CN1_ACCESS_USE_LOCAL_SOURCES=true bash "$ROOT/tools/generate-cn1-access-registry.sh"
-
-echo "Verifying Component is present in generated registry..."
-if ! grep -q 'index.put("com.codename1.ui.Component"' "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
-  echo "GeneratedCN1Access is missing com.codename1.ui.Component" >&2
-  exit 1
-fi
-
-echo "Verifying key com.codename1.ui classes are present in generated registry..."
-for cls in Button Container Dialog Display Form Label List TextField BrowserComponent CodeEditor RichTextArea; do
-  if ! grep -q "index.put(\"com.codename1.ui.${cls}\"" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
-    echo "GeneratedCN1Access is missing com.codename1.ui.${cls}" >&2
-    exit 1
-  fi
-done
-
-echo "Verifying new editor APIs are available to playground scripts..."
-for member in 'setContent(String, RichTextFormat)' \
-              'setMarkdown(String)' 'setAsciiDoc(String)' 'setRtf(String)'; do
-  if ! grep -q "$member" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
-    echo "GeneratedCN1Access is missing editor API ${member}" >&2
-    exit 1
-  fi
-done
+# The API the playground compiles user code against (key classes, editor APIs,
+# internal classes kept out of completion) is checked by PlaygroundSmokeHarness
+# against the stub library the build generates from the local framework.
 
 echo "Verifying the playground uses CodeEditor for its source panes..."
 PLAYGROUND_EDITOR="$ROOT/common/src/main/java/com/codenameone/playground/PlaygroundCodeEditor.java"
@@ -95,14 +69,6 @@ if git -C "$ROOT/../.." grep -inE "[-./]${forbidden_editor}|${forbidden_editor}[
   echo "Removed browser-editor dependency is still referenced by core files" >&2
   exit 1
 fi
-
-echo "Verifying package-private/internal sentinel classes are NOT generated..."
-for cls in com.codename1.ui.Accessor com.codename1.io.IOAccessor; do
-  if grep -q "index.put(\"${cls}\"" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
-    echo "GeneratedCN1Access unexpectedly includes internal class ${cls}" >&2
-    exit 1
-  fi
-done
 
 # These checks intentionally exercise the locally-installed framework SNAPSHOT.
 # Do not let Maven replace it with the latest remote SNAPSHOT between compilation

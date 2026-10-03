@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.playground;
 
 import com.codename1.ui.Component;
@@ -9,23 +31,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Smoke test: every curated sample script in {@link PlaygroundExamples} must
- * evaluate on the Codename One BeanShell runtime and produce a preview
- * component without an error diagnostic.
+ * Smoke test: every curated sample in {@link PlaygroundExamples} must compile
+ * against the Playground's API stubs, and the listed ones must run and produce a
+ * preview component without an error diagnostic.
  *
- * <p>This guards two things at once:
- * <ul>
- *   <li>Listener wiring uses the supported lambda form — anonymous interface
- *       implementations ({@code new ActionListener() { ... }}) are rejected by
- *       the CN1 BeanShell runtime, so a sample that uses them would fail here.</li>
- *   <li>The device-API demos added for the JavaScript port
- *       (clipboard / native share / fullscreen / printing / camera) resolve to
- *       real public APIs in the generated access registry.</li>
- * </ul>
- *
- * <p>The GPU and physics samples are intentionally excluded: they need a live
- * render surface / animation loop that the headless test {@link Display} cannot
- * provide.
+ * <p>The device-API demos added for the JavaScript port (clipboard / native
+ * share / fullscreen / printing / camera) therefore resolve to real public APIs
+ * of the VM the Playground ships. The GPU and physics samples are compiled but
+ * not run: they need a live render surface / animation loop that the headless
+ * test {@link Display} cannot provide.
  */
 public final class PlaygroundSamplesHarness {
     private PlaygroundSamplesHarness() {
@@ -52,6 +66,22 @@ public final class PlaygroundSamplesHarness {
     public static void main(String[] args) {
         List<String> failures = new ArrayList<String>();
         int passed = 0;
+        Display.init(null);
+        HarnessSupport.install();
+        for (int i = 0; i < PlaygroundExamples.SAMPLES.length; i++) {
+            PlaygroundExamples.Sample sample = PlaygroundExamples.SAMPLES[i];
+            try {
+                PlaygroundRunner.compile(sample.script);
+            } catch (PlaygroundRunner.CompileFailure f) {
+                StringBuilder b = new StringBuilder();
+                for (PlaygroundRunner.Diagnostic d : f.diagnostics) {
+                    b.append(" [").append(d.line).append(':').append(d.column).append("] ").append(d.message);
+                }
+                failures.add(sample.title + ": does not compile:" + b);
+            } catch (Exception e) {
+                failures.add(sample.title + ": compiler failed: " + e);
+            }
+        }
         for (int i = 0; i < SLUGS.length; i++) {
             String slug = SLUGS[i];
             PlaygroundExamples.Sample sample = PlaygroundExamples.findBySlug(slug);
@@ -88,6 +118,7 @@ public final class PlaygroundSamplesHarness {
 
     private static String evaluate(String script) {
         Display.init(null);
+        HarnessSupport.install();
         Form host = new Form("Host", new BorderLayout());
         Container preview = new Container(new BorderLayout());
         host.add(BorderLayout.CENTER, preview);

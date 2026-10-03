@@ -24,7 +24,6 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 TRANSLATOR="$REPO_ROOT/vm/ByteCodeTranslator/target/classes"
-ASM_CP_FILE="$REPO_ROOT/vm/ByteCodeTranslator/target/native-signature-asm-classpath.txt"
 
 require_all=0
 quiet_warnings=0
@@ -39,10 +38,6 @@ done
 if [[ ! -f "$TRANSLATOR/com/codename1/tools/translator/NativeSignatureVerifierCli.class" ]]; then
   echo "check-native-signatures: building the translator" >&2
   (cd "$REPO_ROOT/vm" && mvn -q -B -pl ByteCodeTranslator -am package -DskipTests)
-fi
-if [[ ! -f "$ASM_CP_FILE" ]]; then
-  (cd "$REPO_ROOT/vm" && mvn -q -B -pl ByteCodeTranslator \
-     dependency:build-classpath "-Dmdep.outputFile=$ASM_CP_FILE")
 fi
 
 # Each port pairs the classes ParparVM translates with the native sources the
@@ -137,7 +132,7 @@ for entry in "${PORTS[@]}"; do
   fi
 
   echo "== $name"
-  if ! java -cp "$TRANSLATOR:$(cat "$ASM_CP_FILE")" \
+  if ! java -cp "$TRANSLATOR" \
        com.codename1.tools.translator.NativeSignatureVerifierCli "${args[@]}"; then
     status=1
   fi

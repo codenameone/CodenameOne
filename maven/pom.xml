@@ -104,6 +104,7 @@
         <module>windows</module>
         <module>linux</module>
         <module>parparvm</module>
+        <module>javac</module>
         <!-- The hardening engine builds before the plugin so the plugin's
              generate-resources step can embed its shaded standalone jar as a
              classpath resource. The engine is invoked as a forked process, never

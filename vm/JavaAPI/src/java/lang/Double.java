@@ -362,4 +362,37 @@ public final class Double extends Number implements Comparable<Double> {
     public int compareTo(Double another) {
         return compare(cn1Value(), another.cn1Value());
     }
+
+    /**
+     * {@code a + b}; a method reference target for reductions ({@code Double::sum}).
+     *
+     * @param a an operand
+     * @param b an operand
+     * @return the sum
+     */
+    public static double sum(double a, double b) {
+        return a + b;
+    }
+
+    /**
+     * The greater of two values (Math.max), as a method reference target.
+     *
+     * @param a a value
+     * @param b a value
+     * @return the greater
+     */
+    public static double max(double a, double b) {
+        return Math.max(a, b);
+    }
+
+    /**
+     * The smaller of two values (Math.min), as a method reference target.
+     *
+     * @param a a value
+     * @param b a value
+     * @return the smaller
+     */
+    public static double min(double a, double b) {
+        return Math.min(a, b);
+    }
 }

@@ -1,0 +1,739 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.tools.javac;
+
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Definite assignment (JLS 16) for local variables, plus unreachable-statement
+ * detection (JLS 14.22). A read of a local that is not definitely assigned would
+ * otherwise reach the JVM verifier (or, translated, read garbage), so it is a
+ * compile error here as in javac.
+ *
+ * <p>State is the set of definitely assigned locals; {@code null} stands for the
+ * universal set, which is what an unreachable point has.
+ */
+final class Flow {
+    private final Compiler compiler;
+    private Tree.CompilationUnit unit;
+    private Map<VarSymbol, Integer> index;
+    private int nextIndex;
+    private BitSet inits;
+    private boolean alive;
+    private BitSet whenTrue;
+    private BitSet whenFalse;
+    /** Pending jumps: {target tree, BitSet inits at the jump (null = universal), Boolean isContinue}. */
+    private List<Object[]> exits;
+    /** Enclosing jump targets: {tree, label}. */
+    private List<Object[]> targets;
+
+    Flow(Compiler compiler) {
+        this.compiler = compiler;
+    }
+
+    void checkClass(ClassSymbol c) {
+        if (c.decl == null) {
+            return;
+        }
+        unit = c.unit;
+        for (Tree member : c.decl.members) {
+            if (member instanceof Tree.MethodDecl) {
+                Tree.MethodDecl m = (Tree.MethodDecl) member;
+                if (m.body == null || m.sym == null) {
+                    continue;
+                }
+                reset();
+                for (VarSymbol p : m.sym.paramSyms) {
+                    declare(p);
+                    assign(p);
+                }
+                scanStat(m.body);
+            } else if (member instanceof Tree.VarDef) {
+                Tree.VarDef v = (Tree.VarDef) member;
+                if (v.init != null) {
+                    reset();
+                    scanExpr(v.init);
+                }
+            } else if (member instanceof Tree.Block) {
+                reset();
+                scanStat(member);
+            }
+        }
+    }
+
+    private void reset() {
+        index = new IdentityHashMap<VarSymbol, Integer>();
+        nextIndex = 0;
+        inits = new BitSet();
+        alive = true;
+        exits = new ArrayList<Object[]>();
+        targets = new ArrayList<Object[]>();
+    }
+
+    private void error(int pos, String message) {
+        compiler.error(unit, pos, message);
+    }
+
+    // ------------------------------------------------------------------ sets
+
+    private void declare(VarSymbol v) {
+        if (v != null && !index.containsKey(v)) {
+            index.put(v, Integer.valueOf(nextIndex++));
+        }
+    }
+
+    private void assign(VarSymbol v) {
+        Integer i = v == null ? null : index.get(v);
+        if (i != null && inits != null) {
+            inits.set(i.intValue());
+        }
+    }
+
+    private static BitSet copy(BitSet b) {
+        if (b == null) {
+            return null;
+        }
+        // JavaAPI's BitSet has no public clone().
+        BitSet r = new BitSet();
+        r.or(b);
+        return r;
+    }
+
+    /** Intersection, where null is the universal set. */
+    private static BitSet meet(BitSet a, BitSet b) {
+        if (a == null) {
+            return copy(b);
+        }
+        if (b == null) {
+            return copy(a);
+        }
+        BitSet r = copy(a);
+        r.and(b);
+        return r;
+    }
+
+    private void markDead() {
+        alive = false;
+        inits = null;
+    }
+
+    /** Joins the current state with another reachable-or-not state. */
+    private void join(BitSet other, boolean otherAlive) {
+        if (!otherAlive) {
+            return;
+        }
+        if (!alive) {
+            inits = copy(other);
+            alive = true;
+            return;
+        }
+        inits = meet(inits, other);
+    }
+
+    private void checkRead(VarSymbol v, int pos) {
+        Integer i = index.get(v);
+        if (i == null || inits == null || !alive) {
+            return;
+        }
+        if (!inits.get(i.intValue())) {
+            error(pos, "variable " + v.name + " might not have been initialized");
+            inits.set(i.intValue());
+        }
+    }
+
+    // ------------------------------------------------------------------ jumps
+
+    private Object resolveTarget(String label, boolean isContinue) {
+        for (int i = targets.size() - 1; i >= 0; i--) {
+            Object[] t = targets.get(i);
+            Tree node = (Tree) t[0];
+            if (label != null) {
+                if (label.equals(t[1])) {
+                    if (isContinue && node instanceof Tree.Labeled) {
+                        return ((Tree.Labeled) node).body;
+                    }
+                    return node;
+                }
+                continue;
+            }
+            if (node instanceof Tree.Labeled) {
+                continue;
+            }
+            if (isContinue && node instanceof Tree.Switch) {
+                continue;
+            }
+            return node;
+        }
+        return null;
+    }
+
+    private void jump(Object target, boolean isContinue) {
+        if (target != null && alive) {
+            exits.add(new Object[]{target, copy(inits), Boolean.valueOf(isContinue)});
+        }
+        markDead();
+    }
+
+    /** Removes the exits to target of the given kind; returns their meet, and whether there were any. */
+    private BitSet takeExits(Tree target, boolean isContinue, boolean[] any) {
+        BitSet result = null;
+        boolean found = false;
+        for (int i = exits.size() - 1; i >= 0; i--) {
+            Object[] e = exits.get(i);
+            if (e[0] == target && ((Boolean) e[2]).booleanValue() == isContinue) {
+                result = found ? meet(result, (BitSet) e[1]) : copy((BitSet) e[1]);
+                if (!found && e[1] == null) {
+                    result = null;
+                }
+                found = true;
+                exits.remove(i);
+            }
+        }
+        any[0] = found;
+        return result;
+    }
+
+    private void pushTarget(Tree node, String label) {
+        targets.add(new Object[]{node, label});
+    }
+
+    private void popTarget() {
+        targets.remove(targets.size() - 1);
+    }
+
+    // ------------------------------------------------------------------ statements
+
+    private void scanStats(List<Tree> stats) {
+        boolean reported = false;
+        for (Tree s : stats) {
+            if (!alive && !reported && !(s instanceof Tree.Empty) && !(s instanceof Tree.ClassDecl) && s.pos >= 0) {
+                error(s.pos, "unreachable statement");
+                reported = true;
+            }
+            scanStat(s);
+        }
+    }
+
+    private void scanStat(Tree t) {
+        if (t == null) {
+            return;
+        }
+        if (t instanceof Tree.Block) {
+            scanStats(((Tree.Block) t).stats);
+        } else if (t instanceof Tree.VarDef) {
+            Tree.VarDef v = (Tree.VarDef) t;
+            declare(v.sym);
+            if (v.init != null) {
+                scanExpr(v.init);
+                assign(v.sym);
+            }
+        } else if (t instanceof Tree.ExpressionStatement) {
+            scanExpr(((Tree.ExpressionStatement) t).expr);
+        } else if (t instanceof Tree.If) {
+            Tree.If s = (Tree.If) t;
+            scanCond(s.cond);
+            BitSet f = whenFalse;
+            boolean condAlive = alive;
+            inits = whenTrue;
+            scanStat(s.thenPart);
+            BitSet thenInits = inits;
+            boolean thenAlive = alive;
+            inits = f;
+            alive = condAlive;
+            if (s.elsePart != null) {
+                scanStat(s.elsePart);
+            }
+            if (!thenAlive && !(s.elsePart != null)) {
+                // if-then: completes normally whenever reachable (JLS 14.22).
+                alive = condAlive;
+            }
+            if (s.elsePart == null) {
+                if (inits == null && condAlive) {
+                    inits = copy(thenInits);
+                }
+                join(thenInits, thenAlive);
+                alive = condAlive;
+            } else {
+                join(thenInits, thenAlive);
+            }
+        } else if (t instanceof Tree.WhileLoop) {
+            Tree.WhileLoop w = (Tree.WhileLoop) t;
+            scanCond(w.cond);
+            BitSet f = whenFalse;
+            inits = whenTrue;
+            pushTarget(w, null);
+            scanStat(w.body);
+            popTarget();
+            boolean[] any = new boolean[1];
+            takeExits(w, true, any);
+            BitSet breaks = takeExits(w, false, any);
+            boolean hasBreak = any[0];
+            inits = f;
+            alive = !Attr.isTrue(w.cond);
+            join(breaks, hasBreak);
+        } else if (t instanceof Tree.DoLoop) {
+            Tree.DoLoop d = (Tree.DoLoop) t;
+            pushTarget(d, null);
+            scanStat(d.body);
+            popTarget();
+            boolean[] any = new boolean[1];
+            BitSet conts = takeExits(d, true, any);
+            join(conts, any[0]);
+            BitSet breaks = takeExits(d, false, any);
+            boolean hasBreak = any[0];
+            if (alive) {
+                scanCond(d.cond);
+                inits = whenFalse;
+                alive = !Attr.isTrue(d.cond);
+            }
+            join(breaks, hasBreak);
+        } else if (t instanceof Tree.ForLoop) {
+            Tree.ForLoop f = (Tree.ForLoop) t;
+            for (Tree i : f.init) {
+                scanStat(i);
+            }
+            BitSet falseInits;
+            if (f.cond != null) {
+                scanCond(f.cond);
+                falseInits = whenFalse;
+                inits = whenTrue;
+            } else {
+                falseInits = null;
+            }
+            pushTarget(f, null);
+            scanStat(f.body);
+            popTarget();
+            boolean[] any = new boolean[1];
+            BitSet conts = takeExits(f, true, any);
+            join(conts, any[0]);
+            if (alive) {
+                for (Tree s : f.step) {
+                    scanStat(s);
+                }
+            }
+            BitSet breaks = takeExits(f, false, any);
+            boolean hasBreak = any[0];
+            inits = falseInits;
+            alive = f.cond != null && !Attr.isTrue(f.cond);
+            join(breaks, hasBreak);
+        } else if (t instanceof Tree.ForEach) {
+            Tree.ForEach f = (Tree.ForEach) t;
+            scanExpr(f.expr);
+            BitSet before = copy(inits);
+            declare(f.var.sym);
+            assign(f.var.sym);
+            pushTarget(f, null);
+            scanStat(f.body);
+            popTarget();
+            boolean[] any = new boolean[1];
+            takeExits(f, true, any);
+            BitSet breaks = takeExits(f, false, any);
+            boolean hasBreak = any[0];
+            inits = before;
+            alive = true;
+            join(breaks, hasBreak);
+        } else if (t instanceof Tree.Labeled) {
+            Tree.Labeled l = (Tree.Labeled) t;
+            pushTarget(l, l.label);
+            scanStat(l.body);
+            popTarget();
+            boolean[] any = new boolean[1];
+            BitSet breaks = takeExits(l, false, any);
+            join(breaks, any[0]);
+        } else if (t instanceof Tree.Switch) {
+            scanSwitch((Tree.Switch) t);
+        } else if (t instanceof Tree.Return) {
+            Tree.Return r = (Tree.Return) t;
+            if (r.expr != null) {
+                scanExpr(r.expr);
+            }
+            markDead();
+        } else if (t instanceof Tree.Throw) {
+            scanExpr(((Tree.Throw) t).expr);
+            markDead();
+        } else if (t instanceof Tree.Break) {
+            jump(resolveTarget(((Tree.Break) t).label, false), false);
+        } else if (t instanceof Tree.Continue) {
+            jump(resolveTarget(((Tree.Continue) t).label, true), true);
+        } else if (t instanceof Tree.Yield) {
+            scanExpr(((Tree.Yield) t).value);
+            Object target = null;
+            for (int i = targets.size() - 1; i >= 0; i--) {
+                Tree node = (Tree) targets.get(i)[0];
+                if (node instanceof Tree.Switch && ((Tree.Switch) node).isExpression) {
+                    target = node;
+                    break;
+                }
+            }
+            jump(target, false);
+        } else if (t instanceof Tree.Try) {
+            scanTry((Tree.Try) t);
+        } else if (t instanceof Tree.Synchronized) {
+            scanExpr(((Tree.Synchronized) t).lock);
+            scanStat(((Tree.Synchronized) t).body);
+        } else if (t instanceof Tree.Assert) {
+            BitSet saved = copy(inits);
+            boolean savedAlive = alive;
+            scanCond(((Tree.Assert) t).cond);
+            if (((Tree.Assert) t).detail != null) {
+                inits = whenFalse;
+                scanExpr(((Tree.Assert) t).detail);
+            }
+            inits = saved;
+            alive = savedAlive;
+        } else if (t instanceof Tree.ClassDecl || t instanceof Tree.Empty) {
+            // Local classes are checked on their own.
+        } else {
+            scanExpr(t);
+        }
+    }
+
+    private void scanTry(Tree.Try t) {
+        for (Tree r : t.resources) {
+            if (r instanceof Tree.VarDef) {
+                scanStat(r);
+            } else {
+                scanExpr(r);
+            }
+        }
+        BitSet before = copy(inits);
+        boolean beforeAlive = alive;
+        scanStat(t.body);
+        BitSet after = inits;
+        boolean afterAlive = alive;
+        for (Tree.Catch c : t.catches) {
+            inits = copy(before);
+            alive = beforeAlive;
+            declare(c.param.sym);
+            assign(c.param.sym);
+            scanStat(c.body);
+            BitSet ci = inits;
+            boolean ca = alive;
+            inits = after;
+            alive = afterAlive;
+            join(ci, ca);
+            after = inits;
+            afterAlive = alive;
+        }
+        if (t.finalizer != null) {
+            inits = copy(before);
+            alive = beforeAlive;
+            scanStat(t.finalizer);
+            BitSet fin = inits;
+            boolean finAlive = alive;
+            if (!finAlive) {
+                markDead();
+                return;
+            }
+            inits = after;
+            alive = afterAlive;
+            if (inits != null && fin != null) {
+                inits.or(fin);
+            }
+        } else {
+            inits = after;
+            alive = afterAlive;
+        }
+    }
+
+    private void scanSwitch(Tree.Switch sw) {
+        scanExpr(sw.selector);
+        BitSet start = copy(inits);
+        boolean startAlive = alive;
+        pushTarget(sw, null);
+        BitSet result = null;
+        boolean resultAlive = false;
+        boolean fallAlive = false;
+        BitSet fall = null;
+        boolean hasDefault = false;
+        for (Tree.Case c : sw.cases) {
+            hasDefault |= c.isDefault;
+            for (Tree l : c.labels) {
+                if (Attr.isUnconditionalPattern(l, sw)) {
+                    hasDefault = true;
+                }
+            }
+            inits = copy(start);
+            alive = startAlive;
+            if (!sw.arrows && fallAlive) {
+                inits = meet(inits, fall);
+            }
+            for (Tree l : c.labels) {
+                bindPattern(l);
+            }
+            if (c.guard != null) {
+                scanCond(c.guard);
+                inits = whenTrue;
+            }
+            if (c.arrowExpr != null) {
+                scanExpr(c.arrowExpr);
+            } else {
+                scanStats(c.stats);
+            }
+            if (sw.arrows) {
+                if (alive) {
+                    if (!resultAlive) {
+                        result = copy(inits);
+                        resultAlive = true;
+                    } else {
+                        result = meet(result, inits);
+                    }
+                }
+            } else {
+                fall = copy(inits);
+                fallAlive = alive;
+            }
+        }
+        popTarget();
+        if (!sw.arrows && fallAlive) {
+            if (!resultAlive) {
+                result = copy(fall);
+                resultAlive = true;
+            } else {
+                result = meet(result, fall);
+            }
+        }
+        boolean exhaustive = hasDefault || sw.needsDefaultThrow || sw.isExpression;
+        if (!exhaustive && startAlive) {
+            if (!resultAlive) {
+                result = copy(start);
+                resultAlive = true;
+            } else {
+                result = meet(result, start);
+            }
+        }
+        boolean[] any = new boolean[1];
+        BitSet breaks = takeExits(sw, false, any);
+        inits = result;
+        alive = resultAlive;
+        join(breaks, any[0]);
+    }
+
+    private void bindPattern(Tree p) {
+        if (p instanceof Tree.BindingPattern) {
+            VarSymbol v = ((Tree.BindingPattern) p).var.sym;
+            declare(v);
+            assign(v);
+        } else if (p instanceof Tree.RecordPattern) {
+            for (Tree n : ((Tree.RecordPattern) p).nested) {
+                bindPattern(n);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ expressions
+
+    private void scanCond(Tree c) {
+        if (c.constant instanceof Boolean) {
+            scanExpr(c);
+            if (((Boolean) c.constant).booleanValue()) {
+                whenTrue = copy(inits);
+                whenFalse = null;
+            } else {
+                whenTrue = null;
+                whenFalse = copy(inits);
+            }
+            return;
+        }
+        if (c instanceof Tree.Parens) {
+            scanCond(((Tree.Parens) c).expr);
+            return;
+        }
+        if (c instanceof Tree.Unary && ((Tree.Unary) c).op == Token.Kind.BANG) {
+            scanCond(((Tree.Unary) c).arg);
+            BitSet t = whenTrue;
+            whenTrue = whenFalse;
+            whenFalse = t;
+            return;
+        }
+        if (c instanceof Tree.Binary && (((Tree.Binary) c).op == Token.Kind.AMPAMP || ((Tree.Binary) c).op == Token.Kind.BARBAR)) {
+            Tree.Binary b = (Tree.Binary) c;
+            boolean and = b.op == Token.Kind.AMPAMP;
+            scanCond(b.lhs);
+            BitSet t1 = whenTrue;
+            BitSet f1 = whenFalse;
+            inits = copy(and ? t1 : f1);
+            scanCond(b.rhs);
+            if (and) {
+                whenFalse = meet(f1, whenFalse);
+            } else {
+                whenTrue = meet(t1, whenTrue);
+            }
+            return;
+        }
+        if (c instanceof Tree.InstanceOf) {
+            scanExpr(((Tree.InstanceOf) c).expr);
+            whenFalse = copy(inits);
+            bindPattern(((Tree.InstanceOf) c).pattern);
+            whenTrue = copy(inits);
+            return;
+        }
+        scanExpr(c);
+        whenTrue = copy(inits);
+        whenFalse = copy(inits);
+    }
+
+    private VarSymbol localOf(Tree t) {
+        while (t instanceof Tree.Parens) {
+            t = ((Tree.Parens) t).expr;
+        }
+        if (t instanceof Tree.Ident && ((Tree.Ident) t).sym instanceof VarSymbol) {
+            VarSymbol v = (VarSymbol) ((Tree.Ident) t).sym;
+            return v.kind == VarSymbol.Kind.FIELD ? null : v;
+        }
+        return null;
+    }
+
+    private void scanExpr(Tree t) {
+        if (t == null) {
+            return;
+        }
+        if (t instanceof Tree.Ident) {
+            Symbol s = ((Tree.Ident) t).sym;
+            if (s instanceof VarSymbol && ((VarSymbol) s).kind != VarSymbol.Kind.FIELD) {
+                checkRead((VarSymbol) s, t.pos);
+            }
+        } else if (t instanceof Tree.Assign) {
+            Tree.Assign a = (Tree.Assign) t;
+            VarSymbol v = localOf(a.lhs);
+            if (v == null) {
+                scanLhs(a.lhs);
+            }
+            scanExpr(a.rhs);
+            if (v != null) {
+                if (v.isFinal() && !v.hasInitializer && alive && inits != null) {
+                    Integer i = index.get(v);
+                    if (i != null && inits.get(i.intValue())) {
+                        error(a.pos, "variable " + v.name + " might already have been assigned");
+                    }
+                }
+                assign(v);
+            }
+        } else if (t instanceof Tree.CompoundAssign) {
+            scanExpr(((Tree.CompoundAssign) t).lhs);
+            scanExpr(((Tree.CompoundAssign) t).rhs);
+        } else if (t instanceof Tree.Binary && (((Tree.Binary) t).op == Token.Kind.AMPAMP || ((Tree.Binary) t).op == Token.Kind.BARBAR)
+                || t instanceof Tree.Unary && ((Tree.Unary) t).op == Token.Kind.BANG || t instanceof Tree.InstanceOf) {
+            scanCond(t);
+            inits = meet(whenTrue, whenFalse);
+        } else if (t instanceof Tree.Conditional) {
+            Tree.Conditional c = (Tree.Conditional) t;
+            scanCond(c.cond);
+            BitSet f = whenFalse;
+            inits = whenTrue;
+            scanExpr(c.truePart);
+            BitSet a = inits;
+            inits = f;
+            scanExpr(c.falsePart);
+            inits = meet(a, inits);
+        } else if (t instanceof Tree.Lambda) {
+            Tree.Lambda l = (Tree.Lambda) t;
+            if (l.boundExpr != null) {
+                scanExpr(l.boundExpr);
+            }
+            BitSet saved = copy(inits);
+            boolean savedAlive = alive;
+            List<Object[]> savedExits = exits;
+            List<Object[]> savedTargets = targets;
+            exits = new ArrayList<Object[]>();
+            targets = new ArrayList<Object[]>();
+            for (Tree.VarDef p : l.params) {
+                declare(p.sym);
+                assign(p.sym);
+            }
+            if (l.boundVar != null) {
+                declare(l.boundVar);
+                assign(l.boundVar);
+            }
+            if (l.body instanceof Tree.Block) {
+                scanStat(l.body);
+            } else {
+                scanExpr(l.body);
+            }
+            inits = saved;
+            alive = savedAlive;
+            exits = savedExits;
+            targets = savedTargets;
+        } else if (t instanceof Tree.MethodRef) {
+            Tree.MethodRef r = (Tree.MethodRef) t;
+            if (r.lambda != null) {
+                scanExpr(r.lambda);
+            }
+        } else if (t instanceof Tree.Switch) {
+            scanSwitch((Tree.Switch) t);
+        } else if (t instanceof Tree.NewClass) {
+            Tree.NewClass nc = (Tree.NewClass) t;
+            scanExpr(nc.outer);
+            for (Tree a : nc.args) {
+                scanExpr(a);
+            }
+        } else if (t instanceof Tree.MethodCall) {
+            Tree.MethodCall c = (Tree.MethodCall) t;
+            scanExpr(c.receiver);
+            for (Tree a : c.args) {
+                scanExpr(a);
+            }
+        } else if (t instanceof Tree.Select) {
+            scanExpr(((Tree.Select) t).selected);
+        } else if (t instanceof Tree.Parens) {
+            scanExpr(((Tree.Parens) t).expr);
+        } else if (t instanceof Tree.Unary) {
+            scanExpr(((Tree.Unary) t).arg);
+        } else if (t instanceof Tree.Binary) {
+            scanExpr(((Tree.Binary) t).lhs);
+            scanExpr(((Tree.Binary) t).rhs);
+        } else if (t instanceof Tree.Cast) {
+            scanExpr(((Tree.Cast) t).expr);
+        } else if (t instanceof Tree.NewArray) {
+            Tree.NewArray na = (Tree.NewArray) t;
+            for (Tree d : na.dims) {
+                scanExpr(d);
+            }
+            if (na.elems != null) {
+                for (Tree e : na.elems) {
+                    scanExpr(e);
+                }
+            }
+        } else if (t instanceof Tree.ArrayAccess) {
+            scanExpr(((Tree.ArrayAccess) t).array);
+            scanExpr(((Tree.ArrayAccess) t).index);
+        }
+    }
+
+    /** The parts of an assignment target that are evaluated (receiver, array, index). */
+    private void scanLhs(Tree lhs) {
+        while (lhs instanceof Tree.Parens) {
+            lhs = ((Tree.Parens) lhs).expr;
+        }
+        if (lhs instanceof Tree.Select) {
+            scanExpr(((Tree.Select) lhs).selected);
+        } else if (lhs instanceof Tree.ArrayAccess) {
+            scanExpr(((Tree.ArrayAccess) lhs).array);
+            scanExpr(((Tree.ArrayAccess) lhs).index);
+        }
+    }
+}
