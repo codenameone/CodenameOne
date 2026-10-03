@@ -626,6 +626,9 @@ public class MacOSBuildHintsTest {
         // whitelist above lets it through unchanged.
         assertEquals("native", parse(raw("nativeTheme", "native"), "p").getThemeMode());
         assertEquals("native", parse(raw("cn1.nativeTheme", "native"), "p").getThemeMode());
+        // custom installs no native theme; the whitelist used to turn it into "modern".
+        assertEquals("custom", parse(raw("nativeTheme", "custom"), "p").getThemeMode());
+        assertEquals("custom", parse(raw("macos.themeMode", "custom"), "p").getThemeMode());
 
         // The value is interpolated into generated Java source, so it is
         // constrained to what the runtime understands rather than passed

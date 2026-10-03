@@ -3305,6 +3305,15 @@ extern CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int 
 // usually reads adjacent heap rather than faulting, so no signal ever arrives.
 extern CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE);
 
+/* Called from the stub of a method the translator culled, only when the translation
+ * ran with CN1_CULL_TRAP (see BytecodeMethod.appendMethodC). Reaching one means the
+ * cull removed live code, so this dies loudly, naming the method. */
+static inline void cn1CulledMethodCalled(const char *method) {
+    fprintf(stderr, "CN1 FATAL: called %s, which the translator culled as unreachable\n", method);
+    fflush(stderr);
+    abort();
+}
+
 /* Constructing throw helpers for the paths that must RETURN rather than die: a
  * frameless method hands the pending exception back to its caller's frame, and the
  * expression forms have to yield a value. Each allocates its own exception so the

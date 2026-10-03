@@ -1,0 +1,10 @@
+List<String>.from refused an int
+[a, b]
+Uint8List.fromList refused a string
+123
+42
+true
+true
+true
+caught as the Dart error: true
+offset near the limit is a RangeError

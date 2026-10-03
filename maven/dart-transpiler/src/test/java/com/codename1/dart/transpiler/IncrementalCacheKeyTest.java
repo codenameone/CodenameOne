@@ -1,0 +1,111 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.dart.transpiler;
+
+import com.codename1.dart.transpiler.api.DartTranspiler;
+import com.codename1.dart.transpiler.api.TranspileRequest;
+import com.codename1.dart.transpiler.api.TranspileResult;
+import com.codename1.dart.transpiler.harness.TestSupport;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.File;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/// The incremental skip reuses output only when nothing that shaped it changed.
+public class IncrementalCacheKeyTest {
+
+    @TempDir
+    File tmp;
+
+    private TranspileResult run(File src, File out, File state, String pkg) {
+        return new DartTranspiler().transpile(new TranspileRequest()
+                .sourceRoot(src).outputDir(out).stateFile(state).packageName(pkg));
+    }
+
+    @Test
+    public void unchangedInputsSkipAndAChangedPackageDoesNot() throws Exception {
+        File src = new File(tmp, "src");
+        src.mkdirs();
+        TestSupport.write(new File(src, "a.dart"), "int answer() => 42;\n");
+        File out = new File(tmp, "out");
+        File state = new File(tmp, "state.txt");
+
+        TranspileResult first = run(src, out, state, "com.example.one");
+        assertFalse(first.isUpToDate(), "the first run transpiles");
+        assertTrue(run(src, out, state, "com.example.one").isUpToDate(),
+                "nothing changed, so the second run is skipped");
+
+        // Only the package changes. The generated sources name their package, so
+        // reusing them would leave them all in the old one.
+        assertFalse(run(src, out, state, "com.example.two").isUpToDate(),
+                "a changed output package must regenerate");
+    }
+
+    @Test
+    public void changingThePackageRemovesThePreviousPackagesSources() throws Exception {
+        File src = new File(tmp, "src2");
+        src.mkdirs();
+        TestSupport.write(new File(src, "a.dart"), "int answer() => 42;\n");
+        File out = new File(tmp, "out2");
+        File state = new File(tmp, "state2.txt");
+        run(src, out, state, "com.example.one");
+        File oldDir = new File(out, "com/example/one");
+        assertTrue(oldDir.listFiles() != null && oldDir.listFiles().length > 0, "the first run generated sources");
+        run(src, out, state, "com.example.two");
+        File[] left = oldDir.listFiles();
+        assertTrue(left == null || left.length == 0,
+                "the old package's sources must not stay on the compile root beside the new ones");
+        assertTrue(new File(out, "com/example/two").listFiles().length > 0);
+    }
+
+    @Test
+    public void aFailedWriteLeavesNoStateToSkipTheNextBuild() throws Exception {
+        File src = new File(tmp, "src3");
+        src.mkdirs();
+        File dart = new File(src, "a.dart");
+        TestSupport.write(dart, "int answer() => 42;\n");
+        File out = new File(tmp, "out3");
+        File state = new File(tmp, "state3.txt");
+        run(src, out, state, "com.example.three");
+        assertTrue(state.isFile(), "a successful run records its inputs");
+
+        // Every generated file's path becomes a directory, so writing it fails.
+        File pkg = new File(out, "com/example/three");
+        for (File f : pkg.listFiles()) {
+            assertTrue(f.delete() && f.mkdir(), "could not block " + f);
+        }
+        TestSupport.write(dart, "int answer() => 43;\n");
+        TranspileResult failed = run(src, out, state, "com.example.three");
+        assertTrue(failed.hasErrors(), "the blocked writes are reported");
+        assertFalse(state.exists(), "the digest of inputs whose output was not written is not recorded");
+
+        // Back to the inputs of the earlier, successful build: its state is gone, so
+        // this build writes again instead of trusting output that no longer matches.
+        TestSupport.write(dart, "int answer() => 42;\n");
+        assertFalse(run(src, out, state, "com.example.three").isUpToDate());
+    }
+}

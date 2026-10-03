@@ -187,6 +187,25 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     /**
+     * Pins the one way a synchronous hashCode()/equals() site can fail. Those sites
+     * drive a generator implementation to completion instead of suspending, so a
+     * synchronized hashCode() whose monitor another green thread holds cannot wait:
+     * it must throw the driver's named error rather than run unlocked or hash wrong,
+     * and it must leave the monitor's entrant queue as it found it.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void contendedHashCodeAtSynchronousSiteFailsWithNamedError(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsDrivenHashContentionApp.java", "JsDrivenHashContentionApp");
+
+        assertEquals(15, result.result,
+                "a blocked hashCode() at a synchronous site must throw 'sync virtual dispatch reached a blocking"
+                        + " method' and leave the monitor usable (bits: 1 threw, 2 message, 4 map works after,"
+                        + " 8 lock free). raw=" + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    /**
      * Pins synchronized re-entrancy. A thread that already owns a
      * monitor must take the fast ``count++`` path on a nested entry
      * (otherwise it would park itself on its own monitor and
@@ -394,6 +413,20 @@ class JavascriptRuntimeSemanticsTest {
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void intArithmeticWrapsAt32BitsLikeJava(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIntOverflowApp.java", "JsIntOverflowApp");
+
+        // 127 = every check in the fixture. A missing bit names the operation:
+        // 1 IMUL past 2^53, 2/4 IADD/ISUB overflow compared, 8 widened, 16 printed,
+        // 32 an exact 2^32 product, 64 vm/benchmarks' intArithmetic loop.
+        assertEquals(127, result.result,
+                "int arithmetic must wrap at 32 bits as Java's does. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
     @Test
     void newArrayUsesJavaDefaultsForPrimitiveReferenceAndNestedArrays() throws Exception {
         Path runtime = Paths.get("..", "ByteCodeTranslator", "src", "javascript", "parparvm_runtime.js")
@@ -414,7 +447,9 @@ class JavascriptRuntimeSemanticsTest {
                 + "  if (array[0] !== 0 || array[1] !== 0) failures.push(type + '=' + String(array[0]));\n"
                 + "}\n"
                 + "const longs = jvm.newArray(2, 'JAVA_LONG', 1);\n"
-                + "if (!longs[0] || longs[0].__l !== 1 || longs[0].l !== 0 || longs[0].h !== 0) failures.push('JAVA_LONG');\n"
+                // A long within the safe-integer range is a plain number in the runtime's
+                // canonical form, so the default element is the number 0, not a record.
+                + "if (longs[0] !== 0 || longs[1] !== 0 || Object.is(longs[0], -0)) failures.push('JAVA_LONG=' + JSON.stringify(longs[0]));\n"
                 + "const references = jvm.newArray(2, 'java_lang_String', 1);\n"
                 + "if (references[0] !== null || references[1] !== null) failures.push('reference');\n"
                 + "const jagged = jvm.newArray(2, 'JAVA_INT[]', 1);\n"

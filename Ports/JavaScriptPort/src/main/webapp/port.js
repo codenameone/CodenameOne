@@ -3505,92 +3505,12 @@ bindCiFallback("HTML5Implementation.determineFontHeightCoerce", [
   return 16.0;
 });
 
-const hashMapComputeHashCodeImplMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int__impl";
-const hashMapComputeHashCodeMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int";
-
-bindCiFallback("HashMap.computeHashCodeNullKey", [
-  hashMapComputeHashCodeImplMethodId,
-  hashMapComputeHashCodeMethodId
-], function*(key) {
-  if (key == null) {
-    emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCode:nullKey=1");
-    return 0;
-  }
-  // Resolve the translator-generated original lazily — port.js evaluates
-  // before translated_app.js, so a snapshot taken at load time would be
-  // null and force every non-null lookup down the resolveVirtual fallback.
-  // jvm.translatedMethods is populated by bindNative when registering
-  // the native overrides; checking it last preserves any port-specific
-  // override of the same method.
-  let original = null;
-  if (jvm && jvm.translatedMethods) {
-    original = jvm.translatedMethods[hashMapComputeHashCodeImplMethodId]
-      || jvm.translatedMethods[hashMapComputeHashCodeMethodId]
-      || null;
-  }
-  if (typeof original !== "function") {
-    if (typeof global[hashMapComputeHashCodeImplMethodId] === "function"
-        && !global[hashMapComputeHashCodeImplMethodId].__cn1CiFallbackSymbol) {
-      original = global[hashMapComputeHashCodeImplMethodId];
-    } else if (typeof global[hashMapComputeHashCodeMethodId] === "function"
-        && !global[hashMapComputeHashCodeMethodId].__cn1CiFallbackSymbol) {
-      original = global[hashMapComputeHashCodeMethodId];
-    }
-  }
-  if (typeof original === "function") {
-    return yield* cn1_ivAdapt(original(key));
-  }
-  // Last-ditch path when the translated original genuinely isn't
-  // available. ``computeHashCode(key)`` is just ``key.hashCode()`` —
-  // dispatch via the SHARED dispatch id (``cn1_s_hashCode_R_int``), not
-  // the legacy class-specific name. Every translated class registers its
-  // ``hashCode`` slot under the shared key after the dispatch-id
-  // refactor; resolving against ``cn1_java_lang_Object_hashCode_R_int``
-  // skips that slot and silently returns the inherited Object.hashCode
-  // (identity hash), which made every String key in CSSBorder.STYLE_MAP
-  // store under its identity hash and every subsequent ``get("solid")``
-  // miss the entry.
-  var hashCodeMethod = jvm.resolveVirtual(key.__class || "java_lang_Object",
-    "cn1_s_hashCode_R_int");
-  if (typeof hashCodeMethod === "function") {
-    return yield* cn1_ivAdapt(hashCodeMethod(key));
-  }
-  return 0;
-});
-if (typeof global[hashMapComputeHashCodeImplMethodId] === "function") {
-  const originalHashMapComputeHashCodeImpl = global[hashMapComputeHashCodeImplMethodId];
-  global[hashMapComputeHashCodeImplMethodId] = function*(key) {
-    if (key == null) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
-      return 0;
-    }
-    return yield* cn1_ivAdapt(originalHashMapComputeHashCodeImpl(key));
-  };
-  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeImplNullKey");
-}
-if (typeof global[hashMapComputeHashCodeMethodId] === "function") {
-  const originalHashMapComputeHashCode = global[hashMapComputeHashCodeMethodId];
-  global[hashMapComputeHashCodeMethodId] = function*(key) {
-    if (key == null) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
-      return 0;
-    }
-    return yield* cn1_ivAdapt(originalHashMapComputeHashCode(key));
-  };
-  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeNullKey");
-}
-const hashMapClassDef = jvm.classes && jvm.classes["java_util_HashMap"];
-if (hashMapClassDef && hashMapClassDef.methods && typeof hashMapClassDef.methods[hashMapComputeHashCodeMethodId] === "function") {
-  const originalClassHashMapComputeHashCode = hashMapClassDef.methods[hashMapComputeHashCodeMethodId];
-  hashMapClassDef.methods[hashMapComputeHashCodeMethodId] = function*(__cn1ThisObject, key) {
-    if (key == null) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeClass:nullKey=1");
-      return 0;
-    }
-    return yield* cn1_ivAdapt(originalClassHashMapComputeHashCode(__cn1ThisObject, key));
-  };
-  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeClassNullKey");
-}
+// HashMap.computeHashCode used to carry a null-key fallback here, three ways (a
+// bindCiFallback and two direct replacements). The compact HashMap never passes it
+// a null key -- its one caller, cn1Marker, answers null itself -- so the fallback
+// could not fire. It was not free: a replaced method is suspending by definition,
+// and this one sat under every HashMap get/put/containsKey, so every lookup in
+// every app was a generator.
 
 const styleSetPaddingUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setPaddingUnit_byte_1ARRAY";
 const styleSetMarginUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setMarginUnit_byte_1ARRAY";
@@ -5751,8 +5671,6 @@ const cn1ssWs = {
   queue: [],      // {test, bytes} buffered while the socket is still connecting
   pending: 0      // sent-but-unacked frames, for an optional flush at suite end
 };
-cn1RefreshAlias(hashMapComputeHashCodeMethodId, global[hashMapComputeHashCodeMethodId]);
-cn1RefreshAlias(hashMapComputeHashCodeImplMethodId, global[hashMapComputeHashCodeImplMethodId]);
 
 function cn1ssWsHost() {
   try {

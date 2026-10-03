@@ -26,6 +26,24 @@ class BenchmarkTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Process exited'):
                 bench.run(['/bin/sh', '-c', 'exit 7'], {}, Path(root) / 'run.log', platform.system())
 
+    def test_a_crash_is_reported_with_its_signal(self):
+        # A self-hosted translator that dies of SIGSEGV prints nothing of its own; the
+        # signal is all the log has, and it is what makes the gate look for native stacks.
+        with tempfile.TemporaryDirectory() as root:
+            log = Path(root) / 'run.log'
+            with self.assertRaisesRegex(RuntimeError, r'signal 11'):
+                bench.run(['/bin/sh', '-c', 'kill -SEGV $$'], {}, log, platform.system())
+            # GNU time (the Linux runners) exits normally and only reports the signal.
+            gnu = Path(root) / 'gnu.log'
+            bench.error_log(gnu).write_text('Command terminated by signal 11\n'
+                                            '\tExit status: 0\n')
+            self.assertEqual(11, bench.crashed(gnu))
+            # BSD time re-raises it instead.
+            self.assertEqual(11, bench.crashed(gnu, -11))
+            plain = Path(root) / 'plain.log'
+            bench.run(['/bin/sh', '-c', 'exit 0'], {}, plain, platform.system())
+            self.assertIsNone(bench.crashed(plain))
+
     def test_stderr_never_lands_inside_a_stdout_line(self):
         # The shape that split a BENCH checksum on Windows: half a record on stdout, a
         # diagnostic on stderr, then the rest of the record.

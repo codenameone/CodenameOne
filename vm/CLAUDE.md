@@ -446,13 +446,14 @@ every value read in the Java class through `cn1Value`, the debugger's
 `cn1_debugger_tagged_value` switch, and `BoxEdge` cases. `ByteCodeClass` already force-retains
 all six wrapper classes from dead-code elimination.
 
-**And FOUR JavaScript files, not one.** The JS port has no immediates, so `valueOf` binds
-straight through to `valueOfHeap` -- which is static and reached only from
-`parparvm_runtime.js`, so bytecode-only reachability never sees the edge and the cull deletes
-it. All four are needed: `parparvm_runtime.js` (the `bindNative`),
-`JavascriptNativeRegistry.RUNTIME_IMPLEMENTED` (the native), and both
-`JavascriptReachability.enqueueResolved` and
-`JavascriptNativeRegistry.RUNTIME_DELEGATE_TARGETS` (the heap twin). Missing the last two
+**And THREE JavaScript registrations, not one.** The JS port has no immediates, so `valueOf`
+is a call straight through to `valueOfHeap`. The translator emits that call itself, from
+`JavascriptNativeRegistry.TRANSLATED_DELEGATES` (the native -> twin pair), so the native is
+a plain function wherever the twin is one; a `bindNative` for it in `parparvm_runtime.js`
+would replace that function with a generator and must NOT be added. `valueOfHeap` is
+static and nothing in bytecode calls it, so bytecode-only reachability never sees the edge
+and the cull deletes it -- hence the other two: `JavascriptReachability.enqueueResolved` and
+`JavascriptNativeRegistry.RUNTIME_DELEGATE_TARGETS` (the heap twin). Missing those two
 does not produce a recognisable error -- the fixture returns a wrong value, and
 `JavascriptRuntimeSemanticsTest`'s coverage assertion is one of the few in that class that
 does not print `rawMessage`/`errorMessage`. `JavascriptNativeAuditTest` is inert and catches

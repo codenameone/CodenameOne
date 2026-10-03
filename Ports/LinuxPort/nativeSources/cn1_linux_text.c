@@ -66,8 +66,33 @@ PangoContext* cn1LinuxPangoContext(void) {
     return cn1Pango;
 }
 
+/* Metrics already computed, keyed by font description (Pango's own hash/equality,
+ * so family, weight, style and size all take part). pango_context_get_metrics
+ * shapes a sample string to estimate character widths this port never reads, and
+ * a theme creates the same few descriptions over and over: on the transpiled
+ * Flutter gallery it was 7-8% of the launch's CPU. The cache returns exactly what
+ * Pango answered the first time, so no layout moves. Each entry owns a copy of its
+ * key; nothing is ever evicted, since a program uses a bounded set of fonts. The
+ * value packs ascent and height, both small non-negative pixel counts.
+ * Process-wide, like cn1Pango beside it: a thread-local copy would survive the
+ * reset in loadTrueTypeFont on every thread but the one that registered the font. */
+static GHashTable* cn1MetricsCache = NULL;
+
 /* Snapshots ascent/height for the description into the CN1Font. */
 static void cn1FontMetrics(CN1Font* f) {
+    gpointer hit;
+    if (cn1MetricsCache == NULL) {
+        cn1MetricsCache = g_hash_table_new_full(
+                (GHashFunc) pango_font_description_hash,
+                (GEqualFunc) pango_font_description_equal,
+                (GDestroyNotify) pango_font_description_free, NULL);
+    }
+    if (g_hash_table_lookup_extended(cn1MetricsCache, f->desc, NULL, &hit)) {
+        guint64 packed = (guint64) (guintptr) hit;
+        f->ascent = (int) (packed >> 32);
+        f->height = (int) (packed & 0xffffffffu);
+        return;
+    }
     PangoFontMetrics* m = pango_context_get_metrics(cn1LinuxPangoContext(), f->desc, 0);
     if (m != 0) {
         f->ascent = pango_font_metrics_get_ascent(m) / PANGO_SCALE;
@@ -76,6 +101,11 @@ static void cn1FontMetrics(CN1Font* f) {
     } else {
         f->ascent = f->pixelSize;
         f->height = f->pixelSize + f->pixelSize / 4;
+    }
+    if (sizeof(gpointer) >= 8 && f->ascent >= 0 && f->height >= 0) {
+        guint64 packed = ((guint64) (guint32) f->ascent << 32) | (guint32) f->height;
+        g_hash_table_insert(cn1MetricsCache, pango_font_description_copy(f->desc),
+                            (gpointer) (guintptr) packed);
     }
 }
 
@@ -158,13 +188,100 @@ static void cn1LayoutSetText(PangoLayout* layout, const char* s, int len) {
     g_free(valid);
 }
 
-static int cn1MeasureUtf8(CN1Font* f, const char* utf8, int byteLen) {
+/* Widths already measured, keyed by (font, exact UTF-8 bytes). Measuring shapes
+ * the string through Pango, and a UI measures the same labels in the same fonts
+ * over and over -- every layout pass, every preferred-size query: ~5.6% of the
+ * transpiled Flutter gallery's launch. The cache returns exactly what Pango
+ * answered, so nothing moves. The font's address is a sound key because a
+ * CN1Font is never freed. Bounded by dropping everything once it holds
+ * CN1_WIDTH_CACHE_MAX entries -- a UI's working set is far smaller, and a full
+ * clear keeps the bound without bookkeeping on the hot path. Cleared with the
+ * metrics cache when a TrueType font is registered. Process-wide, like cn1Pango. */
+#define CN1_WIDTH_CACHE_MAX 8192
+#define CN1_WIDTH_CACHE_TEXT 256
+typedef struct {
+    CN1Font* font;
+    int len;
+    guint hash;
+    char bytes[1];
+} CN1WidthKey;
+
+static GHashTable* cn1WidthCache = NULL;
+
+static guint cn1WidthKeyHash(gconstpointer p) {
+    return ((const CN1WidthKey*) p)->hash;
+}
+
+static gboolean cn1WidthKeyEqual(gconstpointer a, gconstpointer b) {
+    const CN1WidthKey* x = (const CN1WidthKey*) a;
+    const CN1WidthKey* y = (const CN1WidthKey*) b;
+    return x->font == y->font && x->len == y->len && memcmp(x->bytes, y->bytes, (size_t) x->len) == 0;
+}
+
+static guint cn1WidthHash(CN1Font* f, const char* s, int len) {
+    /* FNV-1a over the bytes, seeded with the font's address. */
+    guint h = 2166136261u ^ (guint) (guintptr) f;
+    int i;
+    for (i = 0; i < len; i++) {
+        h = (h ^ (unsigned char) s[i]) * 16777619u;
+    }
+    return h;
+}
+
+static void cn1WidthCacheClear(void) {
+    if (cn1WidthCache != NULL) {
+        g_hash_table_remove_all(cn1WidthCache);
+    }
+}
+
+static int cn1MeasureUtf8Uncached(CN1Font* f, const char* utf8, int byteLen) {
     PangoLayout* layout = pango_layout_new(cn1LinuxPangoContext());
     int w = 0, h = 0;
     pango_layout_set_font_description(layout, f->desc);
     cn1LayoutSetText(layout, utf8, byteLen);
     pango_layout_get_pixel_size(layout, &w, &h);
     g_object_unref(layout);
+    return w;
+}
+
+static int cn1MeasureUtf8(CN1Font* f, const char* utf8, int byteLen) {
+    union {
+        CN1WidthKey key;
+        char room[sizeof(CN1WidthKey) + CN1_WIDTH_CACHE_TEXT];
+    } probe;
+    CN1WidthKey* key;
+    gpointer hit;
+    int len;
+    int w;
+    if (utf8 == NULL) {
+        return cn1MeasureUtf8Uncached(f, utf8, byteLen);
+    }
+    len = byteLen < 0 ? (int) strlen(utf8) : byteLen;
+    if (len > CN1_WIDTH_CACHE_TEXT) {
+        /* Long text is measured once per wrap and rarely repeats; not worth a copy. */
+        return cn1MeasureUtf8Uncached(f, utf8, byteLen);
+    }
+    if (cn1WidthCache == NULL) {
+        cn1WidthCache = g_hash_table_new_full(cn1WidthKeyHash, cn1WidthKeyEqual, free, NULL);
+    }
+    /* Looked up with a key on the stack, so a hit allocates nothing. */
+    probe.key.font = f;
+    probe.key.len = len;
+    probe.key.hash = cn1WidthHash(f, utf8, len);
+    memcpy(probe.key.bytes, utf8, (size_t) len);
+    if (g_hash_table_lookup_extended(cn1WidthCache, &probe.key, NULL, &hit)) {
+        /* Stored +1 so a zero width is distinguishable from a missing entry. */
+        return (int) (gintptr) hit - 1;
+    }
+    w = cn1MeasureUtf8Uncached(f, utf8, len);
+    key = (CN1WidthKey*) malloc(sizeof(CN1WidthKey) + (size_t) len);
+    if (key != NULL) {
+        memcpy(key, &probe.key, sizeof(CN1WidthKey) + (size_t) len);
+        if (g_hash_table_size(cn1WidthCache) >= CN1_WIDTH_CACHE_MAX) {
+            g_hash_table_remove_all(cn1WidthCache);
+        }
+        g_hash_table_insert(cn1WidthCache, key, (gpointer) (gintptr) (w + 1));
+    }
     return w;
 }
 
@@ -276,6 +393,12 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFontFromMemory___java
              * layout sees the freshly registered family. */
             pango_cairo_font_map_set_default(0);
             cn1Pango = 0;
+            /* A family that fell back to a system face until now may resolve to
+             * the new one, so every cached answer is suspect. */
+            if (cn1MetricsCache != NULL) {
+                g_hash_table_remove_all(cn1MetricsCache);
+            }
+            cn1WidthCacheClear();
         } else {
             close(fd);
         }

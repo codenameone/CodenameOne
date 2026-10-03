@@ -294,6 +294,7 @@ final class JavascriptBundleWriter {
         List<StringBuilder> chunks = new ArrayList<StringBuilder>();
         StringBuilder current = new StringBuilder();
         chunks.add(current);
+        JavascriptMethodGenerator.resetAllocationFunctions();
         for (ByteCodeClass cls : sorted) {
             String code = cls.generateJavascriptCode(classes);
             if (current.length() > 0 && current.length() + code.length() > CLASS_CHUNK_MAX_BYTES) {
@@ -304,6 +305,10 @@ final class JavascriptBundleWriter {
         }
 
         StringBuilder tail = chunks.get(chunks.size() - 1);
+        // After every class registration (this is the last chunk, and it loads last), so
+        // each allocation function can capture its classDef at load; see
+        // JavascriptMethodGenerator.newObjectExpression.
+        JavascriptMethodGenerator.appendAllocationFunctions(tail);
         ByteCodeClass mainClass = ByteCodeClass.getMainClass();
         if (mainClass != null) {
             tail.append("jvm.setMain(\"").append(mainClass.getClsName()).append("\", \"")
@@ -420,7 +425,8 @@ final class JavascriptBundleWriter {
         // screenshot runner (lambda2RunBridge:missingDispatch). Use the
         // regex-based quoted-token collector for those sources instead.
         java.util.Set<String> stringTokens = collectStringLiteralCn1Tokens(chunkStrings);
-        stringTokens.addAll(collectBridgeReferencedCn1Tokens());
+        java.util.Set<String> bridgeTokens = collectBridgeReferencedCn1Tokens();
+        stringTokens.addAll(bridgeTokens);
         // installNativeBindings overrides BOTH global[name] and the CONSTRUCTED
         // global[name + "__impl"] (the static-method body) -- see parparvm_runtime.js.
         // The "__impl" variant never appears as a literal string, so add it for every
@@ -437,6 +443,8 @@ final class JavascriptBundleWriter {
         // (getImpl/valueOfHeap/...) as BARE identifiers -- invisible to the
         // string-literal scans above -- so protect them from renaming explicitly.
         excluded.addAll(JavascriptMethodGenerator.RUNTIME_DELEGATE_IDENTIFIERS);
+        // Field names the allocation functions write as bare keys: renaming is whole-token.
+        excluded.addAll(JavascriptMethodGenerator.ALLOCATION_FUNCTION_KEYS);
         defs.removeAll(excluded);
         // Prefix protection: some bridge names are CONSTRUCTED at runtime by string
         // concatenation, so the full identifier never appears as a literal -- only
@@ -457,8 +465,15 @@ final class JavascriptBundleWriter {
         // the screenshot runner's lambda stem, is 77 chars).
         final int MIN_PREFIX_PROTECT_LEN = 16;
         if (!defs.isEmpty()) {
+            // Stems come from the bridge sources only. The bundle's own cn1_ literals are
+            // complete names -- jvm.setMain's main method, and above all every instance
+            // field's property name in the f: lists -- and the exact-match protection above
+            // covers them. Used as stems they protected every method whose name extends a
+            // field's: a field ``strokeWidth`` protected ``strokeWidth_R_double`` and
+            // ``strokeWidth_double``, the getter and setter a transpiled Dart property
+            // always has, which left 5,211 functions of the Flutter gallery unminified.
             java.util.List<String> prefixTokens = new java.util.ArrayList<String>();
-            for (String t : stringTokens) {
+            for (String t : bridgeTokens) {
                 if (t.length() >= MIN_PREFIX_PROTECT_LEN) {
                     prefixTokens.add(t);
                 }

@@ -245,3 +245,14 @@ vm/JavaAPI/src/java/text/Format.java | Codename One contribution whose copyright
 vm/JavaAPI/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 maven/build-engine/src/main/java/com/codename1/builders/util/JSONSanitizer.java | Adapted from the OWASP JSON Sanitizer (Apache-2.0), whose documentation it keeps verbatim
+
+maven/dart-transpiler/src/test/resources/golden/counter/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MyApp.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MyHomePage.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/_MyHomePageState.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoApp.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoPage.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/_DemoPageState.java | Transpiler golden fixture: expected generated output, compared byte for byte

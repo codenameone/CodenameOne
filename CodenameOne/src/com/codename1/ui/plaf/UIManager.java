@@ -411,6 +411,10 @@ public class UIManager {
     private Hashtable resourceBundle;
     private Map<String, String> bundle;
     private boolean wasThemeInstalled;
+
+    /// A base theme a port has asked to install, not yet installed; see
+    /// [#setDeferredBaseTheme(Runnable)].
+    private Runnable deferredBaseTheme;
     /// This EventDispatcher holds all listeners who would like to register to
     /// Theme refreshed event
     private EventDispatcher themelisteners;
@@ -630,13 +634,47 @@ public class UIManager {
         this.useLargerTextScale = useLargerTextScale;
     }
 
+    /// Registers a base theme to install the first time anything reads the theme,
+    /// instead of immediately.
+    ///
+    /// For a port that supplies a default look to applications with no theme of
+    /// their own. Installing it eagerly while the display initializes is wasted
+    /// whenever the application then installs a theme with [#setThemeProps(Hashtable)]:
+    /// that call resets the property table, so the base theme and every style built
+    /// from it are discarded before anything is drawn. A Flutter application always
+    /// does this, and so does any theme without `@includeNativeBool`. Deferred,
+    /// the base theme is installed only if something reads the theme first -- a
+    /// style, a theme constant or the look and feel -- or when a theme is layered
+    /// on it with [#addThemeProps(Hashtable)]. A theme installed with
+    /// `setThemeProps` supersedes it, and one that asks for the native theme
+    /// through `@includeNativeBool` installs it at that point as it always has.
+    ///
+    /// #### Parameters
+    ///
+    /// - `install`: installs the base theme, typically `Display.installNativeTheme()`;
+    ///   run at most once, on the thread that first reads the theme
+    public void setDeferredBaseTheme(Runnable install) {
+        deferredBaseTheme = install;
+    }
+
+    /// Installs a deferred base theme, if one is still pending.
+    ///
+    /// Cleared before it runs, because installing a theme reads the theme itself.
+    private void ensureBaseTheme() {
+        Runnable install = deferredBaseTheme;
+        if (install != null) {
+            deferredBaseTheme = null;
+            install.run();
+        }
+    }
+
     /// Indicates if a theme was previously installed since the last reset
     ///
     /// #### Returns
     ///
     /// true if setThemeProps was invoked
     public boolean wasThemeInstalled() {
-        return wasThemeInstalled;
+        return wasThemeInstalled || deferredBaseTheme != null;
     }
 
     /// Returns the currently installed look and feel
@@ -645,6 +683,7 @@ public class UIManager {
     ///
     /// the currently installed look and feel
     public LookAndFeel getLookAndFeel() {
+        ensureBaseTheme();
         return current;
     }
 
@@ -766,6 +805,7 @@ public class UIManager {
     ///
     /// the appropriate style (this method never returns null)
     public final Style getComponentStyle(String id) {
+        ensureBaseTheme();
         return getComponentStyleImpl(id, false, "");
     }
 
@@ -781,6 +821,7 @@ public class UIManager {
     /// The IconUIID corresponding to the given ID - or null if none is defined in the theme.
     ///
     public String getIconUIIDFor(String id) {
+        ensureBaseTheme();
         if (id == null || id.length() == 0) {
             return null;
         }
@@ -838,6 +879,7 @@ public class UIManager {
     ///
     /// the appropriate style (this method never returns null)
     public Style getComponentSelectedStyle(String id) {
+        ensureBaseTheme();
         return getComponentStyleImpl(id, true, "sel#");
     }
 
@@ -882,6 +924,7 @@ public class UIManager {
     ///
     /// the appropriate style (this method never returns null)
     public Style getComponentCustomStyle(String id, String type) {
+        ensureBaseTheme();
         return getComponentStyleImpl(id, false, type + "#");
     }
 
@@ -916,6 +959,7 @@ public class UIManager {
     ///
     /// true when that custom style is installed or declared for this UIID
     public boolean hasComponentCustomStyle(String id, String type) {
+        ensureBaseTheme();
         if (type == null || type.length() == 0) {
             return false;
         }
@@ -1034,6 +1078,8 @@ public class UIManager {
     ///
     /// the name of the current theme for theme switching UI's
     public String getThemeName() {
+        // The name of a deferred base theme is only known once it is installed.
+        ensureBaseTheme();
         if (themeProps != null) {
             return (String) themeProps.get("name");
         }
@@ -1051,6 +1097,9 @@ public class UIManager {
     ///
     /// - `themeProps`: the properties of the given theme
     public void setThemeProps(Hashtable themeProps) {
+        // Replacing the whole theme supersedes a deferred base theme: it would be
+        // reset away here before anything saw it. See setDeferredBaseTheme.
+        deferredBaseTheme = null;
         if (accessible) {
             setThemePropsImpl(themeProps);
         }
@@ -1999,6 +2048,8 @@ public class UIManager {
     ///
     /// - `themeProps`: the properties of the given theme
     public void addThemeProps(Hashtable themeProps) {
+        // Layered ON the base theme, so a deferred one has to be installed first.
+        ensureBaseTheme();
         if (accessible) {
             restoreLargerTextFonts();
             restoreNativeThemeValues();
@@ -2081,6 +2132,9 @@ public class UIManager {
         if (factor == 1f) {
             return;
         }
+        // Scale the base theme itself; a deferred one installed after this call
+        // would otherwise come in at its original size.
+        ensureBaseTheme();
         // Zoom the bundled originals, then reapply OS and accessibility settings.
         // Otherwise zoom replaces the instances tracked by the restoration maps.
         restoreLargerTextFonts();
@@ -2196,6 +2250,7 @@ public class UIManager {
     ///
     /// the value of the constant or the default if the constant isn't in the theme
     public int getThemeConstant(String constantName, int def) {
+        ensureBaseTheme();
         String v = (String) themeConstants.get(constantName);
         if (v != null) {
             try {
@@ -2219,6 +2274,7 @@ public class UIManager {
     ///
     /// the value of the constant or the default if the constant isn't in the theme
     public final String getThemeConstant(String constantName, String def) {
+        ensureBaseTheme();
         String v = (String) themeConstants.get(constantName);
         if (v != null) {
             return v;
@@ -2238,6 +2294,7 @@ public class UIManager {
     ///
     /// the value of the constant or the default if the constant isn't in the theme
     public final boolean isThemeConstant(String constantName, boolean def) {
+        ensureBaseTheme();
         String c = getThemeConstant(constantName, null);
         if (c == null) {
             return def;
@@ -2255,6 +2312,7 @@ public class UIManager {
     ///
     /// the value of the constant or null if the constant isn't in the theme
     public Boolean isThemeConstant(String constantName) {
+        ensureBaseTheme();
         String c = getThemeConstant(constantName, null);
         if (c == null) {
             return null;
@@ -2275,6 +2333,7 @@ public class UIManager {
     ///
     /// the image if defined
     public Image getThemeImageConstant(String constantName) {
+        ensureBaseTheme();
         return (Image) themeConstants.get(constantName);
     }
 
@@ -2288,6 +2347,7 @@ public class UIManager {
     ///
     /// the mask if defined
     public Object getThemeMaskConstant(String constantName) {
+        ensureBaseTheme();
         Object o = themeConstants.get(constantName + "Mask");
         if (o != null) {
             return o;

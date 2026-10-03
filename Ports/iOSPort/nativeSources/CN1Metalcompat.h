@@ -349,6 +349,12 @@ void CN1MetalFillGradient(int kind,
 id<MTLTexture> CN1MetalTextureFromUIImage(CN1Image *image);
 void CN1MetalDrawImageRounded(id<MTLTexture> texture, int alpha, int x, int y,
                               int width, int height, float cornerRadius);
+// As above for the region (u0, v0, du, dv) of the picture, in its normalised
+// coordinates (0,0 top left), with the DESTINATION's corners rounded. A du or dv
+// of zero or less means the whole picture.
+void CN1MetalDrawImageRegionRounded(id<MTLTexture> texture, int alpha, int x, int y,
+                                    int width, int height, float cornerRadius,
+                                    float u0, float v0, float du, float dv);
 
 // Global Metal device (from METALView's command queue); shared by anyone
 // who needs to allocate Metal resources.

@@ -1030,6 +1030,57 @@ public final class Graphics {
                 x + xTranslate, y + yTranslate, w, h, cornerRadius);
     }
 
+    /// Draws part of an image, scaled into a destination rectangle, with the
+    /// destination's corners rounded -- without building a cropped or rounded copy
+    /// of the image, on platforms that support it.
+    ///
+    /// This is `drawImageRounded` for a picture scaled to overflow the box it
+    /// sits in, a "cover" fit: drawing the whole picture rounded would put the
+    /// corners outside the box, where a clip cuts them off and the box shows
+    /// square. Where rounding is not supported, the region is drawn square,
+    /// clipped to the destination.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the image to draw
+    /// - `srcX`: left of the region, in the image's pixels
+    /// - `srcY`: top of the region, in the image's pixels
+    /// - `srcW`: width of the region, in the image's pixels
+    /// - `srcH`: height of the region, in the image's pixels
+    /// - `x`: destination x
+    /// - `y`: destination y
+    /// - `w`: destination width
+    /// - `h`: destination height
+    /// - `cornerRadius`: radius in pixels, clamped to half the smaller side of
+    ///   the destination
+    public void drawImageRegionRounded(Image img, int srcX, int srcY, int srcW, int srcH,
+                                       int x, int y, int w, int h, float cornerRadius) {
+        int iw = img.getWidth();
+        int ih = img.getHeight();
+        if (iw <= 0 || ih <= 0 || srcW <= 0 || srcH <= 0 || w <= 0 || h <= 0) {
+            return;
+        }
+        float u0 = srcX / (float) iw;
+        float v0 = srcY / (float) ih;
+        float du = srcW / (float) iw;
+        float dv = srcH / (float) ih;
+        if (isRoundedImageSupported(img)) {
+            impl.drawImageRegionRounded(nativeGraphics, img.roundedDrawPeer(),
+                    x + xTranslate, y + yTranslate, w, h, cornerRadius, u0, v0, du, dv);
+            return;
+        }
+        // Square: the whole image placed so the region lands on the destination,
+        // clipped to the destination.
+        int fw = (int) Math.round(w / (double) du);
+        int fh = (int) Math.round(h / (double) dv);
+        int fx = x - (int) Math.round(u0 * (double) fw);
+        int fy = y - (int) Math.round(v0 * (double) fh);
+        int[] clip = getClip();
+        clipRect(x, y, w, h);
+        drawImage(img, fx, fy, fw, fh);
+        setClip(clip[0], clip[1], clip[2], clip[3]);
+    }
+
     public void drawImage(Image img, int x, int y, int w, int h) {
         if (impl.isScaledImageDrawingSupported()) {
             img.drawImage(this, nativeGraphics, x, y, w, h);

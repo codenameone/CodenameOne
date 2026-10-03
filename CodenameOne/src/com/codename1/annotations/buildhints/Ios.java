@@ -173,14 +173,16 @@ public @interface Ios {
     @Hint(valuePattern = "26|27")
     IosThemeGeneration themeGeneration() default IosThemeGeneration.DEFAULT;
 
-    /// `auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the
+    /// `auto` (default), `modern`, `ios7`, `legacy`, `custom`. `auto` (unset) keeps the
     /// existing iOS 7 flat theme so pre-refactor screenshot goldens and apps see
     /// no behavior change. `modern` / `liquid` opts in to the CSS-generated iOS
     /// Modern (liquid-glass) theme shipped from
     /// `native-themes/ios-modern/theme.css`. `ios7` / `flat` is the same as `auto`
     /// - pre-liquid iOS 7 flat theme; `legacy` / `iphone` loads the pre-iOS 7
     /// iPhone theme. The `auto` -> modern flip is planned for a future release.
-    @Hint(valuePattern = "auto|modern|ios7|legacy")
+    /// `custom` packages and installs no iOS theme at all, for an application
+    /// whose own theme is the only one.
+    @Hint(valuePattern = "auto|modern|ios7|legacy|custom")
     ThemeMode themeMode() default ThemeMode.DEFAULT;
 
     /// Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`

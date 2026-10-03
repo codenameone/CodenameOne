@@ -572,6 +572,43 @@ public abstract class Executor {
         return "        Display.getInstance().setProperty(\"db.legacy\", \"true\");\n";
     }
 
+    /// The `desktop.width` and `desktop.height` build hints, as a call the generated stub makes
+    /// before `Display.init` on the native Linux and Windows ports.
+    ///
+    /// Both hints were declared (`@DesktopBuild`) and honoured only by the JavaSE desktop
+    /// wrapper; the ParparVM desktop ports opened every window at a hard-coded 800x600. It has
+    /// to run before init because init is what creates the window, and resizing it afterwards
+    /// lays the first form out twice.
+    ///
+    /// @param request the build request carrying the hints
+    /// @param implementationClass the port's implementation class, fully qualified
+    /// @return the stub line, or an empty string when neither hint is set
+    protected String desktopWindowSizeStubCall(BuildRequest request, String implementationClass) {
+        int width = positiveIntArg(request, "desktop.width");
+        int height = positiveIntArg(request, "desktop.height");
+        if (width <= 0 && height <= 0) {
+            return "";
+        }
+        return "        " + implementationClass + ".setDefaultWindowSize(" + width + ", " + height + ");\n";
+    }
+
+    private int positiveIntArg(BuildRequest request, String name) {
+        String value = request.getArg(name, null);
+        if (value == null || value.trim().length() == 0) {
+            return 0;
+        }
+        try {
+            int v = Integer.parseInt(value.trim());
+            if (v > 0) {
+                return v;
+            }
+        } catch (NumberFormatException ex) {
+            // reported below
+        }
+        log("Invalid " + name + " build hint: '" + value + "'. Ignoring it.");
+        return 0;
+    }
+
     /// The `desktop.titleBar` build hint, surfaced to the generated stub as a Display property.
     ///
     /// Without this the hint is INERT on every ParparVM desktop port. `Display.getProperty`
@@ -3514,6 +3551,13 @@ public abstract class Executor {
         return false;
     }
 
+    /// True for an application-archive entry that exists only for the build and must
+    /// not reach the installed application. See unzip().
+    static boolean isBuildTimeOnlyEntry(String entryName) {
+        String n = entryName.startsWith("/") ? entryName.substring(1) : entryName;
+        return n.startsWith("META-INF/dart/");
+    }
+
     public void unzip(InputStream source, File classesDir, File resDir, File sourceDir, File libsDir, File xmlDir) throws IOException {
         try {
             BufferedOutputStream dest = null;
@@ -3596,6 +3640,16 @@ public abstract class Executor {
                     while ((count = zis.read(data, 0, data.length)) != -1) {
                         libTos.write(data, 0, count);
                     }
+                    continue;
+                }
+
+                // Build-time metadata, never shipped. META-INF/dart/*.dart are the
+                // Dart API declarations a runtime jar (flutter-runtime) carries for
+                // the transpiler, which reads them from the jar on its own classpath
+                // long before this point. The application jar merges every
+                // dependency, so without this they were copied into every bundle on
+                // every platform -- 22 files of Dart source in a Flutter app.
+                if (isBuildTimeOnlyEntry(entryName)) {
                     continue;
                 }
 

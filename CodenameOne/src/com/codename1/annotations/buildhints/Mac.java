@@ -201,7 +201,8 @@ public @interface Mac {
     /// is no such history here, and the legacy theme defines no dark styles at
     /// all, so an application on it renders light however it asks for dark. The
     /// cross-platform `nativeTheme` hint is honoured when this is unset, with
-    /// `legacy` mapping to `ios7`.
+    /// `legacy` mapping to `ios7`. `custom` packages and installs no native theme
+    /// at all, for an application whose own theme is the only one.
     String themeMode() default "";
 
     /// macOS builds. Raw XML members added to the generated `Info.plist`, the

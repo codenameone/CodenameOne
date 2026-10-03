@@ -128,7 +128,6 @@ public class IPhoneBuilder extends Executor {
     private File resultDir;
     private boolean includePush;
     private File tmpFile;
-    private File icon57;
     private File icon512;
     // Bumped from 12.0 to 13.0 to enable NSURLSessionWebSocketTask
     // (iOS 13+) used by com.codename1.io.WebSocket's iOS implementation.
@@ -2346,6 +2345,10 @@ public class IPhoneBuilder extends Executor {
                 // to the FLAT iOS 7 theme -- the exact opposite of what was asked for,
                 // and silently, because an unrecognised mode is not an error here.
                 iosMode = "modern";
+            } else if (NativeThemes.isCustom(sharedMode)) {
+                // The application's own theme is the only one: the stub tells the
+                // runtime to install none, and no native theme is packaged.
+                iosMode = "custom";
             } else {
                 iosMode = "auto";
             }
@@ -3513,6 +3516,22 @@ public class IPhoneBuilder extends Executor {
             new File(buildinRes, "IPhoneTheme.res").delete();
             new File(buildinRes, "iOS7Theme.res").delete();
         } 
+
+        // Only the native theme the stub's mode will load is shipped. nativeios.jar
+        // carries all four iOS themes, over a megabyte, and installNativeTheme()
+        // installs exactly one: the mode is fixed here at build time (the stub calls
+        // setIosMode / setIosThemeGeneration) and nothing reads it at run time.
+        // btres holds only the port's files -- the application's own resources are
+        // in resDir -- so nothing the developer shipped is removed.
+        try {
+            List<String> droppedThemes = NativeThemes.removeUnusedApple(buildinRes,
+                    iosMode, iosThemeGeneration, false, classesDir);
+            if (!droppedThemes.isEmpty()) {
+                log("Native themes not used by this build, not shipped: " + droppedThemes);
+            }
+        } catch (IOException ex) {
+            throw new BuildException("Failed to remove the unused native themes", ex);
+        }
 
         // Flip the crypto build toggles in CN1Crypto.h based on what the
         // user's bytecode references. Apps that don't touch
@@ -17546,10 +17565,6 @@ public class IPhoneBuilder extends Executor {
 
     }
     
-    private void copyIcon(String name, File srcDir, File destDir) throws IOException {
-        copy(new File(srcDir, name), new File(destDir, name));
-    }
-
     private String buildLocalizedIconSelectorObjC() {
         StringBuilder mapping = new StringBuilder();
         mapping.append("        @{ ");
@@ -17637,80 +17652,57 @@ public class IPhoneBuilder extends Executor {
                 + "    }\n";
     }
     
-    private void copyIcons(File srcDir, File destDir, String... icons) throws IOException {
-        for (String icon : icons) {
-            copyIcon(icon, srcDir, destDir);
-        }
-    }
-    
+    /// The AppIcon asset-catalog images: file name and pixel size. Each is named by
+    /// vm/ByteCodeTranslator/src/Icons.json, the set's Contents.json, which
+    /// IPhoneBuilderIconsTest checks.
+    static final Object[][] APP_ICONS = {
+        {"iPhoneNotification@2x.png", 40}, {"iPhoneNotification@3x.png", 60},
+        {"iPhoneSpotlight.png", 29}, {"iPhoneSpotlight@2x.png", 58}, {"iPhoneSpotlight@3x.png", 87},
+        {"iPhone7Spotlight@2x.png", 80}, {"iPhone7Spotlight@3x.png", 120},
+        {"iPhoneApp.png", 57}, {"iPhoneApp@2x.png", 114},
+        {"iPhone7App@2x.png", 120}, {"iPhone7App@3x.png", 180},
+        {"iPadNotifications.png", 20}, {"iPadNotification@2x.png", 40},
+        {"iPadSettings.png", 29}, {"iPadSettings@2x.png", 58},
+        {"iPadSpotlight7.png", 40}, {"iPadSpotlight7@2x.png", 80},
+        {"iPadSpotlight.png", 50}, {"iPadSpotlight@2x.png", 100},
+        {"iPadApp.png", 72}, {"iPadApp@2x.png", 144},
+        {"iPadApp7.png", 76}, {"iPadApp7@2x.png", 152}, {"iPadPro@2x.png", 167},
+        {"AppStore.png", 1024},
+    };
+
     private boolean generateIcons(BuildRequest request) throws Exception {
 
         File iconDirectory = getIconDirectory(request);
         File resDir = getResDir();
-        
+
         BufferedImage iconImage = ImageIO.read(new ByteArrayInputStream(request.getIcon()));
-        // Legacy iOS icon files are still copied into the root resources, but should not
-        // be placed inside AppIcon.appiconset as they are not referenced by Contents.json.
-        icon512 = new File(resDir, "iTunesArtwork");
+        // The icons live in the AppIcon asset catalog and nowhere else. They used to be
+        // copied into the bundle root as well -- iTunesArtwork, Icon.png and every size
+        // above, about 0.6MB -- for the top-level CFBundleIconFiles of iOS 6 and older.
+        // Nothing reads those now: every SDK this builder supports has a deployment
+        // floor of 12 or more, where the system takes the icon from CFBundleIcons /
+        // CFBundleIconName, which actool writes for the catalog. The Info.plist template
+        // no longer lists them either, so App Store validation finds no dangling name.
+        //
+        // The original image is still kept, outside the bundle, as the source of the
+        // macOS icon set.
+        File iconSource = new File(tmpFile, "icon-source");
+        iconSource.mkdirs();
+        icon512 = new File(iconSource, "iTunesArtwork");
         createFile(icon512, request.getIcon());
-        icon57 = new File(resDir, "Icon.png");
-        createIconFile(icon57, iconImage, 57, 57);
-        createIconFile(new File(iconDirectory, "iPhoneNotification@2x.png"), iconImage, 40, 40);
-        createIconFile(new File(iconDirectory, "iPhoneNotification@3x.png"), iconImage, 60, 60);
-        createIconFile(new File(iconDirectory, "iPhoneSpotlight.png"), iconImage, 29, 29);
-        createIconFile(new File(iconDirectory, "iPhoneSpotlight@2x.png"), iconImage, 58, 58);
-        createIconFile(new File(iconDirectory, "iPhoneSpotlight@3x.png"), iconImage, 87, 87);
-        createIconFile(new File(iconDirectory, "iPhone7Spotlight@2x.png"), iconImage, 80, 80);
-        createIconFile(new File(iconDirectory, "iPhone7Spotlight@3x.png"), iconImage, 120, 120);
-        createIconFile(new File(iconDirectory, "iPhoneApp.png"), iconImage, 57, 57);
-        createIconFile(new File(iconDirectory, "iPhoneApp@2x.png"), iconImage, 114, 114);
-        createIconFile(new File(iconDirectory, "iPhone7App@2x.png"), iconImage, 120, 120);
-        createIconFile(new File(iconDirectory, "iPhone7App@3x.png"), iconImage, 180, 180);
-        createIconFile(new File(iconDirectory, "iPadNotifications.png"), iconImage, 20, 20);
-        createIconFile(new File(iconDirectory, "iPadNotification@2x.png"), iconImage, 40, 40);
-        createIconFile(new File(iconDirectory, "iPadSettings.png"), iconImage, 29, 29);
-        createIconFile(new File(iconDirectory, "iPadSettings@2x.png"), iconImage, 58, 58);
-        createIconFile(new File(iconDirectory, "iPadSpotlight7.png"), iconImage, 40, 40);
-        createIconFile(new File(iconDirectory, "iPadSpotlight7@2x.png"), iconImage, 80, 80);
-        createIconFile(new File(iconDirectory, "iPadSpotlight.png"), iconImage, 50, 50);
-        createIconFile(new File(iconDirectory, "iPadSpotlight@2x.png"), iconImage, 100, 100);
-        createIconFile(new File(iconDirectory, "iPadApp.png"), iconImage, 72, 72);
-        createIconFile(new File(iconDirectory, "iPadApp@2x.png"), iconImage, 144, 144);
-        createIconFile(new File(iconDirectory, "iPadApp7.png"), iconImage, 76, 76);
-        createIconFile(new File(iconDirectory, "iPadApp7@2x.png"), iconImage, 152, 152);
-        createIconFile(new File(iconDirectory, "iPadPro@2x.png"), iconImage, 167, 167);
-        createIconFile(new File(iconDirectory, "AppStore.png"), iconImage, 1024, 1024);
-        
-        copyIcons(iconDirectory, resDir,
-                "iPhoneNotification@2x.png",
-                "iPhoneNotification@3x.png",
-                "iPhoneSpotlight.png",
-                "iPhoneSpotlight@2x.png",
-                "iPhoneSpotlight@3x.png",
-                "iPhone7Spotlight@2x.png",
-                "iPhone7Spotlight@3x.png",
-                "iPhoneApp.png",
-                "iPhoneApp@2x.png",
-                "iPhone7App@2x.png",
-                "iPhone7App@3x.png",
-                "iPadNotifications.png",
-                "iPadNotification@2x.png",
-                "iPadSettings.png",
-                "iPadSettings@2x.png",
-                "iPadSpotlight7.png",
-                "iPadSpotlight7@2x.png",
-                "iPadSpotlight.png",
-                "iPadSpotlight@2x.png",
-                "iPadApp.png",
-                "iPadApp@2x.png",
-                "iPadApp7.png",
-                "iPadApp7@2x.png",
-                "iPadPro@2x.png",
-                "AppStore.png");
+        writeAppIcons(iconImage, iconDirectory);
 
         processLocalizedIcons(resDir, request);
 
         return true;
+    }
+
+    /// Writes every AppIcon asset-catalog image into `iconDirectory`, and nothing else.
+    void writeAppIcons(BufferedImage iconImage, File iconDirectory) throws IOException {
+        for (Object[] icon : APP_ICONS) {
+            int size = ((Integer) icon[1]).intValue();
+            createIconFile(new File(iconDirectory, (String) icon[0]), iconImage, size, size);
+        }
     }
 
     /**

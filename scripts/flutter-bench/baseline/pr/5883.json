@@ -1,0 +1,237 @@
+{
+ "calibrate": {
+  "android": {
+   "gallery": {
+    "cold_start_ratio": {
+     "runs": 8,
+     "tolerance": {
+      "value": 0.55
+     },
+     "value": 0.265
+    },
+    "idle_memory_ratio": {
+     "runs": 8,
+     "tolerance": {
+      "value": 0.2
+     },
+     "value": 0.523
+    }
+   }
+  },
+  "linux": {
+   "gallery": {
+    "cold_start_ratio": {
+     "runs": 7,
+     "value": 0.67
+    },
+    "idle_memory_ratio": {
+     "runs": 7,
+     "value": 0.387
+    }
+   }
+  },
+  "macos": {
+   "gallery": {
+    "idle_memory_ratio": {
+     "runs": 7,
+     "value": 0.682
+    }
+   }
+  },
+  "windows": {
+   "gallery": {
+    "cold_start_ratio": {
+     "runs": 8,
+     "value": 0.632
+    },
+    "idle_memory_ratio": {
+     "runs": 8,
+     "value": 0.616
+    }
+   }
+  }
+ },
+ "pr": 5883,
+ "rebaseline": {
+  "android": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 4720336
+     },
+     "reason": "Android code grew with features added on this branch after the gate was armed: 4,720,336 -> 4,772,660 (d50f587217, +1.1%), +656 bytes for the custom theme mode (0bcf456eab), +188 bytes for the runtime mount/styling change (2fc4148b80); still 4.5x under Flutter. The tolerance went from 0 to 0.5% (d070d57bc1) because at 0 every change that added bytes failed the leg; growth past ~24 KB still fails it.",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 4773504
+    },
+    "install_bytes": {
+     "from": {
+      "value": 91589516
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "tolerance": {
+      "value": 0.001
+     },
+     "value": 81949943
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 91589516
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686 and 36965347627, commits 9717cb0603 and 1b36753c18, identical Codename One sources). The armed values predate the native ports' size work on this branch, and the old gate failed only growth, so a shrink never asked for a re-record; this gate fails a move either way. Android's install and download sizes differ by 4 bytes between those two runs of identical sources (APK packaging), hence their 0.1% tolerance.",
+     "runs": 2,
+     "tolerance": {
+      "value": 0.001
+     },
+     "value": 81949943
+    }
+   }
+  },
+  "ios": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 38015576
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 19402888
+    },
+    "install_bytes": {
+     "from": {
+      "value": 145431213
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 114851733
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 110425140
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 84377598
+    }
+   }
+  },
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 12910326
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 12803600
+    },
+    "install_bytes": {
+     "from": {
+      "value": 110000963
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 108089897
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 80610118
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 79709886
+    }
+   }
+  },
+  "linux": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 18958610
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 14523602
+    },
+    "install_bytes": {
+     "from": {
+      "value": 119594984
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 116342496
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 95706942
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 84685068
+    }
+   }
+  },
+  "macos": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 73212360
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 36989896
+    },
+    "install_bytes": {
+     "from": {
+      "value": 168810517
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 132515373
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 109700753
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 90694082
+    }
+   }
+  },
+  "windows": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 17088000
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 13323264
+    },
+    "install_bytes": {
+     "from": {
+      "value": 116684800
+     },
+     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "runs": 1,
+     "value": 114305024
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 94685578
+     },
+     "reason": "Re-measured on this branch (flutter-bench runs 36896512686, 36965347627 and 37015988276, identical Codename One sources for Windows). The armed value predates the native ports' size work on this branch. The download size, a zip of the build, differs by 1 byte between those runs, hence its 0.1% tolerance.",
+     "runs": 3,
+     "tolerance": {
+      "value": 0.001
+     },
+     "value": 82273541
+    }
+   }
+  }
+ }
+}

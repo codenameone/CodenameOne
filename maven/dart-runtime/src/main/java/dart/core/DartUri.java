@@ -1,0 +1,937 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package dart.core;
+
+/**
+ * A minimal {@code dart:core} {@code Uri}. The new_gallery app mainly uses
+ * {@code Uri.parse(String)} to hand a URL to {@code url_launcher} and reads it
+ * back via {@code toString()}, but Dart code also inspects {@code scheme},
+ * {@code host}, {@code pathSegments} and {@code queryParameters}, so this holds
+ * the original text and parses those components on demand. The component
+ * accessors follow Dart semantics: {@code scheme} is lower-cased and empty when
+ * absent; {@code queryParameters} preserves insertion order and URL-decodes.
+ */
+public final class DartUri {
+
+    private final String text;
+    private String scheme = "";
+    private String host = "";
+    private long port = 0;
+    /// Whether the authority named a port. Without one, port() answers the
+    /// scheme's default, as Dart's Uri.port does.
+    private boolean explicitPort;
+    /// The text of a port too large for an int, which Dart parses and keeps but
+    /// refuses to read (see needsNoNormalizing); null otherwise.
+    private String oversizedPort;
+    private String path = "";
+    private String query = "";
+    private String fragment = "";
+
+    private DartUri(String text) {
+        this.text = normalize(text);
+        parse();
+    }
+
+    /** The parts of a URI whose characters are normalized, and what each allows as is. */
+    private static final int USERINFO = 0;
+    private static final int PATH = 1;
+    private static final int QUERY = 2;
+    private static final int FRAGMENT = 3;
+
+    /**
+     * The text with its user info, path, query and fragment normalized as Dart's
+     * Uri.parse does: a character the component does not allow is percent-encoded
+     * (as UTF-8, upper-case hex), an escape of an unreserved character is decoded, the
+     * hex of any other escape is upper-cased, a '%' that starts no valid escape becomes
+     * %25, and a backslash in the path is a '/'. Only the scheme and host used to be
+     * touched, so Uri.parse("https://x/a b") kept a literal space in its path and its
+     * text, and a launcher or HTTP client rejected what Dart would have sent.
+     */
+    static String normalize(String t) {
+        int end = t.length();
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        StringBuilder out = new StringBuilder(t.length() + 8);
+        int pos = 0;
+        int colon = t.indexOf(':');
+        if (colon > 0 && colon < end && isScheme(t.substring(0, colon))) {
+            out.append(t.substring(0, colon + 1));
+            pos = colon + 1;
+        }
+        if (t.startsWith("//", pos)) {
+            int authEnd = t.length();
+            for (int i = pos + 2; i < t.length(); i++) {
+                char c = t.charAt(i);
+                if (c == '/' || c == '?' || c == '#') {
+                    authEnd = i;
+                    break;
+                }
+            }
+            int at = t.lastIndexOf('@', authEnd - 1);
+            if (at >= pos + 2) {
+                out.append("//");
+                component(t, pos + 2, at, USERINFO, out);
+                out.append(t.substring(at, authEnd));
+            } else {
+                out.append(t.substring(pos, authEnd));
+            }
+            pos = authEnd;
+        }
+        int hash = t.indexOf('#', pos);
+        int stop = hash >= 0 ? hash : t.length();
+        int q = t.indexOf('?', pos);
+        if (q >= stop) {
+            q = -1;
+        }
+        component(t, pos, q >= 0 ? q : stop, PATH, out);
+        if (q >= 0) {
+            out.append('?');
+            component(t, q + 1, stop, QUERY, out);
+        }
+        if (hash >= 0) {
+            out.append('#');
+            component(t, hash + 1, t.length(), FRAGMENT, out);
+        }
+        return out.toString();
+    }
+
+    private static void component(String t, int from, int to, int kind, StringBuilder out) {
+        for (int i = from; i < to; i++) {
+            char c = t.charAt(i);
+            if (c == '%') {
+                if (i + 2 < to && hexValue(t.charAt(i + 1)) >= 0 && hexValue(t.charAt(i + 2)) >= 0) {
+                    int v = hexValue(t.charAt(i + 1)) * 16 + hexValue(t.charAt(i + 2));
+                    if (isUnreserved(v)) {
+                        out.append((char) v);
+                    } else {
+                        percent(v, out);
+                    }
+                    i += 2;
+                } else {
+                    out.append("%25");
+                }
+            } else if (c == '\\' && kind == PATH) {
+                out.append('/');
+            } else if (c < 128 && allowed(c, kind)) {
+                out.append(c);
+            } else {
+                int cp = c;
+                if (Character.isHighSurrogate(c) && i + 1 < to && Character.isLowSurrogate(t.charAt(i + 1))) {
+                    cp = ((c - 0xD800) << 10) + (t.charAt(i + 1) - 0xDC00) + 0x10000;
+                    i++;
+                }
+                utf8(cp, out);
+            }
+        }
+    }
+
+    private static boolean isUnreserved(int c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '.' || c == '_' || c == '~';
+    }
+
+    private static boolean allowed(char c, int kind) {
+        if (isUnreserved(c) || "!$&'()*+,;=".indexOf(c) >= 0 || c == ':') {
+            return true;
+        }
+        if (kind == USERINFO) {
+            return false;
+        }
+        if (c == '@' || c == '/') {
+            return true;
+        }
+        return c == '?' && kind != PATH;
+    }
+
+    private static int hexValue(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
+    private static void percent(int b, StringBuilder out) {
+        String hex = "0123456789ABCDEF";
+        out.append('%').append(hex.charAt((b >> 4) & 0xF)).append(hex.charAt(b & 0xF));
+    }
+
+    private static void utf8(int cp, StringBuilder out) {
+        if (cp < 0x80) {
+            percent(cp, out);
+        } else if (cp < 0x800) {
+            percent(0xC0 | (cp >> 6), out);
+            percent(0x80 | (cp & 0x3F), out);
+        } else if (cp < 0x10000) {
+            percent(0xE0 | (cp >> 12), out);
+            percent(0x80 | ((cp >> 6) & 0x3F), out);
+            percent(0x80 | (cp & 0x3F), out);
+        } else {
+            percent(0xF0 | (cp >> 18), out);
+            percent(0x80 | ((cp >> 12) & 0x3F), out);
+            percent(0x80 | ((cp >> 6) & 0x3F), out);
+            percent(0x80 | (cp & 0x3F), out);
+        }
+    }
+
+    /** Dart's {@code Uri.parse}. */
+    public static DartUri parse(String uri) {
+        String text = uri == null ? "" : uri;
+        String error = malformed(text);
+        if (error != null) {
+            throw new FormatException(error + ": " + text);
+        }
+        return new DartUri(text);
+    }
+
+    /** Dart's {@code Uri.tryParse}: null for what {@link #parse} rejects. */
+    public static DartUri tryParse(String uri) {
+        return uri == null || malformed(uri) != null ? null : new DartUri(uri);
+    }
+
+    /**
+     * Why {@code text} is not a URI Dart would parse, or null. The parser used to be
+     * total, so tryParse never answered null and parse never threw: an unclosed IPv6
+     * host or a non-numeric port came back as a URI with a mangled host and port, and
+     * validation code accepted it. These are the cases Dart rejects -- recorded from the
+     * Dart SDK; it is lenient about the rest (a stray space or a bad escape is encoded,
+     * an out-of-range port is kept), and so is this.
+     */
+    static String malformed(String text) {
+        int end = text.length();
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        int colon = text.indexOf(':');
+        int rest = 0;
+        if (colon >= 0 && colon < end) {
+            // A colon before the first '/', '?' or '#' ends a scheme, so what precedes
+            // it has to be one.
+            if (colon == 0 || !isScheme(text.substring(0, colon))) {
+                return "Invalid scheme";
+            }
+            rest = colon + 1;
+        }
+        if (!text.startsWith("//", rest)) {
+            return null;
+        }
+        int authStart = rest + 2;
+        int authEnd = text.length();
+        for (int i = authStart; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                authEnd = i;
+                break;
+            }
+        }
+        String authority = text.substring(authStart, authEnd);
+        int at = authority.lastIndexOf('@');
+        String hostPort = at >= 0 ? authority.substring(at + 1) : authority;
+        String port = null;
+        if (hostPort.startsWith("[")) {
+            int close = hostPort.indexOf(']');
+            if (close < 0) {
+                return "Missing end `]` to match `[` in host";
+            }
+            // The brackets hold an IP literal, never a name: Dart rejects
+            // http://[not-an-ip]/ and this accepted anything between them.
+            String bad = bracketHostError(hostPort.substring(1, close));
+            if (bad != null) {
+                return bad;
+            }
+            if (close + 1 < hostPort.length()) {
+                if (hostPort.charAt(close + 1) != ':') {
+                    return "Invalid end of authority";
+                }
+                port = hostPort.substring(close + 2);
+            }
+        } else {
+            int pc = hostPort.lastIndexOf(':');
+            if (pc >= 0) {
+                port = hostPort.substring(pc + 1);
+            }
+        }
+        // Dart reads the port with int.parse, so a sign and a 0x prefix are legal --
+        // dart 3.9.3 parses http://a.com:+80/ (port 80) and http://a.com:-1/ (port -1)
+        // and does NOT reject them. What it rejects is what int.parse does: '+',
+        // http://a.com:8 0/, and non-ASCII digits, which the Long parse accepted.
+        if (port != null && port.length() > 0 && portValue(port) == null
+                && !(oversizedPort(port) && !hostPort.startsWith("[") && needsNoNormalizing(text, colon < end ? colon : -1))) {
+            return "Invalid port";
+        }
+        return null;
+    }
+
+    /// A plain decimal port past 2^63-1: no sign, no leading zero, ASCII digits only.
+    private static boolean oversizedPort(String port) {
+        if (port.length() < 19 || port.charAt(0) == '0') {
+            return false;
+        }
+        for (int i = 0; i < port.length(); i++) {
+            char c = port.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return portValue(port) == null;
+    }
+
+    /// Whether dart 3.9.3 parses {@code text} on its fast path, which keeps the text
+    /// and reads the port only when Uri.port is asked for -- so an oversized port
+    /// parses and port throws. Everything else goes through int.parse at parse time
+    /// and is rejected. Recorded case by case from the SDK rather than ported from its
+    /// scanner table: a lower-case scheme and host, no userinfo, no '%', ':' or '@'
+    /// after the authority, no dot segment in the path and no '/' in the query or
+    /// fragment.
+    private static boolean needsNoNormalizing(String text, int schemeColon) {
+        for (int i = 0; i < schemeColon; i++) {
+            char c = text.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                return false;
+            }
+        }
+        int authStart = (schemeColon < 0 ? 0 : schemeColon + 1) + 2;
+        int i = authStart;
+        int portColon = -1;
+        for (; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                break;
+            }
+            if (portColon >= 0) {
+                if (c < '0' || c > '9') {
+                    return false;   // a second ':' or a host like a:b.com
+                }
+            } else if (c == ':') {
+                portColon = i;
+            } else if (!(simpleChar(c) && !(c >= 'A' && c <= 'Z') || c == '\\')) {
+                return false;   // userinfo ('@'), an upper-case or escaped host
+            }
+        }
+        int section = 0;   // 0 path, 1 query, 2 fragment
+        int segStart = i;
+        for (; i <= text.length(); i++) {
+            char c = i < text.length() ? text.charAt(i) : '/';
+            if (section == 0 && (c == '/' || c == '?' || c == '#')) {
+                // Measured: '..' anywhere, '.' only before a '/' or at the very end
+                // (http://a.com:N/x/.?q and /x/.#f do parse).
+                String seg = text.substring(segStart, i);
+                if (seg.equals("..") || (seg.equals(".") && (c == '/' || i == text.length()))) {
+                    return false;
+                }
+                segStart = i + 1;
+            }
+            if (i == text.length()) {
+                break;
+            }
+            if (c == '?' && section == 0) {
+                section = 1;
+            } else if (c == '#' && section < 2) {
+                section = 2;
+            } else if (c == '/') {
+                if (section != 0) {
+                    return false;
+                }
+            } else if (c != '?' && !simpleChar(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The characters dart 3.9.3 leaves alone on its fast path.
+    private static boolean simpleChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || "!$&'()*+,;=~-._".indexOf(c) >= 0;
+    }
+
+    private void parse() {
+        String s = text;
+        int hash = s.indexOf('#');
+        if (hash >= 0) {
+            fragment = s.substring(hash + 1);
+            s = s.substring(0, hash);
+        }
+        int q = s.indexOf('?');
+        if (q >= 0) {
+            query = s.substring(q + 1);
+            s = s.substring(0, q);
+        }
+        int colon = s.indexOf(':');
+        if (colon > 0 && isScheme(s.substring(0, colon))) {
+            scheme = asciiLower(s.substring(0, colon));
+            s = s.substring(colon + 1);
+        }
+        if (s.startsWith("//")) {
+            s = s.substring(2);
+            int slash = s.indexOf('/');
+            String authority = slash >= 0 ? s.substring(0, slash) : s;
+            s = slash >= 0 ? s.substring(slash) : "";
+            int at = authority.indexOf('@');
+            if (at >= 0) {
+                authority = authority.substring(at + 1);
+            }
+            // An IPv6 literal is bracketed, and its colons are not the port
+            // separator: http://[::1]:8080 took the FIRST colon as one, leaving the
+            // host "[" and a port that failed to parse. Dart's host is the address
+            // without its brackets, and the port follows the closing bracket.
+            int close = authority.startsWith("[") ? authority.indexOf(']') : -1;
+            int pc = close >= 0 ? authority.indexOf(':', close) : authority.indexOf(':');
+            boolean literal = close >= 0;
+            if (literal) {
+                host = bracketHost(authority.substring(1, close));
+                if (pc >= 0) {
+                    explicitPort = pc + 1 < authority.length();
+                    Long v = portValue(authority.substring(pc + 1));
+                    port = v == null ? 0 : v.longValue();
+                }
+            } else if (pc >= 0) {
+                // http://a.com: names no port; Dart answers the default for it.
+                explicitPort = pc + 1 < authority.length();
+                host = authority.substring(0, pc);
+                Long v = portValue(authority.substring(pc + 1));
+                port = v == null ? 0 : v.longValue();
+                if (v == null && explicitPort) {
+                    oversizedPort = authority.substring(pc + 1);
+                }
+            } else {
+                host = authority;
+            }
+            // Dart canonicalises a registered name to lower case, so
+            // https://EXAMPLE.COM/ and https://example.com/ have the same host --
+            // host allowlists, route matches and host-keyed caches depend on it.
+            if (!literal) {
+                host = asciiLower(host);
+            }
+        }
+        path = s;
+    }
+
+    /**
+     * Why the text between a host's brackets is not an address Dart's Uri accepts, or
+     * null. Mirrors the SDK's parser: an IPvFuture literal ({@code v1.x}), else an IPv6
+     * address -- at most one {@code ::}, groups of up to four hex digits, an optional
+     * dotted IPv4 tail -- optionally followed by a {@code %} zone ID.
+     */
+    static String bracketHostError(String c) {
+        if (c.startsWith("v")) {
+            int i = 1;
+            while (i < c.length() && hexValue(c.charAt(i)) >= 0) {
+                i++;
+            }
+            if (i == 1 || i >= c.length() || c.charAt(i) != '.' || i + 1 == c.length()) {
+                return "Invalid IPvFuture address";
+            }
+            for (int k = i + 1; k < c.length(); k++) {
+                char ch = c.charAt(k);
+                if (!isUnreserved(ch) && "!$&'()*+,;=:".indexOf(ch) < 0) {
+                    return "Invalid IPvFuture address character";
+                }
+            }
+            return null;
+        }
+        int zone = c.indexOf('%');
+        String bad = ipv6Error(c, zone >= 0 ? zone : c.length());
+        if (bad != null || zone < 0) {
+            return bad;
+        }
+        int z = c.startsWith("25", zone + 1) ? zone + 3 : zone + 1;
+        for (int i = z; i < c.length(); i++) {
+            if (c.charAt(i) == '%' && (i + 2 >= c.length() || hexValue(c.charAt(i + 1)) < 0
+                    || hexValue(c.charAt(i + 2)) < 0)) {
+                return "ZoneID should not contain % anymore";
+            }
+        }
+        return null;
+    }
+
+    /** The host Dart reports for a valid bracketed literal (see {@link #bracketHostError}). */
+    static String bracketHost(String c) {
+        if (c.startsWith("v")) {
+            // IPvFuture keeps its brackets and its case, as Dart's does.
+            return "[" + c + "]";
+        }
+        int zone = c.indexOf('%');
+        if (zone < 0) {
+            return asciiLower(c);
+        }
+        // The zone ID is introduced by an encoded '%' ("%25"); an escape of an
+        // unreserved character is decoded (lower case), others are upper-cased, and a
+        // character that is not unreserved is encoded.
+        StringBuilder out = new StringBuilder(asciiLower(c.substring(0, zone))).append("%25");
+        int i = c.startsWith("25", zone + 1) ? zone + 3 : zone + 1;
+        while (i < c.length()) {
+            char ch = c.charAt(i);
+            if (ch == '%' && i + 2 < c.length()) {
+                int v = hexValue(c.charAt(i + 1)) * 16 + hexValue(c.charAt(i + 2));
+                if (isUnreserved(v)) {
+                    out.append(v >= 'A' && v <= 'Z' ? (char) (v + ('a' - 'A')) : (char) v);
+                } else {
+                    percent(v, out);
+                }
+                i += 3;
+                continue;
+            }
+            if (isUnreserved(ch)) {
+                out.append(ch);
+            } else {
+                // Decoded by hand: ParparVM's String has no codePointAt, and a
+                // call to it compiles on the JVM and then fails the native link.
+                int cp = ch;
+                int width = 1;
+                if (ch >= 0xD800 && ch <= 0xDBFF && i + 1 < c.length()) {
+                    char low = c.charAt(i + 1);
+                    if (low >= 0xDC00 && low <= 0xDFFF) {
+                        cp = ((ch - 0xD800) << 10) + (low - 0xDC00) + 0x10000;
+                        width = 2;
+                    }
+                }
+                utf8(cp, out);
+                i += width;
+                continue;
+            }
+            i++;
+        }
+        return out.toString();
+    }
+
+    /** Dart's parseIPv6Address over {@code c[0, end)}: an error message, or null when valid. */
+    private static String ipv6Error(String c, int end) {
+        int parts = 0;
+        boolean wildcard = false;
+        boolean lastWildcard = false;
+        boolean seenDot = false;
+        int partStart = 0;
+        for (int i = 0; i < end; i++) {
+            char ch = c.charAt(i);
+            if (ch == ':') {
+                if (i == 0) {
+                    // a leading ':' must open a "::"
+                    i++;
+                    if (i >= end || c.charAt(i) != ':') {
+                        return "Illegal IPv6 address, invalid start colon.";
+                    }
+                    partStart = i;
+                }
+                if (i == partStart) {
+                    if (wildcard) {
+                        return "Illegal IPv6 address, only one wildcard `::` is allowed";
+                    }
+                    wildcard = true;
+                    lastWildcard = true;
+                } else {
+                    if (!hexGroup(c, partStart, i)) {
+                        return "Illegal IPv6 address, invalid part";
+                    }
+                    lastWildcard = false;
+                }
+                parts++;
+                partStart = i + 1;
+            } else if (ch == '.') {
+                seenDot = true;
+            }
+        }
+        if (parts == 0) {
+            return "Illegal IPv6 address, too few parts";
+        }
+        boolean atEnd = partStart == end;
+        if (atEnd && !lastWildcard) {
+            return "Illegal IPv6 address, expected a part after last `:`";
+        }
+        if (!atEnd) {
+            if (!seenDot) {
+                if (!hexGroup(c, partStart, end)) {
+                    return "Illegal IPv6 address, invalid part";
+                }
+                parts++;
+            } else {
+                if (!ipv4(c, partStart, end)) {
+                    return "Illegal IPv4 address";
+                }
+                parts += 2;
+            }
+        }
+        // Dart counts the wildcard itself as a part.
+        if (wildcard ? parts > 7 : parts != 8) {
+            return "Illegal IPv6 address, wrong number of parts";
+        }
+        return null;
+    }
+
+    /**
+     * One IPv6 group as Dart reads it: at most four characters parsed by
+     * int.parse(radix: 16), which takes a sign, in 0..0xFFFF.
+     */
+    private static boolean hexGroup(String c, int from, int to) {
+        if (to - from > 4 || to <= from) {
+            return false;
+        }
+        boolean negative = false;
+        int i = from;
+        if (c.charAt(i) == '+' || c.charAt(i) == '-') {
+            negative = c.charAt(i) == '-';
+            i++;
+        }
+        if (i == to) {
+            return false;
+        }
+        int v = 0;
+        for (; i < to; i++) {
+            int d = hexValue(c.charAt(i));
+            if (d < 0) {
+                return false;
+            }
+            v = v * 16 + d;
+        }
+        return !negative || v == 0;
+    }
+
+    /** Dart's dotted IPv4 tail: exactly four decimal parts, each 0..255. */
+    private static boolean ipv4(String c, int from, int to) {
+        int dots = 0;
+        int partStart = from;
+        for (int i = from; i <= to; i++) {
+            if (i == to || c.charAt(i) == '.') {
+                if (i == partStart || i - partStart > 3 && !leadingZeros(c, partStart, i - 3)) {
+                    return false;
+                }
+                int v = 0;
+                for (int k = Math.max(partStart, i - 3); k < i; k++) {
+                    v = v * 10 + (c.charAt(k) - '0');
+                }
+                if (v > 255) {
+                    return false;
+                }
+                if (i < to) {
+                    dots++;
+                    if (dots > 3) {
+                        return false;
+                    }
+                }
+                partStart = i + 1;
+            } else if (c.charAt(i) < '0' || c.charAt(i) > '9') {
+                return false;
+            }
+        }
+        return dots == 3;
+    }
+
+    private static boolean leadingZeros(String c, int from, int to) {
+        for (int i = from; i < to; i++) {
+            if (c.charAt(i) != '0') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * ASCII-only lower case. Schemes and host names are ASCII by definition, and
+     * String.toLowerCase is locale sensitive: on a Turkish device "HTTP" folds
+     * its I to a dotless i and no longer equals "http".
+     */
+    private static String asciiLower(String s) {
+        if (s == null) {
+            return null;
+        }
+        char[] out = null;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                if (out == null) {
+                    out = s.toCharArray();
+                }
+                out[i] = (char) (c + ('a' - 'A'));
+            }
+        }
+        return out == null ? s : new String(out);
+    }
+
+    private static boolean isScheme(String s) {
+        if (s.isEmpty() || !Character.isLetter(s.charAt(0))) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '+' && c != '-' && c != '.') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Dart's {@code Uri.scheme} — lower-cased, empty when absent. */
+    public String scheme() {
+        return scheme;
+    }
+
+    /** Dart's {@code Uri.host}. */
+    public String host() {
+        return host;
+    }
+
+    /** Dart's {@code Uri.port}. */
+    /// Dart's Uri.port: the explicit port, or the scheme's default when the URI
+    /// names none -- 80 for http, 443 for https, 0 otherwise. Returning 0 for
+    /// https://example.com/path sent code that splits a URL into host and port
+    /// to port 0 unless every URL spelled out :443.
+    public long port() {
+        if (oversizedPort != null) {
+            // Dart's own int.parse message for it.
+            throw new FormatException("Positive input exceeds the limit of integer\n" + oversizedPort);
+        }
+        return explicitPort ? port : defaultPort(scheme);
+    }
+
+    /** Dart's {@code Uri.path}. */
+    public String path() {
+        return path;
+    }
+
+    /** Dart's {@code Uri.query}. */
+    public String query() {
+        return query;
+    }
+
+    /** Dart's {@code Uri.fragment}. */
+    public String fragment() {
+        return fragment;
+    }
+
+    /** Dart's {@code Uri.pathSegments} — the non-empty, decoded path segments. */
+    public DartList<String> pathSegments() {
+        DartList<String> out = new DartList<>();
+        String p = path;
+        if (p.startsWith("/")) {
+            p = p.substring(1);
+        }
+        if (!p.isEmpty()) {
+            for (String seg : p.split("/", -1)) {
+                out.add(decodeComponent(seg));
+            }
+        }
+        // Unmodifiable, as Dart's is: editing it changed nothing about the URI.
+        return DartList.unmodifiable(out);
+    }
+
+    /** Dart's {@code Uri.queryParameters} — insertion-ordered, decoded. */
+    public DartMap<String, String> queryParameters() {
+        DartMap<String, String> out = new DartMap<>();
+        if (!query.isEmpty()) {
+            for (String pair : query.split("&", -1)) {
+                if (pair.isEmpty()) {
+                    continue;
+                }
+                int eq = pair.indexOf('=');
+                if (eq >= 0) {
+                    out.put(decodeQueryComponent(pair.substring(0, eq)),
+                            decodeQueryComponent(pair.substring(eq + 1)));
+                } else {
+                    out.put(decodeQueryComponent(pair), "");
+                }
+            }
+        }
+        // Unmodifiable, as Dart's is: a write to it changed nothing about the URI, so
+        // code that "added a parameter" went on as if it had.
+        return new DartUnmodifiableMap<String, String>(out);
+    }
+
+    /// Dart's {@code Uri.decodeComponent}, for path segments: a {@code +} is a
+    /// literal plus. URLDecoder is a form decoder and would turn it into a space,
+    /// so it is escaped first.
+    private static String decodeComponent(String s) {
+        try {
+            return java.net.URLDecoder.decode(s.replace("+", "%2B"), "UTF-8");
+        } catch (Exception e) {
+            return s;
+        }
+    }
+
+    /// Dart's {@code Uri.decodeQueryComponent}, for query keys and values, where
+    /// a {@code +} IS a space -- {@code ?q=hello+world} reads back as "hello world".
+    /// This is exactly URLDecoder's form decoding. The two used to share the
+    /// path rule, which kept every plus in a query literal.
+    private static String decodeQueryComponent(String s) {
+        try {
+            return java.net.URLDecoder.decode(s, "UTF-8");
+        } catch (Exception e) {
+            return s;
+        }
+    }
+
+    /**
+     * The text with its scheme and host folded to lower case, as Dart's Uri prints
+     * them: Uri.parse('HTTPS://EXAMPLE.COM/P').toString() is https://example.com/P.
+     * The path, query and fragment are case sensitive and stay as written.
+     */
+    @Override
+    public String toString() {
+        if (canonical == null) {
+            canonical = canonicalText(text);
+        }
+        return canonical;
+    }
+
+    private String canonical;
+
+    /**
+     * Value equality over the canonical text, as Dart's Uri has: two separate parses
+     * of one URL are equal, and https://EXAMPLE.com/a equals https://example.com/a.
+     * Inherited identity made every parse unequal to every other, so a Uri could
+     * never find its entry in a map or set.
+     */
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof DartUri && toString().equals(o.toString());
+    }
+
+    @Override
+    public int hashCode() {
+        return toString().hashCode();
+    }
+
+    private static String canonicalText(String t) {
+        int end = t.length();
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        char[] out = null;
+        int rest = 0;
+        String scheme = "";
+        int colon = t.indexOf(':');
+        if (colon > 0 && colon < end && isScheme(t.substring(0, colon))) {
+            out = foldRange(t, out, 0, colon);
+            rest = colon + 1;
+            scheme = asciiLower(t.substring(0, colon));
+        }
+        int portColon = -1;
+        int portEnd = -1;
+        if (t.startsWith("//", rest)) {
+            int authStart = rest + 2;
+            int authEnd = end;
+            for (int i = authStart; i < end; i++) {
+                if (t.charAt(i) == '/') {
+                    authEnd = i;
+                    break;
+                }
+            }
+            int at = t.indexOf('@', authStart);
+            int hostStart = at >= 0 && at < authEnd ? at + 1 : authStart;
+            int hostEnd = authEnd;
+            if (hostStart < authEnd && t.charAt(hostStart) == '[') {
+                int close = t.indexOf(']', hostStart);
+                hostEnd = close >= 0 && close < authEnd ? close : authEnd;
+                if (close >= 0 && close + 1 < authEnd && t.charAt(close + 1) == ':') {
+                    portColon = close + 1;
+                }
+            } else {
+                int pc = t.indexOf(':', hostStart);
+                if (pc >= 0 && pc < authEnd) {
+                    hostEnd = pc;
+                    portColon = pc;
+                }
+            }
+            portEnd = authEnd;
+            out = foldRange(t, out, hostStart, hostEnd);
+        }
+        String folded = out == null ? t : new String(out);
+        if (portColon < 0) {
+            return folded;
+        }
+        // Dart drops the scheme's default port and an empty one, and prints the
+        // rest in decimal: http://a.com:80/x is http://a.com/x, so the two are
+        // equal and hash alike. That is the only change: Dart does NOT add "/" to
+        // an empty path after an authority (dart 3.9.3: Uri.parse('http://a.com')
+        // prints http://a.com and is not equal to http://a.com/), so neither does this.
+        String digits = folded.substring(portColon + 1, portEnd);
+        String port = canonicalPort(digits, scheme);
+        if (port.length() > 0 && port.equals(digits)) {
+            return folded;
+        }
+        return folded.substring(0, portColon) + (port.length() == 0 ? "" : ":" + port)
+                + folded.substring(portEnd);
+    }
+
+    /// Dart's default port: 80 for http, 443 for https and 0 for every other
+    /// scheme (ws and wss included).
+    private static long defaultPort(String scheme) {
+        if ("http".equals(scheme)) {
+            return 80;
+        }
+        if ("https".equals(scheme)) {
+            return 443;
+        }
+        return 0;
+    }
+
+    /// The port text Dart prints: empty for the scheme's default, otherwise the
+    /// value in decimal (+80 is the default, 0x10 prints as 16). Text that is not
+    /// a number is left as written.
+    private static String canonicalPort(String digits, String scheme) {
+        if (digits.length() == 0) {
+            return digits;
+        }
+        Long v = portValue(digits);
+        if (v == null) {
+            return digits;
+        }
+        return v.longValue() == defaultPort(scheme) ? "" : String.valueOf(v.longValue());
+    }
+
+    /// The port Dart reads from the text after the colon: int.parse's syntax.
+    private static Long portValue(String text) {
+        return DString.tryParseInt(text);
+    }
+
+    private static char[] foldRange(String t, char[] out, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char c = t.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                if (out == null) {
+                    out = t.toCharArray();
+                }
+                out[i] = (char) (c + ('a' - 'A'));
+            }
+        }
+        return out;
+    }
+}

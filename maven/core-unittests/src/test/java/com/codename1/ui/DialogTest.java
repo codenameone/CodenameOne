@@ -392,4 +392,25 @@ class DialogTest extends UITestBase {
         }
         return null;
     }
+
+    @FormTest
+    void aTimedOutDialogIsOnlyDisposedOnTheEdt() throws Exception {
+        final Dialog dlg = new Dialog("Timed");
+        dlg.setTimeout(1);
+        Thread.sleep(5);   // the deadline is now in the past
+        // invokeAndBlock's waiting thread polls isDisposed() while a modal show blocks.
+        // It must not act on the deadline there: disposing and deregistering the
+        // dialog's animation from that thread raced the EDT walking the same list.
+        final boolean[] offEdt = new boolean[1];
+        Thread poller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                offEdt[0] = dlg.isDisposed();
+            }
+        });
+        poller.start();
+        poller.join();
+        assertFalse(offEdt[0], "the waiting thread leaves the deadline to the EDT");
+        assertTrue(dlg.isDisposed(), "on the EDT the passed deadline disposes the dialog");
+    }
 }

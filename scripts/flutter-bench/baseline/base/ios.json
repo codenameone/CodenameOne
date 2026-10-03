@@ -1,0 +1,16 @@
+{
+ "gallery": {
+  "code_bytes": {
+   "runs": 1,
+   "value": 38015576
+  },
+  "install_bytes": {
+   "runs": 1,
+   "value": 145431213
+  },
+  "wire_bytes": {
+   "runs": 1,
+   "value": 110425140
+  }
+ }
+}

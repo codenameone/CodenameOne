@@ -135,9 +135,10 @@ public final class IOSNative {
     /// the Metal renderer has the shader.
     native boolean isRoundedImageDrawSupported();
 
-    native void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
+    // u0/v0/du/dv: the normalised part of the picture shown; du or dv <= 0 is all of it.
+    native void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius, float u0, float v0, float du, float dv);
 
-    native void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
+    native void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius, float u0, float v0, float du, float dv);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
     native int charWidthNative(long peer, char ch);

@@ -2953,8 +2953,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
+    /// False for the `custom` theme mode, which says the application ships the only
+    /// theme it uses: the builder packages no native theme for it, so there is none to
+    /// install. The macOS port inherits this.
     public boolean hasNativeTheme() {
-        return true;
+        return !"custom".equals(nativeThemeMode());
     }
 
     private static String iosMode = "auto";
@@ -3019,9 +3022,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public void installNativeTheme() {
+        String mode = nativeThemeMode();
+        if ("custom".equals(mode)) {
+            // The application ships its own theme and the builder shipped no native one,
+            // so there is nothing to open. This used to fall through to the pre-flat
+            // iPhoneTheme.res at the bottom of the chain, so a custom application
+            // shipped and installed the legacy iPhone theme under its own.
+            return;
+        }
         try {
             Resources r;
-            String mode = nativeThemeMode();
             // A subclass may own a theme this class knows nothing about. The macOS port
             // extends this one and ships Aqua, which is not in the list below; without the
             // hook it inherited the iOS chain and installed an iPhone theme on a Mac.
@@ -5087,12 +5097,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     private void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
         nativeInstance.nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
     }
-    private void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
-        nativeInstance.nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+    private void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius, float u0, float v0, float du, float dv) {
+        nativeInstance.nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius, u0, v0, du, dv);
     }
 
-    private void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
-        nativeInstance.nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+    private void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius, float u0, float v0, float du, float dv) {
+        nativeInstance.nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius, u0, v0, du, dv);
     }
 
     private void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
@@ -5397,6 +5407,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (superVal == null && !"".equals(Preferences.get(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, ""))) {
                 String backgroundLocationListenerClassName = Preferences.get(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, "");
                 try {
+                    // ReachabilityCull (FOR_NAME_SITES) keeps only LocationListener
+                    // implementations for this forName.
                     Class backgroundLocationListenerClass = (Class)Class.forName(backgroundLocationListenerClassName);
                     super.setBackgroundLocationListener(backgroundLocationListenerClass);
                 } catch (Throwable t) {}
@@ -5522,7 +5534,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (geofenceListeners().containsKey(id)) {
                 Class cls = null;
                 try {
-                    cls = Class.forName(geofenceListeners.get(id)); 
+                    // ReachabilityCull (FOR_NAME_SITES) keeps only GeofenceListener
+                    // implementations for this forName.
+                    cls = Class.forName(geofenceListeners.get(id));
                     if (cls == null) {
                         return null;
                     }
@@ -8097,8 +8111,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
         }
 
-        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius) {
-            nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius, float u0, float v0, float du, float dv) {
+            nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius, u0, v0, du, dv);
         }
         
         
@@ -8782,8 +8796,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         @Override
-        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius) {
-            nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius, float u0, float v0, float du, float dv) {
+            nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius, u0, v0, du, dv);
         }
 
         @Override
@@ -9255,6 +9269,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         float scale = nativeInstance.getDisplayScale();
         return scale > 0 ? scale : super.getDevicePixelRatio();
     }
+
 
     @Override
     public int getDeviceDensity() {
@@ -10588,7 +10603,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyTransform();
         ng.applyClip();
         NativeImage nm = (NativeImage)img;
-        ng.nativeDrawImageRounded(nm.peer, ng.alpha, x, y, w, h, cornerRadius);
+        ng.nativeDrawImageRounded(nm.peer, ng.alpha, x, y, w, h, cornerRadius, 0, 0, 0, 0);
+    }
+
+    @Override
+    public void drawImageRegionRounded(Object graphics, Object img, int x, int y, int w, int h,
+                                       float cornerRadius, float u0, float v0, float du, float dv) {
+        if (img == null) return;
+        if (!isRoundedImageDrawSupported()) {
+            super.drawImageRegionRounded(graphics, img, x, y, w, h, cornerRadius, u0, v0, du, dv);
+            return;
+        }
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        NativeImage nm = (NativeImage)img;
+        // The corner radius may be zero here: the Metal pipeline then draws the
+        // region square, which is still the region and not the whole picture.
+        ng.nativeDrawImageRounded(nm.peer, ng.alpha, x, y, w, h, cornerRadius > 0 ? cornerRadius : 0,
+                u0, v0, du, dv);
     }
 
     @Override
@@ -11358,6 +11392,20 @@ public class IOSImplementation extends CodenameOneImplementation {
             if("native:MainRegular".equals(fontName)) {
                 return "HelveticaNeue-Medium";
             }
+            // native:MainNormal is the system font at its TRUE regular weight.
+            //
+            // native:MainRegular has meant HelveticaNeue-Medium since the alias
+            // was introduced, and on iOS 8.2+ that resolves to the system font
+            // at UIFontWeightMedium -- one step heavier than the platform's own
+            // body weight. Changing it would restyle every existing app, so the
+            // honest regular gets a name of its own. Note the macOS branch
+            // already maps native:MainRegular to NSFontWeightRegular, so the two
+            // platforms disagree about the same alias; this name means the same
+            // thing on both.
+            if("native:MainNormal".equals(fontName)) {
+                return "CN1SystemRegular";
+            }
+
             
             if("native:MainBold".equals(fontName)) {
                 return "HelveticaNeue-Bold";
@@ -15447,6 +15495,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         try {
+            // ReachabilityCull (FOR_NAME_SITES) keeps only BackgroundWorker
+            // implementations for this forName.
             Class<?> cls = Class.forName(workerClass);
             BackgroundWorker worker = (BackgroundWorker) cls.newInstance();
             java.util.Map<String, String> input = new java.util.HashMap<String, String>();

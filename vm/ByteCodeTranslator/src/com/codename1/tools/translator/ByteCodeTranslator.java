@@ -961,6 +961,16 @@ public class ByteCodeTranslator {
         replaceInFile(projectWorkspaceData, "KitchenSink", appName);
 
 
+        // The iOS template sets COMPRESS_PNG_FILES = NO and STRIP_PNG_TEXT = NO. Both are
+        // needed: Xcode's copypng treats -strip-PNG-text as a request to compress too, so
+        // with STRIP_PNG_TEXT on (its Release default) the first setting alone changes
+        // nothing. Xcode's default rewrites every
+        // loose PNG in the bundle into Apple's CgBI form -- premultiplied, byte-swapped
+        // and recompressed with a weaker filter -- which made an application's PNGs larger,
+        // not smaller: 145 photographic PNGs of the Flutter gallery went from 14.4MB to
+        // 20.0MB. Nothing here needs CgBI. Images decode through ImageIO, which reads a
+        // standard PNG just as well, and Image.isPNG only checks the signature both forms
+        // share. An app that wants CgBI can put its images in an asset catalog.
         File projectPbx = new File(xcproj, "project.pbxproj");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));
 
@@ -1439,6 +1449,65 @@ public class ByteCodeTranslator {
             writer.append("else()\n");
             writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf)\n");
             writer.append("endif()\n");
+            // CODE SIZE: an LLVM inline threshold of 50 on optimized builds (the default is
+            // 225 at -O2, 250 at -O3). The translator emits one small C function per Java
+            // method plus per-call helpers, and at the default threshold clang inlines them
+            // into every caller -- most of the __text of a translated app is those copies.
+            // Measured on the transpiled Flutter gallery (macOS arm64, thin LTO): __text
+            // 20.3MB -> 16.4MB (-19%), cold start unchanged, the vm/benchmarks compute
+            // geomean within 2%; -Os reached a similar size but lost 9% on compute
+            // (it disables loop vectorization). The Xcode templates carry the same flag on
+            // their Release configurations, compile and LTO link. Clang only: gcc has no
+            // -mllvm, and clang-cl takes it through /clang:.
+            //
+            // GENERATED SOURCES ONLY. The runtime's hand-written C -- the allocator, the
+            // collector, the write barriers, nativeMethods.c -- stays at the compiler's
+            // default: it is five files of a few thousand, so it is not where the size is,
+            // and it is where a lost inline costs time on every allocation. Applied to the
+            // whole target, the Windows x64 gate's objectAllocation rose 33% in time and
+            // 23% in peak memory. The translator already records which sources it
+            // generated in cn1-source-manifest.txt beside this file, so CMake reads that
+            // at configure time rather than guessing from file names (java_io_File_runtime.c
+            // is hand-written and named like a class). A source COMPILE_OPTIONS list rather
+            // than SHELL:, which the per-source property does not accept; the two words are
+            // the only -mllvm in a file's options, so de-duplication cannot split them.
+            writer.append("set(CN1_MANIFEST \"${CMAKE_CURRENT_SOURCE_DIR}/cn1-source-manifest.txt\")\n");
+            // GCC gets its own limit. The host cc of a Linux build without zig is gcc (the
+            // Flutter benchmark's runner is one), and none of the clang flags above reach
+            // it -- measured, the Linux gallery's code did not move at all. The GCC knob is
+            // max-inline-insns-single (the size limit on functions a caller may inline):
+            // 20 took the gallery's generated object code from 26.45MB to 23.90MB (-9.6%)
+            // with every vm/benchmarks workload within noise. max-inline-insns-auto would
+            // shrink more but stops -O3 inlining a recursive call into itself, which cost
+            // the recursion benchmark 52%; -O2 costs the same. Turning off -O3's cloning,
+            // unswitching, peeling and loop versioning bought 0.2% and was left alone.
+            writer.append("if(EXISTS \"${CN1_MANIFEST}\" AND (MSVC OR CMAKE_C_COMPILER_ID MATCHES \"Clang\" OR CMAKE_C_COMPILER_ID STREQUAL \"GNU\"))\n");
+            writer.append("    if(MSVC)\n");
+            writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:/clang:-mllvm>;$<$<CONFIG:Release>:/clang:-inline-threshold=50>\")\n");
+            writer.append("    elseif(CMAKE_C_COMPILER_ID STREQUAL \"GNU\")\n");
+            writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:--param=max-inline-insns-single=20>\")\n");
+            writer.append("    else()\n");
+            writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:-mllvm>;$<$<CONFIG:Release>:-inline-threshold=50>\")\n");
+            // -O2 rather than CMake's Release -O3 for the generated sources, when there is
+            // no LTO (the default; zig cc on Linux). Measured with clang on the gallery's
+            // generated objects at threshold 50: .text 22.43MB -> 21.49MB (-4.2%), and
+            // the vm/benchmarks compute geomean went 59.44 -> 57.58ms -- faster, not
+            // slower, recursion most of all (161 -> 118ms), since -O3's extra cloning
+            // and unrolling of small translated functions costs i-cache here. Placed
+            // after CMAKE_C_FLAGS_RELEASE on the command line, so it wins. Not with LTO,
+            // which was not measured this way, and not for MSVC: clang-cl is already /O2.
+            writer.append("        if(NOT CN1_ENABLE_LTO)\n");
+            writer.append("            list(APPEND CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:-O2>\")\n");
+            writer.append("        endif()\n");
+            writer.append("    endif()\n");
+            writer.append("    file(STRINGS \"${CN1_MANIFEST}\" CN1_GENERATED_LINES REGEX \"^[^#|]+\\\\.c\\\\|generated\\\\|\")\n");
+            writer.append("    set(CN1_GENERATED_SOURCES \"\")\n");
+            writer.append("    foreach(CN1_LINE IN LISTS CN1_GENERATED_LINES)\n");
+            writer.append("        string(REGEX REPLACE \"\\\\|.*$\" \"\" CN1_NAME \"${CN1_LINE}\")\n");
+            writer.append("        list(APPEND CN1_GENERATED_SOURCES \"${CN1_APP_SOURCE_ROOT}/${CN1_NAME}\")\n");
+            writer.append("    endforeach()\n");
+            writer.append("    set_source_files_properties(${CN1_GENERATED_SOURCES} PROPERTIES COMPILE_OPTIONS \"${CN1_SIZE_OPTIONS}\")\n");
+            writer.append("endif()\n");
             if (executable && !windows) {
                 // ThinLTO for the Release Linux executable: the translator emits one
                 // C function per Java method, so cross-TU inlining is where the
@@ -1453,6 +1522,20 @@ public class ByteCodeTranslator {
                 writer.append("if(CMAKE_C_COMPILER_ID MATCHES \"Clang\")\n");
                 writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-flto=thin>)\n");
                 writer.append("    target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-flto=thin>)\n");
+                // The ThinLTO backend is where cross-translation-unit inlining happens,
+                // so it needs the same threshold as the compile above or it re-inlines
+                // everything the compile left alone. A link-time -mllvm is NOT forwarded
+                // by the clang driver (it warns "argument unused"); -plugin-opt=-<opt> is
+                // the spelling both the LLVM gold plugin (under GNU ld or gold) and lld
+                // hand to LLVM as a command-line option.
+                //
+                // Not under zig cc (the musl and cross-arch toolchain): it identifies as
+                // Clang, but its linker driver accepts a fixed set of arguments and fails
+                // the link with "unsupported linker arg: -plugin-opt". Those builds keep
+                // the compile-side threshold above and LLVM's default at link time.
+                writer.append("    if(NOT CMAKE_C_COMPILER MATCHES \"zig\")\n");
+                writer.append("        target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-Wl,-plugin-opt=-inline-threshold=50>)\n");
+                writer.append("    endif()\n");
                 writer.append("endif()\n");
             }
 

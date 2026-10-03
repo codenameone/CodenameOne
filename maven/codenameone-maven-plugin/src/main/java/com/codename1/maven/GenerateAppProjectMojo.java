@@ -66,6 +66,14 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     @Parameter(property="artifactId")
     private String artifactId;
 
+    /// The Java release the generated project should target: 8 or 17.
+    ///
+    /// Left unset the archetype chooses, which is what a user normally wants.
+    /// A build that will compile the generated project with a specific JDK has
+    /// to say so, because the two have to agree.
+    @Parameter(property = "javaVersion")
+    private String javaVersion;
+
     @Parameter(property="groupId")
     private String groupId;
 
@@ -142,6 +150,17 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 "package="+packageName()
         };
         Properties props = new Properties();
+        // The archetype's javaVersion, when the caller named one.
+        //
+        // This goal invokes archetype:generate as a SEPARATE Maven process, and
+        // that process does not inherit this one's -D properties -- only what is
+        // put in this list reaches it. So a caller passing -DjavaVersion=8 was
+        // silently ignored and got the archetype's default instead, which is 17:
+        // a generated project that a JDK 8 build cannot compile, failing with
+        // "invalid target release: 17" in a module the caller never wrote.
+        if (javaVersion != null && javaVersion.trim().length() > 0) {
+            props.setProperty("javaVersion", javaVersion.trim());
+        }
         for (String prop : propsArr) {
             int eqpos = prop.indexOf("=");
             if (eqpos > 0) {

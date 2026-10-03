@@ -839,5 +839,25 @@ class CpuClassTests(unittest.TestCase):
             self.assertIsNone(gate.cpu_class(cpu), cpu)
 
 
+class FailureLogTests(unittest.TestCase):
+    def test_a_failed_benchmark_keeps_its_logs_beside_the_results(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / 'work'
+            work.mkdir()
+            for name in ('hello-call-r00-parpar.log', 'hello-call-r00-parpar.log.err',
+                         'hello-c2-r00-parpar.log', 'bench-call-r00-parpar.log'):
+                (work / name).write_text(name)
+            out = Path(tmp) / 'out' / 'perf-results.json'
+            out.parent.mkdir()
+            kept = gate.keep_failure_logs(work, 'hello', None, str(out))
+            self.assertEqual(sorted(p.name for p in Path(kept).iterdir()),
+                             ['hello-call-r00-parpar.log', 'hello-call-r00-parpar.log.err'])
+            self.assertEqual(Path(kept).parent, out.parent.resolve())
+
+    def test_nothing_is_kept_without_an_output_directory(self):
+        self.assertIsNone(gate.keep_failure_logs(Path('.'), 'hello', None, None))
+
+
 if __name__ == '__main__':
     unittest.main()

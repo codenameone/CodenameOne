@@ -1,0 +1,196 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.flutter.material;
+
+import com.codename1.flutter.Element;
+import com.codename1.flutter.StatelessElement;
+import com.codename1.flutter.Widget;
+import com.codename1.flutter.rendering.RenderHost;
+import com.codename1.ui.Form;
+
+import java.util.Map;
+
+/**
+ * Element for {@link MaterialApp}: installs the app's EFFECTIVE theme (per
+ * themeMode/darkTheme) into the CN1 UIManager <b>before</b> the subtree
+ * mounts, so every component created below picks the themed Flutter* styles
+ * up; on every widget update the effective theme is recomputed and, when it
+ * changed (a themeMode/theme/darkTheme switch across rebuilds), the overlay
+ * is re-installed, the Form's styles are refreshed and the whole element
+ * subtree re-applies its programmatic styling
+ * ({@link Element#themeChanged()}).
+ */
+public class MaterialAppElement extends StatelessElement {
+
+    /** The prop table last installed, for change detection. */
+    private Map<String, Object> installedProps;
+
+    /**
+     * The widget the initial route resolved to, kept for the life of this element.
+     *
+     * <p>{@code MaterialApp.build} resolves {@code initialRoute} through
+     * {@code onGenerateRoute}. Doing that on EVERY build means any rebuild of the app -
+     * and an app-wide model sitting above MaterialApp causes one on every settings change -
+     * re-runs the route builder and hands back a brand new page, discarding whatever the
+     * user was looking at. Flutter does not re-resolve, because the route stack is
+     * Navigator STATE rather than something recomputed from the widget.</p>
+     *
+     * <p>Resolved once and reused, so a rebuild updates the existing page in place. Routes
+     * pushed later are their own Forms and are unaffected.</p>
+     */
+    private Widget routeContent;
+
+    public Widget routeContent() {
+        return routeContent;
+    }
+
+    public void routeContent(Widget v) {
+        this.routeContent = v;
+    }
+
+    public MaterialAppElement(MaterialApp widget) {
+        super(widget);
+    }
+
+    private MaterialApp app() {
+        return (MaterialApp) widget();
+    }
+
+    @Override
+    public void mount(Element parent, int slot) {
+        // Install before super.mount: the children inflate (and create their
+        // CN1 components) during the first build inside super.mount.
+        RenderHost h = parent != null ? parent.host() : host();
+        installEffectiveTheme(app().effectiveTheme(), h);
+        super.mount(parent, slot);
+    }
+
+    // A size change rebuilds the widgets that READ the display metrics, and only
+    // when the size really changed. MediaQuery.of resolves against the Display when
+    // asked, so a read is never stale -- but a widget that chose a Row or a Column by
+    // width is not asked again unless something rebuilds it, and after a rotation or
+    // a desktop resize it kept its first choice. An earlier listener here rebuilt the
+    // ENTIRE application on every size event, including the one a desktop window
+    // reports just after it is shown: measured on the Mac build, the whole first
+    // screen built twice (2099 elements and 751 components where the app has 1062
+    // and 376). So the size the tree was built for is remembered and an event that
+    // repeats it is ignored, and what is rebuilt is the readers of the display scope
+    // (MediaQuery.displayScope), not the app.
+    private int displayWidth = -1;
+    private int displayHeight = -1;
+    private com.codename1.ui.Form listenedForm;
+    private com.codename1.ui.events.ActionListener sizeListener;
+
+    @Override
+    protected void firstBuild() {
+        int[] s = currentDisplaySize();
+        displayWidth = s[0];
+        displayHeight = s[1];
+        super.firstBuild();
+        Form f = host() == null ? null : host().form();
+        if (f != null) {
+            sizeListener = new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    int[] now = currentDisplaySize();
+                    displaySizeChanged(now[0], now[1]);
+                }
+            };
+            listenedForm = f;
+            f.addSizeChangedListener(sizeListener);
+        }
+    }
+
+    @Override
+    public void unmount() {
+        if (listenedForm != null) {
+            listenedForm.removeSizeChangedListener(sizeListener);
+            listenedForm = null;
+            sizeListener = null;
+        }
+        super.unmount();
+    }
+
+    /**
+     * The display is now {@code width x height}. Returns whether that is a change from
+     * the size the tree was built for, in which case every widget that read
+     * {@code MediaQuery.of} below this app rebuilds.
+     */
+    public boolean displaySizeChanged(int width, int height) {
+        if (width == displayWidth && height == displayHeight) {
+            return false;
+        }
+        displayWidth = width;
+        displayHeight = height;
+        Element scope = child();
+        if (scope instanceof com.codename1.flutter.widgets.InheritedElement
+                && scope.widget() instanceof com.codename1.flutter.MediaQuery) {
+            ((com.codename1.flutter.widgets.InheritedElement) scope).dependenciesChanged();
+        }
+        return true;
+    }
+
+    private static int[] currentDisplaySize() {
+        if (!com.codename1.ui.Display.isInitialized()) {
+            return new int[] {0, 0};
+        }
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        return new int[] {d.getDisplayWidth(), d.getDisplayHeight()};
+    }
+
+    @Override
+    public void update(Widget newWidget) {
+        ThemeData eff = ((MaterialApp) newWidget).effectiveTheme();
+        boolean changed = !ThemeDataAdapter.themeProps(eff).equals(installedProps);
+        if (changed) {
+            installEffectiveTheme(eff, host());
+        }
+        super.update(newWidget);
+        if (changed) {
+            // Reused widget instances skip Element.update, so force every
+            // render element to re-apply its (theme-derived) programmatic
+            // styling and re-measure.
+            themeChanged();
+            if (host() != null) {
+                host().revalidate();
+            }
+        }
+    }
+
+    private void installEffectiveTheme(ThemeData eff, RenderHost h) {
+        installedProps = ThemeDataAdapter.themeProps(eff);
+        ThemeDataAdapter.install(eff);
+        Form f = h == null ? null : h.form();
+        if (f != null) {
+            // Re-derive the existing components' UIID styles from the new
+            // overlay, then style the Form itself per-instance.
+            try {
+                f.refreshTheme();
+            } catch (Throwable ignore) {
+                // headless
+            }
+            ThemeDataAdapter.applyToForm(f, eff);
+        }
+    }
+}

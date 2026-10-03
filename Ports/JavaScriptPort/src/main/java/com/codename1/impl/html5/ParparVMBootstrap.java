@@ -48,8 +48,8 @@ public final class ParparVMBootstrap implements Runnable {
      * As {@link #bootstrap(Lifecycle)}, but runs {@code afterInit} once {@code Display} is
      * initialized and before the lifecycle's {@code init}/{@code start} callbacks. The generated
      * launcher uses this to stamp the app-hardening metadata (so {@code Hardening.isHardened()} and
-     * any crash raised during {@code init}/{@code start} already see the mapping id and level),
-     * which a post-bootstrap stamp would miss because {@code run()} invokes the lifecycle inline.
+     * any crash raised during {@code init}/{@code start} already see the mapping id and level).
+     * The lifecycle itself is then queued to the EDT, so {@code afterInit} always runs first.
      *
      * @param lifecycle the application lifecycle
      * @param afterInit code to run after {@code Display.init} and before the lifecycle starts; may be null
@@ -61,7 +61,12 @@ public final class ParparVMBootstrap implements Runnable {
         if (afterInit != null) {
             afterInit.run();
         }
-        bootstrap.run();
+        // The lifecycle runs on the EDT, as it does on every other port (iOS hands its stub
+        // to Display.init, which runs it there). This used to call run() inline, on the
+        // worker's main thread, so init() and start() ran off the EDT: anything that checks
+        // -- a transpiled Flutter app's runApp asserts it -- threw before the first frame,
+        // and the transpiled Flutter gallery never got past its loading screen.
+        Display.getInstance().callSerially(bootstrap);
     }
 
     // ``window.cn1Initialized = true`` lands on the worker's global

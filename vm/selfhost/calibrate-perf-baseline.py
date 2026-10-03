@@ -41,11 +41,8 @@ hosted pools mix microarchitectures whose ratios differ by more than any toleran
 absorbs. A run whose CPU is unknown feeds the plain `platform` rows instead.
 """
 import argparse
-import copy
 import importlib.util
 import json
-import math
-import statistics
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -62,24 +59,12 @@ def _load(name, file):
 
 perf_gate = _load('perf_gate', 'perf-gate.py')
 perf_baseline = _load('perf_baseline', 'perf_baseline.py')
-SPREAD_MARGIN = 1.5
-# Fewer runs than this cannot estimate a row's spread: EPYC 7763's hello row, from two
-# runs, failed unchanged code at +15.7% against a 15% tolerance. Such a row takes the
-# widest tolerance its benchmark needed anywhere, as a single-run row always did.
-MIN_RUNS_FOR_OWN_SPREAD = 5
+# The arithmetic lives in perf_baseline, shared with the Flutter benchmark's calibrator.
+SPREAD_MARGIN = perf_baseline.SPREAD_MARGIN
+MIN_RUNS_FOR_OWN_SPREAD = perf_baseline.MIN_RUNS_FOR_OWN_SPREAD
 METRICS = perf_baseline.METRICS
-
-
-def round_up(value, step=0.05):
-    return round(math.ceil(value / step - 1e-9) * step, 2)
-
-
-def spread_tolerance(values, base, floor):
-    """The tolerance a set of runs needs to pass themselves, or `floor` if smaller."""
-    if len(values) < 2:
-        return floor
-    spread = max(max(values) / base - 1, 1 - min(values) / base)
-    return max(floor, round_up(spread * SPREAD_MARGIN))
+round_up = perf_baseline.round_up
+spread_tolerance = perf_baseline.spread_tolerance
 
 
 def collect(paths, only=None, rows=None):
@@ -135,118 +120,12 @@ def main(argv=None):
     number = args.pr or perf_baseline.pr_number()
     if number is None:
         raise SystemExit('No pull request number: pass --pr N (the overlay is named after it)')
-    policy = perf_baseline.load_policy(root)
-    tolerance, floor = policy['tolerance'], policy['floor']
-    base = perf_baseline.load_base(root)
-    overlays = perf_baseline.load_overlays(root)
-    own = dict(overlays).get(number, {})
-    # What the gate judged against (this pull request's earlier rows included), and the
-    # baseline as it stands without them -- which is what a rebaseline's "from" names,
-    # since this run replaces this pull request's earlier rebaseline rather than stacking.
-    # This raises when another overlay chains its rebaseline ON TOP of this pull request's
-    # (its "from" is our value), and that is deliberate rather than a gap: re-measuring a
-    # link something else was measured on would move the value that later link starts
-    # from and make IT stale. Recalibrate a pull request nothing has built on yet.
-    others, _ = perf_baseline.resolve(base, [o for o in overlays if o[0] != number], tolerance)
-    try:
-        judged, _ = perf_baseline.resolve(base, overlays, tolerance)
-    except perf_baseline.BaselineError:
-        # This pull request's own overlay went stale (another merged change moved a row it
-        # rebaselines), and perf-gate.py then judged the run without it. Do the same, and
-        # rewrite every stale row below from these fresh runs -- which is the recovery the
-        # stale-overlay message asks for.
-        judged = others
-    stale = set()
-    for key, bench, cores, row in perf_baseline._rows('own', own.get('rebaseline', {})):
-        now = others.get(key, {}).get(bench, {}).get(cores)
-        if now is None or not perf_baseline._same(row['from'], now):
-            stale.add((key, bench, cores))
-    runs = collect(args.results, set(args.only.split(',')) if args.only else None, judged)
-
-    widest = defaultdict(float)   # (benchmark, metric) -> widest tolerance any row has
-    for _, bench, _, row in perf_baseline._rows('baseline', judged):
-        for metric, tol in row.get('tolerance', {}).items():
-            widest[(bench, metric)] = max(widest[(bench, metric)], tol)
-    for benches in runs.values():
-        for (bench, _), metrics in benches.items():
-            for metric, values in metrics.items():
-                own_tol = spread_tolerance(values, statistics.median(values), tolerance[metric])
-                if len(values) > 1:
-                    widest[(bench, metric)] = max(widest[(bench, metric)], own_tol)
-
-    calibrate, rebaseline = {}, {}
-    for key, benches in sorted(runs.items()):
-        for (bench, cores), metrics in sorted(benches.items()):
-            current = judged.get(key, {}).get(bench, {}).get(cores)
-            before = others.get(key, {}).get(bench, {}).get(cores)
-            # This pull request's own calibration counts only while it is the row: once
-            # another pull request's calibration of the same CPU has been folded into base/,
-            # resolve() supersedes ours, and writing a calibration again would be ignored
-            # just the same -- the gate would fail forever. Then the row is base/'s, and a
-            # move past it is a rebaseline FROM it (write_overlay drops the stale entry).
-            new_row = current is None or (
-                before is None and cores in own.get('calibrate', {}).get(key, {}).get(bench, {}))
-            row = {} if current is None else copy.deepcopy(current)
-            moved = []
-            for metric in METRICS:
-                values = metrics[metric]
-                if args.metric and metric != args.metric and not new_row:
-                    continue
-                if not (args.all or new_row or (key, bench, cores) in stale or any(
-                        perf_gate.verdict(v, current[metric],
-                                          current.get('tolerance', {}).get(metric, tolerance[metric]),
-                                          floor[metric]) != 'ok' for v in values)):
-                    continue
-                moved.append(metric)
-                median = statistics.median(values)
-                row[metric] = round(median, 3)
-                tol = spread_tolerance(values, median, tolerance[metric])
-                if len(values) < MIN_RUNS_FOR_OWN_SPREAD:
-                    kept = (current or {}).get('tolerance', {}).get(metric, 0.0)
-                    tol = max(tol, kept, widest.get((bench, metric), 0.0) if new_row else 0.0)
-                row.setdefault('tolerance', {})[metric] = tol
-            if not moved:
-                continue
-            # A row whose tolerance is just the global one does not need to repeat it.
-            tol = {m: t for m, t in row.pop('tolerance', {}).items() if t > tolerance[m]}
-            if tol:
-                row['tolerance'] = tol
-            row['runs'] = min(len(metrics[m]) for m in moved)
-            if new_row or before is None:
-                calibrate.setdefault(key, {}).setdefault(bench, {})[cores] = row
-            else:
-                row['from'] = perf_baseline.from_row(before)
-                rebaseline.setdefault(key, {}).setdefault(bench, {})[cores] = row
-
-    left = sorted(stale - {(k, b, c) for k, benches in rebaseline.items()
-                           for b, per in benches.items() for c in per})
-    if left:
-        raise SystemExit('These rows of pr/%d.json are stale and these runs did not measure '
-                         'them; pass runs that do: %s' % (number, ', '.join(
-                             '%s %s/%s' % row for row in left)))
-    if not calibrate and not rebaseline:
-        print('Every measured row is inside its tolerance; nothing to write.')
-        return 0
-    if not args.reason:
-        # A row this overlay already rebaselined keeps its reason when re-measured; a row
-        # NEW to it needs its own -- never an earlier row's explanation by default.
-        unexplained = ['%s %s/%s' % (key, bench, cores)
-                       for key, bench, cores, _ in perf_baseline._rows('new', rebaseline)
-                       if not own.get('rebaseline', {}).get(key, {}).get(bench, {})
-                       .get(cores, {}).get('reason')]
-        if unexplained:
-            raise SystemExit('These rows moved past their tolerance and would be rebaselined; '
-                             'say why with --reason: %s\n%s' % (', '.join(unexplained),
-                                                              json.dumps(rebaseline, indent=1)))
-    try:
-        path = perf_baseline.write_overlay(root, number, calibrate, rebaseline, args.reason)
-        perf_baseline.load(root)   # the overlay must resolve against everything else
-    except perf_baseline.BaselineError as error:
-        raise SystemExit(str(error))
-    for kind, tree in (('calibrated', calibrate), ('rebaselined', rebaseline)):
-        for key, benches in sorted(tree.items()):
-            print('%s %s: %s' % (kind, key, ', '.join(sorted(benches))))
-    print('Wrote %s -- commit it with this pull request.' % path)
+    context = perf_baseline.calibration_context(root, number)
+    runs = collect(args.results, set(args.only.split(',')) if args.only else None,
+                   context['judged'])
+    calibrate, rebaseline = perf_baseline.plan_calibration(
+        context, runs, perf_gate.verdict, everything=args.all, metric=args.metric)
+    perf_baseline.finish_calibration(root, context, calibrate, rebaseline, args.reason)
     return 0
 
 

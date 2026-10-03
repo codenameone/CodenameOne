@@ -234,6 +234,14 @@ public class WindowsNativeBuilder extends Executor {
             // C/C++ sources), the same mechanism parparvm-compiler.jar uses.
             extractJarResource("/WindowsPort.jar", portClasses);
             extractJarResource("/nativewindows.jar", nativeSources);
+            // The port installs its bundled theme from init() whenever the file is there,
+            // before any application code runs, so the custom theme mode -- the
+            // application's own theme is the only one -- is honoured by not shipping it.
+            if (NativeThemes.desktopShipsNoTheme(request.getArg("desktop.themeMode", null),
+                    request.getArg("nativeTheme", null), request.getArg("cn1.nativeTheme", null))
+                    && NativeThemes.removeDesktopTheme(portClasses, "windowsNativeTheme.res")) {
+                log("Native theme not used by this build, not shipped: windowsNativeTheme.res");
+            }
         } catch (Exception ex) {
             throw new BuildException("Failed to stage the WindowsPort native layer. The codenameone "
                     + "maven plugin must provide the codenameone-windows 'bundle' artifact "
@@ -1250,6 +1258,9 @@ public class WindowsNativeBuilder extends Executor {
         // clients and @OpenTelemetry all compiled here and did nothing at run time.
         src.append(routeDispatcherInstallSource(classesDir, "        "));
         src.append(annotationFrameworksInstallSource(classesDir, "        "));
+        // desktop.width/height: before init, which creates the window. See
+        // Executor.desktopWindowSizeStubCall.
+        src.append(desktopWindowSizeStubCall(request, "com.codename1.impl.windows.WindowsImplementation"));
         src.append("        Display.init(null);\n");
         // The application's identity, which nothing else gives this platform. The stub passes
         // null to Display.init, so the implementation never derives a package from an object, and

@@ -1,0 +1,234 @@
+// Sources for ForNameSeedIntegrationTest, split on the FILE lines.
+//
+// Stand-ins for the Class.forName call sites ReachabilityCull.FOR_NAME_SITES narrows:
+// same class names, method names and result types as the real core and iOS port, so
+// the translator's table matches them, but small enough to translate in seconds and
+// with nothing else in the program calling forName. One Site* main per site makes
+// exactly that site live. Each Seed* class is created ONLY by name -- no NEW, no class
+// literal, no string constant spelling it -- and is kept in the program by a static call.
+//// FILE com/codename1/location/GeofenceListener.java
+package com.codename1.location;
+public interface GeofenceListener {
+    void onEntered(String id);
+}
+//// FILE com/codename1/location/LocationListener.java
+package com.codename1.location;
+public interface LocationListener {
+    void providerStateChanged(int newState);
+}
+//// FILE com/codename1/location/GeofenceManager.java
+package com.codename1.location;
+public class GeofenceManager {
+    public Class getListenerClass(String name) throws Exception {
+        return Class.forName(name);
+    }
+}
+//// FILE com/codename1/system/NativeInterface.java
+package com.codename1.system;
+public interface NativeInterface {
+    boolean isSupported();
+}
+//// FILE com/codename1/system/NativeLookup.java
+package com.codename1.system;
+public class NativeLookup {
+    public static Object create(String interfaceName) throws Exception {
+        return Class.forName(interfaceName + "Impl").newInstance();
+    }
+}
+//// FILE com/codename1/testing/UnitTest.java
+package com.codename1.testing;
+public interface UnitTest {
+    boolean shouldExecuteOnEDT();
+}
+//// FILE com/codename1/testing/DeviceRunner.java
+package com.codename1.testing;
+public class DeviceRunner {
+    public Object runTest(String testClassName) throws Exception {
+        return Class.forName(testClassName).newInstance();
+    }
+}
+//// FILE com/codename1/background/BackgroundWorker.java
+package com.codename1.background;
+public interface BackgroundWorker {
+    void performWork(String workId);
+}
+//// FILE com/codename1/impl/ios/IOSImplementation.java
+package com.codename1.impl.ios;
+public class IOSImplementation {
+    public static Object runBackgroundProcessing(String workerClass) throws Exception {
+        return Class.forName(workerClass).newInstance();
+    }
+
+    public static class Loc {
+        public Class getBackgroundLocationListener(String name) throws Exception {
+            return Class.forName(name);
+        }
+
+        public Object getGeofenceListener(String name) throws Exception {
+            return Class.forName(name).newInstance();
+        }
+    }
+}
+//// FILE Seeds.java
+import com.codename1.background.BackgroundWorker;
+import com.codename1.location.GeofenceListener;
+import com.codename1.location.LocationListener;
+import com.codename1.system.NativeInterface;
+import com.codename1.testing.UnitTest;
+
+interface CullProbe {
+    void probe();
+}
+
+interface SeedNative extends NativeInterface {
+}
+
+class SeedGeofence implements GeofenceListener {
+    static void keep() {
+    }
+
+    public void onEntered(String id) {
+        System.out.println("CASE|geofence|" + id);
+    }
+}
+
+class SeedLocation implements LocationListener {
+    static void keep() {
+    }
+
+    public void providerStateChanged(int newState) {
+        System.out.println("CASE|location|" + newState);
+    }
+}
+
+class SeedWorker implements BackgroundWorker {
+    static void keep() {
+    }
+
+    public void performWork(String workId) {
+        System.out.println("CASE|worker|" + workId);
+    }
+}
+
+class SeedTest implements UnitTest {
+    static void keep() {
+    }
+
+    public boolean shouldExecuteOnEDT() {
+        return true;
+    }
+}
+
+class SeedNativeImpl implements SeedNative {
+    static void keep() {
+    }
+
+    public boolean isSupported() {
+        return true;
+    }
+}
+
+/// Assignable to none of the narrowed types: only an unnarrowed site may keep it.
+class SeedOther implements CullProbe {
+    static void keep() {
+    }
+
+    public void probe() {
+        System.out.println("CASE|other|probed");
+    }
+}
+
+public class Seeds {
+    /// Keeps every seed class in the program without allocating any of them.
+    public static void keepAll() {
+        SeedGeofence.keep();
+        SeedLocation.keep();
+        SeedWorker.keep();
+        SeedTest.keep();
+        SeedNativeImpl.keep();
+        SeedOther.keep();
+    }
+
+    /// Calls every seed interface method, so each is reached and the cull has to decide
+    /// between a body and a stub for every implementation.
+    public static void poke(Object o) {
+        if (o instanceof GeofenceListener) {
+            ((GeofenceListener) o).onEntered("x");
+        }
+        if (o instanceof LocationListener) {
+            ((LocationListener) o).providerStateChanged(1);
+        }
+        if (o instanceof BackgroundWorker) {
+            ((BackgroundWorker) o).performWork("x");
+        }
+        if (o instanceof UnitTest) {
+            System.out.println("CASE|test|" + ((UnitTest) o).shouldExecuteOnEDT());
+        }
+        if (o instanceof NativeInterface) {
+            System.out.println("CASE|native|" + ((NativeInterface) o).isSupported());
+        }
+        if (o instanceof CullProbe) {
+            ((CullProbe) o).probe();
+        }
+    }
+
+    /// A name no constant spells, so only a forName seed can account for the class.
+    public static String name(String reversed) {
+        return new StringBuilder(reversed).reverse().toString();
+    }
+}
+//// FILE SiteGeofenceManager.java
+public class SiteGeofenceManager {
+    public static void main(String[] args) throws Exception {
+        Seeds.keepAll();
+        Class c = new com.codename1.location.GeofenceManager().getListenerClass(Seeds.name("ecnefoeGdeeS"));
+        Seeds.poke(c.newInstance());
+    }
+}
+//// FILE SiteNativeLookup.java
+public class SiteNativeLookup {
+    public static void main(String[] args) throws Exception {
+        Seeds.keepAll();
+        Seeds.poke(com.codename1.system.NativeLookup.create(Seeds.name("evitaNdeeS")));
+    }
+}
+//// FILE SiteDeviceRunner.java
+public class SiteDeviceRunner {
+    public static void main(String[] args) throws Exception {
+        Seeds.keepAll();
+        Seeds.poke(new com.codename1.testing.DeviceRunner().runTest(Seeds.name("tseTdeeS")));
+    }
+}
+//// FILE SiteBackgroundLocation.java
+public class SiteBackgroundLocation {
+    public static void main(String[] args) throws Exception {
+        Seeds.keepAll();
+        Class c = new com.codename1.impl.ios.IOSImplementation.Loc()
+                .getBackgroundLocationListener(Seeds.name("noitacoLdeeS"));
+        Seeds.poke(c.newInstance());
+    }
+}
+//// FILE SiteIosGeofence.java
+public class SiteIosGeofence {
+    public static void main(String[] args) throws Exception {
+        Seeds.keepAll();
+        Seeds.poke(new com.codename1.impl.ios.IOSImplementation.Loc()
+                .getGeofenceListener(Seeds.name("ecnefoeGdeeS")));
+    }
+}
+//// FILE SiteBackgroundWorker.java
+public class SiteBackgroundWorker {
+    public static void main(String[] args) throws Exception {
+        Seeds.keepAll();
+        Seeds.poke(com.codename1.impl.ios.IOSImplementation.runBackgroundProcessing(Seeds.name("rekroWdeeS")));
+    }
+}
+//// FILE SiteUnlisted.java
+/// Calls Class.forName itself, a site the table cannot know: every concrete class with a
+/// no-argument constructor has to count as allocated.
+public class SiteUnlisted {
+    public static void main(String[] args) throws Exception {
+        Seeds.keepAll();
+        Seeds.poke(Class.forName(Seeds.name("rehtOdeeS")).newInstance());
+    }
+}

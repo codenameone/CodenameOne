@@ -36,11 +36,18 @@
     // ordinary case; anything positive rounds the quad in the fragment shader
     // so nobody has to build a rounded copy of the bitmap.
     float cornerRadius;
+    // The part of the picture shown, in its normalised coordinates. regionW or
+    // regionH of zero -- the ivars' initial value -- is the whole picture.
+    float regionX;
+    float regionY;
+    float regionW;
+    float regionH;
 }
 
 -(id)initWithArgs:(int)a xpos:(int)xpos ypos:(int)ypos i:(GLUIImage*)i w:(int)w h:(int)h;
 -(void)execute;
 -(void)setRenderingHints:(JAVA_INT)hints;
 -(void)setCornerRadius:(float)r;
+-(void)setRegionX:(float)u y:(float)v w:(float)du h:(float)dv;
 
 @end

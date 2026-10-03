@@ -52,6 +52,9 @@
 /// Defined here because on the UIKit ports it lives in the app delegate, which
 /// this port replaces.
 BOOL isAppSuspended = NO;
+/// Set on the main thread once the first frame has been handed to the GPU. Read
+/// only by CN1MacBuildMainWindowBeforeRun, on the main thread as well.
+BOOL cn1MacFirstFramePresented = NO;
 int mallocWhileSuspended = 0;
 
 static CodenameOne_GLViewController *singletonInstance = nil;
@@ -199,6 +202,8 @@ static CodenameOne_GLViewController *singletonInstance = nil;
 }
 
 - (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive {
+    static int firstDraw = 1;
+    if (firstDraw) { firstDraw = 0; cn1StartupPhase("firstDrawFrame"); }
     METALView *v = (METALView *)[CN1MacHost sharedHost].activeRenderingView;
     if (v == nil) {
         return;
@@ -281,6 +286,7 @@ static CodenameOne_GLViewController *singletonInstance = nil;
     [DrawStringTextureCache flushDeleted];
     [v presentFramebuffer];
     painted = YES;
+    cn1MacFirstFramePresented = YES;
 #ifndef CN1_USE_ARC
     [ops release];
 #endif
