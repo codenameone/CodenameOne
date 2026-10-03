@@ -38,8 +38,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Behavioral execution tests: each dir under src/test/resources/behavior/
- * holds main.dart + expect.txt. The dart is transpiled, compiled with the
- * JDK 17 javac (JAVA17_HOME), executed, and stdout diffed against
+ * holds main.dart + expect.txt, plus any library main.dart imports. The
+ * dart is transpiled, compiled with the JDK 17 javac (JAVA17_HOME), executed,
+ * and stdout diffed against
  * expect.txt. Pins semantics: int math, double formatting, map ordering,
  * closure capture.
  *
@@ -83,9 +84,17 @@ public class BehaviorTest {
         if (flutterRuntime != null) {
             stubEntries.add(flutterRuntime);
         }
-        TestSupport.Result r = TestSupport.transpile(new String[][] {
-                {"main.dart", TestSupport.read(new File(dir, "main.dart"))}
-        }, stubEntries);
+        // main.dart, then any other library beside it (a case may need imports).
+        List<String[]> sources = new ArrayList<String[]>();
+        sources.add(new String[] {"main.dart", TestSupport.read(new File(dir, "main.dart"))});
+        String[] names = dir.list();
+        java.util.Arrays.sort(names);
+        for (String n : names) {
+            if (n.endsWith(".dart") && !n.equals("main.dart")) {
+                sources.add(new String[] {n, TestSupport.read(new File(dir, n))});
+            }
+        }
+        TestSupport.Result r = TestSupport.transpile(sources.toArray(new String[0][]), stubEntries);
         assertTrue(!r.diags.hasErrors(), "diagnostics: " + r.diags.asList());
 
         File work = Files.createTempDirectory("dart-behavior-" + dir.getName()).toFile();

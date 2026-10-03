@@ -1,0 +1,44 @@
+true
+caught Bad state: boom
+42
+hi!
+1-2
+5
+[in, after]
+no sync throw
+async Invalid argument(s): neg
+[in, after, refresh]
+1 body
+2 default
+3 default
+4 body4
+5 big
+150 big
+50 default
+6 body7
+7 body7
+8 mid
+42 mid
+http://a.com/x 80 true
+https://a.com 443 true
+https://a.com:80 80 true
+ws://a.com:80/x 80 true
+http://a.com 80 true
+https://u@a.com/p?q#f 443 true
+http://a.com 80 true
+foo://a.com 0 true
+true
+1
+http://a.com/p
+http://[::1]/
+A:s
+B:s
+tagA:t
+tagB:t
+10
+X!
+(y)
+(g)
+x=3 reads=1
+y=7 reads=1
+z9 reads=1

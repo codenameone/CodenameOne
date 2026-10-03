@@ -136,6 +136,26 @@ public final class Ast {
         public List<FunctionDecl> functions = new ArrayList<FunctionDecl>();
         public List<FieldDecl> topLevelVars = new ArrayList<FieldDecl>();
         public List<TypedefDecl> typedefs = new ArrayList<TypedefDecl>();
+        /** Every import with its show/hide combinators, in source order. */
+        public List<Directive> importDirectives = new ArrayList<Directive>();
+        /** Every export with its show/hide combinators, in source order. */
+        public List<Directive> exportDirectives = new ArrayList<Directive>();
+    }
+
+    /** An import or export: its (raw) uri and the names its combinators show or hide. */
+    public static class Directive extends Node {
+        public String uri;
+        /** Names a `show` lists; null when there is no show combinator. */
+        public List<String> show;
+        public List<String> hide = new ArrayList<String>();
+
+        /** Whether a declaration named {@code name} passes this directive's combinators. */
+        public boolean admits(String name) {
+            if (show != null && !show.contains(name)) {
+                return false;
+            }
+            return !hide.contains(name);
+        }
     }
 
     public static class ClassDecl extends Node {
@@ -147,6 +167,8 @@ public final class Ast {
         public boolean isSealed;                  // Dart 3: sealed class C { }
         public boolean isMixin;                   // mixin M { }
         public TypeRef extensionOn;               // extension X on T { } — non-null marks an extension
+        /** An `extension on T` with no name: no show combinator can import it, no hide drop it. */
+        public boolean unnamedExtension;
         public List<TypeRef> mixins = new ArrayList<TypeRef>();  // class C with M1, M2
         public TypeRef superclass;                // null if none/Object
         public List<TypeRef> interfaces = new ArrayList<TypeRef>();

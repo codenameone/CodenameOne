@@ -300,19 +300,70 @@ public final class Program {
         return sb.toString();
     }
 
-    /** Finds an extension member for the given receiver type name. */
-    public Ast.ClassDecl findExtension(String typeName, String member, boolean getter) {
+    /**
+     * Finds an extension member for the given receiver type name, as seen from library
+     * {@code from}: Dart applies only an extension that library declares or imports
+     * (directly, or through an export, and not removed by show/hide). Two libraries that each
+     * declare an extension on String with the same member then each get their own; the first
+     * registered answered for both. When none is visible -- an import this cannot resolve,
+     * such as a package: uri -- the first match answers, as before.
+     */
+    public Ast.ClassDecl findExtension(String typeName, String member, boolean getter, Ast.Library from) {
+        Ast.ClassDecl first = null;
         for (Ast.ClassDecl ext : extensions) {
             if (!ext.extensionOn.name.equals(typeName)) {
                 continue;
             }
             for (Ast.MethodDecl m : ext.methods) {
                 if (m.name.equals(member) && m.isGetter == getter && !m.isSetter) {
-                    return ext;
+                    if (from == null || extensionVisible(ext, from)) {
+                        return ext;
+                    }
+                    if (first == null) {
+                        first = ext;
+                    }
+                    break;
                 }
             }
         }
-        return null;
+        return first;
+    }
+
+    /** Whether {@code from} declares {@code ext} or imports it. */
+    public boolean extensionVisible(Ast.ClassDecl ext, Ast.Library from) {
+        if (ext.ownerLibrary == from) {
+            return true;
+        }
+        for (Ast.Directive d : from.importDirectives) {
+            if (exportsExtension(resolveImportedLibrary(from, d.uri), d, ext, new HashSet<Ast.Library>())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether {@code lib}, reached through directive {@code via}, provides {@code ext}: it
+     * declares it, or re-exports a library that does, every directive on the way admitting
+     * the extension's name.
+     */
+    private boolean exportsExtension(Ast.Library lib, Ast.Directive via, Ast.ClassDecl ext,
+                                     Set<Ast.Library> seen) {
+        if (lib == null || (ext.unnamedExtension ? via.show != null : !via.admits(ext.name))) {
+            return false;
+        }
+        if (!seen.add(lib)) {
+            return false;
+        }
+        if (ext.ownerLibrary == lib) {
+            return true;
+        }
+        for (Ast.Directive d : lib.exportDirectives) {
+            if (exportsExtension(resolveImportedLibrary(lib, d.uri), d, ext, seen)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

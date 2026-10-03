@@ -1984,10 +1984,13 @@ public final class JavaEmitter {
             VarDeclStmt v = (VarDeclStmt) s;
             TypeRef declared = v.type;
             Out init = null;
+            TypeRef asyncFn = (declared == null || declared.is("var")) && v.initializer instanceof Lambda
+                    ? asyncClosureType((Lambda) v.initializer, v.name, ctx) : null;
             if (v.initializer != null) {
-                init = emitExpr(v.initializer, declared != null && !declared.is("var") ? declared : null, ctx);
+                init = emitExpr(v.initializer, asyncFn != null ? asyncFn
+                        : declared != null && !declared.is("var") ? declared : null, ctx);
             }
-            TypeRef t = declared == null || declared.is("var")
+            TypeRef t = asyncFn != null ? asyncFn : declared == null || declared.is("var")
                     ? (init != null ? init.type : TypeRef.DYNAMIC) : declared;
             // untyped closure locals get a SAM type by arity. A declared signature
             // (`int Function() f = ...`) has its own SAM type below; it was forced to
@@ -2109,13 +2112,8 @@ public final class JavaEmitter {
                     w.line("return Future.value(null);");
                 } else {
                     Out o = emitExpr(r.value, inner, ctx);
-                    String code = o.code;
                     // await already unwraps; returning a Future directly passes through
-                    if (o.type.is("Future")) {
-                        w.line("return " + code + ";");
-                    } else {
-                        w.line("return Future.value(" + boxIfPrimitive(o, ctx) + ");");
-                    }
+                    w.line("return " + asyncReturnValue(o, inner, ctx) + ";");
                 }
                 return;
             }
@@ -2429,7 +2427,7 @@ public final class JavaEmitter {
         w.line(javaType(subj.type, true, ctx) + " " + temp + " = " + subj.code + ";");
         ctx.declare(temp, subj.type);
         List<String> binds = new ArrayList<String>();
-        String cond = patternMatch(i.casePattern, temp, subj.type, ctx, binds);
+        String cond = patternTest(i.casePattern, temp, subj.type, ctx, binds);
         boolean guarded = i.caseGuard != null;
         // Emit a structural if/else so javac's definite-return analysis holds. A guard that fails must
         // route to the else-branch, which requires emitting the else in two spots (pattern miss and
@@ -2496,22 +2494,37 @@ public final class JavaEmitter {
         boolean hasContentCase = false;
         // an empty non-default case falls through to the next case's body (Dart's only fallthrough)
         List<String> pending = new ArrayList<String>();
+        List<SwitchCase> pendingCases = new ArrayList<SwitchCase>();
         for (SwitchCase c : sw.cases) {
             if (c.isDefault) {
                 defaultCase = c;
                 continue;
             }
-            ctx.pushScope();
-            List<String> binds = new ArrayList<String>();
-            String cond = patternMatch(c.pattern, s, subj.type, ctx, binds);
-            if (c.body.isEmpty() && c.guard == null) {
-                if (!binds.isEmpty()) {
-                    diags.error(c, "E0436", "An empty fall-through case cannot bind variables");
-                }
-                pending.add(cond);
-                ctx.popScope();
+            if (c.body.isEmpty()) {
+                pendingCases.add(c);
                 continue;
             }
+            if (needsMatchFlag(pendingCases, c)) {
+                // Each case keeps its own guard: `case 1: case 2 when g:` shares a body, and
+                // g decides case 2 alone. Folding the patterns into one condition put g on
+                // case 1 too, and an empty guarded case got a body of its own (a break).
+                hasContentCase = true;
+                if (emitSharedBodyCases(pendingCases, c, s, subj.type, label, ctx)) {
+                    anyFallThrough = true;
+                }
+                pendingCases.clear();
+                continue;
+            }
+            for (SwitchCase pc : pendingCases) {
+                ctx.pushScope();
+                List<String> pb = new ArrayList<String>();
+                pending.add(patternTest(pc.pattern, s, subj.type, ctx, pb));
+                ctx.popScope();
+            }
+            pendingCases.clear();
+            ctx.pushScope();
+            List<String> binds = new ArrayList<String>();
+            String cond = patternTest(c.pattern, s, subj.type, ctx, binds);
             String full = cond;
             if (!pending.isEmpty()) {
                 StringBuilder sb = new StringBuilder("(");
@@ -2571,6 +2584,138 @@ public final class JavaEmitter {
             w.line("throw DartRuntime.asError(\"No matching switch case\");");
         }
         ctx.popScope();
+    }
+
+    /**
+     * Whether a body shared by {@code pending} empty cases and {@code last} needs a match
+     * flag: when any of them has a guard or binds, a single folded condition would apply
+     * one case's guard (or bindings) to the others.
+     */
+    private boolean needsMatchFlag(List<SwitchCase> pending, SwitchCase last) {
+        if (pending.isEmpty()) {
+            return false;
+        }
+        if (last.guard != null || patternBinds(last.pattern)) {
+            return true;
+        }
+        for (SwitchCase pc : pending) {
+            if (pc.guard != null || patternBinds(pc.pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** True when a pattern declares a variable anywhere inside it. */
+    private boolean patternBinds(Pattern p) {
+        if (p instanceof VariablePattern) {
+            return !((VariablePattern) p).wildcard;
+        }
+        if (p instanceof CastPattern) {
+            return patternBinds(((CastPattern) p).inner);
+        }
+        if (p instanceof ObjectPattern) {
+            for (PatternField f : ((ObjectPattern) p).fields) {
+                if (patternBinds(f.pattern)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (p instanceof AndPattern) {
+            for (Pattern part : ((AndPattern) p).parts) {
+                if (patternBinds(part)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (p instanceof OrPattern) {
+            for (Pattern part : ((OrPattern) p).alternatives) {
+                if (patternBinds(part)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (p instanceof ListPattern) {
+            for (Pattern part : ((ListPattern) p).elements) {
+                if (patternBinds(part)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (p instanceof RecordPattern) {
+            for (PatternField f : ((RecordPattern) p).fields) {
+                if (patternBinds(f.pattern)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Emits cases that share one body, each tested with its own pattern, bindings and guard
+     * into a match flag, then the body once under the flag. A case's variables are visible to
+     * its own guard only: Dart lets the shared body use none of them unless every case binds
+     * it, which is not supported here. Returns whether control can leave the switch normally.
+     */
+    private boolean emitSharedBodyCases(List<SwitchCase> pending, SwitchCase last, String s,
+                                        TypeRef subjType, String label, Ctx ctx) {
+        Ctx.Writer w = ctx.writer();
+        String m = ctx.newTemp();
+        w.line("boolean " + m + " = false;");
+        List<SwitchCase> all = new ArrayList<SwitchCase>(pending);
+        all.add(last);
+        boolean lastBinds = patternBinds(last.pattern);
+        for (int i = 0; i < all.size(); i++) {
+            SwitchCase c = all.get(i);
+            if (lastBinds && c != last && patternBinds(c.pattern)) {
+                diags.error(c, "E0436", "Variables shared by fall-through cases are not supported");
+            }
+            ctx.pushScope();
+            List<String> binds = new ArrayList<String>();
+            String cond = patternTest(c.pattern, s, subjType, ctx, binds);
+            String test = "true".equals(cond) ? ""
+                    : cond.indexOf("||") >= 0 || cond.indexOf('?') >= 0 ? "(" + cond + ")" : cond;
+            if (i > 0) {
+                test = test.isEmpty() ? "!" + m : "!" + m + " && " + test;
+            } else if (test.isEmpty()) {
+                test = "true";
+            }
+            w.line("if (" + test + ") {");
+            ctx.indent(1);
+            for (String b : binds) {
+                w.line(b);
+            }
+            if (c.guard != null) {
+                Out g = emitExpr(c.guard, TypeRef.BOOL, ctx);
+                w.line(m + " = " + g.code + ";");
+            } else {
+                w.line(m + " = true;");
+            }
+            ctx.indent(-1);
+            w.line("}");
+            ctx.popScope();
+        }
+        w.line("if (" + m + ") {");
+        ctx.indent(1);
+        ctx.pushScope();
+        for (Stmt bs : last.body) {
+            emitStatement(bs, ctx);
+        }
+        boolean leaves = false;
+        if (!endsWithTerminator(last.body)) {
+            w.line("break " + label + ";");
+            leaves = true;
+        }
+        ctx.popScope();
+        ctx.indent(-1);
+        w.line("}");
+        return leaves;
     }
 
     /** True when a statement list definitely transfers control (so a trailing break is unreachable). */
@@ -2711,7 +2856,7 @@ public final class JavaEmitter {
             }
             ctx.pushScope();
             List<String> binds = new ArrayList<String>();
-            String cond = patternMatch(c.pattern, s, subj.type, ctx, binds);
+            String cond = patternTest(c.pattern, s, subj.type, ctx, binds);
             w.line("if (" + cond + ") {");
             ctx.indent(1);
             for (String b : binds) {
@@ -2867,6 +3012,26 @@ public final class JavaEmitter {
      * scrutinee) into {@code binds}, and returns the boolean match condition. Bound variables are
      * declared into the current scope so the case body and guard can reference them.
      */
+    /**
+     * {@link #patternMatch} for a caller that evaluates the returned condition before running
+     * the bindings (a switch case or an if-case), which lets a value read once in the test be
+     * reused by the bindings. A destructuring for-in discards the condition, so it calls
+     * patternMatch directly.
+     */
+    private String patternTest(Pattern p, String subj, TypeRef subjType, Ctx ctx, List<String> binds) {
+        boolean saved = patternCondRuns;
+        patternCondRuns = true;
+        try {
+            return patternMatch(p, subj, subjType, ctx, binds);
+        } finally {
+            patternCondRuns = saved;
+        }
+    }
+
+    /** True while the condition patternMatch returns is evaluated before its bindings run. */
+    private boolean patternCondRuns;
+    private int patternSubjectTokens;
+
     private String patternMatch(Pattern p, String subj, TypeRef subjType, Ctx ctx, List<String> binds) {
         if (p instanceof VariablePattern) {
             VariablePattern v = (VariablePattern) p;
@@ -2925,7 +3090,7 @@ public final class JavaEmitter {
             for (PatternField f : o.fields) {
                 String access = cast + "." + fieldAccess(o.type, f.name) + "()";
                 TypeRef ft = fieldTypeOf(o.type, f.name);
-                cond = joinAnd(cond, patternMatch(f.pattern, access, ft, ctx, binds));
+                cond = joinAnd(cond, fieldPatternMatch(f.pattern, access, ft, ctx, binds));
             }
             return cond;
         }
@@ -2995,6 +3160,60 @@ public final class JavaEmitter {
         }
         diags.error(p, "E0434", "Unsupported pattern in emitter");
         return "false";
+    }
+
+    /**
+     * Matches an object pattern's field subpattern against {@code access}, a getter call.
+     * Dart reads the getter once per match, but a subpattern that both tests and binds
+     * (`Box(value: int x)`) names its subject twice, so the getter ran twice. When it does,
+     * the value goes into a temp: assigned where the condition first reads it, or by a
+     * leading binding when the condition does not read it (or is never evaluated).
+     */
+    private String fieldPatternMatch(Pattern p, String access, TypeRef ft, Ctx ctx, List<String> binds) {
+        String token = "$pfield" + (patternSubjectTokens++) + "$";
+        int bindStart = binds.size();
+        String cond = patternMatch(p, token, ft, ctx, binds);
+        int inCond = countOccurrences(cond, token);
+        int total = inCond;
+        for (int i = bindStart; i < binds.size(); i++) {
+            total += countOccurrences(binds.get(i), token);
+        }
+        String value = access;
+        if (total > 1) {
+            String t = ctx.newTemp();
+            String tj = javaType(ft, true, ctx);
+            int first = cond.indexOf(token);
+            String before = first >= 0 ? cond.substring(0, first) : "";
+            boolean condFirst = patternCondRuns && first >= 0 && before.indexOf("&&") < 0
+                    && before.indexOf("||") < 0 && before.indexOf('?') < 0;
+            if (condFirst) {
+                // The first read sits where the condition always evaluates it, ahead of
+                // every other read and of the bindings.
+                ctx.writer().line(tj + " " + t + " = null;");
+                cond = cond.substring(0, first) + "(" + t + " = " + access + ")"
+                        + cond.substring(first + token.length());
+                value = t;
+            } else if (inCond == 0 || !patternCondRuns) {
+                binds.add(bindStart, tj + " " + t + " = " + access + ";");
+                bindStart++;
+                value = t;
+            }
+        }
+        cond = cond.replace(token, value);
+        for (int i = bindStart; i < binds.size(); i++) {
+            binds.set(i, binds.get(i).replace(token, value));
+        }
+        return cond;
+    }
+
+    private static int countOccurrences(String s, String token) {
+        int n = 0;
+        int at = s.indexOf(token);
+        while (at >= 0) {
+            n++;
+            at = s.indexOf(token, at + token.length());
+        }
+        return n;
     }
 
     private static String joinAnd(String a, String b) {
@@ -4687,7 +4906,7 @@ public final class JavaEmitter {
         if ((tt.is("State") || tt.is("BuildContext")) && name.equals("mounted")) {
             return new Out(target.code + ".mounted()", TypeRef.BOOL);
         }
-        ClassDecl extCls = program.findExtension(tt.name, name, true);
+        ClassDecl extCls = program.findExtension(tt.name, name, true, ctx.library());
         if (extCls != null) {
             MethodDecl eg = extCls.getter(name);
             return new Out(extCls.name + "." + name + "(" + target.code + ")",
@@ -6358,9 +6577,11 @@ public final class JavaEmitter {
                     expected.funcReturn != null ? expected.funcReturn : TypeRef.DYNAMIC;
         }
         boolean outerAsync = ctx.inAsyncBody;
+        boolean outerAsyncLambda = ctx.asyncLambda;
         TypeRef outerReturn = ctx.methodReturnType;
         boolean outerNarrowInt = ctx.narrowReturnToInt;
         ctx.inAsyncBody = false;
+        ctx.asyncLambda = false;
         // Thread the lambda's SAM return type so `return`/switch-expression arms inside the body
         // resolve against it (e.g. an onGenerateRoute builder whose switch arms are Route values).
         TypeRef lambdaReturn = null;
@@ -6369,6 +6590,20 @@ public final class JavaEmitter {
             if (r != null && !r.is("void") && !r.is("dynamic")) {
                 lambdaReturn = r;
             }
+        }
+        // An async closure whose caller takes its Future is emitted as an async method is:
+        // it returns a Future, and what its body throws completes that Future with the
+        // error instead of escaping the call. One passed as a void callback keeps the plain
+        // body -- nobody can observe the Future, and a try per callback is not free natively.
+        boolean asyncValue = l.isAsync && lambdaReturn != null
+                && (lambdaReturn.is("Future") || lambdaReturn.is("FutureOr"));
+        if (asyncValue) {
+            TypeRef fut = new TypeRef("Future");
+            fut.args.add(lambdaReturn.args.isEmpty() ? TypeRef.DYNAMIC : lambdaReturn.arg(0));
+            lambdaReturn = fut;
+            ctx.inAsyncBody = true;
+            ctx.asyncLambda = true;
+            ctx.importClass("dart.async.Future");
         }
         ctx.methodReturnType = lambdaReturn;
         ctx.narrowReturnToInt = false;
@@ -6394,7 +6629,10 @@ public final class JavaEmitter {
         List<TypeRef> outerReturns = ctx.lambdaReturns;
         List<TypeRef> returns = new ArrayList<TypeRef>();
         TypeRef exprType = null;
-        if (l.body != null) {
+        if (asyncValue) {
+            code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
+                    + indentStr(ctx.currentIndent()) + "}";
+        } else if (l.body != null) {
             Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + 1);
             ctx.lambdaReturns = returns;
             emitStatements(l.body, ctx);
@@ -6437,12 +6675,89 @@ public final class JavaEmitter {
         ctx.breakTargets.clear();
         ctx.breakTargets.addAll(savedBreaks);
         ctx.inAsyncBody = outerAsync;
+        ctx.asyncLambda = outerAsyncLambda;
         ctx.methodReturnType = outerReturn;
         ctx.narrowReturnToInt = outerNarrowInt;
         // Last, so a lambda nested in this one cannot overwrite what this one yields.
         lastLambdaExprType = exprType;
         lastLambdaReturns = returns;
         return new Out(code, new TypeRef("Function"));
+    }
+
+    /**
+     * The function type of an untyped async closure local, decided before its body is
+     * emitted because it decides how the body is emitted: Future of dynamic when the local
+     * is called for its value (`final r = f();`, `await f()`), so the body runs as an async
+     * method does; void when every call discards the result, which keeps the closure
+     * passable as a void callback. Null for a zero-arg closure nobody takes a value from,
+     * which keeps its VoidFunc0 form, and for anything that is not an async closure.
+     */
+    private TypeRef asyncClosureType(Lambda l, String name, Ctx ctx) {
+        if (!l.isAsync) {
+            return null;
+        }
+        boolean valued = ctx.valueCalledLocals.contains(name);
+        if (!valued && l.params.isEmpty()) {
+            return null;
+        }
+        TypeRef fn = new TypeRef("Function");
+        fn.funcParams = new ArrayList<TypeRef>();
+        for (Param p : l.params) {
+            fn.funcParams.add(p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type);
+        }
+        if (valued) {
+            TypeRef fut = new TypeRef("Future");
+            fut.args.add(TypeRef.DYNAMIC);
+            fn.funcReturn = fut;
+        } else {
+            fn.funcReturn = TypeRef.VOID;
+        }
+        return fn;
+    }
+
+    /**
+     * The body of an async closure whose Future is used, bracketed as an async method's is
+     * so a throw becomes the Future's error. Returns the body text at one indent past the
+     * current one.
+     */
+    private String emitAsyncLambdaBody(Lambda l, TypeRef futureType, Ctx ctx) {
+        ctx.pushWriter(ctx.currentIndent() + 1);
+        Ctx.Writer w = ctx.writer();
+        String err = ctx.newTemp();
+        w.line("try {");
+        ctx.indent(1);
+        if (l.body != null) {
+            emitStatements(l.body, ctx);
+            if (!endsWithJump(l.body)) {
+                w.line("return Future.value(null);");
+            }
+        } else {
+            TypeRef inner = futureType.arg(0);
+            Out o = emitExpr(l.exprBody, isDynamicType(inner) ? null : inner, ctx);
+            w.line("return " + asyncReturnValue(o, inner, ctx) + ";");
+        }
+        ctx.indent(-1);
+        w.line("} catch (RuntimeException " + err + ") {");
+        ctx.indent(1);
+        w.line("return Future.error(" + err + ");");
+        ctx.indent(-1);
+        w.line("}");
+        return ctx.popWriter();
+    }
+
+    /**
+     * What an async body returns for {@code o}: a Future passes through, any other value is
+     * wrapped. In an async closure typed Future of dynamic, a Future of a narrower type is
+     * cast raw, as Java generics are invariant.
+     */
+    private String asyncReturnValue(Out o, TypeRef inner, Ctx ctx) {
+        if (o.type != null && o.type.is("Future")) {
+            if (ctx.asyncLambda && isDynamicType(inner)) {
+                return "(Future) (" + o.code + ")";
+            }
+            return o.code;
+        }
+        return "Future.value(" + boxIfPrimitive(o, ctx) + ")";
     }
 
     /**
@@ -6666,7 +6981,7 @@ public final class JavaEmitter {
             if (sm != null) {
                 return new Out("$self." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
             }
-            ClassDecl extCls = program.findExtension(ctx.extensionSelfType.name, n, false);
+            ClassDecl extCls = program.findExtension(ctx.extensionSelfType.name, n, false, ctx.library());
             if (extCls != null) {
                 MethodDecl em = extCls.method(n);
                 return new Out(extCls.name + "." + n + "($self"
@@ -7030,7 +7345,7 @@ public final class JavaEmitter {
             return new Out(target.code + "." + n + "(" + plainArgs(c.args, ctx) + ")", TypeRef.VOID);
         }
         // extension methods
-        ClassDecl extCls = program.findExtension(tt.name, n, false);
+        ClassDecl extCls = program.findExtension(tt.name, n, false, ctx.library());
         if (extCls != null) {
             MethodDecl em = extCls.method(n);
             String rest = methodArgs(em.params, c.args, ctx);
@@ -10102,6 +10417,8 @@ public final class JavaEmitter {
         TypeRef methodReturnType;
         TypeRef extensionSelfType;
         boolean inAsyncBody;
+        /** Inside an async closure's body, whose Future may be typed Future of dynamic. */
+        boolean asyncLambda;
         /**
          * The temp an enclosing {@code a?.m()} has already tested for null while it
          * emits the call on it, so {@code a?.call()} does not test the same temp again.

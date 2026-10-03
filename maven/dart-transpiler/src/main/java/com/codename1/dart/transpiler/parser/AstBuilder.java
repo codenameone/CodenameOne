@@ -109,6 +109,27 @@ public final class AstBuilder {
     // Declarations
     // ------------------------------------------------------------------
 
+    private static Ast.Directive directive(String uri, List<Dart2Parser.CombinatorContext> combinators) {
+        Ast.Directive d = new Ast.Directive();
+        d.uri = uri;
+        for (Dart2Parser.CombinatorContext c : combinators) {
+            List<String> names = new ArrayList<String>();
+            for (Dart2Parser.IdentifierContext id : c.identifierList().identifier()) {
+                names.add(id.getText());
+            }
+            if (c.SHOW_() != null) {
+                if (d.show == null) {
+                    d.show = names;
+                } else {
+                    d.show.retainAll(names);
+                }
+            } else {
+                d.hide.addAll(names);
+            }
+        }
+        return d;
+    }
+
     private void buildLibrary(Dart2Parser.LibraryDeclarationContext ctx, Library lib) {
         for (Dart2Parser.ImportOrExportContext ie : ctx.importOrExport()) {
             if (ie.libraryImport() != null) {
@@ -121,6 +142,10 @@ public final class AstBuilder {
                     lib.importPrefixes.add(spec.identifier().getText());
                     lib.prefixImports.put(spec.identifier().getText(), stripQuotes(uri));
                 }
+                lib.importDirectives.add(directive(stripQuotes(uri), spec.combinator()));
+            } else if (ie.libraryExport() != null) {
+                Dart2Parser.LibraryExportContext ex = ie.libraryExport();
+                lib.exportDirectives.add(directive(stripQuotes(ex.configurableUri().getText()), ex.combinator()));
             }
         }
         List<Dart2Parser.TopLevelDeclarationContext> decls = ctx.topLevelDeclaration();
@@ -143,8 +168,13 @@ public final class AstBuilder {
             Dart2Parser.ExtensionDeclarationContext ext = ctx.extensionDeclaration();
             ClassDecl cd = new ClassDecl();
             pos(cd, ext);
-            cd.name = ext.identifier() != null ? ext.identifier().getText()
-                    : "Ext$" + Integer.toHexString(ext.getStart().getStartIndex());
+            // An unnamed extension's Java class carries its library: two libraries with an
+            // unnamed extension at the same offset produced one class name, and one lost.
+            cd.unnamedExtension = ext.identifier() == null;
+            cd.name = !cd.unnamedExtension ? ext.identifier().getText()
+                    : "Ext$" + (lib.fileName == null ? ""
+                    : com.codename1.dart.transpiler.analyze.Program.libClassName(lib.fileName) + "$")
+                    + Integer.toHexString(ext.getStart().getStartIndex());
             cd.javaName = javaName;
             cd.extensionOn = buildType(ext.type());
             java.util.List<Dart2Parser.ClassMemberDeclarationContext> members = ext.classMemberDeclaration();
