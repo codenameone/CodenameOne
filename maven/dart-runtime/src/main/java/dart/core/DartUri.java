@@ -329,7 +329,7 @@ public final class DartUri {
             if (literal) {
                 host = bracketHost(authority.substring(1, close));
                 if (pc >= 0) {
-                    explicitPort = true;
+                    explicitPort = pc + 1 < authority.length();
                     try {
                         port = Long.parseLong(authority.substring(pc + 1));
                     } catch (NumberFormatException ignored) {
@@ -337,7 +337,8 @@ public final class DartUri {
                     }
                 }
             } else if (pc >= 0) {
-                explicitPort = true;
+                // http://a.com: names no port; Dart answers the default for it.
+                explicitPort = pc + 1 < authority.length();
                 host = authority.substring(0, pc);
                 try {
                     port = Long.parseLong(authority.substring(pc + 1));
@@ -626,16 +627,7 @@ public final class DartUri {
     /// https://example.com/path sent code that splits a URL into host and port
     /// to port 0 unless every URL spelled out :443.
     public long port() {
-        if (explicitPort) {
-            return port;
-        }
-        if ("http".equals(scheme)) {
-            return 80;
-        }
-        if ("https".equals(scheme)) {
-            return 443;
-        }
-        return 0;
+        return explicitPort ? port : defaultPort(scheme);
     }
 
     /** Dart's {@code Uri.path}. */
@@ -756,11 +748,15 @@ public final class DartUri {
         }
         char[] out = null;
         int rest = 0;
+        String scheme = "";
         int colon = t.indexOf(':');
         if (colon > 0 && colon < end && isScheme(t.substring(0, colon))) {
             out = foldRange(t, out, 0, colon);
             rest = colon + 1;
+            scheme = asciiLower(t.substring(0, colon));
         }
+        int portColon = -1;
+        int portEnd = -1;
         if (t.startsWith("//", rest)) {
             int authStart = rest + 2;
             int authEnd = end;
@@ -776,15 +772,65 @@ public final class DartUri {
             if (hostStart < authEnd && t.charAt(hostStart) == '[') {
                 int close = t.indexOf(']', hostStart);
                 hostEnd = close >= 0 && close < authEnd ? close : authEnd;
+                if (close >= 0 && close + 1 < authEnd && t.charAt(close + 1) == ':') {
+                    portColon = close + 1;
+                }
             } else {
                 int pc = t.indexOf(':', hostStart);
                 if (pc >= 0 && pc < authEnd) {
                     hostEnd = pc;
+                    portColon = pc;
                 }
             }
+            portEnd = authEnd;
             out = foldRange(t, out, hostStart, hostEnd);
         }
-        return out == null ? t : new String(out);
+        String folded = out == null ? t : new String(out);
+        if (portColon < 0) {
+            return folded;
+        }
+        // Dart drops the scheme's default port and an empty one, and prints the
+        // rest in decimal: http://a.com:80/x is http://a.com/x, so the two are
+        // equal and hash alike.
+        String digits = folded.substring(portColon + 1, portEnd);
+        String port = canonicalPort(digits, scheme);
+        if (port.length() > 0 && port.equals(digits)) {
+            return folded;
+        }
+        return folded.substring(0, portColon) + (port.length() == 0 ? "" : ":" + port)
+                + folded.substring(portEnd);
+    }
+
+    /// Dart's default port: 80 for http, 443 for https and 0 for every other
+    /// scheme (ws and wss included).
+    private static long defaultPort(String scheme) {
+        if ("http".equals(scheme)) {
+            return 80;
+        }
+        if ("https".equals(scheme)) {
+            return 443;
+        }
+        return 0;
+    }
+
+    /// The port text Dart prints: empty for the scheme's default, otherwise the
+    /// value in decimal. Text that is not a plain number is left as written.
+    private static String canonicalPort(String digits, String scheme) {
+        if (digits.length() == 0) {
+            return digits;
+        }
+        if (digits.length() > 18) {
+            return digits;
+        }
+        long v = 0;
+        for (int i = 0; i < digits.length(); i++) {
+            char c = digits.charAt(i);
+            if (c < '0' || c > '9') {
+                return digits;
+            }
+            v = v * 10 + (c - '0');
+        }
+        return v == defaultPort(scheme) ? "" : String.valueOf(v);
     }
 
     private static char[] foldRange(String t, char[] out, int from, int to) {

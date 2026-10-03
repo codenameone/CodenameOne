@@ -27,6 +27,7 @@ import dart.math.DartMath;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -228,6 +229,34 @@ public class DartCoreSemanticsTest {
         assertEquals(80, DartUri.parse("http://example.com/").port());
         assertEquals(8443, DartUri.parse("https://example.com:8443/").port(), "explicit wins");
         assertEquals(0, DartUri.parse("ftp://example.com/").port());
+    }
+
+    @Test
+    public void aDefaultPortIsDroppedAsDartDrops() {
+        // Expected values are what Dart 3.9's Uri.parse prints.
+        assertEquals("http://a.com/x", DartUri.parse("http://a.com:80/x").toString());
+        assertEquals("https://a.com", DartUri.parse("https://a.com:443").toString());
+        assertEquals("https://u@a.com/p?q#f", DartUri.parse("https://u@a.com:443/p?q#f").toString());
+        assertEquals("http://a.com", DartUri.parse("HTTP://A.com:80").toString());
+        assertEquals("http://a.com", DartUri.parse("http://a.com:080").toString());
+        assertEquals("http://a.com:81", DartUri.parse("http://a.com:081").toString());
+        assertEquals("http://a.com/p", DartUri.parse("http://a.com:/p").toString());
+        assertEquals("http://[::1]/", DartUri.parse("http://[::1]:80/").toString());
+        assertEquals("foo://a.com", DartUri.parse("foo://a.com:0").toString(), "0 is every other scheme's default");
+        // Only http and https have a non-zero default; ws keeps its 80, and so does
+        // a URI with no scheme at all.
+        assertEquals("https://a.com:80", DartUri.parse("https://a.com:80").toString());
+        assertEquals("ws://a.com:80/x", DartUri.parse("ws://a.com:80/x").toString());
+        assertEquals("//a.com:80/x", DartUri.parse("//a.com:80/x").toString());
+        // An empty path is not given a slash.
+        assertEquals("http://a.com", DartUri.parse("http://a.com").toString());
+        assertNotEquals(DartUri.parse("http://a.com/"), DartUri.parse("http://a.com"));
+        DartUri explicit = DartUri.parse("http://a.com:80/x");
+        DartUri implied = DartUri.parse("http://a.com/x");
+        assertEquals(explicit, implied);
+        assertEquals(explicit.hashCode(), implied.hashCode());
+        assertEquals(80, DartUri.parse("http://a.com:").port(), "an empty port is no port");
+        assertEquals(81, DartUri.parse("http://a.com:081").port());
     }
 
     @Test
