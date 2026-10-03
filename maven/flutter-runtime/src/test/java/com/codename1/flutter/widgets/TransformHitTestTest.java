@@ -96,33 +96,40 @@ class TransformHitTestTest {
         return taps - before;
     }
 
-    private static int contentY(Form f) {
-        return f.getContentPane().getAbsoluteY();
+    /// The laid-out top-left of the transformed box on screen. Taken from the pane, not
+    /// assumed: the form's padding depends on whatever theme the JVM has installed.
+    private static int[] origin(Form f) {
+        Container root = (Container) f.getContentPane().getComponentAt(0);
+        com.codename1.ui.Component pane = root.getComponentAt(0);
+        return new int[] {pane.getAbsoluteX(), pane.getAbsoluteY()};
     }
 
     @Test
     void aTranslatedChildIsHitWhereItIsDrawn() {
         Form f = show(tappable(Transform.translate(null, new Offset(100, 0), null, null, null)));
-        int y = contentY(f) + 20;
-        assertEquals(1, tapsAt(f, 120, y), "the drawn position takes the tap");
-        assertEquals(0, tapsAt(f, 20, y), "the untransformed position is empty");
+        int[] o = origin(f);
+        int y = o[1] + 20;
+        assertEquals(1, tapsAt(f, o[0] + 120, y), "the drawn position takes the tap");
+        assertEquals(0, tapsAt(f, o[0] + 20, y), "the untransformed position is empty");
     }
 
     @Test
     void transformHitTestsFalseKeepsTheLayoutPosition() {
         Form f = show(tappable(Transform.translate(null, new Offset(100, 0), Boolean.FALSE, null, null)));
-        int y = contentY(f) + 20;
-        assertEquals(0, tapsAt(f, 120, y));
-        assertEquals(1, tapsAt(f, 20, y));
+        int[] o = origin(f);
+        int y = o[1] + 20;
+        assertEquals(0, tapsAt(f, o[0] + 120, y));
+        assertEquals(1, tapsAt(f, o[0] + 20, y));
     }
 
     /// Scaled 2x about its centre (25, 25): the box covers -25..75 on screen.
     @Test
     void aScaledChildIsHitAcrossItsScaledBounds() {
         Form f = show(tappable(Transform.scale(null, 2.0, null, null, null, null, null, null, null)));
-        int y = contentY(f) + 25;
-        assertEquals(1, tapsAt(f, 70, y), "inside the scaled box, outside the layout box");
-        assertEquals(0, tapsAt(f, 80, y), "outside both");
+        int[] o = origin(f);
+        int y = o[1] + 25;
+        assertEquals(1, tapsAt(f, o[0] + 70, y), "inside the scaled box, outside the layout box");
+        assertEquals(0, tapsAt(f, o[0] + 80, y), "outside both");
     }
 
     /// A drag the subtree passes up to its ancestors -- how Codename One finds the
@@ -134,14 +141,15 @@ class TransformHitTestTest {
         Container root = (Container) f.getContentPane().getComponentAt(0);
         final java.util.List<Integer> seen = new java.util.ArrayList<Integer>();
         root.addPointerDraggedListener(e -> seen.add(e.getX()));
-        int y = contentY(f) + 20;
-        f.pointerPressed(120, y);
-        f.pointerDragged(130, y);
-        f.pointerDragged(140, y);
-        f.pointerReleased(140, y);
+        int[] o = origin(f);
+        int y = o[1] + 20;
+        f.pointerPressed(o[0] + 120, y);
+        f.pointerDragged(o[0] + 130, y);
+        f.pointerDragged(o[0] + 140, y);
+        f.pointerReleased(o[0] + 140, y);
         org.junit.jupiter.api.Assertions.assertFalse(seen.isEmpty(), "the drag reached the ancestor");
         for (int x : seen) {
-            org.junit.jupiter.api.Assertions.assertTrue(x >= 120, "screen pixels, got " + seen);
+            org.junit.jupiter.api.Assertions.assertTrue(x >= o[0] + 120, "screen pixels, got " + seen);
         }
     }
 
@@ -162,9 +170,9 @@ class TransformHitTestTest {
         a.alignment(Alignment.topLeft);
         a.child(t);
         Form f = show(a);
-        int top = contentY(f);
+        int[] o = origin(f);
         // Centre (25, 5); upright the bar spans x 20..30, y -20..30.
-        assertEquals(1, tapsAt(f, 25, top + 25), "inside the turned bar");
-        assertEquals(0, tapsAt(f, 45, top + 5), "inside the layout bar, outside the turned one");
+        assertEquals(1, tapsAt(f, o[0] + 25, o[1] + 25), "inside the turned bar");
+        assertEquals(0, tapsAt(f, o[0] + 45, o[1] + 5), "inside the layout bar, outside the turned one");
     }
 }
