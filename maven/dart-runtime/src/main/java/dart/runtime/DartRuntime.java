@@ -443,7 +443,8 @@ public final class DartRuntime {
 
     private static long checkShift(long count) {
         if (count < 0) {
-            throw new dart.core.ArgumentError("Invalid argument: negative shift count " + count);
+            // Dart's message is the count alone: "Invalid argument(s): -1".
+            throw new dart.core.ArgumentError(String.valueOf(count));
         }
         return count;
     }
@@ -525,7 +526,8 @@ public final class DartRuntime {
      */
     public static long clamp(long v, long lower, long upper) {
         if (lower > upper) {
-            throw new dart.core.ArgumentError("Invalid argument(s): " + upper + " < " + lower);
+            // Dart names the lower limit: "Invalid argument(s): 3" for 5.clamp(3, 1).
+            throw new dart.core.ArgumentError(String.valueOf(lower));
         }
         return v < lower ? lower : v > upper ? upper : v;
     }
@@ -533,7 +535,7 @@ public final class DartRuntime {
     /** Dart's {@code double.clamp}, ordered by num.compareTo (NaN compares greatest). */
     public static double clamp(double v, double lower, double upper) {
         if (Double.compare(lower, upper) > 0) {
-            throw new dart.core.ArgumentError("Invalid argument(s): " + doubleStr(upper) + " < " + doubleStr(lower));
+            throw new dart.core.ArgumentError(doubleStr(lower));
         }
         if (Double.compare(v, lower) < 0) {
             return lower;

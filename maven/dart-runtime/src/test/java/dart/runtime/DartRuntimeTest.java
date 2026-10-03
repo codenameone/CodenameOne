@@ -147,6 +147,15 @@ public class DartRuntimeTest {
         assertEquals(0, DartRuntime.ushr(-1, 64));
         assertEquals(8, DartRuntime.shl(1, 3));
         assertThrows(dart.core.ArgumentError.class, () -> DartRuntime.shl(1, -1));
+        // As Dart prints them.
+        assertEquals("Invalid argument(s): -1",
+                assertThrows(dart.core.ArgumentError.class, () -> DartRuntime.shl(1, -1)).toString());
+        assertEquals("Invalid argument(s): 3",
+                assertThrows(dart.core.ArgumentError.class, () -> DartRuntime.clamp(5L, 3L, 1L)).toString());
+        assertEquals("Invalid argument(s): 3.0",
+                assertThrows(dart.core.ArgumentError.class, () -> DartRuntime.clamp(5.5, 3.0, 1.0)).toString());
+        assertEquals("Invalid argument(s): m", new dart.core.ArgumentError("m").toString());
+        assertEquals("Invalid argument (x): bad: 3", dart.core.ArgumentError.value(3L, "x", "bad").toString());
     }
 
     @Test

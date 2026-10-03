@@ -61,7 +61,8 @@ public class ArgumentError extends RuntimeException {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("Invalid argument");
+        // Dart says "argument(s)" when no single value is to blame.
+        StringBuilder sb = new StringBuilder(hasValue ? "Invalid argument" : "Invalid argument(s)");
         if (name != null) {
             sb.append(" (").append(name).append(")");
         }
