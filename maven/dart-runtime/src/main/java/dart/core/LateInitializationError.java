@@ -32,8 +32,22 @@ public class LateInitializationError extends RuntimeException {
         super(message);
     }
 
+    /** Dart prints the message alone, which already names the error; not the Java class. */
+    @Override
+    public String toString() {
+        return getMessage();
+    }
+
     public static LateInitializationError notInitialized(String name) {
         return new LateInitializationError("LateInitializationError: Field '" + name + "' has not been initialized.");
+    }
+
+    public static LateInitializationError localNotInitialized(String name) {
+        return new LateInitializationError("LateInitializationError: Local '" + name + "' has not been initialized.");
+    }
+
+    public static LateInitializationError localAlreadyInitialized(String name) {
+        return new LateInitializationError("LateInitializationError: Local '" + name + "' has already been initialized.");
     }
 
     public static LateInitializationError alreadyInitialized(String name) {

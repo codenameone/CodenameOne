@@ -84,6 +84,39 @@ public final class Program {
     public final Map<String, List<Ast.ClassDecl>> classesByName =
             new LinkedHashMap<String, List<Ast.ClassDecl>>();
 
+    /** Every user enum keyed by simple name, keeping all declarations that share it (see classesByName). */
+    public final Map<String, List<Ast.EnumDecl>> enumsByName =
+            new LinkedHashMap<String, List<Ast.EnumDecl>>();
+
+    /**
+     * Resolves a user enum by simple name as {@link #resolveClass} resolves a class: the
+     * referencing library's own declaration, then one it imports, then the last registered.
+     */
+    public Ast.EnumDecl resolveEnum(String name, Ast.Library fromLibrary) {
+        List<Ast.EnumDecl> byName = enumsByName.get(name);
+        if (byName == null || byName.isEmpty()) {
+            return null;
+        }
+        if (byName.size() > 1 && fromLibrary != null) {
+            for (Ast.EnumDecl e : byName) {
+                if (e.ownerLibrary == fromLibrary) {
+                    return e;
+                }
+            }
+            for (String uri : fromLibrary.imports) {
+                Ast.Library target = resolveImportedLibrary(fromLibrary, uri);
+                if (target != null) {
+                    for (Ast.EnumDecl e : byName) {
+                        if (e.ownerLibrary == target) {
+                            return e;
+                        }
+                    }
+                }
+            }
+        }
+        return byName.get(byName.size() - 1);
+    }
+
     public void add(Ast.Library lib) {
         libraries.add(lib);
         importPrefixes.addAll(lib.importPrefixes);
@@ -102,7 +135,14 @@ public final class Program {
             }
         }
         for (Ast.EnumDecl e : lib.enums) {
+            e.ownerLibrary = lib;
             enums.put(e.name, e);
+            List<Ast.EnumDecl> byName = enumsByName.get(e.name);
+            if (byName == null) {
+                byName = new ArrayList<Ast.EnumDecl>();
+                enumsByName.put(e.name, byName);
+            }
+            byName.add(e);
         }
         for (Ast.FunctionDecl f : lib.functions) {
             // A top-level setter shares its name with the getter/field it backs; keep the

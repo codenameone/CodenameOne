@@ -119,6 +119,56 @@ public class CrossLibraryResolutionTest {
         assertTrue(out.contains("GalleryDemoCategory.material"), out);
     }
 
+    @Test
+    public void sameNamedEnumsInTwoLibrariesGetTheirOwnFiles() {
+        // Two libraries each declare a private `_Mode`. Both were emitted as _Mode.java, so
+        // the second overwrote the first and the first library's code read the wrong enum.
+        String first =
+                "enum _Mode { on, off }\n" +
+                "String firstName() => _Mode.off.name;\n" +
+                "int firstCount() => _Mode.values.length;\n" +
+                "bool firstIsOn(_Mode m) => m == _Mode.on;\n";
+        String second =
+                "enum _Mode { left, middle, right }\n" +
+                "String secondName() => _Mode.right.name;\n" +
+                "String secondSwitch(_Mode m) {\n" +
+                "  switch (m) {\n" +
+                "    case _Mode.left:\n      return 'L';\n" +
+                "    default:\n      return 'other';\n" +
+                "  }\n" +
+                "}\n";
+        TestSupport.Result r = TestSupport.transpile(new String[][] {
+                {"first.dart", first},
+                {"second.dart", second},
+        });
+        assertFalse(r.diags.hasErrors(), "diagnostics: " + r.diags.asList());
+        java.util.Set<String> paths = new java.util.HashSet<String>();
+        for (com.codename1.dart.transpiler.api.GeneratedFile f : r.files) {
+            assertTrue(paths.add(f.relativePath), "two files emitted as " + f.relativePath);
+        }
+        String firstEnum = exactly(r, "First_Mode");
+        String secondEnum = exactly(r, "Second_Mode");
+        assertTrue(firstEnum.contains("public enum First_Mode") && firstEnum.contains("on, off"), firstEnum);
+        assertTrue(secondEnum.contains("public enum Second_Mode") && secondEnum.contains("left, middle, right"),
+                secondEnum);
+        String firstLib = exactly(r, "FirstLib");
+        assertTrue(firstLib.contains("First_Mode.off") && firstLib.contains("First_Mode m")
+                && !firstLib.contains("Second_Mode"), firstLib);
+        String secondLib = exactly(r, "SecondLib");
+        assertTrue(secondLib.contains("Second_Mode.right") && secondLib.contains("Second_Mode m")
+                && !secondLib.contains("First_Mode"), secondLib);
+    }
+
+    private static String exactly(TestSupport.Result r, String simpleName) {
+        for (com.codename1.dart.transpiler.api.GeneratedFile f : r.files) {
+            String p = f.relativePath.replace('\\', '/');
+            if (p.equals(simpleName + ".java") || p.endsWith("/" + simpleName + ".java")) {
+                return f.content;
+            }
+        }
+        return "";
+    }
+
     private static String generated(TestSupport.Result r, String simpleName) {
         for (com.codename1.dart.transpiler.api.GeneratedFile f : r.files) {
             if (f.relativePath.endsWith(simpleName + ".java")) {

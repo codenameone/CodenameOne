@@ -91,6 +91,9 @@ final class CaptureScan {
     }
 
     private void walkBlock(Block b) {
+        if (b == null) {
+            return;
+        }
         for (Stmt s : b.statements) {
             walkStmt(s);
         }
@@ -107,7 +110,19 @@ final class CaptureScan {
         } else if (s instanceof VarDeclStmt) {
             VarDeclStmt v = (VarDeclStmt) s;
             if (v.initializer != null) {
+                // A late local's initializer runs later, from a lambda: what it reads
+                // and something else assigns has to be boxed like any capture.
+                if (v.isLate) {
+                    lambdaDepth++;
+                }
                 walkExpr(v.initializer);
+                if (v.isLate) {
+                    lambdaDepth--;
+                }
+            }
+        } else if (s instanceof VarDeclGroup) {
+            for (VarDeclStmt v : ((VarDeclGroup) s).decls) {
+                walkStmt(v);
             }
         } else if (s instanceof IfStmt) {
             IfStmt i = (IfStmt) s;
@@ -131,6 +146,29 @@ final class CaptureScan {
             walkStmt(f.body);
         } else if (s instanceof ReturnStmt) {
             walkExpr(((ReturnStmt) s).value);
+        } else if (s instanceof YieldStmt) {
+            walkExpr(((YieldStmt) s).value);
+        } else if (s instanceof TryStmt) {
+            // A closure in a try block, catch clause or switch case captures like any
+            // other; these bodies were not walked, so a local reassigned there was left
+            // unboxed and the lambda did not compile.
+            TryStmt t = (TryStmt) s;
+            walkBlock(t.tryBlock);
+            for (CatchClause c : t.catches) {
+                walkBlock(c.body);
+            }
+            if (t.finallyBlock != null) {
+                walkBlock(t.finallyBlock);
+            }
+        } else if (s instanceof SwitchStmt) {
+            SwitchStmt sw = (SwitchStmt) s;
+            walkExpr(sw.subject);
+            for (SwitchCase c : sw.cases) {
+                walkExpr(c.guard);
+                for (Stmt b : c.body) {
+                    walkStmt(b);
+                }
+            }
         } else if (s instanceof Ast.LocalFunc) {
             // A nested function is lowered to a lambda, so its body is a closure
             // context: outer locals it references-and-mutates must be boxed too.

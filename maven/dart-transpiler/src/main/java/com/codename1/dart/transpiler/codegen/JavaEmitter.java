@@ -268,6 +268,9 @@ public final class JavaEmitter {
         boolean enhanced = !e.methods.isEmpty() || !e.fields.isEmpty() || !e.ctors.isEmpty();
         ClassDecl syn = new ClassDecl();
         syn.name = e.name;
+        syn.ownerLibrary = e.ownerLibrary;
+        syn.enumOf = e;
+        String enumJava = javaEnumName(e);
         syn.fields = e.fields;
         syn.methods = e.methods;
         syn.ctors = e.ctors;
@@ -319,7 +322,7 @@ public final class JavaEmitter {
             sb.append('\n');
         }
         sb.append(dartRef(e)).append("\n");
-        sb.append("public enum ").append(e.name).append(" {\n    ");
+        sb.append("public enum ").append(enumJava).append(" {\n    ");
         StringBuilder names = new StringBuilder();
         for (int i = 0; i < e.entries.size(); i++) {
             if (i > 0) {
@@ -335,12 +338,12 @@ public final class JavaEmitter {
         // Dart's `EnumType.values` is a `List<EnumType>`; expose it as a DartList field
         // (coexisting with Java's implicit values() method) so `.values.idx(i)` resolves.
         sb.append(";\n\n");
-        sb.append("    public static final dart.core.DartList<").append(e.name)
-                .append("> values = dart.core.DartList.<").append(e.name).append(">of(")
+        sb.append("    public static final dart.core.DartList<").append(enumJava)
+                .append("> values = dart.core.DartList.<").append(enumJava).append(">of(")
                 .append(names).append(");\n\n");
         sb.append(body);
         sb.append("}\n");
-        return new GeneratedFile(e.name + ".java", sb.toString());
+        return new GeneratedFile(enumJava + ".java", sb.toString());
     }
 
     /**
@@ -633,10 +636,11 @@ public final class JavaEmitter {
             if (m.body != null) {
                 emitStatements(m.body, ctx);
             } else if (m.exprBody != null) {
-                Out o = emitExpr(m.exprBody, rt.is("void") ? null : rt, ctx);
                 if (rt.is("void")) {
-                    ctx.writer().line(statementize(o.code) + ";");
+                    // `void f() => expr;` runs expr for its effects, whatever its shape.
+                    emitDiscardedValue(m.exprBody, ctx);
                 } else {
+                    Out o = emitExpr(m.exprBody, rt, ctx);
                     ctx.writer().line("return " + coerce(o, rt, ctx) + ";");
                 }
             }
@@ -687,10 +691,11 @@ public final class JavaEmitter {
             if (m.body != null) {
                 emitStatements(m.body, ctx);
             } else if (m.exprBody != null) {
-                Out o = emitExpr(m.exprBody, rt.is("void") ? null : rt, ctx);
                 if (rt.is("void")) {
-                    ctx.writer().line(statementize(o.code) + ";");
+                    // `void f() => expr;` runs expr for its effects, whatever its shape.
+                    emitDiscardedValue(m.exprBody, ctx);
                 } else {
+                    Out o = emitExpr(m.exprBody, rt, ctx);
                     ctx.writer().line("return " + coerce(o, rt, ctx) + ";");
                 }
             }
@@ -774,8 +779,9 @@ public final class JavaEmitter {
         // constructors
         if (c.hasNamedNonFactoryCtor()) {
             body.append("    /** Marker distinguishing named-constructor instantiation. */\n");
-            body.append("    private static final class $NamedCtor {\n        private $NamedCtor() {\n        }\n    }\n\n");
-            body.append("    private ").append(javaClassName(c)).append("($NamedCtor $marker) {\n    }\n\n");
+            // Package-private, not private: a subclass's `super.named(..)` runs this pair.
+            body.append("    static final class $NamedCtor {\n        private $NamedCtor() {\n        }\n    }\n\n");
+            body.append("    ").append(javaClassName(c)).append("($NamedCtor $marker) {\n    }\n\n");
         }
         for (CtorDecl ct : c.ctors) {
             body.append(emitCtor(c, ct, ctx));
@@ -1073,6 +1079,7 @@ public final class JavaEmitter {
         }
         sb.append(") {\n");
         Ctx.Writer w = ctx.pushWriter(2);
+        String superNamedInit = null;
 
         // super(...) initializer for program superclasses
         ClassDecl progSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
@@ -1089,14 +1096,26 @@ public final class JavaEmitter {
                     superArgs.named.add(na);
                 }
             }
-            CtorDecl superCtor = progSuper.defaultCtor();
-            // Nothing may precede super(...), so its arguments cannot be sequenced
-            // through lifted temps; they keep the parameter order.
-            inSuperInitializer = true;
-            try {
-                w.line("super(" + canonicalArgs(superCtor, superArgs, ctx) + ");");
-            } finally {
-                inSuperInitializer = false;
+            CtorDecl superNamed = ct.superInit != null && ct.superInit.namedCtor != null
+                    ? progSuper.namedCtor(ct.superInit.namedCtor) : null;
+            if (superNamed != null && !superNamed.isFactory) {
+                // `Child() : super.named(..)` runs the superclass's NAMED constructor; it
+                // ran the unnamed one. A named constructor is the marker constructor plus
+                // its $init$ method, so the same pair runs here. The call comes after this
+                // class's initializer list, before its body, as Dart orders them.
+                w.line("super((" + javaClassName(progSuper) + ".$NamedCtor) null);");
+                superNamedInit = "super.$init$" + superNamed.name + "("
+                        + canonicalArgs(superNamed, superArgs, ctx) + ");";
+            } else {
+                CtorDecl superCtor = progSuper.defaultCtor();
+                // Nothing may precede super(...), so its arguments cannot be sequenced
+                // through lifted temps; they keep the parameter order.
+                inSuperInitializer = true;
+                try {
+                    w.line("super(" + canonicalArgs(superCtor, superArgs, ctx) + ");");
+                } finally {
+                    inSuperInitializer = false;
+                }
             }
         } else if (ct.superInit != null && ct.superInit.args != null
                 && stubClassOf(c.superclass) != null) {
@@ -1123,6 +1142,9 @@ public final class JavaEmitter {
         for (FieldInit fi : ct.fieldInits) {
             Out v = emitExpr(fi.value, typeOfField(c, fi.field, ctx), ctx);
             w.line(fieldStore(c, fi.field, v.code));
+        }
+        if (superNamedInit != null) {
+            w.line(superNamedInit);
         }
         if (ct.body != null) {
             emitStatements(ct.body, ctx);
@@ -1184,7 +1206,7 @@ public final class JavaEmitter {
         sb.append("        ").append(javaClassName(c)).append(" $self = new ").append(javaClassName(c)).append("(($NamedCtor) null);\n");
         sb.append("        $self.$init$").append(ct.name).append('(').append(argList).append(");\n");
         sb.append("        return $self;\n    }\n\n");
-        sb.append("    private void $init$").append(ct.name).append('(').append(paramSig).append(") {\n");
+        sb.append("    void $init$").append(ct.name).append('(').append(paramSig).append(") {\n");
         ctx.pushWriter(2);
         Ctx.Writer w = ctx.writer();
         for (Param p : ct.params) {
@@ -1194,6 +1216,14 @@ public final class JavaEmitter {
             if (p.isSuper) {
                 diags.error(p, "E0206", "super parameters are not supported on named constructors yet");
             }
+        }
+        if (ct.superInit != null && c.superclass != null && program.classes.get(c.superclass.name) != null
+                && (ct.superInit.namedCtor != null || !ct.superInit.args.positional.isEmpty()
+                        || !ct.superInit.args.named.isEmpty())) {
+            // The marker constructor always runs the superclass's unnamed constructor
+            // with no arguments; an explicit super initializer here would be ignored.
+            diags.error(ct, "E0207",
+                    "A named constructor cannot call a superclass constructor with arguments or by name yet");
         }
         for (FieldInit fi : ct.fieldInits) {
             Out v = emitExpr(fi.value, typeOfField(c, fi.field, ctx), ctx);
@@ -1604,13 +1634,17 @@ public final class JavaEmitter {
                 ctx.writer().line("return " + (o.type.is("Future") ? o.code
                         : "Future.value(" + boxIfPrimitive(o, ctx) + ")") + ";");
             } else {
-                Out o = emitExpr(m.exprBody, rt.is("void") ? null : rt, ctx);
                 if (rt.is("void")) {
-                    ctx.writer().line(statementize(o.code) + ";");
-                } else if (forceIntReturn) {
-                    ctx.writer().line("return (int) (" + o.code + ");");
+                    // `void f() => expr;` -- and a value-returning arrow override narrowed
+                    // to void -- runs expr for its effects, whatever its shape.
+                    emitDiscardedValue(m.exprBody, ctx);
                 } else {
-                    ctx.writer().line("return " + coerce(o, rt, ctx) + ";");
+                    Out o = emitExpr(m.exprBody, rt, ctx);
+                    if (forceIntReturn) {
+                        ctx.writer().line("return (int) (" + o.code + ");");
+                    } else {
+                        ctx.writer().line("return " + coerce(o, rt, ctx) + ";");
+                    }
                 }
             }
         }
@@ -1654,6 +1688,157 @@ public final class JavaEmitter {
     }
 
     private void emitStatement(Stmt s, Ctx ctx) {
+        if (s != null && s.labels != null && !isLoop(s)) {
+            // A labeled non-loop statement is a labeled Java block, which `break label;`
+            // leaves. A loop carries its label on its own header (loopLabel), where
+            // `continue label;` can reach it too.
+            Ctx.Writer w = ctx.writer();
+            w.line(loopLabel(s) + "{");
+            ctx.indent(1);
+            emitStatementBody(s, ctx);
+            ctx.indent(-1);
+            w.line("}");
+            return;
+        }
+        emitStatementBody(s, ctx);
+    }
+
+    /**
+     * A {@code late} local. Dart runs its initializer on the first read, not at the
+     * declaration, and a read before any assignment (no initializer) throws
+     * LateInitializationError; `late` used to be dropped, so the initializer ran eagerly
+     * and an unassigned read answered 0. The local becomes a final runtime holder read
+     * and written through get$v()/set$v(), the accessor shape every assignment form
+     * already lowers (compound, ++, ??=), and that a closure captures as it is.
+     */
+    private void emitLateLocal(VarDeclStmt v, Ctx ctx) {
+        Ctx.Writer w = ctx.writer();
+        TypeRef declared = v.type != null && !v.type.is("var") ? v.type : null;
+        String init = "null";
+        TypeRef t = declared != null ? declared : TypeRef.DYNAMIC;
+        if (v.initializer != null) {
+            // Emitted into the initializer lambda, with whatever it lifts.
+            ctx.pushWriter(ctx.currentIndent() + 1);
+            Out o = emitExpr(v.initializer, declared, ctx);
+            String lifted = ctx.popWriter();
+            if (declared == null) {
+                t = o.type != null ? o.type : TypeRef.DYNAMIC;
+            }
+            String value = coerce(o, t, ctx);
+            init = lifted.isEmpty() ? "() -> " + value
+                    : "() -> {\n" + lifted + indentStr(ctx.currentIndent() + 1) + "return " + value + ";\n"
+                            + indentStr(ctx.currentIndent()) + "}";
+        }
+        String holder;
+        if (t.is("int") && !t.nullable) {
+            holder = "LateLong";
+        } else if (t.is("double") && !t.nullable) {
+            holder = "LateDouble";
+        } else if (t.is("bool") && !t.nullable) {
+            holder = "LateBool";
+        } else {
+            holder = "LateLocal";
+        }
+        ctx.importClass("dart.runtime." + holder);
+        String jt = holder.equals("LateLocal") ? "LateLocal<" + javaType(t, true, ctx) + ">" : holder;
+        String jn = ctx.declareLate(v.name, t);
+        w.line("final " + jt + " " + jn + " = new " + holder + (holder.equals("LateLocal") ? "<>" : "")
+                + "(" + quote(v.name) + ", " + v.isFinal + ", " + init + ");");
+    }
+
+    /**
+     * Evaluates {@code e} for its effects only. What Java accepts as a statement (an
+     * assignment, ++/--, a call, a throw) is emitted as one, exactly as an expression
+     * statement is; anything else that may run code -- a getter, an operator, a lazy
+     * top-level read -- is assigned to a discarded local. Only a literal, `this` or a
+     * closure literal, which cannot, is dropped.
+     */
+    private void emitDiscardedValue(Expr e, Ctx ctx) {
+        Expr core = stripParens(e);
+        if (core instanceof IntLit || core instanceof DoubleLit || core instanceof BoolLit
+                || core instanceof NullLit || core instanceof ThisExpr || core instanceof Lambda
+                || (core instanceof StringLit && isConstantString((StringLit) core))
+                || isPlainVariableRead(core, ctx)) {
+            return;
+        }
+        if (core instanceof Assign || core instanceof IncDec || core instanceof Call
+                || core instanceof CtorCall || core instanceof ThrowExpr || core instanceof Conditional
+                || core instanceof Cascade || core instanceof AwaitExpr) {
+            ExprStmt es = new ExprStmt();
+            es.file = e.file;
+            es.line = e.line;
+            es.col = e.col;
+            es.expr = core;
+            emitStatementBody(es, ctx);
+            return;
+        }
+        Out o = emitExpr(core, null, ctx);
+        if (o.type != null && o.type.is("void")) {
+            String code = statementize(o.code);
+            if (!code.isEmpty()) {
+                ctx.writer().line(code + ";");
+            }
+            return;
+        }
+        ctx.writer().line("Object $unused" + (unusedCounter++) + " = " + o.code + ";");
+    }
+
+    /**
+     * A read of a local, or of a field of the class being emitted, that runs no code:
+     * not a late local (its first read runs the initializer or throws), not a lazily
+     * initialised or late-checked field (read through an accessor), not a mixin's field.
+     */
+    private boolean isPlainVariableRead(Expr e, Ctx ctx) {
+        if (!(e instanceof Ident)) {
+            return false;
+        }
+        String n = ((Ident) e).name;
+        if (ctx.lookup(n) != null) {
+            return !ctx.isLate(ctx.javaNameOf(n));
+        }
+        ClassDecl cc = ctx.currentClass;
+        FieldDecl f = cc == null ? null : cc.field(n);
+        return f != null && !cc.isMixin && !isLazyStatic(f) && !isLateChecked(f, cc);
+    }
+
+    private static Expr stripParens(Expr e) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        return e;
+    }
+
+    private static boolean isConstantString(StringLit s) {
+        for (Object part : s.parts) {
+            if (part instanceof Expr) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isLoop(Stmt s) {
+        return s instanceof WhileStmt || s instanceof ForStmt || s instanceof ForInStmt;
+    }
+
+    /** The Java label prefix ({@code "L$outer: "}) a statement's header carries, or "". */
+    private static String loopLabel(Stmt s) {
+        if (s.labels == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String l : s.labels) {
+            sb.append(javaLabel(l)).append(": ");
+        }
+        return sb.toString();
+    }
+
+    /** Java label for a Dart one; prefixed so a Dart label can never be a Java keyword. */
+    private static String javaLabel(String dartLabel) {
+        return "L$" + dartLabel;
+    }
+
+    private void emitStatementBody(Stmt s, Ctx ctx) {
         Ctx.Writer w = ctx.writer();
         if (s instanceof Block) {
             w.line("{");
@@ -1663,6 +1848,8 @@ public final class JavaEmitter {
             ctx.popScope();
             ctx.indent(-1);
             w.line("}");
+        } else if (s instanceof VarDeclStmt && ((VarDeclStmt) s).isLate) {
+            emitLateLocal((VarDeclStmt) s, ctx);
         } else if (s instanceof VarDeclStmt) {
             VarDeclStmt v = (VarDeclStmt) s;
             TypeRef declared = v.type;
@@ -1672,8 +1859,10 @@ public final class JavaEmitter {
             }
             TypeRef t = declared == null || declared.is("var")
                     ? (init != null ? init.type : TypeRef.DYNAMIC) : declared;
-            // untyped closure locals get a SAM type by arity
-            if (t.is("Function") && v.initializer instanceof Lambda) {
+            // untyped closure locals get a SAM type by arity. A declared signature
+            // (`int Function() f = ...`) has its own SAM type below; it was forced to
+            // VoidFunc0 here, which a value-returning closure does not compile against.
+            if (t.is("Function") && t.funcReturn == null && v.initializer instanceof Lambda) {
                 Lambda l = (Lambda) v.initializer;
                 if (l.params.isEmpty()) {
                     ctx.importClass("dart.runtime.Funcs");
@@ -1796,13 +1985,12 @@ public final class JavaEmitter {
                 w.line("return;");
             } else if (rt != null && rt.is("void")) {
                 // Dart allows `return expr;` from a method Java-typed void (it overrides a void
-                // base). Keep a side-effecting call; drop a pure read (not a valid Java statement).
-                Out o = emitExpr(r.value, null, ctx);
-                String code = statementize(o.code);
-                if (!code.isEmpty() && code.contains("(")) {
-                    w.line(code + ";");
+                // base). The value is discarded but the expression still runs: `return n++;`
+                // and `return x = 5;` were dropped because their text had no '('.
+                emitDiscardedValue(r.value, ctx);
+                if (!(stripParens(r.value) instanceof ThrowExpr)) {
+                    w.line("return;");
                 }
-                w.line("return;");
             } else if (ctx.narrowReturnToInt) {
                 Out o = emitExpr(r.value, null, ctx);
                 w.line("return (int) (" + o.code + ");");
@@ -1857,12 +2045,12 @@ public final class JavaEmitter {
             WhileStmt wh = (WhileStmt) s;
             Lazy c = emitLazyOperand(wh.condition, TypeRef.BOOL, ctx, 1);
             if (!c.lifts()) {
-                w.line("while (" + c.out.code + ") {");
+                w.line(loopLabel(s) + "while (" + c.out.code + ") {");
                 ctx.indent(1);
             } else {
                 // The condition's lifted statements belong to every test, not to the
                 // first one only: run them at the top of each pass, then test.
-                w.line("while (true) {");
+                w.line(loopLabel(s) + "while (true) {");
                 w.raw(c.lifted);
                 ctx.indent(1);
                 w.line("if (!(" + c.out.code + ")) {");
@@ -1902,7 +2090,7 @@ public final class JavaEmitter {
             final String forVarJava$ = forVarJava;
             final TypeRef forVarType$ = forVarType;
             final ForStmt f$ = f;
-            emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
+            emitCForLoop(loopLabel(s), initCode, f.condition, f.updates, ctx, new Runnable() {
                 public void run() {
                     // Dart binds the loop variable fresh each iteration, so a closure in the
                     // body captures a distinct value per pass. The Java loop variable is
@@ -1925,7 +2113,7 @@ public final class JavaEmitter {
             // element with its position. There is no runtime `indexed`, so lower to a counted
             // loop that binds the index and element subpatterns directly.
             final ForInStmt f = (ForInStmt) s;
-            emitIndexedFor(f.pattern, f.iterable, ctx, new Runnable() {
+            emitIndexedFor(loopLabel(s), f.pattern, f.iterable, ctx, new Runnable() {
                 public void run() {
                     ctx.pushBreakTarget(null);
                     emitStatement(unwrapBlock(f.body), ctx);
@@ -1944,7 +2132,7 @@ public final class JavaEmitter {
             if (f.pattern != null) {
                 // Dart 3 pattern for-in: bind a temp per element, then destructure into the pattern.
                 String loopVar = ctx.newTemp();
-                w.line("for (" + javaType(elem, true, ctx) + " " + loopVar + " : " + iter.code + ") {");
+                w.line(loopLabel(s) + "for (" + javaType(elem, true, ctx) + " " + loopVar + " : " + iter.code + ") {");
                 ctx.indent(1);
                 ctx.declare(loopVar, elem);
                 List<String> binds = new ArrayList<String>();
@@ -1957,7 +2145,7 @@ public final class JavaEmitter {
                 w.line("}");
             } else {
                 String loopVar = ctx.declareShadowSafe(f.varName, elem);
-                w.line("for (" + javaType(elem, true, ctx) + " " + loopVar + " : " + iter.code + ") {");
+                w.line(loopLabel(s) + "for (" + javaType(elem, true, ctx) + " " + loopVar + " : " + iter.code + ") {");
                 ctx.indent(1);
                 emitStatement(unwrapBlock(f.body), ctx);
                 ctx.indent(-1);
@@ -1966,10 +2154,12 @@ public final class JavaEmitter {
             ctx.popBreakTarget();
             ctx.popScope();
         } else if (s instanceof BreakStmt) {
-            String bl = ctx.currentBreakLabel();
+            String bl = ((BreakStmt) s).label != null ? javaLabel(((BreakStmt) s).label)
+                    : ctx.currentBreakLabel();
             w.line(bl != null ? "break " + bl + ";" : "break;");
         } else if (s instanceof ContinueStmt) {
-            w.line("continue;");
+            String cl = ((ContinueStmt) s).label;
+            w.line(cl != null ? "continue " + javaLabel(cl) + ";" : "continue;");
         } else if (s instanceof SwitchStmt) {
             emitSwitchStmt((SwitchStmt) s, ctx);
         } else if (s instanceof Ast.LocalFunc) {
@@ -2498,6 +2688,10 @@ public final class JavaEmitter {
      * {@code Iterable.indexed} has no runtime counterpart, so this counted lowering stands in.
      */
     private void emitIndexedFor(Pattern pattern, Expr iterable, Ctx ctx, Runnable body) {
+        emitIndexedFor("", pattern, iterable, ctx, body);
+    }
+
+    private void emitIndexedFor(String label, Pattern pattern, Expr iterable, Ctx ctx, Runnable body) {
         Ctx.Writer w = ctx.writer();
         PropertyGet pg = (PropertyGet) iterable;
         Out base = emitExpr(pg.target, null, ctx);
@@ -2509,7 +2703,7 @@ public final class JavaEmitter {
         String counter = ctx.newTemp();
         String el = ctx.newTemp();
         w.line("long " + counter + " = 0;");
-        w.line("for (" + javaType(elemT, true, ctx) + " " + el + " : " + base.code + ") {");
+        w.line(label + "for (" + javaType(elemT, true, ctx) + " " + el + " : " + base.code + ") {");
         ctx.indent(1);
         ctx.declare(el, elemT);
         List<String> binds = new ArrayList<String>();
@@ -2518,8 +2712,10 @@ public final class JavaEmitter {
         for (String b : binds) {
             w.line(b);
         }
-        body.run();
+        // Counted before the body, whose `continue` would otherwise skip the increment
+        // and give every later element a stale index. The binds above copied it.
         w.line(counter + "++;");
+        body.run();
         ctx.indent(-1);
         w.line("}");
         ctx.popScope();
@@ -2541,8 +2737,8 @@ public final class JavaEmitter {
             // `switch (this) { study => ..., material || cupertino => ... }`). Compare by
             // enum identity and bind nothing so it composes inside or-patterns.
             if (v.type == null && subjType != null && program.enums.containsKey(subjType.name)
-                    && program.enums.get(subjType.name).hasEntry(v.name)) {
-                return subj + " == " + subjType.name + "." + v.name;
+                    && programEnum(subjType.name, ctx).hasEntry(v.name)) {
+                return subj + " == " + simpleEnumName(subjType.name, ctx) + "." + v.name;
             }
             if (v.type != null && isReferenceType(v.type)) {
                 String jt = javaType(v.type, true, ctx);
@@ -3831,7 +4027,7 @@ public final class JavaEmitter {
         TypeRef local = ctx.lookup(n);
         if (local != null) {
             String jn = ctx.javaNameOf(n);
-            String base = ctx.isBoxed(n) ? jn + ".v" : jn;
+            String base = ctx.isLate(jn) ? jn + ".get$v()" : ctx.isBoxed(n) ? jn + ".v" : jn;
             // Flow-promoted by an `is` guard: read as the narrowed type via a cast.
             TypeRef promo = ctx.promotedType(n);
             if (promo != null) {
@@ -3893,10 +4089,10 @@ public final class JavaEmitter {
             }
             // inside an enhanced-enum body: a bare enum-constant name resolves to the
             // constant, and the implicit name()/index() intrinsics are in scope.
-            if (program.enums.containsKey(cc.name)) {
-                Ast.EnumDecl selfEnum = program.enums.get(cc.name);
+            if (cc.enumOf != null) {
+                Ast.EnumDecl selfEnum = cc.enumOf;
                 if (selfEnum.hasEntry(n)) {
-                    return new Out(cc.name + "." + n, new TypeRef(cc.name));
+                    return new Out(javaEnumName(selfEnum) + "." + n, new TypeRef(cc.name));
                 }
                 if (n.equals("name")) {
                     return new Out("name()", TypeRef.STRING);
@@ -4241,7 +4437,7 @@ public final class JavaEmitter {
                 return new Out(target.code + ".name()", TypeRef.STRING);
             }
             // enhanced-enum getter declared in the enum body
-            Ast.EnumDecl ed = program.enums.get(tt.name);
+            Ast.EnumDecl ed = programEnum(tt.name, ctx);
             MethodDecl eg = ed.getter(name);
             if (eg != null) {
                 return new Out(target.code + "." + name + "()",
@@ -5333,6 +5529,11 @@ public final class JavaEmitter {
      * reaches both, since each sits where the loop restarts.
      */
     private void emitCForLoop(String initCode, Expr condition, List<Expr> updates, Ctx ctx, Runnable body) {
+        emitCForLoop("", initCode, condition, updates, ctx, body);
+    }
+
+    private void emitCForLoop(String label, String initCode, Expr condition, List<Expr> updates, Ctx ctx,
+                              Runnable body) {
         Ctx.Writer w = ctx.writer();
         Lazy cond = condition != null ? emitLazyOperand(condition, TypeRef.BOOL, ctx, 1) : null;
         List<Lazy> ups = new ArrayList<Lazy>();
@@ -5354,13 +5555,13 @@ public final class JavaEmitter {
                 }
                 sb.append(statementize(ups.get(i).out.code));
             }
-            w.line("for (" + initCode + "; " + (cond != null ? cond.out.code : "") + "; " + sb + ") {");
+            w.line(label + "for (" + initCode + "; " + (cond != null ? cond.out.code : "") + "; " + sb + ") {");
             ctx.indent(1);
         } else {
             if (updatesLift) {
                 String first = ctx.newTemp();
                 w.line("boolean " + first + " = true;");
-                w.line("for (" + initCode + "; ; ) {");
+                w.line(label + "for (" + initCode + "; ; ) {");
                 ctx.indent(1);
                 w.line("if (!" + first + ") {");
                 for (Lazy l : ups) {
@@ -5382,7 +5583,7 @@ public final class JavaEmitter {
                     }
                     sb.append(statementize(ups.get(i).out.code));
                 }
-                w.line("for (" + initCode + "; ; " + sb + ") {");
+                w.line(label + "for (" + initCode + "; ; " + sb + ") {");
                 ctx.indent(1);
             }
             if (cond != null) {
@@ -6511,7 +6712,7 @@ public final class JavaEmitter {
             return intrinsic;
         }
         // enhanced-enum instance method: `category.displayTitle(loc)`
-        Ast.EnumDecl ed = program.enums.get(tt.name);
+        Ast.EnumDecl ed = programEnum(tt.name, ctx);
         if (ed != null) {
             MethodDecl em = ed.method(n);
             if (em != null) {
@@ -9024,7 +9225,11 @@ public final class JavaEmitter {
             ctx.importClass(se.javaName);
             return se.javaName.substring(se.javaName.lastIndexOf('.') + 1);
         }
-        // program class / enum / type parameter — same package
+        Ast.EnumDecl pe = programEnum(t.name, ctx);
+        if (pe != null) {
+            return javaEnumName(pe);
+        }
+        // program class / type parameter -- same package
         return t.name + (t.args.isEmpty() ? "" : genericSuffix(t, ctx));
     }
 
@@ -9050,7 +9255,11 @@ public final class JavaEmitter {
         if (c == null) {
             return null;
         }
-        boolean collides = stubs.isStubClass(c.name) || stubs.isStubEnum(c.name);
+        if (c.enumOf != null) {
+            return javaEnumName(c.enumOf);
+        }
+        boolean collides = stubs.isStubClass(c.name) || stubs.isStubEnum(c.name)
+                || program.enumsByName.containsKey(c.name);
         List<ClassDecl> byName = program.classesByName.get(c.name);
         if (byName != null && byName.size() > 1) {
             collides = true;
@@ -9138,7 +9347,27 @@ public final class JavaEmitter {
         if (se != null && se.javaName != null) {
             return se.javaName.substring(se.javaName.lastIndexOf('.') + 1);
         }
-        return dartName;
+        Ast.EnumDecl pe = programEnum(dartName, ctx);
+        return pe != null ? javaEnumName(pe) : dartName;
+    }
+
+    /** A user enum by simple name, preferring the one the code being emitted can see. */
+    private Ast.EnumDecl programEnum(String name, Ctx ctx) {
+        return program.resolveEnum(name, ctx != null ? ctx.library() : null);
+    }
+
+    /**
+     * The Java name of a user enum: its own name, or library-path prefixed when another
+     * user enum or class shares it. Two libraries each declaring a private {@code _Mode}
+     * otherwise emitted the same {@code _Mode.java}, and the later one overwrote the first.
+     */
+    private String javaEnumName(Ast.EnumDecl e) {
+        List<Ast.EnumDecl> same = program.enumsByName.get(e.name);
+        boolean collides = (same != null && same.size() > 1) || program.classesByName.containsKey(e.name);
+        if (!collides || e.ownerLibrary == null) {
+            return e.name;
+        }
+        return libPathPrefix(e.ownerLibrary) + e.name;
     }
 
     /**
@@ -9778,6 +10007,22 @@ public final class JavaEmitter {
                 renameScopes.get(renameScopes.size() - 1).put(name, javaName);
             }
             return javaName;
+        }
+
+        /** Java names of the late locals in this body; each is unique (see declareLate). */
+        private final java.util.Set<String> lateLocals = new HashSet<String>();
+
+        /** Declares a late local under a Java name no other local can have. */
+        String declareLate(String name, TypeRef type) {
+            declare(name, type);
+            String javaName = javaIdent(name) + "$late" + (shadowCounter++);
+            renameScopes.get(renameScopes.size() - 1).put(name, javaName);
+            lateLocals.add(javaName);
+            return javaName;
+        }
+
+        boolean isLate(String javaName) {
+            return lateLocals.contains(javaName);
         }
 
         String javaNameOf(String name) {

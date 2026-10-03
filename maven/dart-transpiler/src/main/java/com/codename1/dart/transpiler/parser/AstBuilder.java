@@ -922,6 +922,20 @@ public final class AstBuilder {
     }
 
     private Stmt buildStatement(Dart2Parser.StatementContext ctx) {
+        Stmt st = buildUnlabeledStatement(ctx);
+        // `outer: for (...)` -- the labels are kept so `break outer;` / `continue outer;`
+        // reach the statement they name (they were dropped, leaving a plain break that
+        // left only the innermost loop).
+        if (st != null && ctx != null && !ctx.label().isEmpty()) {
+            st.labels = new ArrayList<String>();
+            for (Dart2Parser.LabelContext l : ctx.label()) {
+                st.labels.add(l.identifier().getText());
+            }
+        }
+        return st;
+    }
+
+    private Stmt buildUnlabeledStatement(Dart2Parser.StatementContext ctx) {
         if (ctx == null) {
             return null;
         }
@@ -1001,11 +1015,17 @@ public final class AstBuilder {
         if (s.breakStatement() != null) {
             BreakStmt b = new BreakStmt();
             pos(b, s);
+            if (s.breakStatement().identifier() != null) {
+                b.label = s.breakStatement().identifier().getText();
+            }
             return b;
         }
         if (s.continueStatement() != null) {
             ContinueStmt c = new ContinueStmt();
             pos(c, s);
+            if (s.continueStatement().identifier() != null) {
+                c.label = s.continueStatement().identifier().getText();
+            }
             return c;
         }
         if (s.switchStatement() != null) {
@@ -1336,6 +1356,7 @@ public final class AstBuilder {
         v.name = di.identifier().getText();
         v.type = buildFinalConstVarOrType(di.finalConstVarOrType());
         v.isFinal = di.finalConstVarOrType().FINAL_() != null || di.finalConstVarOrType().CONST_() != null;
+        v.isLate = di.finalConstVarOrType().LATE_() != null;
         if (iv.expr() != null) {
             v.initializer = buildExpr(iv.expr());
         }
@@ -1352,6 +1373,7 @@ public final class AstBuilder {
             extra.name = ii.identifier().getText();
             extra.type = v.type;
             extra.isFinal = v.isFinal;
+            extra.isLate = v.isLate;
             if (ii.expr() != null) {
                 extra.initializer = buildExpr(ii.expr());
             }

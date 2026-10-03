@@ -141,6 +141,7 @@ public final class Ast {
     public static class ClassDecl extends Node {
         public String name;
         public Library ownerLibrary;              // the user library that declares this class (single-package model)
+        public EnumDecl enumOf;                   // set on the stand-in class an enhanced enum's body is emitted with
         public String javaName;                   // from @JavaName('...') in stub files
         public boolean isAbstract;
         public boolean isSealed;                  // Dart 3: sealed class C { }
@@ -213,6 +214,7 @@ public final class Ast {
     public static class EnumDecl extends Node {
         public String name;
         public String javaName;                   // from @JavaName('...') in stub files
+        public Library ownerLibrary;              // the user library that declares this enum
         public List<String> entries = new ArrayList<String>();
         // Dart 2.17 enhanced-enum body members (methods / getters, fields, constructors).
         public List<FieldDecl> fields = new ArrayList<FieldDecl>();
@@ -334,6 +336,8 @@ public final class Ast {
     // ------------------------------------------------------------------
 
     public static abstract class Stmt extends Node {
+        /** Dart labels on this statement ({@code outer: for ...}); null when unlabeled. */
+        public List<String> labels;
     }
 
     public static class Block extends Stmt {
@@ -347,6 +351,7 @@ public final class Ast {
     public static class VarDeclStmt extends Stmt {
         public TypeRef type;                      // may be VAR
         public boolean isFinal;
+        public boolean isLate;                    // a `late` local: lazy initializer, checked reads
         public String name;
         public Expr initializer;                  // nullable
     }
@@ -395,9 +400,11 @@ public final class Ast {
     }
 
     public static class BreakStmt extends Stmt {
+        public String label;                      // `break outer;` -- null for a bare break
     }
 
     public static class ContinueStmt extends Stmt {
+        public String label;                      // `continue outer;` -- null for a bare continue
     }
 
     /**
