@@ -394,7 +394,7 @@ jobs:
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
             }
-            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock,backend,backend-test -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
           }
           if (-not $ok) { throw "mvn install failed after all retries" }
@@ -446,6 +446,30 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      # The CI test server (scripts/hellocodenameone/backend), which the suite
+      # streams its screenshots to and drives its networking tests against. Built
+      # once here as a runnable copy, against the runtime and plugin the install
+      # above put in the local repository, and run with plain java by the capture
+      # steps (CN1SS_SERVER_DIST) -- this x64 one and the arm64 leg, which has no
+      # Maven repository of its own. Git Bash runs server.sh: a bare `bash` from a
+      # JVM can resolve to WSL's instead.
+      - name: Build the test server
+        shell: bash
+        env:
+          CN1SS_BACKEND_SKIP_INSTALL: '1'
+          JAVA17_HOME: ${{ env.JDK_17_HOME }}
+        run: |
+          scripts/hellocodenameone/backend/server.sh dist "$GITHUB_WORKSPACE/artifacts/cn1ss-server"
+          test -f "$GITHUB_WORKSPACE/artifacts/cn1ss-server/classes/META-INF/cn1-backend-main"
+
+      - name: Upload the test server
+        uses: ./.github/actions/upload-artifact-with-retry
+        with:
+          name: windows-cn1ss-server
+          path: artifacts/cn1ss-server
+          if-no-files-found: error
+          retention-days: 1
+
       # Publish the compiled (architecture-independent) core + port bytecode right
       # after building it, so the native arm64 screenshot leg can translate +
       # clang-cl-build an arm64 exe without rebuilding core -- codename1-core needs
@@ -465,8 +489,8 @@ jobs:
 
       # Build the ParparVM JavaAPI, then run the FULL hellocodenameone screenshot
       # suite over the cn1ss WebSocket: capturesHelloSuiteOverWebSocket builds the
-      # suite exe (app + core + port + nativeSources via clang-cl), starts a
-      # Cn1ssScreenshotServer, runs the exe (it renders each test Form offscreen
+      # suite exe (app + core + port + nativeSources via clang-cl), starts the
+      # cn1ss test server (scripts/hellocodenameone/backend), runs the exe (it renders each test Form offscreen
       # with Direct2D/DirectWrite and streams each PNG over com.codename1.io
       # WebSocket), waits for CN1SS:SUITE:FINISHED, and copies every received PNG
       # to CN1_SHOT_OUTPUT_DIR (~112 images). This is the CI equivalent of
@@ -491,6 +515,7 @@ jobs:
         shell: pwsh
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          CN1SS_SERVER_DIST: ${{ github.workspace }}\artifacts\cn1ss-server
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
           # The suite's own translation, replayed by the performance gate below.
@@ -658,6 +683,12 @@ jobs:
       # The Kotlin 1.6.0 compiler cannot run on this runner's JDK 21 (arm64 has no
       # Temurin JDK 8/11), so the hellocodenameone-common bytecode is built once on
       # the x64 leg and reused here (it is architecture-independent).
+      - name: Restore the test server
+        uses: ./.github/actions/download-artifact-with-retry
+        with:
+          name: windows-cn1ss-server
+          path: artifacts/cn1ss-server
+
       - name: Restore hellocodenameone-common classes
         uses: ./.github/actions/download-artifact-with-retry
         with:
@@ -696,6 +727,7 @@ jobs:
         working-directory: vm
         shell: pwsh
         env:
+          CN1SS_SERVER_DIST: ${{ github.workspace }}\artifacts\cn1ss-server
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
           # The suite's own translation, replayed by the performance gate below.

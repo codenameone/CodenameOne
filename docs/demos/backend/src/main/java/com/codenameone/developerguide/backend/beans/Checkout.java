@@ -23,13 +23,13 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.annotations.Autowired;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Qualifier;
-import com.codename1.backend.annotations.Service;
 
 import java.util.List;
 
 // tag::backend-bean-candidates[]
-@Service
+@Component
 public class Checkout {
     private final PaymentProvider preferred;       // the @Primary one: CardPayments
 

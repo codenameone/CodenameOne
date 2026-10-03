@@ -74,6 +74,18 @@ typedef struct {
     char* statusMessage;
     int performed;
     int contentLength;
+
+    /* ConnectionRequest.setHttpMethod, as asked for -- GET and POST included,
+     * which override the post flag; NULL when the request named none. */
+    char* method;
+    /* ConnectionRequest.setTimeout and setReadTimeout, in milliseconds; 0 is
+     * none. Both were accepted and ignored, so a request to a server that never
+     * answered waited forever. */
+    long connectTimeoutMs;
+    long readTimeoutMs;
+    /* Set when the transfer itself failed -- refused, timed out, reset -- as
+     * opposed to answering with an error status. */
+    int failed;
 } CN1Http;
 
 static void cn1HttpEnsureResp(CN1Http* c, int extra) {
@@ -153,11 +165,45 @@ static void cn1HttpPerform(CN1Http* c) {
     if (c->reqHeaders) {
         curl_easy_setopt(c->easy, CURLOPT_HTTPHEADER, c->reqHeaders);
     }
-    if (c->post) {
-        curl_easy_setopt(c->easy, CURLOPT_POST, 1L);
-        curl_easy_setopt(c->easy, CURLOPT_READFUNCTION, cn1HttpReadCb);
-        curl_easy_setopt(c->easy, CURLOPT_READDATA, c);
-        curl_easy_setopt(c->easy, CURLOPT_POSTFIELDSIZE, (long) c->reqLen);
+    {
+        /* A buffered body is sent whatever the post flag says: RequestBuilder
+         * writes one for a DELETE without setting it, and CUSTOMREQUEST below then
+         * sent the right verb with an empty body (the Windows port already sends
+         * whatever was buffered). An explicit GET, HEAD or POST wins over both:
+         * ConnectionRequest lets a request set setPost(true) for how its arguments
+         * are sent and then ask for GET, or the reverse, and the method it asked
+         * for is the one it means. */
+        int sendBody = c->post || c->reqLen > 0;
+        if (c->method != 0 && (strcmp(c->method, "GET") == 0 || strcmp(c->method, "HEAD") == 0)) {
+            sendBody = 0;
+        } else if (c->method != 0 && strcmp(c->method, "POST") == 0) {
+            sendBody = 1;
+        }
+        if (sendBody) {
+            curl_easy_setopt(c->easy, CURLOPT_POST, 1L);
+            curl_easy_setopt(c->easy, CURLOPT_READFUNCTION, cn1HttpReadCb);
+            curl_easy_setopt(c->easy, CURLOPT_READDATA, c);
+            curl_easy_setopt(c->easy, CURLOPT_POSTFIELDSIZE, (long) c->reqLen);
+        }
+    }
+    if (c->method != 0 && strcmp(c->method, "GET") != 0 && strcmp(c->method, "POST") != 0) {
+        /* After the body setup: CUSTOMREQUEST replaces only the request line's
+         * verb, so a PUT or PATCH still sends the body POST would have. */
+        if (strcmp(c->method, "HEAD") == 0) {
+            curl_easy_setopt(c->easy, CURLOPT_NOBODY, 1L);
+        } else {
+            curl_easy_setopt(c->easy, CURLOPT_CUSTOMREQUEST, c->method);
+        }
+    }
+    if (c->connectTimeoutMs > 0) {
+        curl_easy_setopt(c->easy, CURLOPT_CONNECTTIMEOUT_MS, c->connectTimeoutMs);
+    }
+    if (c->readTimeoutMs > 0) {
+        /* A read timeout is an idle limit, not a deadline for the whole transfer
+         * -- a large download must not be cut off for taking long. libcurl's
+         * idle limit is in whole seconds, so round up. */
+        curl_easy_setopt(c->easy, CURLOPT_LOW_SPEED_LIMIT, 1L);
+        curl_easy_setopt(c->easy, CURLOPT_LOW_SPEED_TIME, (c->readTimeoutMs + 999) / 1000);
     }
     /* curl_easy_perform runs the whole blocking HTTP transfer; yield to the GC
      * across it so a thread parked in the network stack never stalls a GC mark. */
@@ -166,6 +212,7 @@ static void cn1HttpPerform(CN1Http* c) {
     CN1_RESUME_THREAD;
     curl_easy_getinfo(c->easy, CURLINFO_RESPONSE_CODE, &code);
     c->status = code;
+    c->failed = rc != CURLE_OK;
     c->statusMessage = strdup(rc == CURLE_OK ? "OK" : curl_easy_strerror(rc));
 }
 
@@ -193,6 +240,41 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetMethod___long_boolean(CODE
     if (c) {
         c->post = post ? 1 : 0;
     }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetCustomMethod___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_OBJECT method) {
+    CN1Http* c = (CN1Http*) (intptr_t) connection;
+    const char* m;
+    if (!c || method == JAVA_NULL) {
+        return;
+    }
+    m = stringToUTF8(threadStateData, method);
+    free(c->method);
+    /* Kept even for GET and POST: an explicit one overrides the post flag. */
+    c->method = m == 0 ? 0 : strdup(m);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetConnectTimeout___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_INT millis) {
+    CN1Http* c = (CN1Http*) (intptr_t) connection;
+    if (c) {
+        c->connectTimeoutMs = millis > 0 ? (long) millis : 0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetReadTimeout___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_INT millis) {
+    CN1Http* c = (CN1Http*) (intptr_t) connection;
+    if (c) {
+        c->readTimeoutMs = millis > 0 ? (long) millis : 0;
+    }
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_httpFailure___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection) {
+    CN1Http* c = (CN1Http*) (intptr_t) connection;
+    if (!c) {
+        return JAVA_NULL;
+    }
+    cn1HttpPerform(c);
+    return c->failed ? newStringFromCString(threadStateData, c->statusMessage ? c->statusMessage : "failed") : JAVA_NULL;
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetHeader___long_java_lang_String_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_OBJECT key, JAVA_OBJECT value) {
@@ -347,5 +429,6 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_httpClose___long(CODENAME_ONE_THR
     free(c->respBody);
     free(c->url);
     free(c->statusMessage);
+    free(c->method);
     free(c);
 }

@@ -84,6 +84,10 @@ class CleanTargetLinuxIntegrationTest {
                 // Install the transcoded SVG/Lottie registry before the first theme so
                 // url(*.svg) backgrounds resolve, then load the app theme.
                 "        try { com.codename1.generated.svg.SVGRegistry.installGlobal(); } catch (Throwable __svg) { __svg.printStackTrace(); }\n" +
+                // The generated annotation bootstraps (the typed REST client and the rest),
+                // as a real build's stub instantiates them; see annotationBootstrapLines.
+                CleanTargetIntegrationTest.annotationBootstrapLines(
+                        CleanTargetIntegrationTest.helloCommonClasses()) +
                 "        com.codename1.ui.plaf.UIManager.initFirstTheme(\"/theme\");\n" +
                 "        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());\n" +
                 "        Cn1ssDeviceRunner.addTest(new com.codenameone.examples.hellocodenameone.tests.KotlinUiTest());\n" +
@@ -361,26 +365,15 @@ class CleanTargetLinuxIntegrationTest {
             elf = buildHelloCodenameOneElf();
         }
 
-        // Compile + start the shared cn1ss WebSocket screenshot server.
+        // Start the CI test server: screenshots in over the websocket, REST out.
         List<CompilerHelper.CompilerConfig> configs = new ArrayList<>();
         for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
             configs.addAll(CompilerHelper.getAvailableCompilers(v));
         }
         CompilerHelper.CompilerConfig jdk = configs.get(0);
-        Path serverSrc = Paths.get("..", "..", "scripts", "common", "java", "Cn1ssScreenshotServer.java")
-                .normalize().toAbsolutePath();
-        Path serverClasses = Files.createTempDirectory("cn1ss-server");
-        assertEquals(0, CompilerHelper.compile(jdk.jdkHome, Arrays.asList(
-                "-d", serverClasses.toString(), "-sourcepath", serverSrc.getParent().toString(),
-                serverSrc.toString())), "Cn1ssScreenshotServer should compile:\n"
-                + CompilerHelper.getLastErrorLog());
-
         int port = 8765;
         Path outDir = Files.createTempDirectory("cn1ss-linux-out");
-        String javaBin = jdk.jdkHome.resolve("bin").resolve("java").toString();
-        Process server = new ProcessBuilder(javaBin, "-cp", serverClasses.toString(),
-                "Cn1ssScreenshotServer", "--port", String.valueOf(port), "--out", outDir.toString())
-                .redirectErrorStream(true).start();
+        Process server = Cn1ssTestServer.processBuilder(jdk.jdkHome, port, outDir).start();
         Process app = null;
         try {
             final CountDownLatch ready = new CountDownLatch(1);
@@ -390,14 +383,21 @@ class CleanTargetLinuxIntegrationTest {
                     String line;
                     while ((line = r.readLine()) != null) {
                         synchronized (serverLog) { serverLog.append(line).append('\n'); }
-                        if (line.contains("CN1SS_SERVER_PORT")) { ready.countDown(); }
+                        if (line.contains(Cn1ssTestServer.READY)) { ready.countDown(); }
                     }
                 } catch (IOException ignore) {
                 }
             });
             sreader.setDaemon(true);
             sreader.start();
-            assertTrue(ready.await(30, TimeUnit.SECONDS), "cn1ss server should start listening");
+            // With the server's own output when it does not: a build or start-up
+            // failure in it otherwise read as a bare timeout.
+            if (!ready.await(900, TimeUnit.SECONDS)) {
+                String log;
+                synchronized (serverLog) { log = serverLog.toString(); }
+                org.junit.jupiter.api.Assertions.fail("cn1ss server should start listening; it printed:\n"
+                        + (log.length() > 6000 ? log.substring(log.length() - 6000) : log));
+            }
 
             ProcessBuilder appPb = new ProcessBuilder(elf.toAbsolutePath().toString());
             appPb.directory(elf.getParent().toFile());

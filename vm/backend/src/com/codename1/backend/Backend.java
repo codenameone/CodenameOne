@@ -22,12 +22,17 @@
  */
 package com.codename1.backend;
 
+import com.codename1.backend.metrics.MetricReader;
+import com.codename1.backend.orm.EntityDefinition;
+import com.codename1.backend.orm.EntityManager;
+import com.codename1.impl.backend.BackendApplication;
+import com.codename1.impl.backend.Management;
+import com.codename1.impl.backend.WiringEnvironment;
+import com.codename1.impl.backend.mcp.McpServer;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.codename1.backend.orm.EntityDefinition;
-import com.codename1.backend.orm.EntityManager;
 
 /// A configured, running server: the twenty lines every main used to open with,
 /// written once.
@@ -68,7 +73,16 @@ import com.codename1.backend.orm.EntityManager;
 /// DATABASE_URL=postgres://app:secret@db.internal/app PORT=8080 ./server
 /// ```
 public final class Backend {
+    static {
+        // First, so code in another package reaching for the internals while
+        // anything below initializes still finds them.
+        com.codename1.impl.backend.BackendAccess.install(new Access());
+    }
+
     private final HttpServer server;
+    /// What the listener hands every request to; [Access#dispatch] calls it
+    /// directly, for a test that answers requests without a socket.
+    private Serving serving;
     private final DataSource dataSource;
     private final EntityManager entities;
     private final Config config;
@@ -79,9 +93,9 @@ public final class Backend {
     /// stopping this one must not shut that down.
     private final Tracer ownTracer;
     /// The generated wiring of this server's beans, or null.
-    private final Application application;
+    private final BackendApplication application;
     /// The metrics exporter this server started, or null.
-    private final com.codename1.backend.metrics.MetricReader metricReader;
+    private final MetricReader metricReader;
     /// This server's managed beans; see [#getManagedBeans].
     private final List managedBeans;
     /// This server's session settings and store.
@@ -95,7 +109,7 @@ public final class Backend {
     private boolean measured;
 
     /// Whether this server records request and job metrics.
-    public boolean isMeasured() {
+    boolean isMeasured() {
         return measured;
     }
 
@@ -113,8 +127,8 @@ public final class Backend {
 
     private Backend(HttpServer server, DataSource dataSource, EntityManager entities,
                     Config config, int shutdownMillis, Tracer ownTracer,
-                    Application application,
-                    com.codename1.backend.metrics.MetricReader metricReader,
+                    BackendApplication application,
+                    MetricReader metricReader,
                     List managedBeans, Sessions sessions, Tasks.Registry tasks,
                     RequestLog requestLog, List gauges) {
         this.gauges = gauges;
@@ -122,14 +136,14 @@ public final class Backend {
         try {
             for ( ; added < gauges.size() ; added++) {
                 Object[] g = (Object[]) gauges.get(added);
-                com.codename1.backend.metrics.Metrics.addSource((String) g[0], (String) g[1],
+                com.codename1.impl.backend.MetricsAccess.get().addSource((String) g[0], (String) g[1],
                         (String) g[2], (com.codename1.backend.metrics.Gauge.Source) g[3]);
             }
         } catch (RuntimeException err) {
             // A start that fails here must not leave the gauges it did add.
             for (int iter = 0 ; iter < added ; iter++) {
                 Object[] g = (Object[]) gauges.get(iter);
-                com.codename1.backend.metrics.Metrics.removeSource((String) g[0],
+                com.codename1.impl.backend.MetricsAccess.get().removeSource((String) g[0],
                         (com.codename1.backend.metrics.Gauge.Source) g[3]);
             }
             throw err;
@@ -188,14 +202,14 @@ public final class Backend {
     }
 
     /// The build-generated wiring of this server's beans, or null when it has none.
-    public Application getApplication() {
+    BackendApplication getApplication() {
         return application;
     }
 
     /// The managed beans THIS server registered, as a copy. Per server rather than
     /// per process: a second server in the same process -- or this one started
     /// again -- must not list or invoke the beans of one that has stopped.
-    public List getManagedBeans() {
+    List getManagedBeans() {
         return new ArrayList(managedBeans);
     }
 
@@ -209,13 +223,28 @@ public final class Backend {
     }
 
     /// The log of this server's recent requests, off until something enables it.
-    public RequestLog getRequestLog() {
+    RequestLog getRequestLog() {
         return requestLog;
     }
 
     /// This server's sessions: their settings and the store they are kept in.
-    public Sessions getSessions() {
+    Sessions getSessions() {
         return sessions;
+    }
+
+    /// Answers `request` as the listener would -- sessions, scoped beans, tracing
+    /// and metrics included -- on the calling thread, without a socket. A request
+    /// no handler answers is a 404, as on the wire.
+    HttpServer.Response dispatch(HttpServer.Request request) throws Exception {
+        Serving chain = serving;
+        if (chain == null) {
+            throw new IllegalStateException("This server is not serving");
+        }
+        HttpServer.Response response = chain.handle(request);
+        if (response == null) {
+            response = HttpServer.Response.text(404, "Not Found");
+        }
+        return response;
     }
 
     /// Blocks until the server stops.
@@ -470,10 +499,10 @@ public final class Backend {
         // a stopped server and pool -- AFTER the drain: a scheduled run that ends
         // in it records its duration and outcome, and with the last measured
         // server's metrics already off that record was silently dropped.
-        com.codename1.backend.metrics.Metrics.disableServer(server, dataSource);
+        com.codename1.impl.backend.MetricsAccess.get().disableServer(server, dataSource);
         for (Object element : gauges) {
             Object[] g = (Object[]) element;
-            com.codename1.backend.metrics.Metrics.removeSource((String) g[0],
+            com.codename1.impl.backend.MetricsAccess.get().removeSource((String) g[0],
                     (com.codename1.backend.metrics.Gauge.Source) g[3]);
         }
         // This server's exporter too, BEFORE the beans: an export in progress
@@ -561,62 +590,12 @@ public final class Backend {
                 throws Exception;
     }
 
-    /// The build-generated wiring of an application: every bean, constructed and
-    /// injected by straight-line code the build wrote, and the lifecycle calls
-    /// around them.
-    ///
-    /// Nothing here is looked up or reflected. The build resolves which
-    /// constructor each bean gets, which bean each injection point receives and
-    /// in what order they are built, and writes that down as `new` and
-    /// setter calls; this interface is only where the server calls into it.
-    public interface Application {
-        /// Constructs the beans and returns the routers, once the database, if
-        /// any, is open.
-        HttpServer.Handler[] create(Environment environment) throws Exception;
-
-        /// Registers the websocket endpoints, which are beans too.
-        void registerWebSockets(HttpServer.WebSocketRegistry registry) throws Exception;
-
-        /// The server is accepting: scheduled jobs and exporters start here.
-        void started(Backend backend) throws Exception;
-
-        /// The server is about to drain: no new scheduled run starts after this.
-        void stopping();
-
-        /// The server has drained: the beans' destroy methods run here.
-        void stopped();
-
-        /// Whether a generated class needs [Backend#currentRequest]: a
-        /// request- or session-scoped bean reached from a singleton. False keeps
-        /// the per-request thread-local write out of servers that have none.
-        boolean tracksCurrentRequest();
-
-        /// A request has been answered; `beans` are its
-        /// `@RequestScope` beans, whose destroy methods run here.
-        void requestEnded(Object[] beans);
-
-        /// A session has ended -- invalidated, expired, or the server stopped;
-        /// `beans` are its `@SessionScope` beans, whose destroy
-        /// methods run here.
-        void sessionEnded(Object[] beans);
-
-        /// The scheduler running this application's `@Scheduled` jobs, or null.
-        Scheduler getScheduler();
-
-        /// Every bean the build wired: name, type, scope and what it was given.
-        /// For the management endpoint and the development MCP server.
-        List describeBeans();
-
-        /// Every route the build generated: method, path and handler.
-        List describeRoutes();
-    }
-
     /// The request the calling thread is serving, for generated scoped proxies.
     private static final ThreadLocal CURRENT_REQUEST = new ThreadLocal();
 
     /// The request the calling thread is serving, or null outside one. Maintained
-    /// only for applications whose build asked for it -- see
-    /// [Application#tracksCurrentRequest].
+    /// only for applications whose build asked for it: one with a request- or
+    /// session-scoped bean reached from a singleton.
     public static HttpServer.Request currentRequest() {
         return (HttpServer.Request) CURRENT_REQUEST.get();
     }
@@ -863,17 +842,24 @@ public final class Backend {
         private final Tasks.Registry tasks;
         private final RequestLog requestLog;
         private final java.util.concurrent.atomic.AtomicBoolean instrumented;
-        private final Application app;
+        private final BackendApplication app;
         private final boolean track;
         /// This server's tracer, or the untraced marker; bound for the request
         /// so work it hands to another thread -- an @Async call -- keeps it.
         private final Tracer tracer;
         /// Every request counted in and out, for a stop() one of them makes.
         private final InFlight inFlight;
+        /// `cn1.cors.*`, or null when CORS is off.
+        private final Cors cors;
+        /// `cn1.server.compression.*`, or null when compression is off.
+        private final Compression compression;
 
         Serving(HttpServer.Handler[] chain, Sessions sessions, Tasks.Registry tasks,
                 RequestLog requestLog, java.util.concurrent.atomic.AtomicBoolean instrumented,
-                Application app, boolean track, Tracer tracer, InFlight inFlight) {
+                BackendApplication app, boolean track, Tracer tracer, InFlight inFlight,
+                Cors cors, Compression compression) {
+            this.cors = cors;
+            this.compression = compression;
             this.tracer = tracer;
             this.inFlight = inFlight;
             this.chain = chain;
@@ -978,7 +964,7 @@ public final class Backend {
         public HttpServer.Response handle(HttpServer.Request request)
                 throws Exception {
             long started = instrumented.get()
-                    ? com.codename1.backend.metrics.Metrics.requestStarted()
+                    ? com.codename1.impl.backend.MetricsAccess.get().requestStarted()
                     : 0L;
             Object previous = null;
             // This server's sessions, not a process-wide set:
@@ -1004,11 +990,15 @@ public final class Backend {
                 HttpServer.Response response = null;
                 List attempted = new ArrayList(2);
                 try {
-                    for (HttpServer.Handler element : chain) {
-                        response = element.handle(request);
-                        if (response != null) {
-                            break;
-                        }
+                    // A cross-origin request the CORS policy does not admit never
+                    // reaches a handler.
+                    response = cors == null ? null : cors.reject(request);
+                    for (int i = 0 ; response == null && i < chain.length ; i++) {
+                        response = chain[i].handle(request);
+                    }
+                    if (response == null && cors != null) {
+                        // A preflight no handler took: the policy answers it.
+                        response = cors.preflight(request);
                     }
                     // Request beans end BEFORE the session is
                     // stored: a @PreDestroy that changes the
@@ -1064,6 +1054,21 @@ public final class Backend {
                     failed(request, attempted, startedMillis, err);
                     throw err;
                 }
+                if (response != null && (cors != null || compression != null)) {
+                    // A copy first. The handler may return one Response for every
+                    // request -- a static final constant -- and both policies write
+                    // into the object they are handed: compression replaced its body
+                    // with gzip for good, so the next client that never offered gzip
+                    // got it anyway, and CORS pinned the first allowed origin onto
+                    // it. withHeaders shares the map, and every write replaces it.
+                    response = response.withHeaders(response.extraHeaders);
+                }
+                if (cors != null) {
+                    cors.decorate(request, response);
+                }
+                if (compression != null) {
+                    compression.apply(request, response);
+                }
                 // Null is a 404 from here, which is what a
                 // router answers for a path it does not route.
                 requestLog.record(request, response == null ? 404
@@ -1076,7 +1081,7 @@ public final class Backend {
                 // route label it set is cleared -- left
                 // behind, the worker's next unrouted
                 // request would be recorded under it.
-                com.codename1.backend.metrics.Metrics.requestEnded(started,
+                com.codename1.impl.backend.MetricsAccess.get().requestEnded(started,
                         request.getMethod(), status);
                 // Destroyed while this is still the current
                 // request: a @PreDestroy that calls another
@@ -1156,91 +1161,6 @@ public final class Backend {
         return octets == 4;
     }
 
-    /// What an [Application] is built from.
-    public static final class Environment {
-        private final Config config;
-        private final DataSource dataSource;
-        private final EntityManager entities;
-
-        private final List tools;
-        private final List managed;
-        /// {name, description, unit, Gauge.Source}, for the server to add and later remove.
-        final List gauges = new ArrayList();
-
-        Environment(Config config, DataSource dataSource, EntityManager entities,
-                    List tools, List managed) {
-            this.config = config;
-            this.dataSource = dataSource;
-            this.entities = entities;
-            this.tools = tools;
-            this.managed = managed;
-        }
-
-        /// Publishes an `@McpTool` on this server's MCP endpoint. Generated
-        /// code calls this while it builds the beans; the tool belongs to this
-        /// server only, so a server started later in the same process does not
-        /// serve a tool bound to a bean that has been destroyed.
-        public void registerTool(com.codename1.backend.mcp.McpTool tool) {
-            for (Object element : tools) {
-                if (((com.codename1.backend.mcp.McpTool) element).name()
-                        .equals(tool.name())) {
-                    // Two active beans publishing one name: one would be
-                    // unreachable, and which depends on construction order.
-                    throw new IllegalStateException("Two MCP tools are named \""
-                            + tool.name() + "\"; give one a distinct name");
-                }
-            }
-            tools.add(tool);
-        }
-
-        /// Publishes a managed attribute as a gauge of this server's: added when
-        /// the server starts and removed when it stops. Generated code calls this.
-        public void registerGauge(String name, String description, String unit,
-                                  com.codename1.backend.metrics.Gauge.Source source) {
-            gauges.add(new Object[] {name, description, unit, source});
-        }
-
-        /// Registers a managed bean with this server. Generated code calls this.
-        public void registerManaged(ManagedBean bean) {
-            String objectName = bean.getObjectName();
-            if (objectName == null || objectName.length() == 0 || objectName.length() > 128) {
-                throw new IllegalArgumentException("A managed bean needs a name of 1 to 128 "
-                        + "characters");
-            }
-            for (int iter = 0 ; iter < objectName.length() ; iter++) {
-                char c = objectName.charAt(iter);
-                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                        || c == '_' || c == '.' || c == '-')) {
-                    // One URL segment, matched undecoded; see the build's check.
-                    throw new IllegalArgumentException("Managed bean \"" + objectName
-                            + "\": a name is letters, digits, _, - and . only");
-                }
-            }
-            for (Object element : managed) {
-                if (((ManagedBean) element).getObjectName()
-                        .equals(bean.getObjectName())) {
-                    throw new IllegalStateException("Two managed resources are named \""
-                            + bean.getObjectName() + "\"; set objectName on one");
-                }
-            }
-            managed.add(bean);
-        }
-
-        public Config getConfig() {
-            return config;
-        }
-
-        /// The pool, or null when this server has no database.
-        public DataSource getDataSource() {
-            return dataSource;
-        }
-
-        /// The entity manager, or null when the build generated no entities.
-        public EntityManager getEntityManager() {
-            return entities;
-        }
-    }
-
     /// Where a server's websocket endpoints come from.
     ///
     /// Deliberately the same shape as [Handlers]: the server calls this once
@@ -1298,15 +1218,15 @@ public final class Backend {
         private boolean createTables;
         private final List mcpTools = new ArrayList();
         /// The application a start in progress has begun building, until a Backend owns it.
-        private Application createdApplication;
+        private BackendApplication createdApplication;
         /// The executors a start in progress opened, until a Backend owns them.
         private Tasks.Registry startingTasks;
         private boolean createTablesGiven;
         private boolean handlersNeedADatabase;
         private boolean quiet;
         private Tracer tracer;
-        private Application application;
-        private com.codename1.backend.metrics.MetricReader metricReader;
+        private BackendApplication application;
+        private MetricReader metricReader;
         private OwnRoute managementRoute;
         private OwnRoute mcpRoute;
         private String[] compiledSettings;
@@ -1327,8 +1247,8 @@ public final class Backend {
         }
 
         /// The build-generated wiring of this server's beans. See
-        /// [Application]; the generated entry point calls this.
-        public Builder application(Application application) {
+        /// [BackendApplication]; the generated entry point calls this.
+        Builder application(BackendApplication application) {
             this.application = application;
             return this;
         }
@@ -1496,7 +1416,7 @@ public final class Backend {
         /// Exports metrics with this reader, once `open` has read the
         /// configuration and agreed to. The build calls this from the entry point
         /// of a project that enables OpenTelemetry.
-        public Builder metrics(com.codename1.backend.metrics.MetricReader reader) {
+        public Builder metrics(MetricReader reader) {
             this.metricReader = reader;
             return this;
         }
@@ -1504,18 +1424,18 @@ public final class Backend {
         /// Serves the MCP endpoint, with the application's `@McpTool`
         /// methods and, when `devTools` is given and the profile is a
         /// development one, the development tools. The build calls this; see
-        /// [com.codename1.backend.mcp.McpServer].
+        /// [McpServer].
         ///
         /// This method is the only code that names the endpoint's classes. The
         /// generated entry point calls it only for a build that asked for MCP, and
         /// the translator drops a method nothing calls -- so a server that did not
         /// ask has none of the endpoint in its binary.
-        public Builder mcp(final com.codename1.backend.mcp.McpServer.Extension devTools) {
+        Builder mcp(final McpServer.Extension devTools) {
             this.mcpRoute = new OwnRoute() {
                 @Override
                 HttpServer.Handler open(Config config, String name, List tools)
                         throws IOException {
-                    return com.codename1.backend.mcp.McpServer.fromConfig(config, devTools,
+                    return McpServer.fromConfig(config, devTools,
                             name, tools);
                 }
 
@@ -1523,19 +1443,19 @@ public final class Backend {
                 // anything else.
                 @Override
                 void attach(HttpServer.Handler opened, Backend running) {
-                    ((com.codename1.backend.mcp.McpServer) opened).attach(running);
+                    ((McpServer) opened).attach(running);
                 }
 
                 @Override
                 String unguardedBy(HttpServer.Handler opened) {
-                    return ((com.codename1.backend.mcp.McpServer) opened).hasToken() ? null
-                            : com.codename1.backend.mcp.McpServer.TOKEN;
+                    return ((McpServer) opened).hasToken() ? null
+                            : McpServer.TOKEN;
                 }
 
                 @Override
                 String announce(HttpServer.Handler opened, String base) {
-                    com.codename1.backend.mcp.McpServer server =
-                            (com.codename1.backend.mcp.McpServer) opened;
+                    McpServer server =
+                            (McpServer) opened;
                     return "cn1: MCP endpoint at " + base + server.getPath()
                             + (server.hasDevTools() ? " (with development tools)" : "");
                 }
@@ -1547,7 +1467,7 @@ public final class Backend {
         /// beans -- when the configuration turns them on; see [Management]. Like
         /// [#mcp], this is the only code that names them, and the generated entry
         /// point calls it only for a build that asked for them.
-        public Builder management() {
+        Builder management() {
             this.managementRoute = new OwnRoute() {
                 @Override
                 HttpServer.Handler open(Config config, String name, List tools)
@@ -1566,14 +1486,14 @@ public final class Backend {
         /// Settings compiled in from the settings annotations, as key and value
         /// pairs: the bottom layer of the configuration, below the properties
         /// files and the environment. The build calls this.
-        public Builder compiledSettings(String[] keysAndValues) {
+        Builder compiledSettings(String[] keysAndValues) {
             this.compiledSettings = keysAndValues;
             return this;
         }
 
         /// Adds a tool of the program's own to the MCP endpoint, beside the
         /// `@McpTool` methods the build found. Needs [#mcp].
-        public Builder mcpTool(com.codename1.backend.mcp.McpTool tool) {
+        Builder mcpTool(com.codename1.impl.backend.mcp.McpTool tool) {
             if (tool == null) {
                 throw new IllegalArgumentException("No tool");
             }
@@ -1582,7 +1502,7 @@ public final class Backend {
         }
 
         /// The name this server reports itself as, to MCP clients.
-        public Builder serviceName(String name) {
+        Builder serviceName(String name) {
             this.serviceName = name;
             return this;
         }
@@ -1692,7 +1612,7 @@ public final class Backend {
             // same as whether anything was configured: .dataSource(url)
             // makes the builder open one, and reading "was one configured" here
             // left exactly that case leaking on a failed start.
-            Application built = createdApplication;
+            BackendApplication built = createdApplication;
             createdApplication = null;
             Tasks.Registry tasks = startingTasks;
             startingTasks = null;
@@ -1775,9 +1695,9 @@ public final class Backend {
             // the first server's beans into the second.
             List tools = new ArrayList(mcpTools);
             List managedBeans = new ArrayList();
-            Environment environment = null;
+            WiringEnvironment environment = null;
             if (application != null) {
-                environment = new Environment(config, pool, manager, tools, managedBeans);
+                environment = new WiringEnvironment(config, pool, manager, tools, managedBeans);
                 HttpServer.Handler[] built = application.create(environment);
                 if (built != null) {
                     for (HttpServer.Handler element : built) {
@@ -1800,7 +1720,8 @@ public final class Backend {
             // handler. With no address chosen the listener would bind every
             // interface, so it binds loopback instead; an address chosen
             // explicitly that is not loopback needs the token.
-            String bindHost = host;
+            String bindHost = host != null && host.length() > 0 ? host
+                    : config.get(Config.SERVER_ADDRESS, null);
             String unguardedBy = mcpServer == null ? null : mcpRoute.unguardedBy(mcpServer);
             if (unguardedBy != null) {
                 if (bindHost == null || bindHost.length() == 0) {
@@ -1920,6 +1841,7 @@ public final class Backend {
             // context exists to leak there. This is a packaged-runtime path.
             boolean ownsContext = context != null && tls == null;
             HttpServer server;
+            Serving serving;
             // For EVERY server, handler-only ones too: their handlers can call
             // getSession(), and skipping the settings would, among other things,
             // send a TLS server's session cookie without Secure.
@@ -1938,7 +1860,7 @@ public final class Backend {
             final java.util.concurrent.atomic.AtomicBoolean instrumented =
                     new java.util.concurrent.atomic.AtomicBoolean();
             boolean bound = false;
-            final Application app = application;
+            final BackendApplication app = application;
             final boolean track = application != null && application.tracksCurrentRequest();
             try {
                 HttpServer.WebSocketRoutes routes = null;
@@ -1964,10 +1886,17 @@ public final class Backend {
                         }
                     };
                 }
+                Cors cors = Cors.fromConfig(config);
+                if (cors != null) {
+                    // Whether a request arrives over TLS, for telling a same-origin
+                    // request from a cross-origin one: the scheme is part of an origin.
+                    cors.servedOverTls(context != null);
+                }
+                serving = new Serving(chain, sessions, tasks, requestLog, instrumented, app,
+                        track, active != null ? active : Tracing.NONE, inFlight,
+                        cors, Compression.fromConfig(config));
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
-                        new Serving(chain, sessions, tasks, requestLog, instrumented, app, track,
-                                active != null ? active : Tracing.NONE, inFlight),
-                        context, routes, active != null ? active : Tracing.NONE);
+                        serving, context, routes, active != null ? active : Tracing.NONE);
                 bound = true;
             } finally {
                 if (!bound && ownsContext) {
@@ -2009,14 +1938,15 @@ public final class Backend {
                     measuring |= readerOpen;
                 }
                 if (measuring) {
-                    com.codename1.backend.metrics.Metrics.enableServer(server, pool);
+                    com.codename1.impl.backend.MetricsAccess.get().enableServer(server, pool);
                     instrumented.set(true);
                 }
                 backend = new Backend(server, pool, manager, config, drain,
                         active, application,
                         readerOpen ? metricReader : null,
                         managedBeans, sessions, tasks, requestLog,
-                        environment == null ? new ArrayList() : environment.gauges);
+                        environment == null ? new ArrayList() : environment.gauges());
+                backend.serving = serving;
                 owned = true;
             } finally {
                 if (!owned) {
@@ -2025,7 +1955,7 @@ public final class Backend {
                     // built session-scoped beans; nothing later destroys them --
                     // the outer clean-up ends only the singletons, and after them.
                     sessions.close();
-                    com.codename1.backend.metrics.Metrics.disableServer(server, pool);
+                    com.codename1.impl.backend.MetricsAccess.get().disableServer(server, pool);
                     if (readerOpen) {
                         metricReader.shutdown(0);
                     }
@@ -2176,7 +2106,11 @@ public final class Backend {
                         config.getInt(Config.DATASOURCE_BUSY_MILLIS, 5000),
                         config.getInt(Config.DATASOURCE_BORROW_MILLIS, 10000));
             }
-            boolean configured = config.get(Config.DATASOURCE_URL) != null;
+            // Resolves rather than get: a compiled-in ${DATABASE_URL} that this
+            // process does not set is not a database it was asked for, and a
+            // server that needs none starts. One that needs one fails below, in
+            // fromConfig, with the message naming the variable.
+            boolean configured = config.resolves(Config.DATASOURCE_URL);
             if (!configured && !handlersNeedADatabase && EntityManager.registered().length == 0) {
                 return null;
             }

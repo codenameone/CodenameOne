@@ -78,6 +78,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String PATH_VARIABLE = PKG + "PathVariable;";
     private static final String REQUEST_PARAM = PKG + "RequestParam;";
     private static final String REQUEST_HEADER = PKG + "RequestHeader;";
+    private static final String REQUEST_PART = PKG + "RequestPart;";
     private static final String REQUEST_BODY = PKG + "RequestBody;";
     private static final String RESPONSE_STATUS = PKG + "ResponseStatus;";
     private static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
@@ -166,6 +167,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     /** Where the generated bootstrap's name is left for the packaging goal to read. */
     public static final String MAIN_CLASS_RESOURCE = "META-INF/cn1-backend-main";
+
+    /**
+     * Where the routers, websocket endpoints and routes the wiring was built from
+     * are left for the test pass, which writes a wiring of its own per test
+     * context and has to register the same handlers. One tab-separated record a
+     * line: {@code package}, {@code router}, {@code socket} and {@code route}.
+     */
+    public static final String WIRING_RESOURCE = "META-INF/cn1-backend-wiring";
 
     private final TreeMap<String, Controller> controllers = new TreeMap<String, Controller>();
     /**
@@ -785,6 +794,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             AnnotationValues requestParam = annotations.get(REQUEST_PARAM);
             AnnotationValues requestHeader = annotations.get(REQUEST_HEADER);
             AnnotationValues requestBody = annotations.get(REQUEST_BODY);
+            AnnotationValues requestPart = annotations.get(REQUEST_PART);
             // EXACTLY one. The chain below is priority-ordered, so a parameter
             // carrying both @RequestHeader("Authorization") and @RequestParam("token")
             // silently bound whichever came first and read from a source the
@@ -792,13 +802,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // difference between a header a proxy controls and a query string the
             // caller writes. The contract client processor already refuses this.
             int bindings = (pathVariable != null ? 1 : 0) + (requestParam != null ? 1 : 0)
-                    + (requestHeader != null ? 1 : 0) + (requestBody != null ? 1 : 0);
+                    + (requestHeader != null ? 1 : 0) + (requestBody != null ? 1 : 0)
+                    + (requestPart != null ? 1 : 0);
             if (bindings > 1) {
                 ctx.error(cls, "Parameter " + (i + 1) + " of " + cls.getBinaryName() + "."
                         + m.getName() + " carries more than one binding annotation. One "
                         + "parameter reads from one place: keep @PathVariable, "
-                        + "@RequestParam, @RequestHeader or @RequestBody, and drop the "
-                        + "others.");
+                        + "@RequestParam, @RequestHeader, @RequestPart or @RequestBody, and "
+                        + "drop the others.");
                 return null;
             }
             if (pathVariable != null) {
@@ -844,6 +855,21 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             } else if (requestBody != null) {
                 p.kind = "BODY";
                 p.required = requestBody.getBoolOrDefault("required", true);
+            } else if (requestPart != null) {
+                p.kind = "PART";
+                p.name = requestPart.getStringOrDefault("value", "");
+                p.required = requestPart.getBoolOrDefault("required", true);
+                if (p.name.length() == 0) {
+                    ctx.error(cls, "@RequestPart needs the part name: "
+                            + cls.getBinaryName() + "." + m.getName());
+                    return null;
+                }
+                if (!isPartType(p.javaType)) {
+                    ctx.error(cls, "Cannot bind " + p.javaType + " from a multipart part on "
+                            + cls.getBinaryName() + "." + m.getName() + ". A @RequestPart "
+                            + "parameter is a HttpServer.Part, a byte[] or a String.");
+                    return null;
+                }
             } else if (isRequestType(p.javaType)) {
                 // The escape hatch: a handler that needs something this binding does not
                 // model takes the Request itself, exactly as it would have before.
@@ -851,8 +877,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             } else {
                 ctx.error(cls, "Parameter " + (i + 1) + " of " + cls.getBinaryName() + "."
                         + m.getName() + " has no binding annotation. Annotate it with "
-                        + "@PathVariable, @RequestParam, @RequestHeader or @RequestBody, "
-                        + "or declare it as HttpServer.Request");
+                        + "@PathVariable, @RequestParam, @RequestHeader, @RequestPart or "
+                        + "@RequestBody, or declare it as HttpServer.Request");
                 return null;
             }
             p.genericJavaType = genericType;
@@ -881,7 +907,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 if (why == null) {
                     p.genericJavaType = bodyType;
                     p.codecRead = codecs(ctx).readStatements(bodyType, "parsed", "com.codename1"
-                            + ".backend.JsonCodec.Path.ROOT", "null", "-1", "0", "target", "");
+                            + ".impl.backend.JsonCodec.Path.ROOT", "null", "-1", "0", "target", "");
                     route.params.add(p);
                     continue;
                 }
@@ -917,7 +943,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "generates the codecs.");
                 return null;
             }
-            if (!"REQUEST".equals(p.kind) && !isBindable(p.javaType, p.kind)) {
+            if (!"REQUEST".equals(p.kind) && !"PART".equals(p.kind)
+                    && !isBindable(p.javaType, p.kind)) {
                 ctx.error(cls, "Cannot bind " + p.javaType + " from the request on "
                         + cls.getBinaryName() + "." + m.getName() + ". Path, query and "
                         + "header values bind to String and the primitive types; a body "
@@ -1314,8 +1341,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (ctx.hasErrors()) {
             return;
         }
-        // And one that only serves files: a static root configured in source or
-        // in a properties file is a server the runtime builds a router for.
+        // And one that only serves files: a static root in a properties file is
+        // a server the runtime builds a router for.
         boolean staticFiles = settings.values.containsKey("cn1.static.root")
                 || applicationPropertyKnown(ctx, "cn1.static.root");
         if (controllers.isEmpty() && webSockets.isEmpty() && !beans.hasJobs()
@@ -1336,6 +1363,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 ctx.getLog().warn("could not remove the stale " + MAIN_CLASS_RESOURCE
                         + "; a build without clean may still package a backend entry "
                         + "point for controllers that no longer exist");
+            }
+            File record = new File(ctx.getOutputClassDir(), WIRING_RESOURCE);
+            if (record.isFile() && !record.delete()) {
+                ctx.getLog().warn("could not remove the stale " + WIRING_RESOURCE);
             }
             return;
         }
@@ -1412,6 +1443,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
             ctx.emitResource(MAIN_CLASS_RESOURCE, asciiBytes(bootstrap));
+            ctx.emitResource(WIRING_RESOURCE, asciiBytes(wiringRecord(entryPackage)));
         } catch (IOException ioe) {
             throw new ProcessingException("Could not compile the generated @RestController "
                     + "sources: " + ioe.getMessage(), ioe);
@@ -1572,6 +1604,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append(pad).append("com.codename1.backend.Tracing.route(")
           .append(quote(route.pattern)).append(");\n");
 
+        emitPartGuards(sb, route, pad);
         emitRequiredGuards(sb, route, pad);
         emitScalarGuards(sb, route, pad);
         emitBodyLocals(sb, route, pad);
@@ -1649,11 +1682,79 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (p.required || (p.defaultValue != null && p.defaultValue.length() > 0)) {
             return false;
         }
-        if ("PATH".equals(p.kind) || "REQUEST".equals(p.kind) || "BODY".equals(p.kind)) {
+        if ("PATH".equals(p.kind) || "REQUEST".equals(p.kind) || "BODY".equals(p.kind)
+                || "PART".equals(p.kind)) {
             return false;
         }
         return p.javaType != null && p.javaType.indexOf('.') < 0
                 && !"void".equals(p.javaType);
+    }
+
+    /// The part types a `@RequestPart` binds to, in either spelling of the nested
+    /// class.
+    private static boolean isPartType(String javaType) {
+        return "com.codename1.backend.HttpServer.Part".equals(javaType)
+                || "com.codename1.backend.HttpServer$Part".equals(javaType)
+                || "byte[]".equals(javaType) || "java.lang.String".equals(javaType);
+    }
+
+    /**
+     * Refuses what the client sent malformed before anything is bound: a body
+     * that is not UTF-8 for a body binding, a request parameter that cannot be
+     * read, a malformed multipart body, and a String part that is not text. getParts() throws for a body that claims to be
+     * multipart and is not, which unguarded would surface as a 500 from inside the
+     * argument list -- for what is the client's syntax error.
+     */
+    private static void emitPartGuards(StringBuilder sb, Route route, String pad) {
+        boolean any = false;
+        boolean bodyChecked = false;
+        for (int i = 0; i < route.params.size(); i++) {
+            Param p = route.params.get(i);
+            if ("BODY".equals(p.kind)) {
+                // Every body binding reads it as text, and a binary-typed body is
+                // not checked for UTF-8 on arrival, so getBody() throws for one that
+                // is not: refused as the client's error before anything reads it.
+                if (!bodyChecked) {
+                    bodyChecked = true;
+                    sb.append(pad).append("if (!bodyIsText(request)) {\n");
+                    sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                    sb.append(pad).append("            utf8(\"The request body is not UTF-8 text\"));\n");
+                    sb.append(pad).append("}\n");
+                }
+                continue;
+            }
+            if ("QUERY".equals(p.kind)) {
+                // A @RequestParam can be a multipart form field, and Request.param
+                // throws for a malformed multipart body or a field that is not
+                // UTF-8: refused here as the client's error, not left to surface
+                // as a 500 from the argument list.
+                sb.append(pad).append("String unreadable").append(i).append(" = paramProblem(request, ")
+                  .append(quote(p.name)).append(");\n");
+                sb.append(pad).append("if (unreadable").append(i).append(" != null) {\n");
+                sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("            utf8(unreadable").append(i).append("));\n");
+                sb.append(pad).append("}\n");
+                continue;
+            }
+            if (!"PART".equals(p.kind)) {
+                continue;
+            }
+            if (!any) {
+                any = true;
+                sb.append(pad).append("if (!partsWellFormed(request)) {\n");
+                sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("            utf8(\"The multipart body is malformed\"));\n");
+                sb.append(pad).append("}\n");
+            }
+            if ("java.lang.String".equals(p.javaType)) {
+                sb.append(pad).append("if (!partIsText(request.getPart(").append(quote(p.name))
+                  .append("))) {\n");
+                sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("            utf8(").append(quote("The part " + p.name
+                        + " is not UTF-8 text")).append("));\n");
+                sb.append(pad).append("}\n");
+            }
+        }
     }
 
     private static void emitRequiredGuards(StringBuilder sb, Route route, String pad) {
@@ -1665,11 +1766,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             String test;
             String what;
             if ("QUERY".equals(p.kind)) {
-                test = "request.queryParam(" + quote(p.name) + ") == null";
+                test = "request.param(" + quote(p.name) + ") == null";
                 what = "query parameter " + p.name;
             } else if ("HEADER".equals(p.kind)) {
                 test = "request.getHeader(" + quote(p.name) + ") == null";
                 what = "header " + p.name;
+            } else if ("PART".equals(p.kind)) {
+                test = "request.getPart(" + quote(p.name) + ") == null";
+                what = "part " + p.name;
             } else if ("BODY".equals(p.kind)) {
                 test = "request.getBody() == null || request.getBody().length() == 0";
                 what = "request body";
@@ -1722,7 +1826,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 raw = "bound[" + p.variableIndex + "]";
                 what = "path variable " + p.name;
             } else if ("QUERY".equals(p.kind)) {
-                raw = "request.queryParam(" + quote(p.name) + ")";
+                raw = "request.param(" + quote(p.name) + ")";
                 what = "query parameter " + p.name;
             } else if ("HEADER".equals(p.kind)) {
                 raw = "request.getHeader(" + quote(p.name) + ")";
@@ -2208,9 +2312,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if ("PATH".equals(p.kind)) {
             raw = "bound[" + p.variableIndex + "]";
         } else if ("QUERY".equals(p.kind)) {
-            raw = "request.queryParam(" + quote(p.name) + ")";
+            raw = "request.param(" + quote(p.name) + ")";
         } else if ("HEADER".equals(p.kind)) {
             raw = "request.getHeader(" + quote(p.name) + ")";
+        } else if ("PART".equals(p.kind)) {
+            String part = "request.getPart(" + quote(p.name) + ")";
+            if ("byte[]".equals(p.javaType)) {
+                return "partBytes(" + part + ")";
+            }
+            if ("java.lang.String".equals(p.javaType)) {
+                return "partText(" + part + ")";
+            }
+            return part;
         } else {
             return bodyExpression(p);
         }
@@ -2272,6 +2385,47 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     private static void emitRouterHelpers(StringBuilder sb) {
         sb.append("    private static final byte[] EMPTY = new byte[0];\n\n");
+        // The multipart helpers. Unused ones go with the dead-code pass.
+        sb.append("    private static boolean partsWellFormed(com.codename1.backend.HttpServer.Request request) {\n");
+        sb.append("        try {\n");
+        sb.append("            request.getParts();\n");
+        sb.append("            return true;\n");
+        sb.append("        } catch (IllegalArgumentException malformed) {\n");
+        sb.append("            return false;\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static boolean partIsText(com.codename1.backend.HttpServer.Part part) {\n");
+        sb.append("        try {\n");
+        sb.append("            return part == null || part.getText() != null;\n");
+        sb.append("        } catch (IllegalStateException binary) {\n");
+        sb.append("            return false;\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static boolean bodyIsText(com.codename1.backend.HttpServer.Request request) {\n");
+        sb.append("        try {\n");
+        sb.append("            request.getBody();\n");
+        sb.append("            return true;\n");
+        sb.append("        } catch (IllegalStateException binary) {\n");
+        sb.append("            return false;\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static String paramProblem(com.codename1.backend.HttpServer.Request request, "
+                + "String name) {\n");
+        sb.append("        try {\n");
+        sb.append("            request.param(name);\n");
+        sb.append("            return null;\n");
+        sb.append("        } catch (IllegalArgumentException malformed) {\n");
+        sb.append("            return \"The multipart body is malformed\";\n");
+        sb.append("        } catch (IllegalStateException binary) {\n");
+        sb.append("            return \"The parameter \" + name + \" is not UTF-8 text\";\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static byte[] partBytes(com.codename1.backend.HttpServer.Part part) {\n");
+        sb.append("        return part == null ? null : part.getBytes();\n");
+        sb.append("    }\n\n");
+        sb.append("    private static String partText(com.codename1.backend.HttpServer.Part part) {\n");
+        sb.append("        return part == null ? null : part.getText();\n");
+        sb.append("    }\n\n");
         sb.append("    /**\n");
         sb.append("     * Binds the path variables, or returns null when the rest of the path is\n");
         sb.append("     * not this route after all. `after[i]` is the literal that follows\n");
@@ -2517,7 +2671,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append("    private static boolean parses").append(numeric[i][0])
               .append("(String value) {\n");
             // ABSENT is fine; present and EMPTY is not. "?count=" is a parameter
-            // the client sent, and queryParam distinguishes it from one that was
+            // the client sent, and param() distinguishes it from one that was
             // omitted -- so treating the two alike let an empty value take the
             // default or zero and call the handler with a number nobody sent,
             // which is the same defect as accepting "zz". A default is documented
@@ -2668,17 +2822,23 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // left here is the part that differs between one server and the next,
         // and even that lives in the generated BackendWiring: every bean, built
         // and injected by straight-line code.
-        sb.append("        com.codename1.backend.Backend.builder()\n");
+        // The builder's public calls first; the build's own -- compiled settings,
+        // the management and MCP endpoints, the wiring -- go through the
+        // runtime's internal access, so none of them is public API.
+        sb.append("        com.codename1.impl.backend.BackendAccess cn1Access =\n")
+          .append("                com.codename1.impl.backend.BackendAccess.get();\n");
+        sb.append("        com.codename1.backend.Backend.Builder cn1Builder = "
+                + "com.codename1.backend.Backend.builder()");
         if (telemetry) {
             // The ONLY references to the OTLP exporters anywhere in the program,
             // which is what keeps them out of a binary that does not ask for
             // them: the translator drops what nothing reaches.
             String name = telemetryServiceName == null || telemetryServiceName.length() == 0
                     ? "null" : quote(telemetryServiceName);
-            sb.append("                .tracing(new com.codename1.backend.otel.OtlpTracer(")
-              .append(name).append("))\n");
-            sb.append("                .metrics(new com.codename1.backend.otel.OtlpMetricExporter(")
-              .append(name).append("))\n");
+            sb.append("\n                .tracing(new com.codename1.backend.otel.OtlpTracer(")
+              .append(name).append("))");
+            sb.append("\n                .metrics(new com.codename1.backend.otel.OtlpMetricExporter(")
+              .append(name).append("))");
         }
         if (beans != null && beans.needsDatabase) {
             // A bean that declares a DataSource, an EntityManager or a Session
@@ -2686,40 +2846,62 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // opens one for a server that has no entities either, which is how a
             // development profile's in-memory default reaches a bean that asked
             // only for the pool.
-            sb.append("                .requiresDataSource()\n");
+            sb.append("\n                .requiresDataSource()");
         }
+        sb.append(";\n");
         if (settings != null && !settings.values.isEmpty()) {
-            // The settings annotations, as the bottom layer of the configuration.
-            sb.append("                .compiledSettings(new String[] {");
+            // application.properties, as the bottom layer of the configuration.
+            sb.append("        cn1Access.compiledSettings(cn1Builder, new String[] {");
             List<String> flat = settings.flat();
             for (int i = 0; i < flat.size(); i++) {
                 sb.append(i == 0 ? "" : ", ").append(quote(flat.get(i)));
             }
-            sb.append("})\n");
+            sb.append("});\n");
         }
         if (devTools || (settings != null && settings.management)) {
             // The ONLY call that names the management endpoints, so a packaged
             // server that did not ask for them has none of their code: the
             // translator drops the builder method nothing calls, and the classes
             // only it named go with it.
-            sb.append("                .management()\n");
+            sb.append("        cn1Access.management(cn1Builder);\n");
         }
         boolean tools = beans != null && beans.hasTools();
         if (devTools || tools || (settings != null && settings.mcp)) {
             // The development tools are named only in a development build, so a
             // packaged server has none of their code.
-            sb.append("                .mcp(").append(devTools
-                    ? "new com.codename1.backend.mcp.DevTools()" : "null").append(")\n");
+            sb.append("        cn1Access.mcp(cn1Builder, ").append(devTools
+                    ? "new com.codename1.impl.backend.mcp.DevTools()" : "null").append(");\n");
             if (telemetryServiceName != null && telemetryServiceName.length() > 0) {
-                sb.append("                .serviceName(").append(quote(telemetryServiceName))
-                  .append(")\n");
+                sb.append("        cn1Access.serviceName(cn1Builder, ")
+                  .append(quote(telemetryServiceName)).append(");\n");
             }
         }
-        sb.append("                .application(new ")
-          .append(qualify(packageName, BackendWiringWriter.CLASS_NAME)).append("())\n");
-        sb.append("                .run();\n");
+        sb.append("        cn1Access.application(cn1Builder, new ")
+          .append(qualify(packageName, BackendWiringWriter.CLASS_NAME)).append("());\n");
+        sb.append("        cn1Builder.run();\n");
         sb.append("    }\n");
         sb.append("}\n");
+        return sb.toString();
+    }
+
+    /// What [#WIRING_RESOURCE] holds for this build.
+    String wiringRecord(String packageName) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("package\t").append(packageName).append('\n');
+        for (Controller c : controllers.values()) {
+            sb.append("router\t").append(c.binaryName).append('\t')
+              .append(qualify(c.packageName, c.routerSimpleName)).append('\n');
+            for (Route r : c.routes) {
+                sb.append("route\t").append(r.httpMethod).append('\t').append(r.pattern)
+                  .append('\t').append(c.binaryName).append('.').append(r.javaMethod)
+                  .append('\t').append(c.binaryName).append('\n');
+            }
+        }
+        for (WebSocketEndpoint e : webSockets.values()) {
+            sb.append("socket\t").append(e.path).append('\t').append(e.binaryName).append('\n');
+            sb.append("route\tWEBSOCKET\t").append(e.path).append('\t').append(e.binaryName)
+              .append('\t').append(e.binaryName).append('\n');
+        }
         return sb.toString();
     }
 
@@ -2905,6 +3087,54 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return false;
     }
 
+    /// The module's base `application.properties`, loaded, or null when it has
+    /// none or it can't be read.
+    static java.util.Properties baseApplicationProperties(ProcessorContext ctx) {
+        return loadProperties(ctx, applicationProperties(ctx));
+    }
+
+    /// The module's `application-<profile>.properties`, loaded, or null when it
+    /// has none. Looked for where the base file is looked for, and independently
+    /// of it: a module may keep only `application-test.properties`, and a test on
+    /// that profile must still get its settings.
+    static java.util.Properties profileApplicationProperties(ProcessorContext ctx,
+                                                             String profile) {
+        if (profile == null || profile.length() == 0) {
+            return null;
+        }
+        return loadProperties(ctx, findProperties(ctx, "application-" + profile + ".properties"));
+    }
+
+    /// `f` loaded as UTF-8, or null when it is null or unreadable. As UTF-8
+    /// because that is how Config reads the same file at run time:
+    /// Properties.load(InputStream) decodes ISO-8859-1, so a value with an accent
+    /// in it -- a password -- was compiled in as different characters from the
+    /// ones the server reads from the file.
+    private static java.util.Properties loadProperties(ProcessorContext ctx, File f) {
+        if (f == null) {
+            return null;
+        }
+        java.util.Properties props = new java.util.Properties();
+        java.io.Reader in = null;
+        try {
+            in = new java.io.InputStreamReader(new java.io.FileInputStream(f),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            props.load(in);
+            return props;
+        } catch (IOException err) {
+            ctx.getLog().warn("Could not read " + f + ": " + err.getMessage());
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // Only read; nothing to lose.
+                }
+            }
+        }
+    }
+
     /// The backend module's `application.properties`, or null.
     ///
     /// Looked for beside the module that owns the output directory FIRST
@@ -2914,6 +3144,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// in a multi-module application is `common`. The packaging goal does pass the
     /// module itself, which is the fallback.
     private static File applicationProperties(ProcessorContext ctx) {
+        return findProperties(ctx, "application.properties");
+    }
+
+    /// `name` in the places [#applicationProperties] searches, in its order.
+    private static File findProperties(ProcessorContext ctx, String name) {
         // Where a project keeps it, in the order Maven would see it. The copy in
         // the classes directory FIRST: the documented layout is
         // src/main/resources/application.properties, which process-resources has
@@ -2925,18 +3160,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         List<File> candidates = new ArrayList<File>();
         File classes = ctx.getOutputClassDir();
         if (classes != null) {
-            candidates.add(new File(classes, "application.properties"));
+            candidates.add(new File(classes, name));
             if (classes.getParentFile() != null
                     && "target".equals(classes.getParentFile().getName())) {
                 File module = classes.getParentFile().getParentFile();
-                candidates.add(new File(module, "src/main/resources/application.properties"));
-                candidates.add(new File(module, "application.properties"));
+                candidates.add(new File(module, "src/main/resources/" + name));
+                candidates.add(new File(module, name));
             }
         }
         File dir = ctx.getProjectDir();
         if (dir != null) {
-            candidates.add(new File(dir, "src/main/resources/application.properties"));
-            candidates.add(new File(dir, "application.properties"));
+            candidates.add(new File(dir, "src/main/resources/" + name));
+            candidates.add(new File(dir, name));
         }
         for (File file : candidates) {
             if (file.isFile()) {

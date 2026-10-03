@@ -43,14 +43,14 @@ import java.util.Map;
 /// `getSession(true)`, so a server that never does sets no cookie and keeps
 /// nothing. The cookie is `HttpOnly`, `SameSite=Lax` and, on a TLS
 /// server, `Secure`; its name, lifetime and store are configured under
-/// `cn1.session.*`. See [Sessions].
+/// `cn1.session.*`.
 ///
 /// Attributes live in the [SessionStore]. The in-memory store keeps any
 /// object; the database store keeps what [Json] can write -- strings,
 /// numbers, booleans, and maps and lists of those -- because it has to read them
 /// back in another process.
 ///
-/// A `@SessionScope` bean is never written to a store: the server that
+/// A session-scoped bean is never written to a store: the server that
 /// built it keeps it in memory for as long as the session lives, and runs its
 /// destroy methods when the session is invalidated, expires or the server stops.
 /// Another instance behind a load balancer builds its own.
@@ -148,7 +148,7 @@ public final class HttpSession {
         checkValid();
         invalid = true;
         attributes.clear();
-        // The @SessionScope beans stay until the request ends, when the server
+        // The session-scoped beans stay until the request ends, when the server
         // runs their destroy methods; dropping them here would skip those.
         dirty = true;
     }
@@ -304,14 +304,14 @@ public final class HttpSession {
 
     /// What generated code locks while it builds one of this session's beans: an
     /// object every loaded copy of the session shares.
-    public Object beanLock() {
+    Object beanLock() {
         Sessions o = owner;
         return o == null ? this : o.beanLock(this);
     }
 
-    /// The `@SessionScope` beans of this session, by the slot the build gave
+    /// The session-scoped beans of this session, by the slot the build gave
     /// each. Called by generated code.
-    public Object[] scopedBeans(int count) {
+    Object[] scopedBeans(int count) {
         Sessions o = owner;
         if (o != null) {
             return o.sharedBeans(this, count);

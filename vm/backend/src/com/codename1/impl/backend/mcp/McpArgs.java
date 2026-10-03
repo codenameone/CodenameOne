@@ -1,0 +1,316 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.backend.mcp;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The conversions the build's generated tool and operation adapters use: one
+/// argument out of a call's argument map, as the type the method declares.
+///
+/// Accepts what an agent or an HTTP client actually sends -- a JSON number or a
+/// numeric string, a JSON boolean or "true" -- and refuses anything else with an
+/// [IllegalArgumentException] naming the argument, which the MCP endpoint
+/// reports to the agent as a tool error it can correct.
+public final class McpArgs {
+    private McpArgs() {
+    }
+
+    /// One property of an input schema.
+    public static Map property(String type, String description, String[] values) {
+        Map p = new LinkedHashMap();
+        if (type != null && type.length() > 0) {
+            p.put("type", type);
+        }
+        if (description != null && description.length() > 0) {
+            p.put("description", description);
+        }
+        if (values != null) {
+            List list = new ArrayList();
+            for (String element : values) {
+                list.add(element);
+            }
+            p.put("enum", list);
+        }
+        return p;
+    }
+
+    /// An object schema.
+    public static Map object(Map properties, String[] required) {
+        Map out = new LinkedHashMap();
+        out.put("type", "object");
+        out.put("properties", properties);
+        if (required != null && required.length > 0) {
+            List list = new ArrayList();
+            for (String element : required) {
+                list.add(element);
+            }
+            out.put("required", list);
+        }
+        return out;
+    }
+
+    private static Object raw(Map args, String name, boolean required) {
+        Object v = args == null ? null : args.get(name);
+        if (v == null && required) {
+            throw new IllegalArgumentException("Missing required argument \"" + name + "\"");
+        }
+        return v;
+    }
+
+    public static Object any(Map args, String name, boolean required) {
+        return raw(args, name, required);
+    }
+
+    /// A string argument. A number or boolean is taken as its text, as Jackson
+    /// coerces a scalar for Spring; an array or object is refused. Its Java
+    /// text -- `[value]`, `{id=value}` -- is not what the caller sent, and a
+    /// malformed call would run a side-effecting tool with an identifier nobody
+    /// meant, where the schema promised a JSON string.
+    public static String string(Map args, String name, boolean required) {
+        Object v = raw(args, name, required);
+        if (v instanceof Map || v instanceof java.util.Collection || v instanceof Object[]) {
+            throw new IllegalArgumentException("\"" + name + "\" must be a string");
+        }
+        return v == null ? null : String.valueOf(v);
+    }
+
+    public static long longValue(Map args, String name, boolean required) {
+        Object v = raw(args, name, required);
+        return v == null ? 0L : toLong(v, name);
+    }
+
+    public static int intValue(Map args, String name, boolean required) {
+        long v = longValue(args, name, required);
+        if (v < Integer.MIN_VALUE || v > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        return (int) v;
+    }
+
+    /// A short argument, refused outside the short range rather than narrowed:
+    /// a cast would turn 40000 into -25536 and run the tool with a number
+    /// nobody sent.
+    public static short shortValue(Map args, String name, boolean required) {
+        int v = intValue(args, name, required);
+        if (v < Short.MIN_VALUE || v > Short.MAX_VALUE) {
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        return (short) v;
+    }
+
+    /// A byte argument, refused outside the byte range for the same reason.
+    public static byte byteValue(Map args, String name, boolean required) {
+        int v = intValue(args, name, required);
+        if (v < Byte.MIN_VALUE || v > Byte.MAX_VALUE) {
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        return (byte) v;
+    }
+
+    public static double doubleValue(Map args, String name, boolean required) {
+        Object v = raw(args, name, required);
+        return v == null ? 0 : toDouble(v, name);
+    }
+
+    public static boolean booleanValue(Map args, String name, boolean required) {
+        Object v = raw(args, name, required);
+        if (v == null) {
+            return false;
+        }
+        if (v instanceof Boolean) {
+            return ((Boolean) v).booleanValue();
+        }
+        String s = String.valueOf(v);
+        if ("true".equalsIgnoreCase(s)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(s)) {
+            return false;
+        }
+        throw new IllegalArgumentException("\"" + name + "\" must be true or false");
+    }
+
+    public static char charValue(Map args, String name, boolean required) {
+        String s = string(args, name, required);
+        if (s == null) {
+            return 0;
+        }
+        if (s.length() != 1) {
+            throw new IllegalArgumentException("\"" + name + "\" must be one character");
+        }
+        return s.charAt(0);
+    }
+
+    public static Integer integerObject(Map args, String name, boolean required) {
+        return raw(args, name, required) == null ? null
+                : Integer.valueOf(intValue(args, name, required));
+    }
+
+    public static Long longObject(Map args, String name, boolean required) {
+        return raw(args, name, required) == null ? null
+                : Long.valueOf(longValue(args, name, required));
+    }
+
+    public static Short shortObject(Map args, String name, boolean required) {
+        return raw(args, name, required) == null ? null
+                : Short.valueOf(shortValue(args, name, required));
+    }
+
+    public static Byte byteObject(Map args, String name, boolean required) {
+        return raw(args, name, required) == null ? null
+                : Byte.valueOf(byteValue(args, name, required));
+    }
+
+    public static Double doubleObject(Map args, String name, boolean required) {
+        return raw(args, name, required) == null ? null
+                : Double.valueOf(doubleValue(args, name, required));
+    }
+
+    public static Float floatObject(Map args, String name, boolean required) {
+        return raw(args, name, required) == null ? null
+                : Float.valueOf(floatValue(args, name, required));
+    }
+
+    /// A float argument, refused when it has no float value: a finite number
+    /// such as 1e100 would otherwise narrow to infinity, and the method would
+    /// run with a number nobody sent.
+    public static float floatValue(Map args, String name, boolean required) {
+        double d = doubleValue(args, name, required);
+        if (Double.isNaN(d) || Double.isInfinite(d) || Math.abs(d) > Float.MAX_VALUE) {
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        float f = (float) d;
+        if (f == 0 && d != 0) {
+            // Below the smallest float: 1e-100 would arrive as 0, a different
+            // number from the one sent, like the overflow above.
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        return f;
+    }
+
+    public static Boolean booleanObject(Map args, String name, boolean required) {
+        return raw(args, name, required) == null ? null
+                : Boolean.valueOf(booleanValue(args, name, required));
+    }
+
+    public static Character characterObject(Map args, String name, boolean required) {
+        return raw(args, name, required) == null ? null
+                : Character.valueOf(charValue(args, name, required));
+    }
+
+    public static Map map(Map args, String name, boolean required) {
+        Object v = raw(args, name, required);
+        if (v == null || v instanceof Map) {
+            return (Map) v;
+        }
+        throw new IllegalArgumentException("\"" + name + "\" must be an object");
+    }
+
+    public static List list(Map args, String name, boolean required) {
+        Object v = raw(args, name, required);
+        if (v == null || v instanceof List) {
+            return (List) v;
+        }
+        throw new IllegalArgumentException("\"" + name + "\" must be an array");
+    }
+
+    private static String constantName(Object constant) {
+        return constant instanceof Enum ? ((Enum) constant).name() : String.valueOf(constant);
+    }
+
+    /// The constant of `values` -- an enum's values() -- that the argument names.
+    public static Object enumValue(Object[] values, Map args, String name, boolean required) {
+        String s = string(args, name, required);
+        if (s == null) {
+            return null;
+        }
+        // By name(), which is what the generated schema advertises; toString()
+        // may be overridden into a display label no schema lists.
+        for (Object element : values) {
+            if (constantName(element).equals(s)) {
+                return element;
+            }
+        }
+        StringBuilder allowed = new StringBuilder();
+        for (int iter = 0 ; iter < values.length ; iter++) {
+            allowed.append(iter == 0 ? "" : ", ").append(constantName(values[iter]));
+        }
+        throw new IllegalArgumentException("\"" + name + "\" must be one of " + allowed);
+    }
+
+    /// A boxed number as a double, NaN for null.
+    public static double toDouble(Object value) {
+        return value instanceof Number ? ((Number) value).doubleValue() : Double.NaN;
+    }
+
+    private static long toLong(Object v, String name) {
+        if (v instanceof Long || v instanceof Integer || v instanceof Short
+                || v instanceof Byte) {
+            return ((Number) v).longValue();
+        }
+        if (v instanceof Number) {
+            double d = ((Number) v).doubleValue();
+            if (Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {
+                throw new IllegalArgumentException("\"" + name + "\" must be a whole number");
+            }
+            // longValue() saturates: 1e20 would become Long.MAX_VALUE and the tool
+            // would act on a number nobody sent. Both boundaries are refused: 2^63
+            // is out of range, and a double of exactly -2^63 is as likely to be a
+            // rounded -9223372036854775809.0 as the minimum itself -- doubles are
+            // 2048 apart there. The exact minimum written as an integer arrives as
+            // a Long above and stays valid.
+            if (d <= -9.223372036854775808E18 || d >= 9.223372036854775808E18) {
+                throw new IllegalArgumentException("\"" + name + "\" is out of range");
+            }
+            return (long) d;
+        }
+        try {
+            return Long.parseLong(String.valueOf(v).trim());
+        } catch (NumberFormatException err) {
+            throw new IllegalArgumentException("\"" + name + "\" must be a whole number", err);
+        }
+    }
+
+    private static double toDouble(Object v, String name) {
+        double d;
+        if (v instanceof Number) {
+            d = ((Number) v).doubleValue();
+        } else {
+            try {
+                d = Double.parseDouble(String.valueOf(v).trim());
+            } catch (NumberFormatException err) {
+                throw new IllegalArgumentException("\"" + name + "\" must be a number", err);
+            }
+        }
+        // The schema advertises a JSON number, and JSON has no NaN or infinity;
+        // parseDouble accepts the strings "NaN" and "Infinity", which would slip
+        // past every comparison the method makes against its own limits.
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            throw new IllegalArgumentException("\"" + name + "\" must be a finite number");
+        }
+        return d;
+    }
+}

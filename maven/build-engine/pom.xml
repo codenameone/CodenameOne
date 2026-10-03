@@ -255,6 +255,14 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- The test support the backend test pass generates code against, so
+             BackendTestGeneratorTest can start a generated context and run a test. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-backend-test</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

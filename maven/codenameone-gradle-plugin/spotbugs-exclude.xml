@@ -23,6 +23,20 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Field name="compileClasspath"/>
     </Match>
+    <!-- The same lazy, deliberately shared FileCollections: the test compile's
+         classpath, the main source set's class directories, and the other test
+         compiler's output and sources, resolved only when the test pass runs. -->
+    <Match>
+        <Class name="com.codename1.gradle.tasks.ProcessTestAnnotationsAction"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Or>
+            <Field name="testClasspath"/>
+            <Field name="mainClassDirs"/>
+            <Field name="otherTestClasses"/>
+            <Field name="deferTo"/>
+        </Or>
+    </Match>
     <!-- The source set's classes directories, the same lazy, deliberately shared
          FileCollection: it names Kotlin's destination wherever the build put it,
          which is only known once the Kotlin plugin has configured its task. -->

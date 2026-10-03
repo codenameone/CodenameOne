@@ -58,7 +58,7 @@ final class BackendJsonCodecs {
     static final String JSON_IGNORE = "Lcom/codename1/annotations/JsonIgnore;";
     private static final String WRITABLE = "com/codename1/backend/Json$Writable";
     private static final String JSON = "com.codename1.backend.Json";
-    private static final String CODEC = "com.codename1.backend.JsonCodec";
+    private static final String CODEC = "com.codename1.impl.backend.JsonCodec";
     private static final String SINK = "com.codename1.backend.ByteSink";
 
     private static final Set<String> PRIMITIVES = new HashSet<String>(Arrays.asList(

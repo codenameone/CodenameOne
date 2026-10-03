@@ -1,5 +1,5 @@
 @echo off
-rem Run the native Windows hellocodenameone exe against a Cn1ssScreenshotServer
+rem Run the native Windows hellocodenameone exe against the CI test server
 rem and let the Cn1ssDeviceRunner suite emit screenshots over the WebSocket.
 rem Screenshots land in OUT (default: repo developer-guide-windows-port/hello-shots).
 rem Arg 1 (optional): seconds to let the suite run (default 180).
@@ -11,21 +11,17 @@ if not exist "%OUT%" mkdir "%OUT%"
 del /q "%OUT%\*.png" 2>nul
 del /q "%TEMP%\hello-out.txt" 2>nul
 
-rem Compile the shared cn1ss screenshot server.
-set SRV=%TEMP%\cn1ss-srv
-if not exist "%SRV%" mkdir "%SRV%"
-"%JAVA_HOME%\bin\javac" -d "%SRV%" -sourcepath Y:\scripts\common\java Y:\scripts\common\java\Cn1ssScreenshotServer.java || exit /b 1
-
-rem Start the server (background, log captured) and wait until it binds
-rem 127.0.0.1:8765 (it prints a CN1SS_SERVER_PORT readiness line).
+rem Start the test server (scripts\hellocodenameone\backend: screenshots in, REST
+rem out) through Git for Windows' bash, which builds it with Maven the first time,
+rem and wait until it prints its "listening on http port" readiness line.
 del /q "%TEMP%\cn1ss-server.log" 2>nul
-start "cn1ss-server" /b cmd /c ""%JAVA_HOME%\bin\java" -cp "%SRV%" Cn1ssScreenshotServer --port 8765 --out "%OUT%" > %TEMP%\cn1ss-server.log 2>&1"
+start "cn1ss-server" /b cmd /c ""%ProgramFiles%\Git\bin\bash.exe" Y:/scripts/hellocodenameone/backend/server.sh run --jvm --port 8765 --out "%OUT%" > %TEMP%\cn1ss-server.log 2>&1"
 set /a tries=0
 :waitserver
 ping -n 2 127.0.0.1 >nul
-findstr /C:"CN1SS_SERVER_PORT" "%TEMP%\cn1ss-server.log" >nul 2>&1 && goto serverup
+findstr /C:"listening on http port" "%TEMP%\cn1ss-server.log" >nul 2>&1 && goto serverup
 set /a tries+=1
-if %tries% LSS 15 goto waitserver
+if %tries% LSS 300 goto waitserver
 echo WARNING: server readiness line not seen; proceeding anyway
 :serverup
 echo ====SERVER LOG (startup)====

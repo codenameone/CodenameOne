@@ -132,8 +132,32 @@
       image), the check is skipped.
     -->
     <Match>
-        <Class name="com.codename1.backend.CronSchedule" />
+        <Class name="com.codename1.impl.backend.CronSchedule" />
         <Method name="knownZone" />
         <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+    </Match>
+
+    <!--
+    com.codename1.io.gzip is the JZlib port (BSD), shared with the client through
+    @SharedWithBackend so both server twins inflate and deflate in pure Java with
+    no zlib to link. It is third-party code whose style we don't own, and the core
+    excludes exactly these patterns on exactly these classes (see
+    maven/core-unittests/spotbugs-exclude.xml); the same source is analysed here.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.io\.gzip\.InfBlocks.*" />
+        <Bug pattern="SA_FIELD_SELF_ASSIGNMENT" />
+    </Match>
+    <Match>
+        <Class name="~com\.codename1\.io\.gzip\.(InfBlocks|InfCodes|Inflate).*" />
+        <Bug pattern="SF_SWITCH_FALLTHROUGH" />
+    </Match>
+    <Match>
+        <Class name="~com\.codename1\.io\.gzip\.Deflate.*" />
+        <Bug pattern="ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.io.gzip.GZIPHeader" />
+        <Bug pattern="NM_CONFUSING" />
     </Match>
 </FindBugsFilter>

@@ -127,6 +127,63 @@ class ConfigTest {
     }
 
     @Test
+    @DisplayName("resolves: absent and unset-without-fallback are unset, a fallback resolves")
+    void resolvesTellsAskedForFromUnresolvable() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.test.a", "${CN1_TEST_NEVER_SET_VAR}");
+        p.setProperty("cn1.test.b", "${CN1_TEST_NEVER_SET_VAR:fallback}");
+        p.setProperty("cn1.test.c", "plain");
+        Config config = Config.of(p, "production");
+        assertFalse(config.resolves("cn1.test.absent"));
+        assertFalse(config.resolves("cn1.test.a"));
+        assertTrue(config.resolves("cn1.test.b"));
+        assertTrue(config.resolves("cn1.test.c"));
+        // get() still fails loudly for code that reads the value.
+        assertThrows(IOException.class, () -> config.get("cn1.test.a"));
+        // A malformed reference is not "unset": it still fails.
+        p.setProperty("cn1.test.d", "${UNCLOSED");
+        assertThrows(IOException.class, () -> config.resolves("cn1.test.d"));
+    }
+
+    @Test
+    @DisplayName("a test's own settings win over the process, and only those")
+    void testSettingsWinOverTheProcess() throws Exception {
+        // What @BackendTest builds: a shell that exports PORT or DATABASE_URL
+        // must not move a test off the free port or the in-memory database it
+        // asked for.
+        System.setProperty(Config.SERVER_PORT, "9999");
+        System.setProperty(Config.DATASOURCE_URL, "postgres://prod/db");
+        Properties mine = new Properties();
+        mine.setProperty(Config.SERVER_PORT, "0");
+        Config config = Config.overriding(mine, "test")
+                .withCompiledDefaults(new String[] {"cn1.test.value", "compiled"});
+        assertEquals(0, config.getInt(Config.SERVER_PORT, 8080));
+        // A key the test does not name falls through to the usual layers.
+        assertEquals("postgres://prod/db", config.get(Config.DATASOURCE_URL));
+        assertEquals("compiled", config.get("cn1.test.value"));
+        assertTrue(config.keys().contains(Config.SERVER_PORT), String.valueOf(config.keys()));
+        assertTrue(config.isDevelopmentProfile());
+    }
+
+    @Test
+    @DisplayName("a compiled-in cn1.profile applies when nothing above it names one")
+    void aCompiledProfileApplies(@TempDir File dir) throws Exception {
+        // A packaged server with no file beside it: the committed
+        // application.properties, compiled in, chooses the profile.
+        write(dir, "application-staging.properties", "cn1.stage=yes\n");
+        Config config = Config.load(dir.getAbsolutePath())
+                .withCompiledDefaults(new String[] {Config.PROFILE, "staging"});
+        assertEquals("staging", config.getProfile());
+        assertEquals("yes", config.get("cn1.stage"), "the compiled profile's file was not read");
+        // A base file on disk that names a profile still wins over the compiled one.
+        File other = new File(dir, "named");
+        other.mkdirs();
+        write(other, "application.properties", "cn1.profile=dev\n");
+        assertEquals("dev", Config.load(other.getAbsolutePath())
+                .withCompiledDefaults(new String[] {Config.PROFILE, "staging"}).getProfile());
+    }
+
+    @Test
     @DisplayName("no files at all is a configuration, not a failure")
     void missingFilesAreNotAnError(@TempDir File dir) throws Exception {
         // The normal shape of a FROM scratch container: there is nothing next to

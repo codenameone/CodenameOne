@@ -23,6 +23,7 @@
 package com.codename1.gradle;
 
 import com.codename1.gradle.tasks.ProcessAnnotationsAction;
+import com.codename1.gradle.tasks.ProcessTestAnnotationsAction;
 import com.codename1.gradle.tasks.RunBackendTask;
 import com.codename1.maven.GradleProjectTemplate;
 import com.codename1.project.ProjectLayout;
@@ -56,6 +57,10 @@ final class BackendSupport {
     /// The SQLite driver the dev profile's in-memory database uses, as the Maven
     /// backend module declares it.
     static final String SQLITE_JDBC = "org.xerial:sqlite-jdbc:3.46.1.0";
+    /// The JUnit a backend's tests are written against; the compiled test run
+    /// translates them against codenameone-backend-test's subset of the same API.
+    static final String JUNIT_JUPITER = "org.junit.jupiter:junit-jupiter:5.9.3";
+    static final String JUNIT_LAUNCHER = "org.junit.platform:junit-platform-launcher:1.9.3";
 
     private BackendSupport() {
     }
@@ -72,6 +77,7 @@ final class BackendSupport {
         // execution does.
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             AppSupport.processingInputs(compile, layout, userProperties);
+            backendSettingsInputs(project, compile, layout);
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().getAsFile(), AppSupport.stubsDir(layout), layout.projectDir(),
                     layout.settingsFile(), project.provider(() -> AppSupport.sourceRoots(main, layout)),
@@ -87,6 +93,7 @@ final class BackendSupport {
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     AppSupport.processingInputs(compile, layout, userProperties);
+                    backendSettingsInputs(project, compile, layout);
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                             AppSupport.kotlinDestinationProvider(compile, layout), AppSupport.stubsDir(layout),
                             layout.projectDir(), layout.settingsFile(),
@@ -95,6 +102,8 @@ final class BackendSupport {
                             .withPendingJavaSources(main.getJava().getSrcDirs())
                             .withSourceEncoding(AppSupport.javaEncoding(project, main)));
                 }));
+
+        applyTests(project, layout, ext, main);
 
         project.getTasks().register("runBackend", RunBackendTask.class, t -> {
             t.setGroup(AppSupport.GROUP);
@@ -111,6 +120,71 @@ final class BackendSupport {
         });
         BackendPackageSupport.register(project, layout, main, ext);
         UpdateSupport.register(project, layout);
+    }
+
+    /// `@BackendTest` support, as the Maven archetype's backend module has it: the
+    /// test library and JUnit 5, a fresh JVM per test class (one server runs per
+    /// process), and the test pass after the test classes compile.
+    private static void applyTests(final Project project, final ProjectLayout layout,
+                                   final CodenameOneExtension ext, final SourceSet main) {
+        AppSupport.addFramework(project, "testImplementation", ext.getVersion(), "codenameone-backend-test");
+        project.getDependencies().add("testImplementation", JUNIT_JUPITER);
+        project.getDependencies().add("testRuntimeOnly", JUNIT_LAUNCHER);
+        final SourceSet test = project.getExtensions().getByType(JavaPluginExtension.class).getSourceSets()
+                .getByName(SourceSet.TEST_SOURCE_SET_NAME);
+        final Provider<List<String>> roots = project.provider(() -> {
+            List<String> all = new ArrayList<String>(AppSupport.sourceRoots(main, layout));
+            for (File dir : test.getJava().getSrcDirs()) {
+                all.add(dir.getAbsolutePath());
+            }
+            all.add(new File(layout.projectDir(), "src/test/kotlin").getAbsolutePath());
+            return all;
+        });
+        final File stubs = new File(layout.buildDir(), "generated/sources/cn1-test-stubs");
+        // A mixed Java and Kotlin test set is one hierarchy -- a Kotlin test can
+        // extend a Java @BackendTest base -- so the pass reads both outputs at once.
+        // Kotlin compiles first and Java after it, against the Kotlin classes: the
+        // pass runs after the Java compile, over both, and after the Kotlin one only
+        // when there is no Java test source (compileTestJava is then NO-SOURCE and
+        // runs no action).
+        final org.gradle.api.file.ConfigurableFileCollection kotlinTestClasses = project.files();
+        project.getTasks().named(test.getCompileJavaTaskName(), JavaCompile.class, compile -> {
+            // The generated contexts embed application.properties and the profile's
+            // file, so a change to either alone must recompile and regenerate them.
+            backendSettingsInputs(project, compile, layout);
+            compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
+                    main.getOutput().getClassesDirs(), compile.getDestinationDirectory().getAsFile(),
+                    stubs, layout.projectDir(), roots, AppSupport.javaEncoding(project, main),
+                    compile.getClasspath(), kotlinTestClasses, null));
+        });
+        project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
+                project.getTasks().named("compileTestKotlin").configure(compile -> {
+                    backendSettingsInputs(project, compile, layout);
+                    Provider<File> kotlinOut = AppSupport.kotlinDestinationProvider(compile, layout);
+                    kotlinTestClasses.from(kotlinOut);
+                    compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
+                            main.getOutput().getClassesDirs(), kotlinOut, stubs,
+                            layout.projectDir(), roots, AppSupport.javaEncoding(project, main),
+                            test.getCompileClasspath(), null, test.getJava()));
+                }));
+        project.getTasks().withType(org.gradle.api.tasks.testing.Test.class).configureEach(t -> {
+            t.useJUnitPlatform();
+            t.setForkEvery(1L);
+        });
+    }
+
+    /// The backend's application.properties and profile files as inputs of
+    /// `compile`: the build compiles them into the server, and into each test's
+    /// context, so a settings-only edit must not leave the task up to date.
+    private static void backendSettingsInputs(Project project, org.gradle.api.Task compile, ProjectLayout layout) {
+        // Both places the processor reads them from: the project directory, and the
+        // conventional src/main/resources, where most projects keep them.
+        compile.getInputs().files(project.fileTree(layout.projectDir(), tree -> {
+            tree.include("application.properties", "application-*.properties",
+                    "src/main/resources/application.properties",
+                    "src/main/resources/application-*.properties");
+        })).withPropertyName("cn1BackendSettings")
+                .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE);
     }
 
     static List<String> split(String s) {

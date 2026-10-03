@@ -22,7 +22,7 @@
  */
 package com.codenameone.developerguide.backend.beans;
 
-import com.codename1.backend.annotations.Service;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.orm.session.Session;
 import com.codenameone.developerguide.backend.Reminder;
@@ -30,7 +30,7 @@ import com.codenameone.developerguide.backend.Reminder;
 import java.util.Date;
 
 // tag::backend-tx-session[]
-@Service
+@Component
 public class ReminderService {
     private final Session session;      // the current transaction's session
 

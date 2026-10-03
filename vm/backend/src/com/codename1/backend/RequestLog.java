@@ -32,7 +32,7 @@ import java.util.Map;
 ///
 /// Off unless the development tools turn it on. Off, recording is a static
 /// read per request and nothing else.
-public final class RequestLog {
+final class RequestLog {
     /// Per server, never per process: with two servers in one process, the one
     /// running the development tools must not show the other's request targets
     /// and exceptions. Volatile: the development tools switch it on after the
@@ -41,9 +41,6 @@ public final class RequestLog {
     private Map[] ring = new Map[0];
     private int next;
     private int size;
-
-    RequestLog() {
-    }
 
     /// Starts keeping the last `capacity` requests.
     public synchronized void enable(int capacity) {

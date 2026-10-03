@@ -51,8 +51,12 @@ one annotation:
 | `String`, or a numeric or `boolean` primitive
 
 | `@RequestParam("q")`
-| a query parameter
+| a query parameter, or a field of a form body
 | `String`, or a numeric or `boolean` primitive
+
+| `@RequestPart("file")`
+| one part of a `multipart/form-data` body
+| `HttpServer.Part`, `byte[]`, or `String` for a text field
 
 | `@RequestHeader("Idempotency-Key")`
 | a request header
@@ -204,6 +208,102 @@ request on it, so a handler that keeps the body beyond its own call copies what 
 needs. That's the price of a router that allocates nothing for a route without
 path variables.
 
+==== Forms and file uploads
+
+A browser form posts its fields as `application/x-www-form-urlencoded`, or as
+`multipart/form-data` when it carries a file. `@RequestParam` reads a field of
+either kind of form the way it reads a query parameter, so a handler doesn't
+care how the client encoded it. The query string wins when both have the name,
+as it does in a servlet container. `@RequestPart` binds one part of a multipart
+body, which is the way to a file:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Uploads.java[tag=backend-request-part,indent=0]
+----
+
+An `HttpServer.Part` has the part's name, its file name when it's a file, its
+content type, its own headers and its bytes. A body that isn't well-formed
+multipart is answered 400 before the method runs, and so is a request without a
+required part. A handler that takes the request itself reads the same parts with
+`getParts()` and `getPart(name)`, and reads a field with `param(name)`.
+
+The body limit applies to the whole multipart request, files included: 8 MB, as
+for any other body. A body that isn't text -- an upload, an image,
+`application/octet-stream` -- reaches the handler as bytes through
+`getBodyBytes()`. `getBody()` returns text only for a text type, JSON, XML or a
+form, after checking that it's valid UTF-8, and refuses a binary body rather
+than hand the handler garbled characters.
+
+==== Compression
+
+`cn1.server.compression.enabled=true` turns on gzip for responses, with the two
+other settings Spring Boot has for it. A response is compressed when the client
+sends `Accept-Encoding: gzip`, its type is in `cn1.server.compression.mimeTypes`
+(text, JSON, JavaScript and XML by default), and its body is at least
+`cn1.server.compression.minResponseSize` bytes (2048 by default). A static file
+is left unchanged, because it's sent straight from the page cache, and so is a
+response whose handler set a `Content-Encoding` of its own. A range answer (`206` or any
+response with `Content-Range`) is never compressed either, because its offsets
+describe the uncompressed bytes, and neither is a response with a strong `ETag`,
+which names its exact bytes, as Tomcat leaves one by default. Compression is off
+by default because it trades processor time for bytes, and a server behind a
+proxy that already compresses would pay for it twice.
+
+A request body sent with `Content-Encoding: gzip` is decompressed before the
+handler sees it, whether responses are compressed or not. It's held to the same
+8 MB limit after decompression, so a small compressed body can't expand past it.
+A request in any other encoding is answered 415.
+
+==== Cross-origin requests
+
+A browser refuses to let a page read a response from another origin -- another
+scheme, host or port -- unless the server says it may. A web app served from one
+host that calls an API on another needs the API to say so, and the `cn1.cors`
+settings do:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.properties[tag=backend-web-properties-001,indent=0]
+----
+
+[cols="2,3", options="header"]
+|===
+| Key | What it sets
+
+| `cn1.cors.allowedOrigins`
+| The origins that may call the server, separated by commas, or `*` for any.
+  Each is `scheme://host[:port]` with no path, as a browser sends it in
+  `Origin`; the server refuses to start with anything else. Cross-origin
+  requests are refused while this is unset.
+
+| `cn1.cors.allowedMethods`
+| The methods a cross-origin request may use, preflighted or not. All the
+  common ones by default.
+
+| `cn1.cors.allowedHeaders`
+| The request headers a preflight allows, `*` by default.
+
+| `cn1.cors.exposedHeaders`
+| Response headers beyond the basic ones that the page may read.
+
+| `cn1.cors.allowCredentials`
+| Whether the browser sends cookies and the page may read the answer. A browser
+  refuses this with a `*` origin, so the server refuses that combination when
+  it starts.
+
+| `cn1.cors.maxAgeSeconds`
+| How long a browser may cache a preflight answer, 1800 seconds by default.
+|===
+
+The server answers a preflight `OPTIONS` request itself, and adds the headers to
+every response to an allowed origin. A cross-origin request from an origin not on
+the list, or with a method not on it, is refused with a 403 before any handler
+runs, as Spring refuses it; a request whose `Origin` is the server itself isn't a
+cross-origin request. A
+handler that maps `OPTIONS` or sets `Access-Control-Allow-Origin` itself keeps its
+own policy, which is how the MCP endpoint keeps the stricter one it has.
+
 ==== Serving static files
 
 `cn1.static.root` names a directory, and the server answers requests under
@@ -280,7 +380,7 @@ injected the same way, and two endpoints claiming one path is a build error rath
 than something registration order decides. Write the path's characters out: an
 escaped character such as `%61` in the mapping is a build error too, since an
 upgrade is matched against the decoded path, which an escaped mapping never equals.
-An endpoint that injects a `@RequestScope` or `@SessionScope` bean, directly or
+An endpoint that injects a request- or session-scoped bean, directly or
 through a singleton, builds with a warning: its callbacks run outside any HTTP
 request, so there's no request or session to find the bean in, and using it there
 throws `IllegalStateException`, as in Spring. Keep per-connection state in the

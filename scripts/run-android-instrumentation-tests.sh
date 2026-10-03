@@ -44,8 +44,8 @@ cd "$REPO_ROOT"
 CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" ]; then
-  ra_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" >&2
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/ProcessScreenshots.java" ]; then
+  ra_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/ProcessScreenshots.java" >&2
   exit 3
 fi
 cn1ss_log() { ra_log "$1"; }

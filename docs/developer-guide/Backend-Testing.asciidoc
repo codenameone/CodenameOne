@@ -1,0 +1,310 @@
+[[backend-testing]]
+== Backend testing
+
+A backend module's tests are JUnit 5 classes in `src/test/java`, written against
+the API a Spring Boot test uses. `@BackendTest` starts the module's server, wired
+the way it ships, and injects what the test asks for. `MockMvc` sends a request
+to that server inside the test process, and `TestRestTemplate` sends one over a
+real port. A test can add beans of its own and replace the application's. This
+chapter covers each of those, and then the same tests compiled into a native
+binary.
+
+Because the names follow Spring's, a test ported from Spring Boot mostly needs
+its imports changed. The differences are listed at the end of the chapter.
+
+=== Setting up a module for tests
+
+A backend module created from the project template is already set up. In
+another module, add the test library and JUnit 5 to the `pom.xml`:
+
+[source,xml]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-testing.xml[tag=backend-testing-xml-001,indent=0]
+----
+
+Then bind two more goals of the Codename One plugin beside `process-annotations`,
+and give each test class a fresh JVM:
+
+[source,xml]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-testing.xml[tag=backend-testing-xml-002,indent=0]
+----
+
+[source,xml]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-testing.xml[tag=backend-testing-xml-003,indent=0]
+----
+
+`process-test-annotations` generates the code each test class runs against.
+`backend-test` runs the compiled tests, and does nothing unless they're asked
+for. A server process runs one backend at a time, so `reuseForks` set to
+`false` keeps the state of one test class's server away from the next class.
+
+Run the tests with:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-testing.sh[tag=backend-testing-bash-001,indent=0]
+----
+
+A Gradle backend gets the same setup from the Codename One plugin: the test
+library, JUnit 5, a fresh JVM per test class and the test pass all come with
+it. The standard `test` task runs the tests, and `backendTest` runs them as a
+native binary, as described below:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-testing.sh[tag=backend-testing-bash-003,indent=0]
+----
+
+=== Testing a controller with MockMvc
+
+This controller answers a greeting as JSON, using a `Greetings` bean:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/GreetingApi.java[tag=backend-test-api,indent=0]
+----
+
+A test of it reads the way a Spring MVC test does:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/GreetingApiTest.java[tag=backend-test-mockmvc,indent=0]
+----
+
+`@BackendTest` starts the application with the same beans and the same wiring as
+the server the build produces. `@Autowired` fields of the test class are filled
+from its beans, and `MockMvc` is one of them. `perform` runs a request through
+the server's dispatch -- the router, the sessions, the scoped beans and the error
+handling -- without opening a socket. Each `andExpect` checks one thing about the
+response and fails the test with a message saying what it saw.
+
+The request builders are static methods of `MockMvcRequestBuilders`:
+
+[cols="2,3", options="header"]
+|===
+| Method | Builds
+
+| `get`, `post`, `put`, `patch`, `delete`, `head`, `options`
+| A request with that method. A URI template's `{name}` placeholders are filled,
+  encoded, from the arguments that follow it.
+
+| `request(HttpMethod, uri, ...)`
+| A request with any method.
+
+| `multipart(uri, ...)`
+| A `multipart/form-data` POST. `.file(...)` adds a file part and `.param(...)`
+  adds a form field.
+|===
+
+Each builder takes `.header`, `.param` (a query parameter), `.content` (the
+body, as a string or bytes), `.contentType`, `.accept`, `.characterEncoding` and
+`.cookie`.
+
+The matchers are static methods of `MockMvcResultMatchers`:
+
+[cols="2,3", options="header"]
+|===
+| Matcher | Checks
+
+| `status()`
+| The status: `isOk()`, `isCreated()`, `isNotFound()` and the other names, a
+  class with `is4xxClientError()` and similar, or a number with `is(int)`.
+
+| `content()`
+| The body with `string`, `bytes` or `json` (a JSON body holding every field of
+  the expected one), and the content type with `contentType` or
+  `contentTypeCompatibleWith`.
+
+| `jsonPath(expression)`
+| A value in a JSON body: `value`, `exists`, `doesNotExist`, `isArray`,
+  `isEmpty` and the type checks. The expression supports `$`, `.name`,
+  `['name']`, `[index]` (negative counts from the end), `[*]`, `.*` and a final
+  `.length()`.
+
+| `header()`
+| A response header: `string`, `longValue`, `exists` or `doesNotExist`.
+
+| `cookie()`
+| A cookie the response sets: `value`, `exists` or `doesNotExist`.
+
+| `redirectedUrl(url)`
+| The `Location` of a redirect.
+|===
+
+`andExpectAll` checks several matchers and reports every one that failed rather
+than stopping at the first. `andDo(print())` writes the request and response to
+standard output. `andReturn()` gives the result, for assertions no matcher
+covers:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/TunedGreetingTest.java[tag=backend-test-and-return,indent=0]
+----
+
+=== Testing over a real port
+
+`MockMvc` skips the socket, the HTTP parser and the response writer. To test
+through them, serve the application on a free port:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/ServedGreetingTest.java[tag=backend-test-random-port,indent=0]
+----
+
+With `RANDOM_PORT`, the test injects `TestRestTemplate`, an HTTP client for the
+running server, and `@LocalServerPort` holds the port it chose. The client
+resolves paths against the server, so a test never builds a URL. It encodes a
+body as JSON and decodes an answer into a `String`, a `byte[]`, a `Map` or a
+`List`. `getForObject` returns the body, and `getForEntity` returns a
+`ResponseEntity` with the status and headers too. `postForEntity`, `put`,
+`delete` and `exchange` cover the other methods, and `withBasicAuth` returns a
+client that signs every request in. A status of 4xx or 5xx is an answer, not an
+exception, so a test can assert on it.
+
+The client is the backend's own, so a compiled test run sends its requests from
+the native binary's HTTP stack.
+
+[cols="1,3", options="header"]
+|===
+| `webEnvironment` | The application is
+
+| `MOCK` (the default) | Reached through `MockMvc`, in the test's process.
+| `RANDOM_PORT` | Served on a free port of the loopback interface.
+| `DEFINED_PORT` | Served on the configured `cn1.server.port`.
+| `NONE` | Started for its beans only; the test calls them directly.
+|===
+
+Every environment but `DEFINED_PORT` listens on a free loopback port, so test
+runs never collide with each other or with a server running on the machine.
+
+=== Settings and profiles
+
+A test runs with the module's `application.properties`, then the profile's file,
+then the settings the annotation names:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/TunedGreetingTest.java[tag=backend-test-properties,indent=0]
+----
+
+The settings a test names win over everything, the environment included, unlike
+a deployed server, where the environment has the last word. A shell that exports
+`PORT` or `DATABASE_URL` therefore doesn't move a test off its free port or its
+test database.
+
+The profile is `test` unless `profile` names another, and `test` is a
+development profile: unless the test or the profile's file names a database, the
+application gets an in-memory SQLite one, and the generated daos create their
+tables. A test therefore starts from an empty database with no setup.
+
+Starting an application costs time, so test classes share one. Classes with the
+same test beans, settings, profile and web environment use the same running
+application, much as Spring caches a context. A class whose configuration
+differs stops it and starts its own. State that a test leaves in a bean or the
+database is visible to the next test that shares the application, so a test
+must not depend on the order tests run in.
+
+=== Replacing a bean
+
+A static nested class marked `@TestConfiguration` adds its `@Bean` methods to the
+test's application. Marked `@Primary`, a test bean wins every injection of its
+type, which replaces the application's bean without a mocking library:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/FakeGreetingsTest.java[tag=backend-test-configuration,indent=0]
+----
+
+A top-level `@TestConfiguration` class is added by listing it in
+`@BackendTest(classes = ...)`. A test bean is an ordinary singleton: it receives
+its own injections, and the test can `@Autowired` it. It can't be request-scoped,
+session-scoped or lazy, and it can't carry `@Transactional`, `@Async` or the
+other annotations the build weaves; the build says so when one does.
+
+=== Mocking a bean with Mockito
+
+With `org.mockito:mockito-core` on the test classpath, `@MockitoBean` replaces
+every bean of the field's type with a Mockito mock and injects it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/MockedGreetingsTest.java[tag=backend-test-mockito-bean,indent=0]
+----
+
+The mock is reset after every test. A controller can't be mocked, because it's
+what the test is exercising. Mockito builds classes while it runs, which a native
+binary can't do, so `@MockitoBean` tests run only on the JVM. A `@Primary` test
+bean works in both.
+
+=== Running the tests compiled
+
+The server ships as a native binary, and the tests can run that way too:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-testing.sh[tag=backend-testing-bash-002,indent=0]
+----
+
+After Surefire runs the tests on the JVM, the `backend-test` goal compiles the
+same test classes with the application into one native binary, the way
+`cn1:backend-package` builds the server, then runs it. The test binary has the
+generated wiring, the woven methods and the natives of the shipped server, so a
+difference between the two runtimes fails a test rather than a deployment.
+
+The binary has no JUnit and no reflection. The build finds the tests in the
+compiled classes and generates the calls JUnit would make: `@BeforeAll`,
+`@BeforeEach`, `@Test`, `@AfterEach` and `@AfterAll`, with `@Disabled` and
+assumptions honored. The tests compile against a subset of JUnit 5 that the test
+library provides for the purpose. It covers those annotations, `@DisplayName`
+and `@Tag`, `Assumptions`, and the `Assertions` methods: `assertEquals`,
+`assertNotEquals`, `assertTrue`, `assertFalse`, `assertNull`, `assertNotNull`,
+`assertSame`, `assertNotSame`, `assertArrayEquals`, `assertIterableEquals`,
+`assertInstanceOf`, `assertThrows`, `assertThrowsExactly`, `assertDoesNotThrow`,
+`assertAll` and `fail`.
+
+The compiled run picks the same test classes as the JVM run: under Maven, the
+ones Surefire's includes and excludes select (its defaults, unless the pom names
+others), or the ones `-Dtest` names, down to the methods a `Class#method` entry
+selects; under Gradle, every test class. Tag selection isn't applied to it.
+
+`@BackendTest` is inherited, so an abstract base class can carry it with the
+shared fields and tests. Each concrete subclass gets its own context, and tests
+declared as default methods of an interface the class implements run too.
+
+The results go to `target/surefire-reports` as `TEST-<class>-compiled.xml`,
+beside the JVM run's reports, and a failed test fails the build.
+
+A compiled run has these limits:
+
+* **Mockito.** A test class whose code uses Mockito is left out of the binary, and
+  a class with a `@MockitoBean` field is reported as skipped. Pass
+  `-Dcn1.backend.compiledTests.strict=true` to make either one fail the build.
+* **Java tests only.** The binary is compiled from Java test sources. A module
+  with Kotlin tests runs them on the JVM, and the compiled run reports them by
+  name and stops rather than running without them.
+* **Toolchain.** The binary needs what `cn1:backend-package` needs: clang, and
+  the OpenSSL, libcurl and nghttp2 headers. It builds on Linux and macOS. On
+  Windows, which has no native backend, the goal reports that and does nothing.
+* **Time.** Building the binary takes about as long as packaging the server, so
+  it suits CI better than an edit-and-run loop.
+
+=== Differences from Spring Boot
+
+* **Packages.** The annotations and classes live in `com.codename1.backend.test`,
+  and `@Autowired` is `com.codename1.backend.annotations.Autowired`.
+* **`@BackendTest` instead of `@SpringBootTest`.** Its options are the
+  web environment, `properties`, `profile` and `classes`. `@WebMvcTest`-style
+  slices don't exist; every test runs the whole application.
+* **Wiring at build time.** The test's application is generated by the build
+  rather than assembled when the test starts. An injection that can't be
+  satisfied fails the build.
+* **One application at a time.** Spring can keep several contexts cached. Here
+  a class with a different configuration stops the running application before
+  it starts its own.
+* **A listener in every environment.** `MOCK` and `NONE` also start the
+  application listening on a free loopback port, because its server hosts the
+  threads its tasks run on.
+* **The JSON path subset.** `jsonPath` supports the expressions listed above,
+  without filters or functions other than `length()`.

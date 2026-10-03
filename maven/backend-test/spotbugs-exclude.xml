@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclusions for codenameone-backend-test. PR CI holds the report at zero
+  findings; every exclusion here is scoped to the class it excuses, with the reason.
+-->
+<FindBugsFilter>
+    <!--
+    The headers of an entity are the entity's to change: a test builds an
+    HttpEntity and then sets headers on it, which is the API Spring's has.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.test.HttpEntity" />
+        <Method name="getHeaders" />
+        <Bug pattern="EI_EXPOSE_REP" />
+    </Match>
+    <!--
+    One client per running test application, shared by every test injected from
+    it on purpose: it holds the server's address and nothing a test can corrupt.
+    -->
+    <Match>
+        <Class name="com.codename1.impl.backend.test.TestEnvironment" />
+        <Method name="restTemplate" />
+        <Bug pattern="EI_EXPOSE_REP" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.impl.backend.test.TestEnvironment" />
+        <Method name="mockMvc" />
+        <Bug pattern="EI_EXPOSE_REP" />
+    </Match>
+</FindBugsFilter>

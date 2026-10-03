@@ -12,7 +12,7 @@
 # src/com/codename1/impl/orm/BackendSqlAccess.java, the server's implementation
 # of the shared SqlAccess interface -- never a second copy of a shared one.
 #
-# Consumers: build.sh, run-javase.sh, ws-conformance.sh, scripts/lib/cn1ss.sh and
+# Consumers: build.sh, run-javase.sh, ws-conformance.sh and
 # scripts/check-native-signatures.sh. maven/backend/pom.xml applies the SAME line
 # match with an Ant selector, so change both together.
 #

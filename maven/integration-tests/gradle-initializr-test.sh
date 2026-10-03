@@ -61,7 +61,7 @@ API=$(find "$SVC/src/main/java" -name Api.java | head -1)
 
 echo "== tasks"
 run_gradle "$SVC" tasks --group "codename one" > "$WORKDIR/tasks.log" 2>&1 || { cat "$WORKDIR/tasks.log"; fail "tasks"; }
-for t in runBackend backendPackage cn1Update; do
+for t in runBackend backendPackage backendTest cn1Update; do
   grep -q "^$t " "$WORKDIR/tasks.log" || { cat "$WORKDIR/tasks.log"; fail "a backend offers $t"; }
 done
 for t in cn1Css buildAndroid generateNativeInterfaces run; do
@@ -71,8 +71,34 @@ done
 echo "== runBackend"
 check_backend_healthz "$SVC" runBackend "$WORKDIR/run.log"
 
+echo "== test"
+# The sample tests on the JVM, counted from the reports: a test task that found
+# no engine runs nothing and succeeds.
+run_gradle "$SVC" test > "$WORKDIR/test.log" 2>&1 || { cat "$WORKDIR/test.log"; fail "test"; }
+backend_tests_ran() {
+  local total=0 count report
+  for report in "$SVC"/build/test-results/test/TEST-*.xml; do
+    [ -f "$report" ] || continue
+    count="$(sed -n 's/.*<testsuite[^>]* tests="\([0-9]*\)".*/\1/p' "$report" | head -1)"
+    total=$((total + ${count:-0}))
+  done
+  echo "$total"
+}
+JVM_TESTS="$(backend_tests_ran)"
+[ "$JVM_TESTS" -ge 3 ] || { cat "$WORKDIR/test.log"; fail "the backend's sample tests did not run (counted $JVM_TESTS)"; }
+echo "   $JVM_TESTS tests on the JVM"
+
 echo "== backendPackage"
 if command -v clang > /dev/null 2>&1; then
+  run_gradle "$SVC" backendTest > "$WORKDIR/backendtest.log" 2>&1 || { cat "$WORKDIR/backendtest.log"; fail "backendTest"; }
+  COMPILED=0
+  for report in "$SVC"/build/surefire-reports/TEST-*-compiled.xml; do
+    [ -f "$report" ] || continue
+    count="$(sed -n 's/.*<testsuite[^>]* tests="\([0-9]*\)".*/\1/p' "$report" | head -1)"
+    COMPILED=$((COMPILED + ${count:-0}))
+  done
+  [ "$COMPILED" -ge 3 ] || { cat "$WORKDIR/backendtest.log"; fail "the sample tests did not run compiled (counted $COMPILED)"; }
+  echo "   $COMPILED tests compiled"
   run_gradle "$SVC" backendPackage > "$WORKDIR/package.log" 2>&1 || { cat "$WORKDIR/package.log"; fail "backendPackage"; }
   BIN="$SVC/build/launcherprobe"
   [ -x "$BIN" ] || { cat "$WORKDIR/package.log"; fail "backendPackage produced no executable at $BIN"; }

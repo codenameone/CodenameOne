@@ -12,7 +12,8 @@
 #     before anything is sent.
 #  4. Every cloud target stages its upload jar (codename1.stageOnly), holding
 #     the app and that platform's native sources -- and no other platform's.
-#  5. addBackend adds backend/, whose runBackend serves /healthz.
+#  5. addBackend adds backend/, whose runBackend serves /healthz and whose
+#     sample tests pass on the JVM and, with clang, compiled.
 #
 # Needs the reactor installed (mvn install) and a JDK 17+ for Gradle; see
 # inc/gradle.sh for MAVEN_REPO_LOCAL and GRADLE_JAVA_HOME.
@@ -160,6 +161,28 @@ run_gradle "$APP" addBackend > "$WORKDIR/add-backend.log" 2>&1 || { cat "$WORKDI
 [ -f "$APP/backend/application.properties" ] || fail "addBackend wrote no backend/application.properties"
 [ ! -e "$APP/backend/pom.xml" ] || fail "a Gradle backend has no pom"
 check_backend_healthz "$APP" ":backend:runBackend" "$WORKDIR/backend-run.log"
+
+echo "== backend tests"
+# The sample tests addBackend writes, on the JVM and (with clang) compiled. Counted
+# from the reports: a test task that found no engine runs nothing and succeeds.
+count_tests() {
+  local total=0 count report
+  for report in "$@"; do
+    [ -f "$report" ] || continue
+    count="$(sed -n 's/.*<testsuite[^>]* tests="\([0-9]*\)".*/\1/p' "$report" | head -1)"
+    total=$((total + ${count:-0}))
+  done
+  echo "$total"
+}
+run_gradle "$APP" :backend:test > "$WORKDIR/backend-test.log" 2>&1 || { cat "$WORKDIR/backend-test.log"; fail ":backend:test"; }
+JVM_TESTS="$(count_tests "$APP"/backend/build/test-results/test/TEST-*.xml)"
+[ "$JVM_TESTS" -ge 3 ] || { cat "$WORKDIR/backend-test.log"; fail "the backend's tests did not run (counted $JVM_TESTS)"; }
+if command -v clang > /dev/null 2>&1; then
+  run_gradle "$APP" :backend:backendTest > "$WORKDIR/backend-compiled.log" 2>&1 \
+    || { cat "$WORKDIR/backend-compiled.log"; fail ":backend:backendTest"; }
+  COMPILED="$(count_tests "$APP"/backend/build/surefire-reports/TEST-*-compiled.xml)"
+  [ "$COMPILED" -ge 3 ] || { cat "$WORKDIR/backend-compiled.log"; fail "the backend's tests did not run compiled (counted $COMPILED)"; }
+fi
 
 # A Gradle older than the plugin supports is refused up front with the fix,
 # rather than failing later on an API it lacks. Opt-in: it downloads one more

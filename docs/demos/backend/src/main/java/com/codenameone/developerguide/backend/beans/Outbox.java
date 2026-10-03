@@ -23,16 +23,16 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.PreDestroy;
-import com.codename1.backend.annotations.Repository;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 // tag::backend-bean-lifecycle[]
-@Repository
+@Component
 public class Outbox {
     private final DataSource db;
     private final List<String> pending = new ArrayList<String>();

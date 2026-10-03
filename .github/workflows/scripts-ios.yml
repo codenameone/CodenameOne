@@ -42,7 +42,7 @@ on:
     - vm/**
     - tests/**
     - maven/**
-    - vm/backend/demo/cn1ss/**
+    - scripts/hellocodenameone/backend/**
     - scripts/lib/cn1ss.sh
     - .github/workflows/scripts-ios-native.yml
     - scripts/ios/create-shared-scheme.py
@@ -98,7 +98,7 @@ on:
     - vm/**
     - tests/**
     - maven/**
-    - vm/backend/demo/cn1ss/**
+    - scripts/hellocodenameone/backend/**
     - scripts/lib/cn1ss.sh
     - .github/workflows/scripts-ios-native.yml
     - scripts/ios/create-shared-scheme.py
@@ -940,7 +940,7 @@ jobs:
     # auto-enables from codename1.watchMain in the sample, so build-ios-app.sh
     # generates the <Main>Watch target alongside the iOS app. This job renders
     # the cn1ss suite on the watch simulator through the Core Graphics backend
-    # (no GL/Metal on watchOS), streams frames to the same Cn1ssScreenshotServer
+    # (no GL/Metal on watchOS), streams frames to the same cn1ss test server
     # WS sink the iOS jobs use, and compares against scripts/ios/screenshots-watch.
     # Isolated in its own job (like build-ios-metal) so the watch result is a
     # distinct check and a regression there doesn't mask the iOS path.
@@ -1098,7 +1098,7 @@ jobs:
     # <Main>TV target alongside the iOS app. tvOS reuses the iOS UIApplicationMain
     # entry and the Metal renderer (no OpenGL ES on tvOS); this job builds the TV
     # target for the appletvsimulator, renders the cn1ss suite and streams frames
-    # to the same Cn1ssScreenshotServer the iOS/watch jobs use, comparing against
+    # to the same cn1ss test server the iOS/watch jobs use, comparing against
     # scripts/ios/screenshots-tv.
     #
     # BLOCKING (a hard golden gate, like build-ios-watch): the tvOS slice

@@ -49,6 +49,7 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     private boolean read;
     private boolean write;
     private int timeout=5000;
+    private int readTimeout = -1;
     private XMLHttpRequest req;
     private ByteArrayOutputStream body;
     private boolean post;
@@ -156,18 +157,22 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
             req.setRequestHeader(h.name, h.value);
         }
         //req.setResponseType("arraybuffer");
-        if ( body != null ){
-            
-            //req.send(new String(body.toByteArray(), "UTF-8"));
-            ((XHRBlob)req).send(BlobUtil.createBlob(body.toByteArray(), "application/octet-stream"));
-        } else {
-            req.send();
+        // Through send(), which applies the request's timeout and turns the
+        // TimeoutError a synchronous XHR throws into this method's IOException --
+        // the error path a timed-out request takes on every other port. The
+        // timeouts were ignored here, so a request past its timeout simply waited
+        // for the answer; and NetworkManager's fallback timeout thread cannot run
+        // while a synchronous request holds the worker.
+        String failure = send(req, body == null ? null
+                : BlobUtil.createBlob(body.toByteArray(), "application/octet-stream"), requestTimeout());
+        if (failure != null) {
+            throw new IOException("Failed to load " + url + ": " + failure);
         }
 
         
         Uint8Array responseBytes = toResponseBytes(req);
         if (responseBytes == null || req.getStatus() == 0 ){
-            System.out.println(req.getAllResponseHeaders());
+            System.out.println(allResponseHeaders());
             System.out.println(req.getStatusText());
             System.out.println("Failed to load url "+url);
             System.out.println("Status code was "+req.getStatus());
@@ -184,6 +189,10 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     private Uint8Array toResponseBytes(XMLHttpRequest req) {
         if ("arraybuffer".equals(req.getResponseType()) && req.getResponse() != null) {
             return Uint8Array.create((ArrayBuffer)req.getResponse());
+        }
+        if ("arraybuffer".equals(req.getResponseType())) {
+            // responseText throws InvalidStateError for an arraybuffer request.
+            return null;
         }
         String responseText = req.getResponseText();
         if (responseText == null) {
@@ -260,9 +269,57 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
      * connection callback, which aborted the request the app was waiting on.
      */
     private String allResponseHeaders() {
-        String headers = req == null ? null : req.getAllResponseHeaders();
+        String headers = req == null ? null : responseHeaders(req);
         return headers == null ? "" : headers;
     }
+
+    /**
+     * The XMLHttpRequest's getAllResponseHeaders(), called as the method it is.
+     *
+     * Not through {@link XMLHttpRequest#getAllResponseHeaders()}: the ParparVM
+     * JSO bridge maps every no-argument {@code getXxx()} on a JSObject
+     * interface to a read of the property {@code xxx}, so that call read
+     * {@code xhr.allResponseHeaders} -- a property no browser has -- and
+     * answered null for every response. Every getHeaderField() on the
+     * JavaScript port therefore answered null, whatever the server sent and
+     * whatever Access-Control-Expose-Headers allowed. A @JSBody runs its
+     * script verbatim, so the method is really invoked.
+     */
+    /// The XHR timeout for this request, in milliseconds, or 0 for none. A
+    /// synchronous XHR has one deadline for the whole request, so it gets the
+    /// connect and the read timeout together; -1 for either means unset, which is
+    /// what a request that set neither passes.
+    int requestTimeout() {
+        if (timeout > 0 && readTimeout > 0) {
+            return timeout + readTimeout;
+        }
+        return Math.max(Math.max(timeout, readTimeout), 0);
+    }
+
+    /// ConnectionRequest.setReadTimeout, through HTML5Implementation.
+    public void setReadTimeout(int readTimeout) {
+        this.readTimeout = readTimeout;
+    }
+
+    /// Sends `xhr` with `body` (null for none) under a `timeoutMillis` deadline
+    /// (0 for none), answering why it failed or null. Setting the timeout is
+    /// inside the try, because a synchronous XHR on a window rather than a
+    /// worker refuses one outright. A request that ended with no response at all
+    /// -- status 0 and nothing received, which is how a timed-out synchronous XHR
+    /// can come back without throwing -- is a failure too: reading on from there
+    /// reached `responseText`, which an arraybuffer request throws for, and that
+    /// JavaScript error ended the network thread with no callback of any kind.
+    @JSBody(params={"xhr", "body", "timeoutMillis"}, script="try {"
+            + " if (timeoutMillis > 0) { try { xhr.timeout = timeoutMillis; } catch (ignored) {} }"
+            + " if (body) { xhr.send(body); } else { xhr.send(); }"
+            + " if (xhr.status === 0 && !xhr.response) { return 'NetworkError: no response'; }"
+            + " return null;"
+            + " } catch (e) { return (e && e.name ? e.name : 'Error') + (e && e.message ? ': ' + e.message : ''); }")
+    static native String send(XMLHttpRequest xhr, Blob body, int timeoutMillis);
+
+    @JSBody(params={"xhr"}, script="return (xhr && typeof xhr.getAllResponseHeaders === 'function') "
+            + "? xhr.getAllResponseHeaders() : null;")
+    static native String responseHeaders(XMLHttpRequest xhr);
 
     public String[] getHeaderFieldNames() {
         List<String> out = new ArrayList<String>();

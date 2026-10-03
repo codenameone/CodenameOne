@@ -39,6 +39,7 @@ import java.io.UnsupportedEncodingException;
 /// #### See also
 ///
 /// - "http://www.ietf.org/rfc/rfc1952.txt"
+@com.codename1.impl.SharedWithBackend
 public class GZIPHeader {
 
     public static final byte OS_MSDOS = (byte) 0x00;

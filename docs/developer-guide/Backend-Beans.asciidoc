@@ -27,8 +27,8 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SignupApi.java[tag=backend-bean-controller,indent=0]
 ----
 
-`@Service`, `@Component` and `@Repository` mark a bean; a `@RestController` or
-`@WebSocketMapping` class is one too. A class with one constructor gets that
+`@Component` marks a bean; a `@RestController`, `@WebSocketMapping` or
+`@Configuration` class is one too. A class with one constructor gets that
 constructor; with several, the one marked `@Autowired`. Fields and setters are
 injected only when marked `@Autowired`, and a private field is fine.
 
@@ -45,7 +45,7 @@ request:
 ----
 constructor parameter 1 of com.example.SignupApi needs a com.example.Signups,
 and no bean has that type. Annotate the implementing class @Component,
-@Service or @Repository, or declare a @Bean method returning one.
+or declare a @Bean method returning one.
 ----
 
 Two beans of one type are an error too, until one is marked `@Primary` or the
@@ -64,10 +64,6 @@ that needs it. These annotations make a class one:
 
 | `@Component`
 | Anything the application wires together.
-
-| `@Service`, `@Repository`
-| The same as `@Component`. They exist so a class can say which layer it
-  belongs to, as in Spring.
 
 | `@Configuration`
 | A class whose `@Bean` methods produce beans, described under
@@ -156,10 +152,10 @@ and they're injected the same way:
   <<backend-data>>.
 
 | `HttpServer.Request`
-| The current request. Only a `@RequestScope` bean can take it.
+| The current request. Only a `@Scope("request")` bean can take it.
 
 | `HttpSession`
-| The current session. Only a `@RequestScope` bean can take it.
+| The current session. Only a `@Scope("request")` bean can take it.
 |===
 
 === Configuration values
@@ -293,8 +289,8 @@ when the session ends for a session-scoped one.
 === Scopes
 
 A bean is a singleton unless it says otherwise. `@Scope("prototype")` gives each
-injection point its own instance. `@RequestScope` and `@SessionScope` give one
-per HTTP request or session; injected into a singleton, such a bean is reached
+injection point its own instance. `@Scope("request")` and `@Scope("session")`
+give one per HTTP request or session; injected into a singleton, such a bean is reached
 through a small generated subclass that finds the current request's instance on
 each call, so the class can't be final and needs a constructor that takes no
 arguments. `@Lazy` builds a bean the first time it's used, through the same kind
@@ -313,11 +309,11 @@ exist at all, so the expensive part of setting a bean up belongs in its
 | A new instance for each injection point. Two fields of type `Ticket` in one
   class get two tickets.
 
-| `@RequestScope`, or `@Scope("request")`
+| `@Scope("request")`
 | One per HTTP request, built the first time the request uses it and destroyed
   when the request ends.
 
-| `@SessionScope`, or `@Scope("session")`
+| `@Scope("session")`
 | One per HTTP session, kept by the server for as long as the session lives and
   destroyed when it ends. See <<backend-sessions>>.
 
@@ -401,8 +397,8 @@ compiles, and each refusal names the class and member at fault:
 | Message fragment | What to do
 
 | `needs a X, and no bean has that type`
-| Annotate the implementation `@Component`, `@Service` or `@Repository`, or add
-  a `@Bean` method returning one.
+| Annotate the implementation `@Component`, or add a `@Bean` method returning
+  one.
 
 | `could receive any of ...`
 | Mark one `@Primary`, or inject with `@Qualifier("name")`.
@@ -422,7 +418,7 @@ compiles, and each refusal names the class and member at fault:
   constructor with no arguments.
 
 | `asks for the current request`
-| Only a `@RequestScope` bean can inject the request. Take it as a parameter of
+| Only a `@Scope("request")` bean can inject the request. Take it as a parameter of
   the handler method instead.
 
 | `Two beans are named`
@@ -453,10 +449,6 @@ differences all follow from doing the work at build time:
 
 Constructor injection is a constructor, so a unit test builds the object with
 fakes and needs nothing else. For the wired server -- what `@SpringBootTest`
-does in Spring -- a test in the backend module starts the generated wiring on a
-free port:
-
-[source,java]
-----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/WiringTest.java[tag=backend-wiring-test,indent=0]
-----
+does in Spring -- annotate a test class with `@BackendTest`. It starts the
+application with the build's wiring, lets the test replace beans, and sends
+requests through `MockMvc` or over a real port. <<backend-testing>> covers it.

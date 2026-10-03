@@ -23,6 +23,8 @@
 package com.codename1.maven.processors;
 
 import com.codename1.backend.Backend;
+import com.codename1.impl.backend.BackendAccess;
+import com.codename1.impl.backend.BackendApplication;
 import com.codename1.backend.Config;
 import com.codename1.backend.HttpServer;
 import com.codename1.maven.annotations.AnnotatedClass;
@@ -36,6 +38,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -54,6 +57,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -80,7 +84,7 @@ public class BackendBeansTest {
         s.put("com.example.Greeter", PKG
                 + "public interface Greeter { String greet(String name); }\n");
         s.put("com.example.PoliteGreeter", PKG
-                + "@Service\n"
+                + "@Component\n"
                 + "public class PoliteGreeter implements Greeter {\n"
                 + "    @Value(\"${greeting.prefix:Hello}\") private String prefix;\n"
                 + "    private int initialized;\n"
@@ -90,7 +94,7 @@ public class BackendBeansTest {
                 + "    }\n"
                 + "}\n");
         s.put("com.example.Notes", PKG
-                + "@Repository\n"
+                + "@Component\n"
                 + "public class Notes {\n"
                 + "    private final DataSource db;\n"
                 + "    public Notes(DataSource db) { this.db = db; }\n"
@@ -110,7 +114,7 @@ public class BackendBeansTest {
                 + "    }\n"
                 + "}\n");
         s.put("com.example.Jobs", PKG
-                + "@Service\n"
+                + "@Component\n"
                 + "public class Jobs {\n"
                 + "    public final AtomicInteger runs = new AtomicInteger();\n"
                 + "    @Scheduled(fixedRate = 20)\n"
@@ -122,7 +126,7 @@ public class BackendBeansTest {
                 + "    }\n"
                 + "}\n");
         s.put("com.example.RequestInfo", PKG
-                + "@Component @RequestScope\n"
+                + "@Component @Scope(\"request\")\n"
                 + "public class RequestInfo {\n"
                 + "    private final String id = String.valueOf(System.nanoTime());\n"
                 + "    public String id() { return id; }\n"
@@ -176,18 +180,16 @@ public class BackendBeansTest {
         assertNoErrors(ctx);
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
-        Backend.Application app = (Backend.Application) loader
+        BackendApplication app = (BackendApplication) loader
                 .loadClass("com.example.BackendWiring").newInstance();
         int port = freePort();
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         settings.setProperty("greeting.prefix", "Hi");
         // What the generated main does, with the development tools a JVM build has.
-        Backend backend = Backend.builder(Config.of(settings, "dev"))
+        Backend backend = withApplication(withManagement(withMcp(Backend.builder(Config.of(settings, "dev"))
                 .quiet()
-                .requiresDataSource()
-                .mcp(new com.codename1.backend.mcp.DevTools()).management()
-                .application(app)
+                .requiresDataSource(), new com.codename1.impl.backend.mcp.DevTools())), app)
                 .start();
         try {
             // Field injection into a private field, @Value, and a package-private
@@ -276,7 +278,7 @@ public class BackendBeansTest {
         ProcessorContext ctx = process(classes, proc);
         assertNoErrors(ctx);
         String bootstrap = proc.generateBootstrap("com.example");
-        assertTrue(bootstrap, bootstrap.contains(".application(new com.example.BackendWiring())"));
+        assertTrue(bootstrap, bootstrap.contains("cn1Access.application(cn1Builder, new com.example.BackendWiring())"));
         assertTrue("a bean takes a DataSource, so the entry point must ask for a database:\n"
                 + bootstrap, bootstrap.contains(".requiresDataSource()"));
         String wiring = proc.generateWiring("com.example");
@@ -427,12 +429,12 @@ public class BackendBeansTest {
         assertNoErrors(process(classes));
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
-        Backend.Application app = (Backend.Application) loader.loadClass(
+        BackendApplication app = (BackendApplication) loader.loadClass(
                 "com.codenameone.developerguide.backend.orders.BackendWiring").newInstance();
         int port = freePort();
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().application(app)
+        Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), app)
                 .start();
         try {
             String placed = post(port, "/orders",
@@ -451,7 +453,7 @@ public class BackendBeansTest {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Tag", PKG + "public class Tag { public String name; }\n");
         s.put("com.example.Shop", PKG
-                + "@Service public class Shop {\n"
+                + "@Component public class Shop {\n"
                 + "    @McpTool(description = \"Totals the ids under a tag\")\n"
                 + "    public Tag total(@McpParam(\"ids\") List<Integer> ids,\n"
                 + "                     @McpParam(\"tag\") Tag tag) {\n"
@@ -467,13 +469,12 @@ public class BackendBeansTest {
         assertNoErrors(process(classes));
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
-        Backend.Application app = (Backend.Application) loader
+        BackendApplication app = (BackendApplication) loader
                 .loadClass("com.example.BackendWiring").newInstance();
         int port = freePort();
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().mcp(null)
-                .application(app).start();
+        Backend backend = withApplication(withMcp(Backend.builder(Config.of(settings, "dev")).quiet(), null), app).start();
         try {
             String tools = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":"
                     + "\"tools/list\"}");
@@ -504,7 +505,7 @@ public class BackendBeansTest {
     public void anMcpToolTheCodecsCannotServeIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Shop", PKG
-                + "@Service public class Shop {\n"
+                + "@Component public class Shop {\n"
                 + "    @McpTool(description = \"a\")\n"
                 + "    public String a(@McpParam(\"ids\") int[] ids) { return \"a\"; }\n"
                 + "    @McpTool(description = \"b\")\n"
@@ -536,7 +537,7 @@ public class BackendBeansTest {
     @Test
     public void aProjectClassWithAGeneratedNameFailsTheBuild() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Foo", PKG + "@Service public class Foo {\n"
+        s.put("com.example.Foo", PKG + "@Component public class Foo {\n"
                 + "    @Timed(\"foo.work\") public void work() { }\n"
                 + "}\n");
         // Exactly the support class the build would generate for Foo's aspects.
@@ -581,10 +582,11 @@ public class BackendBeansTest {
     @Test
     public void aServerWithOnlyManagementStillGetsAnEntryPoint() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Ops", PKG + "@Configuration @EnableManagement public class Ops { }\n");
+        s.put("com.example.Ops", PKG + "@Configuration public class Ops { }\n");
         File classes = compile(s);
+        writeProperties(classes, "application.properties", "cn1.management.enabled=true\n");
         assertNoErrors(process(classes));
-        assertTrue("@EnableManagement alone produced nothing runnable",
+        assertTrue("cn1.management.enabled alone produced nothing runnable",
                 new File(classes, "com/example/BackendApplication.class").isFile());
     }
 
@@ -603,14 +605,13 @@ public class BackendBeansTest {
         assertNoErrors(process(classes));
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
-        Backend.Application app = (Backend.Application) loader
+        BackendApplication app = (BackendApplication) loader
                 .loadClass("com.example.BackendWiring").newInstance();
         int port = freePort();
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         settings.setProperty("cn1.management.token", "t0k");
-        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().management()
-                .application(app).start();
+        Backend backend = withApplication(withManagement(Backend.builder(Config.of(settings, "dev")).quiet()), app).start();
         try {
             HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port
                     + "/manage/managed/reports/latest").openConnection();
@@ -654,11 +655,11 @@ public class BackendBeansTest {
     @Test
     public void aServerThatOnlyServesFilesStillGetsAnEntryPoint() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Site", PKG
-                + "@Configuration @StaticFilesConfig(root = \"www\") public class Site { }\n");
+        s.put("com.example.Site", PKG + "@Configuration public class Site { }\n");
         File classes = compile(s);
+        writeProperties(classes, "application.properties", "cn1.static.root=www\n");
         assertNoErrors(process(classes));
-        assertTrue("@StaticFilesConfig alone produced nothing runnable",
+        assertTrue("cn1.static.root alone produced nothing runnable",
                 new File(classes, "com/example/BackendApplication.class").isFile());
     }
 
@@ -717,30 +718,29 @@ public class BackendBeansTest {
         assertNoErrors(process(classes, proc));
         String bootstrap = proc.generateBootstrap("com.example");
         assertFalse("nothing asked for management, yet the entry point names it:\n" + bootstrap,
-                bootstrap.contains(".management()"));
+                bootstrap.contains("cn1Access.management(cn1Builder)"));
         assertFalse("nothing asked for MCP, yet the entry point names it:\n" + bootstrap,
-                bootstrap.contains(".mcp("));
-        assertFalse(bootstrap, bootstrap.contains(".compiledSettings("));
+                bootstrap.contains("cn1Access.mcp("));
+        assertFalse(bootstrap, bootstrap.contains("cn1Access.compiledSettings("));
 
-        Map<String, String> s = new LinkedHashMap<String, String>(plain);
-        s.put("com.example.Settings", PKG
-                + "@EnableManagement(path = \"/ops\") @EnableMcpServer(allowedOrigins = "
-                + "{\"https://a.example\", \"https://b.example\"})\n"
-                + "public class Settings { }\n");
+        classes = compile(plain);
+        writeProperties(classes, "application.properties", "cn1.management.enabled=true\n"
+                + "cn1.management.path=/ops\n"
+                + "cn1.mcp.allowedOrigins=https://a.example,https://b.example\n");
         proc = new RestControllerAnnotationProcessor();
         proc.setDevTools(false);
-        assertNoErrors(process(compile(s), proc));
+        assertNoErrors(process(classes, proc));
         bootstrap = proc.generateBootstrap("com.example");
-        assertTrue(bootstrap, bootstrap.contains(".management()"));
-        assertTrue(bootstrap, bootstrap.contains(".mcp(null)"));
+        assertTrue(bootstrap, bootstrap.contains("cn1Access.management(cn1Builder)"));
+        assertTrue(bootstrap, bootstrap.contains("cn1Access.mcp(cn1Builder, null)"));
         assertTrue(bootstrap, bootstrap.contains("\"cn1.management.enabled\", \"true\""));
         assertTrue(bootstrap, bootstrap.contains("\"cn1.management.path\", \"/ops\""));
         assertTrue(bootstrap, bootstrap.contains(
                 "\"cn1.mcp.allowedOrigins\", \"https://a.example,https://b.example\""));
-        assertFalse("@EnableMcpServer links the endpoint; whether it serves stays the "
+        assertFalse("naming the origins links the endpoint; whether it serves stays the "
                 + "endpoint's own default:\n" + bootstrap, bootstrap.contains("cn1.mcp.enabled"));
 
-        // The property, in a profile's file, asks as surely as the annotation.
+        // The property, in a profile's file, asks as surely as the base file.
         classes = compile(plain);
         java.io.FileWriter w = new java.io.FileWriter(new File(classes, "application.properties"));
         w.write("cn1.profile=prod\n");
@@ -751,64 +751,47 @@ public class BackendBeansTest {
         proc = new RestControllerAnnotationProcessor();
         proc.setDevTools(false);
         assertNoErrors(process(classes, proc));
-        assertTrue(proc.generateBootstrap("com.example").contains(".management()"));
+        assertTrue(proc.generateBootstrap("com.example").contains("cn1Access.management(cn1Builder)"));
     }
 
     @Test
-    public void settingsAnnotationsBecomeCompiledSettings() throws Exception {
-        Map<String, String> s = sample();
-        s.put("com.example.Settings", PKG
-                + "@ServerConfig(port = 8081, workers = 4)\n"
-                + "@SessionConfig(store = \"DB\", timeoutSeconds = 0, sameSite = \"strict\")\n"
-                + "@DataSourceConfig(url = \"${DATABASE_URL}\", poolSize = 3)\n"
-                + "@StaticFilesConfig(root = \"www\", prefix = \"/assets\")\n"
-                + "public class Settings { }\n");
+    public void applicationPropertiesBecomeCompiledSettings() throws Exception {
+        File classes = compile(sample());
+        writeProperties(classes, "application.properties", "cn1.server.port=8081\n"
+                + "cn1.session.store=db\n"
+                + "cn1.datasource.url=${DATABASE_URL}\n"
+                + "greeting.prefix=Hi\n");
+        writeProperties(classes, "application-dev.properties", "cn1.datasource.url=:memory:\n");
         RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
-        assertNoErrors(process(compile(s), proc));
+        assertNoErrors(process(classes, proc));
         String bootstrap = proc.generateBootstrap("com.example");
         for (String pair : new String[] {"\"cn1.server.port\", \"8081\"",
-                "\"cn1.server.workers\", \"4\"", "\"cn1.session.store\", \"db\"",
-                "\"cn1.session.timeout\", \"0\"", "\"cn1.session.same-site\", \"Strict\"",
+                "\"cn1.session.store\", \"db\"",
                 "\"cn1.datasource.url\", \"${DATABASE_URL}\"",
-                "\"cn1.datasource.pool.size\", \"3\"", "\"cn1.static.root\", \"www\"",
-                "\"cn1.static.prefix\", \"/assets\""}) {
+                "\"greeting.prefix\", \"Hi\""}) {
             assertTrue(pair + " missing from:\n" + bootstrap, bootstrap.contains(pair));
         }
-        assertFalse("an attribute left at its default set a key:\n" + bootstrap,
-                bootstrap.contains("cn1.server.backlog"));
+        // A profile file describes another deployment; compiling it in would make
+        // the dev settings a production binary's defaults.
+        assertFalse("a profile file was compiled in:\n" + bootstrap, bootstrap.contains(":memory:"));
     }
 
     @Test
-    public void aSettingTheRuntimeWouldRefuseIsABuildError() throws Exception {
-        Map<String, String> s = sample();
-        s.put("com.example.Settings", PKG
-                + "@SessionConfig(store = \"jdbc\") public class Settings { }\n");
-        ProcessorContext ctx = process(compile(s));
-        assertTrue(String.valueOf(ctx.getErrors()), String.valueOf(ctx.getErrors())
-                .contains("@SessionConfig store is \"jdbc\"; it must be memory or db."));
-        s.put("com.example.Settings", PKG
-                + "@ServerConfig(port = 70000) public class Settings { }\n");
-        ctx = process(compile(s));
-        assertTrue(String.valueOf(ctx.getErrors()), String.valueOf(ctx.getErrors())
-                .contains("@ServerConfig port is 70000; a port is 0 to 65535."));
-        s.put("com.example.Settings", PKG
-                + "@EnableManagement(path = \"ops\") public class Settings { }\n");
-        ctx = process(compile(s));
-        assertTrue(String.valueOf(ctx.getErrors()), String.valueOf(ctx.getErrors())
-                .contains("@EnableManagement path is \"ops\"; a path starts with /."));
-    }
-
-    @Test
-    public void twoClassesSettingOneKeyDifferentlyIsRefused() throws Exception {
-        Map<String, String> s = sample();
-        s.put("com.example.A", PKG + "@SessionConfig(store = \"db\") public class A { }\n");
-        s.put("com.example.B", PKG + "@SessionConfig(store = \"memory\") public class B { }\n");
-        ProcessorContext ctx = process(compile(s));
-        String errors = String.valueOf(ctx.getErrors());
-        assertTrue(errors, errors.contains("cn1.session.store is set to"));
-        assertTrue(errors, errors.contains("Keep one of them."));
-        s.put("com.example.B", PKG + "@SessionConfig(store = \"db\") public class B { }\n");
-        assertNoErrors(process(compile(s)));
+    public void propertiesFilesAreReadAsUtf8AndAProfileFileStandsAlone() throws Exception {
+        File classes = compile(sample());
+        // Only the profile's file: a test on that profile must still get it.
+        java.nio.file.Files.write(new File(classes, "application-test.properties").toPath(),
+                "greeting=Gr\u00fc\u00dfe\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        ProcessorContext ctx = process(classes, new RestControllerAnnotationProcessor());
+        assertNull("there is no base file", RestControllerAnnotationProcessor.baseApplicationProperties(ctx));
+        java.util.Properties profile = RestControllerAnnotationProcessor.profileApplicationProperties(ctx, "test");
+        assertNotNull("the profile file was not found without a base file", profile);
+        // Read as UTF-8, as Config reads it at run time, not as ISO-8859-1.
+        assertEquals("Gr\u00fc\u00dfe", profile.getProperty("greeting"));
+        java.nio.file.Files.write(new File(classes, "application.properties").toPath(),
+                "password=p\u00e4ss\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals("p\u00e4ss", RestControllerAnnotationProcessor.baseApplicationProperties(ctx)
+                .getProperty("password"));
     }
 
     @Test
@@ -883,7 +866,7 @@ public class BackendBeansTest {
     public void anInvalidCronExpressionIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Jobs", PKG
-                + "@Service public class Jobs {\n"
+                + "@Component public class Jobs {\n"
                 + "    @Scheduled(cron = \"0 0 25 * * *\") public void never() { }\n"
                 + "}\n");
         ProcessorContext ctx = process(compile(s));
@@ -895,7 +878,7 @@ public class BackendBeansTest {
     public void anAsyncMethodMustReturnVoidOrFuture() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Jobs", PKG
-                + "@Service public class Jobs {\n"
+                + "@Component public class Jobs {\n"
                 + "    @Async public String now() { return \"x\"; }\n"
                 + "}\n");
         ProcessorContext ctx = process(compile(s));
@@ -968,7 +951,7 @@ public class BackendBeansTest {
                 + "    public String use() { return \"used\"; }\n"
                 + "}\n");
         s.put("com.example.Handles", PKG + "@Configuration public class Handles {\n"
-                + "    @Bean(destroyMethod = \"close\") @RequestScope\n"
+                + "    @Bean(destroyMethod = \"close\") @Scope(\"request\")\n"
                 + "    public Handle handle() { return new Handle(); }\n"
                 + "}\n");
         s.put("com.example.Api", PKG
@@ -1004,7 +987,7 @@ public class BackendBeansTest {
                 + "    @PostConstruct void baseInit() { inits++; }\n"
                 + "    protected String stamp() { return clock.now() + label; }\n"
                 + "}\n");
-        s.put("com.example.Orders", PKG + "@Service public class Orders extends BaseService {\n"
+        s.put("com.example.Orders", PKG + "@Component public class Orders extends BaseService {\n"
                 + "    @PostConstruct void ownInit() { inits += 10; }\n"
                 + "    public String describe() { return stamp() + inits; }\n"
                 + "}\n");
@@ -1055,7 +1038,7 @@ public class BackendBeansTest {
     @Test
     public void aSynchronizedAsyncMethodHoldsItsMonitorWhereTheBodyRuns() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Worker", PKG + "@Service public class Worker {\n"
+        s.put("com.example.Worker", PKG + "@Component public class Worker {\n"
                 + "    @Async public synchronized void work() { }\n"
                 + "}\n");
         s.put("com.example.Api", PKG
@@ -1127,8 +1110,8 @@ public class BackendBeansTest {
                 + "    public String text() { return text; }\n"
                 + "}\n");
         s.put("com.example.Labels", PKG + "@Configuration public class Labels {\n"
-                + "    @Bean @RequestScope public Label east() { return new Label(\"east\"); }\n"
-                + "    @Bean @RequestScope public Label west() { return new Label(\"west\"); }\n"
+                + "    @Bean @Scope(\"request\") public Label east() { return new Label(\"east\"); }\n"
+                + "    @Bean @Scope(\"request\") public Label west() { return new Label(\"west\"); }\n"
                 + "}\n");
         s.put("com.example.Api", PKG + "@RestController public class Api {\n"
                 + "    @Autowired @Qualifier(\"east\") private Label east;\n"
@@ -1149,7 +1132,7 @@ public class BackendBeansTest {
     @Test
     public void aScopedBeanWhoseConstructorCallsAnOverridableMethodStarts() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Greeter", PKG + "@Component @RequestScope public class Greeter {\n"
+        s.put("com.example.Greeter", PKG + "@Component @Scope(\"request\") public class Greeter {\n"
                 + "    private final String greeting;\n"
                 + "    public Greeter() { greeting = prefix() + \" there\"; }\n"
                 + "    public String prefix() { return \"hi\"; }\n"
@@ -1231,7 +1214,7 @@ public class BackendBeansTest {
     @Test
     public void sessionScopedBeansAreDestroyedWhenTheSessionIsInvalidated() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+        s.put("com.example.Cart", PKG + "@Component @Scope(\"session\") public class Cart {\n"
                 + "    public static int destroyed;\n"
                 + "    private int items;\n"
                 + "    public int add() { return ++items; }\n"
@@ -1270,7 +1253,7 @@ public class BackendBeansTest {
         } finally {
             backend.stop();
         }
-        URLClassLoader loader = (URLClassLoader) backend.getApplication().getClass()
+        URLClassLoader loader = (URLClassLoader) BackendAccess.get().applicationOf(backend).getClass()
                 .getClassLoader();
         assertEquals(2, loader.loadClass("com.example.Cart").getField("destroyed").getInt(null));
     }
@@ -1278,7 +1261,7 @@ public class BackendBeansTest {
     @Test
     public void aScopedOrOverloadedManagedResourceIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Visits", PKG + "@Component @SessionScope @ManagedResource\n"
+        s.put("com.example.Visits", PKG + "@Component @Scope(\"session\") @ManagedResource\n"
                 + "public class Visits {\n"
                 + "    @ManagedAttribute public int getCount() { return 1; }\n"
                 + "}\n");
@@ -1320,7 +1303,7 @@ public class BackendBeansTest {
         } finally {
             backend.stop();
         }
-        Class<?> log = backend.getApplication().getClass().getClassLoader()
+        Class<?> log = BackendAccess.get().applicationOf(backend).getClass().getClassLoader()
                 .loadClass("com.example.Log");
         assertEquals("the subclass must release its state before the base tears down",
                 "open,sub,base,", log.getField("text").get(null));
@@ -1329,10 +1312,10 @@ public class BackendBeansTest {
     @Test
     public void aRequestBeanCanUseAnotherWhileItIsDestroyed() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Clock", PKG + "@Component @RequestScope public class Clock {\n"
+        s.put("com.example.Clock", PKG + "@Component @Scope(\"request\") public class Clock {\n"
                 + "    public String now() { return \"t\"; }\n"
                 + "}\n");
-        s.put("com.example.Audit", PKG + "@Component @RequestScope public class Audit {\n"
+        s.put("com.example.Audit", PKG + "@Component @Scope(\"request\") public class Audit {\n"
                 + "    public static String last = \"none\";\n"
                 + "    @Autowired private Clock clock;\n"
                 + "    public void touch() { }\n"
@@ -1359,7 +1342,7 @@ public class BackendBeansTest {
     @Test
     public void aSessionBeanBuiltByAFailingRequestIsStillDestroyed() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+        s.put("com.example.Cart", PKG + "@Component @Scope(\"session\") public class Cart {\n"
                 + "    public static int destroyed;\n"
                 + "    public void add() { }\n"
                 + "    @PreDestroy void close() { destroyed++; }\n"
@@ -1383,7 +1366,7 @@ public class BackendBeansTest {
         } finally {
             backend.stop();
         }
-        Class<?> cart = backend.getApplication().getClass().getClassLoader()
+        Class<?> cart = BackendAccess.get().applicationOf(backend).getClass().getClassLoader()
                 .loadClass("com.example.Cart");
         assertEquals("a session bean built by a failing request was dropped undestroyed", 1,
                 cart.getField("destroyed").getInt(null));
@@ -1526,12 +1509,12 @@ public class BackendBeansTest {
         assertNoErrors(process(classes));
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
-        Backend.Application app = (Backend.Application) loader
+        BackendApplication app = (BackendApplication) loader
                 .loadClass("com.example.BackendWiring").newInstance();
         int port = freePort();
         Properties off = new Properties();
         off.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        Backend backend = Backend.builder(Config.of(off, "dev")).quiet().application(app).start();
+        Backend backend = withApplication(Backend.builder(Config.of(off, "dev")).quiet(), app).start();
         try {
             String listed = String.valueOf(app.describeRoutes());
             assertTrue(listed, listed.contains("/x"));
@@ -1543,7 +1526,7 @@ public class BackendBeansTest {
         Properties on = new Properties();
         on.setProperty(Config.SERVER_PORT, String.valueOf(port));
         on.setProperty("admin.on", "true");
-        backend = Backend.builder(Config.of(on, "dev")).quiet().application(app).start();
+        backend = withApplication(Backend.builder(Config.of(on, "dev")).quiet(), app).start();
         try {
             assertTrue(String.valueOf(app.describeRoutes()).contains("/admin"));
         } finally {
@@ -1604,13 +1587,13 @@ public class BackendBeansTest {
         assertNoErrors(process(classes));
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
-        Backend.Application app = (Backend.Application) loader
+        BackendApplication app = (BackendApplication) loader
                 .loadClass("com.example.BackendWiring").newInstance();
         int port = freePort();
         Properties on = new Properties();
         on.setProperty(Config.SERVER_PORT, String.valueOf(port));
         on.setProperty("feature.x", "true");
-        Backend first = Backend.builder(Config.of(on, "dev")).quiet().application(app).start();
+        Backend first = withApplication(Backend.builder(Config.of(on, "dev")).quiet(), app).start();
         try {
             assertEquals("true", http("GET", port, "/x"));
         } finally {
@@ -1618,7 +1601,7 @@ public class BackendBeansTest {
         }
         Properties off = new Properties();
         off.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        Backend second = Backend.builder(Config.of(off, "dev")).quiet().application(app).start();
+        Backend second = withApplication(Backend.builder(Config.of(off, "dev")).quiet(), app).start();
         try {
             assertEquals("the second start injected the first start's destroyed bean",
                     "false", http("GET", port, "/x"));
@@ -1652,7 +1635,7 @@ public class BackendBeansTest {
         List<File> cp = new ArrayList<File>(backendClasspath());
         cp.add(libClasses);
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Visits", PKG + "@Component @RequestScope\n"
+        s.put("com.example.Visits", PKG + "@Component @Scope(\"request\")\n"
                 + "public class Visits extends org.lib.BaseCounter { }\n");
         s.put("com.example.Api", PKG
                 + "@RestController public class Api {\n"
@@ -1675,7 +1658,7 @@ public class BackendBeansTest {
     @Test
     public void aRequestBeanDestroyedAfterTheHandlerCanStillUseTheSession() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit {\n"
+        s.put("com.example.Visit", PKG + "@Component @Scope(\"request\") public class Visit {\n"
                 + "    @Autowired private HttpServer.Request request;\n"
                 + "    public void touch() { }\n"
                 + "    @PreDestroy public void done() {\n"
@@ -1714,7 +1697,7 @@ public class BackendBeansTest {
     @Test
     public void aFailedStatementRollsBackAndAnotherCheckedExceptionCommits() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Rows", PKG + "@Service public class Rows {\n"
+        s.put("com.example.Rows", PKG + "@Component public class Rows {\n"
                 + "    private final DataSource db;\n"
                 + "    public Rows(DataSource db) { this.db = db; }\n"
                 + "    @PostConstruct public void schema() throws java.io.IOException {\n"
@@ -1753,9 +1736,8 @@ public class BackendBeansTest {
                 getClass().getClassLoader());
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
-                .requiresDataSource()
-                .application((Backend.Application) loader
+        Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet()
+                .requiresDataSource(), (BackendApplication) loader
                         .loadClass("com.example.BackendWiring").newInstance())
                 .start();
         try {
@@ -1811,15 +1793,14 @@ public class BackendBeansTest {
                 getClass().getClassLoader());
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
-                .application((Backend.Application) loader
+        Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), (BackendApplication) loader
                         .loadClass("com.example.a.BackendWiring").newInstance())
                 .start();
         try {
-            String jobs = String.valueOf(backend.getApplication().getScheduler().describe());
+            String jobs = String.valueOf(BackendAccess.get().applicationOf(backend).getScheduler().describe());
             assertTrue(jobs, jobs.contains("com.example.a.Cleanup.run")
                     && jobs.contains("com.example.b.Cleanup.run"));
-            assertTrue(backend.getApplication().getScheduler()
+            assertTrue(BackendAccess.get().applicationOf(backend).getScheduler()
                     .trigger("com.example.b.Cleanup.run"));
         } finally {
             backend.stop();
@@ -1831,11 +1812,11 @@ public class BackendBeansTest {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Log", PKG + "public class Log { public static String text = \"\"; }\n");
         // Aaa is found first and Zzz depends on it: Zzz must go first.
-        s.put("com.example.Aaa", PKG + "@Component @RequestScope public class Aaa {\n"
+        s.put("com.example.Aaa", PKG + "@Component @Scope(\"request\") public class Aaa {\n"
                 + "    public void use() { }\n"
                 + "    @PreDestroy public void done() { Log.text += \"aaa,\"; }\n"
                 + "}\n");
-        s.put("com.example.Zzz", PKG + "@Component @RequestScope public class Zzz {\n"
+        s.put("com.example.Zzz", PKG + "@Component @Scope(\"request\") public class Zzz {\n"
                 + "    @Autowired private Aaa aaa;\n"
                 + "    public void use() { aaa.use(); }\n"
                 + "    @PreDestroy public void done() { Log.text += \"zzz,\"; }\n"
@@ -1866,7 +1847,7 @@ public class BackendBeansTest {
         } finally {
             backend.stop();
         }
-        Class<?> log = backend.getApplication().getClass().getClassLoader()
+        Class<?> log = BackendAccess.get().applicationOf(backend).getClass().getClassLoader()
                 .loadClass("com.example.Log");
         String text = String.valueOf(log.getField("text").get(null));
         assertTrue("a lazy bean was destroyed after the eager bean it uses: " + text,
@@ -1896,13 +1877,13 @@ public class BackendBeansTest {
     @Test
     public void asyncOnARequestBeanOrAScheduledMethodIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit {\n"
+        s.put("com.example.Visit", PKG + "@Component @Scope(\"request\") public class Visit {\n"
                 + "    @Async public void later() { }\n"
                 + "}\n");
         s.put("com.example.Jobs", PKG + "@Component public class Jobs {\n"
                 + "    @Scheduled(fixedRate = 1000) @Async public void tick() { }\n"
                 + "}\n");
-        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+        s.put("com.example.Cart", PKG + "@Component @Scope(\"session\") public class Cart {\n"
                 + "    @Async public void recount() { }\n"
                 + "}\n");
         s.put("com.example.Stats", PKG + "@Component @ManagedResource(objectName = \"cache/main\")\n"
@@ -1913,9 +1894,9 @@ public class BackendBeansTest {
         String errors = String.valueOf(ctx.getErrors());
         // Warnings, as Spring runs them: the task calls the instance itself.
         assertTrue(String.valueOf(warnings), String.valueOf(warnings)
-                .contains("is on a @RequestScope bean"));
+                .contains("is on a @Scope(\"request\") bean"));
         assertTrue(String.valueOf(warnings), String.valueOf(warnings)
-                .contains("is on a @SessionScope bean"));
+                .contains("is on a @Scope(\"session\") bean"));
         assertFalse(errors, errors.contains("is on a @"));
         assertTrue(errors, errors.contains("is a segment of the management URL"));
         assertTrue(errors, errors.contains("is also @Async"));
@@ -2078,7 +2059,7 @@ public class BackendBeansTest {
         assertNoErrors(process(classes));
         int port = freePort();
         Backend backend = start(classes, port, new Properties());
-        Class<?> base = backend.getApplication().getClass().getClassLoader()
+        Class<?> base = BackendAccess.get().applicationOf(backend).getClass().getClassLoader()
                 .loadClass("com.example.BaseJob");
         try {
             long deadline = System.currentTimeMillis() + 5000;
@@ -2106,7 +2087,7 @@ public class BackendBeansTest {
         File classes = compile(s);
         assertNoErrors(process(classes));
         Backend backend = start(classes, freePort(), new Properties());
-        Class<?> ticker = backend.getApplication().getClass().getClassLoader()
+        Class<?> ticker = BackendAccess.get().applicationOf(backend).getClass().getClassLoader()
                 .loadClass("com.example.Ticker");
         try {
             long deadline = System.currentTimeMillis() + 5000;
@@ -2137,7 +2118,7 @@ public class BackendBeansTest {
         // Both started: the same job name twice refused the start.
         Backend backend = start(classes, freePort(), new Properties());
         try {
-            String jobs = String.valueOf(backend.getApplication().getScheduler().describe());
+            String jobs = String.valueOf(BackendAccess.get().applicationOf(backend).getScheduler().describe());
             assertTrue(jobs, jobs.contains("east.tick") && jobs.contains("west.tick"));
         } finally {
             backend.stop();
@@ -2147,7 +2128,7 @@ public class BackendBeansTest {
     @Test
     public void scopedBeansReachedThroughASingletonAreRefusedOffRequest() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit { }\n");
+        s.put("com.example.Visit", PKG + "@Component @Scope(\"request\") public class Visit { }\n");
         s.put("com.example.Helper", PKG + "@Component public class Helper {\n"
                 + "    @Autowired private Visit visit;\n"
                 + "}\n");
@@ -2181,7 +2162,7 @@ public class BackendBeansTest {
     @Test
     public void anAsyncBeanReachingAScopedBeanIsWarned() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit { }\n");
+        s.put("com.example.Visit", PKG + "@Component @Scope(\"request\") public class Visit { }\n");
         s.put("com.example.Helper", PKG + "@Component public class Helper {\n"
                 + "    @Autowired private Visit visit;\n"
                 + "}\n");
@@ -2218,24 +2199,24 @@ public class BackendBeansTest {
         s.put("com.example.Worker", PKG + "public abstract class Worker {\n"
                 + "    @Async public void later() { }\n"
                 + "}\n");
-        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit "
+        s.put("com.example.Visit", PKG + "@Component @Scope(\"request\") public class Visit "
                 + "extends Worker { }\n");
         assertNoErrors(process(compile(s)));
         String warned = String.valueOf(warnings);
         assertTrue(warned, warned.contains("@Async method com.example.Visit.later is on a "
-                + "@RequestScope bean"));
+                + "@Scope(\"request\") bean"));
     }
 
     @Test
     public void aScopedConfigurationCannotBuildASingleton() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.PerRequest", PKG + "@Configuration @RequestScope public class PerRequest {\n"
+        s.put("com.example.PerRequest", PKG + "@Configuration @Scope(\"request\") public class PerRequest {\n"
                 + "    @Bean public StringBuilder buffer() { return new StringBuilder(); }\n"
                 + "}\n");
         String errors = String.valueOf(process(compile(s)).getErrors());
         assertTrue(errors, errors.contains("@Bean method com.example.PerRequest.buffer builds a "
                 + "singleton bean"));
-        s.put("com.example.PerRequest", PKG + "@Configuration @RequestScope public class PerRequest {\n"
+        s.put("com.example.PerRequest", PKG + "@Configuration @Scope(\"request\") public class PerRequest {\n"
                 + "    @Bean public static StringBuilder buffer() { return new StringBuilder(); }\n"
                 + "}\n");
         assertNoErrors(process(compile(s)));
@@ -2282,7 +2263,7 @@ public class BackendBeansTest {
         assertNoErrors(process(classes));
         Backend backend = start(classes, freePort(), new Properties());
         try {
-            Class<?> api = backend.getApplication().getClass().getClassLoader()
+            Class<?> api = BackendAccess.get().applicationOf(backend).getClass().getClassLoader()
                     .loadClass("com.example.Api");
             assertEquals("the router's controller was built twice, one discarded", 1,
                     ((java.util.concurrent.atomic.AtomicInteger) api.getField("BUILT").get(null))
@@ -2319,10 +2300,10 @@ public class BackendBeansTest {
     @Test
     public void sessionBeansAndSocketsCannotHoldRequestState() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
-        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+        s.put("com.example.Cart", PKG + "@Component @Scope(\"session\") public class Cart {\n"
                 + "    @Autowired private HttpSession session;\n"
                 + "}\n");
-        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit { }\n");
+        s.put("com.example.Visit", PKG + "@Component @Scope(\"request\") public class Visit { }\n");
         s.put("com.example.Chat", PKG + "@WebSocketMapping(\"/chat\")\n"
                 + "public class Chat implements WebSocket {\n"
                 + "    @Autowired private Visit visit;\n"
@@ -2359,7 +2340,7 @@ public class BackendBeansTest {
                 + "    @PostConstruct void warm() { built++; }\n"
                 + "    public String hello() { return \"lazy\"; }\n"
                 + "}\n");
-        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+        s.put("com.example.Cart", PKG + "@Component @Scope(\"session\") public class Cart {\n"
                 + "    private int items;\n"
                 + "    public int add() { return ++items; }\n"
                 + "}\n");
@@ -2447,9 +2428,9 @@ public class BackendBeansTest {
                 "0 0 12 ? * SUN", "0 0 0 * * 7"};
         for (String e : expressions) {
             CronCompiler built = CronCompiler.compile(e);
-            com.codename1.backend.CronSchedule runtime =
-                    com.codename1.backend.CronSchedule.parse(e, "UTC");
-            com.codename1.backend.CronSchedule fromMasks = new com.codename1.backend.CronSchedule(
+            com.codename1.impl.backend.CronSchedule runtime =
+                    com.codename1.impl.backend.CronSchedule.parse(e, "UTC");
+            com.codename1.impl.backend.CronSchedule fromMasks = new com.codename1.impl.backend.CronSchedule(
                     built.seconds, built.minutes, built.hours, built.daysOfMonth, built.months,
                     built.daysOfWeek, built.lastDayOfMonth, "UTC", e);
             long t = 1767225600000L; // 2026-01-01T00:00:00Z
@@ -2467,10 +2448,10 @@ public class BackendBeansTest {
     private Backend start(File classes, int port, Properties settings) throws Exception {
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
-        Backend.Application app = (Backend.Application) loader
+        BackendApplication app = (BackendApplication) loader
                 .loadClass("com.example.BackendWiring").newInstance();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        return Backend.builder(Config.of(settings, "dev")).quiet().application(app).start();
+        return withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), app).start();
     }
 
     private File compile(Map<String, String> sources) throws Exception {
@@ -2539,6 +2520,76 @@ public class BackendBeansTest {
         }
     }
 
+    @Test
+    public void multipartPartsAndFormFieldsBindToParameters() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Uploads", PKG
+                + "@RestController public class Uploads {\n"
+                + "    @PostMapping(\"/upload\")\n"
+                + "    public String upload(@RequestPart(\"file\") HttpServer.Part file,\n"
+                + "            @RequestPart(\"raw\") byte[] raw, @RequestPart(\"note\") String note,\n"
+                + "            @RequestParam(\"title\") String title,\n"
+                + "            @RequestPart(value = \"extra\", required = false) String extra) {\n"
+                + "        return file.getFilename() + \":\" + file.getSize() + \":\" + raw.length\n"
+                + "                + \":\" + note + \":\" + title + \":\" + extra;\n"
+                + "    }\n"
+                + "    @PostMapping(\"/form\")\n"
+                + "    public String form(@RequestParam(\"a\") String a, @RequestParam(\"n\") int n) {\n"
+                + "        return a + \"/\" + n;\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        BackendApplication app = (BackendApplication) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), app)
+                .start();
+        try {
+            String boundary = "b0undary";
+            String body = "--" + boundary + "\r\n"
+                    + "Content-Disposition: form-data; name=\"title\"\r\n\r\nHello\r\n"
+                    + "--" + boundary + "\r\n"
+                    + "Content-Disposition: form-data; name=\"note\"\r\n\r\nshort\r\n"
+                    + "--" + boundary + "\r\n"
+                    + "Content-Disposition: form-data; name=\"raw\"\r\n\r\nabc\r\n"
+                    + "--" + boundary + "\r\n"
+                    + "Content-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\n"
+                    + "Content-Type: text/plain\r\n\r\n12345\r\n"
+                    + "--" + boundary + "--\r\n";
+            String type = "multipart/form-data; boundary=" + boundary;
+            assertEquals("a.txt:5:3:short:Hello:null", send(port, "/upload", type, body));
+            // A missing required part, and a body that is not multipart at all.
+            String partial = "--" + boundary + "\r\n"
+                    + "Content-Disposition: form-data; name=\"title\"\r\n\r\nHello\r\n"
+                    + "--" + boundary + "--\r\n";
+            assertTrue(send(port, "/upload", type, partial).startsWith("HTTP 400"));
+            assertTrue(send(port, "/upload", type, "--" + boundary + "\r\nbroken")
+                    .startsWith("HTTP 400"));
+            // A urlencoded form is @RequestParam too, converted like a query value.
+            assertEquals("x y/7", send(port, "/form", "application/x-www-form-urlencoded",
+                    "a=x+y&n=7"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    private static String send(int port, String path, String type, String body) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + path)
+                .openConnection();
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        c.setRequestProperty("Content-Type", type);
+        OutputStream out = c.getOutputStream();
+        out.write(body.getBytes("UTF-8"));
+        out.close();
+        return read(c);
+    }
+
     private static String http(String method, int port, String path) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + path)
                 .openConnection();
@@ -2578,5 +2629,33 @@ public class BackendBeansTest {
             return "HTTP " + status + ": " + body;
         }
         return body;
+    }
+
+    // The build's own builder calls go through the runtime's internal access,
+    // as the generated entry point does; these keep the tests' chains readable.
+    private static Backend.Builder withApplication(Backend.Builder builder,
+                                                   BackendApplication application) {
+        BackendAccess.get().application(builder, application);
+        return builder;
+    }
+
+    private static Backend.Builder withMcp(Backend.Builder builder,
+                                           com.codename1.impl.backend.mcp.McpServer.Extension devTools) {
+        BackendAccess.get().mcp(builder, devTools);
+        return builder;
+    }
+
+    private static Backend.Builder withManagement(Backend.Builder builder) {
+        BackendAccess.get().management(builder);
+        return builder;
+    }
+
+    private static void writeProperties(File dir, String name, String content) throws IOException {
+        java.io.FileWriter w = new java.io.FileWriter(new File(dir, name));
+        try {
+            w.write(content);
+        } finally {
+            w.close();
+        }
     }
 }

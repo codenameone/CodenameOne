@@ -1,7 +1,7 @@
 # The Backend Module — Spring-Style Server Code
 
 The `backend/` module is the server side of the app, written in Java with Spring's
-annotations under Codename One package names. `@RestController`, `@Service`,
+annotations under Codename One package names. `@RestController`, `@Component`,
 `@Autowired`, `@Transactional`, `@Scheduled` and the rest mean what they mean in
 Spring. The difference is **when** they are resolved: at build time, into plain
 code. There is no container, no classpath scan, no proxy and no reflection when the
@@ -43,12 +43,11 @@ Everything else in this file applies to both build tools.
   and `backend/application-<profile>.properties`, **not** `src/main/resources`.
   Environment variables override them (`cn1.datasource.url` is also read from
   `CN1_DATASOURCE_URL` and `DATABASE_URL`, `cn1.server.port` from `PORT`).
-- **Common settings can be annotations too** (a single binary often ships with
-  no properties file): `@ServerConfig(port = 8080)`, `@SessionConfig(store = "db")`,
-  `@DataSourceConfig(url = "${DATABASE_URL}")`, `@StaticFilesConfig(root = "www")`
-  on any class. Each attribute is one `cn1.*` key compiled in UNDER the properties
-  files and environment, which still override it. A bad value or two classes
-  disagreeing is a build error. Never put a token or password in one.
+- **`application.properties` is compiled into the server** as the bottom layer of
+  its configuration, so a single binary runs with no file beside it; a file or the
+  environment present at run time still overrides every key. Profile files are not
+  compiled in. Never put a token or password in it -- write `${NAME}` and set the
+  variable.
 - **Imports come from `com.codename1.backend.annotations`**, never
   `org.springframework.*`.
 
@@ -60,14 +59,14 @@ package com.example.myapp;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.*;
 
-@Repository
+@Component
 public class NoteStore {
     private final DataSource db;                    // built-in: the connection pool
     public NoteStore(DataSource db) { this.db = db; }
     // ...
 }
 
-@Service
+@Component
 public class Notes {
     private final NoteStore store;
     @Autowired private Mailer mailer;               // private fields are fine
@@ -92,14 +91,14 @@ public class NotesApi {
 
 | Annotation | Meaning |
 | --- | --- |
-| `@Component`, `@Service`, `@Repository` | A bean. Name defaults to the simple class name, decapitalized. |
+| `@Component` | A bean. Name defaults to the simple class name, decapitalized. |
 | `@Configuration` + `@Bean` | Factory methods; parameters are injected. Calling one `@Bean` method from another does NOT share the instance — take the other bean as a parameter. |
 | `@Autowired` | Constructor (needed only when there are several), field, or setter. `required = false` allowed. |
 | `@Qualifier("name")`, `@Primary` | Choose between several beans of one type. Two candidates and neither is enough → build error. |
 | `@Value("${key:fallback}")` | A configuration value, converted to String, a primitive or box, or an enum. |
 | `@ConfigurationProperties("mail")` | Calls the bean's setters from `mail.*` keys (`setMaxSize` reads `mail.maxSize` or `mail.max-size`). |
 | `@Scope("prototype")` | A new instance at each injection point. |
-| `@RequestScope`, `@SessionScope` | One per HTTP request / session. Injected into a singleton through a generated subclass, so the class must not be final and needs a no-argument constructor. |
+| `@Scope("request")`, `@Scope("session")` | One per HTTP request / session. Injected into a singleton through a generated subclass, so the class must not be final and needs a no-argument constructor. |
 | `@Lazy` | Built on first use (same subclass rule). The stand-in runs the no-argument constructor once at start-up, so put expensive set-up in `@PostConstruct`, which runs only on the real instance. |
 | `@Profile("dev")`, `@Profile("!prod")` | Only on that profile (`CN1_PROFILE`). |
 | `@ConditionalOnProperty("feature.x")`, `@ConditionalOnMissingBean` | Conditional beans. |
@@ -133,7 +132,7 @@ shared by app and backend round-trips:
 ## Transactions
 
 ```java
-@Service
+@Component
 public class Transfers {
     private final DataSource db;
     public Transfers(DataSource db) { this.db = db; }
@@ -165,7 +164,7 @@ public class Transfers {
 ## Background work: `@Async`, `@Scheduled`, threads
 
 ```java
-@Service
+@Component
 public class Reports {
     @Async                                          // caller returns at once
     public Future<Report> build(String month) {
@@ -232,8 +231,8 @@ Custom instruments: `Metrics.counter(...)`, `Metrics.histogram(...)`,
 - Management endpoints: `/manage/health`, `/manage/metrics`, `/manage/prometheus`,
   `/manage/jobs`, `/manage/managed`, and `POST /manage/managed/{bean}/{operation}`.
   Always present in the `cn1:backend` / `runBackend` dev run. A **packaged** binary contains them
-  only if the build asked -- `@EnableManagement` on a class or
-  `cn1.management.enabled=true` in a properties file -- otherwise the code is not
+  only if the build asked -- `cn1.management.enabled=true` in a properties
+  file -- otherwise the code is not
   in the binary at all. Outside dev they also need `cn1.management.token` (env).
   `cn1.management.enabled=false` turns built-in endpoints off at start-up.
 
@@ -276,37 +275,74 @@ profile the token is optional, but a server without one listens on `127.0.0.1`
 only: its tools reach the database. To test from a phone or another machine, set
 `cn1.mcp.token` (the MCP client then sends it as a bearer token) or turn the
 endpoint off with `cn1.mcp.enabled=false`. A packaged binary contains the MCP
-endpoint only when it has an `@McpTool` method, `@EnableMcpServer`, or
-`cn1.mcp.enabled=true` in a properties file; the dev tools are only in the dev run.
+endpoint only when it has an `@McpTool` method, or `cn1.mcp.enabled=true`
+(or `cn1.mcp.path`/`cn1.mcp.allowedOrigins`) in a properties file; the dev tools are only in the dev run.
 
 ## Testing
 
-- **Unit test** a service by constructing it: injection is constructor calls, so
-  `new Notes(new FakeStore())` is the whole setup.
-- **Integration test** the wired server — what `@SpringBootTest` does — by
-  starting the generated wiring on a free port:
+Tests are JUnit 5 in `backend/src/test/java`, written against Spring Boot's test
+API under `com.codename1.backend.test`. The module's pom already has the
+dependencies and the goals.
 
 ```java
-Properties p = new Properties();
-p.setProperty("cn1.server.port", "0");             // or a free port you picked
-Backend server = Backend.builder(Config.of(p, "test"))
-        .quiet()
-        .application(new BackendWiring())           // generated into target/classes
-        .start();
-try {
-    // HTTP calls against server.getServer().getPort()
-} finally {
-    server.stop();
+import com.codename1.backend.annotations.Autowired;
+import com.codename1.backend.test.BackendTest;
+import com.codename1.backend.test.MockMvc;
+import org.junit.jupiter.api.Test;
+
+import static com.codename1.backend.test.MockMvcRequestBuilders.get;
+import static com.codename1.backend.test.MockMvcResultMatchers.jsonPath;
+import static com.codename1.backend.test.MockMvcResultMatchers.status;
+
+@BackendTest                                  // = @SpringBootTest; the build wires it
+class NotesTest {
+    @Autowired MockMvc mvc;                   // in process, no socket
+
+    @Test
+    void readsANote() throws Exception {
+        mvc.perform(get("/notes/{id}", 1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("first"));
+    }
 }
 ```
 
-The `test` profile is a development profile: in-memory SQLite, tables created.
+- **Unit test** a service by constructing it: injection is constructor calls, so
+  `new Notes(new FakeStore())` is the whole setup.
+- **Over a real port**: `@BackendTest(webEnvironment = BackendTest.WebEnvironment.RANDOM_PORT)`,
+  then `@Autowired TestRestTemplate rest` (`getForObject`, `getForEntity`,
+  `postForEntity`, `exchange`, `withBasicAuth`) and `@LocalServerPort int port`.
+- **Replace a bean**: a static nested `@TestConfiguration` class with a
+  `@Bean @Primary` method. Works on the JVM and compiled.
+- **Mock a bean**: `@MockitoBean Store store;` with `org.mockito:mockito-core`
+  added as a test dependency. JVM only.
+- **Settings**: `@BackendTest(properties = {"key=value"})`. These beat the
+  environment. The profile is `test` (a development profile): an in-memory
+  SQLite database, tables created.
+- Test classes with the same configuration share one running server; do not
+  rely on test order.
+
+Run:
+
+```bash
+mvn -pl backend -Dcodename1.platform=backend test
+mvn -pl backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true   # also as a native binary
+./gradlew :backend:test          # Gradle (./gradlew test in a backend-only project)
+./gradlew :backend:backendTest   # Gradle, as a native binary
+```
+
+The compiled run translates the same tests into a native test binary (needs
+clang, as `cn1:backend-package` does; skipped on Windows). Classes that import
+Mockito are left out of it. Use only the JUnit 5 API the shim provides:
+lifecycle annotations, `@Disabled`, `@DisplayName`, `@Tag`, `Assertions`
+(including `assertThrows` with a lambda) and `Assumptions`. Results:
+`backend/target/surefire-reports/TEST-*.xml` and `TEST-*-compiled.xml`.
 
 ## Build errors you will see, and what they mean
 
 | Message fragment | Fix |
 | --- | --- |
-| `needs a X, and no bean has that type` | Annotate the implementation `@Service`/`@Component`, or add a `@Bean` method. |
+| `needs a X, and no bean has that type` | Annotate the implementation `@Component`, or add a `@Bean` method. |
 | `could receive any of ...` | Mark one `@Primary` or inject with `@Qualifier("name")`. |
 | `The constructors form a cycle` | Inject one side through an `@Autowired` field or setter. |
 | `is final, so it can only be set by the constructor` | Take it as a constructor parameter. |

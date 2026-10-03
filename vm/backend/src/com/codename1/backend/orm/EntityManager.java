@@ -266,7 +266,7 @@ public final class EntityManager {
             // BEGIN left the writes before a failure committed.
             return pinned.transaction(new ScopedWork(body, dialect, tables));
         }
-        Database joined = com.codename1.backend.Transactions.joined(pool);
+        Database joined = com.codename1.impl.backend.BackendAccess.get().joined(pool);
         if (joined != null) {
             // Inside a @Transactional method: join its transaction, as a manager
             // already inside one does above.
@@ -282,10 +282,10 @@ public final class EntityManager {
         try {
             return body.run(manager);
         } catch (Exception err) {
-            com.codename1.backend.Transactions.markRollbackOnly();
+            com.codename1.impl.backend.BackendAccess.get().markRollbackOnly();
             throw err;
         } catch (Error err) {
-            com.codename1.backend.Transactions.markRollbackOnly();
+            com.codename1.impl.backend.BackendAccess.get().markRollbackOnly();
             throw err;
         }
     }

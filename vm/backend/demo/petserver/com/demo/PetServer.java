@@ -96,6 +96,31 @@ public class PetServer {
             public HttpServer.Response handle(HttpServer.Request request) throws Exception {
                 String method = request.getMethod();
                 String target = request.getTarget();
+                // What the parser made of the body: text or bytes, its length, and
+                // the parts of a multipart form. The binary, gzip and multipart
+                // paths live in HttpServer, so this is where the translated server
+                // proves them.
+                if("/bodyecho".equals(stripQuery(target))) {
+                    StringBuilder sb = new StringBuilder();
+                    byte[] bytes = request.getBodyBytes();
+                    sb.append("length=").append(bytes == null ? 0 : bytes.length);
+                    int sum = 0;
+                    for(int iter = 0 ; bytes != null && iter < bytes.length ; iter++) {
+                        sum = sum * 31 + (bytes[iter] & 0xff);
+                    }
+                    sb.append(" sum=").append(sum);
+                    java.util.List parts = request.getParts();
+                    for(int iter = 0 ; iter < parts.size() ; iter++) {
+                        HttpServer.Part part = (HttpServer.Part) parts.get(iter);
+                        sb.append(" part=").append(part.getName()).append('/')
+                                .append(part.getFilename()).append('/').append(part.getSize());
+                    }
+                    String field = request.param("field");
+                    if(field != null) {
+                        sb.append(" field=").append(field);
+                    }
+                    return HttpServer.Response.text(200, sb.toString());
+                }
                 if("/healthz".equals(stripQuery(target))) {
                     return HttpServer.Response.json(200, Json.write(serverRef[0].getMetrics()));
                 }
