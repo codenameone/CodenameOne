@@ -2424,6 +2424,16 @@
       "medium": {
         "url": "https://medium.com/@Codename_One/a-desktop-theme-has-to-know-about-the-mouse-da9d21626fdf?postPublishedType=initial",
         "syndicated_at": "2026-09-30T19:02:23+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/a-desktop-theme-has-to-know-about-the-mouse",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac1513557ebee6a5b94fd39",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T19:03:29+00:00"
       }
     },
     "parparvm-compiles-itself": {
@@ -2442,6 +2452,10 @@
         "id": 4792979,
         "url": "https://dev.to/codenameone/apple-shouldnt-dictate-your-apps-redesign-schedule-igh",
         "syndicated_at": "2026-10-03T17:35:08+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/90aa9d5c3292/edit",
+        "syndicated_at": "2026-10-03T19:01:40+00:00"
       }
     }
   }
