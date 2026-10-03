@@ -26,6 +26,8 @@ import android.net.Uri;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -36,6 +38,9 @@ import static org.junit.Assert.assertNull;
 /// can run before starting it. An implicit intent has no component, and
 /// answering null for it suppressed every browser, dialer and share intent.
 public class IntentResolveActivityTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
     public void implicitIntentsTheRuntimeHandlesResolve() {

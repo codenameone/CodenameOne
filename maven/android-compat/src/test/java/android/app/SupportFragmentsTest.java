@@ -36,6 +36,8 @@ import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 /// The AndroidX fragments run on the platform fragment engine as a second
@@ -44,6 +46,9 @@ import org.junit.Test;
 /// across a configuration change, and a restored fragment is created through
 /// the application's fragment factory.
 public class SupportFragmentsTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     /// A support fragment with a fixed public type, so the test's factory can
     /// create it by name.

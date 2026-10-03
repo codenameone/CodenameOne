@@ -27,6 +27,8 @@ import android.net.Uri;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -36,6 +38,9 @@ import static org.junit.Assert.assertNull;
 /// ACTION_SEND's file is in EXTRA_STREAM. It was ignored and the share still
 /// reported success; a stream the runtime cannot open is now refused.
 public class ShareStreamTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
     public void fileStreamsNameTheirPathAndOthersAreRefused() {

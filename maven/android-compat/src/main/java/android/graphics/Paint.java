@@ -403,9 +403,19 @@ public class Paint {
             return 0;
         }
         Font f = cn1Font();
-        float w = f.substringWidth(text, start, end - start);
+        float w;
         if (letterSpacing != 0) {
-            w += letterSpacing * textSize * (end - start);
+            // Spaced text is drawn a character at a time (Canvas.drawText),
+            // so it is measured the same way. A run measured whole is
+            // narrower wherever the font kerns -- a browser canvas does -- and
+            // a view sized to it clipped its last letters.
+            w = 0;
+            float extra = letterSpacing * textSize;
+            for (int i = start; i < end; i++) {
+                w += f.charWidth(text.charAt(i)) + extra;
+            }
+        } else {
+            w = f.substringWidth(text, start, end - start);
         }
         return w * textScaleX;
     }

@@ -29,13 +29,18 @@ import android.view.View;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 /// ConstraintLayout's placement on a 1000x1000 parent, for the cases real
 /// layouts lean on. The expected positions are what ConstraintLayout computes
 /// on Android for the same constraints.
 public class ConstraintLayoutTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private Context context;
     private ConstraintLayout parent;

@@ -24,6 +24,8 @@ package com.codename1.androidcompat.jdk;
 
 import android.content.Intent;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -32,6 +34,9 @@ import static org.junit.Assert.assertEquals;
 /// descriptors that name the JDK class's supertypes, such as
 /// `Intent.putExtra(String, Serializable)`: the shim must have them too.
 public class FileTypeContractTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
     public void aFileGoesIntoAnIntentAsSerializable() {

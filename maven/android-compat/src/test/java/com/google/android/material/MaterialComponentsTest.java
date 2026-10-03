@@ -53,11 +53,16 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.theme.MaterialComponentsViewInflater;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 /// The Material themes' values and the widgets' state logic, checked against
 /// what Material Components does on Android.
 public class MaterialComponentsTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static Context themed(int theme) {
         return new ContextThemeWrapper(AndroidTestSupport.context(), theme);

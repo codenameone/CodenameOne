@@ -20,29 +20,43 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.androidcompat.runtime;
+package android.graphics;
 
+import com.codename1.androidcompat.testing.AndroidTestSupport;
+import com.codename1.androidcompat.testing.HeadlessImplementation;
 import com.codename1.androidcompat.testing.MainThreadRule;
+
 import org.junit.Rule;
 import org.junit.Test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertEquals;
 
-/// Device locale to resource qualifiers: `values-fil` must match a Filipino
-/// device, which a fixed two-letter cut turned into `fi`.
-public class LocaleQualifierTest {
+/// Text with letter spacing (Material 3's text appearances all have some) is
+/// drawn a character at a time, so it must be measured that way. Measured as
+/// one run it came out narrower wherever the font kerns -- the browser's does
+/// -- and the JavaScript port clipped the end of every Material label.
+public class LetterSpacingMeasureTest {
 
     @Rule
     public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
-    public void keepsTheWholeLanguage() {
-        assertArrayEquals(new String[] {"en", "US"}, ResourceManager.languageAndRegion("en_US"));
-        assertArrayEquals(new String[] {"fil", "PH"}, ResourceManager.languageAndRegion("fil_PH"));
-        assertArrayEquals(new String[] {"pt", "BR"}, ResourceManager.languageAndRegion("pt-br"));
-        assertArrayEquals(new String[] {"haw", ""}, ResourceManager.languageAndRegion("haw"));
-        assertNull(ResourceManager.languageAndRegion("x"));
-        assertNull(ResourceManager.languageAndRegion(null));
+    public void spacedTextMeasuresAsItIsDrawn() {
+        AndroidTestSupport.context();
+        HeadlessImplementation.kerning = true;
+        try {
+            Paint p = new Paint();
+            p.setTextSize(20);
+            p.setLetterSpacing(0.1f);
+            String label = "Outlined";
+            com.codename1.ui.Font f = p.cn1Font();
+            float drawn = 0;
+            for (int i = 0; i < label.length(); i++) {
+                drawn += f.charWidth(label.charAt(i)) + 0.1f * 20;
+            }
+            assertEquals(drawn, p.measureText(label), 0.01f);
+        } finally {
+            HeadlessImplementation.kerning = false;
+        }
     }
 }

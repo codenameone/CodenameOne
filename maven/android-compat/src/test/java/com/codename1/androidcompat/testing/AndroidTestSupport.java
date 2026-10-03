@@ -96,4 +96,46 @@ public final class AndroidTestSupport {
         }
         return rt.getBaseContext();
     }
+
+    /// Puts the display in a known state for a test that runs activities: no
+    /// activity, no dialog, a plain form current and no transition running.
+    /// The display is shared by every test in the JVM, and what one leaves
+    /// behind -- a transition still sliding, Codename One's error dialog --
+    /// would otherwise become the next one's host form.
+    public static void cleanDisplay() {
+        context();
+        final com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        d.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                android.app.ActivityThread.finishAllActivities();
+                com.codename1.ui.Form current = d.getCurrent();
+                if (current instanceof com.codename1.ui.Dialog) {
+                    ((com.codename1.ui.Dialog) current).dispose();
+                }
+                com.codename1.ui.Form blank = new com.codename1.ui.Form("Test");
+                blank.setTransitionInAnimator(null);
+                blank.setTransitionOutAnimator(null);
+                blank.show();
+            }
+        });
+        long deadline = System.currentTimeMillis() + 10000;
+        final boolean[] busy = {true};
+        while (busy[0] && System.currentTimeMillis() < deadline) {
+            d.callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    busy[0] = d.isInTransition();
+                }
+            });
+            if (busy[0]) {
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
 }

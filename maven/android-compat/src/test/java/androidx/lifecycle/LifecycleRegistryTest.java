@@ -27,12 +27,17 @@ import static org.junit.Assert.assertEquals;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 /// Observers move through every state in order, catch up when added late,
 /// and hear events in AndroidX's order: first added first going up, last
 /// added first going down.
 public class LifecycleRegistryTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static final class Owner implements LifecycleOwner {
         final LifecycleRegistry registry = new LifecycleRegistry(this);

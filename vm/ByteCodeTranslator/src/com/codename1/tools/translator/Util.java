@@ -60,7 +60,7 @@ public class Util {
                     // Object skip until ;
                     int idx = desc.indexOf(';', i);
                     String objectType = desc.substring(i + 1, idx);
-                    objectType = objectType.replace('/', '_').replace('$', '_');
+                    objectType = objectType.replace('/', '_').replace('$', '_').replace('-', '_');
                     //if(!dependentClasses.contains(objectType)) {
                     //    dependentClasses.add(objectType);
                     //}
@@ -101,7 +101,7 @@ public class Util {
         if (owner == null) {
             return owner;
         }
-        ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+        ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_').replace('-', '_'));
         if (bc == null) {
             return owner;
         }
@@ -600,7 +600,7 @@ public class Util {
      * Memoized ParparVM name mangling: '/' and '$' both become '_'.
      *
      * The tree contains 95 hand-written copies of
-     * {@code x.replace('/', '_').replace('$', '_')}, 54 of them in the
+     * {@code x.replace('/', '_').replace('$', '_').replace('-', '_')}, 54 of them in the
      * per-instruction emit classes (Invoke, Field, CustomInvoke, Ldc), so the
      * SAME owner string is re-mangled once per emitted instruction. The distinct
      * inputs are bounded by the class count (5782 on the hellocodenameone
@@ -623,7 +623,7 @@ public class Util {
         }
         String m = MANGLE_CACHE.get(name);
         if (m == null) {
-            m = name.replace('/', '_').replace('$', '_');
+            m = name.replace('/', '_').replace('$', '_').replace('-', '_');
             MANGLE_CACHE.put(name, m);
         }
         return m;

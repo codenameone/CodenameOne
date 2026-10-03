@@ -28,11 +28,16 @@ import static org.junit.Assert.assertTrue;
 
 import android.graphics.Matrix;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 /// The timing rules of the legacy view animations, checked against the
 /// values AOSP's getTransformation produces.
 public class AnimationTimingTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static final float EPS = 1e-4f;
 

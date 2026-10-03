@@ -31,6 +31,8 @@ import android.animation.ObjectAnimator;
 import android.animation.TimeAnimator;
 import android.animation.ValueAnimator;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 /// Codename One's Object.clone() copies nothing (it answers null on the iOS
@@ -38,6 +40,9 @@ import org.junit.Test;
 /// must keep their class and configuration and be independent of the
 /// original, as Android's clones are.
 public class AnimationCloneTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static final float EPS = 1e-4f;
 

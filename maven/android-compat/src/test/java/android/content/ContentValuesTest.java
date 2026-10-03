@@ -31,9 +31,14 @@ import static org.junit.Assert.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class ContentValuesTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
     public void keepsInsertionOrder() {

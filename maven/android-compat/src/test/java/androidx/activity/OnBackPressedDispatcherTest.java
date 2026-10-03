@@ -29,11 +29,16 @@ import static org.junit.Assert.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 /// The most recently added enabled callback handles back; with none enabled
 /// the fallback runs, and a removed callback is no longer asked.
 public class OnBackPressedDispatcherTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static OnBackPressedCallback callback(final String name, final List<String> log, boolean enabled) {
         return new OnBackPressedCallback(enabled) {

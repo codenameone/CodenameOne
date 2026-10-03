@@ -127,7 +127,7 @@ public class Invoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
-        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
+        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_').replace('-', '_');
         t = unarray(t);
         if (t != null && !dependencyList.contains(t)) dependencyList.add(t);
         // The world is incomplete while ClassReader visits instructions. Resolve

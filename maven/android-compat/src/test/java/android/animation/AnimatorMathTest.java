@@ -29,11 +29,16 @@ import android.util.FloatProperty;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 /// Value computation of the property animation classes, without running
 /// them on a frame clock: seeking sets values exactly as a frame would.
 public class AnimatorMathTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static final float EPS = 1e-3f;
 

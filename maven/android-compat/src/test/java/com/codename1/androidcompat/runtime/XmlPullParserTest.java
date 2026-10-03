@@ -31,6 +31,8 @@ import static org.junit.Assert.fail;
 import android.util.TypedValue;
 import android.util.Xml;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -43,6 +45,9 @@ import java.io.StringWriter;
 /// The XmlPull implementations: the text parser, the serializer and the
 /// parser over compiled resource XML.
 public class XmlPullParserTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static XmlPullParser parse(String xml) throws Exception {
         XmlPullParser p = Xml.newPullParser();

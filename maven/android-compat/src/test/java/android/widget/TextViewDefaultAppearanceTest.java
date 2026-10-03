@@ -28,6 +28,8 @@ import android.view.ContextThemeWrapper;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -36,6 +38,9 @@ import static org.junit.Assert.assertEquals;
 /// textAppearanceSmall, as AOSP's Widget.TextView says: on a device the
 /// gallery's plain labels are 54% black, and they rendered primary black.
 public class TextViewDefaultAppearanceTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
     public void aPlainTextViewIsSmallAndTertiaryInMaterialLight() {

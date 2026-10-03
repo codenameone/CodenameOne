@@ -23,6 +23,7 @@
 package com.codename1.androidcompat.runtime;
 
 import com.codename1.android.rescompiler.ResourceCompiler;
+import com.codename1.androidcompat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -45,6 +46,9 @@ import static org.junit.Assert.assertTrue;
 /// runtime's table reader: the two sides of the binary format must agree,
 /// and variant selection must follow Android's rules.
 public class ResTableRoundTripTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     @Rule
     public TemporaryFolder tmp = new TemporaryFolder();

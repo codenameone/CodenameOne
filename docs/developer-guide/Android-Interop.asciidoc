@@ -269,43 +269,43 @@ A few differences are expected:
   screen, because it never stops moving.
 
 .Main screen
-image::img/android-interop-main.png[The launcher activity: an action bar with a menu, a custom view, a text field and buttons, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-main.png["The launcher activity: an action bar with a menu, a custom view, a text field and buttons, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .Second activity
-image::img/android-interop-detail.png[An activity started with an intent, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-detail.png["An activity started with an intent, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .Framework widgets
-image::img/android-interop-widgets.png[Check box, radio buttons, switch, progress bars, seek bar and rating bar, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-widgets.png["Check box, radio buttons, switch, progress bars, seek bar and rating bar, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .ListView
-image::img/android-interop-list.png[A ListView with a custom adapter under a Spinner, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-list.png["A ListView with a custom adapter under a Spinner, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .Fragments
-image::img/android-interop-fragments.png[A list fragment above the detail fragment it updates, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-fragments.png["A list fragment above the detail fragment it updates, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .Input controls
-image::img/android-interop-inputs.png[An autocomplete field, date and time buttons and a number picker, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-inputs.png["An autocomplete field, date and time buttons and a number picker, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .Files and SQLite
-image::img/android-interop-data.png[A file in the application's files directory and a SQLite database, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-data.png["A file in the application's files directory and a SQLite database, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .AppCompat
-image::img/android-interop-appcompat.png[An AppCompatActivity with a Toolbar set as its support action bar, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-appcompat.png["An AppCompatActivity with a Toolbar set as its support action bar, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .ConstraintLayout
-image::img/android-interop-constraint.png[Views placed by ConstraintLayout, including a percentage guideline, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-constraint.png["Views placed by ConstraintLayout, including a percentage guideline, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .ViewModel and LiveData
-image::img/android-interop-jetpack.png[A counter kept in a ViewModel and observed through LiveData, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-jetpack.png["A counter kept in a ViewModel and observed through LiveData, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .RecyclerView
-image::img/android-interop-recycler.png[A RecyclerView with item decorations and click handling, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-recycler.png["A RecyclerView with item decorations and click handling, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .Material Components
-image::img/android-interop-material.png[Material 3 buttons, a text input layout, chips, a card, an extended FAB and bottom navigation, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-material.png["Material 3 buttons, a text input layout, chips, a card, an extended FAB and bottom navigation, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 .Kotlin
-image::img/android-interop-kotlin.png[An activity written in Kotlin, on Android (left) and on Codename One (right),scaledwidth=70%]
+image::img/android-interop-kotlin.png["An activity written in Kotlin, on Android (left) and on Codename One (right)",scaledwidth=70%]
 
 === Limitations
 

@@ -40,6 +40,11 @@ import static org.junit.Assert.assertNotSame;
 /// change is recreated when the application returns, as on Android.
 public class ResumeConfigurationTest {
 
+    @org.junit.Before
+    public void startClean() {
+        AndroidTestSupport.cleanDisplay();
+    }
+
     @Test
     public void aChangeMadeInTheBackgroundRecreatesTheActivityOnReturn() {
         final Context app = AndroidTestSupport.context().getApplicationContext();

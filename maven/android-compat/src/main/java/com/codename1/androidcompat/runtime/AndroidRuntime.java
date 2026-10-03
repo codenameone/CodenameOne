@@ -355,7 +355,13 @@ public final class AndroidRuntime {
             com.codename1.ui.Form host = hostForm;
             hostForm = null;
             returningTo = host;
-            if (host != null) {
+            if (host instanceof com.codename1.ui.Dialog) {
+                // A dialog is put back without a modal loop of its own:
+                // showBack() would start one inside finish() and block it
+                // until the dialog closes, under the loop of the show()
+                // that is still waiting for it.
+                ((com.codename1.ui.Dialog) host).showModeless();
+            } else if (host != null) {
                 host.showBack();
             }
             return;

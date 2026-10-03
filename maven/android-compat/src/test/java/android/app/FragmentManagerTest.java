@@ -29,6 +29,8 @@ import android.view.MenuItem;
 
 import com.codename1.androidcompat.runtime.MenuImpl;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -44,6 +46,9 @@ import static org.junit.Assert.assertTrue;
 /// view) through the activity's states, the back stack, retained instances
 /// and options-menu merging.
 public class FragmentManagerTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     static final class Recorder extends Fragment {
         final List<String> log;

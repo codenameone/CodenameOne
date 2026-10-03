@@ -25,6 +25,8 @@ package androidx.recyclerview.widget;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -35,6 +37,9 @@ import java.util.Random;
 /// new list -- for random lists, with and without move detection -- and the
 /// content changes must land on the right items.
 public class DiffUtilTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     /// Items are "key:version": the same item when the keys match, the same
     /// content when the versions do too.

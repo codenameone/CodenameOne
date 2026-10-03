@@ -301,14 +301,23 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return new Object();
     }
 
+    /// When set, a run of characters measures 1px narrower per adjacent pair
+    /// than its characters one by one, as a kerning font (a browser canvas)
+    /// does. Off by default; tests that measure text flip it.
+    public static boolean kerning;
+
+    private static int kerned(int width, int len) {
+        return kerning && len > 1 ? width - (len - 1) : width;
+    }
+
     @Override
     public int charsWidth(java.lang.Object nativeFont, char[] ch, int offset, int len) {
-        return len * CHAR_WIDTH;
+        return kerned(len * CHAR_WIDTH, len);
     }
 
     @Override
     public int stringWidth(java.lang.Object nativeFont, java.lang.String text) {
-        return text == null ? 0 : text.length() * CHAR_WIDTH;
+        return text == null ? 0 : kerned(text.length() * CHAR_WIDTH, text.length());
     }
 
     @Override

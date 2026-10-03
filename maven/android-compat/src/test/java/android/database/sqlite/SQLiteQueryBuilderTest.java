@@ -28,9 +28,14 @@ import static org.junit.Assert.fail;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class SQLiteQueryBuilderTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
     public void buildsTheSameStringAsAndroid() {

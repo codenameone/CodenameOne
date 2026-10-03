@@ -48,6 +48,11 @@ import static org.junit.Assert.assertTrue;
 /// device its old pixels stayed on screen: a caret after the focus had gone.
 public class EditTextRepaintBackdropTest {
 
+    @org.junit.Before
+    public void startClean() {
+        AndroidTestSupport.cleanDisplay();
+    }
+
     static final class RecordingBackground extends Drawable {
         boolean drawn;
 

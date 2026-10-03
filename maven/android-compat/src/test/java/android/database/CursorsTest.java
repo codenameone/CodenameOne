@@ -30,9 +30,14 @@ import static org.junit.Assert.fail;
 
 import java.util.Arrays;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class CursorsTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static MatrixCursor sample() {
         MatrixCursor c = new MatrixCursor(new String[] {"_id", "Name", "score"});

@@ -27,6 +27,8 @@ import android.content.SharedPreferences;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -36,6 +38,9 @@ import static org.junit.Assert.assertFalse;
 /// were applied before puts whatever the order, so put-then-remove kept the
 /// value.
 public class SharedPreferencesEditOrderTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
     public void theLastEditOfAKeyWins() {

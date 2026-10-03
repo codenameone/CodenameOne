@@ -220,7 +220,7 @@ public final class InlinableConstructor {
                 // A field the struct only declares on some targets cannot be zeroed
                 // unconditionally here; see ByteCodeClass.targetGuardFor.
                 String zeroGuard = com.codename1.tools.translator.ByteCodeClass.targetGuardFor(
-                        f.getClsName().replace('/', '_').replace('$', '_'), f.getFieldName());
+                        f.getClsName().replace('/', '_').replace('$', '_').replace('-', '_'), f.getFieldName());
                 if (zeroGuard != null) {
                     b.append("#if ").append(zeroGuard).append("\n");
                 }
@@ -293,7 +293,7 @@ public final class InlinableConstructor {
      * Called at emit time from the new-site.
      */
     public static InlinableConstructor analyze(String owner, String desc) {
-        ByteCodeClass cls = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+        ByteCodeClass cls = Parser.getClassObject(owner.replace('/', '_').replace('$', '_').replace('-', '_'));
         if (cls == null) {
             return null;
         }
@@ -396,7 +396,7 @@ public final class InlinableConstructor {
             if (stores.size() >= MAX_STORES) {
                 return null;
             }
-            stores.add(new Store(f.getOwner().replace('/', '_').replace('$', '_'),
+            stores.add(new Store(f.getOwner().replace('/', '_').replace('$', '_').replace('-', '_'),
                     f.getFieldName(), cat, paramIndex, constLiteral));
             i += 3;
         }

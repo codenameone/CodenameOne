@@ -24,6 +24,8 @@ package com.codename1.androidcompat.runtime;
 
 import android.graphics.Typeface;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -31,6 +33,9 @@ import static org.junit.Assert.assertEquals;
 /// Android weights onto Codename One's native faces. Medium has no face of its
 /// own and falls back to regular, as CSS font matching does for 500.
 public class FontCacheTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static String face(int weight, boolean italic) {
         return FontCache.nativeName(Typeface.create(Typeface.DEFAULT, weight, italic));

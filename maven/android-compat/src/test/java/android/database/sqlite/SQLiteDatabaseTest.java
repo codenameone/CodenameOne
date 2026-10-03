@@ -39,11 +39,16 @@ import android.database.DatabaseUtils;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class SQLiteDatabaseTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private SQLiteDatabase db;
     private final StringBuilder log = new StringBuilder();

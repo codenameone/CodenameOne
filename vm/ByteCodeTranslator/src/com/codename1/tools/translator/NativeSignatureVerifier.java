@@ -296,7 +296,7 @@ public class NativeSignatureVerifier {
      * thing to keep correct.
      */
     public static Signature signatureOf(String internalClassName, int access, String name, String desc) {
-        String clsName = internalClassName.replace('/', '_').replace('$', '_');
+        String clsName = internalClassName.replace('/', '_').replace('$', '_').replace('-', '_');
         return new BytecodeMethod(clsName, access, name, desc, null, null).getNativeSignature();
     }
 

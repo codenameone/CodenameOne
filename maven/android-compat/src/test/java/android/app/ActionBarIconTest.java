@@ -43,6 +43,11 @@ import static org.junit.Assert.assertTrue;
 /// every icon with the title color, so the gallery's accent star came out white.
 public class ActionBarIconTest {
 
+    @org.junit.Before
+    public void startClean() {
+        AndroidTestSupport.cleanDisplay();
+    }
+
     /// Records whether it was ever drawn under a color filter.
     static final class RecordingIcon extends Drawable {
         ColorFilter filter;

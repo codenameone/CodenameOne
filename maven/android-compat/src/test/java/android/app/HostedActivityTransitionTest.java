@@ -43,6 +43,11 @@ import static org.junit.Assert.assertTrue;
 /// fired, and the runtime attached frame callbacks, overlays and popups there.
 public class HostedActivityTransitionTest {
 
+    @org.junit.Before
+    public void startClean() {
+        AndroidTestSupport.cleanDisplay();
+    }
+
     /// Runs `r` on the EDT and rethrows what it threw here: a failure left on
     /// the EDT never reaches JUnit, and the test would hang instead.
     private static void onEdt(final Runnable r) {
@@ -149,5 +154,61 @@ public class HostedActivityTransitionTest {
             }
         });
         assertSame(host, end[0]);
+    }
+
+    /// The host is a dialog: an activity started from a dialog's button
+    /// returns to it. Showing it back with showBack() ran a second modal loop
+    /// inside finish(), which then never returned.
+    @Test(timeout = 30000)
+    public void finishingReturnsToADialogWithoutBlocking() throws Exception {
+        final Context app = AndroidTestSupport.context().getApplicationContext();
+        final com.codename1.ui.Dialog dialog = new com.codename1.ui.Dialog("Host");
+        // Modal, like the dialog an application shows and its button starts
+        // an activity from: show() runs its own loop, so it is called
+        // asynchronously and the test goes on inside that loop.
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                dialog.setTransitionInAnimator(null);
+                dialog.setTransitionOutAnimator(null);
+                dialog.show();
+            }
+        });
+        final boolean[] shown = new boolean[1];
+        long deadline = System.currentTimeMillis() + 10000;
+        while (!shown[0] && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+            onEdt(new Runnable() {
+                @Override
+                public void run() {
+                    shown[0] = Display.getInstance().getCurrent() == dialog;
+                }
+            });
+        }
+        assertTrue("the dialog never showed", shown[0]);
+        awaitTransitionEnd();
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                start(app);
+            }
+        });
+        awaitTransitionEnd();
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                ActivityThread.finishAllActivities();
+            }
+        });
+        awaitTransitionEnd();
+        final Form[] end = new Form[1];
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                end[0] = Display.getInstance().getCurrent();
+                dialog.dispose();
+            }
+        });
+        assertSame(dialog, end[0]);
     }
 }

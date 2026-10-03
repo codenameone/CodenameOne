@@ -291,7 +291,14 @@ public class LocalForage {
     }
     
     public String setItem(String key, String value) throws IOException {
-        return ((JSString)setItem(key, JSString.valueOf(value))).stringValue();
+        JSObject stored = setItem(key, JSString.valueOf(value));
+        // The synchronous host call answers what localStorage.setItem does:
+        // nothing. Unwrapping that threw a NullPointerException out of every
+        // FileSystemStorage.mkdir, whose directory marker is written here.
+        if (stored == null || JS.isUndefined(stored)) {
+            return value;
+        }
+        return ((JSString) stored).stringValue();
     }
     
     public JSObject setItem(String key, JSObject value) throws IOException {
