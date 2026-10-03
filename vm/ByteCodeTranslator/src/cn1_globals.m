@@ -678,6 +678,33 @@ static JAVA_LONG cn1MonotonicMillis(void) {
 // stop-the-world prologue uses them in all of them.
 extern volatile int cn1GcVirtualThreadsSeen;
 extern volatile int cn1GcStwInProgress;
+// Whether any thread the collector never holds is registered: a NATIVE thread that called
+// into Java (lightweightThread false; threadRunner raises it for every Java thread, so a
+// Java thread is in this state only between its registration and its first statement).
+// codenameOneGCMark waits for no such thread -- it is stopped just long enough to scan its
+// stack and runs through the rest of the cycle, which is sound only while everything it
+// allocates is kept by grace. A stop-the-world cycle gives fresh objects no grace: a large
+// array such a thread allocated mid-cycle was freed under it and the reused memory read
+// back as a length of about -1.9 billion (Windows suite, Base64 benchmark, an access
+// violation in cn1BibopAlloc). So a cycle with one registered is concurrent, the same rule
+// as a virtual thread; cn1CreateThreadLocalData holds a thread registering during a
+// stop-the-world cycle until it ends, which closes the race with this scan.
+extern struct ThreadLocalData** allThreads;
+static JAVA_BOOLEAN cn1GcUnheldThreadPresent(void) {
+    JAVA_BOOLEAN found = JAVA_FALSE;
+    lockCriticalSection();
+    if(allThreads != 0) {
+        for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+            struct ThreadLocalData* t = allThreads[iter];
+            if(t != 0 && !t->lightweightThread && !t->threadKilled) {
+                found = JAVA_TRUE;
+                break;
+            }
+        }
+    }
+    unlockCriticalSection();
+    return found;
+}
 void cn1GcReleaseAllBlockedThreadsPublic(void);
 
 // Monotonic nanoseconds, for the collector's own short waits and policy timing. Same
@@ -1126,9 +1153,11 @@ int cn1GcStwCapablePublic(void) {
 static JAVA_BOOLEAN cn1GcHybridDecide(void);
 #ifdef CN1_DISABLE_BIBOP
 // No page heap, so no generational cycles and no hybrid: the per-process single-core
-// choice, as before, and never stop-the-world in a process with virtual threads.
+// choice, as before, and never stop-the-world in a process with virtual threads or with a
+// native thread registered (cn1GcUnheldThreadPresent).
 static JAVA_BOOLEAN cn1GcHybridDecide(void) {
-    if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)) {
+    if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)
+       || cn1GcUnheldThreadPresent()) {
         return JAVA_FALSE;
     }
     return cn1GcSingleCore() ? JAVA_TRUE : JAVA_FALSE;
@@ -5570,11 +5599,13 @@ void codenameOneGCMark() {
         }
         // The collector's half of the virtual-thread handshake (cn1_virtual_thread.c): the
         // decision read cn1GcVirtualThreadsSeen before any thread was stopped, and a native
-        // thread can create the first virtual thread since. Re-read it now that the flag
+        // thread can create the first virtual thread since. The same holds for a native
+        // thread registering (cn1GcUnheldThreadPresent, cn1CreateThreadLocalData). Re-read it now that the flag
         // is up. Nothing destructive has happened yet -- SATB is not armed and no root is
         // scanned -- so the cycle simply becomes a concurrent one.
         __atomic_store_n(&cn1GcStwInProgress, 1, __ATOMIC_SEQ_CST);
-        if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)) {
+        if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)
+           || cn1GcUnheldThreadPresent()) {
             __atomic_store_n(&cn1GcStwInProgress, 0, __ATOMIC_SEQ_CST);
             cn1GcStwCycle = JAVA_FALSE;
 #ifndef CN1_DISABLE_BIBOP
@@ -5839,6 +5870,8 @@ void codenameOneGCMark() {
                     // force-stop escalation still measure what they measured.
                     int cn1__parkSpins = 0;
                     long long cn1__parkSpinStart = 0;
+                    int cn1__sleepUs = 50;
+                    long long cn1__nextReportCheck = 100000;
                     while(t->threadActive) {
                         if(vtOfState != 0) {
                             /*
@@ -5931,8 +5964,14 @@ void codenameOneGCMark() {
                         // first, so the collector slept 500us and held the stopped
                         // mutator for it: measured on single-core generational minors,
                         // 0.6ms of `waitMs` in 40% of cycles whose own work was 0.1ms.
-                        // After 200us the target is genuinely busy elsewhere, and polling
-                        // in 50us steps keeps that wait from burning a core.
+                        // After 200us the target is genuinely busy elsewhere: poll with a
+                        // sleep that starts at 50us and doubles to 500us. A FIXED 50us poll
+                        // woke the collector ~5,000 times across the 250ms a thread that
+                        // reaches no safepoint is waited for (a pure-compute loop: the
+                        // recursion benchmark's fib), against master's ~500 at 500us; on a
+                        // 4-vCPU SMT runner those wakeups ran beside the mutator and the
+                        // row went 1.35x -> 4.6x of JDK 25 (EPYC 9V45), with 7x the
+                        // involuntary context switches measured locally.
                         if(cn1__parkSpins < 640) {
                             cn1GcHandshakeBackoff(&cn1__parkSpins);
                             continue;
@@ -5947,10 +5986,13 @@ void codenameOneGCMark() {
                                 continue;
                             }
                         }
-                        usleep(50);
+                        usleep(cn1__sleepUs);
+                        if(cn1__sleepUs < 500) {
+                            cn1__sleepUs = cn1__sleepUs * 2 > 500 ? 500 : cn1__sleepUs * 2;
+                        }
                         // Elapsed time, not the nominal sleep: the escalation below is
                         // promised at CN1_GC_SAFEPOINT_WAIT_MAX_US of real waiting, and a
-                        // 50us sleep routinely lasts longer.
+                        // short sleep routinely lasts longer.
                         {
                             long long __wend = cn1MonotonicNanos();
                             totalwait = (__wend - cn1__parkSpinStart) / 1000;
@@ -5966,7 +6008,11 @@ void codenameOneGCMark() {
                         // every 10, naming the thread while it is still stuck. Kept live
                         // even where the escalation below exists, because that escalation
                         // can itself fail and this is then the only thing that says so.
-                        if((totalwait % 100000) == 0) {
+                        // A threshold, not `totalwait % 100000 == 0`: totalwait is elapsed
+                        // time now, which lands on an exact multiple almost never, and the
+                        // modulo silenced this report entirely.
+                        if(totalwait >= cn1__nextReportCheck) {
+                            cn1__nextReportCheck = totalwait + 100000;
                             long later = time(0) - now;
                             if(later >= 10 && later - lastReport >= 10) {
                                 lastReport = later;
@@ -8559,7 +8605,8 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
     // compares consecutive cycles.
     cn1GcHybridPrevStartNs = cn1GcHybridAnyStartNs;
     cn1GcHybridAnyStartNs = cn1GcHybridNowNs();
-    if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)) {
+    if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)
+       || cn1GcUnheldThreadPresent()) {
         if(cn1GcHybridGen) {
             cn1GcHybridGen = 0;
         }

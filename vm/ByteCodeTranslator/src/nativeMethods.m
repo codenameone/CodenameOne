@@ -2555,6 +2555,20 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
     allThreads[threadOffset] = i;
     unlockCriticalSection();
     //printf("Thread slot %d assigned to thread %d\n",threadOffset,(int)i->threadId);
+    // The registering half of the handshake with the collector's stop-the-world recheck
+    // (cn1GcUnheldThreadPresent in cn1_globals.m). This state is not lightweight, so no
+    // cycle will hold it; a stop-the-world cycle whose scan of allThreads came before the
+    // store above would therefore run with it unheld and could free what it allocates. The
+    // collector raised cn1GcStwInProgress before taking the lock this thread took after it,
+    // so it is visible here: wait for that cycle to end. Nothing waits on this thread -- the
+    // collector never waits for a non-lightweight one -- so the wait cannot deadlock.
+    {
+        extern volatile int cn1GcStwInProgress;
+        int spins = 0;
+        while(__atomic_load_n(&cn1GcStwInProgress, __ATOMIC_SEQ_CST)) {
+            cn1GcHandshakeBackoff(&spins);
+        }
+    }
 
     return i;
 }

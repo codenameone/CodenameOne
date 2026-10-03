@@ -243,6 +243,14 @@ alternates phases for the verifier and gauntlet. Each of these was measured to b
   SIGTRAP (malloc's free list corrupted under `HttpServer$Conn.fillTo`). The first
   `cn1VirtualThreadCreate` sets `cn1GcVirtualThreadsSeen` and the process stays concurrent
   for good -- the single-core mode included, which had the same hole on one-CPU hosts.
+- **Never with a native thread registered** -- the same hole. The collector never holds a
+  non-lightweight thread (a native thread that called into Java); it scans its stack and
+  lets it run. A large array such a thread allocated mid-cycle was freed under it on the
+  Windows suite (an access violation in `cn1BibopAlloc`, the size read back as -1.9
+  billion). `cn1GcUnheldThreadPresent` keeps such cycles concurrent, and
+  `cn1CreateThreadLocalData` holds a thread that registers during one until it ends.
+  Stop-the-world cycles were single-core only before the hybrid, which is why nothing had
+  exercised this; stop-the-world needs EVERY allocating thread held.
 - **Stop every cooperative thread before SATB is armed.** The per-thread loop stops
   threads one at a time; the ones not yet reached kept allocating with the barrier armed
   and the fresh filter off, so the SATB log grew with the allocation rate
