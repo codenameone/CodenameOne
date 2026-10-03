@@ -92,6 +92,63 @@ public final class Duration implements Comparable<Duration> {
         return new Duration(micros * factor);
     }
 
+    // Dart's operators, under the transpiler's mangled operator names ($plus for +,
+    // $minus for both binary and unary -, $times, $tdiv, $lt/$le/$gt/$ge), so
+    // `a + b` on two Durations is a call here instead of a Java `+` javac rejects.
+
+    public Duration $plus(Duration other) {
+        return new Duration(micros + other.micros);
+    }
+
+    public Duration $minus(Duration other) {
+        return new Duration(micros - other.micros);
+    }
+
+    /** Unary minus. */
+    public Duration $minus() {
+        return new Duration(0 - micros);
+    }
+
+    /** Dart's {@code operator *(num factor)}: exact for an int. */
+    public Duration $times(long factor) {
+        return new Duration(micros * factor);
+    }
+
+    /** With a double factor Dart rounds the product: {@code (micros * factor).round()}. */
+    public Duration $times(double factor) {
+        return new Duration(dart.runtime.DartRuntime.round(micros * factor));
+    }
+
+    /** A {@code num} factor: an int value multiplies exactly, a double rounds. */
+    public Duration $times(Number factor) {
+        if (factor instanceof Long || factor instanceof Integer || factor instanceof Short
+                || factor instanceof Byte) {
+            return $times(factor.longValue());
+        }
+        return $times(factor.doubleValue());
+    }
+
+    /** Dart's {@code ~/}: truncating, and dividing by zero throws as int ~/ does. */
+    public Duration $tdiv(long quotient) {
+        return new Duration(dart.runtime.DartRuntime.tdiv(micros, quotient));
+    }
+
+    public boolean $lt(Duration other) {
+        return micros < other.micros;
+    }
+
+    public boolean $le(Duration other) {
+        return micros <= other.micros;
+    }
+
+    public boolean $gt(Duration other) {
+        return micros > other.micros;
+    }
+
+    public boolean $ge(Duration other) {
+        return micros >= other.micros;
+    }
+
     public boolean isNegative() {
         return micros < 0;
     }

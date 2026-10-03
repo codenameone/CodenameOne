@@ -381,6 +381,26 @@ public final class DartRuntime {
         if (op.equals("+") && a instanceof java.util.List && b instanceof java.util.List) {
             return dart.core.DartList.concat((java.util.List<?>) a, (java.util.List<?>) b);
         }
+        if (a instanceof dart.core.Duration) {
+            // The same operators the typed path calls, so a Duration held as dynamic
+            // behaves as a typed one.
+            dart.core.Duration d = (dart.core.Duration) a;
+            if (b instanceof dart.core.Duration) {
+                if (op.equals("+")) {
+                    return d.$plus((dart.core.Duration) b);
+                }
+                if (op.equals("-")) {
+                    return d.$minus((dart.core.Duration) b);
+                }
+            } else if (b instanceof Number) {
+                if (op.equals("*")) {
+                    return d.$times((Number) b);
+                }
+                if (op.equals("~/") && isIntegral((Number) b)) {
+                    return d.$tdiv(((Number) b).longValue());
+                }
+            }
+        }
         throw noOperator(op, a, b);
     }
 
@@ -418,6 +438,10 @@ public final class DartRuntime {
             if (op.equals(">=")) {
                 return c >= 0;
             }
+        }
+        if (a instanceof dart.core.Duration && b instanceof dart.core.Duration) {
+            int c = ((dart.core.Duration) a).compareTo((dart.core.Duration) b);
+            return op.equals("<") ? c < 0 : op.equals(">") ? c > 0 : op.equals("<=") ? c <= 0 : c >= 0;
         }
         throw noOperator(op, a, b);
     }
@@ -548,6 +572,9 @@ public final class DartRuntime {
         if (a instanceof Number) {
             Number x = (Number) a;
             return isIntegral(x) ? (Object) Long.valueOf(-x.longValue()) : (Object) Double.valueOf(-x.doubleValue());
+        }
+        if (a instanceof dart.core.Duration) {
+            return ((dart.core.Duration) a).$minus();
         }
         throw noOperator("unary-", a, null);
     }

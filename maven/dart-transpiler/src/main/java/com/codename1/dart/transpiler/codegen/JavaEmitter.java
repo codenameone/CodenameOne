@@ -3663,6 +3663,11 @@ public final class JavaEmitter {
                     return new Out("DartRuntime." + fn + "(" + o.code + ")", TypeRef.DYNAMIC);
                 }
             }
+            if (u.op.equals("-") && o.type != null && o.type.is("Duration")
+                    && !program.classes.containsKey("Duration")) {
+                // Duration's unary minus, under the mangled name (see emitBinary).
+                return new Out(paren(o.code) + ".$minus()", o.type);
+            }
             return new Out(u.op + paren(o.code), o.type);
         }
         if (e instanceof IncDec) {
@@ -5171,6 +5176,10 @@ public final class JavaEmitter {
             ctx.importClass("dart.runtime.DartRuntime");
             return "((Number) DartRuntime.dynBinary(\"" + baseOp + "\", " + readCode + ", " + rhs.code + "))";
         }
+        Out opCall = operatorMethodValue(readCode, vt, baseOp, rhs);
+        if (opCall != null) {
+            return coerce(opCall, vt, ctx);
+        }
         if (baseOp.equals("~/") || baseOp.equals("%")) {
             ctx.importClass("dart.runtime.DartRuntime");
             String fn = baseOp.equals("~/") ? "tdiv" : "mod";
@@ -5587,6 +5596,21 @@ public final class JavaEmitter {
         if ((a.op.equals("<<=") || a.op.equals(">>=") || a.op.equals(">>>="))
                 && !(a.rhs instanceof IntLit && ((IntLit) a.rhs).value >= 0 && ((IntLit) a.rhs).value < 64)) {
             return new Out(lcode + " = " + compoundValue(lcode, lhs.type, a, ctx), lhs.type);
+        }
+        if (!a.op.equals("=") && !a.op.equals("??=") && lhs.type != null && !isNumeric(lhs.type)
+                && !lhs.type.is("String") && !lhs.type.is("bool")) {
+            // An operator the slot's type declares as a method: `total += d` is
+            // `total = total.$plus(d)` (see operatorMethodValue).
+            String baseOp = a.op.substring(0, a.op.length() - 1);
+            String mangled = com.codename1.dart.transpiler.parser.AstBuilder.mangleOperator(baseOp);
+            ClassDecl cls = program.classes.get(lhs.type.name);
+            boolean declares = mangled != null
+                    && (cls != null ? findMethodInHierarchy(cls, mangled) != null
+                    : lhs.type.is("Duration")
+                    || (stubs.isStubClass(lhs.type.name) && stubs.findMethod(lhs.type.name, mangled, false) != null));
+            if (declares) {
+                return new Out(lcode + " = " + compoundValue(lcode, lhs.type, a, ctx), lhs.type);
+            }
         }
         String jop = a.op.equals("~/=") ? null : a.op;
         if (a.op.equals("~/=") || a.op.equals("%=")) {
@@ -6100,6 +6124,60 @@ public final class JavaEmitter {
         return new Out(tmp, TypeRef.BOOL);
     }
 
+    /**
+     * {@code l op r} on a dart:core Duration, as a call to the runtime method carrying
+     * the operator's mangled name; null when {@code op} is not one Duration declares for
+     * that operand type.
+     */
+    private Out durationOperator(Out l, String op, Out r) {
+        if (l.type == null || !l.type.is("Duration") || r.type == null
+                || program.classes.containsKey("Duration")) {
+            return null;
+        }
+        String mangled = com.codename1.dart.transpiler.parser.AstBuilder.mangleOperator(op);
+        boolean durationArg = r.type.is("Duration");
+        if ((("$plus".equals(mangled) || "$minus".equals(mangled)) && durationArg)
+                || ("$times".equals(mangled) && (isNumeric(r.type) || r.type.is("num")))
+                || ("$tdiv".equals(mangled) && r.type.is("int"))) {
+            return new Out(l.code + "." + mangled + "(" + paren(r.code) + ")", new TypeRef("Duration"));
+        }
+        if (durationArg && ("$lt".equals(mangled) || "$le".equals(mangled)
+                || "$gt".equals(mangled) || "$ge".equals(mangled))) {
+            return new Out(l.code + "." + mangled + "(" + paren(r.code) + ")", TypeRef.BOOL);
+        }
+        return null;
+    }
+
+    /**
+     * {@code read op rhs} where the slot's type declares {@code op} as a method -- an app
+     * class, a stub value type or Duration -- for a compound assignment; null otherwise.
+     * Java's {@code +=} does not apply to objects, so {@code total += d} on a Duration
+     * (or an Offset, or an app class with operator +) did not compile.
+     */
+    private Out operatorMethodValue(String readCode, TypeRef vt, String baseOp, Out rhs) {
+        if (vt == null || vt.name == null || isDynamic(vt)) {
+            return null;
+        }
+        String mangled = com.codename1.dart.transpiler.parser.AstBuilder.mangleOperator(baseOp);
+        if (mangled == null) {
+            return null;
+        }
+        ClassDecl cls = program.classes.get(vt.name);
+        if (cls != null) {
+            MethodDecl om = findMethodInHierarchy(cls, mangled);
+            return om == null ? null : new Out(readCode + "." + mangled + "(" + paren(rhs.code) + ")",
+                    om.returnType == null || om.returnType.is("var") ? TypeRef.DYNAMIC : om.returnType);
+        }
+        Ast.MethodDecl om = stubs.isStubClass(vt.name) ? stubs.findMethod(vt.name, mangled, false) : null;
+        if (om != null) {
+            return new Out(readCode + "." + mangled + "(" + paren(rhs.code) + ")",
+                    om.returnType == null || om.returnType.is("var") ? TypeRef.DYNAMIC : om.returnType);
+        }
+        // Duration is ALSO a stub class (flutter-runtime declares its getters), one
+        // that declares no operators, so it is consulted after the stub.
+        return durationOperator(new Out(readCode, vt), baseOp, rhs);
+    }
+
     private Out emitBinary(Binary b, Ctx ctx) {
         if (b.op.equals("??")) {
             // Peephole: (m[k] ?? literal) on a primitive Map<int,int> -> getLongOr(k, literal),
@@ -6229,6 +6307,15 @@ public final class JavaEmitter {
             }
             return new Out("DartRuntime.dynBinary(\"" + b.op + "\", " + l.code + ", " + r.code + ")",
                     TypeRef.DYNAMIC);
+        }
+        // dart:core's Duration declares + - * ~/ and the relational operators; the runtime
+        // class carries them under the mangled names. Without this they reached the
+        // fallback below, which emitted `a + b` on two objects and javac rejected it.
+        if (opClass == null) {
+            Out dur = durationOperator(l, b.op, r);
+            if (dur != null) {
+                return dur;
+            }
         }
         if (b.op.equals("~/")) {
             ctx.importClass("dart.runtime.DartRuntime");
@@ -7693,6 +7780,10 @@ public final class JavaEmitter {
             }
             if (n.equals("removeAt")) {
                 return new Out(target.code + ".removeAt(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", elem);
+            }
+            if (n.equals("removeLast") && pos.isEmpty()) {
+                // DartList has it; only this table lacked it, so the call was E0137.
+                return new Out(target.code + ".removeLast()", elem);
             }
             if (n.equals("remove")) {
                 Out v = emitExpr(pos.get(0), null, ctx);
