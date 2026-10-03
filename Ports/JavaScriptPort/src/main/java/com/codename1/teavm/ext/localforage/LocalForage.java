@@ -426,18 +426,15 @@ public class LocalForage {
     }
 
     private static JSObject getValue(LocalForageImpl impl, String key) throws IOException {
-        final Object[] result = new Object[1];
-        final IOException[] error = new IOException[1];
+        // Returned straight from the bridge, never through a cast: a stored
+        // STRING (a directory marker is the empty string) crosses back as a
+        // java.lang.String, which a checkcast to JSObject refuses. Callers
+        // that meet one only test it against null.
         try {
-            result[0] = impl.getItemSync(key);
+            return impl.getItemSync(key);
         } catch (Throwable t) {
-            error[0] = new IOException("Failed to get value: " + t);
+            throw new IOException("Failed to get value: " + t);
         }
-
-        if (error[0] != null) {
-            throw error[0];
-        }
-        return (JSObject) result[0];
     }
 
     private static void removeItem(LocalForageImpl impl, String key) throws IOException {
