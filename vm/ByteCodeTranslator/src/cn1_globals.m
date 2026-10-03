@@ -673,6 +673,27 @@ static JAVA_LONG cn1MonotonicMillis(void) {
 #endif
 }
 
+// The virtual-thread handshake flags (defined in cn1_virtual_thread.c) and the end-of-cycle
+// release, declared here, outside every configuration guard, because the mark's
+// stop-the-world prologue uses them in all of them.
+extern volatile int cn1GcVirtualThreadsSeen;
+extern volatile int cn1GcStwInProgress;
+void cn1GcReleaseAllBlockedThreadsPublic(void);
+
+// Monotonic nanoseconds, for the collector's own short waits and policy timing. Same
+// split as cn1MonotonicMillis: clock_gettime / CLOCK_MONOTONIC do not exist on the
+// clang-cl Windows target, so it reads the QueryPerformanceCounter-backed clock there
+// (microsecond resolution, which every caller is coarser than).
+static long long cn1MonotonicNanos(void) {
+#ifdef _WIN32
+    return cn1_monotonic_micros() * 1000LL;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+#endif
+}
+
 // Monotonic-millisecond stamp of this thread's last low-memory throttle park,
 // which bounds the throttle to one park per CN1_LOW_MEMORY_PARK_INTERVAL_MS
 // instead of one per allocation. __thread rather than a ThreadLocalData field:
@@ -1048,6 +1069,8 @@ static JAVA_BOOLEAN cn1GcStwCycle = JAVA_FALSE;   // GC thread only
 #ifndef CN1_DISABLE_BIBOP
 static void cn1BibopDetachPreCycle(void);
 static void cn1GcHybridBeginConcurrent(void);
+static void cn1GcHybridAbandonStw(void);
+void cn1GcReleaseAllBlockedThreadsPublic(void);
 static JAVA_BOOLEAN cn1GcHybridLastWasMinor;
 static int cn1GcMinorsSinceMajor;
 static long long cn1GcHybridNowNs(void);
@@ -1101,6 +1124,16 @@ int cn1GcStwCapablePublic(void) {
     return cn1GcStwCapable();
 }
 static JAVA_BOOLEAN cn1GcHybridDecide(void);
+#ifdef CN1_DISABLE_BIBOP
+// No page heap, so no generational cycles and no hybrid: the per-process single-core
+// choice, as before, and never stop-the-world in a process with virtual threads.
+static JAVA_BOOLEAN cn1GcHybridDecide(void) {
+    if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)) {
+        return JAVA_FALSE;
+    }
+    return cn1GcSingleCore() ? JAVA_TRUE : JAVA_FALSE;
+}
+#endif
 
 // The sweep's liveness rule for a specific OBJECT, which is what the reference-clearing
 // passes must ask now that a fresh mark alone no longer decides it: they have to clear
@@ -5515,8 +5548,7 @@ void codenameOneGCMark() {
             }
         }
         unlockCriticalSection();
-        struct timespec __pw0;
-        clock_gettime(CLOCK_MONOTONIC, &__pw0);
+        long long __pw0 = cn1MonotonicNanos();
         for(;;) {
             JAVA_BOOLEAN anyActive = JAVA_FALSE;
             lockCriticalSection();
@@ -5531,13 +5563,24 @@ void codenameOneGCMark() {
             if(!anyActive) {
                 break;
             }
-            struct timespec __pw1;
-            clock_gettime(CLOCK_MONOTONIC, &__pw1);
-            if((__pw1.tv_sec - __pw0.tv_sec) * 1000000000LL + (__pw1.tv_nsec - __pw0.tv_nsec)
-               > 2000000LL) {
+            if(cn1MonotonicNanos() - __pw0 > 2000000LL) {
                 break;
             }
             cn1CpuRelax();
+        }
+        // The collector's half of the virtual-thread handshake (cn1_virtual_thread.c): the
+        // decision read cn1GcVirtualThreadsSeen before any thread was stopped, and a native
+        // thread can create the first virtual thread since. Re-read it now that the flag
+        // is up. Nothing destructive has happened yet -- SATB is not armed and no root is
+        // scanned -- so the cycle simply becomes a concurrent one.
+        __atomic_store_n(&cn1GcStwInProgress, 1, __ATOMIC_SEQ_CST);
+        if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)) {
+            __atomic_store_n(&cn1GcStwInProgress, 0, __ATOMIC_SEQ_CST);
+            cn1GcStwCycle = JAVA_FALSE;
+#ifndef CN1_DISABLE_BIBOP
+            cn1GcHybridAbandonStw();
+#endif
+            cn1GcReleaseAllBlockedThreadsPublic();
         }
     }
 #if !defined(CN1_DISABLE_SATB)
@@ -5895,9 +5938,7 @@ void codenameOneGCMark() {
                             continue;
                         }
                         {
-                            struct timespec __ws;
-                            clock_gettime(CLOCK_MONOTONIC, &__ws);
-                            long long __wnow = (long long)__ws.tv_sec * 1000000000LL + __ws.tv_nsec;
+                            long long __wnow = cn1MonotonicNanos();
                             if(cn1__parkSpinStart == 0) {
                                 cn1__parkSpinStart = __wnow;
                             }
@@ -5911,9 +5952,7 @@ void codenameOneGCMark() {
                         // promised at CN1_GC_SAFEPOINT_WAIT_MAX_US of real waiting, and a
                         // 50us sleep routinely lasts longer.
                         {
-                            struct timespec __we;
-                            clock_gettime(CLOCK_MONOTONIC, &__we);
-                            long long __wend = (long long)__we.tv_sec * 1000000000LL + __we.tv_nsec;
+                            long long __wend = cn1MonotonicNanos();
                             totalwait = (__wend - cn1__parkSpinStart) / 1000;
                         }
                         // REPORTING, fixed. time(0) is in SECONDS; this compared the
@@ -6919,6 +6958,7 @@ void cn1HeapHistogramPublic(void) {
 // the release, which left every held thread parked for good.
 void cn1GcReleaseAllBlockedThreadsPublic(void) {
     JAVA_BOOLEAN any = JAVA_FALSE;
+    __atomic_store_n(&cn1GcStwInProgress, 0, __ATOMIC_SEQ_CST);
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
@@ -8379,9 +8419,7 @@ static long long cn1GcHybridCycleStartNs = 0;
 static long long cn1GcHybridLastMarkNs = 0;
 static JAVA_BOOLEAN cn1GcHybridLastWasMajor = JAVA_FALSE;
 static long long cn1GcHybridNowNs(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+    return cn1MonotonicNanos();
 }
 static int cn1GcHybridGen = 0;          // GC thread only, as is everything below
 static int cn1GcHybridLowStreak = 0;
@@ -8393,17 +8431,29 @@ static JAVA_BOOLEAN cn1GcHybridLastWasMinor = JAVA_FALSE;
 // size of the young generation (the O(1) page reset), so a fixed 24MB trigger made a
 // churning mutator pay a stop-the-world handshake every 24MB for no reason: ~7 minors per
 // objectAllocation rep. HotSpot sizes its young generation so collection is a small share
-// of the time between collections; so does this. After each minor, the trigger doubles
-// while the minor took more than 5% of the interval since the previous cycle and halves
-// below 1%, between the default trigger and the adaptive policy's own ceiling (host
+// of the time between collections; so does this. The trigger doubles after two minors in
+// a row each took more than 5% of the interval since the previous cycle, and halves after
+// one below 1%, between the default trigger and the adaptive policy's own ceiling (host
 // memory / 8, CN1_BIBOP_GC_MAX_TRIGGER_BYTES). It is reapplied after
 // cn1BibopAdaptAfterSweep, which would otherwise halve it on every low-survival sweep,
 // and the default comes back when the phase ends. A pinned trigger (CN1_GC_TRIGGER_MB)
 // is left alone.
 static _Atomic long long cn1CachedHostMemoryBound;   // defined with the pacing state below
 static long cn1GcHybridYoungBytes = 0;
+static void cn1GcHybridExitCheck(void);
+static int cn1GcHybridForced(void) {
+    static int force = -1;
+    if(force < 0) {
+        const char* e = getenv("CN1_GC_HYBRID_FORCE");
+        force = (e != 0 && *e != 0 && *e != '0') ? 1 : 0;
+    }
+    return force;
+}
 static void cn1GcHybridEndCycle(void) {
     cn1GcHybridLastCycleNs = cn1GcHybridNowNs() - cn1GcHybridAnyStartNs;
+    if(cn1GcHybridGen && cn1GcStwCycle && !cn1GcHybridForced()) {
+        cn1GcHybridExitCheck();
+    }
     if(bibopGcTriggerPinned || cn1GcSingleCore()) {
         return;
     }
@@ -8425,7 +8475,15 @@ static void cn1GcHybridEndCycle(void) {
         if(hostMem > 0 && hostMem / 8 < (long long)ceiling) {
             ceiling = (long)(hostMem / 8);
         }
-        if(cn1GcHybridLastCycleNs * 100 > interval * 5 && cn1GcHybridYoungBytes < ceiling) {
+        // Grow on the SECOND expensive minor in a row, never on one: a single minor the OS
+        // descheduled (5-25ms against a usual 1ms) doubled a steady workload's young
+        // generation late in the run and the page heap stepped up a third to match --
+        // GcSteadyStateIntegrationTest's second-half growth read 0.29-0.45 on runs whose
+        // working set never moved.
+        static int expensiveStreak = 0;
+        expensiveStreak = cn1GcHybridLastCycleNs * 100 > interval * 5 ? expensiveStreak + 1 : 0;
+        if(expensiveStreak >= 2 && cn1GcHybridYoungBytes < ceiling) {
+            expensiveStreak = 0;
             cn1GcHybridYoungBytes *= 2;
             if(cn1GcHybridYoungBytes > ceiling) {
                 cn1GcHybridYoungBytes = ceiling;
@@ -8440,6 +8498,49 @@ static void cn1GcHybridEndCycle(void) {
     }
     atomic_store_explicit(&bibopGcTriggerBytes, cn1GcHybridYoungBytes, memory_order_relaxed);
 }
+static void cn1GcHybridLeave(void) {
+    cn1GcHybridGen = 0;
+    cn1GcHybridHighStreak = 0;
+    cn1GcHybridBackoff = cn1GcHybridBackoffLen;
+    if(cn1GcHybridBackoffLen < 64) {
+        cn1GcHybridBackoffLen *= 2;
+    }
+}
+// The phase's exit tests, run at the END of each stop-the-world cycle -- not at the start
+// of the next one. Deciding at the start let the mutator run a whole young generation
+// (up to the 128MB the sizing below reaches) under the phase's trigger and then handed
+// every one of those objects to a CONCURRENT cycle as fresh: the grace pass traced and
+// kept them all, the cycle ran ~500ms, the mutator allocated another 500MB behind it and
+// the page heap compounded (GcSteadyStateIntegrationTest, pages 3446 -> 10538 on a CI
+// runner; locally a 375 major -> 376 concurrent with 646MB "live" of a 1MB working set).
+// Leaving here lets cn1GcHybridEndCycle restore the default trigger before the mutator
+// resumes, so the first concurrent cycle sees one ordinary trigger's worth of fresh
+// objects. Every input is already final: the sweep set the survival figures and the
+// mark time was taken when marking ended.
+static void cn1GcHybridExitCheck(void) {
+    int survival = -1;
+    if(bibopLastCycleOccupiedBytes >= 2 * 1024 * 1024) {
+        survival = (int)((bibopLastCycleLiveBytes * 100) / bibopLastCycleOccupiedBytes);
+    }
+    if(cn1GcHybridLastWasMinor) {
+        cn1GcHybridHighStreak = survival > CN1_GC_HYBRID_EXIT_PERCENT ? cn1GcHybridHighStreak + 1 : 0;
+    }
+    JAVA_BOOLEAN majorTooLong = cn1GcHybridLastWasMajor
+            && cn1GcHybridLastMarkNs > (long long)CN1_GC_HYBRID_MAJOR_BUDGET_MS * 1000000LL;
+    // QUIET: the churn the phase exists for has stopped -- a cycle came round with
+    // little page-heap allocation behind it (a timer cycle, or one driven by legacy
+    // allocations). Hand back to the concurrent collector, whose quiet-cycle major
+    // sweep and page release return the young generation's pages; held in the phase,
+    // minors never splice the partial pools and the free-pool trim keeps the last
+    // cycle's demand, so a small-object pool stayed resident under a later burst of
+    // large allocations (BibopPageFloorIntegrationTest, the issue-5537 shape).
+    long phaseTrigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
+    JAVA_BOOLEAN quiet = bibopLastCycleOccupiedBytes < phaseTrigger / 4;
+    if(cn1GcHybridHighStreak >= 2 || majorTooLong || quiet
+       || atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)) {
+        cn1GcHybridLeave();
+    }
+}
 // Raised, once and for good, by the first cn1VirtualThreadCreate. A STOP-THE-WORLD cycle
 // cannot stop a running virtual thread -- nothing here can -- yet its sweep frees every
 // fresh legacy object nobody marked, on the premise that every mutator was stopped and
@@ -8452,6 +8553,7 @@ static void cn1GcHybridEndCycle(void) {
 // concurrent cycles, which keep fresh objects by grace. The flag is defined in
 // cn1_virtual_thread.c, the runtime that raises it.
 extern volatile int cn1GcVirtualThreadsSeen;   // defined in cn1_virtual_thread.c
+extern volatile int cn1GcStwInProgress;        // ditto; see the handshake there
 static JAVA_BOOLEAN cn1GcHybridDecide(void) {
     // Timestamps for every cycle, before any early return, so the duty test always
     // compares consecutive cycles.
@@ -8472,13 +8574,8 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
     // concurrent, restoring the fresh filter and any pre-cycle pages) on drivers that the
     // policy would never move. Not a tuning knob.
     {
-        static int force = -1;
         static int forceCycle = 0;
-        if(force < 0) {
-            const char* e = getenv("CN1_GC_HYBRID_FORCE");
-            force = (e != 0 && *e != 0 && *e != '0') ? 1 : 0;
-        }
-        if(force) {
+        if(cn1GcHybridForced()) {
             int want = (forceCycle++ % 15) < 12;
             if(want && !cn1GcHybridGen) {
                 cn1GcMinorsSinceMajor = CN1_GC_GEN_MINORS;   // a phase opens with a major
@@ -8493,27 +8590,10 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
     }
     JAVA_BOOLEAN lowMemory = atomic_load_explicit(&lowMemoryMode, memory_order_relaxed) ? JAVA_TRUE : JAVA_FALSE;
     if(cn1GcHybridGen) {
-        if(cn1GcHybridLastWasMinor) {
-            cn1GcHybridHighStreak = survival > CN1_GC_HYBRID_EXIT_PERCENT ? cn1GcHybridHighStreak + 1 : 0;
-        }
-        JAVA_BOOLEAN majorTooLong = cn1GcHybridLastWasMajor
-                && cn1GcHybridLastMarkNs > (long long)CN1_GC_HYBRID_MAJOR_BUDGET_MS * 1000000LL;
-        // QUIET: the churn the phase exists for has stopped -- a cycle came round with
-        // little page-heap allocation behind it (a timer cycle, or one driven by legacy
-        // allocations). Hand back to the concurrent collector, whose quiet-cycle major
-        // sweep and page release return the young generation's pages; held in the phase,
-        // minors never splice the partial pools and the free-pool trim keeps the last
-        // cycle's demand, so a small-object pool stayed resident under a later burst of
-        // large allocations (BibopPageFloorIntegrationTest, the issue-5537 shape).
-        long phaseTrigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
-        JAVA_BOOLEAN quiet = bibopLastCycleOccupiedBytes < phaseTrigger / 4;
-        if(cn1GcHybridHighStreak >= 2 || lowMemory || majorTooLong || quiet) {
-            cn1GcHybridGen = 0;
-            cn1GcHybridHighStreak = 0;
-            cn1GcHybridBackoff = cn1GcHybridBackoffLen;
-            if(cn1GcHybridBackoffLen < 64) {
-                cn1GcHybridBackoffLen *= 2;
-            }
+        // The phase's own exit tests ran at the end of the last cycle (cn1GcHybridExitCheck);
+        // low memory can arrive between cycles, so it is checked again here.
+        if(lowMemory) {
+            cn1GcHybridLeave();
         }
     } else if(cn1GcHybridBackoff > 0) {
         cn1GcHybridBackoff--;
@@ -8547,6 +8627,13 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
 // fresh-reference filter, sound only while every fresh object gets grace, and any pages
 // still flagged pre-cycle because a stop-the-world sweep was skipped -- they go back on the
 // sweep stack with their grace. Being a full trace, it also discards the remembered set.
+// A stop-the-world cycle turned concurrent before it began marking (the virtual-thread
+// handshake). The concurrent restore below undoes what the stop-the-world start did: the
+// fresh filter, the pre-cycle pages, and a set taken for a major (discarded with the rest).
+static void cn1GcHybridAbandonStw(void) {
+    cn1GcHybridGen = 0;
+    cn1GcHybridBeginConcurrent();
+}
 static void cn1GcHybridBeginConcurrent(void) {
     cn1GcMinor = JAVA_FALSE;
     cn1GcHybridLastWasMinor = JAVA_FALSE;
@@ -13508,6 +13595,7 @@ static int cn1ConsSnapEpoch = -1;
 // build -- its current pages and the pages it retired during the cycle -- instead of
 // reading every page header in the registry (~0.4ms a minor on a 5,700-page heap).
 struct ThreadLocalData* cn1ConsSnapOnlyThread = 0;
+#ifndef CN1_DISABLE_BIBOP
 static inline void cn1ConsPgRefresh(CN1BibopPage* p) {
     CN1ConsPage* e = cn1ConsPgFind((char*)p);
     if(e != 0 && e->page == p) {
@@ -13518,6 +13606,7 @@ static inline void cn1ConsPgRefresh(CN1BibopPage* p) {
         e->slotCount = p->slotCount;
     }
 }
+#endif
 int cn1ConsSnapEpochReset(void) {
     cn1ConsSnapEpoch = -1;
     return 0;

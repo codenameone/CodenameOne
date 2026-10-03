@@ -2925,6 +2925,10 @@ static inline __attribute__((always_inline)) JAVA_OBJECT cn1BibopFastAlloc(CODEN
             CN1_OBJ_ZERO_BODY(o, size);
             CN1_ALLOC_CENSUS_COUNT(parent, size);
             CN1_BIBOP_STORE_HEADER(o, index);
+#ifdef DEBUG_GC_ALLOCATIONS
+            o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
+            o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
+#endif
             CN1_BIBOP_PUBLISH_BUMP(p, bi);
             // gcAllocedSinceSweep and the allocation-trigger bytes are no longer touched
             // here: the page was flagged when this thread took it (cn1BibopOwnPage), and
@@ -3002,6 +3006,10 @@ static inline __attribute__((always_inline)) JAVA_OBJECT cn1BibopFastAllocNoZero
             // reclaim still holds the DEAD previous occupant's class.
             CN1_ALLOC_CENSUS_COUNT(parent, size);
             CN1_BIBOP_STORE_HEADER(o, 0);
+#ifdef DEBUG_GC_ALLOCATIONS
+            o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
+            o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
+#endif
             CN1_BIBOP_PUBLISH_BUMP(p, bi);
             // No per-object gcAllocedSinceSweep or byte accounting: see cn1BibopFastAlloc.
 #ifdef CN1_GC_CONFORM

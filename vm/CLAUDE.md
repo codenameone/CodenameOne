@@ -252,8 +252,15 @@ alternates phases for the verifier and gauntlet. Each of these was measured to b
 - **Leave the phase when it goes quiet** (a cycle with little page-heap allocation), or a
   small-object pool stays resident under a later burst of large allocations
   (`BibopPageFloorIntegrationTest`).
-- **Size the young generation by duty** (double above 5% of the interval, halve below 1%,
-  host memory / 8 at most): 3x fewer minors on objectAllocation.
+- **Decide to leave at the END of the stop-the-world cycle** (`cn1GcHybridExitCheck`),
+  so the default trigger is back before the mutator resumes. Deciding at the next cycle's
+  start handed a whole young generation (up to 128MB) to a CONCURRENT cycle as fresh
+  objects: grace kept them all, the cycle ran ~500ms, the mutator allocated 500MB behind it
+  and `GcSteadyStateIntegrationTest`'s page heap went 3446 -> 10538 on a CI runner.
+- **Size the young generation by duty** (double after two minors in a row above 5% of the
+  interval, halve below 1%, host memory / 8 at most): 3x fewer minors on objectAllocation.
+  One minor is not enough to grow on -- a single OS-descheduled minor stepped a steady
+  workload's heap up a third late in the run.
 
 A test whose evidence names one collector's mechanism goes vacuous when the hybrid takes
 its workload. Fix the EVIDENCE, never pin the collector: `GcOverflowSpiralIntegrationTest`

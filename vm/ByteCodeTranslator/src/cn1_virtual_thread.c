@@ -25,6 +25,20 @@
  * written for, this file is empty and the header supplies no-op stubs, so nothing
  * references the assembly. */
 #include "cn1_virtual_thread.h"
+
+/* The collector's half of a handshake with the first virtual thread (cn1GcHybridDecide in
+ * cn1_globals.m). A STOP-THE-WORLD cycle cannot stop a running virtual thread, so a process
+ * that has one only ever runs concurrent cycles. VirtualThreadsSeen is raised by the first
+ * creation and never lowered; StwInProgress is raised by the collector once its
+ * cooperative threads are parked, and lowered when the cycle ends. Both sides store their
+ * own flag and then read the other's, all seq_cst, so either the collector sees the new
+ * virtual thread and abandons the stop-the-world cycle, or the creator sees the cycle and
+ * waits it out. Defined here, outside the capability guard, because the collector
+ * references them on every target and this runtime is also built on its own
+ * (VirtualThreadRuntimeTest). */
+volatile int cn1GcVirtualThreadsSeen = 0;
+volatile int cn1GcStwInProgress = 0;
+
 #ifdef CN1_VIRTUAL_THREADS
 
 #include "cn1_virtual_thread.h"
@@ -234,16 +248,19 @@ void cn1VirtualThreadMain(struct cn1VirtualThread* co) {
     }
 }
 
-/* Raised by the first virtual thread and never lowered; the collector reads it (see
- * cn1GcHybridDecide in cn1_globals.m). Defined HERE, not in the collector: this runtime is
- * also built on its own (VirtualThreadRuntimeTest), and the collector already depends on
- * this file, never the other way round. */
-volatile int cn1GcVirtualThreadsSeen = 0;
 struct cn1VirtualThread* cn1VirtualThreadCreate(cn1VirtualThreadBody body, void* arg,
                                         size_t stackBytes) {
     struct cn1VirtualThread* co;
     unsigned char* stack;
     __atomic_store_n(&cn1GcVirtualThreadsSeen, 1, __ATOMIC_SEQ_CST);
+    /* The creator's half of the handshake above. It is the first statement, before any
+     * lock, and it can only ever wait once in a process: after the first virtual thread
+     * there are no stop-the-world cycles. A cooperative thread cannot be here while one
+     * runs -- it is parked before the flag goes up -- so this never waits on a cycle that
+     * is waiting on it. */
+    while(__atomic_load_n(&cn1GcStwInProgress, __ATOMIC_SEQ_CST)) {
+        cn1VirtualThreadSpinHint();
+    }
     size_t pageSize = (size_t)sysconf(_SC_PAGESIZE);
     if(stackBytes < 16384) {
         stackBytes = 16384;
