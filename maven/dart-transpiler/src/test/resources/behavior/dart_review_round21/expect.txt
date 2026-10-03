@@ -28,6 +28,21 @@ assigned s=two
 captured=40
 counter=4
 [expensive 42, expensive 42]
+1 Mid(1) mid 1
+5 Mid.other other
+2 Mid(12) mid 12
+4 Mid(8) mid 8
+[Root(mid 1), Mid body 1, Leaf.one body, Root(other), Mid.other body, Root(mid 12), Mid body 12, Root(mid 8), Mid body 8]
+sprout
+pc 7 7
+f=1
+g=7
+h=xy
+k=12
+a=3
+q=10
+later=second
+[Root(sprout), expensive 9, expensive 10, cb]
 named 6 extra=3
 [Base.named(6)]
 n=12 x=5

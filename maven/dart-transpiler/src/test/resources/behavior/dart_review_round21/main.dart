@@ -129,6 +129,56 @@ class Child extends Base {
   Child(this.extra) : super.named(extra * 2);
 }
 
+// Named constructors of a subclass run the superclass constructor they name,
+// with its arguments, after their own initializer list.
+class Root {
+  final String origin;
+  Root(this.origin) {
+    log.add('Root($origin)');
+  }
+}
+
+class Mid extends Root {
+  final String how;
+  Mid(int v)
+      : how = 'Mid($v)',
+        super('mid $v') {
+    log.add('Mid body $v');
+  }
+  Mid.other()
+      : how = 'Mid.other',
+        super('other') {
+    log.add('Mid.other body');
+  }
+}
+
+class Leaf extends Mid {
+  final int a;
+  Leaf.one()
+      : a = 1,
+        super(1) {
+    log.add('Leaf.one body');
+  }
+  Leaf.two(int z)
+      : a = z,
+        super.other();
+  Leaf.three(this.a) : super(a + 10);
+  Leaf.four(super.v) : a = 4;
+}
+
+class Sprout extends Root {
+  Sprout(super.origin);
+}
+
+class Plain {
+  int n = 7;
+}
+
+class PlainChild extends Plain {
+  final String s;
+  PlainChild.make(this.s);
+}
+
 class Counter {
   int n = 0;
   int x = 0;
@@ -166,6 +216,38 @@ class Loud extends Counter {
   int noisyRead() => noisy;
 }
 
+// Untyped closures take their function type from their body: a closure that
+// yields a value can be called for it.
+void closures() {
+  var a = 1;
+  final f = () => a;
+  print('f=${f()}');
+  var g = (int x) => x * 2;
+  print('g=${g(3) + 1}');
+  final h = () {
+    return 'x';
+  };
+  print('h=${h() + 'y'}');
+  final k = (x, y) => '$x$y';
+  print('k=${k(1, 2)}');
+  final bump = () {
+    a++;
+  };
+  bump();
+  bump();
+  print('a=$a');
+  final q = () => expensive(9);
+  print('q=${q() + 1}');
+  final r = () => expensive(10);
+  r();
+  final cb = () => log.add('cb');
+  cb();
+  var later = () => 'first';
+  final read = () => later();
+  later = () => 'second';
+  print('later=${read()}');
+}
+
 void extras() {
   // A closure inside a try block or a switch case captures a local that is
   // reassigned there.
@@ -197,6 +279,18 @@ void main() {
   extras();
   lateLocals(true);
   lateLocals(false);
+  print(log);
+  log.clear();
+
+  for (final leaf in [Leaf.one(), Leaf.two(5), Leaf.three(2), Leaf.four(8)]) {
+    print('${leaf.a} ${leaf.how} ${leaf.origin}');
+  }
+  print(log);
+  log.clear();
+  print(Sprout('sprout').origin);
+  final pc = PlainChild.make('pc');
+  print('${pc.s} ${pc.n} ${Plain().n}');
+  closures();
   print(log);
   log.clear();
 

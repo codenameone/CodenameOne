@@ -777,11 +777,27 @@ public final class JavaEmitter {
         }
 
         // constructors
-        if (c.hasNamedNonFactoryCtor()) {
+        if (needsMarker(c)) {
             body.append("    /** Marker distinguishing named-constructor instantiation. */\n");
             // Package-private, not private: a subclass's `super.named(..)` runs this pair.
             body.append("    static final class $NamedCtor {\n        private $NamedCtor() {\n        }\n    }\n\n");
-            body.append("    ").append(javaClassName(c)).append("($NamedCtor $marker) {\n    }\n\n");
+            // A subclass's named constructor builds through this chain and then runs the
+            // superclass constructor it names as an $init$ method, so the chain must not
+            // run any constructor body itself.
+            ClassDecl markerSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+            body.append("    ").append(javaClassName(c)).append("($NamedCtor $marker) {\n");
+            if (markerSuper != null) {
+                body.append("        super((").append(javaClassName(markerSuper)).append(".$NamedCtor) null);\n");
+            }
+            body.append("    }\n\n");
+            if (c.ctors.isEmpty()) {
+                // Declaring the marker constructor removes Java's implicit default one,
+                // which a class with no Dart constructor still needs.
+                body.append("    public ").append(javaClassName(c)).append("() {\n    }\n\n");
+            }
+            if (isSuperOfMarker(c)) {
+                body.append(emitUnnamedInit(c, ctx));
+            }
         }
         for (CtorDecl ct : c.ctors) {
             body.append(emitCtor(c, ct, ctx));
@@ -1084,18 +1100,7 @@ public final class JavaEmitter {
         // super(...) initializer for program superclasses
         ClassDecl progSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
         if (progSuper != null) {
-            Args superArgs = ct.superInit != null ? ct.superInit.args : new Args();
-            // super.x params contribute as named args
-            for (Param p : params) {
-                if (p.isSuper) {
-                    NamedArg na = new NamedArg();
-                    na.name = p.name;
-                    Ident id = new Ident();
-                    id.name = p.name;
-                    na.value = id;
-                    superArgs.named.add(na);
-                }
-            }
+            Args superArgs = superArgsOf(ct);
             CtorDecl superNamed = ct.superInit != null && ct.superInit.namedCtor != null
                     ? progSuper.namedCtor(ct.superInit.namedCtor) : null;
             if (superNamed != null && !superNamed.isFactory) {
@@ -1208,34 +1213,157 @@ public final class JavaEmitter {
         sb.append("        return $self;\n    }\n\n");
         sb.append("    void $init$").append(ct.name).append('(').append(paramSig).append(") {\n");
         ctx.pushWriter(2);
+        emitInitBody(c, ct, ctx);
+        sb.append(ctx.popWriter());
+        ctx.popScope();
+        sb.append("    }\n\n");
+        return sb.toString();
+    }
+
+    /**
+     * The unnamed constructor as an {@code $init$} method, for a subclass's named
+     * constructor to run as its {@code super(..)}: that subclass is built through the
+     * marker chain, so no Java constructor of this class runs for it. A class with no
+     * Dart constructor gets the implicit one's: no parameters, only its own super call.
+     */
+    private String emitUnnamedInit(ClassDecl c, Ctx ctx) {
+        CtorDecl ct = c.defaultCtor();
+        if (ct == null) {
+            if (!c.ctors.isEmpty()) {
+                return "";   // only named constructors: Dart has no super() to call
+            }
+            ct = new CtorDecl();
+        }
+        StringBuilder sb = new StringBuilder();
+        ctx.pushScope();
+        sb.append("    void $init$(");
+        for (int i = 0; i < ct.params.size(); i++) {
+            Param p = ct.params.get(i);
+            TypeRef pt = paramType(c, p, ctx);
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(javaType(pt, false, ctx)).append(' ').append(ctx.declareShadowSafe(p.name, pt));
+        }
+        sb.append(") {\n");
+        ctx.pushWriter(2);
+        emitInitBody(c, ct, ctx);
+        sb.append(ctx.popWriter());
+        ctx.popScope();
+        sb.append("    }\n\n");
+        return sb.toString();
+    }
+
+    /**
+     * A constructor's work in method form, in Dart's order: this.x parameters and the
+     * initializer list, then the superclass constructor it names -- an {@code $init$}
+     * method of a program superclass, or setters for a stub superclass's named
+     * arguments and super parameters, as the unnamed Java constructor applies them --
+     * then the body.
+     */
+    private void emitInitBody(ClassDecl c, CtorDecl ct, Ctx ctx) {
         Ctx.Writer w = ctx.writer();
+        ClassDecl progSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
         for (Param p : ct.params) {
             if (p.isThis) {
                 w.line(fieldStore(c, p.name, javaIdent(p.name)));
             }
-            if (p.isSuper) {
-                diags.error(p, "E0206", "super parameters are not supported on named constructors yet");
-            }
-        }
-        if (ct.superInit != null && c.superclass != null && program.classes.get(c.superclass.name) != null
-                && (ct.superInit.namedCtor != null || !ct.superInit.args.positional.isEmpty()
-                        || !ct.superInit.args.named.isEmpty())) {
-            // The marker constructor always runs the superclass's unnamed constructor
-            // with no arguments; an explicit super initializer here would be ignored.
-            diags.error(ct, "E0207",
-                    "A named constructor cannot call a superclass constructor with arguments or by name yet");
         }
         for (FieldInit fi : ct.fieldInits) {
             Out v = emitExpr(fi.value, typeOfField(c, fi.field, ctx), ctx);
             w.line(fieldStore(c, fi.field, v.code));
         }
+        if (progSuper != null) {
+            Args superArgs = superArgsOf(ct);
+            String target = ct.superInit != null ? ct.superInit.namedCtor : null;
+            CtorDecl superCtor = target != null ? progSuper.namedCtor(target) : progSuper.defaultCtor();
+            w.line("super.$init$" + (target != null ? target : "") + "("
+                    + canonicalArgs(superCtor, superArgs, ctx) + ");");
+        } else if (stubClassOf(c.superclass) != null) {
+            if (ct.superInit != null) {
+                for (NamedArg na : ct.superInit.args.named) {
+                    Out v = emitExpr(na.value, null, ctx);
+                    w.line("this." + na.name + "(" + v.code + ");");
+                }
+            }
+            for (Param p : ct.params) {
+                if (p.isSuper) {
+                    w.line("this." + p.name + "(" + javaIdent(p.name) + ");");
+                }
+            }
+        }
         if (ct.body != null) {
             emitStatements(ct.body, ctx);
         }
-        sb.append(ctx.popWriter());
-        ctx.popScope();
-        sb.append("    }\n\n");
-        return sb.toString();
+    }
+
+    /**
+     * The arguments a constructor passes to its superclass constructor: the super
+     * initializer's, then its super parameters -- a positional {@code super.x} after the
+     * explicit positional arguments, a named one by name, as Dart passes them. Every
+     * super parameter used to go by name, so a positional one reached nothing and the
+     * superclass saw its default. A copy: the declaration is emitted more than once.
+     */
+    private static Args superArgsOf(CtorDecl ct) {
+        Args superArgs = new Args();
+        if (ct.superInit != null) {
+            superArgs.positional.addAll(ct.superInit.args.positional);
+            superArgs.named.addAll(ct.superInit.args.named);
+        }
+        for (Param p : ct.params) {
+            if (p.isSuper) {
+                Ident id = new Ident();
+                id.name = p.name;
+                if (p.named) {
+                    NamedArg na = new NamedArg();
+                    na.name = p.name;
+                    na.value = id;
+                    superArgs.named.add(na);
+                } else {
+                    superArgs.positional.add(id);
+                }
+            }
+        }
+        return superArgs;
+    }
+
+    /**
+     * Whether a class carries the named-constructor marker chain: it declares a named
+     * constructor, or a program subclass does (the chain runs through every ancestor).
+     */
+    private boolean needsMarker(ClassDecl c) {
+        return markerClasses().contains(c);
+    }
+
+    /** Whether some program class with a marker chain extends {@code c} directly. */
+    private boolean isSuperOfMarker(ClassDecl c) {
+        for (ClassDecl m : markerClasses()) {
+            if (m.superclass != null && program.classes.get(m.superclass.name) == c) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private java.util.Set<ClassDecl> markerClasses;
+
+    private java.util.Set<ClassDecl> markerClasses() {
+        if (markerClasses == null) {
+            java.util.Set<ClassDecl> out = new java.util.HashSet<ClassDecl>();
+            for (List<ClassDecl> same : program.classesByName.values()) {
+                for (ClassDecl c : same) {
+                    if (!c.hasNamedNonFactoryCtor()) {
+                        continue;
+                    }
+                    ClassDecl a = c;
+                    while (a != null && out.add(a)) {
+                        a = a.superclass != null ? program.classes.get(a.superclass.name) : null;
+                    }
+                }
+            }
+            markerClasses = out;
+        }
+        return markerClasses;
     }
 
     private void appendParams(StringBuilder sb, ClassDecl c, List<Param> params, Ctx ctx) {
@@ -1518,6 +1646,8 @@ public final class JavaEmitter {
         ctx.boxedLocals.clear();
         ctx.boxedLocals.addAll(m.body != null
                 ? CaptureScan.boxedLocals(m.body) : CaptureScan.boxedLocals(m.exprBody));
+        ctx.valueCalledLocals.clear();
+        ctx.valueCalledLocals.addAll(CaptureScan.valueCalledNames(m.body, m.exprBody));
         if (m.isSyncStar && !rt.is("List") && !m.isSetter) {
             // sync* generator. The body moves into a private helper that yields into the list
             // it is given (`yield x` -> out.add(x), `yield* xs` -> out.addAllIterable(xs), and a
@@ -1862,6 +1992,13 @@ public final class JavaEmitter {
             // untyped closure locals get a SAM type by arity. A declared signature
             // (`int Function() f = ...`) has its own SAM type below; it was forced to
             // VoidFunc0 here, which a value-returning closure does not compile against.
+            if (t.is("Function") && t.funcReturn == null && v.initializer instanceof Lambda
+                    && !((Lambda) v.initializer).isAsync) {
+                // An untyped closure is typed from its body, as Dart infers it: a closure
+                // that yields a value can be called for it (it was forced to VoidFunc0, and
+                // one with parameters was an error).
+                t = inferredClosureType((Lambda) v.initializer, v.name, ctx);
+            }
             if (t.is("Function") && t.funcReturn == null && v.initializer instanceof Lambda) {
                 Lambda l = (Lambda) v.initializer;
                 if (l.params.isEmpty()) {
@@ -1881,7 +2018,8 @@ public final class JavaEmitter {
                         + (holder.startsWith("Ref<") ? "<>" : "") + "(" + initCode + ");");
                 return;
             }
-            if ((v.type == null || v.type.is("var")) && init != null && containsDynamic(t)) {
+            if ((v.type == null || v.type.is("var")) && init != null && containsDynamic(t)
+                    && !(v.initializer instanceof Lambda)) {
                 // let javac infer generics the Dart-side inference doesn't track
                 w.line("var " + jn + " = " + init.code + ";");
                 return;
@@ -1996,6 +2134,9 @@ public final class JavaEmitter {
                 w.line("return (int) (" + o.code + ");");
             } else {
                 Out o = emitExpr(r.value, rt, ctx);
+                if (rt == null && ctx.lambdaReturns != null) {
+                    ctx.lambdaReturns.add(o.type);
+                }
                 w.line("return " + (rt != null ? coerce(o, rt, ctx) : o.code) + ";");
             }
         } else if (s instanceof TryStmt) {
@@ -6194,6 +6335,12 @@ public final class JavaEmitter {
 
     /** Whether the most recently emitted lambda had a {@code void}-typed expression body. */
     private boolean lastLambdaVoid;
+    /**
+     * What the most recently emitted lambda yields: its arrow body's type, or the value
+     * types of its block body's returns (empty when it returns nothing).
+     */
+    private TypeRef lastLambdaExprType;
+    private List<TypeRef> lastLambdaReturns;
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
         lastLambdaVoid = false;
@@ -6244,9 +6391,14 @@ public final class JavaEmitter {
         sig.append(')');
         String head = sig.toString();
         String code;
+        List<TypeRef> outerReturns = ctx.lambdaReturns;
+        List<TypeRef> returns = new ArrayList<TypeRef>();
+        TypeRef exprType = null;
         if (l.body != null) {
             Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + 1);
+            ctx.lambdaReturns = returns;
             emitStatements(l.body, ctx);
+            ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
             code = head + " -> {\n" + body + indentStr(ctx.currentIndent()) + "}";
         } else {
@@ -6269,6 +6421,7 @@ public final class JavaEmitter {
                 o = new Out(coerce(o, lambdaReturn, ctx), lambdaReturn);
             }
             String lifted = ctx.popWriter();
+            exprType = o.type;
             lastLambdaVoid = o.type != null && o.type.is("void");
             if (lifted.isEmpty()) {
                 code = head + " -> " + o.code;
@@ -6286,7 +6439,53 @@ public final class JavaEmitter {
         ctx.inAsyncBody = outerAsync;
         ctx.methodReturnType = outerReturn;
         ctx.narrowReturnToInt = outerNarrowInt;
+        // Last, so a lambda nested in this one cannot overwrite what this one yields.
+        lastLambdaExprType = exprType;
+        lastLambdaReturns = returns;
         return new Out(code, new TypeRef("Function"));
+    }
+
+    /**
+     * The function type of an untyped closure local, read off the lambda just emitted:
+     * its declared parameter types (dynamic when untyped) and what its body yields.
+     * Void only when the body yields nothing -- or when it is a call or assignment
+     * whose result this body never uses: such a closure is a callback, and a value SAM
+     * type would stop it being passed where a void callback is expected.
+     */
+    private TypeRef inferredClosureType(Lambda l, String name, Ctx ctx) {
+        TypeRef fn = new TypeRef("Function");
+        fn.funcParams = new ArrayList<TypeRef>();
+        for (Param p : l.params) {
+            fn.funcParams.add(p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type);
+        }
+        TypeRef ret;
+        if (l.exprBody != null) {
+            Expr core = stripParens(l.exprBody);
+            boolean callback = core instanceof Call || core instanceof CtorCall || core instanceof Assign
+                    || core instanceof IncDec || core instanceof Cascade || core instanceof AwaitExpr;
+            ret = lastLambdaExprType;
+            if (ret == null || ret.is("void") || (callback && !ctx.valueCalledLocals.contains(name))) {
+                ret = TypeRef.VOID;
+            }
+        } else {
+            ret = null;
+            for (TypeRef r : lastLambdaReturns) {
+                TypeRef rr = r == null ? TypeRef.DYNAMIC : r;
+                if (ret == null) {
+                    ret = rr;
+                } else if (!ret.toString().equals(rr.toString())) {
+                    ret = TypeRef.DYNAMIC;
+                }
+            }
+            if (ret == null) {
+                ret = TypeRef.VOID;
+            }
+        }
+        if (ret.is("Null") || ret.is("var")) {
+            ret = TypeRef.DYNAMIC;
+        }
+        fn.funcReturn = ret;
+        return fn;
     }
 
     // ==================================================================
@@ -6449,7 +6648,12 @@ public final class JavaEmitter {
             // `LibraryLoader = Future<void> Function()`) invocation yields the typedef's
             // result type, so a chained `loader().then(...)` sees a real Future receiver.
             TypeRef ret = isFunctionValued(local) ? funcResultType(local) : TypeRef.DYNAMIC;
-            return new Out(n + ".call(" + plainArgs(c.args, ctx) + ")", ret);
+            // Through the local's own Java form: a shadow-renamed, boxed (captured and
+            // reassigned) or late closure is not reachable by its Dart name.
+            Ident callee = new Ident();
+            callee.name = n;
+            String recv = emitIdent(callee, null, ctx).code;
+            return new Out(recv + ".call(" + plainArgs(c.args, ctx) + ")", ret);
         }
         // inside an extension body, bare calls probe the receiver first
         if (ctx.extensionSelfType != null) {
@@ -9890,6 +10094,10 @@ public final class JavaEmitter {
         final List<Map<String, TypeRef>> scopes = new ArrayList<Map<String, TypeRef>>();
         final List<Writer> writers = new ArrayList<Writer>();
         final java.util.Set<String> boxedLocals = new HashSet<String>();
+        /** Names called for their result in the current body (CaptureScan.valueCalledNames). */
+        final java.util.Set<String> valueCalledLocals = new HashSet<String>();
+        /** Value types of the `return`s of the lambda block body being emitted, or null. */
+        List<TypeRef> lambdaReturns;
         private final java.util.Set<String> boxedActive = new HashSet<String>();
         TypeRef methodReturnType;
         TypeRef extensionSelfType;

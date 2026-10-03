@@ -44,6 +44,9 @@ final class CaptureScan {
     private final Set<String> assigned = new HashSet<String>();
     private final Set<String> referencedInLambda = new HashSet<String>();
     private final Set<String> allReferenced = new HashSet<String>();
+    /** Names called as {@code name(..)} where the result is used (not an expression statement). */
+    private final Set<String> valueCalls = new HashSet<String>();
+    private Call statementCall;
     private int lambdaDepth;
 
     private CaptureScan() {
@@ -81,6 +84,23 @@ final class CaptureScan {
         return scan.referencedInLambda.contains(name);
     }
 
+    /**
+     * Names invoked as {@code name(..)} somewhere in {@code body} whose result is used --
+     * anywhere but as a whole expression statement. An untyped closure local whose body
+     * is a call or assignment is only given a value-returning SAM type when one of these
+     * uses needs it, so a callback that was a VoidFunc keeps that type.
+     */
+    static Set<String> valueCalledNames(Block body, Expr exprBody) {
+        CaptureScan scan = new CaptureScan();
+        if (body != null) {
+            scan.walkBlock(body);
+        }
+        if (exprBody != null) {
+            scan.walkExpr(exprBody);
+        }
+        return scan.valueCalls;
+    }
+
     /** Every identifier name referenced anywhere in an expression. */
     static Set<String> referencedNames(Expr e) {
         CaptureScan scan = new CaptureScan();
@@ -106,7 +126,11 @@ final class CaptureScan {
         if (s instanceof Block) {
             walkBlock((Block) s);
         } else if (s instanceof ExprStmt) {
-            walkExpr(((ExprStmt) s).expr);
+            Expr e = ((ExprStmt) s).expr;
+            if (e instanceof Call) {
+                statementCall = (Call) e;
+            }
+            walkExpr(e);
         } else if (s instanceof VarDeclStmt) {
             VarDeclStmt v = (VarDeclStmt) s;
             if (v.initializer != null) {
@@ -235,6 +259,14 @@ final class CaptureScan {
             Call c = (Call) e;
             if (c.name != null) {
                 allReferenced.add(c.name);
+                if (c.target == null && c != statementCall) {
+                    valueCalls.add(c.name);
+                }
+                // `f()` inside a closure captures a closure local `f` as surely as a
+                // bare `f` does; reassigned elsewhere, it has to be boxed too.
+                if (c.target == null && lambdaDepth > 0) {
+                    referencedInLambda.add(c.name);
+                }
             }
             walkExpr(c.target);
             walkExprs(c.args.positional);
@@ -269,6 +301,12 @@ final class CaptureScan {
             walkExpr(((AsCast) e).operand);
         } else if (e instanceof ParenExpr) {
             walkExpr(((ParenExpr) e).inner);
+        } else if (e instanceof AwaitExpr) {
+            walkExpr(((AwaitExpr) e).operand);
+        } else if (e instanceof ThrowExpr) {
+            walkExpr(((ThrowExpr) e).value);
+        } else if (e instanceof SetLit) {
+            walkExprs(((SetLit) e).elements);
         }
     }
 }
