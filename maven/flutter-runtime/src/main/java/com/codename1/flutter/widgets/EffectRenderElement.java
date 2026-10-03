@@ -81,6 +81,33 @@ public abstract class EffectRenderElement extends RenderElement {
      */
     protected abstract void paintWithEffect(Graphics g, Container pane, Subtree paintChildren);
 
+    /// Maps a pointer position from where the subtree is DRAWN back to where it is laid
+    /// out, both in absolute (screen) pixels, for an effect that moves its subtree and
+    /// wants it hit where it is seen -- Transform's transformHitTests.
+    ///
+    /// @return false when the effect does not move hits (the default, and the cheap
+    ///         path: the pane is then hit tested exactly like any other container)
+    protected boolean mapsPointer(Container pane) {
+        return false;
+    }
+
+    /// The inverse of the paint transform, into {@code out}.
+    ///
+    /// @return false when nothing is drawn under ({@code x}, {@code y}) -- a collapsed
+    ///         transform has no inverse, and hits nothing, as in Flutter
+    protected boolean unmapPointer(Container pane, int x, int y, int[] out) {
+        out[0] = x;
+        out[1] = y;
+        return true;
+    }
+
+    /// The paint transform itself, into {@code out}: the way back out of the pane for a
+    /// drag the subtree hands up to a scrollable ancestor.
+    protected void mapPointer(Container pane, int x, int y, int[] out) {
+        out[0] = x;
+        out[1] = y;
+    }
+
     private RenderHost innerHost() {
         if (innerHost == null) {
             innerHost = new RenderHost();
@@ -378,6 +405,160 @@ public abstract class EffectRenderElement extends RenderElement {
                     EffectPane.super.paint(target);
                 }
             });
+        }
+
+        // ---------------------------------------------------------------------
+        // Hit testing through the effect (see mapsPointer)
+        //
+        // Codename One hit tests and delivers pointer events in screen pixels, and every
+        // component checks them against its own untransformed bounds. A subtree drawn
+        // somewhere else therefore cannot simply be handed the hit: the press would land
+        // on it and its own contains() would then reject the release. So the pane hit
+        // tests in the subtree's coordinates, becomes the event target itself, and RELAYS
+        // the events inward with the coordinates mapped -- every component inside sees
+        // one consistent space. A drag that a component inside passes up to its parent
+        // (the way Codename One finds a scrollable ancestor) comes back through this pane
+        // and is mapped back out, so a scroller outside sees screen pixels throughout.
+        // ---------------------------------------------------------------------
+
+        /// False while this pane asks its own super class about MAPPED coordinates.
+        private boolean mapping = true;
+        /// The component under the last hit test, in the subtree.
+        private Component hit;
+        /// The component the current press was relayed to.
+        private Component pressed;
+        /// True while an event is being relayed inward, so one that bubbles back up to
+        /// this pane is recognised as coming from inside.
+        private boolean relaying;
+        private final int[] pt = new int[2];
+
+        private boolean mapsHits() {
+            return mapping && mapsPointer(this);
+        }
+
+        @Override
+        public boolean contains(int x, int y) {
+            if (!mapsHits()) {
+                return super.contains(x, y);
+            }
+            return unmapPointer(this, x, y, pt) && super.contains(pt[0], pt[1]);
+        }
+
+        @Override
+        public Component getComponentAt(int x, int y) {
+            if (!mapsHits()) {
+                return super.getComponentAt(x, y);
+            }
+            hit = null;
+            if (!unmapPointer(this, x, y, pt)) {
+                return this;
+            }
+            Component c;
+            mapping = false;
+            try {
+                c = super.getComponentAt(pt[0], pt[1]);
+            } finally {
+                mapping = true;
+            }
+            while (c != null && c != this && c.isIgnorePointerEvents()) {
+                c = c.getParent();
+            }
+            if (c == null || c == this) {
+                return this;
+            }
+            hit = c;
+            return this;
+        }
+
+        @Override
+        public boolean respondsToPointerEvents() {
+            if (mapsHits()) {
+                // Answers for what is under the pointer, which is what the enclosing
+                // container's hit test asks right after calling getComponentAt.
+                return hit != null && (hit.respondsToPointerEvents() || !(hit instanceof Container));
+            }
+            return super.respondsToPointerEvents();
+        }
+
+        @Override
+        public void pointerPressed(int x, int y) {
+            if (!mapsHits()) {
+                super.pointerPressed(x, y);
+                return;
+            }
+            pressed = hit;
+            if (pressed != null && unmapPointer(this, x, y, pt)) {
+                relaying = true;
+                try {
+                    pressed.pointerPressed(pt[0], pt[1]);
+                } finally {
+                    relaying = false;
+                }
+            }
+        }
+
+        @Override
+        public void longPointerPress(int x, int y) {
+            if (!mapsHits()) {
+                super.longPointerPress(x, y);
+                return;
+            }
+            if (pressed != null && unmapPointer(this, x, y, pt)) {
+                relaying = true;
+                try {
+                    pressed.longPointerPress(pt[0], pt[1]);
+                } finally {
+                    relaying = false;
+                }
+            }
+        }
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            if (relaying) {
+                // Handed up from inside, in the subtree's coordinates: back to screen
+                // pixels before it continues to the ancestors.
+                mapPointer(this, x, y, pt);
+                relaying = false;
+                try {
+                    super.pointerDragged(pt[0], pt[1]);
+                } finally {
+                    relaying = true;
+                }
+                return;
+            }
+            if (!mapsHits()) {
+                super.pointerDragged(x, y);
+                return;
+            }
+            // Like Codename One's own dispatch: the drag goes to what is under it now.
+            Component target = hit != null ? hit : pressed;
+            if (target != null && unmapPointer(this, x, y, pt)) {
+                relaying = true;
+                try {
+                    target.pointerDragged(pt[0], pt[1]);
+                } finally {
+                    relaying = false;
+                }
+            }
+        }
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            if (!mapsHits()) {
+                super.pointerReleased(x, y);
+                return;
+            }
+            Component target = pressed;
+            pressed = null;
+            if (target != null && unmapPointer(this, x, y, pt)) {
+                relaying = true;
+                try {
+                    target.pointerReleased(pt[0], pt[1]);
+                } finally {
+                    relaying = false;
+                }
+            }
         }
 
         /** Paints the subtree with this pane parked at the origin, for {@link #layer}. */

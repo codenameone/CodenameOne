@@ -68,6 +68,12 @@ public class Transform extends Widget {
         this.transformHitTests = v;
     }
 
+    /// Whether the child is hit where it is drawn (true, Flutter's default) or where it
+    /// is laid out.
+    public boolean getTransformHitTests() {
+        return transformHitTests;
+    }
+
     public void filterQuality(Object v) {
         this.filterQuality = v;
     }

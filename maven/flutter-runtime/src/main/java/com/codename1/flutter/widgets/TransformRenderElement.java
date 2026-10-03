@@ -126,6 +126,89 @@ public class TransformRenderElement extends EffectRenderElement {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Hit testing (transformHitTests)
+    // ------------------------------------------------------------------
+
+    /// {scaleX, scaleY, angle, dx, dy} exactly as {@link #paintWithEffect} applies them,
+    /// refreshed by {@link #hitGeometry}. Kept in a field: hit tests run per pointer event.
+    private final double[] geom = new double[5];
+
+    /// Fills {@link #geom} and answers whether the paint moves anything at all: 1 when it
+    /// does, 0 for the identity, -1 for a collapsed scale, which paints nothing.
+    private int hitGeometry() {
+        double sx = transform().effectiveScaleX();
+        double sy = transform().effectiveScaleY();
+        Double angle = transform().effectiveAngle();
+        Offset offset = transform().effectiveOffset();
+        boolean suppressed = "true".equals(com.codename1.ui.Display.getInstance()
+                .getProperty("cn1.flutter.noTransform", "false"));
+        boolean scales = !suppressed && (sx != 1.0 || sy != 1.0);
+        boolean rotates = !suppressed && angle != null && angle.doubleValue() != 0.0;
+        if (scales && !(sx != 0.0 && sy != 0.0 && isFinite(sx) && isFinite(sy))) {
+            return -1;
+        }
+        geom[0] = scales ? sx : 1.0;
+        geom[1] = scales ? sy : 1.0;
+        geom[2] = rotates ? angle.doubleValue() : 0.0;
+        geom[3] = offset == null ? 0 : Math.round(com.codename1.flutter.rendering.Dp.px(offset.dx()));
+        geom[4] = offset == null ? 0 : Math.round(com.codename1.flutter.rendering.Dp.px(offset.dy()));
+        return scales || rotates || geom[3] != 0 || geom[4] != 0 ? 1 : 0;
+    }
+
+    @Override
+    protected boolean mapsPointer(Container pane) {
+        return transform().getTransformHitTests() && hitGeometry() != 0;
+    }
+
+    /// Screen = d + c + R(S(p - c)), c the pane's centre: the inverse of what
+    /// paintScaled / paintRotated draw. Rotation is clockwise for a positive angle on a
+    /// y-down screen, as both Flutter and Codename One's Transform.rotate turn.
+    @Override
+    protected boolean unmapPointer(Container pane, int x, int y, int[] out) {
+        if (hitGeometry() < 0) {
+            return false;
+        }
+        double cx = pane.getAbsoluteX() + pane.getWidth() / 2.0;
+        double cy = pane.getAbsoluteY() + pane.getHeight() / 2.0;
+        double qx = x - geom[3] - cx;
+        double qy = y - geom[4] - cy;
+        if (geom[2] != 0) {
+            double cos = Math.cos(geom[2]);
+            double sin = Math.sin(geom[2]);
+            double rx = cos * qx + sin * qy;
+            double ry = -sin * qx + cos * qy;
+            qx = rx;
+            qy = ry;
+        }
+        out[0] = (int) Math.floor(cx + qx / geom[0]);
+        out[1] = (int) Math.floor(cy + qy / geom[1]);
+        return true;
+    }
+
+    @Override
+    protected void mapPointer(Container pane, int x, int y, int[] out) {
+        if (hitGeometry() < 0) {
+            out[0] = x;
+            out[1] = y;
+            return;
+        }
+        double cx = pane.getAbsoluteX() + pane.getWidth() / 2.0;
+        double cy = pane.getAbsoluteY() + pane.getHeight() / 2.0;
+        double qx = (x - cx) * geom[0];
+        double qy = (y - cy) * geom[1];
+        if (geom[2] != 0) {
+            double cos = Math.cos(geom[2]);
+            double sin = Math.sin(geom[2]);
+            double rx = cos * qx - sin * qy;
+            double ry = sin * qx + cos * qy;
+            qx = rx;
+            qy = ry;
+        }
+        out[0] = (int) Math.round(cx + qx + geom[3]);
+        out[1] = (int) Math.round(cy + qy + geom[4]);
+    }
+
     /// Draws the layer scaled about the pane's centre - Flutter's default anchor, and
     /// what the gallery's carousel expects.
     ///
