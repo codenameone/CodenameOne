@@ -1044,9 +1044,35 @@ public final class ResourceCompiler {
     /// Ships every asset under `andra_<hash>_<name>` and writes the index the
     /// runtime's `AssetManager` reads to map paths back.
     private void writeAssets() throws IOException {
-        if (req.assetsDir == null || !req.assetsDir.isDirectory()) {
+        // The output directory persists between builds, and the index is what
+        // AssetManager.list() and open() read: an asset deleted from the
+        // project, the last one included (which removes the assets directory
+        // too), must leave the index and its copy, not linger in both.
+        java.util.Set<String> shipped = new java.util.HashSet<String>();
+        try {
+            if (req.assetsDir == null || !req.assetsDir.isDirectory()) {
+                return;
+            }
+            writeAssetIndex(shipped);
+        } finally {
+            removeStaleAssets(shipped);
+        }
+    }
+
+    private void removeStaleAssets(java.util.Set<String> shipped) {
+        File[] existing = req.resourcesOut == null ? null : req.resourcesOut.listFiles();
+        if (existing == null) {
             return;
         }
+        for (File f : existing) {
+            String n = f.getName();
+            if ((n.startsWith("andra_") || n.equals(ASSET_INDEX)) && !shipped.contains(n) && !f.delete()) {
+                throw new IllegalStateException("Cannot delete the stale asset output " + f);
+            }
+        }
+    }
+
+    private void writeAssetIndex(java.util.Set<String> shipped) throws IOException {
         List<String> paths = new ArrayList<String>();
         listFiles(req.assetsDir, "", paths);
         Collections.sort(paths);
@@ -1063,6 +1089,7 @@ public final class ResourceCompiler {
             File dest = new File(req.resourcesOut, flat);
             copyIfChanged(new File(req.assetsDir, p), dest);
             result.resourceFiles.add(dest);
+            shipped.add(flat);
             index.append(p).append('\t').append(flat).append('\n');
         }
         File idx = new File(req.resourcesOut, ASSET_INDEX);
@@ -1073,6 +1100,7 @@ public final class ResourceCompiler {
             os.close();
         }
         result.resourceFiles.add(idx);
+        shipped.add(ASSET_INDEX);
     }
 
     private static void listFiles(File dir, String prefix, List<String> out) {

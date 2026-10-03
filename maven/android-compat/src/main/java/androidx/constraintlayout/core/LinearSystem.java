@@ -1313,11 +1313,11 @@ public class LinearSystem {
                 System.out.println("(S) -> " + a + " = " + b + (margin != 0 ? " + " + margin : ""));
             }
             if (b.isSynonym) {
-                margin += b.synonymDelta;
+                margin = (int) (margin + b.synonymDelta); // upstream's implicit narrowing, spelled out
                 b = mCache.mIndexedVariables[b.synonym];
             }
             if (a.isSynonym) {
-                margin -= a.synonymDelta;
+                margin = (int) (margin - a.synonymDelta); // upstream's implicit narrowing, spelled out
                 a = mCache.mIndexedVariables[a.synonym];
             } else {
                 a.setSynonym(this, b, 0);
@@ -1347,11 +1347,11 @@ public class LinearSystem {
                 System.out.println("(S) -> " + a + " = " + b + (margin != 0 ? " + " + margin : "") + " " + getDisplayStrength(strength));
             }
             if (b.isSynonym) {
-                margin += b.synonymDelta;
+                margin = (int) (margin + b.synonymDelta); // upstream's implicit narrowing, spelled out
                 b = mCache.mIndexedVariables[b.synonym];
             }
             if (a.isSynonym) {
-                margin -= a.synonymDelta;
+                margin = (int) (margin - a.synonymDelta); // upstream's implicit narrowing, spelled out
                 a = mCache.mIndexedVariables[a.synonym];
             } else {
                 a.setSynonym(this, b, margin);

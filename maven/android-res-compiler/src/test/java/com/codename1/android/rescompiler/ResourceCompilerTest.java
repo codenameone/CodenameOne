@@ -162,4 +162,51 @@ public class ResourceCompilerTest {
         assertTrue(all, all.contains("E0102"));
         assertTrue(all, all.contains("layout/bad.xml"));
     }
+
+    /// The output directory persists between builds and the asset index is
+    /// what AssetManager lists: an asset deleted from the project -- the last
+    /// one, which takes the assets directory with it -- leaves both.
+    @Test
+    public void deletedAssetsLeaveTheIndexAndTheOutput() throws IOException {
+        File res = project();
+        File assets = new File(res.getParentFile(), "assets");
+        write(new File(assets, "a.txt"), "a");
+        write(new File(assets, "dir/b.txt"), "b");
+        ResourceCompiler.Request r = new ResourceCompiler.Request();
+        r.res.add(new ResourceCompiler.ResSource(res, null));
+        r.manifest = new File(res.getParentFile(), "AndroidManifest.xml");
+        r.javaOut = tmp.newFolder("java");
+        r.resourcesOut = tmp.newFolder("out");
+        r.onClickNamesOut = new File(r.resourcesOut, "onclick.txt");
+        r.assetsDir = assets;
+        r.frameworkSymbols = new ByteArrayInputStream(FRAMEWORK.getBytes("UTF-8"));
+        new ResourceCompiler().compile(r);
+        File index = new File(r.resourcesOut, ResourceCompiler.ASSET_INDEX);
+        assertEquals(2, flattenedAssets(r.resourcesOut));
+        assertTrue(new String(Files.readAllBytes(index.toPath()), "UTF-8").contains("dir/b.txt"));
+
+        assertTrue(new File(assets, "dir/b.txt").delete());
+        r.frameworkSymbols = new ByteArrayInputStream(FRAMEWORK.getBytes("UTF-8"));
+        new ResourceCompiler().compile(r);
+        assertEquals(1, flattenedAssets(r.resourcesOut));
+        assertFalse(new String(Files.readAllBytes(index.toPath()), "UTF-8").contains("dir/b.txt"));
+
+        assertTrue(new File(assets, "a.txt").delete());
+        assertTrue(new File(assets, "dir").delete());
+        assertTrue(assets.delete());
+        r.frameworkSymbols = new ByteArrayInputStream(FRAMEWORK.getBytes("UTF-8"));
+        new ResourceCompiler().compile(r);
+        assertEquals(0, flattenedAssets(r.resourcesOut));
+        assertFalse("the index outlived the last asset", index.exists());
+    }
+
+    private static int flattenedAssets(File out) {
+        int n = 0;
+        for (File f : out.listFiles()) {
+            if (f.getName().startsWith("andra_")) {
+                n++;
+            }
+        }
+        return n;
+    }
 }

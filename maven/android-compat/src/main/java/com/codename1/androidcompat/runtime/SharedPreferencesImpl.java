@@ -168,9 +168,14 @@ final class SharedPreferencesImpl implements SharedPreferences {
         listeners.remove(listener);
     }
 
+    /// The editor's mark for a removed key.
+    private static final Object REMOVED = new Object();
+
     private final class EditorImpl implements Editor {
+        /// One modification per key, the last call's, as on Android: a put
+        /// then a remove removes, a remove then a put puts. A removal is
+        /// recorded as [#REMOVED].
         private final HashMap<String, Object> pending = new HashMap<String, Object>();
-        private final HashSet<String> removed = new HashSet<String>();
         private boolean clear;
 
         @Override
@@ -211,7 +216,7 @@ final class SharedPreferencesImpl implements SharedPreferences {
 
         @Override
         public Editor remove(String key) {
-            removed.add(key);
+            pending.put(key, REMOVED);
             return this;
         }
 
@@ -227,18 +232,16 @@ final class SharedPreferencesImpl implements SharedPreferences {
             if (clear) {
                 values.clear();
             }
-            for (String k : removed) {
-                if (values.remove(k) != null) {
-                    changed.add(k);
-                }
-            }
             for (Map.Entry<String, Object> e : pending.entrySet()) {
-                if (e.getValue() == null) {
-                    values.remove(e.getKey());
+                Object v = e.getValue();
+                if (v == REMOVED || v == null) {
+                    if (values.remove(e.getKey()) != null) {
+                        changed.add(e.getKey());
+                    }
                 } else {
-                    values.put(e.getKey(), e.getValue());
+                    values.put(e.getKey(), v);
+                    changed.add(e.getKey());
                 }
-                changed.add(e.getKey());
             }
             persist();
             if (!listeners.isEmpty()) {

@@ -39,7 +39,13 @@ import java.util.List;
 /// is, an absolute path (`/data/...`) becomes a `file://` path, and a
 /// relative path is resolved against the application home, the directory
 /// `Context.getDataDir()` answers and `getFilesDir()` is under.
-public class File implements Comparable<File> {
+/// Serializable like the JDK class: Android code compiled against
+/// `java.io.File` passes one to `Intent.putExtra(String, Serializable)` and
+/// `Bundle.putSerializable`, and the remapped call still names that
+/// parameter type.
+public class File implements Comparable<File>, java.io.Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     public static final char separatorChar = '/';
     public static final String separator = "/";

@@ -278,7 +278,12 @@ public class Intent implements Parcelable, Cloneable {
     }
 
     public ComponentName resolveActivity(android.content.pm.PackageManager pm) {
-        return pm.resolveActivity(this, 0) != null ? component : null;
+        if (pm.resolveActivity(this, 0) == null) {
+            return null;
+        }
+        com.codename1.androidcompat.runtime.AndroidRuntime rt =
+                com.codename1.androidcompat.runtime.AndroidRuntime.getInstance();
+        return rt == null ? component : rt.resolveComponent(this);
     }
 
     // ------------------------------------------------------------ extras

@@ -536,6 +536,14 @@ public final class ActivityThread {
             return;
         }
         appForeground = true;
+        // The locale or dark mode may have changed while the application was
+        // in the background. Nothing resizes on the way back, so ask now, as
+        // Android delivers the change before resuming the activity.
+        com.codename1.androidcompat.runtime.ResourceManager rm =
+                com.codename1.androidcompat.runtime.ResourceManager.get();
+        if (!STACK.isEmpty() && rm.refresh()) {
+            onConfigurationChanged(rm.configuration());
+        }
         Record t = top();
         if (t != null) {
             if (t.relaunchPending != 0) {

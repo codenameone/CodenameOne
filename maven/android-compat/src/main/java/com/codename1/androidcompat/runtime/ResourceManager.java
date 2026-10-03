@@ -227,10 +227,10 @@ public final class ResourceManager {
             com.codename1.l10n.L10NManager l10n = d.getLocalizationManager();
             if (l10n != null) {
                 String loc = l10n.getLocale();
-                if (loc != null && loc.length() >= 2) {
-                    lang = asciiLower(loc.substring(0, 2));
-                    int sep = loc.indexOf('_') >= 0 ? loc.indexOf('_') : loc.indexOf('-');
-                    region = sep > 0 && loc.length() >= sep + 3 ? asciiUpper(loc.substring(sep + 1, sep + 3)) : "";
+                String[] parsed = languageAndRegion(loc);
+                if (parsed != null) {
+                    lang = parsed[0];
+                    region = parsed[1];
                 }
             }
         } catch (RuntimeException ignored) {
@@ -274,6 +274,23 @@ public final class ResourceManager {
         configuration.screenLayout = sizeClass | (rtl ? Configuration.SCREENLAYOUT_LAYOUTDIR_RTL
                 : Configuration.SCREENLAYOUT_LAYOUTDIR_LTR);
         return changed;
+    }
+
+    /// The language and region of a platform locale such as `en_US`,
+    /// `fil_PH` or `pt-BR`: the language is everything before the separator,
+    /// so three-letter languages (`fil`, matched by `values-fil`) survive.
+    /// Null when there is no language.
+    static String[] languageAndRegion(String loc) {
+        if (loc == null) {
+            return null;
+        }
+        int sep = loc.indexOf('_') >= 0 ? loc.indexOf('_') : loc.indexOf('-');
+        String lang = sep < 0 ? loc : loc.substring(0, sep);
+        if (lang.length() < 2) {
+            return null;
+        }
+        String region = sep > 0 && loc.length() >= sep + 3 ? asciiUpper(loc.substring(sep + 1, sep + 3)) : "";
+        return new String[] {asciiLower(lang), region};
     }
 
     static String asciiLower(String s) {

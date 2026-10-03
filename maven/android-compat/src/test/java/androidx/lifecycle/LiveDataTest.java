@@ -26,6 +26,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.codename1.androidcompat.testing.MainThreadRule;
+
+import org.junit.Rule;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -35,6 +38,9 @@ import java.util.List;
 /// returning observer the latest value once, and forgets an observer whose
 /// owner is destroyed -- AndroidX's rules.
 public class LiveDataTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
 
     private static final class Owner implements LifecycleOwner {
         final LifecycleRegistry registry = new LifecycleRegistry(this);
@@ -98,7 +104,11 @@ public class LiveDataTest {
         data.observeForever(o);
         data.setValue("x");
         data.postValue("y");
-        assertEquals("[start, x, y]", seen.toString());
+        data.postValue("z");
+        MainThreadRule.drain();
+        // Each post is delivered, in order: no value is shared between the
+        // posting thread and the UI thread.
+        assertEquals("[start, x, y, z]", seen.toString());
         data.removeObserver(o);
         assertEquals("[active, inactive]", events.toString());
     }

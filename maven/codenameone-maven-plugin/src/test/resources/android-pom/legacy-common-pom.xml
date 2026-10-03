@@ -2,39 +2,46 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.codenameone.examples.hellocodenameone</groupId>
-        <artifactId>hellocodenameone</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <groupId>${groupId}</groupId>
+        <artifactId>${rootArtifactId}</artifactId>
+        <version>${version}</version>
     </parent>
-    <groupId>com.codenameone.examples.hellocodenameone</groupId>
-    <artifactId>hellocodenameone-common</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <groupId>${groupId}</groupId>
+    <artifactId>${artifactId}</artifactId>
+    <version>${version}</version>
     <packaging>jar</packaging>
-
-    <properties>
-        <!-- The Android compatibility gallery's Android Studio module, compiled
-             into this app so its screens run as screenshot tests on every port. -->
-        <android.gallery.dir>${project.basedir}/../../android-compat-samples/gallery/app/src/main</android.gallery.dir>
-    </properties>
 
     <!-- Add your cn1lib dependencies to this section -->
     <dependencies>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-android-compat</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
             <scope>provided</scope>
         </dependency>
 
-        <!-- Deterministic, network-free mock ad provider used by the advertising screenshot test. -->
+        <!--
+          Test-scope deps needed if you add JUnit 5 tests under
+          src/test/java that drive the simulator via
+          com.codename1.testing.junit.CodenameOneTest. Surefire stays
+          skipped at this module (see skipTests on surefire below);
+          JUnit tests actually run from the javase module, which
+          inherits these sources via testSourceDirectory. They live
+          here only so common can compile the test sources.
+
+          Apps that prefer the legacy AbstractTest / cn1:test flow can
+          delete both blocks; they are inert unless a test imports
+          them.
+        -->
         <dependency>
             <groupId>com.codenameone</groupId>
-            <artifactId>cn1-ads-mock</artifactId>
-            <version>${cn1.version}</version>
+            <artifactId>codenameone-javase</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.3</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- INJECT DEPENDENCIES -->
@@ -73,13 +80,7 @@
                                     <mkdir dir="${project.build.directory}/codenameone/tmpProject/lib"/>
                                     <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar"
                                          dest="${user.home}/UpdateCodenameOne.jar"
-                                         skipexisting="true"
-                                         ignoreerrors="true"/>
-
-                                    <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
-                                         dest="${user.home}/UpdateCodenameOne.jar"
-                                         skipexisting="true"
-                                         ignoreerrors="false"/>
+                                         skipexisting="true"/>
                                     <java jar="${user.home}/UpdateCodenameOne.jar" fork="true">
                                         <arg value="${project.build.directory}/codenameone/tmpProject"/>
                                         <arg value="force"/>
@@ -104,7 +105,7 @@
                 </file>
             </activation>
             <properties>
-                <kotlin.version>1.6.0</kotlin.version>
+                <kotlin.version>${kotlinVersion}</kotlin.version>
                 <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
             </properties>
             <dependencies>
@@ -154,10 +155,6 @@
                         <executions>
                             <execution>
                                 <id>compile</id>
-                                <!-- Ahead of javac: the generated Android factory (Java) names
-                                     the gallery's Kotlin activity. After the process-sources
-                                     generators, as in the archetype. -->
-                                <phase>process-resources</phase>
                                 <goals>
                                     <goal>compile</goal>
                                 </goals>
@@ -165,9 +162,6 @@
                                     <sourceDirs>
                                         <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
                                         <sourceDir>${project.basedir}/src/main/java</sourceDir>
-                                        <sourceDir>${android.gallery.dir}/kotlin</sourceDir>
-                                        <sourceDir>${android.gallery.dir}/java</sourceDir>
-                                        <sourceDir>${project.build.directory}/generated-sources/android</sourceDir>
                                     </sourceDirs>
                                     <args>
                                         <arg>-no-reflect</arg>
@@ -301,10 +295,10 @@
         </profile>
         <profile>
             <!--
-                For sending Windows UWP builds use:
-                mvn cn:build -P uwp
+                For sending Windows device builds use:
+                mvn cn:build -P win
             -->
-            <id>uwp</id>
+            <id>win</id>
             <properties>
                 <codename1.targetType>windows</codename1.targetType>
                 <codename1.targetPlatform>win</codename1.targetPlatform>
@@ -332,7 +326,7 @@
                 <codename1.targetPlatform>javase</codename1.targetPlatform>
             </properties>
         </profile>
-            </profiles>
+    </profiles>
 
     <build>
         <plugins>
@@ -340,8 +334,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>${maven.compiler.source}</source>
-                    <target>${maven.compiler.target}</target>
+                    <source>${javaVersion}</source>
+                    <target>${javaVersion}</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -362,29 +356,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.4.0</version>
-                <executions>
-                    <execution>
-                        <id>add-parparvm-common-benchmark-source</id>
-                        <phase>generate-sources</phase>
-                        <goals><goal>add-source</goal></goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.basedir}/../../../vm/benchmarks/common/src/main/java</source>
-                                <!-- The port conformance suite. It lives under tests/ rather than in
-                                     the framework: it is our check on the ports, not API for
-                                     applications, and shipping it put 2000 lines of assertions in
-                                     com.codename1.testing beside the user-facing test classes, in
-                                     every application ever built. -->
-                                <source>${project.basedir}/../../../tests/conformance/java</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
 
             <plugin>
                 <groupId>com.codenameone</groupId>
@@ -392,24 +363,17 @@
 
                 <executions>
                     <execution>
+                        <!-- Build-time SVG transcoder: any SVG dropped into
+                             src/main/css/ or src/main/svg/ is compiled into
+                             a GeneratedSVGImage subclass plus an SVGRegistry,
+                             so theme.css `url(*.svg)` references resolve at
+                             runtime to vector-rendered Image objects on every
+                             port. See docs/developer-guide/svg.md. -->
                         <id>transcode-svg</id>
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>transcode-svg</goal>
                         </goals>
-                    </execution>
-                    <!-- The Android compatibility gallery
-                         (scripts/android-compat-samples/gallery), built from its own
-                         Android Studio module: its screens are screenshot tests too. -->
-                    <execution>
-                        <id>compile-android-res</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>compile-android-res</goal>
-                        </goals>
-                        <configuration>
-                            <androidSourceDir>${android.gallery.dir}</androidSourceDir>
-                        </configuration>
                     </execution>
                     <execution>
                         <id>generate-gui-sources</id>
@@ -422,9 +386,13 @@
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
                         <goals>
-                            <goal>remap-android</goal>
                             <goal>bytecode-compliance</goal>
                             <goal>css</goal>
+                            <!-- Scans the project's compiled bytecode for
+                                 @Route declarations and generates the
+                                 dispatcher class consumed by the per-platform
+                                 application stub. No-op for projects with no
+                                 @Route. -->
                             <goal>process-annotations</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
@@ -442,6 +410,15 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <!--
+                  Surefire is intentionally skipped in the common module.
+                  Legacy AbstractTest classes run through `cn1:test` (wired
+                  in the javase module's "test" profile). New JUnit 5
+                  tests under src/test/java run from the javase module as
+                  well, which mounts these same sources via
+                  testSourceDirectory. Enabling Surefire here too would
+                  execute every JUnit test twice.
+                  -->
                 <configuration>
                     <skipTests>true</skipTests>
                 </configuration>

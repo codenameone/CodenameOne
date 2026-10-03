@@ -1675,7 +1675,7 @@ public class Form extends Container implements TopLevelContainer {
         // never the look and feel's. Replacing it here disconnected the form
         // from its toolbar on every theme refresh and dropped the back command
         // the hardware back key runs.
-        boolean toolbarOwnsMenuBar = toolbar != null && menuBar != null && menuBar == toolbar.getMenuBar();
+        boolean toolbarOwnsMenuBar = toolbar != null && menuBar != null && menuBar == toolbar.getMenuBar(); //NOPMD CompareObjectsWithEquals - the same instance, not an equal one
         if (!toolbarOwnsMenuBar && (menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass()))) {
             try {
                 menuBar = (MenuBar) laf.getMenuBarClass().newInstance();

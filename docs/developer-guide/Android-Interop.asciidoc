@@ -21,7 +21,7 @@ Studio project into it:
 
 [source,bash]
 ----
-mvn cn1:import-android-project -Dcn1.android.import=/path/to/MyAndroidApp
+include::../demos/common/src/main/snippets/developer-guide/android-interop.sh[tag=android-interop-bash-001,indent=0]
 ----
 
 The goal copies the module's `src/main` (the `app` module unless
@@ -32,8 +32,7 @@ cover. After that, run and build as usual:
 
 [source,bash]
 ----
-mvn cn1:run
-mvn cn1:build -Dcodename1.platform=ios
+include::../demos/common/src/main/snippets/developer-guide/android-interop.sh[tag=android-interop-bash-002,indent=0]
 ----
 
 You can also copy the files by hand. The directory mirrors an Android Studio
@@ -91,11 +90,7 @@ write the class yourself; it needs one line:
 
 [source,java]
 ----
-public class MyApp extends com.codename1.androidcompat.runtime.AndroidLifecycle {
-    public MyApp() {
-        super(new com.codename1.generated.android.AndroidAppImpl());
-    }
-}
+include::../demos/android-interop/src/main/java/com/codenameone/developerguide/androidinterop/MyApp.java[tag=androidInteropEntryPoint,indent=0]
 ----
 
 === Resources
@@ -372,8 +367,7 @@ Codename One component.
 
 [source,java]
 ----
-android.view.View chart = new MyChartView(androidContext);
-form.add(BorderLayout.CENTER, chart.getPeer());
+include::../demos/android-interop/src/main/java/com/codenameone/developerguide/androidinterop/EmbedAndroidView.java[tag=androidInteropEmbedView,indent=0]
 ----
 
 Code in the application can also call Codename One APIs directly, which is how
@@ -385,14 +379,7 @@ it, and start activities from its context:
 
 [source,java]
 ----
-AndroidRuntime rt = AndroidRuntime.getInstance();
-if (rt == null) {
-    rt = AndroidRuntime.install(new com.codename1.generated.android.AndroidAppImpl());
-}
-Context app = rt.getApplication();
-Intent intent = new Intent(app, SettingsActivity.class);
-intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-app.startActivity(intent);
+include::../demos/android-interop/src/main/java/com/codenameone/developerguide/androidinterop/HostAndroidActivity.java[tag=androidInteropHostActivity,indent=0]
 ----
 
 The form that was showing when the first activity started is remembered.

@@ -177,8 +177,11 @@
                                 <!-- Ahead of javac, which runs in the compile phase: Java may
                                      refer to Kotlin classes (the generated Android factory names
                                      every activity), and javac finds Kotlin's output in
-                                     target/classes. Kotlin reads the Java sources itself. -->
-                                <phase>process-sources</phase>
+                                     target/classes. Kotlin reads the Java sources itself.
+                                     process-resources rather than process-sources: the source
+                                     generators (generate-gui-sources) run in process-sources,
+                                     and Kotlin must see what they generate. -->
+                                <phase>process-resources</phase>
                                 <goals>
                                     <goal>compile</goal>
                                 </goals>

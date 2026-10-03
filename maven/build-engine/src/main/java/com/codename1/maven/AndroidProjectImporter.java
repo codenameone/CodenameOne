@@ -97,8 +97,8 @@ public final class AndroidProjectImporter {
     }
 
     /// Finds the module's `src/main`: `source` itself, `source/src/main`, or
-    /// `source/<module>/src/main`.
-    static File mainDir(File source, String module) {
+    /// `source/<module>/src/main`; null when none has a manifest.
+    public static File mainDir(File source, String module) {
         if (new File(source, "AndroidManifest.xml").isFile()) {
             return source;
         }

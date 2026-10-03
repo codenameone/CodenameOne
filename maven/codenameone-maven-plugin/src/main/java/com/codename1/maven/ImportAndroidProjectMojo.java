@@ -54,6 +54,7 @@ public class ImportAndroidProjectMojo extends AbstractCN1Mojo {
         if (common == null) {
             throw new MojoExecutionException("Run this from a Codename One application project");
         }
+        wireAndroidCompat(common);
         String pkg = properties == null ? null : properties.getProperty("codename1.packageName");
         String main = properties == null ? null : properties.getProperty("codename1.mainName");
         AndroidProjectImporter.Result r;
@@ -73,5 +74,49 @@ public class ImportAndroidProjectMojo extends AbstractCN1Mojo {
             getLog().info("The Android applicationId is " + r.applicationId + "; codename1.packageName is " + pkg
                     + ". Change codename1.packageName to keep the same store identity.");
         }
+    }
+
+    /// A project generated before Android compatibility existed has none of
+    /// its wiring, and the imported sources would not build. Adds it to the
+    /// common pom, or stops before copying anything, naming what to add.
+    private void wireAndroidCompat(File common) throws MojoExecutionException, MojoFailureException {
+        File pomFile = new File(common, "pom.xml");
+        String pom;
+        try {
+            pom = new String(java.nio.file.Files.readAllBytes(pomFile.toPath()), "UTF-8");
+        } catch (java.io.IOException e) {
+            throw new MojoExecutionException("Cannot read " + pomFile, e);
+        }
+        File main = AndroidProjectImporter.mainDir(source, module);
+        AndroidPomUpdater u = new AndroidPomUpdater(pom, main != null && hasKotlin(main));
+        if (!u.manual.isEmpty()) {
+            StringBuilder sb = new StringBuilder("Nothing was imported: " + pomFile
+                    + " needs Android compatibility wired in by hand. Add:\n");
+            for (String m : u.manual) {
+                sb.append("\n- ").append(m);
+            }
+            throw new MojoFailureException(sb.toString());
+        }
+        if (u.changed) {
+            try {
+                java.nio.file.Files.write(pomFile.toPath(), u.pom.getBytes("UTF-8"));
+            } catch (java.io.IOException e) {
+                throw new MojoExecutionException("Cannot write " + pomFile, e);
+            }
+            getLog().info("Added Android compatibility to " + pomFile);
+        }
+    }
+
+    private static boolean hasKotlin(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return false;
+        }
+        for (File f : files) {
+            if (f.isDirectory() ? hasKotlin(f) : f.getName().endsWith(".kt")) {
+                return true;
+            }
+        }
+        return false;
     }
 }

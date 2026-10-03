@@ -82,9 +82,12 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return FONT;
     }
 
+    /// What [#isDarkMode()] answers; tests flip it to change the system theme.
+    public static boolean darkMode;
+
     @Override
     public Boolean isDarkMode() {
-        return Boolean.FALSE;
+        return Boolean.valueOf(darkMode);
     }
 
     @Override

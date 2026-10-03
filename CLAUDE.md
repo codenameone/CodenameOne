@@ -731,7 +731,8 @@ Traps that have already cost a fix:
   `java.io.File`/`BufferedReader`; every other CLDC error is real.
 - **Kotlin compiles before javac and is relocated after it.** Java (and the
   generated factory) refers to Kotlin classes, so the archetype's Kotlin
-  profile compiles in `process-sources`; javac must then see Kotlin's classes
+  profile compiles in `process-resources` (after the `process-sources`
+  generators, before javac); javac must then see Kotlin's classes
   *unrelocated*. Maven restores them from `target/kotlin-ic` in
   `compile-android-res`, and copies that tree back only when newer
   (`copyKotlinIncrementalCompileOutputToOutputDir`); Gradle relocates

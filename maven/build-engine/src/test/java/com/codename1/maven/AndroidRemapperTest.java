@@ -501,4 +501,27 @@ public class AndroidRemapperTest {
         assertEquals("onCreate", d2Out.get(2));
         assertEquals("(Lcom/codename1/androidcompat/android/os/Bundle;)V", d2Out.get(3));
     }
+
+    /// The runtime is copied out of its jar into the classes directory; an
+    /// entry naming a path outside it ("Zip Slip") must stop the build, not
+    /// write there.
+    @Test
+    public void anEntryOutsideTheClassesDirectoryIsRefused() throws Exception {
+        File classes = tmp.newFolder("slip-classes");
+        File jar = tmp.newFile("codenameone-android-compat-slip.jar");
+        ZipOutputStream z = new ZipOutputStream(new FileOutputStream(jar));
+        z.putNextEntry(new ZipEntry("../evil.txt"));
+        z.write(new byte[] {1});
+        z.closeEntry();
+        z.close();
+        File evil = new File(classes.getParentFile(), "evil.txt");
+        try {
+            new AndroidRemapper(classes, jar, tmp.newFile("slip-onclick.txt"), LOG).run();
+            org.junit.Assert.fail("an entry outside the classes directory was extracted");
+        } catch (com.codename1.builders.BuildException expected) {
+            String why = expected.getMessage() + (expected.getCause() == null ? "" : " " + expected.getCause().getMessage());
+            assertTrue(why, why.contains("resolves outside"));
+        }
+        assertFalse(evil.exists());
+    }
 }

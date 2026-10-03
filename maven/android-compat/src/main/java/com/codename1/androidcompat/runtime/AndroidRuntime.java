@@ -214,6 +214,32 @@ public final class AndroidRuntime {
                 || Intent.ACTION_SEND.equals(action) || Intent.ACTION_CHOOSER.equals(action);
     }
 
+    /// The package Android reports for an implicit intent the runtime hands
+    /// to the platform (a URL to the browser, a number to the dialer).
+    public static final String PLATFORM_HANDLER_PACKAGE = "android";
+
+    /// What `Intent.resolveActivity` answers: the activity that would run, or
+    /// null when [#canResolve(Intent)] says nothing can. An implicit intent
+    /// has no component of its own, and answering null for it made the usual
+    /// `resolveActivity(pm) != null` guard drop every browser, dialer, mail
+    /// and share intent.
+    public android.content.ComponentName resolveComponent(Intent intent) {
+        if (!canResolve(intent)) {
+            return null;
+        }
+        if (intent.getComponent() != null) {
+            return intent.getComponent();
+        }
+        if (intent.getComponentClass() != null) {
+            return new android.content.ComponentName(app.getPackageName(), intent.getComponentClass().getName());
+        }
+        AndroidApp.ActivityInfo info = app.activityForAction(intent.getAction());
+        if (info != null) {
+            return new android.content.ComponentName(app.getPackageName(), info.className);
+        }
+        return new android.content.ComponentName(PLATFORM_HANDLER_PACKAGE, intent.getAction());
+    }
+
     /// Hands an implicit intent to the platform: URLs to the browser (or the
     /// app registered for them), phone numbers to the dialer, mail and text
     /// to the share sheet. Returns false when nothing can take it.
@@ -256,10 +282,38 @@ public final class AndroidRuntime {
         if (Intent.ACTION_SEND.equals(action)) {
             String text = intent.getStringExtra(Intent.EXTRA_TEXT);
             String subject = intent.getStringExtra(Intent.EXTRA_SUBJECT);
-            Display.getInstance().share(text == null ? (subject == null ? "" : subject) : text, null, intent.getType());
+            String message = text == null ? (subject == null ? "" : subject) : text;
+            Object stream = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (stream instanceof Uri) {
+                // The file or image being shared. Only file URIs name a file
+                // here (there is no content provider); anything else cannot be
+                // shared, and saying so beats a share sheet without the file.
+                String path = sharedFilePath((Uri) stream);
+                if (path == null) {
+                    return false;
+                }
+                String type = intent.getType();
+                if (type != null && type.startsWith("image/")) {
+                    Display.getInstance().share(message, path, type);
+                } else {
+                    Display.getInstance().share(path, null, type);
+                }
+                return true;
+            }
+            Display.getInstance().share(message, null, intent.getType());
             return true;
         }
         return false;
+    }
+
+    /// The file system path of a shared stream, or null when it does not name
+    /// a file the runtime can open.
+    static String sharedFilePath(Uri uri) {
+        String s = uri.toString();
+        if ("file".equals(uri.getScheme()) || s.startsWith("/")) {
+            return uri.getPath();
+        }
+        return null;
     }
 
     private boolean sendMail(Uri data, Intent intent) {

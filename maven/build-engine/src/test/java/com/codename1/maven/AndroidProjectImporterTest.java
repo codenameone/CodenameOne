@@ -25,6 +25,7 @@ package com.codename1.maven;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -85,5 +86,39 @@ public class AndroidProjectImporterTest {
                 "android {\n    namespace 'com.example.where'\n}\n".getBytes("UTF-8"));
         assertEquals("com.example.where", AndroidResourceRunner.gradleNamespace(main));
         assertNull(AndroidResourceRunner.gradleNamespace(new java.io.File(module, "src/main/android")));
+    }
+
+    /// The application writes its own main class after a build generated one:
+    /// the generated copy in the persistent generated-sources tree must go,
+    /// even on a run the unchanged Android inputs would otherwise skip, or
+    /// javac sees two definitions until a clean build.
+    @Test
+    public void ownMainClassRetiresTheGeneratedOne() throws Exception {
+        java.io.File root = java.nio.file.Files.createTempDirectory("mainclass").toFile();
+        java.io.File android = new java.io.File(root, "src/main/android");
+        assertTrue(android.mkdirs());
+        java.nio.file.Files.write(new java.io.File(android, "AndroidManifest.xml").toPath(),
+                ("<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"com.example.app\">"
+                        + "<application/></manifest>").getBytes("UTF-8"));
+        java.io.File jar = new java.io.File(root, "compat.jar");
+        java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(jar));
+        zip.putNextEntry(new java.util.zip.ZipEntry(com.codename1.android.rescompiler.ResourceCompiler.FRAMEWORK_SYMBOLS_RESOURCE));
+        zip.closeEntry();
+        zip.close();
+        java.io.File javaSrc = new java.io.File(root, "src/main/java");
+        java.io.File javaOut = new java.io.File(root, "target/generated-sources/android");
+        java.util.List<java.io.File> roots = java.util.Arrays.asList(javaSrc, javaOut);
+        AndroidResourceRunner runner = new AndroidResourceRunner(android, javaOut, new java.io.File(root, "target/classes"),
+                new java.io.File(root, "target"), jar, null, "com.example", "MyApp", roots,
+                new com.codename1.build.SystemStreamLog());
+        assertTrue(runner.run());
+        java.io.File generated = new java.io.File(javaOut, "com/example/MyApp.java");
+        assertTrue("the first build generates the entry point", generated.isFile());
+
+        java.io.File own = new java.io.File(javaSrc, "com/example/MyApp.java");
+        assertTrue(own.getParentFile().mkdirs());
+        java.nio.file.Files.write(own.toPath(), "package com.example; public class MyApp {}".getBytes("UTF-8"));
+        assertTrue(runner.run());
+        assertFalse("the generated entry point stayed beside the application's own", generated.isFile());
     }
 }

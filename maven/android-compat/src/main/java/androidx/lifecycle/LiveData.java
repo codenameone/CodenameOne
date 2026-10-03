@@ -41,7 +41,6 @@ public abstract class LiveData<T> {
     private int mActiveCount;
     private boolean mChangingActiveState;
     private Object mData;
-    private Object mPendingData = NOT_SET;
     private int mVersion;
     private boolean mDispatchingValue;
     private boolean mDispatchInvalidated;
@@ -278,21 +277,20 @@ public abstract class LiveData<T> {
         dispatchingValue(null);
     }
 
-    /// Sets the value from any thread: it is set on the UI thread later, and
-    /// only the last of several posts made before then is delivered.
-    protected void postValue(T value) {
-        boolean postTask = mPendingData == NOT_SET;
-        mPendingData = value;
-        if (!postTask) {
-            return;
-        }
+    /// Sets the value from any thread: it is set on the UI thread later.
+    ///
+    /// The posting thread hands the value over and touches no field of this
+    /// object; every value is then set on the UI thread, in order. AndroidX
+    /// instead keeps one pending value behind a lock and drops all but the
+    /// last post made before the UI thread runs. Here each one is delivered:
+    /// observers end on the same value, possibly passing through the earlier
+    /// ones, and no state is shared between threads -- the pending field that
+    /// coalesced posts could be read and reset by two threads at once.
+    protected void postValue(final T value) {
         MainThread.post(new Runnable() {
             @Override
-            @SuppressWarnings("unchecked")
             public void run() {
-                Object v = mPendingData;
-                mPendingData = NOT_SET;
-                setValue((T) v);
+                setValue(value);
             }
         });
     }

@@ -333,6 +333,17 @@ public final class AndroidRemapper {
         return p.substring(base.length() + 1).replace(File.separatorChar, '/');
     }
 
+    /// `dest` when it lies inside the classes directory. An entry name with
+    /// `..` (or an absolute one) would write elsewhere; the runtime jar never
+    /// has one, so meeting one means the artifact is not what it should be.
+    private File inside(File dest, String entry) throws IOException {
+        String root = classesDir.getCanonicalPath() + File.separator;
+        if (!dest.getCanonicalPath().startsWith(root)) {
+            throw new IOException(compatJar + " entry " + entry + " resolves outside " + classesDir);
+        }
+        return dest;
+    }
+
     private int extractRuntime() throws IOException {
         int count = 0;
         ZipFile zip = new ZipFile(compatJar);
@@ -347,7 +358,7 @@ public final class AndroidRemapper {
                 byte[] data = read(zip.getInputStream(e));
                 if (name.endsWith(".class")) {
                     String cls = name.substring(0, name.length() - ".class".length());
-                    File dest = new File(classesDir, map(cls) + ".class");
+                    File dest = inside(new File(classesDir, map(cls) + ".class"), name);
                     byte[] remapped = remap(data);
                     if (!dest.isFile() || dest.length() != remapped.length
                             || !Arrays.equals(Files.readAllBytes(dest.toPath()), remapped)) {
@@ -356,7 +367,7 @@ public final class AndroidRemapper {
                     }
                     count++;
                 } else {
-                    File dest = new File(classesDir, name);
+                    File dest = inside(new File(classesDir, name), name);
                     if (!dest.isFile() || dest.length() != data.length) {
                         dest.getParentFile().mkdirs();
                         write(dest, data);
