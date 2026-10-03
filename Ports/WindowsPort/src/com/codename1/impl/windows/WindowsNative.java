@@ -700,6 +700,8 @@ public final class WindowsNative {
 
     public static native String[] httpHeaderFieldNames(long connection);
 
+    /// Bytes read into `buffer`, -1 at the end of the body, or -2 when the read
+    /// failed; [#httpFailure(long)] then says why.
     public static native int httpReadBody(long connection, byte[] buffer, int offset, int length);
 
     public static native int httpWriteBody(long connection, byte[] buffer, int offset, int length);

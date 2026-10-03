@@ -101,7 +101,8 @@ public enum HttpStatus implements HttpStatusCode {
 
     @Override
     public boolean isError() {
-        return code >= 400;
+        // 4xx or 5xx only, as Spring's HttpStatusCode: a 600 is not an error.
+        return is4xxClientError() || is5xxServerError();
     }
 
     /// The constant for `code`, or null when there is none.
@@ -163,7 +164,7 @@ public enum HttpStatus implements HttpStatusCode {
 
             @Override
             public boolean isError() {
-                return code >= 400;
+                return is4xxClientError() || is5xxServerError();
             }
 
             @Override

@@ -281,6 +281,18 @@ class HttpBodiesTest {
         many.setBody(null, ("--x\r\n" + headers + "\r\nhi\r\n--x--").getBytes("UTF-8"));
         assertThrows(IllegalArgumentException.class, many::getParts,
                 "the part header block limit is per line, not for the block");
+        HttpServer.Request empty = new HttpServer.Request("POST", "/x", "HTTP/1.1",
+                java.util.Collections.singletonMap("content-type", "multipart/form-data; boundary=x"),
+                null);
+        assertThrows(IllegalArgumentException.class, empty::getParts,
+                "a multipart body with no bytes, not even its closing delimiter, read as no parts");
+        HttpServer.Request huge = new HttpServer.Request("POST", "/x", "HTTP/1.1",
+                java.util.Collections.singletonMap("content-type", "text/plain"), null);
+        byte[] tooLarge = new byte[8 * 1024 * 1024 + 1];
+        IOException refused = assertThrows(IOException.class,
+                () -> HttpServer.bodyContent(huge, tooLarge, 0, tooLarge.length),
+                "a body past the cap was accepted outside the listener");
+        assertEquals(413, HttpServer.refusalStatus(refused));
     }
 
     @Test

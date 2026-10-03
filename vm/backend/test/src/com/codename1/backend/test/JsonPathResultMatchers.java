@@ -76,12 +76,14 @@ public final class JsonPathResultMatchers {
         };
     }
 
+    /// An empty value is there: an empty string, list or map, or JSON `null`. An
+    /// absent path fails, as [#isNotEmpty] does -- it is not an empty value.
     public ResultMatcher isEmpty() {
         return new ResultMatcher() {
             @Override
             public void match(MvcResult result) throws Exception {
                 Object actual = read(result);
-                Matchers.check(empty(actual), "Expected an empty value at JSON path \""
+                Matchers.check(!JsonPath.isMissing(actual) && empty(actual), "Expected an empty value at JSON path \""
                         + expression + "\" but found: " + actual);
             }
         };
@@ -136,7 +138,7 @@ public final class JsonPathResultMatchers {
     }
 
     private static boolean empty(Object value) {
-        if (value == null || JsonPath.isMissing(value)) {
+        if (value == null) {
             return true;
         }
         if (value instanceof String) {

@@ -48,6 +48,17 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void anExceptionUnwindingThroughAFinallyReachesTheCaller(CompilerHelper.CompilerConfig config) throws Exception {
+        // The catch-all handler's case label used to be stripped as dead, so the
+        // throw vanished at the finally and the method returned normally.
+        WorkerRunResult result = translateAndRunFixture(config, "JsFinallyRethrowApp.java", "JsFinallyRethrowApp");
+        assertEquals(31, result.result, "an exception through a finally or synchronized block was lost: "
+                + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesArrayCovarianceInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsArrayCovarianceApp.java", "JsArrayCovarianceApp");
 

@@ -266,7 +266,10 @@ final class BackendTestGenerator {
             String prefix = owner.getInternalName() + "$";
             for (String name : new TreeSet<String>(testClasses)) {
                 AnnotatedClass nested = ctx.lookup(name);
-                if (name.startsWith(prefix) && nested != null
+                // Directly nested only, as Spring: OuterTest$Nested$Config is the
+                // nested test's configuration, not the outer test's.
+                if (name.startsWith(prefix) && name.indexOf('$', prefix.length()) < 0
+                        && nested != null
                         && nested.getClassAnnotation(TEST_CONFIGURATION) != null
                         && !spec.configurations.contains(name)) {
                     spec.configurations.add(name);

@@ -123,6 +123,19 @@ class ProbeApiTest {
     }
 
     @Test
+    void anAbsentJsonPathIsNotEmpty() throws Exception {
+        boolean passed;
+        try {
+            mvc.perform(get("/api/json/map")).andExpect(jsonPath("$.absent").isEmpty());
+            passed = true;
+        } catch (AssertionError expected) {
+            passed = false;
+        }
+        assertTrue(!passed, "isEmpty() passed for a path that is not there");
+        mvc.perform(get("/api/json/map")).andExpect(jsonPath("$.nothing").isEmpty());
+    }
+
+    @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.
         assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});

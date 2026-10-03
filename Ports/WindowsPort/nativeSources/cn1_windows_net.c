@@ -587,7 +587,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_httpReadBody___long_byte_1ARRA
     JAVA_ARRAY_BYTE* data;
     DWORD bytesRead = 0;
     if (!cn1NetEnsureSent(conn)) {
-        return -1;
+        return -2;
     }
     if (__cn1Arg2 == JAVA_NULL || __cn1Arg4 <= 0) {
         return 0;
@@ -595,8 +595,13 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_httpReadBody___long_byte_1ARRA
     data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(__cn1Arg2);
     if (!WinHttpReadData(conn->request, (LPVOID)(data + __cn1Arg3),
                          (DWORD)__cn1Arg4, &bytesRead)) {
+        /* -2, not the -1 of end of stream: a body that stalls past the receive
+         * timeout fails here, after the response code was already read, and
+         * answering EOF handed the caller a silently truncated body. The error
+         * is kept for httpFailure, which the stream throws with. */
+        conn->failure = GetLastError();
         cn1WindowsLog("httpReadBody: WinHttpReadData failed");
-        return -1;
+        return -2;
     }
     if (bytesRead == 0) {
         return -1; /* EOF */

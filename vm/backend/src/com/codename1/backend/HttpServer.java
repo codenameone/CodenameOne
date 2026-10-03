@@ -1020,6 +1020,12 @@ public final class HttpServer {
                             + "valid boundary");
                 }
                 byte[] data = boundary == null ? null : getBodyBytes();
+                if (boundary != null && (data == null || data.length == 0)) {
+                    // Even a form with no fields carries its closing delimiter, so
+                    // a multipart body with no bytes at all is malformed -- not a
+                    // request with no parts for an optional binding to run on.
+                    throw new IllegalArgumentException("the multipart/form-data body is empty");
+                }
                 parts = data == null ? new ArrayList() : Multipart.parse(data, boundary);
             }
             return parts;
@@ -7817,6 +7823,12 @@ public final class HttpServer {
     /// body for the same request.
     static Object[] bodyContent(Request request, byte[] data, int offset, int length)
             throws ProtocolException {
+        // The listener refuses an oversized body from its Content-Length before
+        // reading it; checked here as well so every other way in -- MockMvc's
+        // in-process dispatch -- refuses what production refuses.
+        if (length > MAX_BODY_BYTES) {
+            throw new ProtocolException(413, "request body too large");
+        }
         String coding = request.getHeader("Content-Encoding");
         if (coding != null) {
             coding = coding.trim();

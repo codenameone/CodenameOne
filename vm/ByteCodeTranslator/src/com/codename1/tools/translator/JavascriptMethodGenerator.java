@@ -2571,13 +2571,19 @@ final class JavascriptMethodGenerator {
         liveTargets.add("0");
         // Also scan ``__cn1TryCatch`` table from the prefix for
         // {s:N,e:M,h:K,...} so handler / range pcs aren't dropped.
+        // The handler is followed by ",t:" for a typed catch and by "}" for a
+        // catch-all -- a finally, or a synchronized block's release. Matching
+        // only the "," form stripped every catch-all handler's case label, so an
+        // exception unwinding through a finally was dispatched to a pc with no
+        // case, fell to "default: return" and vanished: the method returned
+        // normally and nothing above it saw the throw.
         java.util.regex.Matcher tryRangesPrefix = java.util.regex.Pattern.compile(
-                "\\{s:(\\d+),e:(\\d+),h:(\\d+),").matcher(prefix);
+                "\\{s:(\\d+),e:(\\d+),h:(\\d+)[,}]").matcher(prefix);
         while (tryRangesPrefix.find()) {
             liveTargets.add(tryRangesPrefix.group(3));
         }
         java.util.regex.Matcher tryRanges = java.util.regex.Pattern.compile(
-                "\\{s:(\\d+),e:(\\d+),h:(\\d+),").matcher(region);
+                "\\{s:(\\d+),e:(\\d+),h:(\\d+)[,}]").matcher(region);
         while (tryRanges.find()) {
             liveTargets.add(tryRanges.group(3));
         }

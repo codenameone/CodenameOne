@@ -236,6 +236,30 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void onlyADirectlyNestedTestConfigurationAppliesToItsTest() throws Exception {
+        // Helper.Fakes is nested one level deeper; it must not join OuterTest's
+        // context, where its second Clock would make the injection ambiguous.
+        File classes = mainBuild(application());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.OuterTest", "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "@BackendTest\n"
+                + "public class OuterTest {\n"
+                + "    @Autowired Clock clock;\n"
+                + "    static class Helper {\n"
+                + "        @TestConfiguration\n"
+                + "        static class Fakes {\n"
+                + "            @Bean public Clock other() { return null; }\n"
+                + "        }\n"
+                + "    }\n"
+                + "}\n");
+        File tests = testBuild(classes, t);
+        assertTrue("the outer test's context was not generated",
+                new File(tests, "com/example/OuterTestCn1TestContext.class").isFile());
+    }
+
+    @Test
     public void anAmbiguousInjectionIsABuildError() throws Exception {
         File classes = mainBuild(application());
         Map<String, String> t = new LinkedHashMap<String, String>();
