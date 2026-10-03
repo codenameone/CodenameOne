@@ -272,4 +272,27 @@ class SimpleDateFormatTest extends UITestBase {
             java.util.TimeZone.setDefault(saved);
         }
     }
+
+    @Test
+    void equalityCountsTheConfiguredZone() {
+        SimpleDateFormat utc = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        utc.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        SimpleDateFormat tokyo = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        tokyo.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Tokyo"));
+        assertNotEquals(utc, tokyo, "they format one instant differently, so they are not equal");
+        SimpleDateFormat utc2 = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        utc2.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        assertEquals(utc, utc2);
+        assertEquals(utc.hashCode(), utc2.hashCode());
+        java.util.TimeZone saved = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Tokyo"));
+        try {
+            SimpleDateFormat device = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            assertEquals(tokyo, device, "the device zone is the zone a formatter without one uses");
+            assertEquals(tokyo.hashCode(), device.hashCode());
+            assertNotEquals(utc, device);
+        } finally {
+            java.util.TimeZone.setDefault(saved);
+        }
+    }
 }

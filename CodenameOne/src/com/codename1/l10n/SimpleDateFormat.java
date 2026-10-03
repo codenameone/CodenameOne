@@ -222,7 +222,10 @@ public class SimpleDateFormat extends DateFormat {
         return super.equals(o) &&
                 (dateFormatSymbols == null ? that.dateFormatSymbols == null : dateFormatSymbols.equals(that.dateFormatSymbols)) &&
                 (pattern == null ? that.pattern == null : pattern.equals(that.pattern)) &&
-                (patternTokens == null ? that.patternTokens == null : patternTokens.equals(that.patternTokens));
+                (patternTokens == null ? that.patternTokens == null : patternTokens.equals(that.patternTokens)) &&
+                // The zone decides the fields an instant formats to, so it is part of the value.
+                // Compared as the effective zone: no zone means the device's.
+                getTimeZone().getID().equals(that.getTimeZone().getID());
     }
 
     /// {@inheritDoc}
@@ -230,6 +233,7 @@ public class SimpleDateFormat extends DateFormat {
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (pattern != null ? pattern.hashCode() : 0);
+        result = 31 * result + getTimeZone().getID().hashCode();
         return result;
     }
 
