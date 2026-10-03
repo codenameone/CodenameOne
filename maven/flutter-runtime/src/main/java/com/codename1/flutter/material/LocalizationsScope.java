@@ -40,6 +40,51 @@ public class LocalizationsScope extends SingleChildWidget implements InheritedVa
 
     private List<Object> resources;
     private final dart.runtime.Funcs.Func0<List<Object>> supplier;
+    private com.codename1.flutter.Locale locale;
+    private Object delegates;
+
+    /**
+     * What the resources were loaded from: the app's explicit locale and its delegates.
+     * When a rebuild changes either, the readers below rebuild (see
+     * {@link LocalizationsScopeElement}).
+     */
+    public void reloadKey(com.codename1.flutter.Locale locale, Object delegates) {
+        this.locale = locale;
+        this.delegates = delegates;
+    }
+
+    /**
+     * Whether {@code old} published the same resources -- Flutter's test in
+     * Localizations.didUpdateWidget: the same locale, and as many delegates of the same
+     * types. (A delegate list is usually a new list on every build, so it is not
+     * compared by identity.)
+     */
+    boolean sameResourcesAs(LocalizationsScope old) {
+        if (old.locale == null ? locale != null : !old.locale.equals(locale)) {
+            return false;
+        }
+        if (old.delegates == delegates) {
+            return true;
+        }
+        if (!(old.delegates instanceof Iterable) || !(delegates instanceof Iterable)) {
+            return false;
+        }
+        java.util.Iterator<?> a = ((Iterable<?>) old.delegates).iterator();
+        java.util.Iterator<?> b = ((Iterable<?>) delegates).iterator();
+        while (a.hasNext() && b.hasNext()) {
+            Object x = a.next();
+            Object y = b.next();
+            if (x == null ? y != null : y == null || x.getClass() != y.getClass()) {
+                return false;
+            }
+        }
+        return !a.hasNext() && !b.hasNext();
+    }
+
+    @Override
+    public com.codename1.flutter.Element createElement() {
+        return new LocalizationsScopeElement(this);
+    }
 
     public LocalizationsScope(List<Object> resources) {
         this.resources = resources;

@@ -50,7 +50,10 @@ public final class Localizations {
         }
         T value;
         try {
-            value = context.read(witness);
+            // A dependency, not a one-shot read: when the app's locale (or delegates)
+            // change, the scope rebuilds every reader, as Flutter's Localizations.of
+            // does. A page kept across app rebuilds otherwise showed the old strings.
+            value = context.watch(witness);
         } catch (Throwable t) {
             report("Localizations.of(" + witness.getName() + ") threw: " + t);
             return null;

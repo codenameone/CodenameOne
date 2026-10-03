@@ -432,6 +432,7 @@ public class MaterialApp extends StatelessWidget
                 return loadLocalizations();
             }
         });
+        scope.reloadKey(locale, localizationsDelegates);
         scope.child(content);
         return scope;
     }
