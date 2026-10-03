@@ -138,6 +138,16 @@ public class InheritedElement extends StatelessElement {
         return false;
     }
 
+    /**
+     * Rebuilds the readers although the widget itself was not replaced: what it stands
+     * for changed underneath it. MaterialApp's display-metrics scope carries no data of
+     * its own (its readers ask the Display), so a window resize or rotation is announced
+     * through this rather than through an update.
+     */
+    public void dependenciesChanged() {
+        notifyDependents();
+    }
+
     private void notifyDependents() {
         if (dependents.isEmpty()) {
             return;

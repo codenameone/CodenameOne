@@ -173,6 +173,20 @@ public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
                 removeLeft, removeTop, removeRight, removeBottom), child);
     }
 
+    /**
+     * The app-wide scope MaterialApp installs. It carries NO data -- {@link #of} reads
+     * the Display beneath it, because the first screen is built before the Form is
+     * showing and a snapshot taken then has no safe-area insets. What it adds is the
+     * dependency: every widget that asked {@code of(context)} is registered on it, so a
+     * real change of display size (a rotation, a desktop window resize) can rebuild them.
+     * Without it a layout that chose a Row or a Column by width kept its first choice.
+     */
+    public static MediaQuery displayScope(Widget child) {
+        MediaQuery q = new MediaQuery();
+        q.child(child);
+        return q;
+    }
+
     /** A subtree that sees {@code data} instead of whatever is ambient. */
     public static MediaQuery scope(MediaQueryData data, Widget child) {
         MediaQuery q = new MediaQuery();

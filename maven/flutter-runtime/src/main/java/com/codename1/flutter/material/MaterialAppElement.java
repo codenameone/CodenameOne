@@ -86,15 +86,78 @@ public class MaterialAppElement extends StatelessElement {
         super.mount(parent, slot);
     }
 
-    // No size-changed listener here, deliberately. One was added to keep a
-    // root MediaQuery snapshot honest across a window resize; that snapshot
-    // turned out to be wrong for a different reason and was removed, leaving a
-    // listener that rebuilt the ENTIRE application every time the Form
-    // reported a size -- which a desktop window does once, just after it is
-    // shown. Measured on the Mac build that was the whole first screen built
-    // twice: 2099 elements and 751 components where the app has 1062 and 376.
-    // MediaQuery.of resolves against the Display at the moment it is asked, so
-    // there is nothing here that a resize can invalidate.
+    // A size change rebuilds the widgets that READ the display metrics, and only
+    // when the size really changed. MediaQuery.of resolves against the Display when
+    // asked, so a read is never stale -- but a widget that chose a Row or a Column by
+    // width is not asked again unless something rebuilds it, and after a rotation or
+    // a desktop resize it kept its first choice. An earlier listener here rebuilt the
+    // ENTIRE application on every size event, including the one a desktop window
+    // reports just after it is shown: measured on the Mac build, the whole first
+    // screen built twice (2099 elements and 751 components where the app has 1062
+    // and 376). So the size the tree was built for is remembered and an event that
+    // repeats it is ignored, and what is rebuilt is the readers of the display scope
+    // (MediaQuery.displayScope), not the app.
+    private int displayWidth = -1;
+    private int displayHeight = -1;
+    private com.codename1.ui.Form listenedForm;
+    private com.codename1.ui.events.ActionListener sizeListener;
+
+    @Override
+    protected void firstBuild() {
+        int[] s = currentDisplaySize();
+        displayWidth = s[0];
+        displayHeight = s[1];
+        super.firstBuild();
+        Form f = host() == null ? null : host().form();
+        if (f != null) {
+            sizeListener = new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    int[] now = currentDisplaySize();
+                    displaySizeChanged(now[0], now[1]);
+                }
+            };
+            listenedForm = f;
+            f.addSizeChangedListener(sizeListener);
+        }
+    }
+
+    @Override
+    public void unmount() {
+        if (listenedForm != null) {
+            listenedForm.removeSizeChangedListener(sizeListener);
+            listenedForm = null;
+            sizeListener = null;
+        }
+        super.unmount();
+    }
+
+    /**
+     * The display is now {@code width x height}. Returns whether that is a change from
+     * the size the tree was built for, in which case every widget that read
+     * {@code MediaQuery.of} below this app rebuilds.
+     */
+    public boolean displaySizeChanged(int width, int height) {
+        if (width == displayWidth && height == displayHeight) {
+            return false;
+        }
+        displayWidth = width;
+        displayHeight = height;
+        Element scope = child();
+        if (scope instanceof com.codename1.flutter.widgets.InheritedElement
+                && scope.widget() instanceof com.codename1.flutter.MediaQuery) {
+            ((com.codename1.flutter.widgets.InheritedElement) scope).dependenciesChanged();
+        }
+        return true;
+    }
+
+    private static int[] currentDisplaySize() {
+        if (!com.codename1.ui.Display.isInitialized()) {
+            return new int[] {0, 0};
+        }
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        return new int[] {d.getDisplayWidth(), d.getDisplayHeight()};
+    }
 
     @Override
     public void update(Widget newWidget) {

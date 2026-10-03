@@ -357,8 +357,10 @@ public class MaterialApp extends StatelessWidget
         // widget calls Theme.of on every build, so the intended hash lookup was
         // never actually taken, and the diagnostic budget for genuinely missing
         // providers was spent on this one false alarm.
-        return wrapWithTheme(wrapWithLocalizations(
+        Widget app = wrapWithTheme(wrapWithLocalizations(
                 new com.codename1.flutter.navigation.Navigator.RootScope(content, rootApp)));
+        // Outermost, so MaterialAppElement finds it as its child (see displaySizeChanged).
+        return app == null ? null : com.codename1.flutter.MediaQuery.displayScope(app);
     }
 
     /**
@@ -398,13 +400,14 @@ public class MaterialApp extends StatelessWidget
         Theme t = new Theme();
         t.data(data);
         t.child(icons);
-        // No MediaQuery is installed here, deliberately. Flutter's
+        // No MediaQuery DATA is installed, deliberately. Flutter's
         // MediaQuery.fromView is fed by a view whose metrics are already known;
         // ours would have to snapshot the Display during the app's FIRST build,
         // which happens before the Form is showing and therefore before the
         // safe-area insets exist. Every descendant then inherited a zero top
         // inset and the whole app rode 44dp too high. MediaQuery.of resolves
-        // against the Display instead, and MediaQueryData caches that.
+        // against the Display instead; build() wraps the app in a data-less
+        // MediaQuery.displayScope only so a resize can rebuild its readers.
         return t;
     }
 
