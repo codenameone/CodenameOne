@@ -15,12 +15,13 @@
     </requiredProperty>
     <requiredProperty key="javaVersion">
       <!-- Sets codename1.arg.java.version (build server) and the maven-compiler
-           source/target. Java 17 is the default (matching start.codenameone.com);
-           it is also required for Flutter support (src/main/flutter), whose
-           transpiler emits Java 17 source. Pass 8 explicitly for legacy
-           projects, or "auto" to pick 17 on a JDK >= 17 and 8 otherwise via
-           archetype-post-generate.groovy. -->
-      <defaultValue>17</defaultValue>
+           source/target. The literal "auto" (default) lets
+           archetype-post-generate.groovy pick 17 when running on a JDK >= 17
+           and 8 otherwise, so a project generated on JDK 8 still compiles there.
+           Flutter support (src/main/flutter) needs 17 (its transpiler emits
+           Java 17 source), and a Flutter project is built on a JDK >= 17, where
+           "auto" already resolves to 17; pass 17 explicitly to force it. -->
+      <defaultValue>auto</defaultValue>
     </requiredProperty>
 
     <requiredProperty key="platformModules">
