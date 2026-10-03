@@ -35,6 +35,8 @@ public class AssertionError extends Error {
         super(detailMessage);
     }
 
+    // A null Object becomes the message "null", not a null message: measured on
+    // JDK 8 and JDK 21, whose constructor is this(String.valueOf(detailMessage)).
     public AssertionError(Object detailMessage) {
         super(String.valueOf(detailMessage));
         if (detailMessage instanceof Throwable) {

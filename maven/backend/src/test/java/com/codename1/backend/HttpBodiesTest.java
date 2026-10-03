@@ -352,6 +352,9 @@ class HttpBodiesTest {
         c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/big").openConnection();
         c.setRequestProperty("Accept-Encoding", "gzip;q=0, identity");
         assertNull(c.getHeaderField("Content-Encoding"), "q=0 refuses gzip");
+        // The identity answer was chosen by Accept-Encoding too, so it varies by it.
+        assertTrue(String.valueOf(c.getHeaderField("Vary")).contains("Accept-Encoding"),
+                "an uncompressed answer a gzip client would get compressed must vary");
 
         c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/text").openConnection();
         c.setRequestProperty("Accept-Encoding", "gzip");
@@ -361,6 +364,30 @@ class HttpBodiesTest {
         assertEquals(null, encodingFor("*;q=1, gzip;q=0"), "gzip was refused explicitly");
         assertEquals("gzip", encodingFor("*;q=0, gzip"), "gzip was accepted explicitly");
         assertEquals("gzip", encodingFor("br, *"), "* accepts gzip when it is not named");
+    }
+
+    @Test
+    @DisplayName("a gzip body of several members is decoded whole, and trailing junk refused")
+    void everyGzipMemberIsDecoded() throws Exception {
+        java.io.ByteArrayOutputStream both = new java.io.ByteArrayOutputStream();
+        both.write(gzip("first ".getBytes("UTF-8")));
+        both.write(gzip("second".getBytes("UTF-8")));
+        byte[] data = both.toByteArray();
+        assertEquals("first second", new String(HttpServer.gunzip(data, 0, data.length), "UTF-8"));
+        java.io.ByteArrayOutputStream junk = new java.io.ByteArrayOutputStream();
+        junk.write(gzip("first".getBytes("UTF-8")));
+        junk.write("not gzip".getBytes("UTF-8"));
+        byte[] bad = junk.toByteArray();
+        assertThrows(IOException.class, () -> HttpServer.gunzip(bad, 0, bad.length),
+                "bytes after the last member were ignored");
+    }
+
+    private static byte[] gzip(byte[] data) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        GZIPOutputStream gz = new GZIPOutputStream(out);
+        gz.write(data);
+        gz.close();
+        return out.toByteArray();
     }
 
     @Test

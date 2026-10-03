@@ -132,11 +132,18 @@ class JavascriptNetworkBindingsTest {
                 + "console.log('SLOW=' + f(slow, null, 2000) + ' TIMEOUT=' + slow.timeout);\n"
                 + "let sent = null;\n"
                 + "const fast = { timeout: 0, send: function(b) { sent = b === undefined ? 'none' : b; } };\n"
-                + "console.log('FAST=' + f(fast, 'payload', 0) + ' SENT=' + sent + ' TIMEOUT=' + fast.timeout);\n");
+                + "console.log('FAST=' + f(fast, 'payload', 0) + ' SENT=' + sent + ' TIMEOUT=' + fast.timeout);\n"
+                + "const quiet = { timeout: 0, status: 0, response: null, send: function() {} };\n"
+                + "console.log('QUIET=' + f(quiet, null, 2000));\n"
+                + "const answered = { timeout: 0, status: 200, response: {}, send: function() {} };\n"
+                + "console.log('ANSWERED=' + f(answered, null, 2000));\n");
         assertTrue(out.contains("SLOW=TimeoutError: took too long TIMEOUT=2000"),
                 "a timeout must be applied and reported: " + out);
         assertTrue(out.contains("FAST=null SENT=payload TIMEOUT=0"),
                 "a request without a timeout is sent as it was: " + out);
+        assertTrue(out.contains("QUIET=NetworkError: no response"),
+                "a request that came back with no response at all must be a failure: " + out);
+        assertTrue(out.contains("ANSWERED=null"), "an answered request is not a failure: " + out);
     }
 
     /// `ArrayBufferInputStream.read(byte[], int, int)` stores signed Java bytes. A raw 0..255

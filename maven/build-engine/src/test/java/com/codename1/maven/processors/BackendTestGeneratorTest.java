@@ -185,6 +185,57 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void malformedInputToGeneratedBindingsIsA400() throws Exception {
+        // A binary body that is not UTF-8 for a @RequestBody String, and a malformed
+        // multipart body behind an optional @RequestParam: the client's errors, so
+        // 400s from the generated guards rather than 500s from the argument list or
+        // a handler run on a body nothing parsed.
+        Map<String, String> app = application();
+        app.put("com.example.Inputs", MAIN + "@RestController public class Inputs {\n"
+                + "    @PostMapping(\"/text\") public String text(@RequestBody String body) {\n"
+                + "        return body;\n    }\n"
+                + "    @PostMapping(\"/form\") public String form(\n"
+                + "            @RequestParam(value = \"a\", required = false) String a) {\n"
+                + "        return \"ran:\" + a;\n    }\n"
+                + "}\n");
+        File classes = mainBuild(app);
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.InputsTest", "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "import static com.codename1.backend.test.MockMvcRequestBuilders.*;\n"
+                + "import static com.codename1.backend.test.MockMvcResultMatchers.*;\n"
+                + "@BackendTest\n"
+                + "public class InputsTest {\n"
+                + "    @Autowired MockMvc mvc;\n"
+                + "    void check() throws Exception {\n"
+                + "        mvc.perform(post(\"/text\").contentType(\"application/octet-stream\")\n"
+                + "                .content(new byte[] {(byte) 0xff, (byte) 0xfe}))\n"
+                + "                .andExpect(status().isBadRequest());\n"
+                + "        mvc.perform(post(\"/text\").contentType(\"application/octet-stream\")\n"
+                + "                .content(\"plain\")).andExpect(content().string(\"plain\"));\n"
+                + "        mvc.perform(post(\"/form\").contentType(\"multipart/form-data\")\n"
+                + "                .content(\"--x\\r\\n\\r\\nhi\\r\\n--x--\"))\n"
+                + "                .andExpect(status().isBadRequest());\n"
+                + "        mvc.perform(post(\"/form\").param(\"a\", \"1\"))\n"
+                + "                .andExpect(content().string(\"ran:1\"));\n"
+                + "    }\n"
+                + "}\n");
+        File tests = testBuild(classes, t);
+        URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
+                classes.toURI().toURL()}, getClass().getClassLoader());
+        try {
+            Object context = loader.loadClass("com.example.InputsTestCn1TestContext").newInstance();
+            TestEnvironment env = TestContexts.acquire((TestContext) context);
+            Object test = loader.loadClass("com.example.InputsTest").newInstance();
+            ((TestContext) context).inject(test, env);
+            invoke(test, "check");
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
     public void anAmbiguousInjectionIsABuildError() throws Exception {
         File classes = mainBuild(application());
         Map<String, String> t = new LinkedHashMap<String, String>();

@@ -303,5 +303,8 @@ A compiled run has these limits:
 * **One application at a time.** Spring can keep several contexts cached. Here
   a class with a different configuration stops the running application before
   it starts its own.
+* **A listener in every environment.** `MOCK` and `NONE` also start the
+  application listening on a free loopback port, because its server hosts the
+  threads its tasks run on.
 * **The JSON path subset.** `jsonPath` supports the expressions listed above,
   without filters or functions other than `length()`.

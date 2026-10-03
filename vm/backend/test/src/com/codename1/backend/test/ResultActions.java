@@ -36,18 +36,26 @@ public final class ResultActions {
         return this;
     }
 
-    /// Asserts every expectation, reporting all the failures together.
+    /// Asserts every expectation, reporting all the failures together. A matcher
+    /// that throws -- a body that is not JSON, a header that is not a number -- is
+    /// one of the failures and the rest still run; an `Error` other than an
+    /// assertion failure still ends the run.
     public ResultActions andExpectAll(ResultMatcher... matchers) throws Exception {
         StringBuilder failures = null;
         for (ResultMatcher value : matchers) {
+            String failure;
             try {
                 value.match(result);
+                continue;
             } catch (AssertionError failed) {
-                if (failures == null) {
-                    failures = new StringBuilder("Multiple expectations failed:");
-                }
-                failures.append("\n\t").append(failed.getMessage());
+                failure = failed.getMessage();
+            } catch (Exception failed) {
+                failure = failed.getClass().getName() + ": " + failed.getMessage();
             }
+            if (failures == null) {
+                failures = new StringBuilder("Multiple expectations failed:");
+            }
+            failures.append("\n\t").append(failure);
         }
         if (failures != null) {
             throw new AssertionError(failures.toString());

@@ -190,6 +190,10 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
         if ("arraybuffer".equals(req.getResponseType()) && req.getResponse() != null) {
             return Uint8Array.create((ArrayBuffer)req.getResponse());
         }
+        if ("arraybuffer".equals(req.getResponseType())) {
+            // responseText throws InvalidStateError for an arraybuffer request.
+            return null;
+        }
         String responseText = req.getResponseText();
         if (responseText == null) {
             return null;
@@ -300,10 +304,15 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     /// Sends `xhr` with `body` (null for none) under a `timeoutMillis` deadline
     /// (0 for none), answering why it failed or null. Setting the timeout is
     /// inside the try, because a synchronous XHR on a window rather than a
-    /// worker refuses one outright.
+    /// worker refuses one outright. A request that ended with no response at all
+    /// -- status 0 and nothing received, which is how a timed-out synchronous XHR
+    /// can come back without throwing -- is a failure too: reading on from there
+    /// reached `responseText`, which an arraybuffer request throws for, and that
+    /// JavaScript error ended the network thread with no callback of any kind.
     @JSBody(params={"xhr", "body", "timeoutMillis"}, script="try {"
             + " if (timeoutMillis > 0) { try { xhr.timeout = timeoutMillis; } catch (ignored) {} }"
             + " if (body) { xhr.send(body); } else { xhr.send(); }"
+            + " if (xhr.status === 0 && !xhr.response) { return 'NetworkError: no response'; }"
             + " return null;"
             + " } catch (e) { return (e && e.name ? e.name : 'Error') + (e && e.message ? ': ' + e.message : ''); }")
     static native String send(XMLHttpRequest xhr, Blob body, int timeoutMillis);

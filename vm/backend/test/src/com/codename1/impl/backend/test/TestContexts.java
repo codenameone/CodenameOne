@@ -65,6 +65,11 @@ public final class TestContexts {
             settings.setProperty(Config.DATASOURCE_URL, ":memory:");
         }
         boolean defined = context.webEnvironment() == DEFINED_PORT;
+        // MOCK and NONE listen too, on a free loopback port. Spring starts no web
+        // server for NONE, but here the HttpServer is also what hosts the
+        // application's executors and virtual threads (Tasks.Registry.server), so
+        // an application with no server would run its tasks differently from the
+        // one it tests. A loopback port nobody connects to is the cheaper price.
         if (!defined && settings.getProperty(Config.SERVER_PORT) == null) {
             // A free port the system picks, read back from the listener.
             settings.setProperty(Config.SERVER_PORT, "0");

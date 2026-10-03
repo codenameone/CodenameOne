@@ -105,6 +105,24 @@ class ProbeApiTest {
     }
 
     @Test
+    void andExpectAllReportsAMatcherThatThrowsAndRunsTheRest() throws Exception {
+        // A Content-Type is no number: longValue throws, and the status check after
+        // it must still run and be reported with it.
+        String report;
+        try {
+            mvc.perform(get("/api/hello/{name}", "Ada")).andExpectAll(
+                    header().longValue("Content-Type", 1),
+                    status().is(418));
+            report = null;
+        } catch (AssertionError expected) {
+            report = expected.getMessage();
+        }
+        assertTrue(report != null, "two failed expectations passed");
+        assertTrue(report.indexOf("NumberFormatException") >= 0, report);
+        assertTrue(report.indexOf("418") >= 0, "the expectation after the throw did not run: " + report);
+    }
+
+    @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.
         assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});

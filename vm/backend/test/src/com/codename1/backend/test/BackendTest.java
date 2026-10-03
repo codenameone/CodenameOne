@@ -85,7 +85,9 @@ public @interface BackendTest {
         RANDOM_PORT,
         /// Served on the configured `cn1.server.port`.
         DEFINED_PORT,
-        /// The beans only; no requests are made.
+        /// The beans only; the test makes no requests. The application still
+        /// listens on a free loopback port, as [#MOCK] does: its server is also
+        /// what owns the threads its tasks run on, so it does not start without one.
         NONE
     }
 }

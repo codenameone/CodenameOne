@@ -84,7 +84,7 @@ final class Compression {
         // A 206 (or anything carrying Content-Range) is a range of the identity
         // representation: compressing it would leave the offsets describing bytes
         // the client never receives, and a resumed download assembled corrupt.
-        if (response == null || response.fileFd >= 0 || !acceptsGzip(request)
+        if (response == null || response.fileFd >= 0
                 || response.status == 204 || response.status == 304 || response.status == 206
                 || response.hasHeader("Content-Range")
                 || response.hasHeader("Content-Encoding") || !compressible(response.contentType)) {
@@ -95,6 +95,13 @@ final class Compression {
         if (body == null || body.length < minSize) {
             return;
         }
+        // Chosen by Accept-Encoding from here on, whichever way it goes: the
+        // identity answer varies too, or a shared cache that stored it for a
+        // client without gzip serves it to every client after.
+        response.appendToken("Vary", "Accept-Encoding");
+        if (!acceptsGzip(request)) {
+            return;
+        }
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(body.length / 3 + 64);
         com.codename1.io.gzip.GZIPOutputStream gzip =
                 new com.codename1.io.gzip.GZIPOutputStream(out);
@@ -102,7 +109,6 @@ final class Compression {
         gzip.close();
         response.body = out.toByteArray();
         response.header("Content-Encoding", "gzip");
-        response.appendToken("Vary", "Accept-Encoding");
     }
 
     private boolean compressible(String contentType) {

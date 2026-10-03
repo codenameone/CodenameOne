@@ -2594,6 +2594,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
         LinuxNative.httpSetCustomMethod(((LinuxHttpConnection) connection).peer, method);
     }
 
+    /// True: [#setReadTimeout(Object, int)] is honoured, so a caller that checks
+    /// this before setting one gets the timeout it asked for.
+    @Override
+    public boolean isReadTimeoutSupported() {
+        return true;
+    }
+
     @Override
     public void setReadTimeout(Object connection, int readTimeout) {
         LinuxNative.httpSetReadTimeout(((LinuxHttpConnection) connection).peer, readTimeout);

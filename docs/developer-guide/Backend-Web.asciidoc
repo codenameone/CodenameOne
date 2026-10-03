@@ -243,9 +243,9 @@ sends `Accept-Encoding: gzip`, its type is in `cn1.server.compression.mimeTypes`
 (text, JSON, JavaScript and XML by default), and its body is at least
 `cn1.server.compression.minResponseSize` bytes (2048 by default). A static file
 is left unchanged, because it's sent straight from the page cache, and so is a
-response whose handler set a `Content-Encoding` of its own. So is a range answer
-(`206` or any response with `Content-Range`), whose offsets describe the
-uncompressed bytes. Compression is off
+response whose handler set a `Content-Encoding` of its own. A range answer (`206` or any
+response with `Content-Range`) is never compressed either, because its offsets
+describe the uncompressed bytes. Compression is off
 by default because it trades processor time for bytes, and a server behind a
 proxy that already compresses would pay for it twice.
 

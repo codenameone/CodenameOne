@@ -1699,24 +1699,40 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     }
 
     /**
-     * Refuses a malformed multipart body before any part is bound, and a String
-     * part that is not text. getParts() throws for a body that claims to be
+     * Refuses what the client sent malformed before anything is bound: a body
+     * that is not UTF-8 for a body binding, a request parameter that cannot be
+     * read, a malformed multipart body, and a String part that is not text. getParts() throws for a body that claims to be
      * multipart and is not, which unguarded would surface as a 500 from inside the
      * argument list -- for what is the client's syntax error.
      */
     private static void emitPartGuards(StringBuilder sb, Route route, String pad) {
         boolean any = false;
+        boolean bodyChecked = false;
         for (int i = 0; i < route.params.size(); i++) {
             Param p = route.params.get(i);
+            if ("BODY".equals(p.kind)) {
+                // Every body binding reads it as text, and a binary-typed body is
+                // not checked for UTF-8 on arrival, so getBody() throws for one that
+                // is not: refused as the client's error before anything reads it.
+                if (!bodyChecked) {
+                    bodyChecked = true;
+                    sb.append(pad).append("if (!bodyIsText(request)) {\n");
+                    sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                    sb.append(pad).append("            utf8(\"The request body is not UTF-8 text\"));\n");
+                    sb.append(pad).append("}\n");
+                }
+                continue;
+            }
             if ("QUERY".equals(p.kind)) {
-                // A @RequestParam can be a multipart form field, and a field that is
-                // not UTF-8 throws from Request.param: refused here as the client's
-                // error, not left to surface as a 500 from the argument list.
-                sb.append(pad).append("if (!paramIsText(request, ").append(quote(p.name))
-                  .append(")) {\n");
+                // A @RequestParam can be a multipart form field, and Request.param
+                // throws for a malformed multipart body or a field that is not
+                // UTF-8: refused here as the client's error, not left to surface
+                // as a 500 from the argument list.
+                sb.append(pad).append("String unreadable").append(i).append(" = paramProblem(request, ")
+                  .append(quote(p.name)).append(");\n");
+                sb.append(pad).append("if (unreadable").append(i).append(" != null) {\n");
                 sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
-                sb.append(pad).append("            utf8(").append(quote("The parameter " + p.name
-                        + " is not UTF-8 text")).append("));\n");
+                sb.append(pad).append("            utf8(unreadable").append(i).append("));\n");
                 sb.append(pad).append("}\n");
                 continue;
             }
@@ -2385,13 +2401,23 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("            return false;\n");
         sb.append("        }\n");
         sb.append("    }\n\n");
-        sb.append("    private static boolean paramIsText(com.codename1.backend.HttpServer.Request request, "
-                + "String name) {\n");
+        sb.append("    private static boolean bodyIsText(com.codename1.backend.HttpServer.Request request) {\n");
         sb.append("        try {\n");
-        sb.append("            request.param(name);\n");
+        sb.append("            request.getBody();\n");
         sb.append("            return true;\n");
         sb.append("        } catch (IllegalStateException binary) {\n");
         sb.append("            return false;\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static String paramProblem(com.codename1.backend.HttpServer.Request request, "
+                + "String name) {\n");
+        sb.append("        try {\n");
+        sb.append("            request.param(name);\n");
+        sb.append("            return null;\n");
+        sb.append("        } catch (IllegalArgumentException malformed) {\n");
+        sb.append("            return \"The multipart body is malformed\";\n");
+        sb.append("        } catch (IllegalStateException binary) {\n");
+        sb.append("            return \"The parameter \" + name + \" is not UTF-8 text\";\n");
         sb.append("        }\n");
         sb.append("    }\n\n");
         sb.append("    private static byte[] partBytes(com.codename1.backend.HttpServer.Part part) {\n");

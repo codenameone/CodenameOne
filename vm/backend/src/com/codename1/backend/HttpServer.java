@@ -1040,10 +1040,12 @@ public final class HttpServer {
         /// container does: the query string first, then the fields of a form body
         /// -- `application/x-www-form-urlencoded`, or the parts of a
         /// `multipart/form-data` one that are not files. Null when neither has it.
-        /// A malformed multipart body has no fields here; [#getParts] reports why.
         ///
+        /// @throws IllegalArgumentException when the body says it is multipart and
+        /// is not well formed, as [#getParts] does; read as "no such field", a
+        /// route whose parameters are all optional ran on a body nothing parsed
         /// @throws IllegalStateException when the field is a multipart part that is
-        /// not UTF-8 text; a generated `@RequestParam` binding answers that with 400
+        /// not UTF-8 text. A generated `@RequestParam` binding answers either with 400
         public String param(String name) {
             String query = queryParam(name);
             if (query != null || name == null) {
@@ -1053,13 +1055,8 @@ public final class HttpServer {
             if (Multipart.isForm(type)) {
                 return Multipart.formValue(getBody(), name);
             }
-            if (Multipart.boundary(type) != null) {
-                Part p;
-                try {
-                    p = getPart(name);
-                } catch (IllegalArgumentException malformed) {
-                    return null;
-                }
+            if (Multipart.isMultipart(type)) {
+                Part p = getPart(name);
                 return p == null || p.getFilename() != null ? null : p.getText();
             }
             return null;
@@ -7878,36 +7875,55 @@ public final class HttpServer {
 
     /// Inflates a gzip body, refusing one that grows past MAX_BODY_BYTES (413) or
     /// is not gzip at all (400).
+    ///
+    /// Every member is decoded: a gzip body may be several members back to back
+    /// (RFC 1952 2.2), and stopping at the end of the first handed the handler a
+    /// silently truncated payload. Bytes after a member that are not another
+    /// member are refused rather than ignored.
     static byte[] gunzip(byte[] data, int offset, int length) throws ProtocolException {
         ByteSink out = new ByteSink(Math.max(256, Math.min(length * 4, MAX_BODY_BYTES)));
-        com.codename1.io.gzip.GZIPInputStream in = null;
-        try {
-            in = new com.codename1.io.gzip.GZIPInputStream(
-                    new java.io.ByteArrayInputStream(data, offset, length));
-            byte[] chunk = new byte[8192];
-            while (true) {
-                int n = in.read(chunk, 0, chunk.length);
-                if (n < 0) {
-                    break;
+        byte[] chunk = new byte[8192];
+        int pos = offset;
+        int end = offset + length;
+        do {
+            java.io.ByteArrayInputStream source = new java.io.ByteArrayInputStream(data, pos, end - pos);
+            com.codename1.io.gzip.GZIPInputStream in = null;
+            int unread;
+            try {
+                in = new com.codename1.io.gzip.GZIPInputStream(source);
+                while (true) {
+                    int n = in.read(chunk, 0, chunk.length);
+                    if (n < 0) {
+                        break;
+                    }
+                    if (out.length() + n > MAX_BODY_BYTES) {
+                        throw new ProtocolException(413, "request body too large once decompressed");
+                    }
+                    out.put(chunk, 0, n);
                 }
-                if (out.length() + n > MAX_BODY_BYTES) {
-                    throw new ProtocolException(413, "request body too large once decompressed");
+                // What this member did not use: still in the source, or read
+                // ahead into the inflater and left over at the member's end.
+                byte[] left = in.getAvailIn();
+                unread = source.available() + (left == null ? 0 : left.length);
+            } catch (ProtocolException err) {
+                throw err;
+            } catch (IOException err) {
+                throw new ProtocolException(400, "the request body is not valid gzip", err);
+            } finally {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (IOException ignored) {
+                        // In memory; nothing to release.
+                    }
                 }
-                out.put(chunk, 0, n);
             }
-        } catch (ProtocolException err) {
-            throw err;
-        } catch (IOException err) {
-            throw new ProtocolException(400, "the request body is not valid gzip", err);
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignored) {
-                    // In memory; nothing to release.
-                }
+            int next = end - unread;
+            if (next <= pos) {
+                throw new ProtocolException(400, "the request body is not valid gzip");
             }
-        }
+            pos = next;
+        } while (pos < end);
         return usedBytes(out);
     }
 

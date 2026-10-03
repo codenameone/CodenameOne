@@ -2604,6 +2604,13 @@ public class WindowsImplementation extends CodenameOneImplementation {
         WindowsNative.httpSetCustomMethod(((WindowsHttpConnection) connection).peer, method);
     }
 
+    /// True: [#setReadTimeout(Object, int)] is honoured, so a caller that checks
+    /// this before setting one gets the timeout it asked for.
+    @Override
+    public boolean isReadTimeoutSupported() {
+        return true;
+    }
+
     @Override
     public void setReadTimeout(Object connection, int readTimeout) {
         WindowsNative.httpSetReadTimeout(((WindowsHttpConnection) connection).peer, readTimeout);
