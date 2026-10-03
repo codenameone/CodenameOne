@@ -269,6 +269,26 @@
      }
     }
    }
+  },
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.059,
+      "time": 1.204,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.059,
+     "reason": "PR #5883: recursion time on this CPU re-measured with this branch's VM (ReachabilityCull, inline threshold, type-aware RTA); Bench.java is unchanged. Run 37132788847 read 0.944x (rounds 1.025, 0.944, 0.946, 0.933, 0.942: ParparVM 161.6-163.3 ms after a 192.5 ms first round, JDK 25 172.6-173.3 ms) against 1.204x, a row taken from one run of #5903's code whose logs and artifacts have expired; it is the only run of this CPU still on record, so no master-VM run here remains to compare. The direction is a real effect of this branch: on Windows x64 AMD Family 25 Model 1 its 8 runs read 1.378x-1.383x against 1.488x-1.491x on 8 runs of master's VM code (master and the #5930 branch), ParparVM 182.5-182.8 ms against 197.0-197.5 ms with JDK 25 at 132.1-132.6 ms in both; on Family 25 Model 17 it did not move (1.379x-1.381x against 1.381x-1.382x). The -21.6% magnitude on this CPU rests on one run per side and is unverified.",
+     "runs": 1,
+     "time": 0.944,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
   }
  }
 }
