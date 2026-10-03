@@ -204,6 +204,78 @@ a tagged `Double` -- a raw IEEE pattern -- landing inside the arena range by coi
 unaligned load off a word with no header. If a young generation is ever attempted again, the
 range test owns that guard, not its callers.
 
+### ...and where it wins: the hybrid, and what it took
+
+The nursery above lost because it paid for SURVIVORS on a workload where half of them
+survive. The opposite workload -- a high allocation rate with almost nothing surviving,
+`objectAllocation` -- is where the concurrent collector loses instead: its cost follows
+ALLOCATION. Measured with hardware counters (instructions and cycles per allocated object,
+all threads, `proc_pid_rusage` v4, startup cancelled by differencing 25- and 75-rep runs):
+JDK 25 spent 28 instructions / 5.6 cycles per object, ParparVM 242 / 38, about 180 of them
+in the collector (the grace pass traces every fresh object; the sweep visits every slot).
+Wall clock showed only ~3x because that work ran on spare cores, which a 2-4 vCPU CI runner
+does not have. Use the counters, not wall clock, for this kind of question on a shared host.
+
+The fix is `cn1GcHybridDecide`: the existing single-core generational cycles, entered per
+cycle on any host when survival is low AND the concurrent collector is busy (duty >= 50%
+of the interval between cycles), left on high minor survival, an over-budget major MARK,
+or low memory. There is deliberately NO off switch: a collector a test or a deployment can
+opt out of is one whose bugs and costs the opt-out hides. `CN1_GC_HYBRID_FORCE=1` (QA only)
+alternates phases for the verifier and gauntlet. Each of these was measured to be necessary:
+
+- **Majors stop the world too.** A concurrent major graces every young object and
+  promotes it: 6.4M dead objects became OLD, the next minor spent 260-305ms in the
+  remembered set, and the heap churned through thousands of full pages.
+- **The duty test.** Low survival alone sent `stringBuilding` (fused leaf Strings, a
+  concurrent collector busy 10% of the time) into the phase, 15% slower.
+- **The budget is on the major's MARK.** The first major's sweep cleans up after the
+  concurrent cycles before the phase (34ms) and ended the phase every time on a pause budget.
+- **A minor must cost its survivors:** the held thread's current pages and the pages it
+  retired before it was stopped are treated as pre-cycle (`cn1BibopRetireHeldThreadPages`,
+  `cn1BibopDetachHeldRetired`) -- without that ~8,700 objects a minor were graced,
+  promoted and remembered; the minor sweep resets an all-young-dead page in O(1); the
+  grace walk takes a list instead of the page registry; the per-thread root snapshot
+  refreshes only that thread's pages; the collector's stop wait spins by time (it slept
+  500us at 640 spins and held the mutator for it).
+
+- **Never with virtual threads.** A stop-the-world cycle cannot stop a running virtual
+  thread, and its sweep frees unmarked fresh legacy objects: a backend server died with
+  SIGTRAP (malloc's free list corrupted under `HttpServer$Conn.fillTo`). The first
+  `cn1VirtualThreadCreate` sets `cn1GcVirtualThreadsSeen` and the process stays concurrent
+  for good -- the single-core mode included, which had the same hole on one-CPU hosts.
+- **Stop every cooperative thread before SATB is armed.** The per-thread loop stops
+  threads one at a time; the ones not yet reached kept allocating with the barrier armed
+  and the fresh filter off, so the SATB log grew with the allocation rate
+  (`GcSteadyStateIntegrationTest`: 129-837 refs per cycle per live object against 4). Now
+  ~0.7, and that multi-threaded workload uses 35% less CPU than on the concurrent collector.
+  Every held thread is released at the end of every cycle, thrown or not.
+- **Leave the phase when it goes quiet** (a cycle with little page-heap allocation), or a
+  small-object pool stays resident under a later burst of large allocations
+  (`BibopPageFloorIntegrationTest`).
+- **Decide to leave at the END of the stop-the-world cycle** (`cn1GcHybridExitCheck`),
+  so the default trigger is back before the mutator resumes. Deciding at the next cycle's
+  start handed a whole young generation (up to 128MB) to a CONCURRENT cycle as fresh
+  objects: grace kept them all, the cycle ran ~500ms, the mutator allocated 500MB behind it
+  and `GcSteadyStateIntegrationTest`'s page heap went 3446 -> 10538 on a CI runner.
+- **Size the young generation by duty** (double after two minors in a row above 5% of the
+  interval, halve below 1%, host memory / 8 at most): 3x fewer minors on objectAllocation.
+  One minor is not enough to grow on -- a single OS-descheduled minor stepped a steady
+  workload's heap up a third late in the run.
+
+A test whose evidence names one collector's mechanism goes vacuous when the hybrid takes
+its workload. Fix the EVIDENCE, never pin the collector: `GcOverflowSpiralIntegrationTest`
+accepts the churn carried by stop-the-world minors (`minorYoung` in `[GC-OVERFLOW]`). And a
+self-check that proves a test can still SEE an old weakness is obsolete once the weakness is
+gone: `GcSteadyStateIntegrationTest`'s `-DCN1_SATB_LOG_FRESH` twin (the issue-5537 barrier,
+reinjected, had to blow the log up 1000x) was removed because the default collector runs
+that churn with threads parked while the barrier is armed -- the reinjected build stays
+small too. Its real assertion, a log sized by the live set, still runs.
+
+Result on the 16-core Mac: objectAllocation 205 -> 37 instructions and 35 -> 8.4 cycles per
+object (JDK 25: 27 / 5.4), the perf gate's ratio 3.81x -> ~1.9x and the mean ~1.1x; every
+other `vm/benchmarks` row flat or better. The mutator fast path was a separate gap,
+see the store-store publication note in `vm/BIBOP-INVARIANTS.md` R1.
+
 ### The gate has to be in CI, and it has to know which arm it ran
 
 `BoxEdge` first lived only in `run-gauntlet.sh` -- and **no workflow runs the gauntlet**, so
@@ -876,7 +948,7 @@ Two things worth knowing before reading a number from this workload:
 
 - **Small arrays are BiBOP objects.** `codenameOneGcMalloc` serves "small objects AND small
   arrays" from the page heap, so the search's own `int[64]` board copy never reaches
-  `allObjectsInHeap`. Only allocations over `CN1_BIBOP_MAX_OBJECT` (512 bytes) take the
+  `allObjectsInHeap`. Only allocations over `CN1_BIBOP_MAX_OBJECT` (2048 bytes) take the
   legacy calloc + table-registration + extent-snapshot path -- and a real game-tree search
   crosses that line routinely, since a 15x15 board of ints is 900 bytes. `CN1_WL_BIGARRAY`
   (ints per throwaway array per node, default 0) is the knob that puts the workload on that
