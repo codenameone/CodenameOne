@@ -24,3 +24,9 @@ null-short value calls=0
 [1]
 [2]
 slots {k: [1], j: [2]} calls=1
+caught
+42
+attempts=2
+caught static
+loaded
+staticAttempts=2

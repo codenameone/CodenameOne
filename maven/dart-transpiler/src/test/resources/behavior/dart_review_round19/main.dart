@@ -1,7 +1,8 @@
 // Statements the emitter lifts out of an operand Java evaluates lazily or
 // repeatedly -- a loop condition or update, the right side of && || ??, a
 // conditional's arm, a null-short's arguments -- must run where that operand is
-// evaluated: every iteration, and never on the branch not taken.
+// evaluated: every iteration, and never on the branch not taken. Also a lazily
+// initialised top-level whose initialiser throws runs again on the next read.
 class Box {
   int _v = 0;
   int get value => _v;
@@ -28,6 +29,29 @@ int makes = 0;
 Box make() {
   makes++;
   return made;
+}
+
+int attempts = 0;
+int flaky() {
+  attempts++;
+  if (attempts == 1) {
+    throw StateError('first read fails');
+  }
+  return 42;
+}
+
+final int lazyValue = flaky();
+
+int staticAttempts = 0;
+class Config {
+  static final String name = load();
+  static String load() {
+    staticAttempts++;
+    if (staticAttempts == 1) {
+      throw StateError('first read fails');
+    }
+    return 'loaded';
+  }
 }
 
 List<int> source(List<int> xs) {
@@ -136,4 +160,20 @@ void main() {
   print(slots['k'] ??= <int>[...source(<int>[2])]);
   print(slots['j'] ??= <int>[...source(<int>[2])]);
   print('slots $slots calls=$calls');
+
+  // a throwing lazy initialiser runs again on the next read
+  try {
+    print(lazyValue);
+  } on StateError {
+    print('caught');
+  }
+  print(lazyValue);
+  print('attempts=$attempts');
+  try {
+    print(Config.name);
+  } on StateError {
+    print('caught static');
+  }
+  print(Config.name);
+  print('staticAttempts=$staticAttempts');
 }

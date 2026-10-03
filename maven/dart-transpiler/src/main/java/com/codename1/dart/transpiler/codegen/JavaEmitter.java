@@ -452,7 +452,7 @@ public final class JavaEmitter {
      * {@code Lib.set$x(v)} with no special case at the assignment site.
      */
     private String emitLazyTopLevel(FieldDecl v, TypeRef vt, String jt, Ctx ctx) {
-        ctx.pushWriter(3);
+        ctx.pushWriter(4);
         Out init = emitExpr(v.initializer, vt, ctx);
         String lifted = ctx.popWriter();
         StringBuilder sb = new StringBuilder();
@@ -468,9 +468,17 @@ public final class JavaEmitter {
         // initialiser reads it back is a cycle, and returning the zero value
         // beats recursing until the stack goes.
         sb.append("            ").append(v.name).append("$ready = true;\n");
+        // An initialiser that throws leaves the variable uninitialised in Dart, and the
+        // next read runs it again. Left marked ready, every later read answered the
+        // Java zero value -- null, 0 or false, even in a non-nullable variable.
+        sb.append("            try {\n");
         sb.append(lifted);
-        sb.append("            ").append(v.name).append("$value = ")
+        sb.append("                ").append(v.name).append("$value = ")
                 .append(coerce(init, vt, ctx)).append(";\n");
+        sb.append("            } catch (Throwable $e) {\n");
+        sb.append("                ").append(v.name).append("$ready = false;\n");
+        sb.append("                throw $e;\n");
+        sb.append("            }\n");
         sb.append("        }\n");
         sb.append("        return ").append(v.name).append("$value;\n");
         sb.append("    }\n\n");
