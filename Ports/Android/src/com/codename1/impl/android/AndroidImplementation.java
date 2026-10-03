@@ -7598,6 +7598,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void setPage(final String html, final String baseUrl) {
             onWebThread(new Runnable() {
                 public void run() {
+                    WebViewNavDiag.beforeFirstNavigation(web);
                     web.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null);
                 }
             });
