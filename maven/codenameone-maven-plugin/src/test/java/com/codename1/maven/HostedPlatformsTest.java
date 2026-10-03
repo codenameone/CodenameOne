@@ -169,7 +169,7 @@ class HostedPlatformsTest {
         File resource = new File(resources, "native.properties");
         write(resource, "x=1");
         List<File> resourceFiles = Collections.singletonList(resource);
-        String inputs = CompileJavaSENativesMojo.describeInputs(sources, resourceFiles,
+        String inputs = CompileJavaSENativesMojo.describeInputs(sources, resourceFiles, Collections.<String>emptyList(),
                 Collections.singletonList(cp.getAbsolutePath()), new String[] {null, "1.8", "1.8"});
         File stamp = new File(tmp, "inputs.txt");
         assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources), "never compiled");
@@ -184,12 +184,13 @@ class HostedPlatformsTest {
         src.setLastModified(now + 10000);
         assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, inputs, sources, resources), "an edited source");
         src.setLastModified(now - 10000);
-        String noResources = CompileJavaSENativesMojo.describeInputs(sources, Collections.<File>emptyList(),
+        String noResources = CompileJavaSENativesMojo.describeInputs(sources, Collections.<File>emptyList(), Collections.<String>emptyList(),
                 Collections.singletonList(cp.getAbsolutePath()), new String[] {null, "1.8", "1.8"});
         assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, noResources, sources, resources),
                 "a deleted resource, which no timestamp shows, must still rebuild the output");
         String moreSources = CompileJavaSENativesMojo.describeInputs(Arrays.asList(src, new File(tmp, "B.java")),
-                resourceFiles, Collections.singletonList(cp.getAbsolutePath()), new String[] {null, "1.8", "1.8"});
+                resourceFiles, Collections.<String>emptyList(), Collections.singletonList(cp.getAbsolutePath()),
+                new String[] {null, "1.8", "1.8"});
         assertFalse(CompileJavaSENativesMojo.isUpToDate(stamp, moreSources, sources, resources), "a new source");
         File appClass = new File(cp, "App.class");
         write(appClass, "x");
@@ -299,6 +300,55 @@ class HostedPlatformsTest {
             assertTrue(initializrManaged.contains(artifact), artifact + " has no version and the initializr's root pom does not manage it");
         }
         assertTrue(checked > 0, "found no profile dependencies to check");
+    }
+
+    /**
+     * Every profile that runs JavaSE code from common carries the desktop runtime binaries,
+     * as the javase module does: without them the bundled FFmpeg media implementation is
+     * missing from the simulator, the tests and the packaged desktop app.
+     */
+    @Test
+    void everyDesktopProfileShipsTheDesktopBinaries() throws Exception {
+        File fragment = new File("../../scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml");
+        Element profiles = parse("<profiles>" + new String(Files.readAllBytes(fragment.toPath()),
+                StandardCharsets.UTF_8) + "</profiles>");
+        Set<String> desktop = new HashSet<String>(Arrays.asList("simulator", "idea-simulator", "debug-simulator",
+                "debug-eclipse", "run-desktop", "executable-jar", "test"));
+        Set<String> seen = new HashSet<String>();
+        for (Element profile : children(profiles, "profile")) {
+            String id = text(profile, "id");
+            if (!desktop.contains(id)) {
+                continue;
+            }
+            seen.add(id);
+            boolean found = false;
+            Element deps = child(profile, "dependencies");
+            for (Element dep : deps == null ? Collections.<Element>emptyList() : children(deps, "dependency")) {
+                found |= "cn1-binaries-javase".equals(text(dep, "artifactId")) && "runtime".equals(text(dep, "scope"));
+            }
+            assertTrue(found, id + " runs JavaSE code without the desktop runtime binaries");
+        }
+        assertEquals(desktop, seen);
+    }
+
+    @Test
+    void aNativeArchiveIsKeyedByItsContent() throws Exception {
+        File zip = new File(tmp, "nativese.zip");
+        write(zip, "first");
+        String before = CompileJavaSENativesMojo.sha256(zip);
+        long stamp = zip.lastModified();
+        write(zip, "other");
+        zip.setLastModified(stamp);
+        assertFalse(before.equals(CompileJavaSENativesMojo.sha256(zip)),
+                "a rebuilt archive with the same names and dates must still recompile");
+        List<File> none = Collections.emptyList();
+        String[] level = {null, "1.8", "1.8"};
+        assertFalse(CompileJavaSENativesMojo.describeInputs(none, none,
+                Collections.singletonList(zip.getAbsolutePath() + "#" + before), Collections.<String>emptyList(), level)
+                .equals(CompileJavaSENativesMojo.describeInputs(none, none,
+                        Collections.singletonList(zip.getAbsolutePath() + "#" + CompileJavaSENativesMojo.sha256(zip)),
+                        Collections.<String>emptyList(), level)),
+                "the archive hash is part of what the cache compares");
     }
 
     private static Element parse(String xml) throws Exception {

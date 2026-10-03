@@ -130,7 +130,10 @@ grep -q 'tests="1"' "$REPORT" || fail "the JUnit test did not run exactly once"
 grep -q 'failures="0"' "$REPORT" || fail "the JUnit test failed"
 
 echo "== The simulator classpath"
-mvn -B -ntp initialize -Psimulator -Dcodename1.platform=javase
+# The simulator needs JDK 11 or newer, and preparing it says so on an older one; CI
+# runs this script on JDK 8 and names a newer JDK for the native backend step.
+SIMULATOR_JDK="${CN1_BACKEND_PACKAGE_JDK:-$JAVA_HOME}"
+JAVA_HOME="$SIMULATOR_JDK" mvn -B -ntp initialize -Psimulator -Dcodename1.platform=javase
 ARGS=common/target/codenameone/simulator-classpath.args
 [ -f "$ARGS" ] || fail "prepare-simulator-classpath wrote no $ARGS"
 grep -q 'cn1-javase' "$ARGS" || fail "the simulator classpath has no JavaSE natives"
@@ -147,6 +150,8 @@ for entry in com/example/minimal/MyAppStub.class com/example/minimal/HelloImpl.c
   unzip -l "$JAR" | grep -q " $entry\$" || fail "the desktop jar has no $entry"
 done
 [ -f common/target/libs/codenameone-javase-$CN1_VERSION.jar ] || fail "the desktop jar's libs/ has no JavaSE port"
+# The bundled FFmpeg media implementation, which the javase module's desktop app ships.
+ls common/target/libs/ffmpeg-*.jar >/dev/null 2>&1 || fail "the desktop jar's libs/ has no FFmpeg binaries"
 
 echo "== Every device target, staged from common"
 stage() {

@@ -87,6 +87,15 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
         String existingCn1Version = project.getModel().getProperties().getProperty("cn1.version");
         String existingCn1PluginVersion = project.getModel().getProperties().getProperty("cn1.plugin.version");
+        if (existingCn1Version == null || existingCn1PluginVersion == null) {
+            // Generated projects declare both; one edited to hard-code the versions in its
+            // dependencies has nothing for this goal to rewrite.
+            throw new MojoFailureException("cn1:update rewrites the cn1.version and cn1.plugin.version "
+                    + "properties, and this project does not declare "
+                    + (existingCn1Version == null ? "cn1.version" : "cn1.plugin.version")
+                    + ". Add them to " + (backendRoot ? "its pom.xml" : "the root pom.xml")
+                    + " and use them for the Codename One dependency and plugin versions.");
+        }
         boolean isAutoVersion = false;
         if (newVersion == null || newVersion.isEmpty()) {
             if (!existingCn1Version.endsWith("-SNAPSHOT")) {

@@ -78,6 +78,7 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
         File buildDir = new File(project.getBuild().getDirectory());
 
         List<String> classpath = new ArrayList<String>();
+        List<String> archives = new ArrayList<String>();
         File cn1libSources = new File(buildDir, path("generated-sources", "cn1libs-javase"));
         // Rebuilt from the current archives every time, so a library that was upgraded
         // or removed leaves none of its old native sources behind to be compiled. The
@@ -93,6 +94,9 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
                 }
                 if ("nativese.zip".equals(f.getName())) {
                     extract(f, cn1libSources);
+                    // By content, not timestamps: a reproducible archive of a new library
+                    // version can carry the same entry names and dates as the old one.
+                    archives.add(f.getAbsolutePath() + "#" + sha256(f));
                     continue;
                 }
                 classpath.add(element);
@@ -126,7 +130,7 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
         List<File> resourceFiles = new ArrayList<File>();
         collectFiles(resources, resourceFiles);
         Collections.sort(resourceFiles);
-        String inputs = describeInputs(sources, resourceFiles, classpath, level);
+        String inputs = describeInputs(sources, resourceFiles, archives, classpath, level);
         if (isUpToDate(stamp, inputs, sources, resources)) {
             getLog().debug("JavaSE native code is up to date at " + out);
             return;
@@ -230,11 +234,13 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * Everything the compile read, by name: the level, the classpath, the sources and the
-     * resources. Names catch what timestamps cannot, a file that was deleted.
+     * Everything the compile read, by name: the level, the classpath, the sources, the
+     * resources, and each cn1lib native archive with its content hash. Names catch what
+     * timestamps cannot, a file that was deleted; the hash, a rebuilt archive whose
+     * entries kept their names and dates.
      */
-    static String describeInputs(List<File> sources, List<File> resources, List<String> classpath,
-                                 String[] level) {
+    static String describeInputs(List<File> sources, List<File> resources, List<String> archives,
+                                 List<String> classpath, String[] level) {
         StringBuilder sb = new StringBuilder();
         sb.append("level=").append(level[0]).append('/').append(level[1]).append('/').append(level[2]).append('\n');
         for (String element : classpath) {
@@ -245,6 +251,9 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
         }
         for (File resource : resources) {
             sb.append("res=").append(resource.getAbsolutePath()).append('\n');
+        }
+        for (String archive : archives) {
+            sb.append("zip=").append(archive).append('\n');
         }
         return sb.toString();
     }
@@ -284,6 +293,24 @@ public class CompileJavaSENativesMojo extends AbstractCN1Mojo {
             }
         }
         return true;
+    }
+
+    static String sha256(File f) throws MojoExecutionException {
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                digest.update(buf, 0, n);
+            }
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest.digest()) {
+                sb.append(Character.forDigit((b >> 4) & 0xf, 16)).append(Character.forDigit(b & 0xf, 16));
+            }
+            return sb.toString();
+        } catch (IOException | java.security.NoSuchAlgorithmException ex) {
+            throw new MojoExecutionException("Failed to read " + f, ex);
+        }
     }
 
     private void extract(File zip, File dest) {

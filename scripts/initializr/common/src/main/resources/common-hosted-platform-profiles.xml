@@ -770,6 +770,13 @@
                     <artifactId>codenameone-javase</artifactId>
                     <scope>runtime</scope>
                 </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
+                    <scope>runtime</scope>
+                </dependency>
             </dependencies>
             <build>
                 <plugins>
@@ -814,6 +821,13 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>codenameone-javase</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-binaries-javase</artifactId>
+                    <version>${cn1.version}</version>
+                    <type>pom</type>
                     <scope>runtime</scope>
                 </dependency>
             </dependencies>
