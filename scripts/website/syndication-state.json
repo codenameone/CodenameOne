@@ -2298,6 +2298,16 @@
       "medium": {
         "url": "https://medium.com/p/c422f23fb3f4/edit",
         "syndicated_at": "2026-09-24T19:01:30+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/android-17-without-the-last-minute-scramble",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6abfe3231e74b99949915f0a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-02T17:01:18+00:00"
       }
     },
     "why-another-java-server": {
@@ -2309,6 +2319,16 @@
       "medium": {
         "url": "https://medium.com/p/0eb6b7ea20b8/edit",
         "syndicated_at": "2026-09-26T15:01:39+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/we-didn-t-want-to-build-another-java-server",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6abfff9a5090f6893250aac9",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-02T19:03:11+00:00"
       }
     },
     "java-backend-shared-models": {
@@ -2320,6 +2340,16 @@
       "medium": {
         "url": "https://medium.com/p/20c35c2393b9/edit",
         "syndicated_at": "2026-09-27T00:00:32+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/one-java-model-from-the-app-to-postgresql",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac04591b9d2f44082935723",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T00:01:15+00:00"
       }
     },
     "vault-encryption-browser-phone": {
@@ -2331,6 +2361,16 @@
       "medium": {
         "url": "https://medium.com/p/5379b1b7bc1c/edit",
         "syndicated_at": "2026-09-27T19:01:19+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/one-vault-from-your-phone-to-the-browser",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac099f7856857d935032eda",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-03T06:01:29+00:00"
       }
     },
     "invite-link-through-app-store": {
