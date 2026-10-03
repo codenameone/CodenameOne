@@ -259,12 +259,12 @@
        "time": 0.5
       }
      },
-     "memory": 0.403,
-     "reason": "PR #5883: objectAllocation RAM re-measured on this CPU; the earlier value came from a single outlier run",
-     "runs": 1,
+     "memory": 0.331,
+     "reason": "PR #5883: objectAllocation RAM on this CPU is bimodal because the JDK 25 reference's RSS is, not ours. Every run on record: 0.26x (the original single-run calibration of #5903's code), 0.403x (this branch, run 36818059323: ParparVM 251-259 MB, JDK 579-719 MB), 0.402x (another branch on master's VM code, run 37130456164: ParparVM 248-260 MB, JDK 575-671 MB) and 0.245x (this branch, run 37138061955: ParparVM 248-284 MB flat, JDK 557-1669 MB across its rounds). ParparVM's footprint is the same in all of them, so the row is recalibrated from the four run medians: their median 0.331x with a tolerance from their spread (40%), which passes both modes. This branch's objectAllocation RAM is in master's range on every CPU with runs of both (Windows AMD Family 25 Model 1 0.370x-0.462x against 0.362x-0.428x; Neoverse-N2 0.226x-0.252x against 0.197x-0.243x). Time is left alone: 7.37x in run 37138061955 (ParparVM 53-58 ms, then 43.4 ms in round 5 of the same binary) and 5.99x in run 37130456164 both sit inside the existing 5.86x +/-50% row.",
+     "runs": 4,
      "time": 5.86,
      "tolerance": {
-      "memory": 0.3,
+      "memory": 0.4,
       "time": 0.5
      }
     }
