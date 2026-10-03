@@ -2482,6 +2482,13 @@ public final class JavaEmitter {
         ctx.pushScope();
         w.line(javaType(subj.type, true, ctx) + " " + s + " = " + subj.code + ";");
         ctx.declare(s, subj.type);
+        List<Pattern> casePatterns = new ArrayList<Pattern>();
+        for (SwitchCase c : sw.cases) {
+            if (!c.isDefault) {
+                casePatterns.add(c.pattern);
+            }
+        }
+        Map<String, String[]> savedCache = openSwitchFieldCache(casePatterns, s, ctx);
         w.line(label + ": {");
         ctx.indent(1);
         ctx.pushBreakTarget(label);
@@ -2570,6 +2577,7 @@ public final class JavaEmitter {
             }
             ctx.popScope();
         }
+        switchFieldCache = savedCache;
         ctx.popBreakTarget();
         ctx.indent(-1);
         w.line("}");
@@ -2846,6 +2854,13 @@ public final class JavaEmitter {
         w.line(javaType(subj.type, true, ctx) + " " + s + " = " + subj.code + ";");
         ctx.declare(s, subj.type);
         w.line(javaType(resultType, true, ctx) + " " + res + ";");
+        List<Pattern> casePatterns = new ArrayList<Pattern>();
+        for (SwitchExprCase c : sw.cases) {
+            if (!(c.isDefault && c.guard == null)) {
+                casePatterns.add(c.pattern);
+            }
+        }
+        Map<String, String[]> savedCache = openSwitchFieldCache(casePatterns, s, ctx);
         w.line(label + ": {");
         ctx.indent(1);
         SwitchExprCase defaultCase = null;
@@ -2879,6 +2894,7 @@ public final class JavaEmitter {
             w.line("}");
             ctx.popScope();
         }
+        switchFieldCache = savedCache;
         if (defaultCase != null) {
             ctx.pushScope();
             Out v = emitExpr(defaultCase.value, resultType, ctx);
@@ -3031,6 +3047,81 @@ public final class JavaEmitter {
     /** True while the condition patternMatch returns is evaluated before its bindings run. */
     private boolean patternCondRuns;
     private int patternSubjectTokens;
+    /**
+     * The getters several cases of the switch being emitted read off its subject, keyed
+     * subject + "|" + type + "." + name, each to its {flag, value} temps. Null outside one.
+     */
+    private Map<String, String[]> switchFieldCache;
+
+    /**
+     * Declares the cross-case getter cache of a switch over {@code subj}. Dart reads a
+     * getter of the matched value once per switch -- the first time a case needs it -- and
+     * every later case reuses it (its invocation-key rule), so `case Box(value: 5): ...
+     * case Box(value: 4):` calls value once. Only a getter of the subject itself that two or
+     * more cases read is cached; one of a nested subpattern is read once per case. The key
+     * is the pattern's type, so a getter read through a subtype's pattern in one case and
+     * the supertype's in another is read twice. Returns the previous cache, to restore.
+     */
+    private Map<String, String[]> openSwitchFieldCache(List<Pattern> patterns, String subj, Ctx ctx) {
+        Map<String, String[]> saved = switchFieldCache;
+        Map<String, Integer> uses = new java.util.LinkedHashMap<String, Integer>();
+        Map<String, TypeRef> types = new java.util.HashMap<String, TypeRef>();
+        for (Pattern p : patterns) {
+            java.util.Set<String> keys = new java.util.LinkedHashSet<String>();
+            collectSubjectFields(p, subj, keys, types);
+            for (String k : keys) {
+                Integer n = uses.get(k);
+                uses.put(k, n == null ? 1 : n + 1);
+            }
+        }
+        Map<String, String[]> cache = null;
+        for (Map.Entry<String, Integer> e : uses.entrySet()) {
+            if (e.getValue() < 2) {
+                continue;
+            }
+            if (cache == null) {
+                cache = new java.util.HashMap<String, String[]>();
+            }
+            String flag = ctx.newTemp();
+            String val = ctx.newTemp();
+            ctx.writer().line("boolean " + flag + " = false;");
+            ctx.writer().line(javaType(types.get(e.getKey()), true, ctx) + " " + val + " = null;");
+            cache.put(e.getKey(), new String[] {flag, val});
+        }
+        switchFieldCache = cache;
+        return saved;
+    }
+
+    /** The cache keys of the getters {@code p} reads directly off {@code subj}. */
+    private void collectSubjectFields(Pattern p, String subj, java.util.Set<String> keys,
+                                      Map<String, TypeRef> types) {
+        if (p instanceof ObjectPattern) {
+            ObjectPattern o = (ObjectPattern) p;
+            for (PatternField f : o.fields) {
+                String k = subj + "|" + o.type.name + "." + f.name;
+                keys.add(k);
+                types.put(k, cacheableFieldType(o.type, f.name));
+            }
+        } else if (p instanceof AndPattern) {
+            for (Pattern part : ((AndPattern) p).parts) {
+                collectSubjectFields(part, subj, keys, types);
+            }
+        } else if (p instanceof OrPattern) {
+            for (Pattern part : ((OrPattern) p).alternatives) {
+                collectSubjectFields(part, subj, keys, types);
+            }
+        }
+    }
+
+    /** A getter's type for a cache temp: dynamic when it names a class type parameter. */
+    private TypeRef cacheableFieldType(TypeRef owner, String name) {
+        TypeRef ft = fieldTypeOf(owner, name);
+        ClassDecl cd = program.classes.get(owner.name);
+        if (cd != null && cd.typeParams.contains(ft.name)) {
+            return TypeRef.DYNAMIC;
+        }
+        return ft;
+    }
 
     private String patternMatch(Pattern p, String subj, TypeRef subjType, Ctx ctx, List<String> binds) {
         if (p instanceof VariablePattern) {
@@ -3090,7 +3181,9 @@ public final class JavaEmitter {
             for (PatternField f : o.fields) {
                 String access = cast + "." + fieldAccess(o.type, f.name) + "()";
                 TypeRef ft = fieldTypeOf(o.type, f.name);
-                cond = joinAnd(cond, fieldPatternMatch(f.pattern, access, ft, ctx, binds));
+                String[] cached = switchFieldCache == null ? null
+                        : switchFieldCache.get(subj + "|" + o.type.name + "." + f.name);
+                cond = joinAnd(cond, fieldPatternMatch(f.pattern, access, ft, cached, ctx, binds));
             }
             return cond;
         }
@@ -3169,10 +3262,23 @@ public final class JavaEmitter {
      * the value goes into a temp: assigned where the condition first reads it, or by a
      * leading binding when the condition does not read it (or is never evaluated).
      */
-    private String fieldPatternMatch(Pattern p, String access, TypeRef ft, Ctx ctx, List<String> binds) {
+    private String fieldPatternMatch(Pattern p, String access, TypeRef ft, String[] cached, Ctx ctx,
+                                     List<String> binds) {
         String token = "$pfield" + (patternSubjectTokens++) + "$";
         int bindStart = binds.size();
         String cond = patternMatch(p, token, ft, ctx, binds);
+        if (cached != null) {
+            // Shared with other cases of the switch: every use reads through the switch's
+            // cache, which calls the getter on first use only, whichever case that is.
+            String flag = cached[0];
+            String val = cached[1];
+            String lazy = "((" + flag + " || !(" + flag + " = true)) ? " + val + " : (" + val + " = "
+                    + access + "))";
+            for (int i = bindStart; i < binds.size(); i++) {
+                binds.set(i, binds.get(i).replace(token, lazy));
+            }
+            return cond.replace(token, lazy);
+        }
         int inCond = countOccurrences(cond, token);
         int total = inCond;
         for (int i = bindStart; i < binds.size(); i++) {
@@ -6593,8 +6699,11 @@ public final class JavaEmitter {
         }
         // An async closure whose caller takes its Future is emitted as an async method is:
         // it returns a Future, and what its body throws completes that Future with the
-        // error instead of escaping the call. One passed as a void callback keeps the plain
-        // body -- nobody can observe the Future, and a try per callback is not free natively.
+        // error instead of escaping the call. One passed as a void callback (onPressed:
+        // () async {...}) deliberately keeps the plain body: nobody can observe its Future,
+        // and a handler per callback costs native code size in every app. The divergence
+        // is accepted: a throw there escapes the call synchronously, where Dart would
+        // report it as an uncaught async error.
         boolean asyncValue = l.isAsync && lambdaReturn != null
                 && (lambdaReturn.is("Future") || lambdaReturn.is("FutureOr"));
         if (asyncValue) {

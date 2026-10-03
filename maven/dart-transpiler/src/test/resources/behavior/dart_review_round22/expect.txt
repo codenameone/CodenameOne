@@ -42,3 +42,7 @@ X!
 x=3 reads=1
 y=7 reads=1
 z9 reads=1
+four reads=1
+n6 reads=1
+shared 1
+shared 1

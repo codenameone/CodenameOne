@@ -108,6 +108,33 @@ void patterns() {
     _ => 'other',
   };
   print('$s reads=${d.reads}');
+  // Cases of one switch share a getter's value: Dart reads it the first time a
+  // case needs it and never again in that switch.
+  final e = Box(4);
+  switch (e) {
+    case Box(value: 5):
+      print('five');
+    case Box(value: int v) when v > 10:
+      print('big');
+    case Box(value: 4):
+      print('four reads=${e.reads}');
+  }
+  final f = Box(6);
+  final r = switch (f) {
+    Box(value: 1) => 'one',
+    Box(value: 2) => 'two',
+    Box(value: final n) => 'n$n',
+  };
+  print('$r reads=${f.reads}');
+  for (final g in [Box(1), Box(2)]) {
+    switch (g) {
+      case Box(value: 1):
+      case Box(value: 2) when g.reads == 1:
+        print('shared ${g.reads}');
+      default:
+        print('none');
+    }
+  }
 }
 
 void main() async {
