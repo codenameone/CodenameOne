@@ -2800,12 +2800,18 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     if(firstTimeGcThread) {
         firstTimeGcThread = JAVA_FALSE;
         
-        // reduce thread priority
-        int policy;
-        struct sched_param param;
-        pthread_getschedparam(pthread_self(), &policy, &param);
-        param.sched_priority--;
-        pthread_setschedparam(pthread_self(), policy, &param);
+        // Reduce thread priority -- but NOT where the collector runs stop-the-world cycles.
+        // There the mutator is held until the cycle ends, so the collector thread is the
+        // critical path, and a deprioritized one is preempted by everything else on the
+        // host while the application waits on it.
+        extern int cn1GcStwCapablePublic(void);
+        if(!cn1GcStwCapablePublic()) {
+            int policy;
+            struct sched_param param;
+            pthread_getschedparam(pthread_self(), &policy, &param);
+            param.sched_priority--;
+            pthread_setschedparam(pthread_self(), policy, &param);
+        }
     }
     flushReleaseQueue();
     // Defense in depth: a collection cycle must NEVER let an exception escape to the GC
@@ -2871,6 +2877,10 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
 #ifdef CN1_GC_CONFORM
         cn1GcProbeThrew = 1;
 #endif
+    }
+    {
+        extern void cn1GcReleaseAllBlockedThreadsPublic(void);
+        cn1GcReleaseAllBlockedThreadsPublic();
     }
     flushReleaseQueue();
 #ifdef CN1_GC_CONFORM

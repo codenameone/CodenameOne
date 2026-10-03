@@ -234,10 +234,16 @@ void cn1VirtualThreadMain(struct cn1VirtualThread* co) {
     }
 }
 
+/* Raised by the first virtual thread and never lowered; the collector reads it (see
+ * cn1GcHybridDecide in cn1_globals.m). Defined HERE, not in the collector: this runtime is
+ * also built on its own (VirtualThreadRuntimeTest), and the collector already depends on
+ * this file, never the other way round. */
+volatile int cn1GcVirtualThreadsSeen = 0;
 struct cn1VirtualThread* cn1VirtualThreadCreate(cn1VirtualThreadBody body, void* arg,
                                         size_t stackBytes) {
     struct cn1VirtualThread* co;
     unsigned char* stack;
+    __atomic_store_n(&cn1GcVirtualThreadsSeen, 1, __ATOMIC_SEQ_CST);
     size_t pageSize = (size_t)sysconf(_SC_PAGESIZE);
     if(stackBytes < 16384) {
         stackBytes = 16384;

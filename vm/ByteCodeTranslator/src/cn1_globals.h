@@ -1847,6 +1847,22 @@ extern void cn1GcRememberBlock(JAVA_LONG block);
                  if(cn1GcGenBarrier) CN1_GEN_REMEMBER(target, cn1__nv); } } } while(0)
 #endif
 
+// The barrier for a store into an object the same straight-line sequence just allocated
+// (the translator's init-before-publish constructors). Only the SATB insertion half: the
+// generational half records an OLD target (CN1_GEN_REMEMBER tests for an epoch), and the
+// target here is fresh -- no safepoint separates its allocation from these stores. If a
+// signal-stopped thread's slot is nonetheless graced by a sweep in that window, the sweep
+// remembers it itself (the grace branch of cn1BibopSweep), so no edge is lost.
+#if defined(CN1_DISABLE_SATB)
+#define CN1_INIT_WRITE_BARRIER(target, value) do { (void)(target); } while(0)
+#else
+#define CN1_INIT_WRITE_BARRIER(target, value) \
+    do { (void)(target); if(__builtin_expect(gcSatbActive, 0)) { \
+             JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
+             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv) \
+                && !CN1_SATB_FRESH_INLINE(cn1__nv)) cn1SatbEnqueue(cn1__nv); } } while(0)
+#endif
+
 // ---- Snapshot-at-the-beginning (Yuasa) DELETION write barrier ---------------
 // The concurrent collector marks each thread's roots while that thread is paused,
 // then RELEASES the thread before the others are scanned (cn1_globals.m:963), and
@@ -2211,10 +2227,22 @@ static inline void cn1GcHandshakeBackoff(int* spins) {
         cn1GcHandshakeSleep();
     }
 }
+// A thread held by the collector spins briefly, then BLOCKS until the collector releases
+// it (cn1GcWakeUnblocked). It used to back off into usleep(50) and poll: on macOS that
+// sleep routinely lasts a millisecond or more, so a held mutator overslept every short
+// stop-the-world cycle -- measured on objectAllocation in single-core generational mode,
+// a hold of 2.5ms mean (p99 8ms) around a collection whose own work was ~0.4ms, which
+// left the allocating thread asleep in 70% of its samples.
+struct ThreadLocalData;
+extern void cn1GcWaitUnblockedSlow(struct ThreadLocalData* ts);
 #define CN1_GC_WAIT_UNBLOCKED(ts) do { \
         int cn1__gcw = 0; \
         while(__atomic_load_n(&(ts)->threadBlockedByGC, __ATOMIC_ACQUIRE)) { \
-            cn1GcHandshakeBackoff(&cn1__gcw); \
+            if(cn1__gcw++ < 512) { \
+                cn1CpuRelax(); \
+            } else { \
+                cn1GcWaitUnblockedSlow((ts)); \
+            } \
         } \
     } while(0)
 
@@ -2538,6 +2566,14 @@ typedef struct CN1BibopPage {
     void* freeList;                       // intrusive free-list head (slot ptr)
     int freeCount;
     JAVA_BOOLEAN owned;
+    // OWNER-ONLY, both set when a thread takes the page (cn1BibopOwnPage) and read only by
+    // that thread. bumpLimit is the bound the inline bump path tests: slotCount once the
+    // page has no free list and the VM is past start-up, 0 otherwise, so the one compare
+    // replaces the free-list and constant-pool tests that used to sit on every allocation.
+    // bumpAccounted is the bump index up to which this page's bytes have been charged to
+    // the allocation trigger: bump allocations are accounted per page, not per object.
+    int bumpLimit;
+    int bumpAccounted;
     // COLLECTOR-ONLY. Set on a page retired BEFORE the running cycle began, when that
     // cycle is a single-core stop-the-world one: its fresh slots predate every root
     // scan, so an unmarked one is garbage and gets no grace. Cleared by the sweep.
@@ -2591,6 +2627,18 @@ typedef struct CN1BibopPage {
                                           //  EVERY page whenever any monitor existed
                                           //  (e.g. java.lang.System.LOCK, permanently).
                                           //  (recomputed at every full walk)
+    JAVA_LONG gcRetiredBy;                // threadId of the thread that retired this page
+                                          //  to the sweep stack, -1 for a dying thread's
+                                          //  pages (see cn1BibopDetachHeldRetired)
+    JAVA_BOOLEAN gcHasFinalizable;        // STICKY: an object whose class has a finalizer
+                                          //  (a real finalize() or native-block storage) was
+                                          //  ever placed on this page. Set by every path that
+                                          //  fills a slot -- CN1_BIBOP_NOTE_FINALIZABLE on the
+                                          //  inline ones, cn1BibopInitSlot and the recycled
+                                          //  paths out of line -- and cleared only by
+                                          //  cn1BibopFormatPage. A minor may reset an all-dead
+                                          //  young page in O(1) only without it: a dead slot of
+                                          //  such a class must reach cn1BibopReclaimSlot.
     JAVA_BOOLEAN gcHasAdopted;            // STICKY: an object on this page was ever MATURED
                                           //  into the legacy mark/sweep (heapPosition==-4).
                                           //  Suppresses the O(1) all-dead page reclaim for
@@ -2772,28 +2820,85 @@ void cn1RecordAllocation(struct clazz* parent, int size);
 // Out of line, and only reached when the inline bump path misses: a slot from the
 // current page's FREE LIST, which the inline path does not take. See the definition.
 extern JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci);
-static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
+// THE WHOLE HEADER IN ONE STORE. A fresh slot's header is a constant -- class index,
+// mark -1, heap state CN1_BIBOP_HEAP_POS -- so it is written as one 32-bit word with the
+// release the mark store carried. It used to be three partial stores AFTER a load of the
+// same cold word: CN1_OBJ_SET_HEAPPOS reads the old state to forget a heap-table entry,
+// which a BiBOP slot never has once its occupant is dead (an adopted object's INDEXED
+// state is restored to CN1_BIBOP_ADOPTED inside cn1DrainAdoptBuffer, and a dead adopted
+// object is turned back to CN1_BIBOP_HEAP_POS before its slot is freed). A slot carved
+// out of a reformatted page can hold any byte there, and overwriting it is what it needs.
+// PUBLISHING A BUMP SLOT. A concurrent reader (the grace walk, the root snapshot, the
+// sweep) loads bumpIndex with ACQUIRE and then reads the headers of the slots below it,
+// so every store that initializes a slot must be visible before the bumpIndex store that
+// covers it. That is a STORE->STORE ordering, and it used to be bought with release
+// stores -- on the header AND on bumpIndex, per object. A release store is far dearer than
+// the ordering it is used for here: measured on the bare allocation pattern (8M 32-byte
+// objects, Apple M-series), release on both 22ms, on bumpIndex alone 22ms, on the header
+// alone 14ms, a store-store fence before a relaxed bumpIndex store 14-16ms, nothing 11-16ms
+// -- while JDK 25's whole objectAllocation rep is 10.5ms. HotSpot publishes an allocation
+// with exactly this fence (StoreStore after initialization).
+//
+// So the slot is initialized with plain stores and then fenced: dmb ishst on ARM; on x86
+// stores are already ordered (TSO), so only the compiler must not reorder them; anywhere
+// else, a C11 release fence, which is stronger than needed.
+#if defined(__aarch64__) || defined(__arm__)
+#define CN1_STORESTORE_FENCE() __asm__ volatile("dmb ishst" ::: "memory")
+#elif defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
+#define CN1_STORESTORE_FENCE() __atomic_signal_fence(__ATOMIC_SEQ_CST)
+#else
+#define CN1_STORESTORE_FENCE() __atomic_thread_fence(__ATOMIC_RELEASE)
+#endif
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ && !defined(DEBUG_GC_ALLOCATIONS)
+#define CN1_BIBOP_HEADER_WORD(index) \
+    ((uint32_t)(uint16_t)(index) | ((uint32_t)(uint8_t)(signed char)-1 << 16) \
+     | ((uint32_t)(uint8_t)(signed char)CN1_BIBOP_HEAP_POS << 24))
+// Relaxed: the fence before the bumpIndex store orders it (see above). Atomic only so the
+// word is written whole against a concurrent reader of the mark byte.
+#define CN1_BIBOP_STORE_HEADER(o, index) \
+    __atomic_store_n((uint32_t*)&((struct JavaObjectPrototype*)(o))->__cn1ClassId, \
+                     CN1_BIBOP_HEADER_WORD(index), __ATOMIC_RELAXED)
+#else
+#define CN1_BIBOP_STORE_HEADER(o, index) do { \
+        ((struct JavaObjectPrototype*)(o))->__cn1ClassId = (uint16_t)(index); \
+        ((struct JavaObjectPrototype*)(o))->__cn1HeapState = (signed char)CN1_BIBOP_HEAP_POS; \
+        CN1_OBJ_MARK_STORE((o), -1, __ATOMIC_RELAXED); \
+    } while(0)
+#endif
+// Publishes bump slot bi of p: everything written to the slot before this is visible to a
+// reader that acquire-loads the new bumpIndex.
+#define CN1_BIBOP_PUBLISH_BUMP(p, bi) do { \
+        CN1_STORESTORE_FENCE(); \
+        atomic_store_explicit(&(p)->bumpIndex, (bi) + 1, memory_order_relaxed); \
+    } while(0)
+// The header index a NEW of class X stamps. Only the String twins override classId + 1
+// (cn1HeaderIndex), and they are never the subject of a NEW.
+#define CN1_CLASS_HEADER_INDEX(X) ((uint16_t)(cn1_class_id_##X + 1))
+// Publishes the class of an object built under init-before-publish. X was registered by
+// its static initializer (cn1ClassReady) before any instance could be allocated, so this
+// is a constant store with no registry test.
+#define CN1_OBJ_PUBLISH_CLASS(o, X) \
+    (((struct JavaObjectPrototype*)(o))->__cn1ClassId = CN1_CLASS_HEADER_INDEX(X))
+// Registers a class in both class registries; emitted into every static initializer,
+// before the class is marked initialized, which is what lets CN1_FAST_NEW skip both tests.
+extern void cn1ClassReady(struct clazz* c);
+// The free-list half of cn1BibopFastAllocNoZero; see the note at its call.
+extern JAVA_OBJECT cn1BibopAllocRecycledNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci);
+static inline __attribute__((always_inline)) JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci, uint16_t index) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
-    // EVERY allocation path must register the class BEFORE the object publishes --
-    // including this inline bump. That completes the invariant the GC mark guard
-    // depends on: a resolved (current) slot whose class pointer is NOT in the
-    // registry can only be a clobbered/reused header, and the guard skips it
-    // WITHOUT dereferencing. (An earlier version left this path unhooked and had
-    // the guard "adopt" unknown class values after resolving the slot -- a
-    // conservatively-reached slot with a reused header then fed garbage into the
-    // registry and the register write faulted: the arm64 suite SIGSEGV in
-    // cn1GcRegisterClazz.) Cost is one predictable flag-test per alloc, measured
-    // at noise level on allocation-heavy renders.
-    CN1_CLAZZ_REGISTER(parent);
+    // No class registration here: this is reached only through CN1_FAST_NEW, after the
+    // class's static-initializer guard, and the initializer registered the class
+    // (cn1ClassReady) before it published `initialized`. Every OTHER allocation path
+    // still registers on its own (cn1BibopAlloc, cn1BibopAllocRecycled, the NoZero
+    // entry the String twins use).
     CN1BibopPage* p = threadStateData->bibopCurrent[ci];
-    if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
-                        constantPoolObjects != (JAVA_OBJECT*)0
+    if(__builtin_expect(p != (CN1BibopPage*)0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
                         && !threadStateData->nativeAllocationMode
 #endif
                         , 1)) {
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
-        if(__builtin_expect(bi < CN1_BIBOP_SLOT_COUNT(ci), 1)) {
+        if(__builtin_expect(bi < p->bumpLimit, 1)) {
             JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + CN1_BIBOP_HDR_BYTES
                     + (long)bi * CN1_BIBOP_CLASS_SIZE(ci));
 #ifdef CN1_BIBOP_VALIDATE
@@ -2818,34 +2923,13 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             // fields get scanned during the mark==-1 grace window and retain
             // floating garbage. The body zero is load-bearing, not overhead.
             CN1_OBJ_ZERO_BODY(o, size);
-            CN1_OBJ_SET_CLASS(o, parent);
-            // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the
-            // header (force-visited / monitor side tables); no per-object stores.
-            CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
             CN1_ALLOC_CENSUS_COUNT(parent, size);
-#ifdef DEBUG_GC_ALLOCATIONS
-            o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
-            o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
-#endif
-            CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
-            atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-#ifndef CN1_BIBOP_NO_FASTSWEEP
-            // Mark the page dirty: the O(1) sweep never treats a page that still has
-            // fresh mark==-1 (grace-candidate) slots as homogeneous, and the grace
-            // pass slot-scans exactly the flagged pages ("-1 slot present" implies
-            // "allocated into since last sweep" -- the sweep converts every -1 it
-            // sees). Relaxed atomic (compiles to the same plain store on the hot
-            // path) because the GRACE PASS reads this concurrently: pre-mark stores
-            // are ordered ahead of it by the mark-start thread pause, and a store
-            // it can still miss is by definition a during-mark allocation --
-            // SATB-covered this cycle and rescanned next cycle since only the
-            // sweep (never a concurrent phase) clears the flag.
-            __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
-#endif
-            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
-            // allocationsSinceLastGC / totalAllocations (the isHighFrequencyGC heuristic)
-            // are now bumped in bulk by CN1_BIBOP_FLUSH_BYTES once per page-acquire, not
-            // per object -- removing two global-counter stores from the hot path.
+            CN1_BIBOP_STORE_HEADER(o, index);
+            CN1_BIBOP_PUBLISH_BUMP(p, bi);
+            // gcAllocedSinceSweep and the allocation-trigger bytes are no longer touched
+            // here: the page was flagged when this thread took it (cn1BibopOwnPage), and
+            // its bump bytes are charged when it is retired (cn1BibopAccountBump). Both
+            // were stores on every allocation for facts that only change per page.
 #ifdef CN1_GC_CONFORM
             cn1RecordAllocation(parent, size);
 #endif
@@ -2874,18 +2958,23 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 // header (parentCls / mark / heapPosition) is still initialized here; ONLY the
 // body zero is elided.
 
-static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
+// The NoZero bump. `registered` is a constant at every call: 1 from CN1_FAST_NEW_NOZERO,
+// whose class registered in its static initializer, and 0 from the runtime's own direct
+// callers, which allocate the String twins -- classes with no static initializer of their
+// own, registered by this test on first use.
+static inline __attribute__((always_inline)) JAVA_OBJECT cn1BibopFastAllocNoZeroImpl(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci, int registered) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
-    CN1_CLAZZ_REGISTER(parent); // see cn1BibopFastAlloc: every alloc path registers
+    if(!registered) {
+        CN1_CLAZZ_REGISTER(parent); // see cn1BibopFastAlloc: every alloc path registers
+    }
     CN1BibopPage* p = threadStateData->bibopCurrent[ci];
-    if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
-                        constantPoolObjects != (JAVA_OBJECT*)0
+    if(__builtin_expect(p != (CN1BibopPage*)0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
                         && !threadStateData->nativeAllocationMode
 #endif
                         , 1)) {
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
-        if(__builtin_expect(bi < CN1_BIBOP_SLOT_COUNT(ci), 1)) {
+        if(__builtin_expect(bi < p->bumpLimit, 1)) {
             JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + CN1_BIBOP_HDR_BYTES
                     + (long)bi * CN1_BIBOP_CLASS_SIZE(ci));
 #ifdef CN1_BIBOP_VALIDATE
@@ -2901,75 +2990,36 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             }
 #endif
             // BODY MEMSET ELIDED (init-before-publish -- see comment above).
-            // parentCls is deliberately left 0 UNTIL THE PUBLISH: a thread can be
+            // The class index is deliberately left 0 UNTIL THE PUBLISH: a thread can be
             // SIGNAL-STOPPED at an arbitrary instruction inside the construction
             // window, and the conservative scan then resolves this slot (heapPosition
             // is already CN1_BIBOP_HEAP_POS) and calls gcMarkObject on it -- whose
-            // parentCls==0 guard is the ONLY thing preventing it from tracing the
-            // garbage body. The translator stores &class__X right before publishing
+            // class==0 guard is the ONLY thing preventing it from tracing the
+            // garbage body. The translator stores the class right before publishing
             // the fully-built object (InlinableConstructor.appendInitBeforePublish);
             // the mark==-1 grace keeps the object alive through the skipped cycle.
-            // The explicit 0 store matters: a bump slot recycled by the O(1)
-            // homogeneous page reclaim still holds the DEAD previous occupant's
-            // class pointer.
-            CN1_OBJ_SET_CLASS(o, (struct clazz*)0);
-            CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
+            // The explicit 0 matters: a bump slot recycled by the O(1) homogeneous page
+            // reclaim still holds the DEAD previous occupant's class.
             CN1_ALLOC_CENSUS_COUNT(parent, size);
-#ifdef DEBUG_GC_ALLOCATIONS
-            o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
-            o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
-#endif
-            CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
-            atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-#ifndef CN1_BIBOP_NO_FASTSWEEP
-            // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
-            __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
-#endif
-            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
+            CN1_BIBOP_STORE_HEADER(o, 0);
+            CN1_BIBOP_PUBLISH_BUMP(p, bi);
+            // No per-object gcAllocedSinceSweep or byte accounting: see cn1BibopFastAlloc.
 #ifdef CN1_GC_CONFORM
             cn1RecordAllocation(parent, size);
 #endif
             return o;
         }
     }
-    // A RECYCLED page: take a slot its last sweep freed. This used to fall through to
-    // __NEW_X and the full slow path for EVERY object once pages came back partial --
-    // which is every allocation in a heap small enough to be reused. Profiled at an 8MB
-    // trigger, that slow path (cn1BibopAlloc, codenameOneGcMalloc, its pthread_once and
-    // the class-initializer call) was ~55% of objectAllocation's main thread, and it is
-    // why small triggers were slow. Sound under the same argument as the bump slot above:
-    // parentCls is 0 until the constructor publishes it, so a conservative scan of the
-    // construction window stops at the guard, and a recycled bump slot already holds a
-    // dead occupant's bytes exactly as this one does (the free-list link is in the word
-    // zeroed here). The slot reads FREE_MARK until the release store of -1.
-    if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList != (void*)0 &&
-                        constantPoolObjects != (JAVA_OBJECT*)0
-#ifndef CN1_CONSERVATIVE_GC_ROOTS
-                        && !threadStateData->nativeAllocationMode
-#endif
-                        , 1)) {
-        JAVA_OBJECT o = (JAVA_OBJECT)p->freeList;
-        p->freeList = CN1_BIBOP_FREE_LINK(o);
-        p->freeCount--;
-        CN1_BIBOP_NOTE_RECYCLED(p, o);
-        CN1_OBJ_SET_CLASS(o, (struct clazz*)0);
-        CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
-        CN1_ALLOC_CENSUS_COUNT(parent, size);
-#ifdef DEBUG_GC_ALLOCATIONS
-        o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
-        o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
-#endif
-        CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
-#ifndef CN1_BIBOP_NO_FASTSWEEP
-        __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
-#endif
-        CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
-#ifdef CN1_GC_CONFORM
-        cn1RecordAllocation(parent, size);
-#endif
-        return o;
-    }
-    return (JAVA_OBJECT)0;
+    // A RECYCLED page: take a slot its last sweep freed -- out of line, exactly as
+    // cn1BibopFastAlloc leaves it to cn1BibopAllocRecycled. Inlining this second path
+    // made the function too large for clang to inline at all: every CN1_FAST_NEW_NOZERO
+    // site then CALLED a generic copy that took ci at run time, so the bump path paid a
+    // call, eight register spills and a udiv (CN1_BIBOP_SLOT_COUNT) per object --
+    // 69% of objectAllocation's main thread. Keep everything below the bump path cold.
+    return cn1BibopAllocRecycledNoZero(threadStateData, size, parent, ci);
+}
+static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
+    return cn1BibopFastAllocNoZeroImpl(threadStateData, size, parent, ci, 0);
 }
 
 // CN1_FAST_NEW(X): inlined alloc + static-init guard for a NEW of concrete type
@@ -2987,21 +3037,34 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
  * the same word, and without it the core speculates that load early and pays for it.
  * Static-method entries and interface thunks DO drop the guard for eager classes; only
  * allocation sites keep it. */
+// Flags the page of a freshly allocated finalizable object (see gcHasFinalizable).
+// CN1_FINALIZABLE_<class> is a translator-emitted 0/1 constant, so for every class without
+// a finalizer this folds away and the allocation path is unchanged.
+#if !defined(CN1_BIBOP_NO_FASTSWEEP)
+#define CN1_BIBOP_NOTE_FINALIZABLE(X, o) do { \
+    if(CN1_FINALIZABLE_##X && CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS) { \
+        ((CN1BibopPage*)((uintptr_t)(o) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcHasFinalizable = JAVA_TRUE; \
+    } } while(0)
+#else
+#define CN1_BIBOP_NOTE_FINALIZABLE(X, o) do {} while(0)
+#endif
 #define CN1_FAST_NEW(X) ({ \
     if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
-    JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
+    JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X)), CN1_CLASS_HEADER_INDEX(X)); \
     if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) { \
         __cn1fo = cn1BibopAllocRecycled(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
         if(__cn1fo == (JAVA_OBJECT)0) __cn1fo = __NEW_##X(threadStateData); \
     } \
+    CN1_BIBOP_NOTE_FINALIZABLE(X, __cn1fo); \
     __cn1fo; })
 // No-body-zero variant (init-before-publish). The slow-path fallback __NEW_X
 // still fully zeroes (calloc) -- correct, just un-elided on the rare page-full
 // path.
 #define CN1_FAST_NEW_NOZERO(X) ({ \
     if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
-    JAVA_OBJECT __cn1fo = cn1BibopFastAllocNoZero(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
+    JAVA_OBJECT __cn1fo = cn1BibopFastAllocNoZeroImpl(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X)), 1); \
     if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
+    CN1_BIBOP_NOTE_FINALIZABLE(X, __cn1fo); \
     __cn1fo; })
 #else
 #define CN1_FAST_NEW(X) __NEW_##X(threadStateData)
