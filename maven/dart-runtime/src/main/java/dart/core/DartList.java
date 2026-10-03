@@ -541,16 +541,32 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     public DartIterable<E> reversed() {
         DartList<E> self = this;
         return DartIterable.wrap(() -> new java.util.Iterator<E>() {
-            private int i = self.size() - 1;
+            // Dart's ListIterator: the length at creation, checked on every step, so
+            // a list that grows or shrinks mid-loop throws rather than skipping or
+            // repeating elements (a shrink used to read past the new end).
+            private final int length = self.size();
+            private int i = length - 1;
 
             @Override
             public boolean hasNext() {
+                checkLength();
                 return i >= 0;
             }
 
             @Override
             public E next() {
+                checkLength();
+                if (i < 0) {
+                    throw new java.util.NoSuchElementException();
+                }
                 return self.get(i--);
+            }
+
+            private void checkLength() {
+                if (self.size() != length) {
+                    throw new ConcurrentModificationError("list length changed from "
+                            + length + " to " + self.size());
+                }
             }
         });
     }

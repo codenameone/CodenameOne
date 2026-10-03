@@ -1050,4 +1050,37 @@ public class DartCoreSemanticsTest {
         assertNull(DString.tryParseInt("\u0663", 10));
         assertEquals(Long.valueOf(35L), DString.tryParseInt("Z", 36));
     }
+
+    // --- List.reversed is Dart's ListIterator ------------------------------------
+
+    @Test
+    public void reversedThrowsWhenTheListChangesLengthMidLoop() {
+        final DartList<Long> grow = new DartList<Long>();
+        grow.add(1L);
+        grow.add(2L);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Long v : grow.reversed()) {
+                grow.add(v);
+            }
+        });
+        final DartList<Long> shrink = new DartList<Long>();
+        shrink.add(1L);
+        shrink.add(2L);
+        shrink.add(3L);
+        // Shrinking used to read past the new end instead.
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Long v : shrink.reversed()) {
+                shrink.removeLast();
+            }
+        });
+        DartList<Long> same = new DartList<Long>();
+        same.add(1L);
+        same.add(2L);
+        StringBuilder seen = new StringBuilder();
+        for (Long v : same.reversed()) {
+            same.set(0, v);
+            seen.append(v);
+        }
+        assertEquals("22", seen.toString(), "an element write is not a length change");
+    }
 }
