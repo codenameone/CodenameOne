@@ -203,7 +203,10 @@ case "$PLATFORM" in
     # ios-source generates the Xcode project locally rather than sending the
     # build to the cloud builder.
     cn1_build ios ios-source
-    XCPROJ="$(first "$CN1/ios/target" -maxdepth 2 -type d -name '*-ios-source')"
+    # Searched across the project, not in an ios/ module: since the archetype
+    # generates the minimal layout (no per-platform modules), the build writes
+    # its source project under common/target.
+    XCPROJ="$(first "$CN1" -maxdepth 3 -path '*/target/*' -type d -name '*-ios-source')"
     [ -n "$XCPROJ" ] || { echo "no generated Xcode project" >&2; exit 2; }
     # BY TARGET, and with an explicit output directory.
     #
@@ -258,7 +261,9 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
         RETRY_ONLY_MATCHING='Failed to install the following SDK components|Archive is not a ZIP archive|Error on ZipFile unknown archive' \
         bash "$HERE/../../ci/retry.sh" flutter build apk --release -t "$FLUTTER_ENTRY" )
     cn1_build android android-source
-    GRADLE_PROJECT="$(first "$CN1/android/target" -maxdepth 2 -type d -name '*-android-source')"
+    # As for iOS: the minimal layout puts it under common/target, the old one
+    # under android/target.
+    GRADLE_PROJECT="$(first "$CN1" -maxdepth 3 -path '*/target/*' -type d -name '*-android-source')"
     [ -n "$GRADLE_PROJECT" ] || { echo "no generated Gradle project" >&2; exit 2; }
     ( cd "$GRADLE_PROJECT" && ./gradlew assembleRelease )
     emit flutter "$FL/build/app/outputs/flutter-apk/app-release.apk"
