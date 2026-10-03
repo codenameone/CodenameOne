@@ -425,6 +425,55 @@ public final class JavaEmitter {
         return f.isStatic && isLazyTopLevel(f);
     }
 
+    /**
+     * An initialiser that cannot throw when the getter runs it: a {@code const}
+     * variable's (Dart evaluates it at compile time, where a throwing constant is a
+     * compile error, and everything it reads is itself constant), or one
+     * {@link #cannotThrow} accepts.
+     */
+    private static boolean initializerCannotThrow(FieldDecl v) {
+        return v.isConst || cannotThrow(v.initializer);
+    }
+
+    /**
+     * An expression that cannot throw: a constant, or a plain collection literal --
+     * {@code <K, V>{}}, {@code [1, 2]} -- of such expressions. Anything that runs code
+     * of its own (a call, a non-const constructor, a read that may be a lazy getter,
+     * an operator) is assumed to be able to.
+     */
+    private static boolean cannotThrow(Expr e) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        if (e instanceof CtorCall) {
+            return ((CtorCall) e).isConst;
+        }
+        if (e instanceof ListLit) {
+            ListLit l = (ListLit) e;
+            return l.isConst || allCannotThrow(l.elements);
+        }
+        if (e instanceof Ast.SetLit) {
+            Ast.SetLit l = (Ast.SetLit) e;
+            return l.isConst || allCannotThrow(l.elements);
+        }
+        if (e instanceof Ast.MapLit) {
+            Ast.MapLit m = (Ast.MapLit) e;
+            return m.isConst || (!m.structured && m.elements.isEmpty()
+                    && allCannotThrow(m.keys) && allCannotThrow(m.values));
+        }
+        return isSelfContainedLiteral(e);
+    }
+
+    /** Every one of {@code es} is {@link #cannotThrow}; spreads, ifs and fors are not. */
+    private static boolean allCannotThrow(List<Expr> es) {
+        for (Expr x : es) {
+            if (!cannotThrow(x)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** A literal whose value cannot reference any other declaration. */
     private static boolean isSelfContainedLiteral(Expr e) {
         if (e instanceof Ast.IntLit || e instanceof Ast.DoubleLit
@@ -452,7 +501,8 @@ public final class JavaEmitter {
      * {@code Lib.set$x(v)} with no special case at the assignment site.
      */
     private String emitLazyTopLevel(FieldDecl v, TypeRef vt, String jt, Ctx ctx) {
-        ctx.pushWriter(4);
+        boolean cannotThrow = initializerCannotThrow(v);
+        ctx.pushWriter(cannotThrow ? 3 : 4);
         Out init = emitExpr(v.initializer, vt, ctx);
         String lifted = ctx.popWriter();
         StringBuilder sb = new StringBuilder();
@@ -468,17 +518,28 @@ public final class JavaEmitter {
         // initialiser reads it back is a cycle, and returning the zero value
         // beats recursing until the stack goes.
         sb.append("            ").append(v.name).append("$ready = true;\n");
-        // An initialiser that throws leaves the variable uninitialised in Dart, and the
-        // next read runs it again. Left marked ready, every later read answered the
-        // Java zero value -- null, 0 or false, even in a non-nullable variable.
-        sb.append("            try {\n");
-        sb.append(lifted);
-        sb.append("                ").append(v.name).append("$value = ")
-                .append(coerce(init, vt, ctx)).append(";\n");
-        sb.append("            } catch (Throwable $e) {\n");
-        sb.append("                ").append(v.name).append("$ready = false;\n");
-        sb.append("                throw $e;\n");
-        sb.append("            }\n");
+        if (cannotThrow) {
+            // A constant is evaluated by the Dart compiler, so it never throws at run
+            // time and the reset below would be dead code. It is not free dead code:
+            // ParparVM gives a method with a handler a full frame and an unwind
+            // point, and the gallery's 190-odd constant getters grew the Linux
+            // executable by 2% when every one carried it.
+            sb.append(lifted);
+            sb.append("            ").append(v.name).append("$value = ")
+                    .append(coerce(init, vt, ctx)).append(";\n");
+        } else {
+            // An initialiser that throws leaves the variable uninitialised in Dart, and the
+            // next read runs it again. Left marked ready, every later read answered the
+            // Java zero value -- null, 0 or false, even in a non-nullable variable.
+            sb.append("            try {\n");
+            sb.append(lifted);
+            sb.append("                ").append(v.name).append("$value = ")
+                    .append(coerce(init, vt, ctx)).append(";\n");
+            sb.append("            } catch (Throwable $e) {\n");
+            sb.append("                ").append(v.name).append("$ready = false;\n");
+            sb.append("                throw $e;\n");
+            sb.append("            }\n");
+        }
         sb.append("        }\n");
         sb.append("        return ").append(v.name).append("$value;\n");
         sb.append("    }\n\n");
@@ -5116,7 +5177,37 @@ public final class JavaEmitter {
     private Lazy emitLazyOperand(Expr e, TypeRef expected, Ctx ctx, int depth) {
         ctx.pushWriter(ctx.currentIndent() + depth);
         Out o = emitExpr(e, expected, ctx);
-        return new Lazy(o, ctx.popWriter());
+        String lifted = ctx.popWriter();
+        if (!lifted.isEmpty() && onlyTempDeclarations(lifted)) {
+            // A bare `T $t3;` runs nothing; it only gives the operand's expression a
+            // temp to assign (`(($t3 = a) != null ? $t3 : b)`). It stays in front of
+            // the enclosing statement, as it always was, so the operand keeps its
+            // plain expression form instead of costing an if/else, an if or a
+            // break-loop for no change in behaviour.
+            Ctx.Writer w = ctx.writer();
+            for (String line : lifted.split("\n")) {
+                if (!line.trim().isEmpty()) {
+                    w.line(line.trim());
+                }
+            }
+            lifted = "";
+        }
+        return new Lazy(o, lifted);
+    }
+
+    /** A temp declaration with no initialiser: {@code Widget $t3;}. */
+    private static final java.util.regex.Pattern TEMP_DECLARATION = java.util.regex.Pattern.compile(
+            "[A-Za-z_][\\w.$]*(<[^;=(){}]*>)?(\\[\\])* \\$t\\d+;");
+
+    /** True when every line of {@code lifted} is a {@link #TEMP_DECLARATION}. */
+    private static boolean onlyTempDeclarations(String lifted) {
+        for (String line : lifted.split("\n")) {
+            String t = line.trim();
+            if (!t.isEmpty() && !TEMP_DECLARATION.matcher(t).matches()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** A Java type a temp can be declared with for {@code t}, or null when there is none. */
@@ -5769,6 +5860,12 @@ public final class JavaEmitter {
 
     /** The result type produced by invoking a function-valued {@link TypeRef} (VOID or DYNAMIC when unknown). */
     private TypeRef funcResultType(TypeRef t) {
+        if (t != null && t.funcParams != null && t.funcReturn != null) {
+            // An inline function type (`int Function(int)?`) carries its own signature.
+            // Answered as dynamic, `print(o.f?.call(x))` took the void path and printed
+            // nothing: the callback ran and its result was dropped.
+            return t.funcReturn.is("void") ? TypeRef.VOID : t.funcReturn;
+        }
         TypeRef[] sig = t == null ? null : typedefSig(t.name);
         if (sig != null) {
             TypeRef r = sig[sig.length - 1];
@@ -5984,8 +6081,15 @@ public final class JavaEmitter {
             // The arguments are evaluated only when the receiver is non-null, so any
             // statements they lift (`a?.addAll([...xs])`) go inside the guard.
             ctx.pushWriter(ctx.currentIndent() + 1);
-            Out called = emitMethodCallOn(
-                    new Out(tmp, copyNonNull(mat.type), mat.fromError), c, ctx);
+            String outerChecked = ctx.nullCheckedTemp;
+            ctx.nullCheckedTemp = tmp;
+            Out called;
+            try {
+                called = emitMethodCallOn(
+                        new Out(tmp, copyNonNull(mat.type), mat.fromError), c, ctx);
+            } finally {
+                ctx.nullCheckedTemp = outerChecked;
+            }
             String lifted = ctx.popWriter();
             if (!lifted.isEmpty()) {
                 Out guarded = guardLifted(tmp, lifted, called, ctx);
@@ -6396,6 +6500,15 @@ public final class JavaEmitter {
         // SAM invocation on a function-typed value: `f.call(args)` / `f?.call(args)`
         if (n.equals("call") && isFunctionValued(tt)) {
             TypeRef ret = funcResultType(tt);
+            // `f?.call()` reached through the `a?.m()` path above, which has already
+            // put f in a temp and is guarding it: a second temp and test inside that
+            // guard is dead code.
+            if (c.nullAware && target.code.equals(ctx.nullCheckedTemp)) {
+                // Typed as the guarded form below would be: a void (or erased-void)
+                // callback stays a statement, which the caller's guard wraps.
+                String call = target.code + ".call(" + plainArgs(c.args, ctx) + ")";
+                return new Out(call, ret.is("void") || ret.is("dynamic") ? TypeRef.VOID : ret);
+            }
             if (c.nullAware) {
                 String tmp = ctx.newTemp();
                 ctx.writer().line("var " + tmp + " = " + target.code + ";");
@@ -8832,6 +8945,8 @@ public final class JavaEmitter {
         }
         TypeRef c = TypeRef.of(t.name, t.args.toArray(new TypeRef[0]));
         c.nullable = true;
+        c.funcParams = t.funcParams;
+        c.funcReturn = t.funcReturn;
         return c;
     }
 
@@ -8841,6 +8956,11 @@ public final class JavaEmitter {
         }
         TypeRef c = TypeRef.of(t.name, t.args.toArray(new TypeRef[0]));
         c.nullable = false;
+        // An inline function type keeps its signature (in boxType too): without it a
+        // callback read through `a?.f` lost its return type, and a value-returning
+        // `?.call()` was emitted as a statement that dropped the value.
+        c.funcParams = t.funcParams;
+        c.funcReturn = t.funcReturn;
         return c;
     }
 
@@ -9274,6 +9394,11 @@ public final class JavaEmitter {
         TypeRef methodReturnType;
         TypeRef extensionSelfType;
         boolean inAsyncBody;
+        /**
+         * The temp an enclosing {@code a?.m()} has already tested for null while it
+         * emits the call on it, so {@code a?.call()} does not test the same temp again.
+         */
+        String nullCheckedTemp;
         /** Inside a hashCode/compareTo body: narrow each `return` value to Java int. */
         boolean narrowReturnToInt;
         String syncStarList;                  // non-null inside a sync* body: the result-list temp

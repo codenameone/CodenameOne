@@ -53,3 +53,12 @@ values [set top 4, set top 6, set top 5, set top 6, cell 1=7, cell 1=8, set p 8,
 null
 4 5
 cascade [side 4, side 5, set p 5]
+null
+14
+null
+18
+callbacks [tapped, side 7, side 9]
+3 k
+{x: 10} [a, b]
+11 12
+statics [side 10, side 11]

@@ -58,6 +58,28 @@ Node make() {
   return shared;
 }
 
+// A callback field reached through `a?.m()` is tested for null once, and its
+// arguments run only when it is set.
+class Callbacks {
+  void Function()? onTap;
+  int Function(int)? compute;
+  Callbacks? next;
+}
+
+// A constant static has no failure to recover from; a plain collection literal
+// neither. Both still initialise on first read.
+class Konst {
+  final int v;
+  const Konst(this.v);
+}
+
+class Statics {
+  static const Konst k = Konst(3);
+  static const String label = 'k';
+  static final cache = <String, int>{};
+  static final names = <String>['a', 'b'];
+}
+
 void show(String what) {
   print('$what $log');
   log.clear();
@@ -170,4 +192,28 @@ void main() {
   other?..v = side(4)..p = side(5);
   print('${other?.v} ${other?.p}');
   show('cascade');
+
+  // 6. a callback field invoked through ?.call
+  final cbs = Callbacks();
+  cbs.onTap?.call();
+  print(cbs.compute?.call(side(6)));
+  cbs.onTap = () => log.add('tapped');
+  cbs.compute = (x) => x * 2;
+  cbs.onTap?.call();
+  print(cbs.compute?.call(side(7)));
+  print(cbs.next?.compute?.call(side(8)));
+  cbs.next = cbs;
+  print(cbs.next?.compute?.call(side(9)));
+  show('callbacks');
+
+  // 7. constant and literal statics, and a conditional arm whose ?? needs a temp
+  print('${Statics.k.v} ${Statics.label}');
+  Statics.cache['x'] = side(10);
+  print('${Statics.cache} ${Statics.names}');
+  final Node? fresh = Node();
+  final pick = log.isEmpty ? 'empty' : fresh?.maybe ?? side(11);
+  fresh?.maybe = 12;
+  final pick2 = log.isEmpty ? 'empty' : fresh?.maybe ?? side(13);
+  print('$pick $pick2');
+  show('statics');
 }

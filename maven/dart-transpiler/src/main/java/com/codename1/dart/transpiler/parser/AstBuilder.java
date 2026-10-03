@@ -197,6 +197,7 @@ public final class AstBuilder {
                     f.name = ii.identifier().getText();
                     f.type = type;
                     f.isFinal = isFinal;
+                    f.isConst = ctx.CONST_() != null;
                     f.isStatic = true;
                     f.javaName = javaName;
                     if (ii.expr() != null) {
@@ -211,6 +212,7 @@ public final class AstBuilder {
                     f.name = sf.identifier().getText();
                     f.type = type;
                     f.isFinal = true;
+                    f.isConst = ctx.CONST_() != null;
                     f.isStatic = true;
                     f.javaName = javaName;
                     f.initializer = buildExpr(sf.expr());
