@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <FindBugsFilter>
+    <!-- DIAG branch only -->
+    <Match><Class name="com.codename1.impl.android.WebViewNavDiag" /></Match>
     <!--
     Project-specific SpotBugs exclusions for the Android port.
 
