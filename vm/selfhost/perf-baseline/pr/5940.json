@@ -86,6 +86,24 @@
    }
   },
   "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.803,
+      "time": 1.228,
+      "tolerance": {
+       "time": 0.25
+      }
+     },
+     "memory": 0.803,
+     "reason": "Noise recalibration, not a performance change: this runner's hello rounds spanned 0.92x-1.59x within one run (two runs, medians 1.26x and 1.55x), while hello on linux-x64 and linux-arm64 in the same CI run was 0.89x/0.90x against baselines of 0.95x/0.93x.",
+     "runs": 2,
+     "time": 1.409,
+     "tolerance": {
+      "time": 0.25
+     }
+    }
+   },
    "objectAllocation": {
     "all": {
      "from": {
@@ -96,12 +114,12 @@
        "time": 0.5
       }
      },
-     "memory": 0.294,
-     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25).",
-     "runs": 1,
+     "memory": 0.34,
+     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25). RAM on this row is noisy (0.27x-0.44x across rounds), so it is set from two runs.",
+     "runs": 2,
      "time": 1.559,
      "tolerance": {
-      "memory": 0.2,
+      "memory": 0.25,
       "time": 0.5
      }
     }
