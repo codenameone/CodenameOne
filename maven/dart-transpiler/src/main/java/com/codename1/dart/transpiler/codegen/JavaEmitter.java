@@ -700,7 +700,8 @@ public final class JavaEmitter {
             ctx.popScope();
             body.append("    }\n\n");
         }
-        return finishClassFile(mx.name, "public interface " + mx.name, null, null, body, ctx, mx.file);
+        String typeParams = mx.typeParams.isEmpty() ? "" : "<" + String.join(", ", mx.typeParams) + ">";
+        return finishClassFile(mx.name, "public interface " + mx.name + typeParams, null, null, body, ctx, mx.file);
     }
 
     private GeneratedFile emitClass(ClassDecl c) {
@@ -838,9 +839,18 @@ public final class JavaEmitter {
             if (impls.length() > 0) {
                 impls.append(", ");
             }
-            impls.append(mixRef.name);
+            impls.append(javaType(mixRef, false, ctx));
+            // The applying class holds the mixin's state, so a generic mixin's field is
+            // declared with the type arguments it is applied with (`with Holder<String>`
+            // holds a String); applied raw, with dynamic, as Dart instantiates to bounds.
+            Map<String, TypeRef> mixSubst = new LinkedHashMap<String, TypeRef>();
+            for (int i = 0; i < mx.typeParams.size(); i++) {
+                mixSubst.put(mx.typeParams.get(i), mixRef.args.size() == mx.typeParams.size()
+                        ? mixRef.args.get(i) : TypeRef.DYNAMIC);
+            }
             for (FieldDecl f : mx.fields) {
-                TypeRef ft = fieldType(f, ctx);
+                TypeRef ft = mixSubst.isEmpty() ? fieldType(f, ctx)
+                        : substituteTypeParams(fieldType(f, ctx), mixSubst);
                 String jt = javaType(ft, false, ctx);
                 body.append("    private ").append(jt).append(' ').append(f.name);
                 if (f.initializer != null) {
@@ -862,7 +872,25 @@ public final class JavaEmitter {
         }
         // Dart `implements X` clauses (c.interfaces): the runtime interface the class satisfies
         // (e.g. `implements Iterator<T>` / `PreferredSizeWidget`). Emitted as Java `implements`.
+        TypeRef implementedAsSuper = null;
         for (TypeRef itf : c.interfaces) {
+            ClassDecl implemented = program.classes.get(itf.name);
+            if (implemented != null && !implemented.isMixin) {
+                // A program class is a Java class, which `implements` cannot name. One
+                // that is purely an interface -- abstract, no state, no implemented
+                // members -- is extended instead, which inherits nothing Dart's
+                // `implements` would not. Anything else is reported rather than emitted
+                // as Java that does not compile.
+                if (c.superclass == null && implementedAsSuper == null && isPureInterface(implemented)) {
+                    implementedAsSuper = itf;
+                } else {
+                    diags.error(c, "E0404", "Implementing the class " + itf.name
+                            + " is not supported yet; only an abstract class with no fields"
+                            + " or implemented members can be implemented, once per class"
+                            + " and only by a class with no superclass");
+                }
+                continue;
+            }
             if (impls.length() > 0) {
                 impls.append(", ");
             }
@@ -906,6 +934,8 @@ public final class JavaEmitter {
         String ext = null;
         if (c.superclass != null) {
             ext = javaType(c.superclass, false, ctx);
+        } else if (implementedAsSuper != null) {
+            ext = javaType(implementedAsSuper, false, ctx);
         }
         String permits = null;
         if (sealedSelf) {
@@ -920,6 +950,40 @@ public final class JavaEmitter {
         }
         return finishClassFile(jname, decl, ext, impls.length() == 0 ? null : impls.toString(),
                 permits, body, ctx, c.file);
+    }
+
+    /**
+     * A program class Java can stand in for an interface by extending it: abstract, with
+     * no superclass or mixins of its own, no instance fields, no member with a body and
+     * no constructor that takes or does anything.
+     */
+    private boolean isPureInterface(ClassDecl c) {
+        if (!c.isAbstract || c.superclass != null || !c.mixins.isEmpty()) {
+            return false;
+        }
+        for (TypeRef itf : c.interfaces) {
+            ClassDecl ip = program.classes.get(itf.name);
+            if (ip != null && !ip.isMixin) {
+                return false;
+            }
+        }
+        for (FieldDecl f : c.fields) {
+            if (!f.isStatic) {
+                return false;
+            }
+        }
+        for (MethodDecl m : c.methods) {
+            if (!m.isStatic && (m.body != null || m.exprBody != null)) {
+                return false;
+            }
+        }
+        for (CtorDecl ct : c.ctors) {
+            if (ct.isFactory || !ct.params.isEmpty() || !ct.fieldInits.isEmpty()
+                    || ct.superInit != null || ct.body != null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Names of the classes that directly extend or implement the named class (whole-program). */
@@ -4193,28 +4257,31 @@ public final class JavaEmitter {
                     return new Out("this." + name, fieldType(f, ctx));
                 }
                 return new Out(target.code + ".get$" + name + "()",
-                        asSeenFrom(fieldType(f, ctx), pc, tt));
+                        asSeenFrom(fieldType(f, ctx), f, null, pc, tt));
             }
             MethodDecl g = pc.getter(name);
             if (g != null) {
-                return new Out(target.code + "." + name + "()", asSeenFrom(g.returnType, pc, tt));
+                return new Out(target.code + "." + name + "()", asSeenFrom(g.returnType, g, null, pc, tt));
             }
             Object mixF = findMixinMember(pc, name, true);
             if (mixF instanceof FieldDecl) {
-                return new Out(target.code + ".get$" + name + "()", fieldType((FieldDecl) mixF, ctx));
+                return new Out(target.code + ".get$" + name + "()",
+                        asSeenFrom(fieldType((FieldDecl) mixF, ctx), mixF, null, pc, tt));
             }
             Object mixG = findMixinMember(pc, name, false);
             if (mixG instanceof MethodDecl && ((MethodDecl) mixG).isGetter) {
-                return new Out(target.code + "." + name + "()", ((MethodDecl) mixG).returnType);
+                return new Out(target.code + "." + name + "()",
+                        asSeenFrom(((MethodDecl) mixG).returnType, mixG, null, pc, tt));
             }
             // field/getter inherited from a program superclass
             FieldDecl inhF = findInheritedField(pc, name);
             if (inhF != null && !inhF.name.startsWith("_")) {
-                return new Out(target.code + ".get$" + name + "()", fieldType(inhF, ctx));
+                return new Out(target.code + ".get$" + name + "()",
+                        asSeenFrom(fieldType(inhF, ctx), inhF, null, pc, tt));
             }
             MethodDecl inhG = findInheritedGetter(pc, name);
             if (inhG != null) {
-                return new Out(target.code + "." + name + "()", inhG.returnType);
+                return new Out(target.code + "." + name + "()", asSeenFrom(inhG.returnType, inhG, null, pc, tt));
             }
             // method tear-off on an instance: `obj.method` as a function value (method reference)
             MethodDecl tm = pc.method(name);
@@ -6467,7 +6534,8 @@ public final class JavaEmitter {
             }
             if (m != null) {
                 return new Out(target.code + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")",
-                        m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType);
+                        m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
+                                : asSeenFrom(m.returnType, m, m.typeParams, pc, tt));
             }
             // method inherited from the program class's stub superclass or a stub mixin
             // (e.g. a RestorableProperty subclass calling the inherited `dispose()`).
@@ -7452,16 +7520,31 @@ public final class JavaEmitter {
         if (pc != null) {
             String jn = javaClassName(pc);
             CtorDecl ct = pc.defaultCtor();
+            // The written type arguments are part of the result's type (`Box<String>()`
+            // is a Box<String>), so members read through it see them; a raw or
+            // mismatched instantiation stays raw.
+            TypeRef constructed = typeArgs != null && !typeArgs.isEmpty()
+                    && typeArgs.size() == pc.typeParams.size()
+                    ? TypeRef.of(className, typeArgs.toArray(new TypeRef[0])) : new TypeRef(className);
             if (ct != null && ct.isFactory) {
                 return new Out(jn + ".$create(" + canonicalArgs(ct, pc, args, ctx) + ")",
-                        new TypeRef(className));
+                        constructed);
             }
             // A generic program class constructed raw (`new Foo(...)`) erases the generics on ALL
             // its members — a constructor param typed Func1<BuildContext, Widget> becomes raw
             // Func1, so a lambda argument gets Object params. A diamond keeps the signatures.
             String diamond = pc.typeParams.isEmpty() ? "" : "<>";
+            if (!constructed.args.isEmpty()) {
+                // Written out rather than inferred: a diamond in receiver position
+                // (`new Box<>().get()`) infers Object, not the String the Dart type says.
+                StringBuilder ta = new StringBuilder("<");
+                for (int i = 0; i < constructed.args.size(); i++) {
+                    ta.append(i > 0 ? ", " : "").append(javaType(constructed.args.get(i), true, ctx));
+                }
+                diamond = ta.append('>').toString();
+            }
             return new Out("new " + jn + diamond + "(" + canonicalArgs(ct, pc, args, ctx) + ")",
-                    new TypeRef(className));
+                    constructed);
         }
         Ast.ClassDecl sc = stubs.classes.get(className);
         if (sc == null) {
@@ -7619,27 +7702,104 @@ public final class JavaEmitter {
 
     /** Recursively replaces type-parameter names (e.g. {@code T}, {@code A}) with concrete args. */
     /**
-     * A member type of the generic program class {@code pc} read through a receiver of
-     * type {@code receiver}: {@code T? get v} on a {@code Box<String>} is a
-     * {@code String?}. Left as T, {@code box.v!.length} did not resolve. A raw receiver,
-     * or one whose argument count does not match, keeps the declared type.
+     * The type of {@code member} -- a field, getter or method of a program class --
+     * as seen through a receiver {@code receiver} of class {@code receiverDecl}. The
+     * declaring class's type variables take the arguments the receiver's type carries
+     * down to it through every superclass, mixin and interface on the way, each link
+     * substituting its own: {@code T m()} on {@code Base<T>} is a String through a
+     * {@code class Sub extends Base<String>}, and {@code X? f} on {@code A<X>} is an int?
+     * through a {@code B<int>} of {@code class B<Y> extends A<Y>}. Left as the type
+     * variable, {@code sub.m().length} did not resolve. A raw receiver, a raw link on the
+     * way, or a variable a generic method declares itself ({@code shadowed}) keeps the
+     * declared type.
      */
-    private TypeRef asSeenFrom(TypeRef t, ClassDecl pc, TypeRef receiver) {
-        if (t == null || pc.typeParams.isEmpty() || receiver == null
-                || receiver.args.size() != pc.typeParams.size()) {
+    private TypeRef asSeenFrom(TypeRef t, Object member, List<String> shadowed,
+                               ClassDecl receiverDecl, TypeRef receiver) {
+        if (t == null || receiver == null || receiver.args.size() != receiverDecl.typeParams.size()
+                || program.classes.get(receiverDecl.name) != receiverDecl) {
+            // The chain below is walked by name; a class sharing its name with another
+            // library's (new_gallery's two Backdrops) cannot be told apart there.
+            return t;
+        }
+        ClassDecl owner = memberOwner(member);
+        if (owner == null || owner.typeParams.isEmpty()) {
+            return t;
+        }
+        List<TypeRef> args = instantiationArgs(receiverDecl.name, receiver.args, owner.name,
+                new java.util.HashSet<String>());
+        if (args == null || args.size() != owner.typeParams.size()) {
             return t;
         }
         Map<String, TypeRef> subst = new LinkedHashMap<String, TypeRef>();
-        for (int i = 0; i < pc.typeParams.size(); i++) {
-            subst.put(pc.typeParams.get(i), receiver.args.get(i));
+        for (int i = 0; i < owner.typeParams.size(); i++) {
+            String p = owner.typeParams.get(i);
+            if (shadowed == null || !shadowed.contains(p)) {
+                subst.put(p, args.get(i));
+            }
+        }
+        if (subst.isEmpty()) {
+            return t;
         }
         TypeRef out = substituteTypeParams(t, subst);
-        if (out != t && t.nullable && out != null && !out.nullable) {
+        if (t.nullable && out != null && !out.nullable) {
             // `T?` with T := String is String?, which the substitution of the bare
             // name does not carry over.
             out = boxType(out);
         }
         return out;
+    }
+
+    /**
+     * The type arguments {@code target} receives from {@code cls<args>}, searching its
+     * superclass, mixins and interfaces depth first; null when no path reaches it.
+     */
+    private List<TypeRef> instantiationArgs(String cls, List<TypeRef> args, String target,
+                                            java.util.Set<String> seen) {
+        if (cls.equals(target)) {
+            return args;
+        }
+        if (!seen.add(cls)) {
+            return null;
+        }
+        Ast.ClassDecl decl = program.classes.get(cls);
+        if (decl == null) {
+            decl = stubs.classes.get(cls);
+        }
+        if (decl == null) {
+            return null;
+        }
+        List<TypeRef> sups = new ArrayList<TypeRef>();
+        if (decl.superclass != null) {
+            sups.add(decl.superclass);
+        }
+        sups.addAll(decl.mixins);
+        sups.addAll(decl.interfaces);
+        for (TypeRef sup : sups) {
+            List<TypeRef> found = instantiationArgs(sup.name,
+                    substituteTypeParams(sup.args, decl.typeParams, args), target, seen);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    /** Program class declaring each field and method, built on first use. */
+    private java.util.IdentityHashMap<Object, ClassDecl> memberOwners;
+
+    private ClassDecl memberOwner(Object member) {
+        if (memberOwners == null) {
+            memberOwners = new java.util.IdentityHashMap<Object, ClassDecl>();
+            for (ClassDecl cd : program.classes.values()) {
+                for (FieldDecl f : cd.fields) {
+                    memberOwners.put(f, cd);
+                }
+                for (MethodDecl m : cd.methods) {
+                    memberOwners.put(m, cd);
+                }
+            }
+        }
+        return memberOwners.get(member);
     }
 
     private TypeRef substituteTypeParams(TypeRef t, Map<String, TypeRef> subst) {

@@ -159,6 +159,13 @@ public final class AstBuilder {
             pos(cd, mx);
             cd.name = mx.typeIdentifier().getText();
             cd.isMixin = true;
+            // `mixin Holder<H>`: dropped, the interface named an undeclared H and every
+            // class applying the mixin failed to compile.
+            if (mx.typeParameters() != null) {
+                for (Dart2Parser.TypeParameterContext tp : mx.typeParameters().typeParameter()) {
+                    cd.typeParams.add(tp.identifier().getText());
+                }
+            }
             cd.javaName = javaName;
             cd.javaName = javaName;
             java.util.List<Dart2Parser.ClassMemberDeclarationContext> members = mx.classMemberDeclaration();

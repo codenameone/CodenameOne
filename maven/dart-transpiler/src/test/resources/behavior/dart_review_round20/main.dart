@@ -116,6 +116,46 @@ class Inferred {
   var b = Box<String>();
 }
 
+// A member of a generic class read through a subclass, a mixin application, an
+// implemented interface or a typed receiver has the type its type arguments give it.
+class Base<T> {
+  T? v;
+  T get g => v!;
+  T m() => v!;
+}
+
+class Sub extends Base<String> {}
+
+class Box2<T> {
+  T? value;
+  T get() => value!;
+}
+
+class A<X> {
+  X? f;
+  X get fg => f!;
+  X fm() => f!;
+}
+
+class B<Y> extends A<Y> {}
+
+class C extends B<int> {}
+
+mixin Holder<H> {
+  H? held;
+  H take() => held!;
+}
+
+class UsesHolder with Holder<String> {}
+
+abstract class Source<S> {
+  S produce();
+}
+
+class StrSource implements Source<String> {
+  String produce() => 'made';
+}
+
 void show(String what) {
   print('$what $log');
   log.clear();
@@ -263,4 +303,23 @@ void main() {
   print('${inf.i.x} ${inf.b.v!.length}');
   topNamed = Pt(10);
   print(topNamed.x);
+
+  // 9. generic members through subclasses, mixins, interfaces and receivers
+  final sub = Sub();
+  sub.v = 'abc';
+  print('${sub.m().length} ${sub.g.length} ${sub.v!.length}');
+  final box = Box2<String>();
+  box.value = 'four';
+  print(box.get().length);
+  final b = B<int>();
+  b.f = 41;
+  print('${b.f! + 1} ${b.fg + 2} ${b.fm() + 3}');
+  final c = C();
+  c.f = 10;
+  print('${c.f! + 1} ${c.fg + 2} ${c.fm() + 3}');
+  final u = UsesHolder();
+  u.held = 'held';
+  print('${u.take().length} ${u.held!.length}');
+  Source<String> src = StrSource();
+  print(src.produce().length);
 }
