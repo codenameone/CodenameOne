@@ -51,9 +51,15 @@ public class CN1RunMojo extends AbstractCN1Mojo {
         if (commonDir == null) {
             return;
         }
+        if (!isFirstProjectOfTheBuild()) {
+            // Every module of the reactor resolves the same common directory; one nested
+            // run is the simulator, a second would be another window. The first project,
+            // not the execution root: `mvn -pl common cn1:run` selects common alone.
+            return;
+        }
         File rootMavenProjectDir = commonDir.getParentFile();
-        File javaSEDir = new File(rootMavenProjectDir, "javase");
-        if (!javaSEDir.exists()) {
+        // The javase module is optional: without one, common runs the simulator itself.
+        if (!new File(rootMavenProjectDir, "pom.xml").isFile()) {
             return;
         }
 
@@ -77,6 +83,10 @@ public class CN1RunMojo extends AbstractCN1Mojo {
         // nested build also has to inherit -Dmaven.repo.local or it resolves
         // against a different repository than the one this build installed into.
         forwardLocalRepository(props);
+        // What activates the simulator's module, or common's stand-in for it.
+        if (props.getProperty("codename1.platform") == null) {
+            props.setProperty("codename1.platform", "javase");
+        }
         request.setProperties(props);
         request.setBaseDirectory(rootMavenProjectDir);
 

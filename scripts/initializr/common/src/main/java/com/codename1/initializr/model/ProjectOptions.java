@@ -100,11 +100,15 @@ public final class ProjectOptions {
         }
     }
 
-    /// What the generated project holds. Only a Gradle project has a choice: a
-    /// Maven download always carries the backend module behind the `backend`
-    /// profile (it builds only when asked for, so an app pays nothing for it),
-    /// which makes APP and APP_WITH_BACKEND the same download there, and there is
-    /// no backend-only Maven scaffold -- GeneratorModel refuses that combination.
+    /// What the generated project holds: an app, an app with a `backend/` server
+    /// beside it, or a server on its own.
+    ///
+    /// A Maven project has the choice only when the plugin it is generated against
+    /// can build an app without its platform modules
+    /// ([GeneratorModel#isMavenLayoutChoiceOffered()]). Against an older plugin a
+    /// Maven download is the full multi-module layout, which always carries the
+    /// backend module behind the `backend` profile, so APP and APP_WITH_BACKEND are
+    /// the same download there and GeneratorModel refuses BACKEND_ONLY.
     public enum ProjectType {
         APP("App"),
         APP_WITH_BACKEND("App + backend"),
@@ -131,6 +135,11 @@ public final class ProjectOptions {
     public final String customThemeCss;
     public final BuildTool buildTool;
     public final ProjectType projectType;
+    /// Whether a Maven app is generated with every platform module (`javase/`,
+    /// `android/`, `ios/`, ...) rather than the minimal layout, where `common/`
+    /// builds every platform itself. Ignored for Gradle and for a backend-only
+    /// project, and against a plugin that predates the minimal layout.
+    public final boolean allPlatformModules;
 
     public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
@@ -149,6 +158,14 @@ public final class ProjectOptions {
                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
                           JavaVersion javaVersion, String customThemeCss,
                           BuildTool buildTool, ProjectType projectType) {
+        this(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage, javaVersion,
+                customThemeCss, buildTool, projectType, false);
+    }
+
+    public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
+                          boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
+                          JavaVersion javaVersion, String customThemeCss,
+                          BuildTool buildTool, ProjectType projectType, boolean allPlatformModules) {
         this.themeMode = themeMode;
         this.accent = accent;
         this.roundedButtons = roundedButtons;
@@ -158,12 +175,20 @@ public final class ProjectOptions {
         this.customThemeCss = customThemeCss;
         this.buildTool = buildTool == null ? BuildTool.MAVEN : buildTool;
         this.projectType = projectType == null ? ProjectType.APP : projectType;
+        this.allPlatformModules = allPlatformModules;
     }
 
     /// A copy of these options with a different build tool and project type.
     public ProjectOptions withBuild(BuildTool buildTool, ProjectType projectType) {
         return new ProjectOptions(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage,
-                javaVersion, customThemeCss, buildTool, projectType);
+                javaVersion, customThemeCss, buildTool, projectType, allPlatformModules);
+    }
+
+    /// A copy of these options that does or does not ask for every platform module;
+    /// see [#allPlatformModules].
+    public ProjectOptions withPlatformModules(boolean all) {
+        return new ProjectOptions(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage,
+                javaVersion, customThemeCss, buildTool, projectType, all);
     }
 
     public boolean isGradle() {

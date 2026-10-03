@@ -68,13 +68,13 @@ Before you write any platform code, run the target you care about so you can see
 ```bash
 # iOS — produces an Xcode project under ios/target/codenameone/ios/dist/. Open it and
 # confirm the stub files appear and that the project builds (no missing-symbol errors).
-mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
 
 # Android — cloud builds emit logs that show the stubs being compiled into the APK.
-mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device -Dautomated=true
+mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device -Dautomated=true
 
 # JavaScript — produces a web bundle; open dev tools and confirm the JS impl is included.
-mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
+mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
 
 # Desktop simulator — just run cn1:run and observe the bridge boots without errors.
 mvn -pl common cn1:run

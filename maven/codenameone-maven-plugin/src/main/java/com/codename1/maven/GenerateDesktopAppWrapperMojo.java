@@ -102,7 +102,7 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     void generateThemeConfiguration() throws MojoExecutionException {
         Properties theme = new Properties();
         theme.setProperty("desktop.themeMode", arg("desktop.themeMode", sharedThemeModeDefault()));
-        File output = new File(project.getBuild().getOutputDirectory(), "codenameone-desktop.properties");
+        File output = new File(outputDirectory(), "codenameone-desktop.properties");
         try {
             Files.createDirectories(output.toPath().getParent());
             try (OutputStream stream = Files.newOutputStream(output.toPath())) {
@@ -127,7 +127,7 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
             getLog().warn("Icon file "+iconFile+" not found.  Skipping desktop app icon generation.");
             return;
         }
-        File outputDir = new File(project.getBuild().getOutputDirectory());
+        File outputDir = outputDirectory();
         if (!outputDir.exists()) {
             outputDir.mkdirs();
         }
@@ -144,9 +144,26 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         }
     }
 
+    /// Where the icons and the desktop properties go: the module's classes, or, when
+    /// `common` stands in for a missing `javase` module, a directory of their own that
+    /// the desktop jar and the desktop run add. Never `common`'s own classes, which
+    /// every device build uploads.
+    private File outputDirectory() {
+        return isHosting() ? hostedDesktopResourcesDir() : new File(project.getBuild().getOutputDirectory());
+    }
+
+    /// The directory a hand-written stub is read from: `src/desktop/java` of the
+    /// `javase` module, which a hosted build finds at the same place under the root.
+    private File customStubSourceRoot() {
+        File base = isHosting() ? new File(getCN1ProjectDir().getParentFile(), "javase") : project.getBasedir();
+        return new File(base, path("src", "desktop", "java"));
+    }
+
     private void registerCustomStubSourceRoot() {
-        File wrapperSources = new File(project.getBasedir(), path("src", "desktop", "java"));
-        if (wrapperSources.exists()) {
+        File wrapperSources = customStubSourceRoot();
+        // A hosted build compiles the stub with the rest of the JavaSE native code
+        // (compile-javase-natives); in common's own compile it would need the JavaSE port.
+        if (wrapperSources.exists() && !isHosting()) {
             project.addCompileSourceRoot(wrapperSources.getAbsolutePath());
         }
     }
@@ -163,15 +180,20 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         // treat it as a full override and skip generation - the source root that
         // registerCustomStubSourceRoot adds will pick it up.
         String packagePath = packageName.replace('.', File.separatorChar);
-        File customStub = new File(project.getBasedir(),
-                path("src", "desktop", "java", packagePath, mainName + "Stub.java"));
-        if (customStub.exists()) {
-            getLog().info("Custom desktop stub found at " + customStub.getAbsolutePath() + " - skipping generation.");
-            return;
-        }
-
+        File customStub = new File(customStubSourceRoot(), path(packagePath, mainName + "Stub.java"));
         File generatedRoot = new File(project.getBuild().getDirectory(),
                 path("generated-sources", GENERATED_SOURCES_DIR));
+        if (customStub.exists()) {
+            getLog().info("Custom desktop stub found at " + customStub.getAbsolutePath() + " - skipping generation.");
+            // A stub generated before the custom one appeared would otherwise still be
+            // compiled beside it (compile-javase-natives reads the generated directory),
+            // two definitions of one class, until a clean.
+            File stale = new File(generatedRoot, path(packagePath, mainName + "Stub.java"));
+            if (stale.isFile() && !stale.delete()) {
+                throw new MojoExecutionException("Could not delete the obsolete generated stub " + stale);
+            }
+            return;
+        }
         File generatedPkgDir = new File(generatedRoot, packagePath);
         generatedPkgDir.mkdirs();
         File generatedStub = new File(generatedPkgDir, mainName + "Stub.java");
@@ -195,7 +217,9 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
             throw new MojoExecutionException("Failed to write generated desktop stub " + generatedStub, ex);
         }
 
-        project.addCompileSourceRoot(generatedRoot.getAbsolutePath());
+        if (!isHosting()) {
+            project.addCompileSourceRoot(generatedRoot.getAbsolutePath());
+        }
     }
 
     // package-private for unit testing the build-hint -> generated-stub substitution

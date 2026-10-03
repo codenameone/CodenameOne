@@ -42,7 +42,7 @@ The cn1app archetype generates a `common/pom.xml` and `javase/pom.xml` that alre
 </dependency>
 ```
 
-The `common` module has Surefire skipped (`<skipTests>true</skipTests>`) — JUnit tests actually execute from the `javase` module, which mounts `common/src/test/java` via `<testSourceDirectory>`. That avoids running each test twice.
+In a project with a `javase` module, the `common` module has Surefire skipped (`<skipTests>true</skipTests>`) — JUnit tests execute from the `javase` module, which mounts `common/src/test/java` via `<testSourceDirectory>`, so each test runs once. A project without a `javase` module runs them in `common` itself (its `cn1-javase-natives` profile), with the JavaSE native code on the test classpath.
 
 ## A minimal JUnit test
 
@@ -74,7 +74,7 @@ class GreetingFormTest {
 }
 ```
 
-Run it with `mvn -pl javase test` (or `mvn test` from the project root). Filter to one method with `mvn -pl javase test -Dtest=GreetingFormTest#formShowsExpectedTitle`.
+Run it with `mvn test` from the project root. Filter to one method with `mvn test -Dtest=GreetingFormTest#formShowsExpectedTitle`.
 
 ## Annotation reference
 
@@ -254,12 +254,12 @@ Both runners discover their own classes in the same `common/src/test/java` tree:
 - `cn1:test` looks for classes that `implements com.codename1.testing.UnitTest` (the AbstractTest interface).
 - Surefire (JUnit Jupiter) looks for `@Test`-annotated methods.
 
-They don't trip over each other. `mvn install` runs both — Surefire during `test`, then `cn1:test` from the javase module's test profile. If you want only one or the other:
+They don't trip over each other. `mvn install` runs both — Surefire during `test`, then `cn1:test` from the `test` profile. If you want only one or the other:
 
 ```bash
-mvn -pl javase test                            # only Surefire / JUnit
-mvn -pl javase test -DskipTests                # neither
-mvn -pl javase verify -Dtest=NoMatchingTest    # only cn1:test (skip Surefire by filtering it to nothing)
+mvn test                                       # only Surefire / JUnit
+mvn test -DskipTests                           # neither
+mvn verify -Dtest=NoMatchingTest               # only cn1:test (skip Surefire by filtering it to nothing)
 ```
 
 ## Side-by-side example

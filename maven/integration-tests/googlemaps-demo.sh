@@ -11,6 +11,7 @@ curl -fL --retry 5 --retry-all-errors https://github.com/shannah/googlemaps-mave
 unzip master.zip
 rm master.zip
 mvn -e com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeGroupId=com.codename1 \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeVersion=${CN1_VERSION} \
