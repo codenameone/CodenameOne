@@ -62,17 +62,32 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
 
     private String prepareClasspath() {
         StringBuilder sb = new StringBuilder();
-        try {
-            for (String el : project.getRuntimeClasspathElements()) {
-                if (sb.length() > 0) {
-                    sb.append(File.pathSeparator);
-                }
-                sb.append(el);
+        for (String el : simulatorClasspath()) {
+            if (sb.length() > 0) {
+                sb.append(File.pathSeparator);
             }
+            sb.append(el);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * The runtime classpath, plus -- when {@code common} hosts the simulator because the
+     * application has no {@code javase} module -- the compiled JavaSE natives and the
+     * desktop resources that module would have contributed. The natives directory is named
+     * even before {@code compile-javase-natives} creates it later in this same build.
+     */
+    private List<String> simulatorClasspath() {
+        List<String> out = new ArrayList<String>();
+        try {
+            out.addAll(project.getRuntimeClasspathElements());
         } catch (Exception ex) {
             getLog().error("Failed to get runtime classpath elementes", ex);
         }
-        return sb.toString();
+        if (isHosting()) {
+            out.add(hostedNativesDir().getAbsolutePath());
+        }
+        return out;
     }
 
 
@@ -134,6 +149,29 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         }
         if ("true".equals(project.getProperties().getProperty("cn1.class.path.required"))) {
             project.getModel().addProperty("cn1.class.path", prepareClasspath());
+        }
+        if (isHosting()) {
+            // exec:exec's <classpath/> cannot be extended with the natives directory, so a
+            // hosted simulator is launched with `java @<this file>` instead. Argument files
+            // need the Java 9 launcher, which costs nothing: the simulator itself requires
+            // JDK 11 or newer at runtime, whatever source level the project compiles at
+            // (a "Java 8" project is a source level, not a simulator JDK), and on an older
+            // JDK it fails anyway, less clearly. Say so here, as cn1:run and cn1:debug do,
+            // rather than let the launcher read "@file" as a class name.
+            try {
+                JavaVersionUtil.requireRuntimeJavaVersion(JavaVersionUtil.MIN_RUNTIME_JAVA_VERSION,
+                        "run the Codename One simulator");
+            } catch (com.codename1.build.BuildFailureException ex) {
+                throw new MojoFailureException(ex.getMessage(), ex);
+            }
+            File argFile = new File(project.getBuild().getDirectory(),
+                    path("codenameone", "simulator-classpath.args"));
+            try {
+                FileUtils.writeStringToFile(argFile, HostedPlatforms.classpathArgFile(simulatorClasspath()), "UTF-8");
+            } catch (IOException ex) {
+                throw new MojoExecutionException("Failed to write " + argFile, ex);
+            }
+            project.getModel().addProperty(HostedPlatforms.CLASSPATH_ARG_FILE_PROPERTY, argFile.getAbsolutePath());
         }
 
         File simulatorPropertiesFile = new File(getCN1ProjectDir(), path("target", "codenameone", "simulator.properties"));

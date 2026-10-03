@@ -73,19 +73,20 @@ a server and go into depth:
 
 === A first server
 
-The archetype and the initializr both generate a `backend` module beside the
-client ones:
+The archetype (with `-DprojectType=app-with-backend`) and the initializr (with the
+_App with backend_ project type) both generate a `backend` module beside the app:
 
 ----
 myapp/
   common/    shared app code
-  javase/    desktop build
-  ios/       iOS build
-  android/   Android build
   backend/   the server
     pom.xml
     src/main/java/com/example/myapp/Notes.java
 ----
+
+A server-only project, generated with `-DprojectType=backend-only` or the
+initializr's _Backend only_ type, has no `common` module: the server is the whole
+project, at the root (see <<maven-backend-only>>).
 
 A server is a class with routes on it. The annotations are Spring's, under
 Codename One's package names, so this reads the same way to anyone who has
@@ -123,6 +124,9 @@ Two commands matter:
 mvn -pl backend -Dcodename1.platform=backend cn1:backend           # run it on this JVM
 mvn -pl backend -Dcodename1.platform=backend cn1:backend-package   # build the native binary
 ----
+
+In a backend-only Maven project, run `./mvnw cn1:backend` and
+`./mvnw cn1:backend-package` from the root, with no module or property.
 
 In a Gradle project the backend is the `backend` subproject (or the whole project,
 for a backend-only application), and the same two steps are tasks:

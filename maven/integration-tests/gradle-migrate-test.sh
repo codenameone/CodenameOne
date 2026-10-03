@@ -161,6 +161,7 @@ echo "   Ant app converted, built with its Kotlin, staged, and its Kotlin test r
 echo "== Maven to Gradle, with a backend of its own"
 rm -rf mvnapp
 mvn_local archetype:generate -DarchetypeArtifactId=cn1app-archetype -DarchetypeGroupId=com.codenameone \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeVersion="$CN1_VERSION" -DartifactId=mvnapp -DgroupId=com.acme.mvnapp -Dpackage=com.acme.mvnapp \
   -Dversion=1.0-SNAPSHOT -DmainName=MvnApp -DjavaVersion=17 -DinteractiveMode=false > "$WORKDIR/archetype.log" 2>&1 \
   || { tail -40 "$WORKDIR/archetype.log"; fail "archetype:generate"; }

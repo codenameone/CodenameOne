@@ -45,6 +45,10 @@ import java.util.List;
 /// | CSS | `css/` | `common/src/main/css` | `src/main/css` |
 /// | native Android | `native/android` | `android/src/main/java` | `src/android/java` |
 /// | build output | `build/` | `common/target/` | `build/` |
+///
+/// A Maven application's platform modules (`android/`, `ios/`, `javase/`, ...)
+/// are optional: see [hasPlatformModule(NativePlatform)]. A Maven backend-only
+/// project is a single module whose [rootDir()] and [projectDir()] are the same.
 public final class ProjectLayout {
     /// The settings file of an application.
     public static final String SETTINGS_FILE = "codenameone_settings.properties";
@@ -338,6 +342,46 @@ public final class ProjectLayout {
             default:
                 return file(projectDir, "src", platform.id(), platform.language());
         }
+    }
+
+    /// The directory of `platform`'s own resources, beside its native sources:
+    /// `<root>/<platform>/src/main/resources` under Maven, `src/<platform>/resources`
+    /// under Gradle, and the native directory itself under Ant. Returned whether
+    /// or not it exists.
+    public File nativeResourcesDir(NativePlatform platform) {
+        switch (buildSystem) {
+            case ANT:
+                return nativeSourceDir(platform);
+            case MAVEN:
+                return file(rootDir, platform.id(), "src", "main", "resources");
+            default:
+                return file(projectDir, "src", platform.id(), "resources");
+        }
+    }
+
+    /// The directories of `platform`'s sources that ride a build's upload as
+    /// resources, exactly as a Maven platform module packages them: the native
+    /// sources and the platform's resources. Both are returned whether or not
+    /// they exist yet, so one created later is not missed; a consumer skips the
+    /// ones that do not.
+    public List<File> platformUploadDirs(NativePlatform platform) {
+        List<File> out = new ArrayList<File>();
+        out.add(nativeSourceDir(platform));
+        File resources = nativeResourcesDir(platform);
+        if (!out.contains(resources)) {
+            out.add(resources);
+        }
+        return out;
+    }
+
+    /// Whether `platform` is built by a module of its own: under Maven, whether
+    /// `<root>/<platform>/pom.xml` exists. The module is optional. When it is
+    /// absent the application's `common` module builds that platform itself and
+    /// picks up whatever native sources sit in [nativeSourceDir(NativePlatform)],
+    /// which can exist without a pom -- `generate-native-interfaces` creates it on
+    /// demand. Always false for Gradle and Ant, which have no platform modules.
+    public boolean hasPlatformModule(NativePlatform platform) {
+        return buildSystem == BuildSystem.MAVEN && file(rootDir, platform.id(), "pom.xml").isFile();
     }
 
     /// [nativeSourceDir(NativePlatform)], created if missing.

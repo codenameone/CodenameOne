@@ -23,6 +23,7 @@ cd "$WORKDIR"
 PKG=com.acme.parity
 PKG_PATH=com/acme/parity
 mvn_local archetype:generate -DarchetypeArtifactId=cn1app-archetype -DarchetypeGroupId=com.codenameone \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeVersion="$CN1_VERSION" -DartifactId=parity -DgroupId=$PKG -Dpackage=$PKG \
   -Dversion=1.0-SNAPSHOT -DmainName=Parity -DjavaVersion=17 -DinteractiveMode=false > "$WORKDIR/archetype.log" 2>&1 \
   || { tail -40 "$WORKDIR/archetype.log"; fail "archetype:generate"; }

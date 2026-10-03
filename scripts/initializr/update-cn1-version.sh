@@ -81,6 +81,13 @@ replace_file "$ROOT_INITIALIZR_DIR/pom.xml" "s|(<id>cn1-local-workspace</id>.*?<
 replace_file "$ROOT_INITIALIZR_DIR/pom.xml" "s|(<id>cn1-local-workspace</id>.*?<cn1\\.plugin\\.version>)[^<]+(</cn1\\.plugin\\.version>)|\${1}$SNAPSHOT_VERSION\${2}|s;"
 
 replace_file "$GENERATOR_MODEL" "s|private static final String CN1_PLUGIN_VERSION = \\\"[^\\\"]+\\\";|private static final String CN1_PLUGIN_VERSION = \\\"$VERSION\\\";|g;"
+# perl's s||| reports nothing when it matches nothing, and the version this
+# constant holds decides which Maven layouts a download gets (MAVEN_LAYOUTS_SINCE),
+# so a rename that left it behind must stop the bump rather than ship stale.
+if ! grep -qF "private static final String CN1_PLUGIN_VERSION = \"$VERSION\";" "$GENERATOR_MODEL"; then
+  echo "CN1_PLUGIN_VERSION in $GENERATOR_MODEL was not updated to $VERSION" >&2
+  exit 1
+fi
 
 # Gradle downloads resolve the Gradle plugin at this same version, so the
 # initializr offers Gradle only when its marker is published there. Checked, not

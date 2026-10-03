@@ -16,6 +16,7 @@ source $SCRIPTPATH/inc/env.sh
 cd $SCRIPTPATH/build
 rm -rf myapphints
 mvn archetype:generate \
+  -DplatformModules=all -DprojectType=app-with-backend \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeVersion=$CN1_VERSION \

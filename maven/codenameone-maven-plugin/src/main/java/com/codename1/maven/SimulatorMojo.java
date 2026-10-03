@@ -89,17 +89,19 @@ private static final String GROUP_ID="com.codenameone";
         }
         
         File javaseProject = new File(canonicalCn1Project.getParentFile(), "javase");
-        if (!javaseProject.exists()) {
-            throw new MojoExecutionException("JavaSE sibling project is required in order to run the simulator goal.");
-        }
+        boolean javaseModule = new File(javaseProject, "pom.xml").isFile();
         InvocationRequest request = new DefaultInvocationRequest();
         //request.setPomFile( new File( "/path/to/pom.xml" ) );
         request.setGoals( Collections.singletonList( "verify" ) );
-        request.setBaseDirectory(javaseProject);
+        // Without a javase module, common runs the simulator itself, from the root.
+        request.setBaseDirectory(javaseModule ? javaseProject : canonicalCn1Project.getParentFile());
         // The command line reaches the nested build, which is where
         // prepare-simulator-classpath publishes it onward to the simulator JVM.
         Properties props = nestedBuildProperties(
                 getSession() == null ? null : getSession().getUserProperties());
+        if (!javaseModule && props.getProperty("codename1.platform") == null) {
+            props.setProperty("codename1.platform", "javase");
+        }
         
         forwardLocalRepository(props);
         request.setProperties(props);

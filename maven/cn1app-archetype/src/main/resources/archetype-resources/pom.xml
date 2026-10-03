@@ -154,6 +154,12 @@
             </snapshots>
         </pluginRepository>
     </pluginRepositories>
+    <!--
+      One profile per optional module. Each adds its module only when the module
+      exists: a project without android/, for example, still builds Android with
+      -Dcodename1.platform=android, from common (see the cn1-host-* profiles in
+      common/pom.xml). Maven requires both the property and the file.
+    -->
     <profiles>
         <!--
           Codename One's client modules run their tests with cn1:test, so Surefire is
@@ -199,6 +205,9 @@
                     <name>codename1.platform</name>
                     <value>javascript</value>
                 </property>
+                <file>
+                    <exists>${basedir}/javascript/pom.xml</exists>
+                </file>
             </activation>
             <modules>
                 <module>javascript</module>
@@ -211,6 +220,9 @@
                     <name>codename1.platform</name>
                     <value>ios</value>
                 </property>
+                <file>
+                    <exists>${basedir}/ios/pom.xml</exists>
+                </file>
             </activation>
             <modules>
                 <module>ios</module>
@@ -223,6 +235,9 @@
                     <name>codename1.platform</name>
                     <value>win</value>
                 </property>
+                <file>
+                    <exists>${basedir}/win/pom.xml</exists>
+                </file>
             </activation>
             <modules>
                 <module>win</module>
@@ -235,6 +250,9 @@
                     <name>codename1.platform</name>
                     <value>linux</value>
                 </property>
+                <file>
+                    <exists>${basedir}/linux/pom.xml</exists>
+                </file>
             </activation>
             <modules>
                 <module>linux</module>
@@ -254,6 +272,9 @@
                     <name>codename1.platform</name>
                     <value>backend</value>
                 </property>
+                <file>
+                    <exists>${basedir}/backend/pom.xml</exists>
+                </file>
             </activation>
             <modules>
                 <module>backend</module>
@@ -266,6 +287,9 @@
                     <name>codename1.platform</name>
                     <value>android</value>
                 </property>
+                <file>
+                    <exists>${basedir}/android/pom.xml</exists>
+                </file>
             </activation>
             <modules>
                 <module>android</module>
@@ -278,6 +302,9 @@
                     <name>codename1.platform</name>
                     <value>javase</value>
                 </property>
+                <file>
+                    <exists>${basedir}/javase/pom.xml</exists>
+                </file>
                 <activeByDefault>true</activeByDefault>
             </activation>
             <modules>

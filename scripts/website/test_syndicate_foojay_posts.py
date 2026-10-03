@@ -190,6 +190,9 @@ class SubmissionTest(unittest.TestCase):
         self.assertEqual(set(files), {entry['path'] for entry in writes[3][1]['tree']})
         self.assertEqual(['base'], writes[4][1]['parents'])
         self.assertEqual('refs/heads/cn1-syndication/friday', writes[5][1]['ref'])
+        self.assertFalse(writes[-1][1]['draft'])
+        self.assertEqual('writer:cn1-syndication/friday', writes[-1][1]['head'])
+        self.assertIn(post().canonical_url, writes[-1][1]['body'])
 
     def test_failed_fork_sync_does_not_block_submission(self):
         github = self.fake()
@@ -203,6 +206,7 @@ class SubmissionTest(unittest.TestCase):
         files = {'draft/friday/index.md': b'article'}
         result = submit_bundle(post(), files, 'writer/website', github)
         self.assertEqual('submitted', result['status'])
+        writes = [call.args for call in github.api.call_args_list if len(call.args) > 1]
         self.assertFalse(writes[-1][1]['draft'])
         self.assertEqual('writer:cn1-syndication/friday', writes[-1][1]['head'])
         self.assertIn(post().canonical_url, writes[-1][1]['body'])
