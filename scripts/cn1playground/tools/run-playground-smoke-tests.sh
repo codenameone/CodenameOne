@@ -74,21 +74,53 @@ fi
 # Do not let Maven replace it with the latest remote SNAPSHOT between compilation
 # and the harness runs.
 mvn -nsu -pl common -am -DskipTests install
-mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+
+# Each harness runs inside Maven's own JVM (exec:java). A harness that hangs -- an EDT
+# deadlock under Xvfb, say -- would otherwise hold the job until GitHub's six-hour limit
+# with no log at all. Past the limit the JVM gets SIGQUIT first, which prints every
+# thread's stack into the log, and is killed a minute later.
+run_harness() {
+  local limit="${PLAYGROUND_HARNESS_TIMEOUT:-900}"
+  # Mvn execs java, so this pid is the JVM itself.
+  "$@" &
+  local pid=$!
+  (
+    waited=0
+    while kill -0 "$pid" 2>/dev/null; do
+      if [ "$waited" -ge "$limit" ]; then
+        echo "Harness still running after ${limit}s; asking the JVM for a thread dump." >&2
+        kill -QUIT "$pid" 2>/dev/null || true
+        sleep 60
+        kill -9 "$pid" 2>/dev/null || true
+        exit 0
+      fi
+      sleep 5
+      waited=$((waited + 5))
+    done
+  ) &
+  local watchdog=$!
+  local rc=0
+  wait "$pid" || rc=$?
+  kill "$watchdog" 2>/dev/null || true
+  wait "$watchdog" 2>/dev/null || true
+  return "$rc"
+}
+
+run_harness mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundSmokeHarness
-mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+run_harness mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundSyntaxMatrixHarness
 # This harness checks only the native CN1 chrome. Keep its BrowserComponent as
 # a placeholder instead of provisioning a full JCEF runtime during the test.
-mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+run_harness mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dcn1.javase.implementation=jmf \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundLayoutHarness
-mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+run_harness mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundPreviewResolutionHarness
-mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+run_harness mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundSamplesHarness
