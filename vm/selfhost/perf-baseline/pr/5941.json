@@ -1,0 +1,25 @@
+{
+ "pr": 5941,
+ "rebaseline": {
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.803,
+      "time": 1.228,
+      "tolerance": {
+       "time": 0.25
+      }
+     },
+     "memory": 0.979,
+     "reason": "hello's translation input now includes the Android compatibility gallery, its relocated android-compat runtime and the Kotlin stdlib, so the self-hosted translator holds more classes while translating it",
+     "runs": 2,
+     "time": 1.228,
+     "tolerance": {
+      "time": 0.25
+     }
+    }
+   }
+  }
+ }
+}
