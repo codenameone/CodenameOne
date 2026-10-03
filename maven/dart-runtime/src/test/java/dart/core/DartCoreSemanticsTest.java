@@ -1015,4 +1015,39 @@ public class DartCoreSemanticsTest {
         updating.forEachDart((k, v) -> updating.put(k, "b"));
         assertEquals("b", updating.get(1L), "updating a value is not structural");
     }
+
+    // --- int.parse: unsigned 0x literals and ASCII-only digits -----------------
+
+    @Test
+    public void anUnsignedHexLiteralParsesAsTwosComplementBits() {
+        // Recorded from dart 3.9.3.
+        assertEquals(Long.valueOf(-1L), DString.tryParseInt("0xffffffffffffffff"));
+        assertEquals(Long.valueOf(Long.MIN_VALUE), DString.tryParseInt("0x8000000000000000"));
+        assertEquals(Long.valueOf(-2L), DString.tryParseInt("0x0000fffffffffffffffe"));
+        assertEquals(Long.valueOf(-1L), DString.tryParseInt("+0XFFFFFFFFFFFFFFFF"));
+        assertEquals(Long.valueOf(Long.MAX_VALUE), DString.tryParseInt("0x7fffffffffffffff"));
+        assertNull(DString.tryParseInt("0x10000000000000000"));
+        assertEquals(-1L, DString.parseInt("0xffffffffffffffff"));
+    }
+
+    @Test
+    public void aNegativeHexLiteralKeepsTheSignedRange() {
+        assertEquals(Long.valueOf(Long.MIN_VALUE), DString.tryParseInt("-0x8000000000000000"));
+        assertEquals(Long.valueOf(-1L), DString.tryParseInt("-0x1"));
+        assertNull(DString.tryParseInt("-0x8000000000000001"));
+        assertNull(DString.tryParseInt("-0xffffffffffffffff"));
+        assertThrows(FormatException.class, () -> DString.parseInt("-0xffffffffffffffff"));
+        // An explicit radix takes no 0x and keeps the signed range.
+        assertNull(DString.tryParseInt("8000000000000000", 16));
+        assertEquals(Long.valueOf(Long.MIN_VALUE), DString.tryParseInt("-8000000000000000", 16));
+    }
+
+    @Test
+    public void onlyAsciiDigitsParse() {
+        assertNull(DString.tryParseInt("\u0663"));
+        assertNull(DString.tryParseInt("1\u0663"));
+        assertNull(DString.tryParseInt("0x\u0663"));
+        assertNull(DString.tryParseInt("\u0663", 10));
+        assertEquals(Long.valueOf(35L), DString.tryParseInt("Z", 36));
+    }
 }

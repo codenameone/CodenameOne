@@ -383,10 +383,12 @@ public final class DString {
             t = t.substring(1);
         }
         int r = radix;
+        boolean hexPrefix = false;
         if (r < 0) {
             if (t.length() > 2 && t.charAt(0) == '0' && (t.charAt(1) == 'x' || t.charAt(1) == 'X')) {
                 t = t.substring(2);
                 r = 16;
+                hexPrefix = true;
             } else {
                 r = 10;
             }
@@ -395,15 +397,52 @@ public final class DString {
             return null;
         }
         for (int i = 0; i < t.length(); i++) {
-            if (Character.digit(t.charAt(i), r) < 0) {
+            if (asciiDigit(t.charAt(i), r) < 0) {
                 return null;   // also rejects a second sign, which parseLong would take
             }
+        }
+        if (hexPrefix && !negative) {
+            // Dart reads an unsigned 0x literal up to 0xffffffffffffffff as the
+            // two's-complement bits (0xffffffffffffffff is -1); a '-' keeps the signed
+            // range, which parseLong below already enforces. Hand-folded because
+            // Long.parseUnsignedLong is not in the device class library.
+            int start = 0;
+            while (start < t.length() - 1 && t.charAt(start) == '0') {
+                start++;
+            }
+            if (t.length() - start > 16) {
+                return null;
+            }
+            long bits = 0;
+            for (int i = start; i < t.length(); i++) {
+                bits = (bits << 4) | asciiDigit(t.charAt(i), 16);
+            }
+            return Long.valueOf(bits);
         }
         try {
             return Long.valueOf(Long.parseLong(negative ? "-" + t : t, r));
         } catch (NumberFormatException e) {
             return null;   // out of range
         }
+    }
+
+    /**
+     * The value of an ASCII digit or letter in {@code radix}, or -1. Dart's int.parse
+     * takes only these; Character.digit also takes every Unicode decimal digit, so
+     * Arabic-Indic three parsed as 3 (and Long.parseLong would take it too).
+     */
+    private static int asciiDigit(char c, int radix) {
+        int d;
+        if (c >= '0' && c <= '9') {
+            d = c - '0';
+        } else if (c >= 'a' && c <= 'z') {
+            d = c - 'a' + 10;
+        } else if (c >= 'A' && c <= 'Z') {
+            d = c - 'A' + 10;
+        } else {
+            return -1;
+        }
+        return d < radix ? d : -1;
     }
 
     /**
