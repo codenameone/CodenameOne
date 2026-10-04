@@ -30,7 +30,9 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.codename1.androidcompat.runtime.AndroidRuntime;
+import com.codename1.androidcompat.runtime.ResourceManager;
 import com.codename1.generated.android.AndroidAppImpl;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.hellocodenameone.tests.BaseTest;
@@ -73,7 +75,17 @@ public abstract class AndroidCompatScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() throws Exception {
+        // Pin the light appearance. The runtime answers night mode from
+        // CN.isDarkMode(), so on a host that defaults to dark (the tvOS
+        // simulator does) the gallery resolves its values-night resources --
+        // its card turns #303030 under the light theme's dark text -- and the
+        // baseline would depend on the host's appearance setting rather than
+        // on the code.
+        // The resource manager reads it once, when first asked, so refresh it
+        // in case anything created it before this pin.
+        Display.getInstance().setDarkMode(Boolean.FALSE);
         Context app = galleryContext();
+        ResourceManager.get().refresh();
         beforeStart(app);
         Intent intent = new Intent(app, activity);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -81,6 +93,7 @@ public abstract class AndroidCompatScreenshotTest extends BaseTest {
         Activity top = ActivityThread.getTopActivity();
         if (top == null) {
             fail("the activity did not start: " + activity.getName());
+            Display.getInstance().setDarkMode(null);
             done();
             return false;
         }
@@ -107,6 +120,7 @@ public abstract class AndroidCompatScreenshotTest extends BaseTest {
                     @Override
                     public void run() {
                         ActivityThread.finishAllActivities();
+                        Display.getInstance().setDarkMode(null);
                         done();
                     }
                 });
