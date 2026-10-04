@@ -149,8 +149,10 @@ static BOOL cn1NetEnsureSent(CN1Connection* conn) {
     }
 
     {
-        /* An explicit GET sends no body, whatever the post flag buffered. */
-        DWORD bodyLen = (conn->verb != NULL && wcscmp(conn->verb, L"GET") == 0) ? 0 : conn->pendingLen;
+        /* An explicit GET or HEAD sends no body, whatever the post flag buffered,
+         * as on the Linux port. */
+        DWORD bodyLen = (conn->verb != NULL && (wcscmp(conn->verb, L"GET") == 0
+                                               || wcscmp(conn->verb, L"HEAD") == 0)) ? 0 : conn->pendingLen;
         ok = WinHttpSendRequest(conn->request,
                                 WINHTTP_NO_ADDITIONAL_HEADERS, 0,
                                 bodyLen > 0 ? (LPVOID)conn->pendingBody

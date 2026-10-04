@@ -86,6 +86,10 @@ final class BackendPackageSupport {
             t.setDescription("Runs the backend's tests as a native binary");
             t.dependsOn(test.getClassesTaskName());
             t.getToolchain().from(testRuntime);
+            // testImplementation libraries a test imports, as the Maven goal passes
+            // its test classpath; the packager drops the JVM-only ones (JUnit,
+            // Mockito) and compiles the rest with the tests.
+            t.getTestClasspath().from(test.getCompileClasspath());
             t.getTestSources().from(test.getJava().getSrcDirs());
             // The Kotlin test directory too, so the packager can refuse Kotlin
             // tests by name instead of compiling the run without them.
@@ -291,15 +295,23 @@ final class BackendPackageSupport {
         private final File processed;
         private final List<String> roots;
         private final File testResources;
+        private final List<String> testClasspath;
 
         GradleBackendTestPackager(ProjectHost host, ProjectLayout layout, java.util.Set<File> toolchain,
-                                  File processed, List<String> roots, File testResources) {
+                                  File processed, List<String> roots, File testResources,
+                                  List<String> testClasspath) {
             super(host);
             this.layout = layout;
             this.toolchain = toolchain;
             this.processed = processed;
             this.roots = roots;
             this.testResources = testResources;
+            this.testClasspath = testClasspath;
+        }
+
+        @Override
+        protected List<String> testClasspathElements() {
+            return testClasspath;
         }
 
         @Override
@@ -341,6 +353,9 @@ final class BackendPackageSupport {
         @PathSensitive(PathSensitivity.RELATIVE)
         public abstract ConfigurableFileCollection getTestResources();
 
+        @Classpath
+        public abstract ConfigurableFileCollection getTestClasspath();
+
         @Input
         public abstract Property<Boolean> getStrict();
 
@@ -353,8 +368,12 @@ final class BackendPackageSupport {
             }
             java.util.Iterator<File> resources = getTestResources().getFiles().iterator();
             final File testResources = resources.hasNext() ? resources.next() : null;
-            com.codename1.maven.BackendTestPackager p =
-                    new GradleBackendTestPackager(host, layout, toolchain, processed, roots, testResources);
+            final List<String> testClasspath = new ArrayList<String>();
+            for (File f : getTestClasspath().getFiles()) {
+                testClasspath.add(f.getAbsolutePath());
+            }
+            com.codename1.maven.BackendTestPackager p = new GradleBackendTestPackager(host, layout, toolchain,
+                    processed, roots, testResources, testClasspath);
             p.strict(getStrict().get());
             return p;
         }

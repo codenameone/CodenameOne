@@ -135,6 +135,8 @@ For example, If your application is hosted at http://example.com/myapp/index.htm
 
 NOTE: The HTTP standard does support cross-origin requests in the browser via the `Access-Control-Allow-Origin` HTTP header. Some web services supply this header when serving resources, but not all. The way to be make network requests to arbitrary resources is to do it through a proxy.
 
+NOTE: In the browser a request runs as one synchronous `XMLHttpRequest`, which reports no progress until it ends. The connection and read timeouts of a `ConnectionRequest` therefore bound the whole request: their sum is a deadline, not an idle limit, so a long download needs a timeout that covers the whole transfer.
+
 A ParparVM JavaScript build generates a same-origin proxy wrapper by default and configures the application to use `/cn1-cors-proxy?_target=`. Select its platform with the `javascript.proxy.target` build hint:
 
 [cols="1,3",options="header"]

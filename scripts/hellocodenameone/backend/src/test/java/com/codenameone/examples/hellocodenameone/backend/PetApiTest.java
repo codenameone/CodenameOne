@@ -90,6 +90,14 @@ class PetApiTest {
         assertTrue(failed.getMessage().contains("404"), failed.getMessage());
     }
 
+    @Test
+    void aTemplateWithNoVariableForItIsRefused() {
+        // Rather than sending the literal "{id}" for the route to bind.
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                () -> mvc.perform(get("/api/pets/{id}")));
+        assertTrue(refused.getMessage().contains("Not enough variables"), refused.getMessage());
+    }
+
     /// The "id" of a JSON object, read without a parser or a regular expression,
     /// either of which a compiled test would have to bring along.
     private static long idOf(String json) {

@@ -282,7 +282,7 @@ A compiled run has these limits:
   a class with a `@MockitoBean` field is reported as skipped. Pass
   `-Dcn1.backend.compiledTests.strict=true` to make either one fail the build.
 * **JUnit and Surefire subsets.** The compiled run reads the common JUnit 5
-  annotations and Surefire selections, not all of them. Repeating `@Tag` on a
+  annotations and Surefire selections, not every one. Repeating `@Tag` on a
   class or method fails the compiled run's compile, so use one per element. A
   `-Dtest` regex selector with a method part, such as `%regex[.*Api.*#one.*]`,
   selects nothing in the compiled run. The JVM run handles both.

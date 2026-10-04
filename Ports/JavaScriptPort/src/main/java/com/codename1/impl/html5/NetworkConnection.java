@@ -289,6 +289,14 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     /// synchronous XHR has one deadline for the whole request, so it gets the
     /// connect and the read timeout together; -1 for either means unset, which is
     /// what a request that set neither passes.
+    ///
+    /// Deliberately a deadline, not the idle limit the other ports enforce: a
+    /// synchronous XHR reports neither when it connected nor when bytes arrive,
+    /// so inactivity cannot be measured here. It is what NetworkManager's own
+    /// watchdog does with a request that shows no activity, except that the
+    /// watchdog cannot run while the request holds the worker. Leaving the
+    /// timeouts out instead let a request to an unreachable host wait forever.
+    /// The developer guide's JavaScript chapter documents the difference.
     int requestTimeout() {
         if (timeout > 0 && readTimeout > 0) {
             return timeout + readTimeout;

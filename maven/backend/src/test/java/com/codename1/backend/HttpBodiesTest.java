@@ -304,6 +304,8 @@ class HttpBodiesTest {
                 + "Access-Control-Request-Method: PUT\r\nConnection: close\r\n\r\n");
         assertTrue(preflight.startsWith("HTTP/1.1 204"), preflight);
         assertTrue(preflight.contains("Access-Control-Allow-Methods: PUT"), preflight);
+        // The echoed method makes the answer depend on that request header.
+        assertTrue(preflight.matches("(?s).*Vary: [^\r]*Access-Control-Request-Method.*"), preflight);
     }
 
     @Test

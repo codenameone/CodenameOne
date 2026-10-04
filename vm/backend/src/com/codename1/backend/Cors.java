@@ -234,14 +234,21 @@ final class Cors {
         HttpServer.Response response = varyByOrigin(HttpServer.Response.empty(204, null, null));
         allowOrigin(response, origin);
         // With credentials "*" is a literal method name to a browser, as it is for
-        // headers below, so the method asked for is echoed instead.
-        response.header("Access-Control-Allow-Methods",
-                credentials && "*".equals(methods.trim()) ? asked.trim() : methods);
+        // headers below, so the method asked for is echoed instead -- and then the
+        // answer depends on that request header, which a cache must key on.
+        if (credentials && "*".equals(methods.trim())) {
+            response.header("Access-Control-Allow-Methods", asked.trim());
+            response.appendToken("Vary", "Access-Control-Request-Method");
+        } else {
+            response.header("Access-Control-Allow-Methods", methods);
+        }
         String requested = request.getHeader("Access-Control-Request-Headers");
         if ("*".equals(headers.trim())) {
             // With credentials "*" is a literal header name to a browser, so the
             // headers actually requested are echoed instead; without them it is a
-            // wildcard and echoing is equivalent.
+            // wildcard and echoing is equivalent. The answer varies with the request
+            // header either way, absent included.
+            response.appendToken("Vary", "Access-Control-Request-Headers");
             if (requested != null && requested.length() > 0) {
                 response.header("Access-Control-Allow-Headers", requested);
             }

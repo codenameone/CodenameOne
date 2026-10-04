@@ -75,8 +75,13 @@ class BackendTestPackagerTest {
                 "/r/org/mockito/mockito-core/5.0/mockito-core-5.0.jar"));
         assertTrue(BackendTestPackager.jvmOnlyTestLibrary(
                 "/r/com/codenameone/codenameone-backend-test/8.0/codenameone-backend-test-8.0.jar"));
+        assertTrue(BackendTestPackager.jvmOnlyTestLibrary("/home/u/.gradle/caches/modules-2/files-2.1/"
+                + "org.junit.jupiter/junit-jupiter-api/5.9.3/abc/junit-jupiter-api-5.9.3.jar"), "Gradle's cache");
+        assertTrue(BackendTestPackager.jvmOnlyTestLibrary("/g/files-2.1/org.mockito/mockito-core/5.0/abc/m.jar"));
         assertFalse(BackendTestPackager.jvmOnlyTestLibrary(
                 "/r/com/acme/test-fixtures/1.0/test-fixtures-1.0.jar"), "an ordinary test helper");
+        assertFalse(BackendTestPackager.jvmOnlyTestLibrary(
+                "/g/files-2.1/com.acme/test-fixtures/1.0/abc/test-fixtures-1.0.jar"), "a Gradle test helper");
     }
 
     @Test

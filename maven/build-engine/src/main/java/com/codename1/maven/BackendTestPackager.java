@@ -94,10 +94,13 @@ public abstract class BackendTestPackager extends BackendPackager {
 
     /// Test libraries that run only on the JVM: the compiled run brings its own
     /// JUnit (the shim) and test support as sources, and a mocking library builds
-    /// classes while it runs. Recognised by their Maven repository directories.
+    /// classes while it runs. Recognised by their Maven repository directories,
+    /// and by the group directories of Gradle's dependency cache.
     private static final String[] JVM_ONLY_TEST_LIBRARIES = {
         "/org/junit/", "/org/opentest4j/", "/org/apiguardian/", "/org/mockito/",
         "/net/bytebuddy/", "/org/objenesis/", "/codenameone-backend-test/",
+        "/org.junit.", "/org.junit/", "/org.opentest4j/", "/org.apiguardian/", "/org.mockito/",
+        "/net.bytebuddy/", "/org.objenesis/",
     };
 
     /// The compile classpath plus the test-scoped dependencies a test imports: a

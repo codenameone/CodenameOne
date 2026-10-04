@@ -202,10 +202,14 @@ public class MockRequestBuilder {
     }
 
     /// `/pets/{id}` with its variables substituted in order, each percent-encoded
-    /// as a path segment.
+    /// as a path segment. A placeholder with no variable left for it throws, rather
+    /// than sending the literal `{id}` for a route to bind.
     static String expand(String template, Object[] variables) {
-        if (variables == null || variables.length == 0 || template.indexOf('{') < 0) {
+        if (template.indexOf('{') < 0) {
             return template;
+        }
+        if (variables == null) {
+            variables = new Object[0];
         }
         StringBuilder sb = new StringBuilder();
         int next = 0;
