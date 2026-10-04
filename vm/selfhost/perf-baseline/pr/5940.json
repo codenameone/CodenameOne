@@ -128,6 +128,24 @@
    }
   },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "arraySequential": {
+    "all": {
+     "from": {
+      "memory": 0.387,
+      "time": 0.394,
+      "tolerance": {
+       "time": 0.3
+      }
+     },
+     "memory": 0.387,
+     "reason": "Noise recalibration, not a performance change: this runner's arraySequential median moved between runs of this pull request (0.45x, 0.38x, 0.51x; each run tight within itself), the first before any of the later collector changes. The workload does not allocate, and a local A/B of the final branch against master measured it within 1%.",
+     "runs": 3,
+     "time": 0.455,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   },
    "objectAllocation": {
     "all": {
      "from": {
@@ -137,11 +155,12 @@
        "time": 0.45
       }
      },
-     "memory": 0.33,
-     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25).",
-     "runs": 1,
+     "memory": 0.43,
+     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25). RAM on this row moves between runs on this runner (0.43x, 0.33x, 0.44x), so it is set from three runs.",
+     "runs": 3,
      "time": 2.808,
      "tolerance": {
+      "memory": 0.35,
       "time": 0.45
      }
     }
@@ -198,12 +217,12 @@
        "time": 0.5
       }
      },
-     "memory": 0.125,
-     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25).",
-     "runs": 1,
+     "memory": 0.209,
+     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25). RAM on this row is noisy on Windows (0.12x in one run, 0.29x in the next), so it is set from two runs.",
+     "runs": 2,
      "time": 1.645,
      "tolerance": {
-      "memory": 0.3,
+      "memory": 0.65,
       "time": 0.5
      }
     }
