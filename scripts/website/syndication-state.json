@@ -2445,6 +2445,16 @@
       "medium": {
         "url": "https://medium.com/p/3504143f7a34/edit",
         "syndicated_at": "2026-10-01T19:02:08+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/the-java-compiler-that-became-its-own-test-case",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac19772827ede5ed9d6b68c",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-04T00:02:48+00:00"
       }
     },
     "who-decides-your-app-redesign": {
@@ -2456,6 +2466,12 @@
       "medium": {
         "url": "https://medium.com/p/90aa9d5c3292/edit",
         "syndicated_at": "2026-10-03T19:01:40+00:00"
+      }
+    },
+    "ios-27-glass-you-can-test": {
+      "medium": {
+        "url": "https://medium.com/p/92611a4c388e/edit",
+        "syndicated_at": "2026-10-04T00:01:45+00:00"
       }
     }
   }
