@@ -5630,6 +5630,37 @@ void codenameOneGCMark() {
 #endif
             cn1GcReleaseAllBlockedThreadsPublic();
         }
+#if defined(CN1_CONSERVATIVE_GC_ROOTS) && !defined(CN1_DISABLE_BIBOP)
+        // REBUILD THE SNAPSHOT NOW THAT THE THREADS ARE PARKED. The cycle's first build
+        // (above) ran while every thread was still running, so a page another thread
+        // allocated on afterwards was cached with a stale bumpIndex -- and the per-thread
+        // refresh below used to cover only the scanned thread's own pages. An object a
+        // producer allocated after that build and handed to a consumer, kept only in a
+        // local, then failed the conservative resolve on the producer's page: an unmarked
+        // fresh object on a pre-cycle page, freed by the minor. Threads parked by now stay
+        // parked until the sweep ends, so this build is current for them; the ones that
+        // are not (cn1ConsSnapLate, rare -- the pre-stop waited 20ms) are refreshed at
+        // every thread's scan. The late set is taken BEFORE the build: a thread seen
+        // parked here was parked when its pages were read.
+        if(cn1GcStwCycle) {
+            extern struct ThreadLocalData* cn1ConsSnapLate[];
+            extern int cn1ConsSnapLateN;
+            extern int cn1ConsSnapEpochReset(void);
+            struct ThreadLocalData* __lwd = getThreadLocalData();
+            cn1ConsSnapLateN = 0;
+            lockCriticalSection();
+            for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+                struct ThreadLocalData* t = allThreads[iter];
+                if(t != 0 && t != __lwd && t->lightweightThread
+                   && __atomic_load_n(&t->threadActive, __ATOMIC_ACQUIRE)) {
+                    cn1ConsSnapLate[cn1ConsSnapLateN++] = t;
+                }
+            }
+            unlockCriticalSection();
+            cn1ConsSnapEpochReset();
+            cn1GcBuildRootSnapshots();
+        }
+#endif
     }
 #if !defined(CN1_DISABLE_SATB)
     __atomic_store_n(&gcSatbActive, 1, __ATOMIC_SEQ_CST);
@@ -6223,9 +6254,9 @@ void codenameOneGCMark() {
                         extern int cn1ConsSnapEpochReset(void);
                         extern struct ThreadLocalData* cn1ConsSnapOnlyThread;
                         cn1ConsSnapEpochReset();
-                        // Only THIS thread's pages can have moved since the cycle's first
-                        // build: the others are held, or released and graced. See
-                        // cn1GcBuildRootSnapshots.
+                        // Only this thread's pages and the LATE threads' can have moved
+                        // since the build after the pre-stop: every other thread was
+                        // parked by then. See cn1ConsSnapLate.
                         cn1ConsSnapOnlyThread = t;
                         cn1GcBuildRootSnapshots();
                         cn1ConsSnapOnlyThread = 0;
@@ -13675,6 +13706,12 @@ static int cn1ConsSnapEpoch = -1;
 // build -- its current pages and the pages it retired during the cycle -- instead of
 // reading every page header in the registry (~0.4ms a minor on a 5,700-page heap).
 struct ThreadLocalData* cn1ConsSnapOnlyThread = 0;
+// The threads that had NOT parked when the stop-the-world cycle rebuilt the snapshot after
+// its pre-stop (codenameOneGCMark). Everyone else was frozen from that build on, so its
+// pages are current; a late thread kept allocating, and could hand what it allocated to
+// another late thread before both parked. The per-thread refresh covers all of them.
+struct ThreadLocalData* cn1ConsSnapLate[NUMBER_OF_SUPPORTED_THREADS];
+int cn1ConsSnapLateN = 0;
 #ifndef CN1_DISABLE_BIBOP
 static inline void cn1ConsPgRefresh(CN1BibopPage* p) {
     CN1ConsPage* e = cn1ConsPgFind((char*)p);
@@ -13813,17 +13850,27 @@ void cn1GcBuildRootSnapshots(void) {
     // page by page, so the refresh stays a sequential sweep over one array however
     // scattered the page bases are.
     if(cn1ConsSnapOnlyThread != 0 && !cn1PgIndexRebuilt) {
-        struct ThreadLocalData* ot = cn1ConsSnapOnlyThread;
-        for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
-            CN1BibopPage* p = ot->bibopCurrent[ci];
-            if(p != 0) {
-                cn1ConsPgRefresh(p);
+        // The scanned thread and every LATE one (cn1ConsSnapLate): an object a late
+        // producer allocated after the post-pre-stop build and handed to this thread
+        // lives on the PRODUCER's page, and refreshing only this thread's pages left that
+        // page's cached bumpIndex stale -- the conservative resolve rejected a live root
+        // and the minor freed it.
+        for(int li = -1 ; li < cn1ConsSnapLateN ; li++) {
+            struct ThreadLocalData* ot = li < 0 ? cn1ConsSnapOnlyThread : cn1ConsSnapLate[li];
+            if(ot == 0) {
+                continue;
             }
-        }
-        for(CN1BibopPage* p = atomic_load_explicit(&bibopSweepStack, memory_order_acquire);
-            p != 0 ; p = p->nextPool) {
-            if(p->gcRetiredBy == ot->threadId) {
-                cn1ConsPgRefresh(p);
+            for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
+                CN1BibopPage* p = ot->bibopCurrent[ci];
+                if(p != 0) {
+                    cn1ConsPgRefresh(p);
+                }
+            }
+            for(CN1BibopPage* p = atomic_load_explicit(&bibopSweepStack, memory_order_acquire);
+                p != 0 ; p = p->nextPool) {
+                if(p->gcRetiredBy == ot->threadId) {
+                    cn1ConsPgRefresh(p);
+                }
             }
         }
     } else
