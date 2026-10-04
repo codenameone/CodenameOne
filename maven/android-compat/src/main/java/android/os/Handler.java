@@ -100,7 +100,7 @@ public class Handler {
     }
 
     public final boolean postAtFrontOfQueue(Runnable r) {
-        return post(r);
+        return enqueue(getPostMessage(r, null), 0, true);
     }
 
     private Message getPostMessage(Runnable r, Object token) {
@@ -150,31 +150,57 @@ public class Handler {
     }
 
     public final boolean sendMessageAtFrontOfQueue(Message msg) {
-        return sendMessage(msg);
+        return enqueue(msg, 0, true);
     }
 
     public boolean sendMessageAtTime(final Message msg, long uptimeMillis) {
+        return enqueue(msg, uptimeMillis, false);
+    }
+
+    /// Queues `msg` for `uptimeMillis`. A front-of-queue message is due at
+    /// time 0 and goes ahead of everything else this handler has due, as on
+    /// Android; the latest one posted runs first.
+    ///
+    /// On the main looper every message gets its own EDT callback, but a
+    /// callback runs the earliest message due rather than the one it was
+    /// scheduled for, so a message that jumped the queue runs first. That
+    /// orders this handler's work only: other handlers' callbacks keep their
+    /// place in the EDT queue. Every callback either runs its own message or
+    /// leaves it to the callback of the message it ran instead, so nothing
+    /// is lost or run twice.
+    private boolean enqueue(final Message msg, long uptimeMillis, boolean front) {
         msg.target = this;
         msg.when = uptimeMillis;
         if (!looper.isMain()) {
             synchronized (looper.queue) {
-                looper.queue.add(msg);
+                if (front) {
+                    looper.queue.add(0, msg);
+                } else {
+                    looper.queue.add(msg);
+                }
                 looper.queue.notifyAll();
             }
             return true;
         }
         synchronized (pending) {
-            pending.add(msg);
+            if (front) {
+                pending.add(0, msg);
+            } else {
+                pending.add(msg);
+            }
         }
         Runnable run = new Runnable() {
             @Override
             public void run() {
+                Message next;
                 synchronized (pending) {
-                    if (msg.canceled || !pending.remove(msg)) {
+                    next = nextDue(msg);
+                    if (next == null) {
                         return;
                     }
+                    pending.remove(next);
                 }
-                dispatchMessage(msg);
+                dispatchMessage(next);
             }
         };
         long delay = uptimeMillis - SystemClock.uptimeMillis();
@@ -184,6 +210,25 @@ public class Handler {
             CN.setTimeout((int) Math.min(Integer.MAX_VALUE, delay), run);
         }
         return true;
+    }
+
+    /// The pending message to run now: the earliest due, first posted on a
+    /// tie. `own` -- the message the calling callback was scheduled for --
+    /// counts as due even if its timer fired a little early, so a callback
+    /// never drops the message it exists for. Called holding `pending`.
+    private Message nextDue(Message own) {
+        long limit = SystemClock.uptimeMillis();
+        if (!own.canceled && pending.contains(own) && own.when > limit) {
+            limit = own.when;
+        }
+        Message next = null;
+        for (int i = 0, n = pending.size(); i < n; i++) {
+            Message m = pending.get(i);
+            if (m.when <= limit && (next == null || m.when < next.when)) {
+                next = m;
+            }
+        }
+        return next;
     }
 
     public final void removeCallbacks(Runnable r) {

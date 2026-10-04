@@ -103,7 +103,77 @@ public final class Bitmap {
         m.mapRect(r);
         int w = Math.max(1, Math.round(r.width()));
         int h = Math.max(1, Math.round(r.height()));
-        return new Bitmap(sub.getImage().scaled(w, h), false, source.config);
+        float[] v = new float[9];
+        m.getValues(v);
+        if (m.isScaleTranslate() && v[0] > 0 && v[4] > 0) {
+            // A plain enlargement or reduction: the port's own scaling.
+            return new Bitmap(sub.getImage().scaled(w, h), false, source.config);
+        }
+        // Rotations, mirrors and skews move pixels, which scaling cannot do:
+        // each output pixel is sampled from the source through the inverse
+        // matrix, the output's origin being the mapped bounds' top left.
+        int[] out = new int[w * h];
+        Matrix inv = new Matrix();
+        if (m.invert(inv)) {
+            inv.getValues(v);
+            int[] src = sub.getImage().getRGB();
+            int sw = sub.width;
+            int sh = sub.height;
+            for (int dy = 0; dy < h; dy++) {
+                float py = dy + 0.5f + r.top;
+                for (int dx = 0; dx < w; dx++) {
+                    float px = dx + 0.5f + r.left;
+                    // Affine, like the rest of this Matrix.
+                    float sx = v[0] * px + v[1] * py + v[2];
+                    float sy = v[3] * px + v[4] * py + v[5];
+                    out[dy * w + dx] = filter ? sampleBilinear(src, sw, sh, sx - 0.5f, sy - 0.5f)
+                            : sampleNearest(src, sw, sh, sx, sy);
+                }
+            }
+        }
+        return new Bitmap(Image.createImage(out, w, h), false, source.config);
+    }
+
+    private static int sampleNearest(int[] src, int sw, int sh, float sx, float sy) {
+        int x = (int) Math.floor(sx);
+        int y = (int) Math.floor(sy);
+        return x < 0 || y < 0 || x >= sw || y >= sh ? 0 : src[y * sw + x];
+    }
+
+    /// Bilinear sample at (`fx`, `fy`) in pixel-centre coordinates, outside
+    /// the source counting as transparent, blended with premultiplied alpha
+    /// so a transparent neighbour does not darken an edge.
+    private static int sampleBilinear(int[] src, int sw, int sh, float fx, float fy) {
+        int x0 = (int) Math.floor(fx);
+        int y0 = (int) Math.floor(fy);
+        float tx = fx - x0;
+        float ty = fy - y0;
+        float a = 0;
+        float rr = 0;
+        float gg = 0;
+        float bb = 0;
+        for (int j = 0; j < 2; j++) {
+            for (int i = 0; i < 2; i++) {
+                int x = x0 + i;
+                int y = y0 + j;
+                if (x < 0 || y < 0 || x >= sw || y >= sh) {
+                    continue;
+                }
+                float wgt = (i == 0 ? 1 - tx : tx) * (j == 0 ? 1 - ty : ty);
+                int c = src[y * sw + x];
+                float ca = ((c >>> 24) & 0xff) * wgt;
+                a += ca;
+                rr += ((c >> 16) & 0xff) * ca;
+                gg += ((c >> 8) & 0xff) * ca;
+                bb += (c & 0xff) * ca;
+            }
+        }
+        if (a <= 0) {
+            return 0;
+        }
+        int ia = Math.min(255, Math.round(a));
+        return (ia << 24) | (Math.min(255, Math.round(rr / a)) << 16)
+                | (Math.min(255, Math.round(gg / a)) << 8) | Math.min(255, Math.round(bb / a));
     }
 
     public static Bitmap createBitmap(int[] colors, int width, int height, Config config) {

@@ -40,11 +40,12 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
     }
 
     public SpannableStringBuilder(CharSequence source, int start, int end) {
-        text = new StringBuilder(source == null ? "" : source.subSequence(start, end).toString());
-        if (source instanceof SpannableStringBuilder && start == 0) {
-            spans = ((SpannableStringBuilder) source).spans.copy();
-        } else if (source instanceof SpannableString && start == 0) {
-            spans = ((SpannableString) source).spans().copy();
+        // Not source.subSequence: for a builder that is this constructor.
+        text = new StringBuilder(source == null ? "" : source.toString().substring(start, end));
+        if (source instanceof SpannableStringBuilder) {
+            spans = ((SpannableStringBuilder) source).spans.slice(start, end);
+        } else if (source instanceof SpannableString) {
+            spans = ((SpannableString) source).spans().slice(start, end);
         } else {
             spans = new SpanSet();
         }

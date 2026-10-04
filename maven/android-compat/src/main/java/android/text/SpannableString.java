@@ -44,6 +44,11 @@ public class SpannableString implements CharSequence, GetChars, Spannable {
         }
     }
 
+    private SpannableString(String text, SpanSet spans) {
+        this.text = text;
+        this.spans = spans;
+    }
+
     public static SpannableString valueOf(CharSequence source) {
         return source instanceof SpannableString ? (SpannableString) source : new SpannableString(source);
     }
@@ -64,7 +69,7 @@ public class SpannableString implements CharSequence, GetChars, Spannable {
 
     @Override
     public CharSequence subSequence(int start, int end) {
-        return new SpannableString(text.substring(start, end));
+        return new SpannableString(text.substring(start, end), spans.slice(start, end));
     }
 
     @Override

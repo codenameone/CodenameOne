@@ -1009,6 +1009,13 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             }
         } else if (!dispatchedToNewTarget) {
             if (intercepted) {
+                // The event that starts the interception only cancels the
+                // child; it is not also handed to this group's onTouchEvent.
+                // That is Android's contract: per onInterceptTouchEvent's
+                // documentation the target receives this same event as
+                // ACTION_CANCEL and only the events that follow reach the
+                // group's onTouchEvent. Parents such as ScrollView rely on it
+                // and start their drag inside onInterceptTouchEvent.
                 MotionEvent cancel = MotionEvent.obtain(ev);
                 cancel.setAction(MotionEvent.ACTION_CANCEL);
                 dispatchTransformed(mTouchTarget, cancel);

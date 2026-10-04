@@ -119,10 +119,28 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void getRGB(java.lang.Object a0, int[] a1, int a2, int a3, int a4, int a5, int a6) {
+        if (a0 instanceof int[][]) {
+            int[][] rows = (int[][]) a0;
+            for (int y = 0; y < a6; y++) {
+                System.arraycopy(rows[a4 + y], a3, a1, a2 + y * a5, a5);
+            }
+        }
     }
+
+    /// When set, an image made from ARGB pixels keeps them (as an `int[][]`
+    /// of rows) and answers them to `getRGB`. Off by default; tests that
+    /// inspect pixels flip it.
+    public static boolean pixelImages;
 
     @Override
     public java.lang.Object createImage(int[] a0, int a1, int a2) {
+        if (pixelImages && a1 > 0 && a2 > 0) {
+            int[][] rows = new int[a2][a1];
+            for (int y = 0; y < a2; y++) {
+                System.arraycopy(a0, y * a1, rows[y], 0, a1);
+            }
+            return rows;
+        }
         return new Object();
     }
 
@@ -158,6 +176,17 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.lang.Object scale(java.lang.Object a0, int a1, int a2) {
+        if (a0 instanceof int[][] && a1 > 0 && a2 > 0) {
+            // Nearest-neighbour, for the pixel images of pixelImages.
+            int[][] src = (int[][]) a0;
+            int[][] out = new int[a2][a1];
+            for (int y = 0; y < a2; y++) {
+                for (int x = 0; x < a1; x++) {
+                    out[y][x] = src[y * src.length / a2][x * src[0].length / a1];
+                }
+            }
+            return out;
+        }
         return new Object();
     }
 
@@ -223,32 +252,71 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public void setNativeFont(java.lang.Object a0, java.lang.Object a1) {
     }
 
+    /// When set, every graphics context shares one tracked clip rectangle
+    /// and shape clips are supported: `setClip(Shape)` records the shape in
+    /// [#shapeClip] and clips to its bounds. Off by default, when the clip is
+    /// always the whole display; tests that check clipping flip it.
+    public static boolean trackClip;
+    /// The last shape passed to `setClip(Shape)` while [#trackClip] is set,
+    /// null once a rectangle replaces it.
+    public static com.codename1.ui.geom.Shape shapeClip;
+    private static int clipX;
+    private static int clipY;
+    private static int clipW = WIDTH;
+    private static int clipH = HEIGHT;
+
     @Override
     public int getClipX(java.lang.Object a0) {
-        return 0;
+        return trackClip ? clipX : 0;
     }
 
     @Override
     public int getClipY(java.lang.Object a0) {
-        return 0;
+        return trackClip ? clipY : 0;
     }
 
     @Override
     public int getClipWidth(java.lang.Object a0) {
-        return WIDTH;
+        return trackClip ? clipW : WIDTH;
     }
 
     @Override
     public int getClipHeight(java.lang.Object a0) {
-        return HEIGHT;
+        return trackClip ? clipH : HEIGHT;
     }
 
     @Override
     public void setClip(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        clipX = a1;
+        clipY = a2;
+        clipW = a3;
+        clipH = a4;
+        shapeClip = null;
     }
 
     @Override
     public void clipRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        int x2 = Math.min(clipX + clipW, a1 + a3);
+        int y2 = Math.min(clipY + clipH, a2 + a4);
+        clipX = Math.max(clipX, a1);
+        clipY = Math.max(clipY, a2);
+        clipW = Math.max(0, x2 - clipX);
+        clipH = Math.max(0, y2 - clipY);
+        shapeClip = null;
+    }
+
+    @Override
+    public boolean isShapeClipSupported(java.lang.Object graphics) {
+        return trackClip;
+    }
+
+    @Override
+    public void setClip(java.lang.Object graphics, com.codename1.ui.geom.Shape shape) {
+        if (trackClip) {
+            com.codename1.ui.geom.Rectangle b = shape.getBounds();
+            setClip(graphics, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+            shapeClip = shape;
+        }
     }
 
     @Override

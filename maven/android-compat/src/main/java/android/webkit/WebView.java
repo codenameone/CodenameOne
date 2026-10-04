@@ -488,8 +488,18 @@ public class WebView extends View {
         }
     }
 
+    /// Codename One's browser reports only whether one entry exists in each
+    /// direction, not how deep the history goes, so a move of more than one
+    /// entry cannot be confirmed and answers false rather than enabling a
+    /// control for a position that may not exist.
     public boolean canGoBackOrForward(int steps) {
-        return steps == 0 || (steps < 0 ? canGoBack() : canGoForward());
+        if (steps == 0) {
+            return true;
+        }
+        if (steps < -1 || steps > 1) {
+            return false;
+        }
+        return steps < 0 ? canGoBack() : canGoForward();
     }
 
     /// Moves `steps` entries through the history, one at a time.

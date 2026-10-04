@@ -28,6 +28,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
 
 import java.util.ArrayList;
 
@@ -252,13 +253,30 @@ public class Canvas {
         return true;
     }
 
+    /// Narrows the clip to `path`. `Graphics.setClip(Shape)` replaces the
+    /// clip, so the path is first intersected with the current clip whenever
+    /// it reaches outside it; a custom view therefore cannot paint past the
+    /// bounds its parent clipped it to. The current clip is read as its
+    /// bounding rectangle, so a second clipPath intersects with the first
+    /// path's bounds rather than its exact outline. Ports without shape
+    /// clipping clip to the path's bounds.
     public boolean clipPath(Path path) {
         if (g.isShapeClipSupported()) {
-            RectF b = new RectF();
-            path.computeBounds(b, true);
             Path p = new Path(path);
             p.transform(matrix);
-            g.setClip(p.toGeneralPath(originX, originY));
+            GeneralPath shape = p.toGeneralPath(originX, originY);
+            int cx = g.getClipX();
+            int cy = g.getClipY();
+            int cw = g.getClipWidth();
+            int ch = g.getClipHeight();
+            Rectangle b = shape.getBounds();
+            boolean inside = b.getX() >= cx && b.getY() >= cy
+                    && b.getX() + b.getWidth() <= cx + cw && b.getY() + b.getHeight() <= cy + ch;
+            if (!inside && !shape.intersect(cx, cy, cw, ch)) {
+                g.setClip(cx, cy, 0, 0);
+                return false;
+            }
+            g.setClip(shape);
             return true;
         }
         RectF b = new RectF();

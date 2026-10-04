@@ -52,6 +52,24 @@ final class SpanSet {
         return s;
     }
 
+    /// The spans `[start, end)` of the text keeps, clipped to it and moved
+    /// to begin at 0: what a subsequence carries over. A span that only
+    /// touches the range is left behind, exactly as [#get] leaves it out.
+    SpanSet slice(int start, int end) {
+        SpanSet s = new SpanSet();
+        for (Entry e : entries) {
+            if (e.start > end || e.end < start) {
+                continue;
+            }
+            if (start != end && e.start != e.end && (e.start == end || e.end == start)) {
+                continue;
+            }
+            s.entries.add(new Entry(e.what, Math.max(e.start, start) - start,
+                    Math.min(e.end, end) - start, e.flags));
+        }
+        return s;
+    }
+
     void set(Object what, int start, int end, int flags) {
         remove(what);
         entries.add(new Entry(what, start, end, flags));
