@@ -5578,6 +5578,7 @@ void codenameOneGCMark() {
         }
         unlockCriticalSection();
         long long __pw0 = cn1MonotonicNanos();
+        int __pwSleepUs = 50;
         for(;;) {
             JAVA_BOOLEAN anyActive = JAVA_FALSE;
             lockCriticalSection();
@@ -5592,10 +5593,26 @@ void codenameOneGCMark() {
             if(!anyActive) {
                 break;
             }
-            if(cn1MonotonicNanos() - __pw0 > 2000000LL) {
+            // 20ms, sleeping after the first 200us. It was 2ms of pure spin: on a loaded
+            // 4-vCPU runner a descheduled worker routinely took longer than that to come
+            // back and park, so SATB was armed with it still running and every store it
+            // made was logged -- GcSteadyStateIntegrationTest's SATB check read 5.05
+            // references per cycle per live object (limit 4) on one CI run of code that
+            // passed on the next. The loop below waits for every thread anyway, so ending
+            // this early saved nothing; the bound only keeps a thread that reaches no
+            // safepoint at all from doubling the wait before that loop's escalation.
+            long long __pwEl = cn1MonotonicNanos() - __pw0;
+            if(__pwEl > 20000000LL) {
                 break;
             }
-            cn1CpuRelax();
+            if(__pwEl < 200000LL) {
+                cn1CpuRelax();
+            } else {
+                usleep(__pwSleepUs);
+                if(__pwSleepUs < 500) {
+                    __pwSleepUs = __pwSleepUs * 2 > 500 ? 500 : __pwSleepUs * 2;
+                }
+            }
         }
         // The collector's half of the virtual-thread handshake (cn1_virtual_thread.c): the
         // decision read cn1GcVirtualThreadsSeen before any thread was stopped, and a native
@@ -8486,6 +8503,7 @@ static JAVA_BOOLEAN cn1GcHybridLastWasMinor = JAVA_FALSE;
 // is left alone.
 static _Atomic long long cn1CachedHostMemoryBound;   // defined with the pacing state below
 static long cn1GcHybridYoungBytes = 0;
+static int cn1GcHybridExpensiveStreak = 0;   // consecutive minors over 5% of the interval
 static void cn1GcHybridExitCheck(void);
 static int cn1GcHybridForced(void) {
     static int force = -1;
@@ -8504,6 +8522,9 @@ static void cn1GcHybridEndCycle(void) {
         return;
     }
     if(!cn1GcHybridGen) {
+        // "Two in a row" means within one phase: a streak carried across an exit let the
+        // first expensive minor after re-entry double the young generation on its own.
+        cn1GcHybridExpensiveStreak = 0;
         if(cn1GcHybridYoungBytes != 0) {
             cn1GcHybridYoungBytes = 0;
             atomic_store_explicit(&bibopGcTriggerBytes, (long)CN1_BIBOP_GC_TRIGGER_BYTES,
@@ -8526,10 +8547,10 @@ static void cn1GcHybridEndCycle(void) {
         // generation late in the run and the page heap stepped up a third to match --
         // GcSteadyStateIntegrationTest's second-half growth read 0.29-0.45 on runs whose
         // working set never moved.
-        static int expensiveStreak = 0;
-        expensiveStreak = cn1GcHybridLastCycleNs * 100 > interval * 5 ? expensiveStreak + 1 : 0;
-        if(expensiveStreak >= 2 && cn1GcHybridYoungBytes < ceiling) {
-            expensiveStreak = 0;
+        cn1GcHybridExpensiveStreak = cn1GcHybridLastCycleNs * 100 > interval * 5
+                ? cn1GcHybridExpensiveStreak + 1 : 0;
+        if(cn1GcHybridExpensiveStreak >= 2 && cn1GcHybridYoungBytes < ceiling) {
+            cn1GcHybridExpensiveStreak = 0;
             cn1GcHybridYoungBytes *= 2;
             if(cn1GcHybridYoungBytes > ceiling) {
                 cn1GcHybridYoungBytes = ceiling;
@@ -8566,7 +8587,7 @@ static void cn1GcHybridLeave(void) {
 static void cn1GcHybridExitCheck(void) {
     int survival = -1;
     if(bibopLastCycleOccupiedBytes >= 2 * 1024 * 1024) {
-        survival = (int)((bibopLastCycleLiveBytes * 100) / bibopLastCycleOccupiedBytes);
+        survival = (int)(((long long)bibopLastCycleLiveBytes * 100) / bibopLastCycleOccupiedBytes);   // long is 32-bit on Windows
     }
     if(cn1GcHybridLastWasMinor) {
         cn1GcHybridHighStreak = survival > CN1_GC_HYBRID_EXIT_PERCENT ? cn1GcHybridHighStreak + 1 : 0;
@@ -8633,7 +8654,7 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
     }
     int survival = -1;
     if(bibopLastCycleOccupiedBytes >= 2 * 1024 * 1024) {
-        survival = (int)((bibopLastCycleLiveBytes * 100) / bibopLastCycleOccupiedBytes);
+        survival = (int)(((long long)bibopLastCycleLiveBytes * 100) / bibopLastCycleOccupiedBytes);   // long is 32-bit on Windows
     }
     JAVA_BOOLEAN lowMemory = atomic_load_explicit(&lowMemoryMode, memory_order_relaxed) ? JAVA_TRUE : JAVA_FALSE;
     if(cn1GcHybridGen) {
@@ -8741,7 +8762,7 @@ static void cn1GcGenEndCycle(void) {
     // old child at an earlier epoch is live after a minor, not "aged out".
 }
 
-static void cn1GcRsetLegacyInsertLocked(JAVA_OBJECT t) {
+static JAVA_BOOLEAN cn1GcRsetLegacyInsertLocked(JAVA_OBJECT t) {
     if((cn1GcRsetLegacyCount + 1) * 2 > cn1GcRsetLegacyCap) {
         long nc = cn1GcRsetLegacyCap ? cn1GcRsetLegacyCap * 2 : 1024;
         JAVA_OBJECT* nt = (JAVA_OBJECT*)calloc((size_t)nc, sizeof(JAVA_OBJECT));
@@ -8749,7 +8770,7 @@ static void cn1GcRsetLegacyInsertLocked(JAVA_OBJECT t) {
             // Out of memory for the set: fall back to the one record that cannot be
             // lost -- make the next cycle a major, which traces everything.
             cn1GcForceMajor();
-            return;
+            return JAVA_FALSE;
         }
         for(long i = 0 ; i < cn1GcRsetLegacyCap ; i++) {
             JAVA_OBJECT e = cn1GcRsetLegacy[i];
@@ -8765,11 +8786,12 @@ static void cn1GcRsetLegacyInsertLocked(JAVA_OBJECT t) {
     }
     long h = (long)(((uintptr_t)t >> 4) & (uintptr_t)(cn1GcRsetLegacyCap - 1));
     while(cn1GcRsetLegacy[h] != 0) {
-        if(cn1GcRsetLegacy[h] == t) return;
+        if(cn1GcRsetLegacy[h] == t) return JAVA_TRUE;
         h = (h + 1) & (cn1GcRsetLegacyCap - 1);
     }
     cn1GcRsetLegacy[h] = t;
     cn1GcRsetLegacyCount++;
+    return JAVA_TRUE;
 }
 
 
@@ -8809,10 +8831,18 @@ void cn1GcRememberSlow(JAVA_OBJECT t) {
         if(atomic_load_explicit(&cn1GcRsetLegacyRecent[slot], memory_order_acquire) == t) {
             return;
         }
+        // Published INSIDE the mutex, as one transaction with the insert. Published after
+        // the unlock, a thread paused between the two let cn1GcRsetScan clear the cache and
+        // detach the set, and the late store then named an object the NEW set did not hold:
+        // every later young store into it hit the cache and was not remembered, and the
+        // next minor could free a child it still referenced. The scan clears the cache
+        // under the same mutex, so either both land in the set it detaches or both in the
+        // fresh one.
         pthread_mutex_lock(&cn1GcRsetLegacyMutex);
-        cn1GcRsetLegacyInsertLocked(t);
+        if(cn1GcRsetLegacyInsertLocked(t)) {
+            atomic_store_explicit(&cn1GcRsetLegacyRecent[slot], t, memory_order_release);
+        }
         pthread_mutex_unlock(&cn1GcRsetLegacyMutex);
-        atomic_store_explicit(&cn1GcRsetLegacyRecent[slot], t, memory_order_release);
     }
     // heapPosition -1 (stack / scalar-replaced / iterator scope) and anything else: a
     // root every cycle, never recorded.
@@ -8942,8 +8972,8 @@ static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
 #ifdef CN1_GC_INSTRUMENT
     clock_gettime(CLOCK_MONOTONIC, &__rt2);
 #endif
-    cn1GcRsetLegacyRecentClear();
     pthread_mutex_lock(&cn1GcRsetLegacyMutex);
+    cn1GcRsetLegacyRecentClear();   // with the detach, under the insert's mutex: see above
     JAVA_OBJECT* set = cn1GcRsetLegacy;
     long cap = cn1GcRsetLegacyCap;
     cn1GcRsetLegacy = 0;
@@ -12487,6 +12517,10 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             // remembered-set cards are zero -- the scan consumed them at cycle start and the
             // mutators stay stopped until the sweep ends, so nothing can store into a slot
             // that died here.
+            // Counted before the emptied-page exit below, which continues past the per-page
+            // tail: the young objects it reclaims are churn this minor handled as much as
+            // the all-dead O(1) branch's are (minorYoung, GcOverflowSpiralIntegrationTest).
+            __minorYoung += freed + marked;
             if(oldFree + freed == n) {
                 atomic_store_explicit(&page->bumpIndex, 0, memory_order_relaxed);
                 page->freeList = 0;
@@ -12507,7 +12541,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 pthread_mutex_unlock(&bibopMutex);
                 continue;
             }
-            __minorYoung += freed + marked;
             page->freeList = fl;
             page->freeCount = oldFree + freed;
             page->gcSweptBump = n;
