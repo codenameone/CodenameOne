@@ -71,4 +71,12 @@ public @interface Build {
     /// reducing archive size. This might have adverse effects on some features of
     /// Codename One so it isn't recommended.
     Toggle noExtraResources() default Toggle.DEFAULT;
+
+    /// How long, in seconds, the instrumented application runs when `ios.pgo`,
+    /// `macos.pgo` or `linux.pgo` is on. Defaults to 60; a value below 10 or
+    /// above 300 is brought into that range. Ignored when no profile-guided
+    /// build is requested. See Profile-guided optimization in the developer
+    /// guide.
+    @Hint(name = "pgo.trainingSeconds", external = true)
+    int pgoTrainingSeconds() default 0;
 }

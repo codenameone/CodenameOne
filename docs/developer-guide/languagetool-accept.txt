@@ -787,3 +787,8 @@ libimobiledevice
 Adwaita
 Mockito
 Toolchain
+# -----------------------------------------------------------------------------
+# Compiler terms used by the profile-guided optimization section
+# (performance.asciidoc).
+inlining
+inlined
