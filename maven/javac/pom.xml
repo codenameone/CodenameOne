@@ -59,6 +59,44 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- The compiler runs inside ParparVM (the Playground translates it to JavaScript), so it
+                 may only use what ParparVM's class library has. The main compile above is against the
+                 JDK and cannot tell: a JDK-only call compiles, links nothing on the device, and fails
+                 only when the browser reaches it ("..._impl is not defined"). This compiles the same
+                 sources again with vm/JavaAPI as the boot class path, so such a call fails the build. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>compile-against-javaapi</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <property name="javaapi.check.dir" value="${project.build.directory}/javaapi-check"/>
+                                <mkdir dir="${javaapi.check.dir}/api"/>
+                                <mkdir dir="${javaapi.check.dir}/classes"/>
+                                <javac srcdir="../../vm/JavaAPI/src" destdir="${javaapi.check.dir}/api"
+                                       source="1.8" target="1.8" encoding="${project.build.sourceEncoding}"
+                                       includeantruntime="false" nowarn="true" failonerror="true"/>
+                                <javac destdir="${javaapi.check.dir}/classes" source="1.8" target="1.8"
+                                       encoding="${project.build.sourceEncoding}" bootclasspath="${javaapi.check.dir}/api"
+                                       includeantruntime="false" includejavaruntime="false" nowarn="true"
+                                       failonerror="true">
+                                    <src path="../../vm/JavaCompiler/src"/>
+                                    <src path="../../vm/ByteCodeTranslator/src"/>
+                                    <include name="com/codename1/tools/javac/**"/>
+                                    <include name="com/codename1/tools/translator/classfile/**"/>
+                                    <compilerarg value="-Xlint:-options"/>
+                                </javac>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- Held to the same zero-findings SpotBugs gate as the other build
                  modules (.github/scripts/generate-quality-report.py). -->
             <plugin>

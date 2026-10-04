@@ -1120,6 +1120,13 @@ final class Attr {
             return null;
         }
         ClassSymbol s = ((Type.ClassType) sup).sym;
+        // Resolved quietly, so access is checked here: an inaccessible super() compiles to a
+        // class whose construction fails with IllegalAccessError.
+        Env ctorEnv = new Env(cenv, cenv.unit, c, null);
+        if (!isAccessible(r.method.flags, s, sup, ctorEnv, true)) {
+            error(cenv, pos, accessMessage(r.method.flags, s, s.simpleName + "()"));
+            return null;
+        }
         if (s.hasOuterInstance && !c.hasOuterInstance && !isSubclassOfAnyEnclosing(c, s.outer)) {
             error(cenv, pos, "no enclosing instance of type " + s.outer.javaName() + " is in scope");
         }
@@ -3250,6 +3257,11 @@ final class Attr {
                     // Only members (JLS 8.4.8): a supertype's private method is not
                     // inherited, nor a package-private one from another package.
                     if (k != origin && (m.isPrivate() || isPackagePrivate(m) && !packageOf(k).equals(packageOf(origin)))) {
+                        continue;
+                    }
+                    // Nor an interface's static method (JLS 8.4.8, 9.4.1): it is called through
+                    // the interface that declares it, never through an implementing type.
+                    if (k != origin && k.isInterface() && m.isStatic()) {
                         continue;
                     }
                     out.add(m);

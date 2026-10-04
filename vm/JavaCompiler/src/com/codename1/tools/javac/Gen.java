@@ -245,6 +245,38 @@ final class Gen {
                 attrs.add(a);
             }
         }
+        String classSig = classSignature(c);
+        if (classSig != null) {
+            ByteBuf a = new ByteBuf();
+            a.u2(pool.utf8("Signature")).u4(2).u2(pool.utf8(classSig));
+            attrs.add(a);
+        }
+        if (c.isRecord()) {
+            ByteBuf body = new ByteBuf();
+            body.u2(c.recordComponents.size());
+            for (VarSymbol rc : c.recordComponents) {
+                body.u2(pool.utf8(rc.name)).u2(pool.utf8(desc(erased(rc.type))));
+                if (isGeneric(rc.type)) {
+                    body.u2(1).u2(pool.utf8("Signature")).u4(2).u2(pool.utf8(signature(rc.type)));
+                } else {
+                    body.u2(0);
+                }
+            }
+            ByteBuf a = new ByteBuf();
+            a.u2(pool.utf8("Record")).u4(body.length).bytes(body);
+            attrs.add(a);
+        }
+        if ((c.flags & Symbol.SEALED) != 0) {
+            List<ClassSymbol> permitted = compiler.attr.permittedSubclasses(c);
+            if (!permitted.isEmpty()) {
+                ByteBuf a = new ByteBuf();
+                a.u2(pool.utf8("PermittedSubclasses")).u4(2 + 2 * permitted.size()).u2(permitted.size());
+                for (ClassSymbol k : permitted) {
+                    a.u2(pool.cls(k.internalName));
+                }
+                attrs.add(a);
+            }
+        }
         if (pool.hasBootstrapMethods()) {
             ByteBuf body = pool.bootstrapAttribute();
             ByteBuf a = new ByteBuf();
@@ -358,10 +390,13 @@ final class Gen {
             ByteBuf b = new ByteBuf();
             b.u2(access).u2(pool.utf8(f.name)).u2(pool.utf8(desc(erased(f.type))));
             Object cv = f.isStatic() && f.isFinal() ? f.constValue : null;
+            String sig = isGeneric(f.type) ? signature(f.type) : null;
+            b.u2((cv != null ? 1 : 0) + (sig != null ? 1 : 0));
             if (cv != null) {
-                b.u2(1).u2(pool.utf8("ConstantValue")).u4(2).u2(constantIndex(cv, f.type));
-            } else {
-                b.u2(0);
+                b.u2(pool.utf8("ConstantValue")).u4(2).u2(constantIndex(cv, f.type));
+            }
+            if (sig != null) {
+                b.u2(pool.utf8("Signature")).u4(2).u2(pool.utf8(sig));
             }
             fieldInfos.add(b);
         }
@@ -380,6 +415,181 @@ final class Gen {
         if (c.isEnum() && !c.anonymous) {
             syntheticField("$VALUES", "[L" + c.internalName + ";", Symbol.ACC_PRIVATE | Symbol.ACC_STATIC | Symbol.ACC_FINAL | Symbol.ACC_SYNTHETIC);
         }
+    }
+
+    // ------------------------------------------------------------------ generic signatures (JVMS 4.7.9.1)
+
+    /** Whether t says more than its erasure: a type variable or a parameterized type anywhere in it. */
+    private static boolean isGeneric(Type t) {
+        if (t instanceof Type.TypeVar) {
+            return true;
+        }
+        if (t instanceof Type.ArrayType) {
+            return isGeneric(((Type.ArrayType) t).elem);
+        }
+        if (t instanceof Type.ClassType) {
+            Type.ClassType ct = (Type.ClassType) t;
+            return !ct.args.isEmpty() || ct.outer != null && isGeneric(ct.outer);
+        }
+        return false;
+    }
+
+    /** The signature of a type, or null for one that has none (an error or inference leftover). */
+    private String signature(Type t) {
+        StringBuilder b = new StringBuilder();
+        return appendSignature(b, t) ? b.toString() : null;
+    }
+
+    private boolean appendSignature(StringBuilder b, Type t) {
+        if (t == null) {
+            return false;
+        }
+        switch (t.tag) {
+            case BOOLEAN: b.append('Z'); return true;
+            case BYTE: b.append('B'); return true;
+            case SHORT: b.append('S'); return true;
+            case CHAR: b.append('C'); return true;
+            case INT: b.append('I'); return true;
+            case LONG: b.append('J'); return true;
+            case FLOAT: b.append('F'); return true;
+            case DOUBLE: b.append('D'); return true;
+            case VOID: b.append('V'); return true;
+            case TYPEVAR: b.append('T').append(((Type.TypeVar) t).name).append(';'); return true;
+            case ARRAY:
+                b.append('[');
+                return appendSignature(b, ((Type.ArrayType) t).elem);
+            case CLASS:
+                if (!appendClassSignature(b, (Type.ClassType) t)) {
+                    return false;
+                }
+                b.append(';');
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** {@code Lpkg/Outer<..>.Inner<..>} without the closing semicolon. */
+    private boolean appendClassSignature(StringBuilder b, Type.ClassType ct) {
+        if (ct.outer != null && isGeneric(ct.outer) && ct.sym.simpleName != null) {
+            if (!appendClassSignature(b, ct.outer)) {
+                return false;
+            }
+            b.append('.').append(ct.sym.simpleName);
+        } else {
+            b.append('L').append(ct.sym.internalName);
+        }
+        if (!ct.args.isEmpty()) {
+            b.append('<');
+            for (Type a : ct.args) {
+                if (a instanceof Type.WildcardType) {
+                    Type.WildcardType w = (Type.WildcardType) a;
+                    if (w.kind == Type.WildcardType.UNBOUND) {
+                        b.append('*');
+                        continue;
+                    }
+                    b.append(w.kind == Type.WildcardType.EXTENDS ? '+' : '-');
+                    if (!appendSignature(b, w.bound)) {
+                        return false;
+                    }
+                } else if (!appendSignature(b, a)) {
+                    return false;
+                }
+            }
+            b.append('>');
+        }
+        return true;
+    }
+
+    /** {@code <T:Ljava/lang/Object;U::Ljava/lang/Comparable<TU;>;>}; an interface bound takes the second colon. */
+    private boolean appendTypeParams(StringBuilder b, List<Type.TypeVar> params) {
+        if (params.isEmpty()) {
+            return true;
+        }
+        b.append('<');
+        for (Type.TypeVar tv : params) {
+            b.append(tv.name);
+            List<Type> bounds = tv.bound instanceof Type.IntersectionType
+                    ? ((Type.IntersectionType) tv.bound).bounds : java.util.Collections.singletonList(tv.bound);
+            boolean first = true;
+            for (Type bound : bounds) {
+                if (bound == null) {
+                    bound = syms.objectType;
+                }
+                boolean itf = bound instanceof Type.ClassType && ((Type.ClassType) bound).sym.isInterface();
+                if (first && itf) {
+                    b.append(':');
+                }
+                b.append(':');
+                first = false;
+                if (!appendSignature(b, bound)) {
+                    return false;
+                }
+            }
+        }
+        b.append('>');
+        return true;
+    }
+
+    private String classSignature(ClassSymbol c) {
+        Type sup = c.isInterface() ? syms.objectType : c.superclass();
+        boolean generic = !c.typeParams().isEmpty() || isGeneric(sup);
+        for (Type i : c.interfaces()) {
+            generic |= isGeneric(i);
+        }
+        if (!generic || sup == null) {
+            return null;
+        }
+        StringBuilder b = new StringBuilder();
+        if (!appendTypeParams(b, c.typeParams()) || !appendSignature(b, sup)) {
+            return null;
+        }
+        for (Type i : c.interfaces()) {
+            if (!appendSignature(b, i)) {
+                return null;
+            }
+        }
+        return b.toString();
+    }
+
+    private String methodSignature(MethodSymbol m) {
+        boolean generic = !m.typeParams.isEmpty() || isGeneric(m.returnType);
+        for (Type p : m.params) {
+            generic |= isGeneric(p);
+        }
+        for (Type t : m.thrown) {
+            generic |= isGeneric(t);
+        }
+        if (!generic) {
+            return null;
+        }
+        StringBuilder b = new StringBuilder();
+        if (!appendTypeParams(b, m.typeParams)) {
+            return null;
+        }
+        b.append('(');
+        for (Type p : m.params) {
+            if (!appendSignature(b, p)) {
+                return null;
+            }
+        }
+        b.append(')');
+        if (!appendSignature(b, m.isConstructor() ? Type.VOID : m.returnType)) {
+            return null;
+        }
+        boolean throwsGeneric = false;
+        for (Type t : m.thrown) {
+            throwsGeneric |= t instanceof Type.TypeVar;
+        }
+        if (throwsGeneric) {
+            for (Type t : m.thrown) {
+                b.append('^');
+                if (!appendSignature(b, t)) {
+                    return null;
+                }
+            }
+        }
+        return b.toString();
     }
 
     private void syntheticField(String name, String descriptor, int access) {
@@ -440,8 +650,32 @@ final class Gen {
         }
         ByteBuf m = new ByteBuf();
         m.u2(access & 0xFFFF).u2(pool.utf8(name)).u2(pool.utf8(descriptor));
+        // A source method's declared exceptions and generic signature, as javac writes them: a
+        // class compiled later against this one (the Playground's launcher is) and reflection
+        // read both from here. A bridge repeats the exceptions but not the signature.
+        List<ByteBuf> extra = new ArrayList<ByteBuf>();
+        MethodSymbol src = method != null && method.decl != null && method.name.equals(name) ? method : null;
+        if (src != null && !src.thrown.isEmpty()) {
+            ByteBuf a = new ByteBuf();
+            a.u2(pool.utf8("Exceptions")).u4(2 + 2 * src.thrown.size()).u2(src.thrown.size());
+            for (Type t : src.thrown) {
+                a.u2(pool.cls(internalName(erased(t))));
+            }
+            extra.add(a);
+        }
+        if (src != null && (access & (Symbol.ACC_BRIDGE | Symbol.ACC_SYNTHETIC)) == 0) {
+            String sig = methodSignature(src);
+            if (sig != null) {
+                ByteBuf a = new ByteBuf();
+                a.u2(pool.utf8("Signature")).u4(2).u2(pool.utf8(sig));
+                extra.add(a);
+            }
+        }
         if (code == null) {
-            m.u2(0);
+            m.u2(extra.size());
+            for (ByteBuf a : extra) {
+                m.bytes(a);
+            }
             methodInfos.add(m);
             return;
         }
@@ -467,7 +701,10 @@ final class Gen {
                 body.u2(ln[0]).u2(ln[1]);
             }
         }
-        m.u2(1).u2(pool.utf8("Code")).u4(body.length).bytes(body);
+        m.u2(1 + extra.size()).u2(pool.utf8("Code")).u4(body.length).bytes(body);
+        for (ByteBuf a : extra) {
+            m.bytes(a);
+        }
         methodInfos.add(m);
         code = null;
     }
@@ -530,6 +767,7 @@ final class Gen {
         Tree.MethodDecl d = m.decl;
         if (d.body == null) {
             code = null;
+            method = m;
             endMethod(methodAccess(m), m.name, jvmDescriptor(m), m.isStatic(), false);
             return;
         }

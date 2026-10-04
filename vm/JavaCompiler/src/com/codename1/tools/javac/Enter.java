@@ -197,6 +197,17 @@ final class Enter {
                 continue;
             }
             if (t.tag == Type.Tag.CLASS) {
+                boolean repeated = false;
+                for (Type earlier : c.interfaces()) {
+                    if (earlier.tag == Type.Tag.CLASS && ((Type.ClassType) earlier).sym == ((Type.ClassType) t).sym) {
+                        repeated = true;
+                    }
+                }
+                if (repeated) {
+                    // The class file would list it twice, which the JVM refuses to load.
+                    compiler.error(c.unit, i.pos, "repeated interface");
+                    continue;
+                }
                 c.interfaces().add(t);
             }
         }
@@ -207,6 +218,74 @@ final class Enter {
             }
         }
         c.thisType = null;
+    }
+
+    // ------------------------------------------------------------------ member modifiers (JLS 8.3.1, 8.4.3, 9.3, 9.4)
+
+    private static final int ACCESS = Symbol.ACC_PUBLIC | Symbol.ACC_PROTECTED | Symbol.ACC_PRIVATE;
+    private static final int FIELD_MODIFIERS = ACCESS | Symbol.ACC_STATIC | Symbol.ACC_FINAL | Symbol.ACC_TRANSIENT
+            | Symbol.ACC_VOLATILE;
+    private static final int INTERFACE_FIELD_MODIFIERS = Symbol.ACC_PUBLIC | Symbol.ACC_STATIC | Symbol.ACC_FINAL;
+    private static final int METHOD_MODIFIERS = ACCESS | Symbol.ACC_STATIC | Symbol.ACC_FINAL | Symbol.ACC_ABSTRACT
+            | Symbol.ACC_SYNCHRONIZED | Symbol.ACC_NATIVE | Symbol.ACC_STRICT;
+    private static final int INTERFACE_METHOD_MODIFIERS = Symbol.ACC_PUBLIC | Symbol.ACC_PRIVATE | Symbol.ACC_STATIC
+            | Symbol.ACC_ABSTRACT | Symbol.ACC_STRICT | JavaSourceParser.DEFAULT;
+    /** Every source modifier, in the order javac names them. */
+    private static final int[] MODIFIER_FLAGS = {Symbol.ACC_PUBLIC, Symbol.ACC_PRIVATE, Symbol.ACC_PROTECTED,
+        Symbol.ACC_STATIC, Symbol.ACC_FINAL, Symbol.ACC_SYNCHRONIZED, Symbol.ACC_VOLATILE, Symbol.ACC_TRANSIENT,
+        Symbol.ACC_NATIVE, Symbol.ACC_ABSTRACT, Symbol.ACC_STRICT, JavaSourceParser.DEFAULT, JavaSourceParser.SEALED,
+        JavaSourceParser.NON_SEALED};
+    private static final String[] MODIFIER_NAMES = {"public", "private", "protected", "static", "final",
+        "synchronized", "volatile", "transient", "native", "abstract", "strictfp", "default", "sealed", "non-sealed"};
+
+    /**
+     * A field or method modifier the declaration cannot carry, or two that exclude each other.
+     * The flags are written to the class file as they are, and several share a bit with a
+     * different meaning on the other kind of member (a volatile method is a bridge, a
+     * transient one variable-arity), so an unchecked combination is a class the JVM refuses
+     * or one that means something else.
+     */
+    private void checkModifiers(int flags, int allowed, ClassSymbol c, int pos) {
+        for (int i = 0; i < MODIFIER_FLAGS.length; i++) {
+            if ((flags & MODIFIER_FLAGS[i]) != 0 && (allowed & MODIFIER_FLAGS[i]) == 0) {
+                compiler.error(c.unit, pos, "modifier " + MODIFIER_NAMES[i] + " not allowed here");
+                return;
+            }
+        }
+        String a = null;
+        String b = null;
+        int access = flags & ACCESS;
+        if ((access & (access - 1)) != 0) {
+            a = name(flags & ACCESS, 0);
+            b = name(flags & ACCESS, 1);
+        } else if ((flags & Symbol.ACC_FINAL) != 0 && (flags & Symbol.ACC_VOLATILE) != 0) {
+            a = "final";
+            b = "volatile";
+        } else if ((flags & Symbol.ACC_ABSTRACT) != 0) {
+            int clash = flags & (Symbol.ACC_PRIVATE | Symbol.ACC_STATIC | Symbol.ACC_FINAL | Symbol.ACC_NATIVE
+                    | Symbol.ACC_SYNCHRONIZED | Symbol.ACC_STRICT | JavaSourceParser.DEFAULT);
+            if (clash != 0) {
+                a = "abstract";
+                b = name(clash, 0);
+            }
+        } else if ((flags & JavaSourceParser.DEFAULT) != 0
+                && (flags & (Symbol.ACC_PRIVATE | Symbol.ACC_STATIC)) != 0) {
+            a = (flags & Symbol.ACC_PRIVATE) != 0 ? "private" : "static";
+            b = "default";
+        }
+        if (a != null) {
+            compiler.error(c.unit, pos, "illegal combination of modifiers: " + a + " and " + b);
+        }
+    }
+
+    /** The name of the n-th modifier set in flags, in javac's order. */
+    private static String name(int flags, int n) {
+        for (int i = 0; i < MODIFIER_FLAGS.length; i++) {
+            if ((flags & MODIFIER_FLAGS[i]) != 0 && n-- == 0) {
+                return MODIFIER_NAMES[i];
+            }
+        }
+        return "";
     }
 
     void enterMembers(ClassSymbol c) {
@@ -227,6 +306,9 @@ final class Enter {
         for (Tree member : decl.members) {
             if (member instanceof Tree.VarDef) {
                 Tree.VarDef v = (Tree.VarDef) member;
+                if ((v.mods.flags & Symbol.ACC_ENUM) == 0) {
+                    checkModifiers(v.mods.flags, isInterface ? INTERFACE_FIELD_MODIFIERS : FIELD_MODIFIERS, c, v.pos);
+                }
                 int flags = v.mods.flags & 0xFFFF;
                 Type t;
                 if ((flags & Symbol.ACC_ENUM) != 0) {
@@ -285,6 +367,7 @@ final class Enter {
     }
 
     MethodSymbol enterMethod(Tree.MethodDecl m, ClassSymbol c, Env classEnv) {
+        checkModifiers(m.mods.flags, c.isInterface() ? INTERFACE_METHOD_MODIFIERS : METHOD_MODIFIERS, c, m.pos);
         int flags = m.mods.flags & 0xFFFF;
         boolean isInterface = c.isInterface();
         if (isInterface) {
