@@ -33,12 +33,14 @@ import org.objectweb.asm.Opcodes;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -523,5 +525,35 @@ public class AndroidRemapperTest {
             assertTrue(why, why.contains("resolves outside"));
         }
         assertFalse(evil.exists());
+    }
+
+    /// An incremental build after the runtime jar changed: a resource whose
+    /// contents changed but whose length did not (a rebuilt resource table)
+    /// must replace the copy the previous build extracted.
+    @Test
+    public void aChangedResourceOfTheSameLengthIsReplaced() throws Exception {
+        File classes = tmp.newFolder("res-classes");
+        File onClick = tmp.newFile("res-onclick.txt");
+        File jar = tmp.newFile("codenameone-android-compat-res.jar");
+        writeJar(jar, "cn1_android_framework.bin", new byte[] {1, 2, 3, 4});
+        new AndroidRemapper(classes, jar, onClick, LOG).run();
+        File table = new File(classes, "cn1_android_framework.bin");
+        assertArrayEquals(new byte[] {1, 2, 3, 4}, Files.readAllBytes(table.toPath()));
+
+        writeJar(jar, "cn1_android_framework.bin", new byte[] {9, 8, 7, 6});
+        new AndroidRemapper(classes, jar, onClick, LOG).run();
+        assertArrayEquals("the previous runtime's resource table survived the rebuild",
+                new byte[] {9, 8, 7, 6}, Files.readAllBytes(table.toPath()));
+    }
+
+    private static void writeJar(File jar, String entry, byte[] data) throws IOException {
+        ZipOutputStream z = new ZipOutputStream(new FileOutputStream(jar));
+        try {
+            z.putNextEntry(new ZipEntry(entry));
+            z.write(data);
+            z.closeEntry();
+        } finally {
+            z.close();
+        }
     }
 }

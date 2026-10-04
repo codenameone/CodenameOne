@@ -31,10 +31,13 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -868,25 +871,110 @@ public final class ResourceCompiler {
             if (!f.tag.equals("intent-filter")) {
                 continue;
             }
-            boolean main = false;
-            boolean launcher = false;
-            for (RawNode c : f.children) {
-                String name = c.attr(RawNode.NS_KEY_ANDROID, "name");
-                if (c.tag.equals("action") && name != null) {
-                    if (name.equals("android.intent.action.MAIN")) {
-                        main = true;
-                    } else {
-                        a.actions.add(name);
-                    }
-                } else if (c.tag.equals("category") && "android.intent.category.LAUNCHER".equals(name)) {
-                    launcher = true;
-                }
-            }
-            if (main && launcher) {
+            ManifestInfo.IntentFilter filter = parseIntentFilter(f, file);
+            if (filter.actions.contains("android.intent.action.MAIN")
+                    && filter.categories.contains("android.intent.category.LAUNCHER")) {
                 a.launcher = true;
+            }
+            if (filter.actions.isEmpty()) {
+                // Android drops a filter with no action: it can never match.
+                continue;
+            }
+            if (!unsupportedData(f, file)) {
+                a.filters.add(filter);
             }
         }
         return a;
+    }
+
+    /// The `<data>` attributes and the `PatternMatcher` type each pattern
+    /// attribute stands for (`PATTERN_LITERAL` 0, `PREFIX` 1, `SIMPLE_GLOB`
+    /// 2, `SUFFIX` 4).
+    private static final String[] PATH_ATTRS = {"path", "pathPrefix", "pathPattern", "pathSuffix"};
+    private static final String[] SSP_ATTRS = {"ssp", "sspPrefix", "sspPattern", "sspSuffix"};
+    private static final int[] PATTERN_TYPES = {0, 1, 2, 4};
+
+    /// Keeps a whole `<intent-filter>` -- actions, categories and every
+    /// `<data>` constraint -- because flattening it to its actions made an
+    /// `ACTION_VIEW` filter for a custom scheme capture every browser,
+    /// dialer and share intent. Attribute values go through the resource
+    /// string unescaping aapt applies, so `pathPattern=".*\\.pdf"` reaches
+    /// the matcher as `.*\.pdf`, as it does on a device.
+    private ManifestInfo.IntentFilter parseIntentFilter(RawNode f, String file) {
+        ManifestInfo.IntentFilter filter = new ManifestInfo.IntentFilter();
+        for (RawNode c : f.children) {
+            if (c.tag.equals("action") || c.tag.equals("category")) {
+                String name = c.attr(RawNode.NS_KEY_ANDROID, "name");
+                if (name == null) {
+                    continue;
+                }
+                List<String> into = c.tag.equals("action") ? filter.actions : filter.categories;
+                if (!into.contains(name)) {
+                    into.add(name);
+                }
+            } else if (c.tag.equals("data")) {
+                String scheme = dataAttr(c, "scheme");
+                if (scheme != null && !filter.schemes.contains(scheme)) {
+                    filter.schemes.add(scheme);
+                }
+                String host = dataAttr(c, "host");
+                if (host != null) {
+                    filter.authorities.add(new ManifestInfo.Authority(host, dataAttr(c, "port")));
+                }
+                for (int i = 0; i < PATH_ATTRS.length; i++) {
+                    String v = dataAttr(c, PATH_ATTRS[i]);
+                    if (v != null) {
+                        filter.paths.add(new ManifestInfo.DataPattern(v, PATTERN_TYPES[i]));
+                    }
+                    v = dataAttr(c, SSP_ATTRS[i]);
+                    if (v != null) {
+                        filter.schemeSpecificParts.add(new ManifestInfo.DataPattern(v, PATTERN_TYPES[i]));
+                    }
+                }
+                String type = dataAttr(c, "mimeType");
+                if (type != null) {
+                    if (type.indexOf('/') <= 0) {
+                        error("E0304", file, c.line, "mimeType '" + type + "' is not a MIME type (type/subtype)");
+                    } else if (!filter.types.contains(type)) {
+                        filter.types.add(type);
+                    }
+                }
+            }
+        }
+        return filter;
+    }
+
+    private static String dataAttr(RawNode c, String name) {
+        String v = c.attr(RawNode.NS_KEY_ANDROID, name);
+        return v == null ? null : AndroidStrings.unescape(v);
+    }
+
+    /// True, with a warning, when a filter's `<data>` uses something the
+    /// runtime cannot match. Such a filter is dropped rather than kept
+    /// without the constraint: a filter that matched more than it declared
+    /// would take intents meant for the browser or another application.
+    private boolean unsupportedData(RawNode f, String file) {
+        for (RawNode c : f.children) {
+            if (!c.tag.equals("data")) {
+                continue;
+            }
+            String[] unsupported = {"pathAdvancedPattern", "sspAdvancedPattern", "mimeGroup"};
+            for (String u : unsupported) {
+                if (c.attr(RawNode.NS_KEY_ANDROID, u) != null) {
+                    warn("W0304", file, c.line, "<data android:" + u + "> is not supported; the intent filter is"
+                            + " ignored");
+                    return true;
+                }
+            }
+            for (RawNode.Attr at : c.attrs) {
+                if (at.ns == RawNode.NS_KEY_ANDROID && at.value != null && at.value.startsWith("@")) {
+                    warn("W0304", file, c.line, "<data android:" + at.name + "> names a resource; only literal"
+                            + " values are supported, and the intent filter is ignored");
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private Value encodeManifestRef(String raw, ValueEncoder.Problems p) {
@@ -1077,15 +1165,15 @@ public final class ResourceCompiler {
         listFiles(req.assetsDir, "", paths);
         Collections.sort(paths);
         StringBuilder index = new StringBuilder();
+        // Output name (case folded, for case-insensitive file systems) to the
+        // asset that claimed it: two assets must never share a copy.
+        Map<String, String> claimed = new HashMap<String, String>();
         for (String p : paths) {
-            String base = p.substring(p.lastIndexOf('/') + 1);
-            StringBuilder safe = new StringBuilder();
-            for (int i = 0; i < base.length(); i++) {
-                char c = base.charAt(i);
-                safe.append((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.'
-                        || c == '_' || c == '-' ? c : '_');
+            String flat = flatAssetName(p);
+            String owner = claimed.put(asciiLower(flat), p);
+            if (owner != null) {
+                throw new IOException("The assets " + owner + " and " + p + " both map to the output file " + flat);
             }
-            String flat = "andra_" + Integer.toHexString(p.hashCode()) + "_" + safe;
             File dest = new File(req.resourcesOut, flat);
             copyIfChanged(new File(req.assetsDir, p), dest);
             result.resourceFiles.add(dest);
@@ -1101,6 +1189,33 @@ public final class ResourceCompiler {
         }
         result.resourceFiles.add(idx);
         shipped.add(ASSET_INDEX);
+    }
+
+    /// The flat output name of the asset at relative path `path`:
+    /// `andra_<digest>_<basename>`. The digest is SHA-256 of the whole path,
+    /// not `String.hashCode()`, under which `Aa/file.txt` and `BB/file.txt`
+    /// collide and one asset silently overwrote the other.
+    static String flatAssetName(String path) {
+        String base = path.substring(path.lastIndexOf('/') + 1);
+        StringBuilder sb = new StringBuilder("andra_");
+        byte[] digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256").digest(path.getBytes(Charset.forName("UTF-8")));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
+        // 128 bits: no accidental collision across any asset tree.
+        for (int i = 0; i < 16; i++) {
+            int b = digest[i] & 0xff;
+            sb.append(Character.forDigit(b >> 4, 16)).append(Character.forDigit(b & 0xf, 16));
+        }
+        sb.append('_');
+        for (int i = 0; i < base.length(); i++) {
+            char c = base.charAt(i);
+            sb.append((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.'
+                    || c == '_' || c == '-' ? c : '_');
+        }
+        return sb.toString();
     }
 
     private static void listFiles(File dir, String prefix, List<String> out) {

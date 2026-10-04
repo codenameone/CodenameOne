@@ -147,7 +147,7 @@ public final class ActivityThread {
         } else if (intent.getComponent() != null) {
             info = rt.getApp().activityInfo(intent.getComponent().getClassName());
         } else if (intent.getAction() != null) {
-            info = rt.getApp().activityForAction(intent.getAction());
+            info = rt.getApp().activityForIntent(intent);
             if (info == null) {
                 if (rt.handleImplicitIntent(intent)) {
                     return;

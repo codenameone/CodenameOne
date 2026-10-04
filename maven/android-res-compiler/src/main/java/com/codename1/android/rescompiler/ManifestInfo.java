@@ -41,9 +41,46 @@ public final class ManifestInfo {
         /// changes the activity handles itself instead of being recreated.
         public int configChanges;
         public boolean launcher;
-        /// Implicit-intent actions this activity declares it handles.
-        public final List<String> actions = new ArrayList<String>();
+        /// Every `<intent-filter>`, kept whole: an implicit intent must match
+        /// a filter's data, MIME types and categories as well as its action.
+        public final List<IntentFilter> filters = new ArrayList<IntentFilter>();
         public int line;
+    }
+
+    /// A path or scheme-specific-part pattern: the text and its
+    /// `android.os.PatternMatcher` type.
+    public static final class DataPattern {
+        public final String pattern;
+        public final int type;
+
+        public DataPattern(String pattern, int type) {
+            this.pattern = pattern;
+            this.type = type;
+        }
+    }
+
+    /// A host and port of a filter's `<data>`; the port is null for any.
+    public static final class Authority {
+        public final String host;
+        public final String port;
+
+        public Authority(String host, String port) {
+            this.host = host;
+            this.port = port;
+        }
+    }
+
+    /// One `<intent-filter>`, as the `IntentFilter` calls Android's package
+    /// parser makes for it. Every `<data>` element adds to the filter's
+    /// shared sets, so schemes, hosts and paths combine across elements.
+    public static final class IntentFilter {
+        public final List<String> actions = new ArrayList<String>();
+        public final List<String> categories = new ArrayList<String>();
+        public final List<String> schemes = new ArrayList<String>();
+        public final List<Authority> authorities = new ArrayList<Authority>();
+        public final List<DataPattern> paths = new ArrayList<DataPattern>();
+        public final List<DataPattern> schemeSpecificParts = new ArrayList<DataPattern>();
+        public final List<String> types = new ArrayList<String>();
     }
 
     public String packageName;

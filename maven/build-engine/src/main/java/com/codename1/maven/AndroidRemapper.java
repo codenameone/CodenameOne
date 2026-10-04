@@ -359,25 +359,31 @@ public final class AndroidRemapper {
                 if (name.endsWith(".class")) {
                     String cls = name.substring(0, name.length() - ".class".length());
                     File dest = inside(new File(classesDir, map(cls) + ".class"), name);
-                    byte[] remapped = remap(data);
-                    if (!dest.isFile() || dest.length() != remapped.length
-                            || !Arrays.equals(Files.readAllBytes(dest.toPath()), remapped)) {
-                        dest.getParentFile().mkdirs();
-                        write(dest, remapped);
-                    }
+                    writeIfDifferent(dest, remap(data));
                     count++;
                 } else {
-                    File dest = inside(new File(classesDir, name), name);
-                    if (!dest.isFile() || dest.length() != data.length) {
-                        dest.getParentFile().mkdirs();
-                        write(dest, data);
-                    }
+                    // Resource tables and assets are compared byte for byte
+                    // too: a rebuilt table routinely keeps its length while
+                    // its contents change, and a length check alone kept the
+                    // previous runtime's copy.
+                    writeIfDifferent(inside(new File(classesDir, name), name), data);
                 }
             }
         } finally {
             zip.close();
         }
         return count;
+    }
+
+    /// Writes `data` to `dest` unless the file already holds exactly those
+    /// bytes, so an incremental build leaves unchanged outputs (and their
+    /// timestamps) alone.
+    private static void writeIfDifferent(File dest, byte[] data) throws IOException {
+        if (dest.isFile() && dest.length() == data.length && Arrays.equals(Files.readAllBytes(dest.toPath()), data)) {
+            return;
+        }
+        dest.getParentFile().mkdirs();
+        write(dest, data);
     }
 
     /// Writes `OnClickDispatch.dispatch(Object, String, View)`: for each layout

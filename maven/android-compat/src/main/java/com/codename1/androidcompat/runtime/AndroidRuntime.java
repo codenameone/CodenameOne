@@ -206,7 +206,7 @@ public final class AndroidRuntime {
         if (action == null) {
             return false;
         }
-        if (app.activityForAction(action) != null) {
+        if (app.activityForIntent(intent) != null) {
             return true;
         }
         return Intent.ACTION_VIEW.equals(action) || Intent.ACTION_DIAL.equals(action)
@@ -233,7 +233,7 @@ public final class AndroidRuntime {
         if (intent.getComponentClass() != null) {
             return new android.content.ComponentName(app.getPackageName(), intent.getComponentClass().getName());
         }
-        AndroidApp.ActivityInfo info = app.activityForAction(intent.getAction());
+        AndroidApp.ActivityInfo info = app.activityForIntent(intent);
         if (info != null) {
             return new android.content.ComponentName(app.getPackageName(), info.className);
         }

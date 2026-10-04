@@ -200,6 +200,77 @@ public class ResourceCompilerTest {
         assertFalse("the index outlived the last asset", index.exists());
     }
 
+    /// Activity filters reach the generated code whole. Flattened to their
+    /// actions, an ACTION_VIEW filter for a custom scheme captured every
+    /// browser and telephone intent the application started.
+    @Test
+    public void intentFiltersKeepTheirDataTypesAndCategories() throws IOException {
+        File res = project();
+        File manifest = new File(res.getParentFile(), "AndroidManifest.xml");
+        String m = new String(Files.readAllBytes(manifest.toPath()), "UTF-8");
+        write(manifest, m.replace("<activity android:name=\"com.other.Second\"/>",
+                "<activity android:name=\"com.other.Second\"><intent-filter>"
+                        + "<action android:name=\"android.intent.action.VIEW\"/>"
+                        + "<category android:name=\"android.intent.category.DEFAULT\"/>"
+                        + "<category android:name=\"android.intent.category.BROWSABLE\"/>"
+                        + "<data android:scheme=\"myapp\" android:host=\"example.com\" android:port=\"8080\"/>"
+                        + "<data android:pathPrefix=\"/items\"/><data android:pathPattern=\".*\\\\.pdf\"/>"
+                        + "</intent-filter><intent-filter><action android:name=\"android.intent.action.SEND\"/>"
+                        + "<category android:name=\"android.intent.category.DEFAULT\"/>"
+                        + "<data android:mimeType=\"image/*\"/></intent-filter>"
+                        + "<intent-filter><action android:name=\"com.x.ADVANCED\"/>"
+                        + "<data android:scheme=\"x\" android:pathAdvancedPattern=\"/[a-z]+\"/></intent-filter>"
+                        + "</activity>"));
+        ResourceCompiler.Result r = compile(res);
+        assertFalse(r.diagnostics.toString(), r.hasErrors());
+        String impl = new String(Files.readAllBytes(r.javaFiles.get(1).toPath()), "UTF-8");
+        assertTrue(impl, impl.contains("android.content.IntentFilter f = intentFilter(com.other.Second.class);"));
+        assertTrue(impl, impl.contains("f.addAction(\"android.intent.action.VIEW\");"));
+        assertTrue(impl, impl.contains("f.addCategory(\"android.intent.category.BROWSABLE\");"));
+        assertTrue("the filter's scheme was dropped: " + impl, impl.contains("f.addDataScheme(\"myapp\");"));
+        assertTrue(impl, impl.contains("f.addDataAuthority(\"example.com\", \"8080\");"));
+        assertTrue(impl, impl.contains("f.addDataPath(\"/items\", 1);"));
+        // aapt unescapes ".*\\.pdf" to the pattern ".*\.pdf", quoted again here.
+        assertTrue(impl, impl.contains("f.addDataPath(\".*\\\\.pdf\", 2);"));
+        assertTrue(impl, impl.contains("f.addDataType(\"image/*\");"));
+        // The launcher filter is kept too: it lists no DEFAULT, so it takes
+        // no implicit start, as on Android.
+        assertTrue(impl, impl.contains("intentFilter(com.x.Main.class);"));
+        // A filter with a constraint the runtime cannot evaluate is dropped,
+        // never kept without it.
+        assertFalse(impl, impl.contains("com.x.ADVANCED"));
+        assertTrue(r.diagnostics.toString(), r.diagnostics.toString().contains("W0304"));
+    }
+
+    /// Two assets whose paths have the same `String.hashCode()` -- `Aa` and
+    /// `BB` collide -- each keep their own output file.
+    @Test
+    public void assetsWithCollidingPathHashesKeepSeparateCopies() throws IOException {
+        assertEquals("Aa/file.txt".hashCode(), "BB/file.txt".hashCode());
+        File res = project();
+        File assets = new File(res.getParentFile(), "assets");
+        write(new File(assets, "Aa/file.txt"), "first");
+        write(new File(assets, "BB/file.txt"), "second");
+        ResourceCompiler.Request r = new ResourceCompiler.Request();
+        r.res.add(new ResourceCompiler.ResSource(res, null));
+        r.manifest = new File(res.getParentFile(), "AndroidManifest.xml");
+        r.javaOut = tmp.newFolder("java");
+        r.resourcesOut = tmp.newFolder("out");
+        r.onClickNamesOut = new File(r.resourcesOut, "onclick.txt");
+        r.assetsDir = assets;
+        r.frameworkSymbols = new ByteArrayInputStream(FRAMEWORK.getBytes("UTF-8"));
+        new ResourceCompiler().compile(r);
+        assertEquals("the two assets share one output file", 2, flattenedAssets(r.resourcesOut));
+        String index = new String(Files.readAllBytes(new File(r.resourcesOut, ResourceCompiler.ASSET_INDEX).toPath()),
+                "UTF-8");
+        for (String line : index.split("\n")) {
+            String[] kv = line.split("\t");
+            String expected = kv[0].startsWith("Aa/") ? "first" : "second";
+            assertEquals(line, expected, new String(Files.readAllBytes(new File(r.resourcesOut, kv[1]).toPath()),
+                    "UTF-8"));
+        }
+    }
+
     private static int flattenedAssets(File out) {
         int n = 0;
         for (File f : out.listFiles()) {

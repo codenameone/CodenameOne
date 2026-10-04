@@ -53,7 +53,8 @@ public abstract class AndroidApp {
         /// The `android:configChanges` the activity handles itself, as
         /// `ActivityInfo.CONFIG_*` bits; any other change recreates it.
         public int configChanges;
-        public final List<String> actions = new ArrayList<String>();
+        /// The manifest's `<intent-filter>`s, data and categories included.
+        public final List<android.content.IntentFilter> filters = new ArrayList<android.content.IntentFilter>();
     }
 
     private final String table;
@@ -105,11 +106,15 @@ public abstract class AndroidApp {
         }
     }
 
-    protected final void intentAction(Class<?> type, String action) {
+    /// A new, empty intent filter of the activity `type`; the generated
+    /// code fills it from the manifest's `<intent-filter>`.
+    protected final android.content.IntentFilter intentFilter(Class<?> type) {
+        android.content.IntentFilter f = new android.content.IntentFilter();
         ActivityInfo a = activityInfo(type);
         if (a != null) {
-            a.actions.add(action);
+            a.filters.add(f);
         }
+        return f;
     }
 
     private static int orientation(String s) {
@@ -185,13 +190,36 @@ public abstract class AndroidApp {
         return null;
     }
 
-    public ActivityInfo activityForAction(String action) {
+    /// The declared activity an implicit `startActivity(intent)` reaches, or
+    /// null. As on Android, the intent is matched against every filter with
+    /// `CATEGORY_DEFAULT` added to its categories, so a filter must list
+    /// DEFAULT to take implicit starts, and its data, MIME types and
+    /// categories must all match -- an `ACTION_VIEW` filter for a custom
+    /// scheme does not capture an `https:` URL. Of several matches the most
+    /// specific wins (Android would offer a chooser), the first declared on a
+    /// tie.
+    public ActivityInfo activityForIntent(android.content.Intent intent) {
+        String action = intent.getAction();
+        if (action == null) {
+            return null;
+        }
+        java.util.Set<String> categories = new java.util.HashSet<String>();
+        if (intent.getCategories() != null) {
+            categories.addAll(intent.getCategories());
+        }
+        categories.add(android.content.Intent.CATEGORY_DEFAULT);
+        ActivityInfo best = null;
+        int bestMatch = -1;
         for (ActivityInfo a : activities) {
-            if (a.actions.contains(action)) {
-                return a;
+            for (android.content.IntentFilter f : a.filters) {
+                int m = f.match(action, intent.getType(), intent.getScheme(), intent.getData(), categories, null);
+                if (m > bestMatch) {
+                    bestMatch = m;
+                    best = a;
+                }
             }
         }
-        return null;
+        return best;
     }
 
     public ActivityInfo launcherActivity() {

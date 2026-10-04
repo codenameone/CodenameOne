@@ -152,8 +152,8 @@ final class JavaWriter {
                     sb.append("        configChanges(").append(a.className).append(".class, 0x")
                             .append(hex8(a.configChanges)).append(");\n");
                 }
-                for (String action : a.actions) {
-                    sb.append("        intentAction(").append(a.className).append(".class, ").append(quote(action)).append(");\n");
+                for (ManifestInfo.IntentFilter f : a.filters) {
+                    writeIntentFilter(sb, a.className, f);
                 }
             }
         }
@@ -207,6 +207,37 @@ final class JavaWriter {
 
     /// A Java string literal. Non-ASCII is written as escapes: generated
     /// sources must stay ASCII like every other source in a Codename One build.
+    /// One manifest `<intent-filter>` as the `IntentFilter` calls that
+    /// rebuild it on the device, in a block of its own.
+    private static void writeIntentFilter(StringBuilder sb, String activity, ManifestInfo.IntentFilter f) {
+        sb.append("        {\n");
+        sb.append("            android.content.IntentFilter f = intentFilter(").append(activity).append(".class);\n");
+        for (String v : f.actions) {
+            sb.append("            f.addAction(").append(quote(v)).append(");\n");
+        }
+        for (String v : f.categories) {
+            sb.append("            f.addCategory(").append(quote(v)).append(");\n");
+        }
+        for (String v : f.schemes) {
+            sb.append("            f.addDataScheme(").append(quote(v)).append(");\n");
+        }
+        for (ManifestInfo.DataPattern v : f.schemeSpecificParts) {
+            sb.append("            f.addDataSchemeSpecificPart(").append(quote(v.pattern)).append(", ").append(v.type)
+                    .append(");\n");
+        }
+        for (ManifestInfo.Authority v : f.authorities) {
+            sb.append("            f.addDataAuthority(").append(quote(v.host)).append(", ")
+                    .append(v.port == null ? "null" : quote(v.port)).append(");\n");
+        }
+        for (ManifestInfo.DataPattern v : f.paths) {
+            sb.append("            f.addDataPath(").append(quote(v.pattern)).append(", ").append(v.type).append(");\n");
+        }
+        for (String v : f.types) {
+            sb.append("            f.addDataType(").append(quote(v)).append(");\n");
+        }
+        sb.append("        }\n");
+    }
+
     static String quote(String s) {
         StringBuilder sb = new StringBuilder("\"");
         for (int i = 0; i < s.length(); i++) {
