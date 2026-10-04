@@ -240,7 +240,7 @@ The build server isn't one of your users' devices. A training run has no stored 
 
 ==== A profile-guided build never falls back
 
-A build that asks for PGO either delivers a profiled binary or fails with a message that says why. It never delivers an unprofiled binary under the same name. The build stops when:
+A build that asks for PGO either delivers a profiled binary or fails with a message that says why. It never delivers a binary built without the profile under the same name. The build stops when:
 
 * The hint has a value other than `true` or `false`, or `pgo.trainingSeconds` isn't a whole number.
 * The account isn't on a Pro or Enterprise plan.
