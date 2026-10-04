@@ -2329,6 +2329,14 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-02T19:03:11+00:00"
+      },
+      "foojay": {
+        "id": 104,
+        "url": "https://github.com/foojayio/website/pull/104",
+        "pull_request_url": "https://github.com/foojayio/website/pull/104",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-10-04T17:33:49+00:00"
       }
     },
     "java-backend-shared-models": {
@@ -2492,6 +2500,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-04T15:01:11+00:00"
+      },
+      "devto": {
+        "id": 4796855,
+        "url": "https://dev.to/codenameone/ios-27-glass-you-can-choose-measure-and-test-45ce",
+        "syndicated_at": "2026-10-04T17:33:47+00:00"
       }
     },
     "orm-session-from-phone-to-server": {
