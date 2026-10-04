@@ -403,6 +403,17 @@ final class BuildHintsExternal {
                 .doc("(Optional) The version of TeaVM to use for the build. *Use caution*, only use this "
                         + "property if you know what you're doing!"));
 
+        h.add(new Hint("linux.pgo")
+                .group(HintGroup.LINUX)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("linux")
+                .external()
+                .doc("Cloud builds only, Pro plan and above. true/false. Profile-guided optimization for the "
+                        + "native Linux build: an instrumented binary runs unattended on the build host for "
+                        + "`pgo.trainingSeconds`, and the profile it records drives the optimizer for the binary that "
+                        + "ships. The `linux.arch` being built has to be one the build host can run. See link:#_profile_guided_optimization[Profile-guided optimization]."));
+
         h.add(new Hint("mac.desktop-vm")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
