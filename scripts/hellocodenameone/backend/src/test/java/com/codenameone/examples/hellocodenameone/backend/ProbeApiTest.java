@@ -202,6 +202,14 @@ class ProbeApiTest {
     }
 
     @Test
+    void aMultipartFilenameWithAQuoteArrivesIntact() throws Exception {
+        mvc.perform(multipart("/api/upload").file(new MockMultipartFile("file", "a\"b\\c.txt",
+                        "application/octet-stream", new byte[] {1, 2, 3})))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.filename").value("a\"b\\c.txt"));
+    }
+
+    @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.
         assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});

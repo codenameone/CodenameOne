@@ -101,7 +101,8 @@ public final class TestRestTemplate {
                                           Class<T> responseType, Object... uriVariables)
             throws IOException {
         String target = MockRequestBuilder.expand(url, uriVariables);
-        if (!target.startsWith("http://") && !target.startsWith("https://")) {
+        // A scheme is case-insensitive: HTTPS://host/x is absolute and is sent as it is.
+        if (!target.regionMatches(true, 0, "http://", 0, 7) && !target.regionMatches(true, 0, "https://", 0, 8)) {
             target = rootUri + (target.startsWith("/") ? "" : "/") + target;
         }
         HttpHeaders headers = requestEntity == null ? new HttpHeaders() : requestEntity.getHeaders();

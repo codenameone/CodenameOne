@@ -419,6 +419,31 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void aTestThatInjectsTheDatabaseGetsOne() throws Exception {
+        // The application has no entities and nothing else that needs a database;
+        // the test asking for one is what starts it.
+        File classes = mainBuild(application());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.DbTest", "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "@BackendTest\n"
+                + "public class DbTest {\n"
+                + "    @Autowired com.codename1.backend.DataSource db;\n"
+                + "}\n");
+        File tests = testBuild(classes, t);
+        URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
+                classes.toURI().toURL()}, getClass().getClassLoader());
+        try {
+            Object context = loader.loadClass("com.example.DbTestCn1TestContext").newInstance();
+            assertTrue("the context does not start the database the test injects",
+                    ((TestContext) context).requiresDataSource());
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
     public void aStaticTestIsABuildError() throws Exception {
         Map<String, String> t = new LinkedHashMap<String, String>();
         t.put("t.StaticTest", "package t;\n"

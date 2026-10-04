@@ -71,18 +71,18 @@ public final class MockMultipartRequestBuilder extends MockRequestBuilder {
             write(out, "--" + BOUNDARY + "\r\n");
             if (part instanceof MockMultipartFile) {
                 MockMultipartFile f = (MockMultipartFile) part;
-                write(out, "Content-Disposition: form-data; name=\"" + f.getName() + "\""
+                write(out, "Content-Disposition: form-data; name=" + quoted(f.getName())
                         + (f.getOriginalFilename() == null ? ""
-                        : "; filename=\"" + f.getOriginalFilename() + "\"") + "\r\n");
+                        : "; filename=" + quoted(f.getOriginalFilename())) + "\r\n");
                 if (f.getContentType() != null) {
-                    write(out, "Content-Type: " + f.getContentType() + "\r\n");
+                    write(out, "Content-Type: " + noLineBreak(f.getContentType()) + "\r\n");
                 }
                 write(out, "\r\n");
                 byte[] content = f.getBytes();
                 out.write(content, 0, content.length);
             } else if (part instanceof String[]) {
                 String[] field = (String[]) part;
-                write(out, "Content-Disposition: form-data; name=\"" + field[0] + "\"\r\n\r\n");
+                write(out, "Content-Disposition: form-data; name=" + quoted(field[0]) + "\r\n\r\n");
                 write(out, field[1]);
             }
             write(out, "\r\n");
@@ -94,6 +94,30 @@ public final class MockMultipartRequestBuilder extends MockRequestBuilder {
     @Override
     String bodyType() {
         return "multipart/form-data; boundary=" + BOUNDARY;
+    }
+
+    /// `value` as a quoted header parameter: a quote or backslash escaped, as the
+    /// server's parser reads them back. Written raw, a"b.txt arrived as a.
+    private static String quoted(String value) {
+        String v = noLineBreak(value);
+        StringBuilder sb = new StringBuilder(v.length() + 2).append('"');
+        for (int iter = 0 ; iter < v.length() ; iter++) {
+            char c = v.charAt(iter);
+            if (c == '"' || c == '\\') {
+                sb.append('\\');
+            }
+            sb.append(c);
+        }
+        return sb.append('"').toString();
+    }
+
+    /// `value`, refused if it would break the header it goes in.
+    private static String noLineBreak(String value) {
+        if (value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0) {
+            throw new IllegalArgumentException("A multipart header value cannot contain a line break: "
+                    + value);
+        }
+        return value;
     }
 
     private static void write(ByteArrayOutputStream out, String text) {

@@ -56,6 +56,11 @@ class ServedTest {
     }
 
     @Test
+    void anAbsoluteUrlWithAnUppercaseSchemeIsSentAsItIs() throws Exception {
+        assertEquals("Hello, Ada", rest.getForObject("HTTP://127.0.0.1:" + port + "/api/hello/Ada", String.class));
+    }
+
+    @Test
     void postsJsonAndReadsItBack() throws Exception {
         Map<String, Object> pet = new LinkedHashMap<String, Object>();
         pet.put("name", "Tom");

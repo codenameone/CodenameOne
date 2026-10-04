@@ -501,7 +501,7 @@ final class BackendTestGenerator {
         sb.append("    public int webEnvironment() {\n        return ").append(spec.webEnvironment)
           .append(";\n    }\n\n");
         sb.append("    public boolean requiresDataSource() {\n        return ")
-          .append(spec.model.needsDatabase).append(";\n    }\n\n");
+          .append(spec.model.needsDatabase || testInjectsDatabase(spec)).append(";\n    }\n\n");
         sb.append("    public void prepare() {\n");
         if (ctx.lookup(OrmAnnotationProcessor.BACKEND_BOOTSTRAP_BINARY.replace('.', '/')) != null
                 || RestControllerAnnotationProcessor.resolveClass(ctx,
@@ -554,6 +554,27 @@ final class BackendTestGenerator {
         }
         sb.append("    }\n}\n");
         return sb.toString();
+    }
+
+    /// Whether the test itself injects the database -- an @Autowired DataSource or
+    /// EntityManager -- which starts one even when the application has nothing
+    /// that needs it: the field would otherwise be filled with null instead of the
+    /// development profile's in-memory database.
+    private boolean testInjectsDatabase(Spec spec) {
+        for (AnnotatedClass c : hierarchy(spec.test)) {
+            for (FieldInfo f : c.getFields()) {
+                if (f.isStatic() || f.isFinal() || f.getAnnotation(BackendBeans.AUTOWIRED) == null
+                        || f.getAnnotation(MOCKITO_BEAN) != null) {
+                    continue;
+                }
+                Type t = Type.getType(f.getDescriptor());
+                if (t.getSort() == Type.OBJECT && (BackendBeans.DATASOURCE_TYPE.equals(t.getInternalName())
+                        || BackendBeans.ENTITIES_TYPE.equals(t.getInternalName()))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// The expression a test field is filled with, or null when it is not injected.

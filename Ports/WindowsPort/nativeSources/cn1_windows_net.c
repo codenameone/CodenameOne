@@ -137,8 +137,12 @@ static BOOL cn1NetEnsureSent(CN1Connection* conn) {
         WinHttpSetOption(conn->request, WINHTTP_OPTION_REDIRECT_POLICY, &policy, sizeof(policy));
     }
     if (conn->connectTimeout > 0 || conn->readTimeout > 0) {
-        /* WinHTTP's defaults: no resolve limit, 60s connect, 30s send and receive. */
-        WinHttpSetTimeouts(conn->request, 0,
+        /* WinHTTP's defaults: no resolve limit, 60s connect, 30s send and receive.
+         * A connect timeout bounds name resolution as well: left at 0 (unlimited),
+         * a DNS server that never answers blocked the request past the timeout the
+         * caller asked for, since WinHTTP applies the connect limit only after
+         * resolution. */
+        WinHttpSetTimeouts(conn->request, conn->connectTimeout > 0 ? conn->connectTimeout : 0,
                            conn->connectTimeout > 0 ? conn->connectTimeout : 60000,
                            30000,
                            conn->readTimeout > 0 ? conn->readTimeout : 30000);
