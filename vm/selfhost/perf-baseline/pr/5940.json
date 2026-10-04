@@ -65,6 +65,46 @@
     }
    }
   },
+  "macos-arm64": {
+   "longArithmetic": {
+    "all": {
+     "from": {
+      "memory": 0.112,
+      "time": 1.026,
+      "tolerance": {
+       "memory": 0.5
+      }
+     },
+     "memory": 0.07,
+     "reason": "Noise recalibration, not a performance change: longArithmetic allocates almost nothing and its macOS footprint ratio is bimodal across the rounds of one run (0.03x or 0.11x), so a run's median lands on either mode. Set by hand to the midpoint with a band covering both, rather than from one run's median.",
+     "runs": 1,
+     "time": 1.026,
+     "tolerance": {
+      "memory": 0.65
+     }
+    }
+   },
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.481,
+      "time": 3.696,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.937,
+     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors (time 3.70x -> 1.11x of JDK 25 here). The young generation is sized by collector duty, which costs RAM on this row: 0.48x -> 0.94x of JDK 25 on the 3-CPU macOS VM, still below the JDK's footprint.",
+     "runs": 1,
+     "time": 1.106,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
    "objectAllocation": {
     "all": {
