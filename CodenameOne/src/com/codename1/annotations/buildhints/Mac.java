@@ -204,6 +204,14 @@ public @interface Mac {
     /// `legacy` mapping to `ios7`.
     String themeMode() default "";
 
+    /// macOS cloud builds only, Pro plan and above. Profile-guided optimization:
+    /// an instrumented application runs unattended on the build host for
+    /// `pgo.trainingSeconds`, and the profile it records drives the optimizer
+    /// for the binary that ships. Needs the optimized Release configuration.
+    /// See Profile-guided optimization in the developer guide.
+    @Hint(external = true)
+    Toggle pgo() default Toggle.DEFAULT;
+
     /// macOS builds. Raw XML members added to the generated `Info.plist`, the
     /// same form `ios.plistInject` takes -- for example
     /// `<key>NSAppTransportSecurity</key><dict/>`. A key that the build also

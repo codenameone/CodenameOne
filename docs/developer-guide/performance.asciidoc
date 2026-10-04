@@ -195,6 +195,12 @@ Only the second binary is delivered. The instrumented one never leaves the build
 
 PGO is available for iOS, native macOS and native Linux builds. The translated Java code, the Codename One runtime and your native sources are all compiled with the profile.
 
+==== When to use it
+
+PGO is at its best on workloads that run the same code over and over, which is what a benchmark does. If you publish performance numbers for your application, or compare it against another toolchain, a profile-guided build shows it at its best. How much an ordinary application gains depends on how much of its time is spent in the code the training run exercised.
+
+Codename One's own benchmarks are built without PGO. A profile trained on the benchmark itself would skew the result, so the published numbers describe a regular build.
+
 ==== Enabling a profile-guided build
 
 Each target has its own build hint, so turning PGO on for one target never changes the build of another:
@@ -216,6 +222,8 @@ codename1.arg.pgo.trainingSeconds=90
 ----
 
 `pgo.trainingSeconds` is shared by every target. It defaults to 60 seconds, and a value below 10 or above 300 is brought into that range.
+
+The iOS and macOS hints and the training period are also available as build hint annotations: `@Ios(pgo = Toggle.ON)`, `@Mac(pgo = Toggle.ON)` and `@Build(pgoTrainingSeconds = 90)`. `linux.pgo` has no annotation and is set in `codenameone_settings.properties`.
 
 Profile-guided builds are a Pro and Enterprise feature of the cloud build service. A local build doesn't read these hints.
 

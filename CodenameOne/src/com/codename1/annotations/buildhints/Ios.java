@@ -119,6 +119,16 @@ public @interface Ios {
     /// libraries require
     Toggle objC() default Toggle.DEFAULT;
 
+    /// Cloud builds only, Pro plan and above. Profile-guided optimization:
+    /// compiles the application twice. An instrumented build runs unattended on
+    /// an iOS simulator for `pgo.trainingSeconds`, and the profile it records
+    /// drives the optimizer for the binary that ships. The build fails rather
+    /// than deliver an unprofiled binary when the profile cannot be collected.
+    /// Cannot be combined with `ios.buildForSimulator`. See Profile-guided
+    /// optimization in the developer guide.
+    @Hint(external = true)
+    Toggle pgo() default Toggle.DEFAULT;
+
     /// entries to inject into the iOS plist file during build.
     @Hint(appendable = true, kind = HintKind.XML)
     String plistInject() default "";
