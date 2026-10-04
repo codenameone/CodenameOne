@@ -88,6 +88,11 @@ Codename One never reads or persists the unscrubbed crash payload — emails are
 ### Can I disable Crash Protection on specific platforms?
 Yes. Per-platform opt-outs are independent of the master switch — set e.g. `codename1.crashProtection.and.enabled=false` to skip Android while still capturing iOS / Mac / Linux / Windows crashes.
 
+### What is profile-guided optimization?
+Pro and Enterprise cloud builds can optimize a native binary from a measurement of how your application runs. The build server compiles an instrumented copy of the app, runs it for a training period, and feeds the recorded profile into the compile of the binary you ship. Frequently executed code is inlined and laid out for speed; code that never ran stays small.
+
+It is available for iOS, native macOS and native Linux builds, and is switched on per target with a build hint: `ios.pgo=true`, `macos.pgo=true` or `linux.pgo=true`. A profile-guided build never silently falls back — if the profile cannot be collected, the build fails and says why. See the [Developer Guide](/developer-guide/performance/#_profile_guided_optimization) for the details.
+
 ### What is Commerce?
 Commerce is an optional managed service for apps that sell in-app purchases or subscriptions. It validates store receipts server-side, normalizes the subscription lifecycle across Apple and Google into one state machine (renewals, cancellations, refunds, billing retries, grace periods), forwards lifecycle webhooks to your backend, and gives you a revenue console with MRR, churn, cohorts and LTV. Your app then asks one store-agnostic question — *does this user have this entitlement right now?* It's available on every plan, including Free.
 

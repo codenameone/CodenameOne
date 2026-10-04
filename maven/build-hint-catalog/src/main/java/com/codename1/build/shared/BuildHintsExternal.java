@@ -304,6 +304,18 @@ final class BuildHintsExternal {
                         + "documentation]. These are added to the entitlements file with the key "
                         + "`keychain-access-groups`."));
 
+        h.add(new Hint("ios.pgo")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("ios")
+                .external()
+                .doc("Cloud builds only, Pro plan and above. true/false. Compiles the application twice: an "
+                        + "instrumented build runs unattended on an iOS simulator for `pgo.trainingSeconds`, and the "
+                        + "profile it records drives the optimizer for the binary that ships. The build fails rather "
+                        + "than deliver an unprofiled binary when the profile cannot be collected. Cannot be combined "
+                        + "with `ios.buildForSimulator`. See link:#_profile_guided_optimization[Profile-guided optimization]."));
+
         h.add(new Hint("ios.release.archs")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -403,6 +415,17 @@ final class BuildHintsExternal {
                 .doc("(Optional) The version of TeaVM to use for the build. *Use caution*, only use this "
                         + "property if you know what you're doing!"));
 
+        h.add(new Hint("linux.pgo")
+                .group(HintGroup.LINUX)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("linux")
+                .external()
+                .doc("Cloud builds only, Pro plan and above. true/false. Profile-guided optimization for the "
+                        + "native Linux build: an instrumented binary runs unattended on the build host for "
+                        + "`pgo.trainingSeconds`, and the profile it records drives the optimizer for the binary that "
+                        + "ships. The `linux.arch` being built has to be one the build host can run. See link:#_profile_guided_optimization[Profile-guided optimization]."));
+
         h.add(new Hint("mac.desktop-vm")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
@@ -466,6 +489,27 @@ final class BuildHintsExternal {
                 .external()
                 .doc("Mac Native builds only. Provisioning profile name for Developer ID distribution — used "
                         + "only when `macNative.signing.style=manual`."));
+
+        h.add(new Hint("macos.pgo")
+                .group(HintGroup.MAC_OS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("mac")
+                .external()
+                .doc("Cloud builds only, Pro plan and above. true/false. Profile-guided optimization for the "
+                        + "native macOS build: an instrumented application runs unattended on the build host for "
+                        + "`pgo.trainingSeconds`, and the profile it records drives the optimizer for the binary that "
+                        + "ships. Needs the optimized Release configuration. See link:#_profile_guided_optimization[Profile-guided optimization]."));
+
+        h.add(new Hint("pgo.trainingSeconds")
+                .group(HintGroup.GENERAL)
+                .type(HintType.INT)
+                .def("60")
+                .platform("general")
+                .external()
+                .doc("How long, in seconds, the instrumented application runs when `ios.pgo`, `macos.pgo` or "
+                        + "`linux.pgo` is on. A whole number; values below 10 or above 300 are brought into that "
+                        + "range. Ignored when no profile-guided build is requested. See link:#_profile_guided_optimization[Profile-guided optimization]."));
 
         h.add(new Hint("win.desktop-vm")
                 .group(HintGroup.GENERAL)

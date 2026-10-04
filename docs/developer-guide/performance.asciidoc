@@ -183,6 +183,75 @@ If you're using the integration test harness, make sure CMake is configured with
 
 Without this setting, comparison between Java and ParparVM native output is often noisy and can lead to wrong optimization conclusions.
 
+=== Profile-guided optimization
+
+A C compiler optimizes without knowing which code your application runs. It guesses which branch of an `if` is the common one, which calls are worth inlining and which functions belong next to each other in the binary. Profile-guided optimization (PGO) replaces those guesses with measurements. The build server compiles your application twice:
+
+. The first compile produces an _instrumented_ binary that counts how often every function and branch runs.
+. The build server launches that binary and lets it run for a training period. The counts it records are the _profile_.
+. The second compile reads the profile. Code that ran often is inlined and laid out for speed, and code that never ran is kept small and out of the way.
+
+Only the second binary is delivered. The instrumented one never leaves the build server.
+
+PGO is available for iOS, native macOS and native Linux builds. The translated Java code, the Codename One runtime and your native sources are all compiled with the profile.
+
+==== Enabling a profile-guided build
+
+Each target has its own build hint, so turning PGO on for one target never changes the build of another:
+
+[options="header",cols="1,2,3"]
+|===
+|Build hint |Target |Where the training run happens
+|`ios.pgo` |iOS |An iOS simulator that the build server creates for the run and deletes afterward
+|`macos.pgo` |Native macOS |The build server itself
+|`linux.pgo` |Native Linux |The build server itself, on a virtual display
+|===
+
+For example, to profile the iOS and macOS builds and give each run 90 seconds:
+
+----
+codename1.arg.ios.pgo=true
+codename1.arg.macos.pgo=true
+codename1.arg.pgo.trainingSeconds=90
+----
+
+`pgo.trainingSeconds` is shared by every target. It defaults to 60 seconds, and a value below 10 or above 300 is brought into that range.
+
+Profile-guided builds are a Pro and Enterprise feature of the cloud build service. A local build doesn't read these hints.
+
+==== What the training run measures
+
+Nobody touches the application during the training run. It starts, shows its first form and is then left alone until the training period ends, so the profile describes start-up and whatever the application does by itself after that: loading resources, laying out and painting the first screen, timers, animations and network requests it makes without being asked.
+
+That has two practical consequences:
+
+* Work that only happens after a tap isn't in the profile. The compiler treats that code as cold. It still runs correctly, but it gains nothing from the profile.
+* The application has to keep running for the whole period. An application that exits by itself or crashes during the run stops the build.
+
+The build server isn't one of your users' devices. A training run has no stored login and no saved data. Make sure the application reaches a representative screen from a clean install.
+
+==== A profile-guided build never falls back
+
+A build that asks for PGO either delivers a profiled binary or fails with a message that says why. It never delivers an unprofiled binary under the same name. The build stops when:
+
+* The hint has a value other than `true` or `false`, or `pgo.trainingSeconds` isn't a whole number.
+* The account isn't on a Pro or Enterprise plan.
+* The application ends before the training period does, or is still running well after it.
+* The training run recorded no profile data.
+* The hint is combined with a setting that produces a binary the profile can't apply to. The following table lists these.
+
+[options="header",cols="1,3"]
+|===
+|Build hint |Can't be combined with
+|`ios.pgo` |`ios.buildForSimulator=true`, because the profile optimizes the device binary. `ios.no_strip=true` together with `ios.buildType=debug`, because that archives the unoptimized Debug configuration. A standalone watch application.
+|`macos.pgo` |`macos.configuration=Debug`, which is compiled without optimization.
+|`linux.pgo` |A `linux.arch` that the build server can't run. Build that architecture without `linux.pgo`.
+|===
+
+The settings and the plan are checked before any compilation starts, so a request that can't be honored fails within seconds.
+
+A profile-guided build takes longer than a regular one. It adds a second compile, the training period, and the time to start and stop the simulator on iOS.
+
 === SIMD: Data-Parallel primitives
 
 SIMD stands for *Single Instruction, Multiple Data*. It's a family of CPU
