@@ -180,6 +180,19 @@ class ProbeApiTest {
     }
 
     @Test
+    void aJsonPathWithMismatchedQuotesIsRefused() throws Exception {
+        boolean refused;
+        try {
+            jsonPath("$[\"method']");
+            refused = false;
+        } catch (IllegalArgumentException expected) {
+            refused = true;
+        }
+        assertTrue(refused, "a bracketed name opened with \" and closed with ' compiled");
+        mvc.perform(get("/api/echo")).andExpect(jsonPath("$['method']").value("GET"));
+    }
+
+    @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.
         assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});

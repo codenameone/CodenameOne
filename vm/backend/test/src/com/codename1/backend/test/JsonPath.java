@@ -85,6 +85,32 @@ final class JsonPath {
                 }
                 pos = end;
             } else if (c == '[') {
+                int open = pos + 1;
+                while (open < e.length() && e.charAt(open) == ' ') {
+                    open++;
+                }
+                if (open < e.length() && (e.charAt(open) == '\'' || e.charAt(open) == '"')) {
+                    // A quoted name runs to its MATCHING quote, then the bracket closes:
+                    // $["role'] used to compile as role, and a name holding ']' was
+                    // cut at it.
+                    char quote = e.charAt(open);
+                    int endQuote = e.indexOf(quote, open + 1);
+                    if (endQuote < 0) {
+                        throw new IllegalArgumentException("An unclosed " + quote + " in JSON path "
+                                + expression);
+                    }
+                    int close = endQuote + 1;
+                    while (close < e.length() && e.charAt(close) == ' ') {
+                        close++;
+                    }
+                    if (close >= e.length() || e.charAt(close) != ']') {
+                        throw new IllegalArgumentException("A quoted name not closed by ] in JSON path "
+                                + expression);
+                    }
+                    steps.add(new Object[] {Integer.valueOf(NAME), e.substring(open + 1, endQuote)});
+                    pos = close + 1;
+                    continue;
+                }
                 int close = e.indexOf(']', pos);
                 if (close < 0) {
                     throw new IllegalArgumentException("An unclosed [ in JSON path " + expression);
@@ -92,8 +118,6 @@ final class JsonPath {
                 String inner = e.substring(pos + 1, close).trim();
                 if ("*".equals(inner)) {
                     steps.add(new Object[] {Integer.valueOf(WILDCARD), null});
-                } else if (inner.length() >= 2 && (inner.charAt(0) == '\'' || inner.charAt(0) == '"')) {
-                    steps.add(new Object[] {Integer.valueOf(NAME), inner.substring(1, inner.length() - 1)});
                 } else {
                     try {
                         steps.add(new Object[] {Integer.valueOf(INDEX), Integer.valueOf(Integer.parseInt(inner))});

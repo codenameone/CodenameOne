@@ -398,6 +398,10 @@ public class BackendTestGeneratorTest {
                 + "@org.junit.jupiter.api.Disabled(\"not on this target\")\n"
                 + "public @interface Skipped {\n"
                 + "}\n");
+        t.put("t.OomTest", "package t;\n"
+                + "public class OomTest {\n"
+                + "    @org.junit.jupiter.api.Test void exhausts() { throw new OutOfMemoryError(\"simulated\"); }\n"
+                + "}\n");
         t.put("t.InterfaceOnlyTest", "package t;\n"
                 + "public class InterfaceOnlyTest implements Checks {\n"
                 + "}\n");
@@ -438,6 +442,12 @@ public class BackendTestGeneratorTest {
         try {
             loader.loadClass("t.SubTestCn1TestRunner").getMethod("run").invoke(null);
             loader.loadClass("t.InterfaceOnlyTestCn1TestRunner").getMethod("run").invoke(null);
+            try {
+                loader.loadClass("t.OomTestCn1TestRunner").getMethod("run").invoke(null);
+                fail("an OutOfMemoryError was recorded as a failure and the run carried on");
+            } catch (InvocationTargetException expected) {
+                assertTrue(String.valueOf(expected.getCause()), expected.getCause() instanceof OutOfMemoryError);
+            }
             java.lang.reflect.Field failed = com.codename1.impl.backend.test.TestRun.class
                     .getDeclaredField("failed");
             failed.setAccessible(true);

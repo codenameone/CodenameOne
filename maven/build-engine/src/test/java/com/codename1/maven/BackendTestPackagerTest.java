@@ -68,6 +68,18 @@ class BackendTestPackagerTest {
     }
 
     @Test
+    void jvmOnlyTestLibrariesStayOutOfTheCompiledClasspath() {
+        assertTrue(BackendTestPackager.jvmOnlyTestLibrary(
+                "/home/u/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.3/junit-jupiter-api-5.9.3.jar"));
+        assertTrue(BackendTestPackager.jvmOnlyTestLibrary(
+                "/r/org/mockito/mockito-core/5.0/mockito-core-5.0.jar"));
+        assertTrue(BackendTestPackager.jvmOnlyTestLibrary(
+                "/r/com/codenameone/codenameone-backend-test/8.0/codenameone-backend-test-8.0.jar"));
+        assertFalse(BackendTestPackager.jvmOnlyTestLibrary(
+                "/r/com/acme/test-fixtures/1.0/test-fixtures-1.0.jar"), "an ordinary test helper");
+    }
+
+    @Test
     void theWordsInCommentsAndStringsAreNotAUse() {
         assertFalse(BackendTestPackager.usesMockito("// unlike org.mockito, this needs nothing\nclass A {}\n"));
         assertFalse(BackendTestPackager.usesMockito("/** Not org.mockito: a fake. */\nclass A {}\n"));

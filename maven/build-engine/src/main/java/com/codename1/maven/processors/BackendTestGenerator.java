@@ -81,6 +81,14 @@ final class BackendTestGenerator {
     static final String JUNIT_BEFORE_ALL = "Lorg/junit/jupiter/api/BeforeAll;";
     static final String JUNIT_AFTER_ALL = "Lorg/junit/jupiter/api/AfterAll;";
     static final String JUNIT_DISABLED = "Lorg/junit/jupiter/api/Disabled;";
+
+    /// The first statement of every catch in a generated runner: an
+    /// OutOfMemoryError ends the run, as JUnit treats it as unrecoverable, rather
+    /// than being recorded as one failure while the process carries on allocating.
+    private static final String RETHROW_UNRECOVERABLE =
+            "                if (err instanceof OutOfMemoryError) {\n"
+            + "                    throw (OutOfMemoryError) err;\n"
+            + "                }\n";
     static final String JUNIT_NESTED = "Lorg/junit/jupiter/api/Nested;";
 
     /// The compiled run's entry point.
@@ -708,6 +716,7 @@ final class BackendTestGenerator {
             sb.append("        if (ready) {\n            try {\n                ")
               .append(call(owners.get(m), m, pkg, testType)).append(";\n")
               .append("            } catch (Throwable err) {\n")
+              .append(RETHROW_UNRECOVERABLE)
               .append("                if (com.codename1.impl.backend.test.TestRun.isAbort(err)) {\n")
               .append("                    notReady = ").append(quote("@BeforeAll " + m.getName() + " aborted: "))
               .append(" + err.getMessage();\n")
@@ -737,6 +746,7 @@ final class BackendTestGenerator {
         for (MethodInfo m : afterAll) {
             sb.append("        try {\n            ").append(call(owners.get(m), m, pkg, testType))
               .append(";\n        } catch (Throwable err) {\n")
+              .append(RETHROW_UNRECOVERABLE)
               .append("            com.codename1.impl.backend.test.TestRun.lifecycleFailed(CLS, ")
               .append(quote("@AfterAll " + m.getName())).append(", err);\n        }\n");
         }
@@ -762,12 +772,14 @@ final class BackendTestGenerator {
                 sb.append("            ").append(call(owners.get(b), b, pkg, "test")).append(";\n");
             }
             sb.append("            ").append(call(owners.get(m), m, pkg, "test")).append(";\n");
-            sb.append("        } catch (Throwable err) {\n            failure = err;\n        }\n");
+            sb.append("        } catch (Throwable err) {\n").append(RETHROW_UNRECOVERABLE)
+              .append("            failure = err;\n        }\n");
             if (!afterEach.isEmpty()) {
                 sb.append("        if (test != null) {\n");
                 for (MethodInfo a : afterEach) {
                     sb.append("            try {\n                ").append(call(owners.get(a), a, pkg, "test"))
                       .append(";\n            } catch (Throwable err) {\n")
+                      .append(RETHROW_UNRECOVERABLE)
                       // A real teardown failure fails the test even after an
                       // assumption aborted it, as JUnit reports it.
                       .append("                if (failure == null || (com.codename1.impl.backend.test.TestRun"

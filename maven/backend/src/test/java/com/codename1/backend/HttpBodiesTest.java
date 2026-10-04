@@ -434,6 +434,21 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("the opening delimiter must start a line, and preamble text is skipped")
+    void theOpeningDelimiterStartsALine() throws Exception {
+        String part = "Content-Disposition: form-data; name=\"f\"\r\n\r\nv\r\n--x--";
+        // The only delimiter is mid-line: nothing opens the body.
+        assertThrows(IllegalArgumentException.class,
+                () -> Multipart.parse(("prefix--x\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nv")
+                        .getBytes("UTF-8"), "x"),
+                "a delimiter in the middle of a line was taken as the opening");
+        // A preamble that mentions the boundary mid-line, before the real one.
+        java.util.List parts = Multipart.parse(("a preamble naming --x inline\r\n--x\r\n" + part)
+                .getBytes("UTF-8"), "x");
+        assertEquals(1, parts.size());
+    }
+
+    @Test
     @DisplayName("a boundary search over a body of dashes is linear")
     void aDashBoundaryOverDashesIsLinear() throws Exception {
         StringBuilder boundary = new StringBuilder();

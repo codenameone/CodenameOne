@@ -85,6 +85,53 @@ public abstract class BackendTestPackager extends BackendPackager {
         return true;
     }
 
+    /// The test classpath the JVM run resolved -- test-scoped dependencies
+    /// included -- or empty when the build tool does not say. Its entries beyond
+    /// the compile classpath are compiled against and translated with the tests.
+    protected List<String> testClasspathElements() throws BuildExecutionException {
+        return new ArrayList<String>();
+    }
+
+    /// Test libraries that run only on the JVM: the compiled run brings its own
+    /// JUnit (the shim) and test support as sources, and a mocking library builds
+    /// classes while it runs. Recognised by their Maven repository directories.
+    private static final String[] JVM_ONLY_TEST_LIBRARIES = {
+        "/org/junit/", "/org/opentest4j/", "/org/apiguardian/", "/org/mockito/",
+        "/net/bytebuddy/", "/org/objenesis/", "/codenameone-backend-test/",
+    };
+
+    /// The compile classpath plus the test-scoped dependencies a test imports: a
+    /// helper library the JVM run compiles and runs the tests with, and which the
+    /// compile classpath alone left out, so javac failed on a missing package.
+    /// The JVM-only test libraries above stay out.
+    @Override
+    protected List<String> compileClasspathWithoutRuntime() throws BuildExecutionException {
+        List<String> classpath = super.compileClasspathWithoutRuntime();
+        String testOutput = testOutputDirectory() == null ? null : testOutputDirectory().getAbsolutePath();
+        String mainOutput = host.outputDirectory().getAbsolutePath();
+        for (String element : testClasspathElements()) {
+            String absolute = new File(element).getAbsolutePath();
+            if (classpath.contains(element) || absolute.equals(testOutput) || absolute.equals(mainOutput)
+                    || jvmOnlyTestLibrary(absolute)) {
+                continue;
+            }
+            classpath.add(element);
+        }
+        // The runtime goes as the parent drops it: by file, wherever it came from --
+        // the test classpath carries it too, and its JVM build has a main of its own.
+        return withoutRuntime(classpath, runtimeArtifactFile(), host.outputDirectory().getPath());
+    }
+
+    static boolean jvmOnlyTestLibrary(String path) {
+        String p = path.replace('\\', '/');
+        for (String marker : JVM_ONLY_TEST_LIBRARIES) {
+            if (p.indexOf(marker) >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Whether the JVM run runs test `method` of the selected class `binaryName`:
     /// all of them by default; the Maven goal narrows them by `-Dtest=Class#method`.
     protected boolean selectsTestMethod(String binaryName, String method) {

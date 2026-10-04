@@ -669,7 +669,7 @@ public class BackendPackager {
     }
 
     /** The resolved file of com.codenameone:codenameone-backend, or null. */
-    private File runtimeArtifactFile() {
+    protected File runtimeArtifactFile() {
         java.util.Collection<BuildArtifact> artifacts = host.artifacts();
         if (artifacts != null) {
             for (BuildArtifact artifact : artifacts) {

@@ -174,6 +174,20 @@ public class BackendTestMojo extends AbstractMojo {
             }
 
             @Override
+            protected List<String> testClasspathElements() {
+                // The test-SCOPED artifacts alone: the compile classpath already
+                // has the compile ones, and runtime-scoped ones (a JDBC driver) are
+                // JVM-only, as the main translation treats them.
+                List<String> out = new ArrayList<String>();
+                for (org.apache.maven.artifact.Artifact a : project.getArtifacts()) {
+                    if (org.apache.maven.artifact.Artifact.SCOPE_TEST.equals(a.getScope()) && a.getFile() != null) {
+                        out.add(a.getFile().getAbsolutePath());
+                    }
+                }
+                return out;
+            }
+
+            @Override
             protected boolean selectsTestClass(String binaryName) {
                 return selection.test(binaryName);
             }

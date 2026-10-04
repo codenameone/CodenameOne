@@ -84,7 +84,7 @@ final class Multipart {
     static List parse(byte[] body, String boundary) {
         byte[] delimiter = ascii("--" + boundary);
         List parts = new ArrayList();
-        int pos = indexOf(body, delimiter, 0);
+        int pos = openingDelimiter(body, delimiter);
         if (pos < 0) {
             throw new IllegalArgumentException("the multipart body has no boundary");
         }
@@ -170,6 +170,34 @@ final class Multipart {
                 return at;
             }
             at = indexOf(body, closing, at + 1);
+        }
+        return -1;
+    }
+
+    /// Where the first delimiter starts: at the start of the body or of a line of
+    /// the preamble, and complete -- `--` after it, or padding and CRLF (RFC 2046
+    /// 5.1.1). Any other `--boundary` is preamble text: taking the first substring
+    /// match accepted `prefix--b` as an opening and refused a valid preamble that
+    /// merely mentioned the boundary before the real one.
+    private static int openingDelimiter(byte[] body, byte[] delimiter) {
+        int at = indexOf(body, delimiter, 0);
+        while (at >= 0) {
+            boolean lineStart = at == 0 || (at >= 2 && body[at - 2] == '\r' && body[at - 1] == '\n');
+            int after = at + delimiter.length;
+            boolean complete;
+            if (after + 1 < body.length && body[after] == '-' && body[after + 1] == '-') {
+                complete = closeEnds(body, after + 2);
+            } else {
+                int p = after;
+                while (p < body.length && (body[p] == ' ' || body[p] == '\t')) {
+                    p++;
+                }
+                complete = crlfAt(body, p);
+            }
+            if (lineStart && complete) {
+                return at;
+            }
+            at = indexOf(body, delimiter, at + 1);
         }
         return -1;
     }
