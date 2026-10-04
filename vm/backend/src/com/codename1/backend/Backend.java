@@ -836,7 +836,7 @@ public final class Backend {
     /// request -- runs the chain, finishes the session and records metrics and
     /// the log. Named and static rather than an anonymous class holding the
     /// builder.
-    private static final class Serving implements HttpServer.Handler {
+    private static final class Serving implements HttpServer.Handler, HttpServer.FallbackDecorator {
         private final HttpServer.Handler[] chain;
         private final Sessions sessions;
         private final Tasks.Registry tasks;
@@ -853,6 +853,15 @@ public final class Backend {
         private final Cors cors;
         /// `cn1.server.compression.*`, or null when compression is off.
         private final Compression compression;
+
+        /// The server's own 404 and 500 get the CORS headers a handler's answer
+        /// gets, as Spring's filter puts them on every response.
+        @Override
+        public void decorateFallback(HttpServer.Request request, HttpServer.Response response) {
+            if (cors != null) {
+                cors.decorate(request, response);
+            }
+        }
 
         Serving(HttpServer.Handler[] chain, Sessions sessions, Tasks.Registry tasks,
                 RequestLog requestLog, java.util.concurrent.atomic.AtomicBoolean instrumented,

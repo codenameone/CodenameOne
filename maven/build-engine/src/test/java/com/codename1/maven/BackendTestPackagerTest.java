@@ -102,6 +102,17 @@ class BackendTestPackagerTest {
     }
 
     @Test
+    void aSupportClassNamedOnlyInProseIsNotAUse() {
+        java.util.Map<java.io.File, String> texts = new java.util.LinkedHashMap<java.io.File, String>();
+        java.io.File base = new java.io.File("Base.java");
+        java.io.File other = new java.io.File("OtherTest.java");
+        texts.put(base, "import org.mockito.Mockito;\nabstract class Base {}\n");
+        texts.put(other, "// Base case first.\nclass OtherTest { String s = \"Base\"; }\n");
+        java.util.Map<java.io.File, String> reach = BackendTestPackager.mockitoReach(texts);
+        assertFalse(reach.containsKey(other), String.valueOf(reach));
+    }
+
+    @Test
     void theWordsInCommentsAndStringsAreNotAUse() {
         assertFalse(BackendTestPackager.usesMockito("// unlike org.mockito, this needs nothing\nclass A {}\n"));
         assertFalse(BackendTestPackager.usesMockito("/** Not org.mockito: a fake. */\nclass A {}\n"));

@@ -188,37 +188,7 @@ public abstract class BackendTestPackager extends BackendPackager {
     /// words in a comment, a Javadoc or a fixture string left an otherwise
     /// translatable test file out of the compiled run.
     static boolean usesMockito(String source) {
-        StringBuilder code = new StringBuilder(source.length());
-        int n = source.length();
-        int i = 0;
-        while (i < n) {
-            char c = source.charAt(i);
-            char next = i + 1 < n ? source.charAt(i + 1) : 0;
-            if (c == '/' && next == '/') {
-                while (i < n && source.charAt(i) != '\n') {
-                    i++;
-                }
-            } else if (c == '/' && next == '*') {
-                int end = source.indexOf("*/", i + 2);
-                i = end < 0 ? n : end + 2;
-                code.append(' ');
-            } else if (c == '"' && source.startsWith("\"\"\"", i)) {
-                int end = source.indexOf("\"\"\"", i + 3);
-                i = end < 0 ? n : end + 3;
-                code.append(' ');
-            } else if (c == '"' || c == '\'') {
-                i++;
-                while (i < n && source.charAt(i) != c && source.charAt(i) != '\n') {
-                    i += source.charAt(i) == '\\' ? 2 : 1;
-                }
-                i++;
-                code.append(' ');
-            } else {
-                code.append(c);
-                i++;
-            }
-        }
-        return MOCKITO.matcher(code).find();
+        return MOCKITO.matcher(codeOnly(source)).find();
     }
 
     @Override
@@ -472,11 +442,16 @@ public abstract class BackendTestPackager extends BackendPackager {
     /// A test with no Mockito of its own that extends a MockitoTestBase still
     /// pulls the base in through -sourcepath, and the Mockito jars are not on the
     /// compiled run's classpath, so the compile failed instead of the test being
-    /// left out. Matched by class name, so a false match only leaves a test out.
+    /// left out. Matched by simple class name in the code, comments and string
+    /// literals stripped; a same-named class in another package still matches,
+    /// which is not resolved because a false match only leaves a test out, and
+    /// the run's warning names it.
     static Map<File, String> mockitoReach(Map<File, String> texts) {
         Map<File, String> out = new LinkedHashMap<File, String>();
         Map<File, String> names = new LinkedHashMap<File, String>();
+        Map<File, String> code = new LinkedHashMap<File, String>();
         for (Map.Entry<File, String> e : texts.entrySet()) {
+            code.put(e.getKey(), codeOnly(e.getValue()));
             String file = e.getKey().getName();
             names.put(e.getKey(), file.endsWith(".java") ? file.substring(0, file.length() - 5) : file);
             if (usesMockito(e.getValue())) {
@@ -493,7 +468,7 @@ public abstract class BackendTestPackager extends BackendPackager {
                 for (File tainted : new ArrayList<File>(out.keySet())) {
                     String name = names.get(tainted);
                     if (java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(name) + "\\b")
-                            .matcher(e.getValue()).find()) {
+                            .matcher(code.get(e.getKey())).find()) {
                         out.put(e.getKey(), "uses " + name + ", which needs Mockito, which runs only on the JVM");
                         grew = true;
                         break;
@@ -502,6 +477,42 @@ public abstract class BackendTestPackager extends BackendPackager {
             }
         }
         return out;
+    }
+
+    /// `source` with its comments and string, character and text-block literals
+    /// blanked, so a name mentioned in prose or a message is not a use.
+    static String codeOnly(String source) {
+        StringBuilder code = new StringBuilder(source.length());
+        int n = source.length();
+        int i = 0;
+        while (i < n) {
+            char c = source.charAt(i);
+            char next = i + 1 < n ? source.charAt(i + 1) : 0;
+            if (c == '/' && next == '/') {
+                while (i < n && source.charAt(i) != '\n') {
+                    i++;
+                }
+            } else if (c == '/' && next == '*') {
+                int end = source.indexOf("*/", i + 2);
+                i = end < 0 ? n : end + 2;
+                code.append(' ');
+            } else if (c == '"' && source.startsWith("\"\"\"", i)) {
+                int end = source.indexOf("\"\"\"", i + 3);
+                i = end < 0 ? n : end + 3;
+                code.append(' ');
+            } else if (c == '"' || c == '\'') {
+                i++;
+                while (i < n && source.charAt(i) != c && source.charAt(i) != '\n') {
+                    i += source.charAt(i) == '\\' ? 2 : 1;
+                }
+                i++;
+                code.append(' ');
+            } else {
+                code.append(c);
+                i++;
+            }
+        }
+        return code.toString();
     }
 
     /// Whether the JVM run selects a source: by the top-level classes compiled

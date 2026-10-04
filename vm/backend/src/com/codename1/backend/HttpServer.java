@@ -1395,6 +1395,28 @@ public final class HttpServer {
         Response handle(Request request) throws Exception;
     }
 
+    /// A handler that also shapes the answers this server writes on its own: the
+    /// 404 for a request no handler took and the 500 for one that threw. The
+    /// backend's CORS policy goes on those too, or a browser reports the real
+    /// status as a CORS failure. Package-private: only Backend's chain is one.
+    interface FallbackDecorator {
+        void decorateFallback(Request request, Response response);
+    }
+
+    /// The status-only answer for `request`, decorated by the handler when it asks.
+    private Response fallback(Request request, int status, String text) {
+        Response response = Response.text(status, text);
+        if (handler instanceof FallbackDecorator) {
+            try {
+                ((FallbackDecorator) handler).decorateFallback(request, response);
+            } catch (RuntimeException err) {
+                // The bare answer still goes out; a decorator never costs the reply.
+                System.err.println("fallback decoration failed: " + err);
+            }
+        }
+        return response;
+    }
+
     /// Chooses the websocket endpoint for an upgrade request, or null when this
     /// router does not serve that path.
     ///
@@ -5850,13 +5872,13 @@ public final class HttpServer {
                 try {
                     response = handler.handle(request);
                     if (response == null) {
-                        response = Response.text(404, "not found");
+                        response = fallback(request, 404, "not found");
                     }
                 } catch (Throwable err) {
                     rethrowIfFatal(err);
                     System.err.println("handler failed: " + err);
                     handlerError = err;
-                    response = Response.text(500, "internal error");
+                    response = fallback(request, 500, "internal error");
                 }
                 // A deferred JSON body is rendered HERE, into the connection's
                 // reusable buffer the writer then sends from, rather than inside
@@ -5872,7 +5894,7 @@ public final class HttpServer {
                         rethrowIfFatal(err);
                         System.err.println("handler failed: " + err);
                         handlerError = err;
-                        response = Response.text(500, "internal error");
+                        response = fallback(request, 500, "internal error");
                     }
                 }
                 // Read before the write: writing releases what the Response held.
@@ -6261,13 +6283,13 @@ public final class HttpServer {
                 try {
                     response = handler.handle(request);
                     if (response == null) {
-                        response = Response.text(404, "not found");
+                        response = fallback(request, 404, "not found");
                     }
                 } catch (Throwable err) {
                     rethrowIfFatal(err);
                     System.err.println("handler failed: " + err);
                     handlerError = err;
-                    response = Response.text(500, "internal error");
+                    response = fallback(request, 500, "internal error");
                 }
                 // Rendered now for the same reason as on HTTP/1: a deferred JSON
                 // body runs the application's code, and a throw there is a 500.
@@ -6278,7 +6300,7 @@ public final class HttpServer {
                         rethrowIfFatal(err);
                         System.err.println("handler failed: " + err);
                         handlerError = err;
-                        response = Response.text(500, "internal error");
+                        response = fallback(request, 500, "internal error");
                     }
                 }
                 try {

@@ -431,6 +431,11 @@ public class BackendTestGeneratorTest {
                 + "public class DbTest {\n"
                 + "    @Autowired com.codename1.backend.DataSource db;\n"
                 + "}\n");
+        t.put("com.example.PlainTest", "package com.example;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "@BackendTest\n"
+                + "public class PlainTest {\n"
+                + "}\n");
         File tests = testBuild(classes, t);
         URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
                 classes.toURI().toURL()}, getClass().getClassLoader());
@@ -438,6 +443,11 @@ public class BackendTestGeneratorTest {
             Object context = loader.loadClass("com.example.DbTestCn1TestContext").newInstance();
             assertTrue("the context does not start the database the test injects",
                     ((TestContext) context).requiresDataSource());
+            // A context started without the database is cached by key, so the two
+            // must not share one, or whichever ran second got the first's.
+            Object plain = loader.loadClass("com.example.PlainTestCn1TestContext").newInstance();
+            assertFalse("the two contexts share a key",
+                    ((TestContext) context).key().equals(((TestContext) plain).key()));
         } finally {
             loader.close();
         }

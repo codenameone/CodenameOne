@@ -20,23 +20,29 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package org.junit.jupiter.api;
+package com.codenameone.examples.hellocodenameone.backend;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
-/// Skips a test method, or every test of a class.
-///
-/// Part of the subset of JUnit 5's API that a compiled backend test translates
-/// against. On the JVM the real JUnit runs the same source; under ParparVM there is
-/// no JUnit, no reflection and no annotation reading at run time, so the build
-/// finds the tests from their bytecode and generates the calls, and these classes
-/// only have to compile and to fail the way JUnit's do. Never on a JVM classpath.
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.METHOD})
-public @interface Disabled {
-    /// Why, for the report.
-    String value() default "";
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+/// A plain JUnit test with a nested class. The JVM run runs both; the compiled run
+/// runs the outer test only, which needs this source to compile against the JUnit
+/// subset in the first place.
+class NestingTest {
+    int base = 1;
+
+    @Test
+    void theOuterTestRuns() {
+        assertEquals(1, base);
+    }
+
+    @Nested
+    class Inner {
+        @Test
+        void runsInsideAnOuterInstance() {
+            assertEquals(1, base);
+        }
+    }
 }

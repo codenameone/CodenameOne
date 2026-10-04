@@ -113,6 +113,9 @@ class HttpBodiesTest {
                         if (path.startsWith("/shared")) {
                             return SHARED;
                         }
+                        if (path.startsWith("/boom")) {
+                            throw new IllegalStateException("boom");
+                        }
                         if (path.startsWith("/etag")) {
                             StringBuilder sb = new StringBuilder();
                             while (sb.length() < 5000) {
@@ -290,6 +293,22 @@ class HttpBodiesTest {
                 + "Origin: https://127.0.0.1:" + port + "\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n"
                 + "Connection: close\r\n\r\nhi");
         assertTrue(proxied.startsWith("HTTP/1.1 200"), "a proxied same-origin POST was refused: " + proxied);
+    }
+
+    @Test
+    @DisplayName("the server's own 404 and 500 carry the CORS headers")
+    void fallbackAnswersAreDecorated() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.cors.allowedOrigins", "http://app.example");
+        start(p);
+        String missing = raw("GET /nowhere HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Connection: close\r\n\r\n");
+        assertTrue(missing.startsWith("HTTP/1.1 404"), missing);
+        assertTrue(missing.contains("Access-Control-Allow-Origin: http://app.example"), missing);
+        String failed = raw("GET /boom HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Connection: close\r\n\r\n");
+        assertTrue(failed.startsWith("HTTP/1.1 500"), failed);
+        assertTrue(failed.contains("Access-Control-Allow-Origin: http://app.example"), failed);
     }
 
     @Test

@@ -283,9 +283,12 @@ A compiled run has these limits:
   `-Dcn1.backend.compiledTests.strict=true` to make either one fail the build.
 * **JUnit and Surefire subsets.** The compiled run reads the common JUnit 5
   annotations and Surefire selections, not every one. Repeating `@Tag` on a
-  class or method fails the compiled run's compile, so use one per element. A
+  class or method stops the compiled run from compiling, so use one per element. A
   `-Dtest` regex selector with a method part, such as `%regex[.*Api.*#one.*]`,
   selects nothing in the compiled run. The JVM run handles both.
+* **Nested classes.** The compiled run doesn't run the tests of a `@Nested` class.
+  A `@Nested` class inside a `@BackendTest` class isn't supported on either run;
+  give it a top-level `@BackendTest` class of its own.
 * **Java tests only.** The binary is compiled from Java test sources. A module
   with Kotlin tests runs them on the JVM, and the compiled run reports them by
   name and stops rather than running without them.

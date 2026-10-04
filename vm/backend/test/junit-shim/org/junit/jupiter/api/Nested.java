@@ -27,16 +27,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/// Skips a test method, or every test of a class.
+/// Marks an inner test class, which JUnit runs inside an instance of the outer
+/// one. Inert here: the compiled run reports a nested class as skipped, and this
+/// exists so the source that declares one still compiles for that report.
 ///
 /// Part of the subset of JUnit 5's API that a compiled backend test translates
-/// against. On the JVM the real JUnit runs the same source; under ParparVM there is
-/// no JUnit, no reflection and no annotation reading at run time, so the build
-/// finds the tests from their bytecode and generates the calls, and these classes
-/// only have to compile and to fail the way JUnit's do. Never on a JVM classpath.
+/// against. Never on a JVM classpath.
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.METHOD})
-public @interface Disabled {
-    /// Why, for the report.
-    String value() default "";
+@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+public @interface Nested {
 }

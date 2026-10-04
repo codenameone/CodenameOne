@@ -94,6 +94,9 @@ typedef struct {
     curl_off_t lastDown;
     curl_off_t lastUp;
     int readTimedOut;
+    /* Whether the callback has seen the connection up, so its first call after
+     * connecting restarts the idle clock. */
+    int sawConnect;
 } CN1Http;
 
 static void cn1HttpEnsureResp(CN1Http* c, int extra) {
@@ -131,14 +134,19 @@ static int cn1HttpProgressCb(void* userdata, curl_off_t dltotal, curl_off_t dlno
         c->lastActivityMs = now;
         return 0;
     }
-    if (now - c->lastActivityMs > c->readTimeoutMs) {
-        c->readTimedOut = 1;
-        return 1;
-    }
-    if (dlnow != c->lastDown || ulnow != c->lastUp) {
+    /* Progress first: data that arrived since the last call is activity now,
+     * however long the call interval was. The first call after connecting
+     * starts the clock too, so a slow connect is not counted as idle reading. */
+    if (dlnow != c->lastDown || ulnow != c->lastUp || !c->sawConnect) {
+        c->sawConnect = 1;
         c->lastDown = dlnow;
         c->lastUp = ulnow;
         c->lastActivityMs = now;
+        return 0;
+    }
+    if (now - c->lastActivityMs > c->readTimeoutMs) {
+        c->readTimedOut = 1;
+        return 1;
     }
     return 0;
 }
@@ -249,6 +257,7 @@ static void cn1HttpPerform(CN1Http* c) {
         c->lastDown = 0;
         c->lastUp = 0;
         c->readTimedOut = 0;
+        c->sawConnect = 0;
         curl_easy_setopt(c->easy, CURLOPT_XFERINFOFUNCTION, cn1HttpProgressCb);
         curl_easy_setopt(c->easy, CURLOPT_XFERINFODATA, c);
         curl_easy_setopt(c->easy, CURLOPT_NOPROGRESS, 0L);

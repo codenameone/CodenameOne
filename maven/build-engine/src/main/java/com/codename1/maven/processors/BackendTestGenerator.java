@@ -306,6 +306,9 @@ final class BackendTestGenerator {
         }
         Collections.sort(mockTypes);
         key.append(mockTypes);
+        // A test that injects the database starts one the application alone may
+        // not: sharing a context started without it would hand that test null.
+        key.append('|').append(testInjectsDatabase(spec));
         spec.key = key.toString();
         return spec;
     }
