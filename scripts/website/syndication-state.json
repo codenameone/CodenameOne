@@ -2493,6 +2493,18 @@
         "canonical_set": true,
         "syndicated_at": "2026-10-04T15:01:11+00:00"
       }
+    },
+    "orm-session-from-phone-to-server": {
+      "hashnode": {
+        "url": "https://debugagent.com/jpa-inspired-orm-from-sqlite-to-postgresql",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac2861e82fa969d1ebfa751",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-04T17:01:10+00:00"
+      }
     }
   }
 }
