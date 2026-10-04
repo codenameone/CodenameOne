@@ -434,6 +434,22 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("a form part without a form-data disposition or a field name is malformed")
+    void aFormPartMustNameItsField() throws Exception {
+        assertThrows(IllegalArgumentException.class,
+                () -> Multipart.parse("--x\r\nContent-Type: text/plain\r\n\r\nv\r\n--x--".getBytes("UTF-8"), "x"),
+                "a part with no Content-Disposition was accepted");
+        assertThrows(IllegalArgumentException.class,
+                () -> Multipart.parse(("--x\r\nContent-Disposition: attachment; name=\"f\"\r\n\r\nv\r\n--x--")
+                        .getBytes("UTF-8"), "x"), "an attachment disposition was accepted");
+        assertThrows(IllegalArgumentException.class,
+                () -> Multipart.parse("--x\r\nContent-Disposition: form-data\r\n\r\nv\r\n--x--".getBytes("UTF-8"),
+                        "x"), "a part naming no field was accepted");
+        assertEquals(1, Multipart.parse(("--x\r\nContent-Disposition: Form-Data; name=\"f\"\r\n\r\nv\r\n--x--")
+                .getBytes("UTF-8"), "x").size(), "the disposition type is case-insensitive");
+    }
+
+    @Test
     @DisplayName("the opening delimiter must start a line, and preamble text is skipped")
     void theOpeningDelimiterStartsALine() throws Exception {
         String part = "Content-Disposition: form-data; name=\"f\"\r\n\r\nv\r\n--x--";

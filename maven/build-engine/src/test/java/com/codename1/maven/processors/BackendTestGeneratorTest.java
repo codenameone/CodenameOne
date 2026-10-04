@@ -338,6 +338,30 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void aStaticTestIsABuildError() throws Exception {
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("t.StaticTest", "package t;\n"
+                + "public class StaticTest {\n"
+                + "    @org.junit.jupiter.api.Test static void check() { }\n"
+                + "}\n");
+        File tests = tmp.newFolder();
+        List<File> cp = new ArrayList<File>(classpath());
+        JavaSourceCompiler.compile(t, tests, cp);
+        List<String> elements = new ArrayList<String>();
+        elements.add(tests.getAbsolutePath());
+        for (File f : cp) {
+            elements.add(f.getAbsolutePath());
+        }
+        try {
+            BackendTests.process(tmp.newFolder(), tests, tmp.newFolder(), tmp.newFolder(),
+                    Collections.<String>emptyList(), "UTF-8", elements, true, new SystemStreamLog());
+            fail("a static @Test was accepted for the compiled run");
+        } catch (BuildFailureException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("is static"));
+        }
+    }
+
+    @Test
     public void anAmbiguousInjectionIsABuildError() throws Exception {
         File classes = mainBuild(application());
         Map<String, String> t = new LinkedHashMap<String, String>();

@@ -1004,6 +1004,13 @@ final class BackendTestGenerator {
 
     /// A test or lifecycle method the runner can call: not private, taking nothing.
     private void checkCallable(AnnotatedClass owner, MethodInfo m, boolean isStatic) {
+        if (m.isStatic() != isStatic) {
+            // JUnit does not run a static @Test (nor an instance @BeforeAll); called
+            // anyway, the compiled run reported a pass the JVM run never gave.
+            ctx.error(owner, owner.getSourceName() + "." + m.getName() + " is "
+                    + (isStatic ? "not static" : "static") + "; a test method is an instance method, "
+                    + "as JUnit requires.");
+        }
         if (m.isPrivate()) {
             ctx.error(owner, owner.getSourceName() + "." + m.getName() + " is private; a test "
                     + "method is package-private or public, as JUnit requires.");

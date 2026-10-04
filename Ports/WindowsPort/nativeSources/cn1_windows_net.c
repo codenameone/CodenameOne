@@ -97,6 +97,14 @@ static BOOL cn1NetCreateRequest(CN1Connection* conn) {
                                        NULL, WINHTTP_NO_REFERER,
                                        WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (conn->request == NULL) {
+        /* Recorded here, for every caller: a custom method recreates the request
+         * after closing the old handle and ignored this result, so httpFailure
+         * found no request and no error and the caller read response code -1
+         * instead of an IOException. */
+        conn->failure = GetLastError();
+        if (conn->failure == 0) {
+            conn->failure = ERROR_WINHTTP_INTERNAL_ERROR;
+        }
         return FALSE;
     }
     for (i = 0; i < conn->headerCount; i++) {

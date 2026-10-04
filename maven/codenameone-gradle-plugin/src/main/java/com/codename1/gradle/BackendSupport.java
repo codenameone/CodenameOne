@@ -90,6 +90,15 @@ final class BackendSupport {
         // Kotlin backend compileJava has no sources and would generate no router or
         // entry point at all. (backendPackage compiles Java sources itself, so a
         // Kotlin backend runs on the JVM with runBackend; see BackendPackager.)
+        //
+        // A mixed backend whose annotated classes are in BOTH languages is not
+        // served half-wired: each pass writes the entry point, its wiring record
+        // (META-INF/cn1-backend-main, META-INF/cn1-backend-wiring) and same-named
+        // generated classes into its own directory, and the SplitOutputCheck that
+        // compileJava runs above refuses any path the two directories share. One
+        // index over both outputs would need every processor that rewrites classes
+        // in place -- bean weaving, the ORM enhancer -- to write across directories;
+        // Maven compiles both languages into one directory and never meets this.
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     AppSupport.processingInputs(compile, layout, userProperties);

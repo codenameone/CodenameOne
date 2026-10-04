@@ -140,9 +140,18 @@ final class Multipart {
             byte[] data = new byte[next - pos];
             System.arraycopy(body, pos, data, 0, data.length);
             String disposition = (String) headers.get("content-disposition");
-            String name = disposition == null ? null : parameter(afterType(disposition), "name");
-            String filename = disposition == null ? null
-                    : parameter(afterType(disposition), "filename");
+            // RFC 7578 4.2: every part of a form says Content-Disposition: form-data
+            // and names its field. One that does not is a malformed form, not a
+            // nameless part that an optional binding quietly ignores.
+            if (disposition == null || !isFormData(disposition)) {
+                throw new IllegalArgumentException("a multipart/form-data part has no "
+                        + "Content-Disposition: form-data");
+            }
+            String name = parameter(afterType(disposition), "name");
+            if (name == null) {
+                throw new IllegalArgumentException("a multipart/form-data part names no field");
+            }
+            String filename = parameter(afterType(disposition), "filename");
             parts.add(new HttpServer.Part(name, filename, (String) headers.get("content-type"),
                     headers, data));
             pos = next + 2;
@@ -200,6 +209,11 @@ final class Multipart {
             at = indexOf(body, delimiter, at + 1);
         }
         return -1;
+    }
+
+    private static boolean isFormData(String disposition) {
+        int semi = disposition.indexOf(';');
+        return (semi < 0 ? disposition : disposition.substring(0, semi)).trim().equalsIgnoreCase("form-data");
     }
 
     /// Whether the close delimiter whose `--` ends just before `pos` really ends
