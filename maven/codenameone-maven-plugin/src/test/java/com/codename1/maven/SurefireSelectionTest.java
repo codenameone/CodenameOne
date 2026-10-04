@@ -116,6 +116,14 @@ class SurefireSelectionTest {
     }
 
     @Test
+    void aClasslessMethodSelectorNarrowsEveryClass() {
+        SurefireSelection s = SurefireSelection.of(project(null, null), "#fast*+slowTest");
+        assertTrue(s.test("com.acme.ApiTest#fastPath"));
+        assertTrue(s.test("com.acme.deep.OtherSpec#slowTest"), "a classless selector names every class");
+        assertFalse(s.test("com.acme.ApiTest#deletes"), "a method the selector does not name");
+    }
+
+    @Test
     void aNegativeDashDTestEntryExcludes() {
         SurefireSelection s = SurefireSelection.of(project(null, null), "*Test, !SlowTest");
         assertTrue(s.test("com.acme.ApiTest"));

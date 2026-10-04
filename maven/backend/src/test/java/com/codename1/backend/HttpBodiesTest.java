@@ -381,6 +381,24 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("an explicit host(null) binds every interface over a configured address")
+    void anExplicitWildcardHostBeatsTheConfiguredAddress() throws Exception {
+        // 203.0.113.1 is TEST-NET-3: no machine has it, so binding it fails. The
+        // configured address is used only when the builder named no host.
+        Properties p = new Properties();
+        p.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        p.setProperty(Config.SERVER_ADDRESS, "203.0.113.1");
+        HttpServer.Handler none = new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return null;
+            }
+        };
+        assertThrows(Exception.class, () -> Backend.builder(Config.of(p, "test")).quiet().handler(none)
+                .start().stop(), "the configured address was not used when no host was named");
+        backend = Backend.builder(Config.of(p, "test")).quiet().handler(none).host(null).start();
+    }
+
+    @Test
     @DisplayName("without cn1.cors.allowedOrigins there is no CORS at all")
     void corsIsOffByDefault() throws Exception {
         start(null);

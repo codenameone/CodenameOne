@@ -389,6 +389,13 @@ public abstract class BackendTestPackager extends BackendPackager {
     @Override
     public File execute() throws BuildExecutionException {
         clearCompiledReports();
+        if (!hasTests()) {
+            // Here, for every build tool: the Maven goal checked before calling,
+            // Gradle's backendTest did not, and a module with no tests failed with
+            // "No test source can be compiled" instead of having nothing to run.
+            getLog().info("cn1: no test sources, so no compiled backend tests");
+            return null;
+        }
         if (!strict && kotlinTestSources().isEmpty() && !testSources().isEmpty()
                 && compilableSources().isEmpty()) {
             getLog().warn("cn1: no compiled backend tests to run"

@@ -88,7 +88,13 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
                     e = e.substring(0, hash);
                 }
                 if (e.length() == 0) {
-                    continue;
+                    if (method == null || method.length() == 0) {
+                        continue;
+                    }
+                    // Surefire's classless selector, -Dtest=#fast*: those methods of
+                    // every class. Skipped, it fell back to the default includes and
+                    // ran every method of every test class.
+                    e = "**/*";
                 }
                 // A bare class name pattern names a class in any package; a regex is
                 // Surefire's own syntax and is kept as written.

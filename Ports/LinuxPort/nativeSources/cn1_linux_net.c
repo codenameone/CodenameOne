@@ -38,6 +38,7 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h> /* usleep -- explicit so strict/clang toolchains (zig, iOS) compile this */
+#include <time.h>
 #include <curl/curl.h>
 
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
@@ -86,6 +87,13 @@ typedef struct {
     /* Set when the transfer itself failed -- refused, timed out, reset -- as
      * opposed to answering with an error status. */
     int failed;
+    /* The read-timeout bookkeeping the progress callback keeps: when data last
+     * moved, how much had moved then, and whether the callback ended the
+     * transfer for being idle too long. */
+    long long lastActivityMs;
+    curl_off_t lastDown;
+    curl_off_t lastUp;
+    int readTimedOut;
 } CN1Http;
 
 static void cn1HttpEnsureResp(CN1Http* c, int extra) {
@@ -97,6 +105,42 @@ static void cn1HttpEnsureResp(CN1Http* c, int extra) {
         c->respBody = (unsigned char*) realloc(c->respBody, cap);
         c->respCap = cap;
     }
+}
+
+static long long cn1NowMs(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long) ts.tv_sec * 1000LL + ts.tv_nsec / 1000000L;
+}
+
+/* ConnectionRequest.setReadTimeout as an idle limit, in milliseconds: the time
+ * between pieces of data, not a deadline for the whole transfer. libcurl's own
+ * low-speed options measure AVERAGE speed in whole seconds, so a response that
+ * trickled a byte every 900ms against a 500ms limit never timed out. The gap is
+ * checked when data arrives as well as while none does, because libcurl calls
+ * this only about once a second when the transfer is idle. Until the connection
+ * is up the clock restarts: connecting is the connect timeout's business. */
+static int cn1HttpProgressCb(void* userdata, curl_off_t dltotal, curl_off_t dlnow,
+        curl_off_t ultotal, curl_off_t ulnow) {
+    CN1Http* c = (CN1Http*) userdata;
+    long long now = cn1NowMs();
+    curl_off_t connected = 0;
+    (void) dltotal;
+    (void) ultotal;
+    if (curl_easy_getinfo(c->easy, CURLINFO_CONNECT_TIME_T, &connected) != CURLE_OK || connected == 0) {
+        c->lastActivityMs = now;
+        return 0;
+    }
+    if (now - c->lastActivityMs > c->readTimeoutMs) {
+        c->readTimedOut = 1;
+        return 1;
+    }
+    if (dlnow != c->lastDown || ulnow != c->lastUp) {
+        c->lastDown = dlnow;
+        c->lastUp = ulnow;
+        c->lastActivityMs = now;
+    }
+    return 0;
 }
 
 static size_t cn1HttpWriteCb(char* ptr, size_t size, size_t nmemb, void* userdata) {
@@ -199,11 +243,15 @@ static void cn1HttpPerform(CN1Http* c) {
         curl_easy_setopt(c->easy, CURLOPT_CONNECTTIMEOUT_MS, c->connectTimeoutMs);
     }
     if (c->readTimeoutMs > 0) {
-        /* A read timeout is an idle limit, not a deadline for the whole transfer
-         * -- a large download must not be cut off for taking long. libcurl's
-         * idle limit is in whole seconds, so round up. */
-        curl_easy_setopt(c->easy, CURLOPT_LOW_SPEED_LIMIT, 1L);
-        curl_easy_setopt(c->easy, CURLOPT_LOW_SPEED_TIME, (c->readTimeoutMs + 999) / 1000);
+        /* An idle limit, not a deadline: a large download must not be cut off for
+         * taking long. See cn1HttpProgressCb. */
+        c->lastActivityMs = cn1NowMs();
+        c->lastDown = 0;
+        c->lastUp = 0;
+        c->readTimedOut = 0;
+        curl_easy_setopt(c->easy, CURLOPT_XFERINFOFUNCTION, cn1HttpProgressCb);
+        curl_easy_setopt(c->easy, CURLOPT_XFERINFODATA, c);
+        curl_easy_setopt(c->easy, CURLOPT_NOPROGRESS, 0L);
     }
     /* curl_easy_perform runs the whole blocking HTTP transfer; yield to the GC
      * across it so a thread parked in the network stack never stalls a GC mark. */
@@ -213,7 +261,8 @@ static void cn1HttpPerform(CN1Http* c) {
     curl_easy_getinfo(c->easy, CURLINFO_RESPONSE_CODE, &code);
     c->status = code;
     c->failed = rc != CURLE_OK;
-    c->statusMessage = strdup(rc == CURLE_OK ? "OK" : curl_easy_strerror(rc));
+    c->statusMessage = strdup(rc == CURLE_OK ? "OK"
+            : c->readTimedOut ? "the read timed out" : curl_easy_strerror(rc));
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_httpOpen___java_lang_String_boolean_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT url, JAVA_BOOLEAN read, JAVA_BOOLEAN write) {

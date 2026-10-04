@@ -1210,6 +1210,9 @@ public final class Backend {
         private int workers = -1;
         private int shutdownMillis = -1;
         private String host;
+        /// Whether host() was called: null is then the wildcard the caller chose,
+        /// which configuration must not replace.
+        private boolean hostSet;
         private Tls tls;
         private String tlsCertificate;
         private String tlsKey;
@@ -1276,9 +1279,11 @@ public final class Backend {
             return this;
         }
 
-        /// The address to bind, or null for every interface.
+        /// The address to bind, or null (or "") for every interface. Otherwise
+        /// cn1.server.address; called, it wins over that, the wildcard included.
         public Builder host(String host) {
             this.host = host;
+            this.hostSet = true;
             return this;
         }
 
@@ -1720,10 +1725,19 @@ public final class Backend {
             // handler. With no address chosen the listener would bind every
             // interface, so it binds loopback instead; an address chosen
             // explicitly that is not loopback needs the token.
-            String bindHost = host != null && host.length() > 0 ? host
-                    : config.get(Config.SERVER_ADDRESS, null);
+            // An explicit host() -- null or "" meaning every interface -- beats the
+            // configured address, as every other builder setter beats its key.
+            boolean everyInterfaceChosen = hostSet && (host == null || host.length() == 0);
+            String bindHost = everyInterfaceChosen ? null
+                    : hostSet ? host : config.get(Config.SERVER_ADDRESS, null);
             String unguardedBy = mcpServer == null ? null : mcpRoute.unguardedBy(mcpServer);
             if (unguardedBy != null) {
+                if (everyInterfaceChosen) {
+                    throw new IOException("The MCP endpoint has no token and the server was "
+                            + "asked to listen on every interface, so any machine that reaches it "
+                            + "could run its tools; set " + unguardedBy
+                            + ", or bind to a loopback address");
+                }
                 if (bindHost == null || bindHost.length() == 0) {
                     bindHost = "127.0.0.1"; //NOPMD AvoidUsingHardCodedIP - a tokenless MCP endpoint binds loopback only
                     if (!quiet) {
