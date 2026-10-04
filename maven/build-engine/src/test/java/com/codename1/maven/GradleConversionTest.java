@@ -472,6 +472,23 @@ class GradleConversionTest {
     }
 
     @Test
+    void aBackendWhoseSurefireWasCustomizedIsNotTheSkeleton() throws Exception {
+        // The plugin the archetype declares, but with the developer's own settings:
+        // their work, so the backend is kept rather than left behind.
+        File mvn = mavenApp(UNTOUCHED_API);
+        String generated = GENERATED_BACKEND_POM.replace("</plugins>", "<plugin><groupId>org.apache.maven.plugins</groupId>"
+                + "<artifactId>maven-surefire-plugin</artifactId><configuration><reuseForks>false</reuseForks>"
+                + "</configuration></plugin></plugins>");
+        touch(mvn, "backend/pom.xml", generated);
+        assertTrue(GradleConversion.pomAsGenerated(new File(mvn, "backend/pom.xml")),
+                "Surefire as the archetype writes it is the skeleton");
+        touch(mvn, "backend/pom.xml", generated.replace("<reuseForks>false</reuseForks>",
+                "<reuseForks>false</reuseForks><includes><include>**/*Spec.java</include></includes>"));
+        assertFalse(GradleConversion.pomAsGenerated(new File(mvn, "backend/pom.xml")),
+                "a customized Surefire read as generated");
+    }
+
+    @Test
     void theArchetypesSampleTestsStillCountAsTheSkeleton() throws Exception {
         // The archetype now writes ApiTest and ServedApiTest beside the generated
         // code, with the test library, JUnit and Surefire in the pom. None of that

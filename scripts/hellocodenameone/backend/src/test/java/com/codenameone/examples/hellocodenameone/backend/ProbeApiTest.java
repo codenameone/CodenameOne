@@ -209,6 +209,11 @@ class ProbeApiTest {
                 .andExpect(jsonPath("$.filename").value("a\"b\\c.txt"));
     }
 
+    @ProbeTest
+    void aComposedTestAnnotationRuns() throws Exception {
+        mvc.perform(get("/api/hello/{name}", "Ada")).andExpect(status().isOk());
+    }
+
     @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.

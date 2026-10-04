@@ -172,6 +172,36 @@ public final class GradleConversion {
                     + text(p, "artifactId"))) {
                 return false;
             }
+            if ("maven-surefire-plugin".equals(text(p, "artifactId")) && !surefireAsGenerated(p)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Whether a Surefire declaration is the archetype's, which sets only
+    /// reuseForks=false: by coordinates alone, a backend whose Surefire carried the
+    /// developer's executions, includes or system properties read as untouched,
+    /// and the conversion left it -- their work -- behind.
+    static boolean surefireAsGenerated(Element plugin) {
+        for (org.w3c.dom.Node n = plugin.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element) {
+                String name = ((Element) n).getTagName();
+                if (!"groupId".equals(name) && !"artifactId".equals(name) && !"version".equals(name)
+                        && !"configuration".equals(name)) {
+                    return false;
+                }
+            }
+        }
+        Element config = child(plugin, "configuration");
+        if (config == null) {
+            return true;
+        }
+        for (org.w3c.dom.Node n = config.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element && !("reuseForks".equals(((Element) n).getTagName())
+                    && "false".equals(((Element) n).getTextContent().trim()))) {
+                return false;
+            }
         }
         return true;
     }

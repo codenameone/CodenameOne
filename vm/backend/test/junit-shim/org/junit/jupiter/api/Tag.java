@@ -35,6 +35,9 @@ import java.lang.annotation.Target;
 /// finds the tests from their bytecode and generates the calls, and these classes
 /// only have to compile and to fail the way JUnit's do. Never on a JVM classpath.
 @Retention(RetentionPolicy.RUNTIME)
+// Not repeatable, unlike JUnit's: vm/JavaAPI has no java.lang.annotation.Repeatable.
+// Two @Tag on one element compile on the JVM and fail the compiled run's compile;
+// documented as unsupported in Backend-Testing.asciidoc.
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface Tag {
     /// The tag.

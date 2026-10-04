@@ -35,6 +35,6 @@ import java.lang.annotation.Target;
 /// finds the tests from their bytecode and generates the calls, and these classes
 /// only have to compile and to fail the way JUnit's do. Never on a JVM classpath.
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD})
+@Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 public @interface BeforeAll {
 }

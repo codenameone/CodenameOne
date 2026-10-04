@@ -20,21 +20,17 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package org.junit.jupiter.api;
+package com.codenameone.examples.hellocodenameone.backend;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/// Runs before each test method of its class.
-///
-/// Part of the subset of JUnit 5's API that a compiled backend test translates
-/// against. On the JVM the real JUnit runs the same source; under ParparVM there is
-/// no JUnit, no reflection and no annotation reading at run time, so the build
-/// finds the tests from their bytecode and generates the calls, and these classes
-/// only have to compile and to fail the way JUnit's do. Never on a JVM classpath.
+/// A composed test annotation, as JUnit allows: a method carrying it is a test on
+/// the JVM, and must be one in the compiled run too.
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
-public @interface BeforeEach {
+@Target(ElementType.METHOD)
+@org.junit.jupiter.api.Test
+@interface ProbeTest {
 }

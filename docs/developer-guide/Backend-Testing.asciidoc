@@ -281,6 +281,11 @@ A compiled run has these limits:
 * **Mockito.** A test class whose code uses Mockito is left out of the binary, and
   a class with a `@MockitoBean` field is reported as skipped. Pass
   `-Dcn1.backend.compiledTests.strict=true` to make either one fail the build.
+* **JUnit and Surefire subsets.** The compiled run reads the common JUnit 5
+  annotations and Surefire selections, not all of them. Repeating `@Tag` on a
+  class or method fails the compiled run's compile, so use one per element. A
+  `-Dtest` regex selector with a method part, such as `%regex[.*Api.*#one.*]`,
+  selects nothing in the compiled run. The JVM run handles both.
 * **Java tests only.** The binary is compiled from Java test sources. A module
   with Kotlin tests runs them on the JVM, and the compiled run reports them by
   name and stops rather than running without them.

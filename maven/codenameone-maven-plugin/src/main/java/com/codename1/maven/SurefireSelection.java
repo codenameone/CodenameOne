@@ -81,6 +81,9 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
                     e = e.substring(1).trim();
                 }
                 String method = null;
+                // Not supported: a regex selector with a method part inside the
+                // brackets (%regex[.*Api.*#one.*]); it is read as a class regex,
+                // selects nothing, and a non-strict compiled run says so and skips.
                 boolean regex = e.startsWith(REGEX_PREFIX);
                 int hash = e.indexOf('#', regex ? Math.max(e.indexOf(']'), 0) : 0);
                 if (hash >= 0) {
