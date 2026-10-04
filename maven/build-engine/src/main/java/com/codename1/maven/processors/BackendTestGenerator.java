@@ -887,27 +887,28 @@ final class BackendTestGenerator {
     }
 
     /// The class, its superclasses and every interface they implement, for the
-    /// methods JUnit collects: classes subclass first, then the interfaces, whose
-    /// default `@Test` and lifecycle methods a test class inherits. Interfaces come
-    /// last because a class's method overrides theirs, and so that a "before" from
-    /// an interface runs ahead of the class's, as JUnit orders them.
+    /// methods JUnit collects: each class followed by the interfaces it brings in
+    /// (theirs before their super-interfaces'), subclass first. lifecycle()
+    /// prepends each element for a "before" and appends it for an "after", which
+    /// is then JUnit's order level by level -- a superclass's setup, the
+    /// subclass's interfaces' default hooks, then the subclass's own -- where all
+    /// interfaces after all classes ran a subclass-level interface hook ahead of
+    /// the base class setup it may depend on.
     private List<AnnotatedClass> methodHierarchy(AnnotatedClass cls) {
-        List<AnnotatedClass> out = new ArrayList<AnnotatedClass>(hierarchy(cls));
+        List<AnnotatedClass> out = new ArrayList<AnnotatedClass>();
         Set<String> visited = new LinkedHashSet<String>();
-        java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>();
-        for (AnnotatedClass c : out) {
-            pending.addAll(c.getInterfaceInternalNames());
-        }
-        List<AnnotatedClass> interfaces = new ArrayList<AnnotatedClass>();
-        while (!pending.isEmpty() && visited.size() < 64) {
-            String name = pending.removeFirst();
-            AnnotatedClass i = visited.add(name) ? ctx.lookup(name) : null;
-            if (i != null) {
-                interfaces.add(i);
-                pending.addAll(i.getInterfaceInternalNames());
+        for (AnnotatedClass c : hierarchy(cls)) {
+            out.add(c);
+            java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>(c.getInterfaceInternalNames());
+            while (!pending.isEmpty() && visited.size() < 64) {
+                String name = pending.removeFirst();
+                AnnotatedClass i = visited.add(name) ? ctx.lookup(name) : null;
+                if (i != null) {
+                    out.add(i);
+                    pending.addAll(i.getInterfaceInternalNames());
+                }
             }
         }
-        out.addAll(interfaces);
         return out;
     }
 

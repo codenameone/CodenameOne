@@ -213,7 +213,7 @@ final class Multipart {
 
     private static boolean isFormData(String disposition) {
         int semi = disposition.indexOf(';');
-        return (semi < 0 ? disposition : disposition.substring(0, semi)).trim().equalsIgnoreCase("form-data");
+        return "form-data".equalsIgnoreCase((semi < 0 ? disposition : disposition.substring(0, semi)).trim());
     }
 
     /// Whether the close delimiter whose `--` ends just before `pos` really ends
@@ -348,6 +348,13 @@ final class Multipart {
                     }
                     sb.append(c);
                     pos++;
+                }
+                if (pos >= length) {
+                    // No closing quote: the header is malformed, and what it would
+                    // have said is unknown. Answered as absent, which both callers
+                    // refuse -- no valid boundary, a part naming no field -- where
+                    // boundary="b used to be accepted as b.
+                    return null;
                 }
                 pos++;
                 value = sb.toString();

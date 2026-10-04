@@ -293,6 +293,20 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("a credentialed preflight against a wildcard method list echoes the method")
+    void aCredentialedPreflightEchoesTheMethod() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.cors.allowedOrigins", "http://app.example");
+        p.setProperty("cn1.cors.allowedMethods", "*");
+        p.setProperty("cn1.cors.allowCredentials", "true");
+        start(p);
+        String preflight = raw("OPTIONS /text HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Access-Control-Request-Method: PUT\r\nConnection: close\r\n\r\n");
+        assertTrue(preflight.startsWith("HTTP/1.1 204"), preflight);
+        assertTrue(preflight.contains("Access-Control-Allow-Methods: PUT"), preflight);
+    }
+
+    @Test
     @DisplayName("with any origin allowed and no credentials, the answer does not vary by Origin")
     void anyOriginDoesNotVary() throws Exception {
         Properties p = new Properties();
@@ -431,6 +445,16 @@ class HttpBodiesTest {
         assertEquals(1, Multipart.parse((part + "--x--").getBytes("UTF-8"), "x").size());
         assertEquals(1, Multipart.parse((part + "--x-- \r\nan epilogue").getBytes("UTF-8"), "x")
                 .size(), "padding, CRLF and an epilogue may follow");
+    }
+
+    @Test
+    @DisplayName("an unterminated quoted boundary or field name is malformed")
+    void anUnterminatedQuoteIsMalformed() throws Exception {
+        assertNull(Multipart.boundary("multipart/form-data; boundary=\"b"), "boundary=\"b read as b");
+        assertEquals("b", Multipart.boundary("multipart/form-data; boundary=\"b\""));
+        assertThrows(IllegalArgumentException.class,
+                () -> Multipart.parse("--x\r\nContent-Disposition: form-data; name=\"f\r\n\r\nv\r\n--x--".getBytes("UTF-8"),
+                        "x"), "an unterminated field name was accepted");
     }
 
     @Test

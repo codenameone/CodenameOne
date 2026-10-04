@@ -125,6 +125,18 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
         Plugin surefire = project.getPlugin("org.apache.maven.plugins:maven-surefire-plugin");
         Xpp3Dom config = surefire == null || !(surefire.getConfiguration() instanceof Xpp3Dom) ? null
                 : (Xpp3Dom) surefire.getConfiguration();
+        if (surefire != null) {
+            // The test phase's run is the default-test execution: filters a pom puts
+            // under <execution><configuration> are what it runs with, the plugin's
+            // own configuration beneath them, as Maven merges the two.
+            for (org.apache.maven.model.PluginExecution execution : surefire.getExecutions()) {
+                if ("default-test".equals(execution.getId())
+                        && execution.getConfiguration() instanceof Xpp3Dom) {
+                    Xpp3Dom own = new Xpp3Dom((Xpp3Dom) execution.getConfiguration());
+                    config = config == null ? own : Xpp3Dom.mergeXpp3Dom(own, new Xpp3Dom(config));
+                }
+            }
+        }
         List<String> includes = patterns(config, "includes", "include");
         List<String> excludes = patterns(config, "excludes", "exclude");
         return new SurefireSelection(includes == null ? DEFAULT_INCLUDES : includes,

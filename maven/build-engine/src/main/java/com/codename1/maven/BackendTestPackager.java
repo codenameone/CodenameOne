@@ -420,31 +420,78 @@ public abstract class BackendTestPackager extends BackendPackager {
     /// The test sources the compiled run names to javac: the ones whose class the
     /// JVM run selects, less those that use Mockito, which go into [#excluded].
     private List<String> compilableSources() throws BuildExecutionException {
-        List<String> sources = new ArrayList<String>();
         Map<String, List<String>> declared = declaredClasses(testOutputDirectory());
+        // Every test source, selected or not: javac compiles an unselected support
+        // source a selected test uses, through -sourcepath.
+        Map<File, String> texts = new LinkedHashMap<File, String>();
+        Map<File, File> roots = new LinkedHashMap<File, File>();
         for (String root : testSourceRoots()) {
             File base = new File(root);
             List<String> found = new ArrayList<String>();
             collectJava(base, found);
             for (String path : found) {
                 File f = new File(path);
-                if (!selects(declared.get(sourcePath(base, f)), binaryName(base, f))) {
-                    continue;
-                }
-                String text;
                 try {
-                    text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+                    texts.put(f, new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));
                 } catch (IOException err) {
                     throw new BuildExecutionException("Could not read " + f, err);
                 }
-                if (usesMockito(text)) {
-                    excluded.put(f.getName(), "imports Mockito, which runs only on the JVM");
-                    continue;
-                }
-                sources.add(f.getAbsolutePath());
+                roots.put(f, base);
             }
         }
+        Map<File, String> mockito = mockitoReach(texts);
+        List<String> sources = new ArrayList<String>();
+        for (Map.Entry<File, String> e : texts.entrySet()) {
+            File f = e.getKey();
+            File base = roots.get(f);
+            if (!selects(declared.get(sourcePath(base, f)), binaryName(base, f))) {
+                continue;
+            }
+            String why = mockito.get(f);
+            if (why != null) {
+                excluded.put(f.getName(), why);
+                continue;
+            }
+            sources.add(f.getAbsolutePath());
+        }
         return sources;
+    }
+
+    /// The test sources that cannot be compiled without Mockito, with why: those
+    /// whose code uses it, and -- to a fixed point -- those that name one of them.
+    /// A test with no Mockito of its own that extends a MockitoTestBase still
+    /// pulls the base in through -sourcepath, and the Mockito jars are not on the
+    /// compiled run's classpath, so the compile failed instead of the test being
+    /// left out. Matched by class name, so a false match only leaves a test out.
+    static Map<File, String> mockitoReach(Map<File, String> texts) {
+        Map<File, String> out = new LinkedHashMap<File, String>();
+        Map<File, String> names = new LinkedHashMap<File, String>();
+        for (Map.Entry<File, String> e : texts.entrySet()) {
+            String file = e.getKey().getName();
+            names.put(e.getKey(), file.endsWith(".java") ? file.substring(0, file.length() - 5) : file);
+            if (usesMockito(e.getValue())) {
+                out.put(e.getKey(), "imports Mockito, which runs only on the JVM");
+            }
+        }
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (Map.Entry<File, String> e : texts.entrySet()) {
+                if (out.containsKey(e.getKey())) {
+                    continue;
+                }
+                for (File tainted : new ArrayList<File>(out.keySet())) {
+                    String name = names.get(tainted);
+                    if (java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(name) + "\\b")
+                            .matcher(e.getValue()).find()) {
+                        out.put(e.getKey(), "uses " + name + ", which needs Mockito, which runs only on the JVM");
+                        grew = true;
+                        break;
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     /// Whether the JVM run selects a source: by the top-level classes compiled

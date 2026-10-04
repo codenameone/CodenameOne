@@ -93,6 +93,29 @@ class SurefireSelectionTest {
     }
 
     @Test
+    void theDefaultTestExecutionsFiltersApply() {
+        MavenProject project = new MavenProject(new Model());
+        project.getModel().setBuild(new Build());
+        Plugin surefire = new Plugin();
+        surefire.setGroupId("org.apache.maven.plugins");
+        surefire.setArtifactId("maven-surefire-plugin");
+        org.apache.maven.model.PluginExecution execution = new org.apache.maven.model.PluginExecution();
+        execution.setId("default-test");
+        Xpp3Dom config = new Xpp3Dom("configuration");
+        Xpp3Dom includes = new Xpp3Dom("includes");
+        Xpp3Dom include = new Xpp3Dom("include");
+        include.setValue("**/*Spec.java");
+        includes.addChild(include);
+        config.addChild(includes);
+        execution.setConfiguration(config);
+        surefire.addExecution(execution);
+        project.getBuild().addPlugin(surefire);
+        SurefireSelection s = SurefireSelection.of(project, null);
+        assertTrue(s.test("com.acme.ApiSpec"), "the execution's include was not read");
+        assertFalse(s.test("com.acme.ApiTest"), "the execution's includes replace the defaults");
+    }
+
+    @Test
     void aNegativeDashDTestEntryExcludes() {
         SurefireSelection s = SurefireSelection.of(project(null, null), "*Test, !SlowTest");
         assertTrue(s.test("com.acme.ApiTest"));

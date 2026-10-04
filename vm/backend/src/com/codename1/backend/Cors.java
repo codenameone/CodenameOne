@@ -233,7 +233,10 @@ final class Cors {
         }
         HttpServer.Response response = varyByOrigin(HttpServer.Response.empty(204, null, null));
         allowOrigin(response, origin);
-        response.header("Access-Control-Allow-Methods", methods);
+        // With credentials "*" is a literal method name to a browser, as it is for
+        // headers below, so the method asked for is echoed instead.
+        response.header("Access-Control-Allow-Methods",
+                credentials && "*".equals(methods.trim()) ? asked.trim() : methods);
         String requested = request.getHeader("Access-Control-Request-Headers");
         if ("*".equals(headers.trim())) {
             // With credentials "*" is a literal header name to a browser, so the

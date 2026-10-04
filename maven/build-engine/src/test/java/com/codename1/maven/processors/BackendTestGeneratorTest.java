@@ -338,6 +338,48 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void anInterfaceHookRunsAfterTheBaseClassSetup() throws Exception {
+        // JUnit: the base class's @BeforeEach, then the subclass's interfaces' default
+        // hooks, then the subclass's own; and the reverse for @AfterEach.
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("o.Base", "package o;\n"
+                + "public abstract class Base {\n"
+                + "    public static java.util.List<String> calls = new java.util.ArrayList<String>();\n"
+                + "    @org.junit.jupiter.api.BeforeEach void baseSetUp() { calls.add(\"base-before\"); }\n"
+                + "    @org.junit.jupiter.api.AfterEach void baseTearDown() { calls.add(\"base-after\"); }\n"
+                + "}\n");
+        t.put("o.Hooks", "package o;\n"
+                + "public interface Hooks {\n"
+                + "    @org.junit.jupiter.api.BeforeEach default void hookSetUp() { Base.calls.add(\"hook-before\"); }\n"
+                + "    @org.junit.jupiter.api.AfterEach default void hookTearDown() { Base.calls.add(\"hook-after\"); }\n"
+                + "}\n");
+        t.put("o.OrderTest", "package o;\n"
+                + "public class OrderTest extends Base implements Hooks {\n"
+                + "    @org.junit.jupiter.api.BeforeEach void ownSetUp() { calls.add(\"own-before\"); }\n"
+                + "    @org.junit.jupiter.api.Test void runs() { calls.add(\"test\"); }\n"
+                + "}\n");
+        File tests = tmp.newFolder();
+        List<File> cp = new ArrayList<File>(classpath());
+        JavaSourceCompiler.compile(t, tests, cp);
+        List<String> elements = new ArrayList<String>();
+        elements.add(tests.getAbsolutePath());
+        for (File f : cp) {
+            elements.add(f.getAbsolutePath());
+        }
+        BackendTests.process(tmp.newFolder(), tests, tmp.newFolder(), tmp.newFolder(),
+                Collections.<String>emptyList(), "UTF-8", elements, true, new SystemStreamLog());
+        java.net.URLClassLoader loader = new java.net.URLClassLoader(new java.net.URL[] {tests.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            loader.loadClass("o.OrderTestCn1TestRunner").getMethod("run").invoke(null);
+            assertEquals(java.util.Arrays.asList("base-before", "hook-before", "own-before", "test",
+                    "hook-after", "base-after"), loader.loadClass("o.Base").getField("calls").get(null));
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
     public void aStaticTestIsABuildError() throws Exception {
         Map<String, String> t = new LinkedHashMap<String, String>();
         t.put("t.StaticTest", "package t;\n"

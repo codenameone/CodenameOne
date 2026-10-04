@@ -80,6 +80,23 @@ class BackendTestPackagerTest {
     }
 
     @Test
+    void aTestThatUsesAMockitoSupportClassIsLeftOutToo() {
+        java.util.Map<java.io.File, String> texts = new java.util.LinkedHashMap<java.io.File, String>();
+        java.io.File base = new java.io.File("MockitoTestBase.java");
+        java.io.File api = new java.io.File("ApiTest.java");
+        java.io.File deep = new java.io.File("DeepTest.java");
+        java.io.File plain = new java.io.File("PlainTest.java");
+        texts.put(base, "import org.mockito.Mockito;\nabstract class MockitoTestBase {}\n");
+        texts.put(api, "class ApiTest extends MockitoTestBase {}\n");
+        texts.put(deep, "class DeepTest extends ApiTest {}\n");
+        texts.put(plain, "class PlainTest {}\n");
+        java.util.Map<java.io.File, String> reach = BackendTestPackager.mockitoReach(texts);
+        assertTrue(reach.containsKey(base) && reach.containsKey(api) && reach.containsKey(deep),
+                String.valueOf(reach));
+        assertFalse(reach.containsKey(plain), String.valueOf(reach));
+    }
+
+    @Test
     void theWordsInCommentsAndStringsAreNotAUse() {
         assertFalse(BackendTestPackager.usesMockito("// unlike org.mockito, this needs nothing\nclass A {}\n"));
         assertFalse(BackendTestPackager.usesMockito("/** Not org.mockito: a fake. */\nclass A {}\n"));
