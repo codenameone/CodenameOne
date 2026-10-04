@@ -27,6 +27,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
+          # A rerun must read current publication state, not its original SHA.
+          ref: ${{ github.ref_name }}
           # Token with write scope so the post-run commit can push the state file.
           token: ${{ secrets.GITHUB_TOKEN }}
           # The state commit rebases onto the latest default-branch commit before
