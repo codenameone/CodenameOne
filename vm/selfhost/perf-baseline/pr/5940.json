@@ -65,6 +65,28 @@
     }
    }
   },
+  "linux-x64@intel-xeon-platinum-8573c": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.511,
+      "time": 2.631,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.511,
+     "reason": "Hybrid GC (#5940): low-survival allocation churn now runs stop-the-world generational minors, so objectAllocation's collector cost follows survivors instead of allocation. The young generation is sized by collector duty (up to host memory / 8), which trades some RAM on this row for 3x fewer minors (linux-arm64's RAM ratio rose 0.24x -> 0.38x, still well under JDK 25).",
+     "runs": 1,
+     "time": 1.034,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "macos-arm64": {
    "longArithmetic": {
     "all": {
@@ -183,6 +205,24 @@
      "tolerance": {
       "memory": 0.3,
       "time": 0.5
+     }
+    }
+   },
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.059,
+      "time": 1.204,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.059,
+     "reason": "Measured, not attributed: two CI runs on this CPU model put recursion at 0.94x of JDK 25 (rounds 0.93-0.95), before and after the collector stop-wait backoff. The workload allocates nothing, so this records what the runner measures rather than claiming a cause.",
+     "runs": 2,
+     "time": 0.943,
+     "tolerance": {
+      "time": 0.2
      }
     }
    }
