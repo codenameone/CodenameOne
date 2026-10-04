@@ -380,6 +380,45 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void aSuperclassMethodHidesAnInterfaceDefaultTest() throws Exception {
+        // Java: the inherited class method beats the interface default, so JUnit
+        // sees an unannotated check() and runs no test called check.
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("h.Base", "package h;\n"
+                + "public abstract class Base {\n"
+                + "    public static java.util.List<String> calls = new java.util.ArrayList<String>();\n"
+                + "    public void check() { calls.add(\"base-check\"); }\n"
+                + "}\n");
+        t.put("h.Checks", "package h;\n"
+                + "public interface Checks {\n"
+                + "    @org.junit.jupiter.api.Test default void check() { Base.calls.add(\"interface-check\"); }\n"
+                + "}\n");
+        t.put("h.HiddenTest", "package h;\n"
+                + "public class HiddenTest extends Base implements Checks {\n"
+                + "    @org.junit.jupiter.api.Test void own() { calls.add(\"own\"); }\n"
+                + "}\n");
+        File tests = tmp.newFolder();
+        List<File> cp = new ArrayList<File>(classpath());
+        JavaSourceCompiler.compile(t, tests, cp);
+        List<String> elements = new ArrayList<String>();
+        elements.add(tests.getAbsolutePath());
+        for (File f : cp) {
+            elements.add(f.getAbsolutePath());
+        }
+        BackendTests.process(tmp.newFolder(), tests, tmp.newFolder(), tmp.newFolder(),
+                Collections.<String>emptyList(), "UTF-8", elements, true, new SystemStreamLog());
+        java.net.URLClassLoader loader = new java.net.URLClassLoader(new java.net.URL[] {tests.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            loader.loadClass("h.HiddenTestCn1TestRunner").getMethod("run").invoke(null);
+            assertEquals(java.util.Collections.singletonList("own"),
+                    loader.loadClass("h.Base").getField("calls").get(null));
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
     public void aStaticTestIsABuildError() throws Exception {
         Map<String, String> t = new LinkedHashMap<String, String>();
         t.put("t.StaticTest", "package t;\n"

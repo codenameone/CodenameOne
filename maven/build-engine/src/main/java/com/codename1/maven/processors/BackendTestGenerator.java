@@ -641,7 +641,7 @@ final class BackendTestGenerator {
         }
         List<AnnotatedClass> chain = methodHierarchy(cls);
         List<MethodInfo> tests = new ArrayList<MethodInfo>();
-        Overrides seen = new Overrides();
+        OverrideScan seen = new OverrideScan(chain);
         java.util.IdentityHashMap<MethodInfo, AnnotatedClass> owners =
                 new java.util.IdentityHashMap<MethodInfo, AnnotatedClass>();
         for (AnnotatedClass c : chain) {
@@ -804,7 +804,7 @@ final class BackendTestGenerator {
                                        boolean isStatic, boolean superFirst,
                                        java.util.Map<MethodInfo, AnnotatedClass> owners) {
         List<MethodInfo> out = new ArrayList<MethodInfo>();
-        Overrides seen = new Overrides();
+        OverrideScan seen = new OverrideScan(chain);
         for (AnnotatedClass c : chain) {
             List<MethodInfo> level = new ArrayList<MethodInfo>();
             for (MethodInfo m : c.getMethods()) {
@@ -910,6 +910,39 @@ final class BackendTestGenerator {
             }
         }
         return out;
+    }
+
+    /// What hides what across a [#methodHierarchy] chain, which interleaves each
+    /// class with its interfaces for the lifecycle ORDER. Overriding follows Java,
+    /// not that order: a class method -- inherited from any superclass -- beats an
+    /// interface default of the same signature, so a superclass's unannotated
+    /// check() hides an interface's default @Test check() even though the
+    /// interface comes first in the chain; and an interface default never hides a
+    /// class method. Class methods are therefore checked only against classes
+    /// lower down, interface defaults against every class plus lower interfaces.
+    private static final class OverrideScan {
+        private final Overrides classes = new Overrides();
+        private final Overrides interfaces = new Overrides();
+        private final Overrides everyClass = new Overrides();
+
+        OverrideScan(List<AnnotatedClass> chain) {
+            for (AnnotatedClass c : chain) {
+                if (!c.isInterface()) {
+                    for (MethodInfo m : c.getMethods()) {
+                        everyClass.declare(c, m);
+                    }
+                }
+            }
+        }
+
+        boolean covers(AnnotatedClass owner, MethodInfo m) {
+            return owner.isInterface() ? everyClass.covers(owner, m) || interfaces.covers(owner, m)
+                    : classes.covers(owner, m);
+        }
+
+        void declare(AnnotatedClass owner, MethodInfo m) {
+            (owner.isInterface() ? interfaces : classes).declare(owner, m);
+        }
     }
 
     /// The methods declared lower in a hierarchy, by signature, and what they

@@ -201,12 +201,16 @@ public class ProbeApi {
     /// over a kilobyte it is gzipped for a client that accepts it.
     @GetMapping("/big")
     public String big(@RequestParam(value = "size", defaultValue = "4096") int size) {
-        StringBuilder sb = new StringBuilder(size);
+        // Capped like the download below, BEFORE allocating: an unbounded size took
+        // the shared test server down with an OutOfMemoryError, and a negative one
+        // was a 500 from the StringBuilder constructor.
+        int n = Math.max(0, Math.min(size, 8 * 1024 * 1024));
+        StringBuilder sb = new StringBuilder(n);
         String pattern = "Codename One backend probe. ";
-        while (sb.length() < size) {
+        while (sb.length() < n) {
             sb.append(pattern);
         }
-        sb.setLength(Math.max(0, size));
+        sb.setLength(n);
         return sb.toString();
     }
 

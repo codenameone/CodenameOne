@@ -193,6 +193,15 @@ class ProbeApiTest {
     }
 
     @Test
+    void theBigProbeClampsItsSize() throws Exception {
+        mvc.perform(get("/api/big").param("size", "-5")).andExpect(status().isOk())
+                .andExpect(content().string(""));
+        String capped = mvc.perform(get("/api/big").param("size", "2147483647"))
+                .andReturn().getResponse().getContentAsString();
+        assertEquals(8 * 1024 * 1024, capped.length());
+    }
+
+    @Test
     void nestedPrimitiveArraysCompareByContent() {
         // The rows of an int[][] are compared by content, compiled as on the JVM.
         assertArrayEquals(new int[][] {{1, 2}, {3}}, new int[][] {{1, 2}, {3}});

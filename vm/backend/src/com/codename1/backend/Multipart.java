@@ -286,6 +286,14 @@ final class Multipart {
                 n += utf.length;
             }
         }
+        if (!Utf8.isValid(out, 0, n)) {
+            // The raw body passed the UTF-8 check -- "%FF" is ASCII -- but what it
+            // escapes is not text; decoding it would hand the handler a replacement
+            // character the client never sent. Request.param answers this with the
+            // same exception as a multipart field that is not UTF-8, which a
+            // generated @RequestParam binding turns into a 400.
+            throw new IllegalStateException("a form field is not UTF-8 text once decoded");
+        }
         try {
             return new String(out, 0, n, "UTF-8");
         } catch (java.io.UnsupportedEncodingException err) {

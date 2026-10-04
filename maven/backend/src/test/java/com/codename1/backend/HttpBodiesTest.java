@@ -506,6 +506,13 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("a form value that is not UTF-8 once decoded is refused")
+    void aFormValueMustDecodeToUtf8() {
+        assertThrows(IllegalStateException.class, () -> Multipart.formValue("name=%FF", "name"));
+        assertEquals("\u00e9", Multipart.formValue("name=%C3%A9", "name"));
+    }
+
+    @Test
     @DisplayName("a form value keeps a supplementary character beside + and %")
     void aFormValueKeepsSupplementaryCharacters() {
         String emoji = "\ud83d\ude00";
