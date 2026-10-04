@@ -291,8 +291,32 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         return b;
     }
 
+    /// This URI with its scheme folded to lower case (`HTTP://x` becomes
+    /// `http://x`); the URI itself when the scheme is absent or already lower
+    /// case. Nothing after the scheme changes.
     public Uri normalizeScheme() {
-        return this;
+        String s = getScheme();
+        if (s == null) {
+            return this;
+        }
+        String lower = asciiLower(s);
+        if (lower.equals(s)) {
+            return this;
+        }
+        return new Uri(lower + string.substring(s.length()));
+    }
+
+    /// Lower-cases ASCII letters only. A scheme is ASCII by specification,
+    /// and `toLowerCase()` would fold by the device locale (a Turkish
+    /// device turns `I` into a dotless i).
+    private static String asciiLower(String s) {
+        char[] c = s.toCharArray();
+        for (int i = 0; i < c.length; i++) {
+            if (c[i] >= 'A' && c[i] <= 'Z') {
+                c[i] = (char) (c[i] + ('a' - 'A'));
+            }
+        }
+        return new String(c);
     }
 
     private static List<String> split(String s, char sep) {

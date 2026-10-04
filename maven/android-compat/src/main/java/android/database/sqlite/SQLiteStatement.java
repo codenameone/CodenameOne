@@ -52,6 +52,14 @@ public final class SQLiteStatement extends SQLiteProgram {
 
     /// Runs an INSERT and returns the new row's id, or -1 when no row was
     /// inserted (an `OR IGNORE` conflict, for instance).
+    ///
+    /// The statement and the `changes()`/`last_insert_rowid()` read are two
+    /// engine calls, deliberately without a lock around them: Codename One
+    /// code runs on one thread and the runtime adds no locks. Used from one
+    /// thread the pair is exact. Two threads inserting through one database
+    /// at once can interleave here, as they can anywhere else in this class;
+    /// serializing statements on the connection belongs to the Codename One
+    /// `Database` implementation, not to a lock in this runtime.
     public long executeInsert() {
         acquireReference();
         try {

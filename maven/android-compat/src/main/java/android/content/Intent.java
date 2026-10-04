@@ -295,6 +295,10 @@ public class Intent implements Parcelable, Cloneable {
         return extras;
     }
 
+    /// A copy of the extras, or null when there are none. A copy on purpose:
+    /// Android's `Intent.getExtras()` is `new Bundle(mExtras)` too, so code
+    /// that changes the returned bundle has never changed the intent there;
+    /// `putExtra`, `removeExtra` and `replaceExtras` are the way to.
     public Bundle getExtras() {
         return extras == null ? null : new Bundle(extras);
     }

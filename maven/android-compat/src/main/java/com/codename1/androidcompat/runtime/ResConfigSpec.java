@@ -35,6 +35,9 @@ public final class ResConfigSpec {
     final String canonical;
     boolean unsupported;
     String language;
+    /// The four-letter script of a `b+` locale (`Hans` in `b+zh+Hans`), or
+    /// null.
+    String script;
     String region;
     int layoutDirection;
     int smallestWidthDp;
@@ -59,7 +62,9 @@ public final class ResConfigSpec {
                 String[] parts = splitPlus(t.substring(2));
                 language = parts[0];
                 for (int p = 1; p < parts.length; p++) {
-                    if (parts[p].length() != 4) {
+                    if (parts[p].length() == 4) {
+                        script = parts[p];
+                    } else {
                         region = parts[p];
                     }
                 }
@@ -142,6 +147,11 @@ public final class ResConfigSpec {
             if (!language.equals(d.language)) {
                 return false;
             }
+            // A device whose script is unknown accepts any; otherwise a
+            // Traditional variant must not serve a Simplified device.
+            if (script != null && d.script != null && !script.equalsIgnoreCase(d.script)) {
+                return false;
+            }
             if (region != null && !region.equals(d.region)) {
                 return false;
             }
@@ -176,12 +186,17 @@ public final class ResConfigSpec {
         if (o == null) {
             return true;
         }
-        // Locale: a language beats none; then a region beats none.
+        // Locale: a language beats none; then a script; then a region.
         if (language != null || o.language != null) {
             boolean mine = language != null;
             boolean theirs = o.language != null;
             if (mine != theirs) {
                 return mine;
+            }
+            boolean myScript = script != null;
+            boolean theirScript = o.script != null;
+            if (myScript != theirScript) {
+                return myScript;
             }
             boolean myRegion = region != null;
             boolean theirRegion = o.region != null;

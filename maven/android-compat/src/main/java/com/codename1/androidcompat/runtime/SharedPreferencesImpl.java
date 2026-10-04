@@ -229,7 +229,9 @@ final class SharedPreferencesImpl implements SharedPreferences {
         @Override
         public boolean commit() {
             ArrayList<String> changed = new ArrayList<String>();
+            ArrayList<String> cleared = null;
             if (clear) {
+                cleared = new ArrayList<String>(values.keySet());
                 values.clear();
             }
             for (Map.Entry<String, Object> e : pending.entrySet()) {
@@ -241,6 +243,18 @@ final class SharedPreferencesImpl implements SharedPreferences {
                 } else {
                     values.put(e.getKey(), v);
                     changed.add(e.getKey());
+                }
+            }
+            if (cleared != null) {
+                // Every key clear() removed is reported, unless this edit put
+                // it back (the put above already reported it). Android 11+
+                // reports a clear as one call with a null key instead; one
+                // call per key tells a listener the same thing without
+                // handing a null to listeners written for the older contract.
+                for (String k : cleared) {
+                    if (!values.containsKey(k)) {
+                        changed.add(k);
+                    }
                 }
             }
             persist();

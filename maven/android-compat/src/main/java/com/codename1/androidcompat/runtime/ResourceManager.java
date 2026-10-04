@@ -223,6 +223,7 @@ public final class ResourceManager {
 
         String lang = "en";
         String region = "US";
+        String script = null;
         try {
             com.codename1.l10n.L10NManager l10n = d.getLocalizationManager();
             if (l10n != null) {
@@ -231,6 +232,7 @@ public final class ResourceManager {
                 if (parsed != null) {
                     lang = parsed[0];
                     region = parsed[1];
+                    script = scriptOf(loc);
                 }
             }
         } catch (RuntimeException ignored) {
@@ -244,11 +246,13 @@ public final class ResourceManager {
         int night = dark != null && dark.booleanValue() ? 2 : 1;
 
         boolean changed = device.generation == 0 || !lang.equals(device.language) || !region.equals(device.region)
+                || !sameScript(script, device.script)
                 || rtl != device.rtl || wDp != device.widthDp || hDp != device.heightDp
                 || orientation != device.orientation || night != device.night
                 || metrics.densityDpi != device.densityDpi;
         device.language = lang;
         device.region = region;
+        device.script = script;
         device.rtl = rtl;
         device.widthDp = wDp;
         device.heightDp = hDp;
@@ -277,20 +281,84 @@ public final class ResourceManager {
     }
 
     /// The language and region of a platform locale such as `en_US`,
-    /// `fil_PH` or `pt-BR`: the language is everything before the separator,
+    /// `fil_PH` or `pt-BR`: the language is everything before the first separator,
     /// so three-letter languages (`fil`, matched by `values-fil`) survive.
     /// Null when there is no language.
     static String[] languageAndRegion(String loc) {
         if (loc == null) {
             return null;
         }
-        int sep = loc.indexOf('_') >= 0 ? loc.indexOf('_') : loc.indexOf('-');
-        String lang = sep < 0 ? loc : loc.substring(0, sep);
+        // Split at every separator, not the first `_`: iOS writes
+        // `zh-Hans_CN`, whose language is `zh`, not `zh-Hans`.
+        String[] segs = segments(loc);
+        String lang = segs[0];
         if (lang.length() < 2) {
             return null;
         }
-        String region = sep > 0 && loc.length() >= sep + 3 ? asciiUpper(loc.substring(sep + 1, sep + 3)) : "";
+        String region = "";
+        for (int i = 1; i < segs.length; i++) {
+            // A script (`zh_Hans_CN`, `zh-Hans-CN`) sits where the region
+            // usually is; the region is the next segment.
+            if (segs[i].length() >= 2 && !isScript(segs[i])) {
+                region = asciiUpper(segs[i].substring(0, 2));
+                break;
+            }
+        }
         return new String[] {asciiLower(lang), region};
+    }
+
+    /// The script of a platform locale, title-cased (`Hans`): written out
+    /// in `zh_Hans_CN`, `zh-Hant-TW` or Android's `zh_CN_#Hans`; for
+    /// Chinese without one, the script its region implies (Traditional for
+    /// Taiwan, Hong Kong and Macau, Simplified otherwise), so a plain
+    /// `zh_TW` device picks `values-b+zh+Hant`. Null when unknown.
+    static String scriptOf(String loc) {
+        String[] lr = languageAndRegion(loc);
+        if (lr == null) {
+            return null;
+        }
+        String[] segs = segments(loc);
+        for (int i = 1; i < segs.length; i++) {
+            if (isScript(segs[i])) {
+                return asciiUpper(segs[i].substring(0, 1)) + asciiLower(segs[i].substring(1));
+            }
+        }
+        if (lr[0].equals("zh")) {
+            String r = lr[1];
+            return r.equals("TW") || r.equals("HK") || r.equals("MO") ? "Hant" : "Hans";
+        }
+        return null;
+    }
+
+    private static boolean isScript(String seg) {
+        if (seg.length() != 4) {
+            return false;
+        }
+        for (int i = 0; i < 4; i++) {
+            char c = seg.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// `loc` split at `_`, `-` and `#`.
+    private static String[] segments(String loc) {
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i <= loc.length(); i++) {
+            char c = i == loc.length() ? '_' : loc.charAt(i);
+            if (c == '_' || c == '-' || c == '#') {
+                out.add(loc.substring(start, i));
+                start = i + 1;
+            }
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    private static boolean sameScript(String a, String b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     static String asciiLower(String s) {

@@ -58,8 +58,60 @@ public final class Bundle implements Parcelable, Cloneable {
         return new Bundle(this);
     }
 
+    /// A copy that shares no mutable container with this bundle: nested
+    /// bundles are deep copied, lists and arrays are copied (a list's bundle
+    /// elements deep copied too). Other values -- strings, boxed numbers,
+    /// parcelables -- are shared, as on Android.
     public Bundle deepCopy() {
-        return new Bundle(this);
+        Bundle out = new Bundle();
+        for (Map.Entry<String, Object> e : map.entrySet()) {
+            out.map.put(e.getKey(), deepCopyValue(e.getValue()));
+        }
+        return out;
+    }
+
+    private static Object deepCopyValue(Object v) {
+        if (v instanceof Bundle) {
+            return ((Bundle) v).deepCopy();
+        }
+        if (v instanceof ArrayList) {
+            ArrayList<?> src = (ArrayList<?>) v;
+            ArrayList<Object> copy = new ArrayList<Object>(src.size());
+            for (int i = 0; i < src.size(); i++) {
+                copy.add(deepCopyValue(src.get(i)));
+            }
+            return copy;
+        }
+        // Array clone() keeps the runtime type (a String[] stays a String[])
+        // on every target; only Object.clone() of a non-array is unavailable.
+        if (v instanceof Object[]) {
+            return ((Object[]) v).clone();
+        }
+        if (v instanceof int[]) {
+            return ((int[]) v).clone();
+        }
+        if (v instanceof long[]) {
+            return ((long[]) v).clone();
+        }
+        if (v instanceof float[]) {
+            return ((float[]) v).clone();
+        }
+        if (v instanceof double[]) {
+            return ((double[]) v).clone();
+        }
+        if (v instanceof boolean[]) {
+            return ((boolean[]) v).clone();
+        }
+        if (v instanceof byte[]) {
+            return ((byte[]) v).clone();
+        }
+        if (v instanceof short[]) {
+            return ((short[]) v).clone();
+        }
+        if (v instanceof char[]) {
+            return ((char[]) v).clone();
+        }
+        return v;
     }
 
     public int size() {

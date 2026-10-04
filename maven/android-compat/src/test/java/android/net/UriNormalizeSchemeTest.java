@@ -20,26 +20,37 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.androidcompat.runtime;
+package android.net;
 
-/// The configuration of the running device, in the terms resource qualifiers
-/// are written in. Rebuilt whenever the Codename One display changes size,
-/// orientation, locale or dark mode.
-public final class DeviceConfig {
-    public String language = "en";
-    public String region = "US";
-    /// The locale's script (`Hans`, `Hant`), or null when it is unknown.
-    public String script;
-    public boolean rtl;
-    public int smallestWidthDp;
-    public int widthDp;
-    public int heightDp;
-    /// 1 portrait, 2 landscape.
-    public int orientation = 1;
-    /// 1 not night, 2 night.
-    public int night = 1;
-    public int densityDpi = 160;
-    public int sdkVersion = android.os.Build.VERSION.SDK_INT;
-    /// Bumped on every change so cached best-variant choices can be dropped.
-    public int generation;
+import com.codename1.androidcompat.testing.MainThreadRule;
+
+import org.junit.Rule;
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+
+/// `normalizeScheme()` lower-cases the scheme and nothing else; it used to
+/// return the URI unchanged.
+public class UriNormalizeSchemeTest {
+
+    @Rule
+    public final MainThreadRule mainThread = new MainThreadRule();
+
+    @Test
+    public void lowerCasesOnlyTheScheme() {
+        Uri u = Uri.parse("HTTP://Example.COM/Path?Q=V#Frag").normalizeScheme();
+        assertEquals("http", u.getScheme());
+        assertEquals("http://Example.COM/Path?Q=V#Frag", u.toString());
+        assertEquals("mailto:Someone@Example.com",
+                Uri.parse("MailTo:Someone@Example.com").normalizeScheme().toString());
+    }
+
+    @Test
+    public void returnsTheSameUriWhenNothingChanges() {
+        Uri lower = Uri.parse("http://example.com");
+        assertSame(lower, lower.normalizeScheme());
+        Uri relative = Uri.parse("Some/Path");
+        assertSame(relative, relative.normalizeScheme());
+    }
 }
