@@ -1,0 +1,169 @@
+[[java-in-the-browser]]
+== Java in the browser: The Playground compiler and the self-hosted translator
+
+The Codename One Playground runs the Java you type. In its browser build nothing leaves the page: a Java compiler running in the page compiles the source to class files, the ParparVM translator running in the same page turns those class files into JavaScript, and the running virtual machine loads the result and calls it. The compiler and the translator are ordinary Java programs, translated by ParparVM into the Playground's own JavaScript bundle.
+
+This chapter describes how those pieces fit together, what each one is responsible for, and how the build keeps them correct. It's aimed at contributors working on the compiler, the translator or the Playground, and at anyone who wants to know what Java the Playground accepts.
+
+=== The pipeline at a glance
+
+....
+ CodeEditor text
+      |  PlaygroundRunner.compile()
+      v
+ Java compiler (com.codename1.tools.javac)  <--  stub library: the API the page contains
+      |  class files
+      v
+ ParparVM translator, incremental mode (JavascriptIncremental)
+      |  JavaScript class definitions
+      v
+ __cn1LoadClasses()  -->  classes defined in the running VM  -->  entry point runs  -->  preview
+....
+
+Each run goes through every step. An edit triggers a run 300 milliseconds after typing stops; the console prints how long the compile, load and run phases took.
+
+[cols="1,2,3",options="header"]
+|===
+|Piece |Where |What it does
+|Compiler |`vm/JavaCompiler` (artifact `codenameone-javac`) |Compiles Java source to class files, with javac's diagnostics
+|Stub library |`playground-api.cn1stubs`, built by `BuildStubLibrary` |Tells the compiler which classes and members the page contains
+|Class-file reader |`vm/ByteCodeTranslator/.../translator/classfile` |Reads class files for the translator, in place of ASM
+|Incremental translator |`JavascriptIncremental` |Translates the user's classes against an already-running bundle
+|Open-world host bundle |`JavascriptOpenWorld`, `translator-opts.txt` |Keeps the API user code can call, under names user code can find
+|Loader |`__cn1LoadClasses` in `parparvm_runtime.js` |Defines the new classes in the running virtual machine
+|Runner |`PlaygroundRunner` |Wraps a script, finds its entry point and shows its result
+|===
+
+=== The compiler
+
+`com.codename1.tools.javac` compiles Java source to class files. Its input is the Java language of current Java releases: records, sealed types, `switch` expressions and pattern matching (including record patterns), text blocks, `var`, lambdas and method references, generics with inference, and the rest of the language a Codename One application uses. Its output is class files that the HotSpot verifier accepts, and its error messages use javac's wording and positions.
+
+Because it has to run inside ParparVM, it's built against ParparVM's class library (`vm/JavaAPI`) rather than the JDK. That rules out reflection, `java.util.regex`, `java.nio.file` and the JDK's own class-file tools, so the compiler writes class files itself and computes their `StackMapTable` from its own type information.
+
+The compiler is a classic pipeline:
+
+. `Lexer` and `JavaSourceParser` build a syntax tree. Malformed input always produces a diagnostic, never an exception, because the Playground compiles while the user is still typing.
+. `Enter` declares the classes and their members.
+. `Attr` resolves names, picks overloads, infers generic types and type-checks every expression.
+. `Flow` checks definite assignment, unreachable code and which local variables are effectively final.
+. `Gen` lowers the tree and writes bytecode; `FrameComputer` derives the stack-map frames from the finished code.
+
+Some constructs are lowered by the compiler itself rather than left to a run-time bootstrap method, because the translator doesn't implement those bootstraps: string concatenation becomes `StringBuilder` calls, records get explicit `toString`, `equals` and `hashCode` methods, and a pattern `switch` becomes a chain of `instanceof` tests. Lambdas and method references are emitted as `LambdaMetafactory` call sites, which the translator lowers.
+
+==== What the compiler doesn't do
+
+* No annotation processing and no modules. Annotations are parsed and dropped.
+* No `native` methods. A `native` declaration is a compile error. Codename One reaches platform code through native interfaces (see <<_native_interfaces>>), and neither the browser nor the simulator has a library to bind a Java `native` method to.
+* No API beyond what the page contains. User code compiles against the stub library described below, so a call to a JDK class or method that ParparVM's class library lacks is a compile error rather than a failure at run time. One case compiles and still fails: ParparVM's `java.util.regex.Pattern` exists so code that names it compiles, but its methods throw when called in the browser.
+
+=== Script mode
+
+The Playground accepts more than complete classes. A script can mix import statements, statements, methods and classes at the top level, the way a notebook cell does. The compiler's script mode (`JavaCompiler.addScript` with a `ScriptSpec`) wraps such a script into one class:
+
+* top-level classes, interfaces, enums and records stay top-level types;
+* top-level methods become methods of a generated `PlaygroundScript` class;
+* top-level statements become the body of its `run(PlaygroundContext ctx)` method, which returns the value of a trailing expression and the script's top-level local variables.
+
+`PlaygroundRunner` then looks for the entry point, in this order: a `build` method, the lifecycle methods `init` and `start`, and finally a top-level class that declares `start` or `build`. A `build` or `start` method qualifies only when it returns `void`, `Object` or a `Component`. When the entry point isn't the script class itself, the runner compiles a small `PlaygroundLauncher` class that calls it.
+
+Two more adjustments make ordinary application code work unchanged:
+
+* Every unit sees a set of default imports, among them `com.codename1.ui.*`, `com.codename1.ui.layouts.*`, `com.codename1.components.*` and `java.util.*`. The user's own imports take precedence.
+* Calls to `Form.show()` and `Form.showBack()` are compiled as calls to `PlaygroundContext`, which places the form in the preview instead of replacing the Playground's own user interface. This also applies to a form shown later, for example from a button's action listener.
+
+The run's result is the first of these that exists: the component the script returned, a form it showed, the first form it created, or the first component it created.
+
+=== The stub library
+
+The compiler needs the class files of every class user code can reference, but the page can't afford to download the full class files of the framework. A stub library is the compact form: the same classes with their method bodies, private members, synthetic members, annotations and debug information removed. What remains is what compilation needs: access flags, superclasses and interfaces, generic signatures, constants, member signatures, thrown exceptions and inner-class information.
+
+`BuildStubLibrary`, a build-time tool in `vm/JavaCompiler/tools-src`, packs the stubs into one file. The Playground's build generates `playground-api.cn1stubs` from ParparVM's class library, the Codename One core and the Playground's own helper classes, in that order, so user code compiles against exactly the API the browser's virtual machine contains. The same file feeds the editor's code completion.
+
+=== The translator, inside the page
+
+The translator that builds every Codename One iOS, desktop and JavaScript application also runs inside the Playground page. That requires the translator itself to be translatable by ParparVM, which places the same constraint on it as on the compiler: it compiles against ParparVM's class library alone. Three parts of the translator exist because of that constraint:
+
+* *Its own class-file reader.* The `classfile` package is a rewrite of the parts of the ASM bytecode framework the translator uses, keeping ASM's API and design. ASM's copyright and BSD license notice is retained in each of its files and reproduced in the repository's `NOTICE` file.
+* *Its own regular-expression engine*, used by the JavaScript backend's peephole passes, because `java.util.regex` isn't available.
+* *Its own SHA-256*, used to hash inline scripts for the content security policy.
+
+Running in the page, the translator works in *incremental* mode (`JavascriptIncremental.translate`). It reads the user's class files, reads from the stub library every class they reference (and their superclasses and interfaces), links the hierarchy, and emits JavaScript definitions for the user's classes only. Every user method is emitted as a generator, so user code can block cooperatively wherever it calls into the framework. Calls into the host bundle go through `_GW`, which looks up the host function by name when it's called.
+
+==== Loading the result
+
+`__cn1LoadClasses(source, classNames)` in `parparvm_runtime.js` defines the translated classes in the running virtual machine:
+
+. It refuses a class whose JavaScript name belongs to a class of the running application. The translator maps both `/` and `$` to `_`, so a user class can collide with a framework class whose name only differs in those characters; the check runs before the code is evaluated, because evaluation would replace the host's functions.
+. In the page's worker it evaluates the code with `importScripts` on a `blob:` URL, which is why the Playground's content security policy allows `blob:` scripts.
+. A later run redefines classes it loaded before, so editing a class and running again replaces its old definition without restarting the worker.
+
+The runner then creates the entry class and calls it.
+
+=== The open-world host bundle
+
+An ordinary Codename One JavaScript bundle is a *closed world*: the translator removes every class and method the application doesn't reach, renames identifiers to shorter ones, and calls a method directly when only one implementation exists. The Playground's bundle can't be built that way, because code that arrives after the bundle was built has to find the framework still there, under names it can predict, with dispatch that a new subclass can join.
+
+The system property `parparvm.js.openWorld` names the packages to keep open, as a comma-separated list of prefixes where a leading `!` excludes one. The Playground sets it in `scripts/cn1playground/javascript/translator-opts.txt`:
+
+....
+-Dparparvm.js.openWorld=java/,com/codename1/,com/codenameone/playground/,org/teavm/,!com/codename1/tools/,!com/codename1/impl/
+....
+
+For the classes it keeps, the translator:
+
+* keeps every class and method, instead of removing what the bundle itself doesn't call;
+* keeps their function names, so a user class can call them by name;
+* emits every field and dispatch identifier;
+* treats an abstract method that nothing in the bundle implements as one that may block, because the implementation that arrives later is always a generator.
+
+Across the whole bundle, it also stops replacing a virtual call with a direct call when only one implementation exists, since a user class can add another.
+
+The compiler and translator classes (`com/codename1/tools/`) and the platform implementation (`com/codename1/impl/`) stay closed: the bundle needs them, but user code never calls them, so they're reduced and renamed like ordinary application code.
+
+=== The simulator path
+
+In the simulator and the desktop build there's no translator step. The same compiler produces the same class files against the same stub library, and `PlaygroundClassDefiner` defines them in a fresh class loader for each run. On other platforms the Playground can't run compiled code and says so.
+
+=== How the build keeps it correct
+
+Every piece has a gate that compares it against an independent implementation, so a defect shows up as a difference rather than depending on a test anticipating it.
+
+[cols="2,3",options="header"]
+|===
+|Gate |What it requires
+|`JavaCompilerConformanceTest` |Each program in `vm/JavaCompiler/tests/corpus` compiled by javac 21 and by this compiler prints the same output under `-Xverify:all`; each case in `tests/negative` reports javac's diagnostic on javac's line; no prefix of a program makes the compiler throw or hang
+|`TranslatorBuiltByJavaCompilerTest` |The translator compiled by this compiler emits byte-identical JavaScript to the translator compiled by javac
+|`ClassReaderConformanceTest` |The `classfile` reader produces the same visitor events as ASM, and its subroutine inliner places code as ASM's does
+|`TranslatorRegexTest` |The translator's regular-expression engine agrees with `java.util.regex` on every operation the backend uses
+|`verify-selfhost.sh`, gates D, A and J |The translator built by ParparVM is deterministic and emits byte-identical C and JavaScript to the translator running on the JVM
+|`verify-selfhost-js.sh`, gates C and S |The translator translated to JavaScript and run under Node emits byte-identical C and JavaScript to the translator running on the JVM
+|Playground harnesses |Every bundled sample compiles and runs on the JVM, and in a real headless browser the samples, compile errors, re-runs, listener exceptions and form navigation all behave
+|===
+
+To run the compiler's conformance suite, which needs a JDK 21 for the reference compiler:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/java-in-the-browser.sh[tag=java-in-the-browser-bash-001,indent=0]
+----
+
+To build the self-hosted translator and run the self-hosting gates:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/java-in-the-browser.sh[tag=java-in-the-browser-bash-002,indent=0]
+----
+
+To run the Playground's suites on the JVM and in a headless browser, which builds the open-world bundle and serves it locally:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/java-in-the-browser.sh[tag=java-in-the-browser-bash-003,indent=0]
+----
+
+=== Where to read more
+
+* `vm/JavaCompiler/README.md` covers the compiler's layout and use as a library.
+* `vm/selfhost/README.md` covers self-hosting the translator, on the native targets and on JavaScript.
+* `scripts/cn1playground/README.md` covers building and running the Playground.
+* `vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/README.md` covers the class-file reader and its relation to ASM.

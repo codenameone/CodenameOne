@@ -106,8 +106,10 @@ throw exactly as before, so ordinary JavaScript applications are unaffected.
 Three things made the translator translatable at all, and stay load-bearing:
 
 - **It reads class files with its own `classfile` package**, not ASM. That
-  package mirrors the visitor API the translator was written against, including
-  the subroutine inliner (`tree/JsrInliner`): the Codename One core was compiled
+  package is a rewrite of the parts of ASM the translator uses, keeping ASM's
+  visitor API and design and retaining ASM's BSD license notice in every file
+  (see its `README.md` and the repository `NOTICE`), including the subroutine
+  inliner (`tree/JsrInliner`): the Codename One core was compiled
   for a target old enough to use `JSR`/`RET` for `finally`, and the translator's
   output for those methods is built from the inlined layout, so it must not drift.
   `ClassReaderConformanceTest` holds it to ASM, which survives only as that test's

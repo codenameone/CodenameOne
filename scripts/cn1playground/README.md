@@ -117,6 +117,8 @@ Changes made in the property editor are immediately reflected in the preview. Th
 
 ## How It Works
 
+The developer guide's "Java in the browser" chapter (`docs/developer-guide/Java-In-The-Browser.asciidoc`) describes the whole pipeline -- compiler, stub library, in-page translator, open-world bundle and loader -- and the gates that keep each part correct. In short:
+
 1. `PlaygroundRunner` compiles the editor's text with `com.codename1.tools.javac.JavaCompiler` in script mode: top-level statements become the body of an entry method, top-level methods and classes become members and nested classes, and the script's trailing value is returned. A class-shaped entry (lifecycle or `build`) gets a small generated launcher.
 2. The compiler reads the API from `playground-api.cn1stubs`, a stub library the `common` build generates (`BuildStubLibrary`) from the framework jar and ParparVM's Java class library: signatures, generic signatures and constants, no code.
 3. The class files are loaded:
