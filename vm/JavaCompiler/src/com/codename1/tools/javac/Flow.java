@@ -208,9 +208,24 @@ final class Flow {
 
     // ------------------------------------------------------------------ sets
 
+    /*
+     * Each variable has two bits in the state: index i is "definitely assigned" and i + 1 is
+     * "definitely unassigned" (JLS 16). Both meet by intersection where paths join and are
+     * universal on a dead path, so every merge below handles them alike; only loops differ,
+     * where an assignment in the body reaches the loop head again (see loopAssignments).
+     */
+
     private void declare(VarSymbol v) {
         if (v != null && !index.containsKey(v)) {
-            index.put(v, Integer.valueOf(nextIndex++));
+            int i = nextIndex;
+            nextIndex += 2;
+            index.put(v, Integer.valueOf(i));
+            if (inits != null) {
+                inits.set(i + 1);
+            }
+            if (v.kind == VarSymbol.Kind.LOCAL) {
+                v.flowChecked = true;
+            }
         }
     }
 
@@ -218,7 +233,50 @@ final class Flow {
         Integer i = v == null ? null : index.get(v);
         if (i != null && inits != null) {
             inits.set(i.intValue());
+            inits.clear(i.intValue() + 1);
         }
+    }
+
+    /** An assignment to v here: unless v is definitely unassigned, v is not effectively final. */
+    private void assignedHere(VarSymbol v) {
+        Integer i = v == null ? null : index.get(v);
+        if (i != null && alive && inits != null && !inits.get(i.intValue() + 1)) {
+            v.notEffectivelyFinal = true;
+        }
+    }
+
+    /**
+     * After a loop: a variable definitely unassigned on entry that the body (back edge state
+     * {@code back}, null when the body never loops back) may assign is assigned while it may
+     * already hold a value on the next iteration, and is no longer definitely unassigned after
+     * the loop.
+     */
+    private void loopAssignments(BitSet entry, BitSet back) {
+        if (entry == null || back == null) {
+            return;
+        }
+        for (Map.Entry<VarSymbol, Integer> e : index.entrySet()) {
+            int du = e.getValue().intValue() + 1;
+            if (entry.get(du) && !back.get(du)) {
+                e.getKey().notEffectivelyFinal = true;
+                if (inits != null) {
+                    inits.clear(du);
+                }
+            }
+        }
+    }
+
+    /** The state flowing back to a loop's head: the end of the body met with its continues. */
+    private BitSet backEdge(Tree loop) {
+        boolean[] any = new boolean[1];
+        BitSet conts = takeExits(loop, true, any);
+        if (alive && any[0]) {
+            return meet(inits, conts);
+        }
+        if (alive) {
+            return copy(inits);
+        }
+        return any[0] ? copy(conts) : null;
     }
 
     private static BitSet copy(BitSet b) {
@@ -390,21 +448,24 @@ final class Flow {
             }
         } else if (t instanceof Tree.WhileLoop) {
             Tree.WhileLoop w = (Tree.WhileLoop) t;
+            BitSet entry = alive ? copy(inits) : null;
             scanCond(w.cond);
             BitSet f = whenFalse;
             inits = whenTrue;
             pushTarget(w, null);
             scanStat(w.body);
             popTarget();
+            BitSet back = backEdge(w);
             boolean[] any = new boolean[1];
-            takeExits(w, true, any);
             BitSet breaks = takeExits(w, false, any);
             boolean hasBreak = any[0];
             inits = f;
             alive = !Attr.isTrue(w.cond);
             join(breaks, hasBreak);
+            loopAssignments(entry, back);
         } else if (t instanceof Tree.DoLoop) {
             Tree.DoLoop d = (Tree.DoLoop) t;
+            BitSet entry = alive ? copy(inits) : null;
             pushTarget(d, null);
             scanStat(d.body);
             popTarget();
@@ -413,17 +474,21 @@ final class Flow {
             join(conts, any[0]);
             BitSet breaks = takeExits(d, false, any);
             boolean hasBreak = any[0];
+            BitSet back = null;
             if (alive) {
                 scanCond(d.cond);
+                back = copy(whenTrue);
                 inits = whenFalse;
                 alive = !Attr.isTrue(d.cond);
             }
             join(breaks, hasBreak);
+            loopAssignments(entry, back);
         } else if (t instanceof Tree.ForLoop) {
             Tree.ForLoop f = (Tree.ForLoop) t;
             for (Tree i : f.init) {
                 scanStat(i);
             }
+            BitSet entry = alive ? copy(inits) : null;
             BitSet falseInits;
             if (f.cond != null) {
                 scanCond(f.cond);
@@ -443,27 +508,31 @@ final class Flow {
                     scanStat(s);
                 }
             }
+            BitSet back = alive ? copy(inits) : null;
             BitSet breaks = takeExits(f, false, any);
             boolean hasBreak = any[0];
             inits = falseInits;
             alive = f.cond != null && !Attr.isTrue(f.cond);
             join(breaks, hasBreak);
+            loopAssignments(entry, back);
         } else if (t instanceof Tree.ForEach) {
             Tree.ForEach f = (Tree.ForEach) t;
             scanExpr(f.expr);
             BitSet before = copy(inits);
+            BitSet entry = alive ? copy(inits) : null;
             declare(f.var.sym);
             assign(f.var.sym);
             pushTarget(f, null);
             scanStat(f.body);
             popTarget();
+            BitSet back = backEdge(f);
             boolean[] any = new boolean[1];
-            takeExits(f, true, any);
             BitSet breaks = takeExits(f, false, any);
             boolean hasBreak = any[0];
             inits = before;
             alive = true;
             join(breaks, hasBreak);
+            loopAssignments(entry, back);
         } else if (t instanceof Tree.Labeled) {
             Tree.Labeled l = (Tree.Labeled) t;
             pushTarget(l, l.label);
@@ -536,8 +605,11 @@ final class Flow {
         scanStat(t.body);
         BitSet after = inits;
         boolean afterAlive = alive;
+        // A catch or finally can start anywhere in the try block, so a variable the block
+        // may assign is not definitely unassigned there (JLS 16.2.15).
+        BitSet handlerEntry = withoutUnassigned(before, assignedIn(t.body));
         for (Tree.Catch c : t.catches) {
-            inits = copy(before);
+            inits = copy(handlerEntry);
             alive = beforeAlive;
             declare(c.param.sym);
             assign(c.param.sym);
@@ -551,7 +623,11 @@ final class Flow {
             afterAlive = alive;
         }
         if (t.finalizer != null) {
-            inits = copy(before);
+            List<VarSymbol> assigned = assignedIn(t.body);
+            for (Tree.Catch c : t.catches) {
+                assigned.addAll(assignedIn(c.body));
+            }
+            inits = withoutUnassigned(before, assigned);
             alive = beforeAlive;
             scanStat(t.finalizer);
             BitSet fin = inits;
@@ -563,7 +639,15 @@ final class Flow {
             inits = after;
             alive = afterAlive;
             if (inits != null && fin != null) {
+                // Assigned after the statement if assigned by either part; unassigned only if
+                // unassigned by both.
+                BitSet du = copy(inits);
+                du.and(fin);
                 inits.or(fin);
+                for (Integer i : index.values()) {
+                    int u = i.intValue() + 1;
+                    inits.set(u, du.get(u));
+                }
             }
         } else {
             inits = after;
@@ -715,6 +799,47 @@ final class Flow {
      * or a blank final field being initialized, named as {@code x} or {@code this.x}
      * (JLS 16: only those two forms count).
      */
+    /** The variables of this method that a statement assigns anywhere inside it. */
+    private List<VarSymbol> assignedIn(Tree stat) {
+        final List<VarSymbol> out = new ArrayList<VarSymbol>();
+        new TreeScanner() {
+            @Override
+            void scan(Tree t) {
+                Tree lhs = t instanceof Tree.Assign ? ((Tree.Assign) t).lhs
+                        : t instanceof Tree.CompoundAssign ? ((Tree.CompoundAssign) t).lhs
+                        : t instanceof Tree.Unary && (((Tree.Unary) t).op == Token.Kind.PLUSPLUS
+                                || ((Tree.Unary) t).op == Token.Kind.SUBSUB) ? ((Tree.Unary) t).arg : null;
+                VarSymbol v = lhs == null ? null : localOf(lhs);
+                if (v != null) {
+                    out.add(v);
+                }
+                super.scan(t);
+            }
+        }.scan(stat);
+        return out;
+    }
+
+    /** A copy of state in which none of vars is definitely unassigned. */
+    private BitSet withoutUnassigned(BitSet state, List<VarSymbol> vars) {
+        BitSet r = copy(state);
+        if (r != null) {
+            for (VarSymbol v : vars) {
+                Integer i = index.get(v);
+                if (i != null) {
+                    r.clear(i.intValue() + 1);
+                }
+            }
+        }
+        return r;
+    }
+
+    private void markNotEffectivelyFinal(Tree lhs) {
+        VarSymbol v = localOf(lhs);
+        if (v != null) {
+            v.notEffectivelyFinal = true;
+        }
+    }
+
     private VarSymbol localOf(Tree t) {
         while (t instanceof Tree.Parens) {
             t = ((Tree.Parens) t).expr;
@@ -766,6 +891,7 @@ final class Flow {
             }
             scanExpr(a.rhs);
             if (v != null) {
+                assignedHere(v);
                 if (v.isFinal() && !v.hasInitializer && alive && inits != null) {
                     Integer i = index.get(v);
                     if (i != null && inits.get(i.intValue())) {
@@ -775,6 +901,7 @@ final class Flow {
                 assign(v);
             }
         } else if (t instanceof Tree.CompoundAssign) {
+            markNotEffectivelyFinal(((Tree.CompoundAssign) t).lhs);
             scanExpr(((Tree.CompoundAssign) t).lhs);
             scanExpr(((Tree.CompoundAssign) t).rhs);
         } else if (t instanceof Tree.Binary && (((Tree.Binary) t).op == Token.Kind.AMPAMP || ((Tree.Binary) t).op == Token.Kind.BARBAR)
@@ -852,6 +979,10 @@ final class Flow {
         } else if (t instanceof Tree.Parens) {
             scanExpr(((Tree.Parens) t).expr);
         } else if (t instanceof Tree.Unary) {
+            Token.Kind op = ((Tree.Unary) t).op;
+            if (op == Token.Kind.PLUSPLUS || op == Token.Kind.SUBSUB) {
+                markNotEffectivelyFinal(((Tree.Unary) t).arg);
+            }
             scanExpr(((Tree.Unary) t).arg);
         } else if (t instanceof Tree.Binary) {
             scanExpr(((Tree.Binary) t).lhs);

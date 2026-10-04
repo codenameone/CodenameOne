@@ -16,6 +16,13 @@ That use sets its constraints:
   `toString`/`equals`/`hashCode`, pattern switch) is lowered by the compiler itself.
 - **Fast and robust on partial input.** The Playground compiles while the user types,
   so malformed source is always a diagnostic, never an exception.
+- **No `native` methods.** A `native` declaration is an error (javac accepts it):
+  the code this compiles runs in a live ParparVM or the simulator, neither of which
+  can bind one, and Codename One reaches platform code through `NativeInterface`.
+
+How the compiler fits into the Playground -- the stub library, the translator
+running in the page and the loader -- is described in the developer guide's
+"Java in the browser" chapter (`../../docs/developer-guide/Java-In-The-Browser.asciidoc`).
 
 ## Layout
 

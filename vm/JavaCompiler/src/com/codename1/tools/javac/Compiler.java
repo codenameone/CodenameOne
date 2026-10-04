@@ -153,13 +153,16 @@ final class Compiler {
                     attr.attribClass(c);
                 }
             }
-            checkCaptures();
+            // Flow first: it decides which locals declared without an initializer are
+            // effectively final (assigned only while definitely unassigned), which the
+            // capture check reads.
             if (log.errorCount == 0) {
                 Flow flow = new Flow(this);
                 for (int i = 0; i < enter.sourceClasses.size(); i++) {
                     flow.checkClass(enter.sourceClasses.get(i));
                 }
             }
+            checkCaptures();
         } catch (CompileError e) {
             error(null, 0, e.getMessage());
         }

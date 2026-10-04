@@ -37,7 +37,9 @@ final class MethodSymbol extends Symbol {
     Tree.MethodDecl decl;
     /** The erased JVM descriptor; computed lazily for library methods from their class file. */
     String descriptor;
-    /** Default value present (annotation element). */
+    /** For a constructor that starts with this(...): the constructor it delegates to, and where. */
+    MethodSymbol thisCall;
+    int thisCallPos;
     /** For a constructor without an explicit this()/super() call: the superclass constructor it calls. */
     MethodSymbol superCtor;
     /**

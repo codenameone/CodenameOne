@@ -60,6 +60,8 @@ final class Env {
     boolean methodBoundary;
     /** Exception types a try statement's catch clauses handle, for the body's env. */
     java.util.List<Type> caught;
+    /** The checked exceptions this try statement's catch clauses catch, as thrown (for precise rethrow). */
+    java.util.List<Type> caughtThrown;
     /** Inside a loop or switch: break (and for loops, continue) is legal. */
     boolean breakable;
     boolean continuable;

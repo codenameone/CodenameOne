@@ -57,6 +57,8 @@ final class Gen {
     private Set<String> emittedMethods;
     private final Map<Tree.Lambda, String> lambdaNames = new IdentityHashMap<Tree.Lambda, String>();
     private List<Tree.Lambda> pendingLambdas;
+    /** Whether the class being generated contains an {@code assert} (outside its nested classes). */
+    private boolean usesAssert;
 
     // ---- per method
     private Code code;
@@ -94,6 +96,7 @@ final class Gen {
         methodInfos = new ArrayList<ByteBuf>();
         emittedMethods = new LinkedHashSet<String>();
         pendingLambdas = new ArrayList<Tree.Lambda>();
+        usesAssert = containsAssert(c.decl);
         try {
             genFields(c);
             for (MethodSymbol m : new ArrayList<MethodSymbol>(c.methods)) {
@@ -367,6 +370,12 @@ final class Gen {
         }
         for (VarSymbol v : c.capturedVars) {
             syntheticField("val$" + v.name, desc(erased(v.type)), Symbol.ACC_PRIVATE | Symbol.ACC_FINAL | Symbol.ACC_SYNTHETIC);
+        }
+        if (usesAssert) {
+            // javac's layout: a class with an assert caches whether assertions are enabled for it.
+            // An interface field must be public; elsewhere it is package access, as javac emits it.
+            syntheticField(ASSERTIONS_DISABLED, "Z", Symbol.ACC_STATIC | Symbol.ACC_FINAL | Symbol.ACC_SYNTHETIC
+                    | (c.isInterface() ? Symbol.ACC_PUBLIC : 0));
         }
         if (c.isEnum() && !c.anonymous) {
             syntheticField("$VALUES", "[L" + c.internalName + ";", Symbol.ACC_PRIVATE | Symbol.ACC_STATIC | Symbol.ACC_FINAL | Symbol.ACC_SYNTHETIC);
@@ -749,7 +758,7 @@ final class Gen {
     // ------------------------------------------------------------------ static initializer
 
     private void genClassInit(ClassSymbol c) {
-        boolean needed = c.isEnum() && !c.anonymous;
+        boolean needed = c.isEnum() && !c.anonymous || usesAssert;
         for (Tree member : c.decl.members) {
             if (member instanceof Tree.VarDef) {
                 Tree.VarDef v = (Tree.VarDef) member;
@@ -766,6 +775,20 @@ final class Gen {
         MethodSymbol clinit = new MethodSymbol("<clinit>", Symbol.ACC_STATIC, c);
         clinit.returnType = Type.VOID;
         beginMethod(clinit, true);
+        if (usesAssert) {
+            // $assertionsDisabled = !Outermost.class.desiredAssertionStatus(), first, so a static
+            // initializer that asserts already sees it. The outermost class is asked, as javac
+            // does, so -ea:pkg.Outer enables the asserts of its nested classes too.
+            ClassSymbol top = c;
+            while (top.outer != null) {
+                top = top.outer;
+            }
+            code.ldc(pool.cls(top.internalName));
+            code.op2(Code.INVOKEVIRTUAL, pool.method("java/lang/Class", "desiredAssertionStatus", "()Z", false));
+            code.iconst(1);
+            code.op(Code.IXOR);
+            code.op2(Code.PUTSTATIC, pool.field(c.internalName, ASSERTIONS_DISABLED, "Z"));
+        }
         int ordinal = 0;
         List<VarSymbol> constants = new ArrayList<VarSymbol>();
         boolean valuesDone = !(c.isEnum() && !c.anonymous);
@@ -1458,11 +1481,69 @@ final class Gen {
             genTry((Tree.Try) t);
         } else if (t instanceof Tree.Synchronized) {
             genSynchronized((Tree.Synchronized) t);
-        } else if (t instanceof Tree.Assert || t instanceof Tree.Empty || t instanceof Tree.ClassDecl) {
-            // Assertions are disabled (the JVM default); local classes are generated on their own.
+        } else if (t instanceof Tree.Assert) {
+            genAssert((Tree.Assert) t);
+        } else if (t instanceof Tree.Empty || t instanceof Tree.ClassDecl) {
+            // Local classes are generated on their own.
         } else {
             genEffect(t);
         }
+    }
+
+    private static final String ASSERTIONS_DISABLED = "$assertionsDisabled";
+
+    /**
+     * {@code if (!$assertionsDisabled && !cond) throw new AssertionError(detail);} -- the check is
+     * emitted whatever the target does with it: whether assertions run is decided when the class
+     * is loaded ({@code -ea} on the JVM), not when it is compiled.
+     */
+    private void genAssert(Tree.Assert a) {
+        Code.Label end = new Code.Label();
+        code.op2(Code.GETSTATIC, pool.field(cls.internalName, ASSERTIONS_DISABLED, "Z"));
+        code.jump(Code.IFNE, end);
+        genCond(a.cond, end, true);
+        code.op2(Code.NEW, pool.cls("java/lang/AssertionError"));
+        code.op(Code.DUP);
+        String ctor = "()V";
+        if (a.detail != null) {
+            Type t = genExpr(a.detail);
+            switch (t.tag) {
+                case BOOLEAN: ctor = "(Z)V"; break;
+                case CHAR: ctor = "(C)V"; break;
+                case BYTE: case SHORT: case INT: ctor = "(I)V"; break;
+                case LONG: ctor = "(J)V"; break;
+                case FLOAT: ctor = "(F)V"; break;
+                case DOUBLE: ctor = "(D)V"; break;
+                default: ctor = "(Ljava/lang/Object;)V"; break;
+            }
+        }
+        code.op2(Code.INVOKESPECIAL, pool.method("java/lang/AssertionError", "<init>", ctor, false));
+        code.op(Code.ATHROW);
+        code.place(end);
+    }
+
+    /** Whether {@code decl} has an {@code assert} of its own: nested and anonymous classes are separate classes. */
+    private static boolean containsAssert(final Tree.ClassDecl decl) {
+        final boolean[] found = new boolean[1];
+        new TreeScanner() {
+            @Override
+            void scan(Tree t) {
+                if (found[0] || t == null) {
+                    return;
+                }
+                if (t instanceof Tree.Assert) {
+                    found[0] = true;
+                } else if (t instanceof Tree.ClassDecl && t != decl) {
+                    return;
+                } else if (t instanceof Tree.NewClass) {
+                    scan(((Tree.NewClass) t).outer);
+                    scan(((Tree.NewClass) t).args);
+                    return;
+                }
+                super.scan(t);
+            }
+        }.scan(decl);
+        return found[0];
     }
 
     /** Evaluates an expression for its side effects only. */

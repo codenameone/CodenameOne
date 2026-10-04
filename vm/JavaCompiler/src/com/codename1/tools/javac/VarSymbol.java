@@ -39,6 +39,14 @@ final class VarSymbol extends Symbol {
     Tree.VarDef decl;
     /** 0 = not computed, 1 = computing (cycle guard), 2 = done. */
     int constState;
+    /**
+     * For a catch parameter: the checked exceptions a rethrow of it throws (JLS 11.2.2) -- the
+     * ones the try block throws that this clause, and no earlier one, catches -- and the
+     * rethrows waiting for the catch body to finish, when it is known whether the parameter
+     * is effectively final.
+     */
+    java.util.List<Type> preciseThrown;
+    java.util.List<Object[]> pendingRethrows;
 
     VarSymbol(String name, int flags, Type type, Kind kind) {
         super(name, flags);
@@ -46,8 +54,24 @@ final class VarSymbol extends Symbol {
         this.kind = kind;
     }
 
+    /**
+     * For a local declared without an initializer, set by {@link Flow}: whether it is ever
+     * assigned when it might already hold a value (JLS 4.12.4 -- not definitely unassigned
+     * before the assignment), or by a compound assignment or increment. {@code flowChecked}
+     * says the analysis ran; until it has, the assignment count is all there is to go on.
+     */
+    boolean flowChecked;
+    boolean notEffectivelyFinal;
+
     boolean isEffectivelyFinal() {
-        return isFinal() || assignCount == 0 || assignCount == 1 && !hasInitializer && kind == Kind.LOCAL;
+        if (isFinal()) {
+            return true;
+        }
+        if (kind == Kind.LOCAL && !hasInitializer && flowChecked) {
+            // int i; if (b) i = 1; else i = 2; -- two assignments, each on its own path.
+            return !notEffectivelyFinal;
+        }
+        return assignCount == 0 || assignCount == 1 && !hasInitializer && kind == Kind.LOCAL;
     }
 
     @Override

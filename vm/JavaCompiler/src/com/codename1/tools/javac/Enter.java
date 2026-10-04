@@ -297,9 +297,23 @@ final class Enter {
             }
             if (m.body == null && (flags & Symbol.ACC_ABSTRACT) == 0) {
                 compiler.error(c.unit, m.pos, "missing method body, or declare abstract");
+            } else if (m.body != null && (flags & Symbol.ACC_ABSTRACT) != 0) {
+                compiler.error(c.unit, m.pos, "interface abstract methods cannot have body");
             }
-        } else if (m.body == null && (flags & (Symbol.ACC_ABSTRACT | Symbol.ACC_NATIVE)) == 0) {
+        } else if ((flags & Symbol.ACC_NATIVE) != 0) {
+            // A deliberate departure from javac. The code this compiles runs
+            // inside a running ParparVM (the Playground) or is defined into the
+            // simulator's JVM, and neither can bind a native method to an
+            // implementation: there is no library to load it from. Codename One
+            // reaches platform code through NativeInterface, never through Java
+            // `native` methods, so the declaration is refused outright -- with
+            // or without a body -- instead of producing a class that fails with
+            // UnsatisfiedLinkError (or ClassFormatError, for a body) at run time.
+            compiler.error(c.unit, m.pos, "native methods are not supported");
+        } else if (m.body == null && (flags & Symbol.ACC_ABSTRACT) == 0) {
             compiler.error(c.unit, m.pos, "missing method body, or declare abstract");
+        } else if (m.body != null && (flags & Symbol.ACC_ABSTRACT) != 0) {
+            compiler.error(c.unit, m.pos, "abstract methods cannot have a body");
         }
         if (m.varargs) {
             flags |= Symbol.ACC_VARARGS;

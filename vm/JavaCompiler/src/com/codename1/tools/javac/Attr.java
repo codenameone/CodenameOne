@@ -663,6 +663,8 @@ final class Attr {
             }
         }
         checkOverrides(c, cenv);
+        checkInheritedDefaults(c, cenv);
+        checkCyclicConstructors(c, cenv);
         if (!c.isInterface() && !c.isAbstract() && !(c.isEnum() && !c.isFinal())) {
             checkAbstractImplemented(c, cenv);
         }
@@ -757,6 +759,124 @@ final class Attr {
             }
         }
         return null;
+    }
+
+    /**
+     * JLS 8.4.8.4 and 9.4.1.3: a type that inherits a default method together with another
+     * method of the same signature from an unrelated interface must override it -- a class
+     * method (declared here or inherited from a superclass) wins, and so does the more specific
+     * of two related interfaces. Left alone, the JVM refuses the call at run time with
+     * IncompatibleClassChangeError (two defaults) or AbstractMethodError.
+     */
+    private void checkInheritedDefaults(ClassSymbol c, Env cenv) {
+        List<ClassSymbol> supers = new ArrayList<ClassSymbol>();
+        collectSupertypes(c, supers, new LinkedHashSet<ClassSymbol>());
+        Set<String> classProvided = new java.util.HashSet<String>();
+        for (MethodSymbol m : c.methods()) {
+            classProvided.add(erasedSignature(m));
+        }
+        for (ClassSymbol s : supers) {
+            if (!s.isInterface()) {
+                for (MethodSymbol m : s.methods()) {
+                    if (!m.isPrivate() && !m.isStatic()) {
+                        classProvided.add(erasedSignature(m));
+                    }
+                }
+            }
+        }
+        java.util.Map<String, List<MethodSymbol>> bySignature = new java.util.LinkedHashMap<String, List<MethodSymbol>>();
+        for (ClassSymbol s : supers) {
+            if (!s.isInterface()) {
+                continue;
+            }
+            for (MethodSymbol m : s.methods()) {
+                if (m.isStatic() || m.isPrivate() || m.isConstructor()) {
+                    continue;
+                }
+                String key = erasedSignature(m);
+                if (classProvided.contains(key)) {
+                    continue;
+                }
+                List<MethodSymbol> list = bySignature.get(key);
+                if (list == null) {
+                    list = new ArrayList<MethodSymbol>();
+                    bySignature.put(key, list);
+                }
+                list.add(m);
+            }
+        }
+        for (List<MethodSymbol> inherited : bySignature.values()) {
+            // Drop every method overridden by another candidate's more specific interface.
+            List<MethodSymbol> live = new ArrayList<MethodSymbol>();
+            for (MethodSymbol m : inherited) {
+                boolean overridden = false;
+                for (MethodSymbol o : inherited) {
+                    if (o.owner != m.owner && types.isSubClass(o.owner, m.owner)) {
+                        overridden = true;
+                    }
+                }
+                if (!overridden) {
+                    live.add(m);
+                }
+            }
+            MethodSymbol firstDefault = null;
+            for (MethodSymbol m : live) {
+                if (!m.isAbstract()) {
+                    firstDefault = m;
+                    break;
+                }
+            }
+            if (firstDefault == null || live.size() < 2) {
+                continue;
+            }
+            MethodSymbol a = live.get(0);
+            MethodSymbol b = live.get(1);
+            boolean bothDefault = !a.isAbstract() && !b.isAbstract();
+            error(cenv, c.decl.pos, "types " + a.owner.simpleName + " and " + b.owner.simpleName
+                    + " are incompatible;\n  " + (c.isInterface() ? "interface " : "class ") + c.simpleName
+                    + " inherits " + (bothDefault ? "unrelated defaults" : "abstract and default")
+                    + " for " + firstDefault + " from types " + a.owner.simpleName + " and " + b.owner.simpleName);
+            return;
+        }
+    }
+
+    /**
+     * Constructors that reach themselves through this(...) calls (JLS 8.8.7): javac refuses
+     * them, and the class would otherwise overflow the stack on every instantiation. Reported
+     * once per cycle, at the call of the last constructor in it, where javac reports it.
+     */
+    private void checkCyclicConstructors(ClassSymbol c, Env cenv) {
+        Set<MethodSymbol> reported = new java.util.HashSet<MethodSymbol>();
+        for (MethodSymbol m : c.methods) {
+            if (!m.isConstructor() || m.thisCall == null || reported.contains(m)) {
+                continue;
+            }
+            List<MethodSymbol> chain = new ArrayList<MethodSymbol>();
+            MethodSymbol x = m;
+            while (x != null && x.owner == c && !chain.contains(x)) {
+                chain.add(x);
+                x = x.thisCall;
+            }
+            if (x != m) {
+                continue;
+            }
+            MethodSymbol last = m;
+            for (MethodSymbol k : c.methods) {
+                if (chain.contains(k)) {
+                    last = k;
+                }
+            }
+            reported.addAll(chain);
+            error(cenv, last.thisCallPos, "recursive constructor invocation");
+        }
+    }
+
+    private String erasedSignature(MethodSymbol m) {
+        StringBuilder sb = new StringBuilder(m.name).append('(');
+        for (Type p : m.params) {
+            sb.append(types.erased(p)).append(',');
+        }
+        return sb.append(')').toString();
     }
 
     private void collectSupertypes(ClassSymbol c, List<ClassSymbol> out, Set<ClassSymbol> seen) {
@@ -1260,8 +1380,15 @@ final class Attr {
         } else if (t instanceof Tree.Throw) {
             Tree.Throw th = (Tree.Throw) t;
             Type et = attribExpr(th.expr, env, null);
+            Tree x = strip(th.expr);
+            VarSymbol param = x instanceof Tree.Ident && ((Tree.Ident) x).sym instanceof VarSymbol
+                    ? (VarSymbol) ((Tree.Ident) x).sym : null;
             if (!et.isErroneous() && !types.isSubtype(types.erased(et), syms.type("java/lang/Throwable"))) {
                 error(env, th.expr.pos, "incompatible types: " + et + " cannot be converted to Throwable");
+            } else if (param != null && param.kind == VarSymbol.Kind.EXCEPTION && param.pendingRethrows != null) {
+                // Rethrowing a catch parameter throws what the try block threw, not its declared
+                // type -- decided once the catch body shows whether the parameter is reassigned.
+                param.pendingRethrows.add(new Object[] {env, Integer.valueOf(t.pos)});
             } else {
                 checkThrown(et, env, t.pos);
             }
@@ -1277,8 +1404,8 @@ final class Attr {
         } else if (t instanceof Tree.Assert) {
             Tree.Assert a = (Tree.Assert) t;
             attribCond(a.cond, env);
-            if (a.detail != null) {
-                attribExpr(a.detail, env, null);
+            if (a.detail != null && attribExpr(a.detail, env, null).tag == Type.Tag.VOID) {
+                error(env, a.detail.pos, "'void' type not allowed here");
             }
         } else if (t instanceof Tree.Empty) {
             // nothing
@@ -1503,7 +1630,11 @@ final class Attr {
         }
         Env body = tryEnv.dup();
         body.caught = caught;
+        List<Type> thrownInTry = new ArrayList<Type>();
+        tryEnv.caughtThrown = thrownInTry;
+        body.caughtThrown = thrownInTry;
         attribStat(t.body, body);
+        List<Type> earlier = new ArrayList<Type>();
         int i = 0;
         for (Tree.Catch c : t.catches) {
             Tree.VarDef p = c.param;
@@ -1529,12 +1660,70 @@ final class Attr {
             sym.hasInitializer = true;
             p.sym = sym;
             p.type = pt;
+            List<Type> clause = p.unionTypes != null && !p.unionTypes.isEmpty() ? new ArrayList<Type>() : null;
+            if (clause != null) {
+                for (Tree u : p.unionTypes) {
+                    clause.add(u.type);
+                }
+            } else {
+                clause = new ArrayList<Type>();
+                clause.add(pt);
+            }
+            sym.preciseThrown = preciseThrown(thrownInTry, clause, earlier);
+            sym.pendingRethrows = new ArrayList<Object[]>();
+            earlier.addAll(clause);
             cenv.enterLocal(sym);
             attribStat(c.body, cenv);
+            for (Object[] rethrow : sym.pendingRethrows) {
+                Env te = (Env) rethrow[0];
+                int pos = ((Integer) rethrow[1]).intValue();
+                if (sym.isEffectivelyFinal()) {
+                    for (Type th : sym.preciseThrown) {
+                        checkThrown(th, te, pos);
+                    }
+                } else {
+                    checkThrown(pt, te, pos);
+                }
+            }
+            sym.pendingRethrows = null;
         }
         if (t.finalizer != null) {
             attribStat(t.finalizer, env.dup());
         }
+    }
+
+    /**
+     * JLS 11.2.2: the checked exceptions the try block can throw that a catch clause with the
+     * given alternatives catches and no earlier clause does. A thrown type wider than an
+     * alternative (the block throws Exception, the clause catches IOException) contributes the
+     * alternative itself.
+     */
+    private List<Type> preciseThrown(List<Type> thrownInTry, List<Type> clause, List<Type> earlier) {
+        List<Type> out = new ArrayList<Type>();
+        for (Type th : thrownInTry) {
+            Type et = types.erased(th);
+            boolean caughtBefore = false;
+            for (Type e : earlier) {
+                if (!e.isErroneous() && types.isSubtype(et, types.erased(e))) {
+                    caughtBefore = true;
+                }
+            }
+            if (caughtBefore) {
+                continue;
+            }
+            for (Type alt : clause) {
+                if (alt.isErroneous()) {
+                    continue;
+                }
+                Type ea = types.erased(alt);
+                if (types.isSubtype(et, ea)) {
+                    out.add(th);
+                } else if (types.isSubtype(ea, et)) {
+                    out.add(alt);
+                }
+            }
+        }
+        return out;
     }
 
     private void checkAutoCloseable(Type t, Env env, int pos) {
@@ -1845,6 +2034,9 @@ final class Attr {
             if (e.caught != null) {
                 for (Type c : e.caught) {
                     if (types.isSubtype(ee, types.erased(c))) {
+                        if (e.caughtThrown != null) {
+                            e.caughtThrown.add(exc);
+                        }
                         return;
                     }
                 }
@@ -3243,8 +3435,42 @@ final class Attr {
                 return null;
             }
         }
+        if (!lowerBoundsWithinDeclaredBounds(m, r)) {
+            return null;
+        }
         // A plain varargs call with an array in last position (phase 1/2) is not variable-arity.
         return r;
+    }
+
+    /**
+     * A candidate whose arguments put a type below one of its type variables that is not within
+     * that variable's declared bound is not applicable: {@code <T extends Number> m(T)} called as
+     * {@code m("x")} gives T the lower bound String, and String is not a Number. javac reports it
+     * through the same "cannot be applied" diagnostic. Only proper lower bounds are checked, and a
+     * bound that mentions an inference variable ({@code T extends Comparable<T>}) by its erasure:
+     * both make this a necessary condition, so it never rejects a call javac accepts.
+     */
+    private boolean lowerBoundsWithinDeclaredBounds(MethodSymbol m, Resolution r) {
+        for (Type.TypeVar tv : m.typeParams) {
+            Type v = r.map.get(tv);
+            if (!(v instanceof Type.InferenceVar) || tv.bound == null) {
+                continue;
+            }
+            Type bound = types.erased(tv.bound);
+            if (bound.isErroneous()) {
+                continue;
+            }
+            for (Type lower : ((Type.InferenceVar) v).lower) {
+                Type l = types.resolveInference(lower);
+                if (hasUnsolved(l) || l.isErroneous() || l.tag == Type.Tag.NULL) {
+                    continue;
+                }
+                if (!types.isSubtype(l, bound) && !types.isSubtype(types.erased(l), bound)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /** Standalone types of deferred arguments, computed once, quietly. */
@@ -3577,7 +3803,7 @@ final class Attr {
             if (applicable.size() == 1) {
                 return applicable.get(0);
             }
-            Resolution best = mostSpecific(applicable, args, phase == 3);
+            Resolution best = mostSpecific(applicable, args, phase == 3, env);
             if (best != null) {
                 return best;
             }
@@ -3688,12 +3914,12 @@ final class Attr {
         return "<expression>";
     }
 
-    private Resolution mostSpecific(List<Resolution> applicable, List<Tree> args, boolean varargs) {
+    private Resolution mostSpecific(List<Resolution> applicable, List<Tree> args, boolean varargs, Env env) {
         Resolution best = null;
         for (Resolution r1 : applicable) {
             boolean all = true;
             for (Resolution r2 : applicable) {
-                if (r1 != r2 && !moreSpecific(r1.method, r2.method, args, varargs)) {
+                if (r1 != r2 && !moreSpecific(r1.method, r2.method, args, varargs, env)) {
                     all = false;
                     break;
                 }
@@ -3730,7 +3956,7 @@ final class Attr {
         return best;
     }
 
-    private boolean moreSpecific(MethodSymbol m1, MethodSymbol m2, List<Tree> args, boolean varargs) {
+    private boolean moreSpecific(MethodSymbol m1, MethodSymbol m2, List<Tree> args, boolean varargs, Env env) {
         int n = Math.max(args.size(), Math.max(m1.params.size(), m2.params.size()));
         if (!varargs) {
             n = args.size();
@@ -3761,13 +3987,14 @@ final class Attr {
                 if (r2.tag == Type.Tag.VOID && r1.tag != Type.Tag.VOID) {
                     continue;
                 }
-                if (r1.isPrimitive() && !r2.isPrimitive() && r1.tag != Type.Tag.VOID && r2.tag != Type.Tag.VOID
-                        && lambdaReturnsPrimitive(arg)) {
-                    continue;
-                }
-                if (!r1.isPrimitive() && r2.isPrimitive() && r2.tag != Type.Tag.VOID && !lambdaReturnsPrimitive(arg)
-                        && r1.tag != Type.Tag.VOID) {
-                    continue;
+                if (r1.tag != Type.Tag.VOID && r2.tag != Type.Tag.VOID && r1.isPrimitive() != r2.isPrimitive()) {
+                    // JLS 15.12.2.5: the primitive return is more specific for a lambda whose results
+                    // are all primitive, the boxed one for results that are all references. When that
+                    // cannot be told, neither is -- an ambiguity error, never a silent guess.
+                    int results = resultKind(arg, env);
+                    if (results != RESULTS_UNKNOWN && (results == RESULTS_PRIMITIVE) == r1.isPrimitive()) {
+                        continue;
+                    }
                 }
                 return false;
             }
@@ -3793,14 +4020,188 @@ final class Attr {
         return true;
     }
 
-    private static boolean lambdaReturnsPrimitive(Tree arg) {
-        if (arg instanceof Tree.Lambda) {
-            Tree body = strip(((Tree.Lambda) arg).body);
-            return body instanceof Tree.Literal && ((Tree.Literal) body).kind != Token.Kind.STRING_LITERAL
-                    && ((Tree.Literal) body).kind != Token.Kind.NULL
-                    || body instanceof Tree.Binary && ((Tree.Binary) body).op != Token.Kind.PLUS;
+    private static final int RESULTS_UNKNOWN = 0;
+    private static final int RESULTS_PRIMITIVE = 1;
+    private static final int RESULTS_REFERENCE = 2;
+
+    /**
+     * Whether every result of a lambda or method reference is a primitive, every one a
+     * reference, or unknown when that cannot be told without a target type. A lambda's
+     * results are typed on their own, as JLS 15.12.2.5 does for an explicitly typed lambda (one
+     * with no parameters, or declared parameter types); an implicitly typed lambda with
+     * parameters has none to give. A method reference answers with the return type of the
+     * methods its name denotes, when they all agree.
+     */
+    private int resultKind(Tree arg, Env env) {
+        if (arg instanceof Tree.MethodRef) {
+            return methodRefResultKind((Tree.MethodRef) arg, env);
         }
-        return false;
+        if (!(arg instanceof Tree.Lambda)) {
+            return RESULTS_UNKNOWN;
+        }
+        Tree.Lambda l = (Tree.Lambda) arg;
+        if (!l.params.isEmpty() && !l.explicitParams) {
+            return RESULTS_UNKNOWN;
+        }
+        compiler.quiet++;
+        try {
+            Env le = env.dup();
+            for (Tree.VarDef p : l.params) {
+                if (p.vartype == null) {
+                    return RESULTS_UNKNOWN;
+                }
+                Type pt = attribType(p.vartype, env);
+                if (pt.isErroneous()) {
+                    return RESULTS_UNKNOWN;
+                }
+                le.enterLocal(new VarSymbol(p.name, 0, pt, VarSymbol.Kind.LOCAL));
+            }
+            List<Tree> results = new ArrayList<Tree>();
+            Tree body = strip(l.body);
+            if (body instanceof Tree.Block) {
+                collectReturns(body, results);
+                enterBlockLocals(body, le);
+            } else {
+                results.add(body);
+            }
+            int answer = RESULTS_UNKNOWN;
+            for (Tree r : results) {
+                if (!typeableTwice(r)) {
+                    return RESULTS_UNKNOWN;
+                }
+                Type t = standaloneType(r, le);
+                if (t == null || t.isErroneous() || t.tag == Type.Tag.VOID) {
+                    return RESULTS_UNKNOWN;
+                }
+                int kind = t.isPrimitive() ? RESULTS_PRIMITIVE : RESULTS_REFERENCE;
+                if (answer != RESULTS_UNKNOWN && answer != kind) {
+                    return RESULTS_UNKNOWN;
+                }
+                answer = kind;
+            }
+            return answer;
+        } finally {
+            compiler.quiet--;
+        }
+    }
+
+    /**
+     * Enters a lambda block's locals into env, typed by their declarations (or a {@code var}'s
+     * initializer), so its return expressions can be typed. Shadowing is impossible in Java,
+     * so one flat scope serves the whole block.
+     */
+    private void enterBlockLocals(Tree body, Env env) {
+        for (Tree.VarDef d : localDeclarations(body)) {
+            Type t = null;
+            if (d.vartype != null) {
+                t = attribType(d.vartype, env);
+            } else if (d.init != null && typeableTwice(d.init)) {
+                t = standaloneType(d.init, env);
+            }
+            if (t != null && !t.isErroneous() && t.tag != Type.Tag.VOID) {
+                env.enterLocal(new VarSymbol(d.name, 0, t, VarSymbol.Kind.LOCAL));
+            }
+        }
+    }
+
+    /** A block's local variable declarations, in order, not counting nested lambdas and classes. */
+    private static List<Tree.VarDef> localDeclarations(Tree body) {
+        final List<Tree.VarDef> defs = new ArrayList<Tree.VarDef>();
+        new TreeScanner() {
+            @Override
+            void scan(Tree t) {
+                if (t instanceof Tree.ClassDecl || t instanceof Tree.Lambda || t instanceof Tree.NewClass
+                        && ((Tree.NewClass) t).body != null) {
+                    return;
+                }
+                if (t instanceof Tree.VarDef) {
+                    defs.add((Tree.VarDef) t);
+                }
+                super.scan(t);
+            }
+        }.scan(body);
+        return defs;
+    }
+
+    /**
+     * Whether an expression may be attributed here as well as where it really is: one that
+     * declares a class, holds a lambda or switch, or assigns would be entered or counted twice.
+     */
+    private static boolean typeableTwice(Tree r) {
+        final boolean[] ok = {true};
+        new TreeScanner() {
+            @Override
+            void scan(Tree t) {
+                if (t instanceof Tree.NewClass && ((Tree.NewClass) t).body != null || t instanceof Tree.Lambda
+                        || t instanceof Tree.MethodRef || t instanceof Tree.Switch || t instanceof Tree.Assign
+                        || t instanceof Tree.CompoundAssign || t instanceof Tree.Unary
+                        && (((Tree.Unary) t).op == Token.Kind.PLUSPLUS || ((Tree.Unary) t).op == Token.Kind.SUBSUB)) {
+                    ok[0] = false;
+                    return;
+                }
+                super.scan(t);
+            }
+        }.scan(r);
+        return ok[0];
+    }
+
+    /** The expressions a lambda block returns, not counting nested lambdas and classes. */
+    private static void collectReturns(Tree body, final List<Tree> out) {
+        new TreeScanner() {
+            @Override
+            void scan(Tree t) {
+                if (t instanceof Tree.ClassDecl || t instanceof Tree.Lambda || t instanceof Tree.NewClass
+                        && ((Tree.NewClass) t).body != null) {
+                    return;
+                }
+                if (t instanceof Tree.Return && ((Tree.Return) t).expr != null) {
+                    out.add(((Tree.Return) t).expr);
+                }
+                super.scan(t);
+            }
+        }.scan(body);
+    }
+
+    private int methodRefResultKind(Tree.MethodRef r, Env env) {
+        if ("new".equals(r.name)) {
+            return RESULTS_REFERENCE;
+        }
+        Type q;
+        compiler.quiet++;
+        try {
+            q = r.qualifierIsType ? attribType(r.qualifier, env) : standaloneType(r.qualifier, env);
+            if ((q == null || q.isErroneous()) && !r.qualifierIsType) {
+                // Decided by attribution: Type::m parses as an expression qualifier until then.
+                q = attribType(r.qualifier, env);
+            }
+        } finally {
+            compiler.quiet--;
+        }
+        if (q == null || q.isErroneous()) {
+            return RESULTS_UNKNOWN;
+        }
+        Type eq = types.erased(q);
+        if (eq.tag != Type.Tag.CLASS) {
+            return RESULTS_UNKNOWN;
+        }
+        ClassSymbol c = ((Type.ClassType) eq).sym;
+        List<ClassSymbol> owners = new ArrayList<ClassSymbol>();
+        owners.add(c);
+        collectSupertypes(c, owners, new LinkedHashSet<ClassSymbol>());
+        int answer = RESULTS_UNKNOWN;
+        for (ClassSymbol o : owners) {
+            for (MethodSymbol m : o.methods()) {
+                if (!m.name.equals(r.name) || m.returnType == null) {
+                    continue;
+                }
+                int kind = m.returnType.isPrimitive() ? RESULTS_PRIMITIVE : RESULTS_REFERENCE;
+                if (m.returnType.tag == Type.Tag.VOID || answer != RESULTS_UNKNOWN && answer != kind) {
+                    return RESULTS_UNKNOWN;
+                }
+                answer = kind;
+            }
+        }
+        return answer;
     }
 
     // ------------------------------------------------------------------ argument attribution
@@ -4530,6 +4931,10 @@ final class Attr {
         call.sym = r.method;
         call.varargsCall = r.varargs;
         call.qualifier = site.sym;
+        if (!call.superCall && env.enclMethod != null && env.enclMethod.isConstructor()) {
+            env.enclMethod.thisCall = r.method;
+            env.enclMethod.thisCallPos = call.pos;
+        }
         for (Type th : r.method.thrown) {
             checkThrown(th, env, call.pos);
         }
