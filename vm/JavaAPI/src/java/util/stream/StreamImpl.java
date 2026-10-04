@@ -46,6 +46,8 @@ final class StreamImpl<T> implements Stream<T> {
     private static final class Source {
         final List<?> values;
         boolean closed;
+        /** onClose handlers, shared by every stage of the pipeline, run once by the first close(). */
+        List<Runnable> closeHandlers;
         Source(List<?> values) { this.values = values; }
     }
 
@@ -95,6 +97,8 @@ final class StreamImpl<T> implements Stream<T> {
     public Stream<T> sorted() { return new StreamImpl<T>(this, SORTED, null, 0); }
 
     public Stream<T> sorted(Comparator<? super T> comparator) {
+        // A null comparator is an error, not natural order: SORTED with a null callback means sorted().
+        require(comparator);
         return new StreamImpl<T>(this, SORTED, comparator, 0);
     }
 
@@ -131,6 +135,8 @@ final class StreamImpl<T> implements Stream<T> {
         private boolean exhausted;
         private Object next;
         private Iterator<?> inner;
+        /** The stream flatMap's mapper returned, closed once its elements are used (as the JDK does). */
+        private Stream<?> innerStream;
 
         Cursor(Iterator<?> input, int operation, Object callback, long amount) {
             this.input = input;
@@ -171,11 +177,13 @@ final class StreamImpl<T> implements Stream<T> {
                         ready = true;
                         return true;
                     }
+                    closeInner();
                     if (!input.hasNext()) {
                         exhausted = true;
                         return false;
                     }
                     Stream<?> s = (Stream<?>) ((Function<Object, Object>) callback).apply(input.next());
+                    innerStream = s;
                     inner = s == null ? null : s.iterator();
                 }
             }
@@ -206,6 +214,29 @@ final class StreamImpl<T> implements Stream<T> {
         }
 
         public void remove() { throw new UnsupportedOperationException(); }
+
+        private void closeInner() {
+            if (innerStream != null) {
+                Stream<?> s = innerStream;
+                innerStream = null;
+                inner = null;
+                s.close();
+            }
+        }
+
+        /** A terminal operation stopped early: close the mapped streams still open upstream. */
+        void release() {
+            closeInner();
+            if (input instanceof Cursor) {
+                ((Cursor) input).release();
+            }
+        }
+    }
+
+    private static void release(Iterator<?> values) {
+        if (values instanceof Cursor) {
+            ((Cursor) values).release();
+        }
     }
 
     private Iterator<?> open() {
@@ -259,22 +290,28 @@ final class StreamImpl<T> implements Stream<T> {
     public boolean anyMatch(Predicate<? super T> predicate) {
         require(predicate);
         Iterator<T> values = iterator();
-        while (values.hasNext()) if (predicate.test(values.next())) return true;
-        return false;
+        boolean found = false;
+        while (!found && values.hasNext()) found = predicate.test(values.next());
+        release(values);
+        return found;
     }
 
     public boolean allMatch(Predicate<? super T> predicate) {
         require(predicate);
         Iterator<T> values = iterator();
-        while (values.hasNext()) if (!predicate.test(values.next())) return false;
-        return true;
+        boolean all = true;
+        while (all && values.hasNext()) all = predicate.test(values.next());
+        release(values);
+        return all;
     }
 
     public boolean noneMatch(Predicate<? super T> predicate) { return !anyMatch(predicate); }
 
     public Optional<T> findFirst() {
         Iterator<T> values = iterator();
-        return values.hasNext() ? Optional.of(values.next()) : Optional.<T>empty();
+        Optional<T> first = values.hasNext() ? Optional.of(values.next()) : Optional.<T>empty();
+        release(values);
+        return first;
     }
 
     public Optional<T> findAny() { return findFirst(); }
@@ -329,5 +366,38 @@ final class StreamImpl<T> implements Stream<T> {
     }
     public Stream<T> sequential() { return this; }
     public Stream<T> parallel() { return this; }
-    public void close() { source.closed = true; linkedOrConsumed = true; }
+    public Stream<T> onClose(Runnable closeHandler) {
+        require(closeHandler);
+        if (linkedOrConsumed || source.closed) throw new IllegalStateException();
+        if (source.closeHandlers == null) source.closeHandlers = new ArrayList<Runnable>();
+        source.closeHandlers.add(closeHandler);
+        return this;
+    }
+
+    /** Runs every handler even when one throws; the first failure is rethrown with the rest suppressed. */
+    public void close() {
+        linkedOrConsumed = true;
+        if (source.closed) return;
+        source.closed = true;
+        List<Runnable> handlers = source.closeHandlers;
+        source.closeHandlers = null;
+        if (handlers == null) return;
+        Throwable failure = null;
+        for (int i = 0; i < handlers.size(); i++) {
+            // Fetched outside the try: the generic get() is a checkcast, which ParparVM does not
+            // check, so it must never sit under a handler that would catch its failure.
+            Runnable handler = handlers.get(i);
+            try {
+                handler.run();
+            } catch (Throwable t) {
+                if (failure == null) {
+                    failure = t;
+                } else if (failure != t) {
+                    failure.addSuppressed(t);
+                }
+            }
+        }
+        if (failure instanceof RuntimeException) throw (RuntimeException) failure;
+        if (failure instanceof Error) throw (Error) failure;
+    }
 }

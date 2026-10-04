@@ -20,6 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class StreamEdgeApp {
@@ -187,7 +190,40 @@ public class StreamEdgeApp {
         return 20000;
     }
 
+    /** flatMap closes every stream its mapper returns; sorted(null) is an error, not natural order. */
+    private static int closeSemantics() {
+        final StringBuilder log = new StringBuilder();
+        List<Integer> all = Stream.of(1, 2, 3)
+                .flatMap(v -> Stream.of(v, v * 10).onClose(() -> log.append("close-s").append(v).append(' ')))
+                .collect(Collectors.toList());
+        check(all.size() == 6 && all.get(5).intValue() == 30);
+        check("close-s1 close-s2 close-s3 ".equals(log.toString()));
+        log.setLength(0);
+        Optional<Integer> first = Stream.of(1, 2, 3)
+                .flatMap(v -> Stream.of(v, v * 10).onClose(() -> log.append("close-t").append(v).append(' ')))
+                .filter(v -> v.intValue() >= 10)
+                .findFirst();
+        check(first.get().intValue() == 10);
+        check("close-t1 ".equals(log.toString()));
+        log.setLength(0);
+        check(Stream.of(1, 2, 3)
+                .flatMap(v -> Stream.of(v).onClose(() -> log.append("close-u").append(v).append(' ')))
+                .anyMatch(v -> v.intValue() == 2));
+        check("close-u1 close-u2 ".equals(log.toString()));
+        log.setLength(0);
+        Stream<Integer> closing = Stream.of(1).onClose(() -> log.append("a")).onClose(() -> log.append("b"));
+        closing.close();
+        closing.close();
+        check("ab".equals(log.toString()));
+        try {
+            Stream.of(2, 1).sorted(null).collect(Collectors.toList());
+            throw new AssertionError("sorted(null)");
+        } catch (NullPointerException expected) {
+        }
+        return 0;
+    }
+
     public static void main(String[] args) {
-        System.out.println("RESULT=" + (calculate() + lazySemantics() + fusionSemantics()));
+        System.out.println("RESULT=" + (calculate() + lazySemantics() + fusionSemantics() + closeSemantics()));
     }
 }

@@ -38,6 +38,10 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
         return null;
     }
 
+    static <T> Stream<T> of(T value) {
+        return null;
+    }
+
     static <T> Stream<T> of(T... values) {
         return null;
     }

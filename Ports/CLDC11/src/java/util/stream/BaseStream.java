@@ -9,5 +9,7 @@ public interface BaseStream<T, S extends BaseStream<T, S>> extends AutoCloseable
 
     S parallel();
 
+    S onClose(Runnable closeHandler);
+
     void close();
 }

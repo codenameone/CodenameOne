@@ -92,6 +92,16 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
         return new StreamImpl<T>(new ArrayList<T>());
     }
 
+    /**
+     * The single-element overload the JDK has: code compiled against the JDK binds a
+     * one-argument Stream.of to it, so without it that call fails to link here.
+     */
+    static <T> Stream<T> of(T value) {
+        List<T> one = new ArrayList<T>();
+        one.add(value);
+        return new StreamImpl<T>(one);
+    }
+
     static <T> Stream<T> of(T... values) {
         if (values == null) throw new NullPointerException();
         return new StreamImpl<T>(java.util.Arrays.asList(values));
