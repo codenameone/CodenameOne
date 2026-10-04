@@ -199,11 +199,11 @@
       }
      },
      "memory": 0.803,
-     "reason": "Noise recalibration, not a performance change: this runner's hello rounds spanned 0.92x-1.59x within one run (two runs, medians 1.26x and 1.55x), while hello on linux-x64 and linux-arm64 in the same CI run was 0.89x/0.90x against baselines of 0.95x/0.93x.",
-     "runs": 2,
-     "time": 1.409,
+     "reason": "Noise recalibration, not a performance change: hello on this runner spans 0.88x-1.59x across rounds and its run medians were 1.27x, 1.55x, 1.18x and 0.99x over four runs of this pull request, around master's own 1.23x; hello on linux-x64 and linux-arm64 did not move.",
+     "runs": 4,
+     "time": 1.221,
      "tolerance": {
-      "time": 0.25
+      "time": 0.45
      }
     }
    },
