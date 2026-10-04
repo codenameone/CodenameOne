@@ -11,6 +11,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from merge_syndication_json import MergeConflict, merge_value
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 MODULE_PATH = SCRIPT_DIR / "syndicate_blog_posts.py"
@@ -88,6 +90,41 @@ class DevToRecoveryTest(unittest.TestCase):
 
         self.assertEqual(123, result["id"])
         self.assertTrue(result["recovered"])
+
+
+class RecoveredStateMergeTest(unittest.TestCase):
+    def state(self, **fields):
+        return {"posts": {"same-post": {"devto": fields}}}
+
+    def test_same_article_keeps_recorded_timestamp_and_recovery_metadata(self):
+        remote = self.state(id=123, url="https://dev.to/same-post",
+                            syndicated_at="2026-10-03T17:35:08+00:00")
+        local = self.state(id=123, url="https://dev.to/same-post",
+                           syndicated_at="2026-10-03T17:35:07Z", recovered=True)
+        merged = merge_value({"posts": {}}, local, remote)
+        self.assertEqual(remote["posts"]["same-post"]["devto"]["syndicated_at"],
+                         merged["posts"]["same-post"]["devto"]["syndicated_at"])
+        self.assertTrue(merged["posts"]["same-post"]["devto"]["recovered"])
+
+    def test_different_or_missing_article_identity_still_conflicts(self):
+        remote = self.state(id=123, url="https://dev.to/same-post", syndicated_at="old")
+        for identity in ({"id": 456, "url": "https://dev.to/same-post"},
+                         {"id": 123, "url": "https://dev.to/another-post"},
+                         {"url": "https://dev.to/same-post"},
+                         {"id": 123}):
+            with self.subTest(identity=identity), self.assertRaises(MergeConflict):
+                merge_value({"posts": {}}, self.state(**identity, syndicated_at="new"), remote)
+
+    def test_other_metadata_conflicts_are_not_hidden(self):
+        remote = self.state(id=123, url="https://dev.to/same-post", published=True)
+        local = self.state(id=123, url="https://dev.to/same-post", published=False)
+        with self.assertRaises(MergeConflict):
+            merge_value({"posts": {}}, local, remote)
+
+    def test_unrelated_timestamp_conflicts_are_not_hidden(self):
+        with self.assertRaises(MergeConflict):
+            merge_value({}, {"id": 123, "url": "same", "syndicated_at": "new"},
+                        {"id": 123, "url": "same", "syndicated_at": "old"})
 
 
 class StateCommitRaceTest(unittest.TestCase):
@@ -192,6 +229,11 @@ class StateCommitRaceTest(unittest.TestCase):
                     {
                         "posts": {
                             "same-post": {
+                                "devto": {
+                                    "id": 123,
+                                    "url": "https://dev.to/same-post",
+                                    "syndicated_at": "2026-10-03T17:35:08+00:00",
+                                },
                                 "hashnode": {
                                     "url": "https://hashnode.example/same-post"
                                 }
@@ -229,7 +271,12 @@ class StateCommitRaceTest(unittest.TestCase):
                     {
                         "posts": {
                             "same-post": {
-                                "devto": {"url": "https://dev.to/same-post"},
+                                "devto": {
+                                    "id": 123,
+                                    "url": "https://dev.to/same-post",
+                                    "syndicated_at": "2026-10-03T17:35:07Z",
+                                    "recovered": True,
+                                },
                                 "foojay": {"url": "https://foojay.io/same-post"},
                             }
                         }
@@ -270,6 +317,9 @@ class StateCommitRaceTest(unittest.TestCase):
                 {"devto", "foojay", "hashnode"},
                 set(state["posts"]["same-post"]),
             )
+            self.assertEqual("2026-10-03T17:35:08+00:00",
+                             state["posts"]["same-post"]["devto"]["syndicated_at"])
+            self.assertTrue(state["posts"]["same-post"]["devto"]["recovered"])
             queue = json.loads(
                 (verify / "scripts" / "website" / "syndication-queue.json").read_text(
                     encoding="utf-8"
