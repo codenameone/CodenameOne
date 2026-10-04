@@ -41,7 +41,8 @@ import java.util.ArrayList;
 ///
 /// Transactions nest the way Android's do: only the outermost
 /// `beginTransaction`/`endTransaction` pair reaches the engine, and it
-/// commits only if every nested level was marked successful.
+/// commits only if every nested level was marked successful. Nesting is per
+/// thread, as on Android: a transaction belongs to the thread that began it.
 public final class SQLiteDatabase extends SQLiteClosable {
 
     private static final String TAG = "SQLiteDatabase";
@@ -77,12 +78,48 @@ public final class SQLiteDatabase extends SQLiteClosable {
     private final DatabaseErrorHandler mErrorHandler;
     private final boolean mDeleteOnClose;
     private Database mDb;
-    private final ArrayList<Transaction> mTransactions = new ArrayList<Transaction>();
+    /// The calling thread's transaction nesting. Android apps use a database
+    /// from background threads (executors, `HandlerThread`), and a single
+    /// shared stack made one thread's `beginTransaction` a nested level of
+    /// another thread's transaction: its `endTransaction` popped the other
+    /// thread's level and its work committed or rolled back with it.
+    ///
+    /// Only the owning thread ever touches its stack, so this needs no lock.
+    private final ThreadLocal<ArrayList<Transaction>> mTransactions = new ThreadLocal<ArrayList<Transaction>>();
+
+    /// The thread whose outermost transaction is open on the engine, or null.
+    ///
+    /// There is one engine connection, so a second thread cannot have a
+    /// transaction of its own beside it. Android would block that thread
+    /// until the first one ends; this runtime adds no locks (serializing
+    /// statements on the connection is the Codename One `Database`
+    /// implementation's job), so it refuses with
+    /// [SQLiteDatabaseLockedException] -- SQLite's own answer when a busy
+    /// wait runs out -- rather than silently folding the second thread's
+    /// work into the first one's transaction. A stale read of this field on
+    /// another thread is harmless: the engine then refuses the nested BEGIN.
+    private Thread mTransactionOwner;
 
     private static final class Transaction {
         boolean markedSuccessful;
         boolean childFailed;
         SQLiteTransactionListener listener;
+    }
+
+    /// This thread's transaction stack, created on first use.
+    private ArrayList<Transaction> transactions() {
+        ArrayList<Transaction> stack = mTransactions.get();
+        if (stack == null) {
+            stack = new ArrayList<Transaction>();
+            mTransactions.set(stack);
+        }
+        return stack;
+    }
+
+    /// Whether the calling thread has a transaction open.
+    private boolean hasTransaction() {
+        ArrayList<Transaction> stack = mTransactions.get();
+        return stack != null && !stack.isEmpty();
     }
 
     private SQLiteDatabase(String path, int openFlags, CursorFactory cursorFactory, DatabaseErrorHandler errorHandler,
@@ -272,7 +309,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
     }
 
     public boolean isDbLockedByCurrentThread() {
-        return !mTransactions.isEmpty();
+        return hasTransaction();
     }
 
     @Deprecated
@@ -309,22 +346,30 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
     public void beginTransactionWithListener(SQLiteTransactionListener transactionListener) {
         Database d = db();
-        if (mTransactions.isEmpty()) {
+        ArrayList<Transaction> stack = transactions();
+        if (stack.isEmpty()) {
+            Thread current = Thread.currentThread();
+            Thread owner = mTransactionOwner;
+            if (owner != null && owner != current) {
+                throw new SQLiteDatabaseLockedException("database is locked: another thread's transaction is open");
+            }
             try {
                 d.beginTransaction();
             } catch (IOException e) {
                 throw toSqlException(e, "BEGIN");
             }
+            mTransactionOwner = current;
         }
         Transaction t = new Transaction();
         t.listener = transactionListener;
-        mTransactions.add(t);
+        stack.add(t);
         if (transactionListener != null) {
             try {
                 transactionListener.onBegin();
             } catch (RuntimeException ex) {
-                mTransactions.remove(mTransactions.size() - 1);
-                if (mTransactions.isEmpty()) {
+                stack.remove(stack.size() - 1);
+                if (stack.isEmpty()) {
+                    mTransactionOwner = null;
                     rollbackQuietly();
                 }
                 throw ex;
@@ -334,10 +379,11 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
     public void setTransactionSuccessful() {
         db();
-        if (mTransactions.isEmpty()) {
+        ArrayList<Transaction> stack = transactions();
+        if (stack.isEmpty()) {
             throw new IllegalStateException("Cannot perform this operation because there is no current transaction.");
         }
-        Transaction top = mTransactions.get(mTransactions.size() - 1);
+        Transaction top = stack.get(stack.size() - 1);
         if (top.markedSuccessful) {
             throw new IllegalStateException("Cannot perform this operation because the transaction has already "
                     + "been marked successful.  The only thing you can do now is call endTransaction().");
@@ -347,10 +393,11 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
     public void endTransaction() {
         Database d = db();
-        if (mTransactions.isEmpty()) {
+        ArrayList<Transaction> stack = transactions();
+        if (stack.isEmpty()) {
             throw new IllegalStateException("Cannot perform this operation because there is no current transaction.");
         }
-        Transaction top = mTransactions.remove(mTransactions.size() - 1);
+        Transaction top = stack.remove(stack.size() - 1);
         boolean successful = top.markedSuccessful && !top.childFailed;
         RuntimeException listenerException = null;
         if (top.listener != null) {
@@ -365,18 +412,23 @@ public final class SQLiteDatabase extends SQLiteClosable {
                 successful = false;
             }
         }
-        if (!mTransactions.isEmpty()) {
+        if (!stack.isEmpty()) {
             if (!successful) {
-                mTransactions.get(mTransactions.size() - 1).childFailed = true;
-            }
-        } else if (successful) {
-            try {
-                d.commitTransaction();
-            } catch (IOException e) {
-                throw toSqlException(e, "COMMIT");
+                stack.get(stack.size() - 1).childFailed = true;
             }
         } else {
-            rollbackQuietly();
+            // The engine transaction ends here either way, so the database
+            // is free for another thread's even if the commit throws.
+            mTransactionOwner = null;
+            if (successful) {
+                try {
+                    d.commitTransaction();
+                } catch (IOException e) {
+                    throw toSqlException(e, "COMMIT");
+                }
+            } else {
+                rollbackQuietly();
+            }
         }
         if (listenerException != null) {
             throw listenerException;
@@ -392,7 +444,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
     }
 
     public boolean inTransaction() {
-        return !mTransactions.isEmpty();
+        return hasTransaction();
     }
 
     // ------------------------------------------------------------ statements

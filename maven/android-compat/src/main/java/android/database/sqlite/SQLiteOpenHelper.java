@@ -104,11 +104,15 @@ public abstract class SQLiteOpenHelper implements AutoCloseable {
             final int version = db.getVersion();
             if (version != mNewVersion) {
                 if (version > 0 && version < mMinimumSupportedVersion) {
+                    // As on Android, the hook sees the obsolete database while
+                    // it is still open -- it is there to inspect or export it
+                    // -- and only then is it closed, deleted and recreated.
+                    onBeforeDelete(db);
                     db.close();
-                    SQLiteDatabase.deleteDatabase(mName);
+                    // Through the context, the way it was opened.
+                    mContext.deleteDatabase(mName);
                     db = mContext.openOrCreateDatabase(mName, Context.MODE_PRIVATE, mFactory, mErrorHandler);
                     onConfigure(db);
-                    onBeforeDelete(db);
                 }
                 db.beginTransaction();
                 try {
@@ -151,8 +155,9 @@ public abstract class SQLiteOpenHelper implements AutoCloseable {
     public void onConfigure(SQLiteDatabase db) {
     }
 
-    /// Called before a database older than the minimum supported version
-    /// is recreated from scratch.
+    /// Called with the still-open database when its version is older than
+    /// the minimum supported version, just before it is deleted and
+    /// recreated from scratch.
     public void onBeforeDelete(SQLiteDatabase db) {
     }
 

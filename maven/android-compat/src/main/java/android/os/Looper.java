@@ -41,14 +41,31 @@ public final class Looper {
     }
 
     public static Looper getMainLooper() {
+        bindMainIfEdt();
         return MAIN;
     }
 
     public static Looper myLooper() {
-        if (com.codename1.ui.Display.getInstance().isEdt()) {
+        if (bindMainIfEdt()) {
             return MAIN;
         }
         return LOCAL.get();
+    }
+
+    /// Records the event dispatch thread as the main looper's thread when
+    /// called on it, and answers whether it was.
+    ///
+    /// The main looper is created with the class, which can be before the
+    /// EDT exists, so its thread is bound lazily: the runtime calls
+    /// [#prepareMainLooper()] on the EDT before the first activity starts,
+    /// and every main-looper lookup made on the EDT re-binds it -- Codename
+    /// One can replace the EDT, and the latest one is the main thread.
+    private static boolean bindMainIfEdt() {
+        if (!com.codename1.ui.Display.getInstance().isEdt()) {
+            return false;
+        }
+        MAIN.thread = Thread.currentThread();
+        return true;
     }
 
     public static void prepare() {
@@ -60,7 +77,12 @@ public final class Looper {
         LOCAL.set(l);
     }
 
+    /// Binds the main looper to the calling thread when that is the event
+    /// dispatch thread. The runtime calls it before starting an activity, as
+    /// Android's `ActivityThread.main` does, so `getMainLooper().getThread()`
+    /// names the EDT even when first asked from a background thread.
     public static void prepareMainLooper() {
+        bindMainIfEdt();
     }
 
     /// Runs this thread's queue until [#quit()]. Background loopers only; the
@@ -117,10 +139,13 @@ public final class Looper {
     }
 
     public boolean isCurrentThread() {
-        return main ? com.codename1.ui.Display.getInstance().isEdt() : Thread.currentThread() == thread;
+        return main ? bindMainIfEdt() : Thread.currentThread() == thread;
     }
 
     public Thread getThread() {
+        if (main) {
+            bindMainIfEdt();
+        }
         return thread;
     }
 

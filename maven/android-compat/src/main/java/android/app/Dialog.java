@@ -215,7 +215,7 @@ public class Dialog implements DialogInterface, Window.Callback {
         }
         create();
         onStart();
-        mHost = new com.codename1.ui.Dialog(new BorderLayout());
+        mHost = new Host();
         if (mTitle != null && mTitle.length() > 0 && !(this instanceof AlertDialog)) {
             mHost.setTitle(mTitle.toString());
         }
@@ -284,6 +284,40 @@ public class Dialog implements DialogInterface, Window.Callback {
             mCancelListener.onCancel(this);
         }
         dismiss();
+    }
+
+    /// The Codename One dialog showing this one, for tests.
+    com.codename1.ui.Dialog host() {
+        return mHost;
+    }
+
+    /// The Codename One dialog this one is shown in. Codename One closes it on
+    /// its own -- a tap outside it (`setDisposeWhenPointerOutOfBounds`), its
+    /// host window going away -- and every such path ends in `dispose()`.
+    /// Disposing it directly skipped `cancel()`/`dismiss()`: no
+    /// `OnCancelListener` or `OnDismissListener`, no `onStop()` or detach,
+    /// and `isShowing()` stayed true over a disposed host. So a dispose this
+    /// wrapper did not ask for is routed through it: an outside tap cancels,
+    /// as on Android, and anything else dismisses.
+    private final class Host extends com.codename1.ui.Dialog {
+        Host() {
+            super(new BorderLayout());
+        }
+
+        @Override
+        public void dispose() {
+            if (mShowing && mHost == this) {
+                // dismiss() clears mShowing before disposing the host, so
+                // this comes back through super.dispose() exactly once.
+                if (isDisposeWhenPointerOutOfBounds() && wasDisposedDueToOutOfBoundsTouch()) {
+                    cancel();
+                } else {
+                    dismiss();
+                }
+                return;
+            }
+            super.dispose();
+        }
     }
 
     /// The dialog's root: as wide as Android makes a dialog, which is the

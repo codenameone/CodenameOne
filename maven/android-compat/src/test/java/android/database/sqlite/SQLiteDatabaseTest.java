@@ -329,6 +329,108 @@ public class SQLiteDatabaseTest {
         }
     }
 
+    /// A database older than the minimum supported version is handed to
+    /// `onBeforeDelete` while it is still the old one, so the application
+    /// can read or export it -- not the empty replacement.
+    @Test
+    public void onBeforeDeleteSeesTheObsoleteDatabase() throws Exception {
+        final JdbcDatabase[] engine = {new JdbcDatabase()};
+        Context ctx = new ContextWrapper(null) {
+            @Override
+            public SQLiteDatabase openOrCreateDatabase(String name, int mode, SQLiteDatabase.CursorFactory factory,
+                                                       DatabaseErrorHandler errorHandler) {
+                return SQLiteDatabase.wrap(engine[0], name, factory, errorHandler);
+            }
+
+            @Override
+            public boolean deleteDatabase(String name) {
+                try {
+                    engine[0] = new JdbcDatabase();
+                } catch (java.io.IOException e) {
+                    throw new IllegalStateException(e);
+                }
+                return true;
+            }
+        };
+        SQLiteDatabase old = new Helper(ctx, 1, new ArrayList<String>()).getWritableDatabase();
+        old.execSQL("INSERT INTO t (x) VALUES ('legacy')");
+        final List<String> calls = new ArrayList<String>();
+        SQLiteOpenHelper v3 = new SQLiteOpenHelper(ctx, "helper.db", null, 3, 2, null) {
+            @Override
+            public void onBeforeDelete(SQLiteDatabase db) {
+                calls.add("beforeDelete v" + db.getVersion() + " "
+                        + DatabaseUtils.stringForQuery(db, "SELECT x FROM t", null));
+            }
+
+            @Override
+            public void onCreate(SQLiteDatabase db) {
+                calls.add("create v" + db.getVersion());
+            }
+
+            @Override
+            public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+                calls.add("upgrade");
+            }
+        };
+        assertEquals(3, v3.getWritableDatabase().getVersion());
+        assertEquals("[beforeDelete v1 legacy, create v0]", calls.toString());
+    }
+
+    /// A transaction belongs to the thread that began it. Another thread's
+    /// `beginTransaction` used to become a nested level of this one, so its
+    /// `endTransaction` popped this thread's level and its work committed or
+    /// rolled back with ours.
+    @Test
+    public void anotherThreadDoesNotNestIntoThisThreadsTransaction() throws Exception {
+        db.beginTransaction();
+        final boolean[] otherSawTransaction = new boolean[1];
+        final Throwable[] otherFailure = new Throwable[1];
+        Thread other = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                otherSawTransaction[0] = db.inTransaction();
+                try {
+                    db.beginTransaction();
+                    db.endTransaction();
+                } catch (Throwable t) {
+                    otherFailure[0] = t;
+                }
+            }
+        });
+        other.start();
+        other.join();
+        assertFalse("this thread's transaction is not the other thread's", otherSawTransaction[0]);
+        assertTrue(String.valueOf(otherFailure[0]), otherFailure[0] instanceof SQLiteDatabaseLockedException);
+        assertTrue(db.inTransaction());
+        db.insert("notes", null, note("mine", 1));
+        db.setTransactionSuccessful();
+        db.endTransaction();
+        assertFalse(db.inTransaction());
+
+        // Once it ended, the other thread has transactions of its own.
+        Thread later = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    db.beginTransaction();
+                    try {
+                        db.insert("notes", null, note("theirs", 2));
+                        db.setTransactionSuccessful();
+                    } finally {
+                        db.endTransaction();
+                    }
+                } catch (Throwable t) {
+                    otherFailure[0] = t;
+                }
+            }
+        });
+        otherFailure[0] = null;
+        later.start();
+        later.join();
+        assertNull(otherFailure[0]);
+        assertEquals(2, DatabaseUtils.queryNumEntries(db, "notes"));
+    }
+
     private static final class Helper extends SQLiteOpenHelper {
         private final List<String> calls;
 

@@ -138,6 +138,8 @@ public final class ActivityThread {
         if (intent == null) {
             throw new NullPointerException("intent");
         }
+        // Activities start on the EDT, which is the main looper's thread.
+        android.os.Looper.prepareMainLooper();
         Class<?> cls = intent.getComponentClass();
         AndroidApp.ActivityInfo info = null;
         if (cls != null) {
@@ -401,7 +403,15 @@ public final class ActivityThread {
             Record below = top();
             if (below != null) {
                 if (below.relaunchPending != 0) {
+                    Activity replaced = below.activity;
                     below = relaunch(below, below.relaunchPending, false);
+                    // relaunch() moves the caller of every record still on
+                    // the stack to the new instance, but this one was just
+                    // taken off it: without this its result went to the
+                    // destroyed caller and was dropped.
+                    if (r.caller == replaced) {
+                        r.caller = below.activity;
+                    }
                 }
                 deliverResult(r, below);
                 resumeRecord(below, true);

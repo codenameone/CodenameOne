@@ -45,6 +45,12 @@ public final class AndroidTestSupport {
         /// Fills the options menu of the next activities started, or null.
         public static OptionsMenu optionsMenu;
 
+        /// The request code of the last result delivered, or -1.
+        public int resultRequestCode = -1;
+
+        /// The result code of the last result delivered.
+        public int resultCode;
+
         @Override
         public boolean onCreateOptionsMenu(android.view.Menu menu) {
             if (optionsMenu != null) {
@@ -52,6 +58,18 @@ public final class AndroidTestSupport {
             }
             return true;
         }
+
+        @Override
+        protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+            resultRequestCode = requestCode;
+            this.resultCode = resultCode;
+        }
+    }
+
+    /// An activity that declares `android:configChanges="uiMode"`, so a dark
+    /// mode change reaches it through `onConfigurationChanged` instead of
+    /// recreating it.
+    public static final class UiModeHandlingActivity extends Activity {
     }
 
     /// Builds a test activity's options menu.
@@ -64,6 +82,9 @@ public final class AndroidTestSupport {
             super(null, "com.codename1.androidcompat.test");
             activity(TestActivity.class, TestActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "Test", null, null, false);
+            activity(UiModeHandlingActivity.class, UiModeHandlingActivity.class.getName(),
+                    android.R.style.Theme_Material_Light_DarkActionBar, 0, "UiMode", null, null, false);
+            configChanges(UiModeHandlingActivity.class, android.content.pm.ActivityInfo.CONFIG_UI_MODE);
         }
 
         @Override
@@ -78,7 +99,10 @@ public final class AndroidTestSupport {
 
         @Override
         public Activity createActivity(Class<?> type) {
-            return type == TestActivity.class ? new TestActivity() : null;
+            if (type == TestActivity.class) {
+                return new TestActivity();
+            }
+            return type == UiModeHandlingActivity.class ? new UiModeHandlingActivity() : null;
         }
 
         @Override
