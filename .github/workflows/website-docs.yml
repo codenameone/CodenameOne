@@ -345,6 +345,7 @@ jobs:
           node docs/website/scripts/test-build-first-funnel.mjs docs/website/public
           node docs/website/scripts/test-cn1-crisp-events.mjs
           node docs/website/scripts/test-initializr-download-beacon.mjs
+          node docs/website/scripts/test-initializr-chat-clearance.mjs
 
       - name: Validate Playground JS bundle output
         run: test -f docs/website/public/playground-app/index.html
