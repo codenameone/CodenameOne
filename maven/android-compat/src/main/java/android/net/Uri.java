@@ -216,12 +216,18 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         return s.isEmpty() ? null : s.get(s.size() - 1);
     }
 
+    /// The query, or null. An opaque URI has none: the `?` in
+    /// `mailto:a@b.c?subject=x` is part of its scheme-specific part, as on
+    /// Android. Neither does a `?` inside the fragment start one.
     public String getEncodedQuery() {
-        int q = string.indexOf('?');
-        if (q < 0) {
+        if (!isHierarchical()) {
             return null;
         }
-        int h = string.indexOf('#', q);
+        int q = string.indexOf('?');
+        int h = string.indexOf('#');
+        if (q < 0 || (h >= 0 && h < q)) {
+            return null;
+        }
         return h >= 0 ? string.substring(q + 1, h) : string.substring(q + 1);
     }
 

@@ -275,12 +275,27 @@ public final class Bitmap {
         }
     }
 
+    /// Refuses a pixel write the way Android does: a recycled bitmap has no
+    /// pixels, and an immutable one may share its image with other bitmaps
+    /// (`createBitmap(source)` hands an immutable source back as is, and a
+    /// decoded resource is cached), so writing it would change them too.
+    private void checkWritable(String op) {
+        if (recycled) {
+            throw new IllegalStateException("Can't call " + op + "() on a recycled bitmap");
+        }
+        if (!mutable) {
+            throw new IllegalStateException();
+        }
+    }
+
     public void setPixel(int x, int y, int color) {
+        checkWritable("setPixel");
         pixels()[y * width + x] = color;
         pixelsDirty = true;
     }
 
     public void setPixels(int[] in, int offset, int stride, int x, int y, int w, int h) {
+        checkWritable("setPixels");
         int[] p = pixels();
         for (int row = 0; row < h; row++) {
             System.arraycopy(in, offset + row * stride, p, (y + row) * width + x, w);
@@ -289,6 +304,7 @@ public final class Bitmap {
     }
 
     public void eraseColor(int color) {
+        checkWritable("eraseColor");
         int[] p = new int[width * height];
         for (int i = 0; i < p.length; i++) {
             p[i] = color;

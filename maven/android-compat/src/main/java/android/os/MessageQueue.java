@@ -110,7 +110,14 @@ public final class MessageQueue {
         });
     }
 
+    /// True when no message is due now. A background looper answers from
+    /// its queue, as Android does: a message posted for later does not make
+    /// it busy. The main looper always answers true: its messages are
+    /// Codename One EDT callbacks, held per handler and interleaved with the
+    /// EDT's own serial calls and input, so there is no single queue here to
+    /// ask, and idle work belongs in [#addIdleHandler(IdleHandler)], which
+    /// does wait for the EDT to go idle.
     public boolean isIdle() {
-        return true;
+        return looper.isMain() || !looper.hasDueMessage();
     }
 }

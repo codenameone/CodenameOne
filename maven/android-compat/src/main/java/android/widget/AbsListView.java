@@ -677,6 +677,16 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
                         && Math.abs(y - mDownY) > ViewConfiguration.get(getContext()).getScaledTouchSlop()) {
                     startScroll(y);
                 }
+                if (mTouchMode == TOUCH_MODE_DOWN && mPressedChild != null && !pointInList(x, y)) {
+                    // Dragged off the list without scrolling it: as on
+                    // Android the press and the pending long press end, so
+                    // the release clicks nothing. Android's list would still
+                    // click if the pointer came back before the release;
+                    // this follows a plain View instead, which does not, so
+                    // a press once abandoned stays abandoned.
+                    cancelLongPress();
+                    unpress();
+                }
                 if (mTouchMode == TOUCH_MODE_SCROLL) {
                     int dy = (int) (y - mLastY);
                     if (dy != 0) {
@@ -691,7 +701,10 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
                 if (mTouchMode == TOUCH_MODE_DOWN) {
                     final View child = mPressedChild;
                     final int position = mMotionPosition;
-                    if (child != null && position >= 0 && !mLongPressed && mAdapter != null
+                    // A release beside the list clicks nothing, as on Android,
+                    // which checks the release against the list's padding.
+                    boolean inList = x >= getPaddingLeft() && x < getWidth() - getPaddingRight();
+                    if (inList && child != null && position >= 0 && !mLongPressed && mAdapter != null
                             && position < mItemCount && mAdapter.isEnabled(position)) {
                         performItemClick(child, position, mAdapter.getItemId(position));
                     }
@@ -726,6 +739,13 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
             default:
                 return true;
         }
+    }
+
+    /// Whether `(x, y)` is within the list, widened by the touch slop on
+    /// every side as Android's `pointInView(x, y, slop)` is.
+    private boolean pointInList(float x, float y) {
+        float slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+        return x >= -slop && y >= -slop && x < getWidth() + slop && y < getHeight() + slop;
     }
 
     private void press(View child) {

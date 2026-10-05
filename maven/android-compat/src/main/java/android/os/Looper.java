@@ -200,6 +200,20 @@ public final class Looper {
         return quitting || safeQuitAt >= 0;
     }
 
+    /// Whether a background looper's queue holds a message due now. Takes
+    /// the queue's monitor, as every other access to it does.
+    boolean hasDueMessage() {
+        synchronized (queue) {
+            long now = SystemClock.uptimeMillis();
+            for (int i = 0, n = queue.size(); i < n; i++) {
+                if (queue.get(i).when <= now) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     boolean isMain() {
         return main;
     }
