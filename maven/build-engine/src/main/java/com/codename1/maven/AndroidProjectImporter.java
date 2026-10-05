@@ -206,8 +206,36 @@ public final class AndroidProjectImporter {
         if (Pattern.compile("\\s" + Pattern.quote(name) + "\\s*=").matcher(tag).find()) {
             return manifest;
         }
-        return manifest.substring(0, open.start()) + "<manifest " + name + "=\"" + value + "\""
+        return manifest.substring(0, open.start()) + "<manifest " + name + "=\"" + escapeXmlAttribute(value) + "\""
                 + tag.substring("<manifest".length()) + manifest.substring(open.end());
+    }
+
+    /// `value` escaped for a double-quoted XML attribute. A Gradle
+    /// `versionName` may hold any character (`1.0 & beta`), and a raw `&`,
+    /// `<` or quote would leave the copied manifest malformed.
+    static String escapeXmlAttribute(String value) {
+        StringBuilder b = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '&':
+                    b.append("&amp;");
+                    break;
+                case '<':
+                    b.append("&lt;");
+                    break;
+                case '>':
+                    b.append("&gt;");
+                    break;
+                case '"':
+                    b.append("&quot;");
+                    break;
+                default:
+                    b.append(c);
+                    break;
+            }
+        }
+        return b.toString();
     }
 
     private void writeEntryPoint(File javaDir, String pkg, String cls) throws IOException {

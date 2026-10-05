@@ -253,12 +253,19 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         return names;
     }
 
+    /// The first value of `key`, decoded. As on Android (which documents it),
+    /// a literal `+` here decodes to a space; [#getQueryParameters(String)]
+    /// keeps it, as Android's does. Encode a literal plus as `%2B`.
     public String getQueryParameter(String key) {
-        List<String> v = getQueryParameters(key);
+        List<String> v = queryParameters(key, true);
         return v.isEmpty() ? null : v.get(0);
     }
 
     public List<String> getQueryParameters(String key) {
+        return queryParameters(key, false);
+    }
+
+    private List<String> queryParameters(String key, boolean plusIsSpace) {
         ArrayList<String> out = new ArrayList<String>();
         String q = getEncodedQuery();
         if (q == null) {
@@ -268,7 +275,12 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
             int eq = part.indexOf('=');
             String k = decode(eq >= 0 ? part.substring(0, eq) : part);
             if (k.equals(key)) {
-                out.add(eq >= 0 ? decode(part.substring(eq + 1).replace('+', ' ')) : "");
+                if (eq < 0) {
+                    out.add("");
+                } else {
+                    String raw = part.substring(eq + 1);
+                    out.add(decode(plusIsSpace ? raw.replace('+', ' ') : raw));
+                }
             }
         }
         return out;

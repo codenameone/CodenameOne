@@ -230,13 +230,19 @@ public abstract class LayoutInflater {
             }
         }
         XmlNode child = context.getResources().getXmlNode(layoutId);
+        CompiledAttributeSet includeAttrs = new CompiledAttributeSet(include);
+        // An android:theme on the <include> themes the included tree, merged
+        // or not, and replaces any theme the included root declares, as on
+        // Android.
+        Context themed = applyThemeAttr(context, includeAttrs);
+        boolean themeOverride = themed != context;
+        context = themed;
         if (child.tag.equals("merge")) {
             rInflate(child, group, context);
             return;
         }
         CompiledAttributeSet childAttrs = new CompiledAttributeSet(child);
-        CompiledAttributeSet includeAttrs = new CompiledAttributeSet(include);
-        View view = createViewFromTag(group, child.tag, context, childAttrs);
+        View view = createViewFromTag(group, child.tag, context, childAttrs, themeOverride);
         ViewGroup.LayoutParams params = null;
         // The <include>'s own layout_* attributes win when it sets both
         // dimensions, as on Android.
@@ -277,6 +283,26 @@ public abstract class LayoutInflater {
     }
 
     View createViewFromTag(View parent, String name, Context context, AttributeSet attrs) {
+        return createViewFromTag(parent, name, context, attrs, false);
+    }
+
+    /// `context` wrapped in the theme `attrs` names with `android:theme`, or
+    /// `context` itself when it names none.
+    private static Context applyThemeAttr(Context context, CompiledAttributeSet attrs) {
+        ResValue themeRef = attrs.valueForAttr(android.R.attr.theme);
+        if (themeRef == null || themeRef.data == 0) {
+            return context;
+        }
+        int themeId = themeRef.data;
+        if (themeRef.type == android.util.TypedValue.TYPE_ATTRIBUTE) {
+            android.util.TypedValue tv = new android.util.TypedValue();
+            themeId = context.getTheme().resolveAttribute(themeId, tv, true) ? tv.resourceId : 0;
+        }
+        return themeId != 0 ? new ContextThemeWrapper(context, themeId) : context;
+    }
+
+    private View createViewFromTag(View parent, String name, Context context, AttributeSet attrs,
+                                   boolean ignoreThemeAttr) {
         if (name.equals("view")) {
             String cls = attrs.getAttributeValue("", "class");
             if (cls != null) {
@@ -284,18 +310,8 @@ public abstract class LayoutInflater {
             }
         }
         CompiledAttributeSet cas = attrs instanceof CompiledAttributeSet ? (CompiledAttributeSet) attrs : null;
-        if (cas != null) {
-            ResValue themeRef = cas.valueForAttr(android.R.attr.theme);
-            if (themeRef != null && themeRef.data != 0) {
-                int themeId = themeRef.data;
-                if (themeRef.type == android.util.TypedValue.TYPE_ATTRIBUTE) {
-                    android.util.TypedValue tv = new android.util.TypedValue();
-                    themeId = context.getTheme().resolveAttribute(themeId, tv, true) ? tv.resourceId : 0;
-                }
-                if (themeId != 0) {
-                    context = new ContextThemeWrapper(context, themeId);
-                }
-            }
+        if (cas != null && !ignoreThemeAttr) {
+            context = applyThemeAttr(context, cas);
         }
         View view = null;
         if (mFactory2 != null) {

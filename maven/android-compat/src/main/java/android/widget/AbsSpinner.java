@@ -99,6 +99,12 @@ public abstract class AbsSpinner extends AdapterView<SpinnerAdapter> {
         } else if (mSelectedPosition < 0 && mItemCount > 0) {
             setSelectedPositionInt(0);
             checkSelectionChanged();
+        } else if (mSelectedPosition >= 0) {
+            // The position survived, but the row now there may be a different
+            // one: keep getSelectedItemId() in step with getSelectedItem().
+            // Android's stable-id search for the old row's new position is
+            // not done; the selection stays at its position.
+            setSelectedPositionInt(mSelectedPosition);
         }
     }
 

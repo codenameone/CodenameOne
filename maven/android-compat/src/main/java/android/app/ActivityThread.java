@@ -148,6 +148,14 @@ public final class ActivityThread {
         }
         // Activities start on the EDT, which is the main looper's thread.
         android.os.Looper.prepareMainLooper();
+        // A component's package, and an implicit intent's setPackage(), are
+        // deliberately not checked against this application's. This runtime
+        // hosts one application and cannot launch another, and its package
+        // name is the manifest's (the Gradle namespace), not the Gradle
+        // applicationId Android reports: a strict match would reject the
+        // common ComponentName(BuildConfig.APPLICATION_ID, ...) wherever the
+        // two differ. A foreign-package intent naming one of this
+        // application's own classes is not worth that breakage.
         Class<?> cls = intent.getComponentClass();
         AndroidApp.ActivityInfo info = null;
         if (cls != null) {
@@ -401,12 +409,17 @@ public final class ActivityThread {
             return;
         }
         Activity a = r.activity;
-        Bundle out = new Bundle();
-        a.onSaveInstanceState(out);
-        for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
-            cb.onActivitySaveInstanceState(a, out);
+        // A finishing activity is never restored, so Android does not ask it
+        // to save its state; only one that may come back (stopped under
+        // another activity, the app backgrounded, a relaunch) saves.
+        if (!a.mFinished) {
+            Bundle out = new Bundle();
+            a.onSaveInstanceState(out);
+            for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
+                cb.onActivitySaveInstanceState(a, out);
+            }
+            r.savedState = out;
         }
-        r.savedState = out;
         a.hostsDispatchStop();
         a.onStop();
         r.started = false;
@@ -418,11 +431,14 @@ public final class ActivityThread {
 
     private static void destroy(Record r, boolean deliverResult) {
         Activity a = r.activity;
+        // Finishing from the first callback on, as on Android: isFinishing()
+        // is true in onPause, and stop() skips the state save. A relaunch has
+        // already stopped (and saved) the instance before it gets here.
+        a.mFinished = true;
         if (r.resumed) {
             pause(r);
         }
         stop(r);
-        a.mFinished = true;
         r.decor.dispatchAttachedToWindow(false);
         a.hostsDispatchDestroy();
         a.onDestroy();

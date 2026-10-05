@@ -29,21 +29,39 @@ public final class MessageQueue {
         boolean queueIdle();
     }
 
+    /// The handlers registered and not yet removed. An idle run checks it
+    /// first, so a removed handler is neither invoked again nor rescheduled.
+    private final java.util.ArrayList<IdleHandler> idleHandlers = new java.util.ArrayList<IdleHandler>();
+
     MessageQueue() {
     }
 
     public void addIdleHandler(final IdleHandler handler) {
+        if (handler == null) {
+            throw new NullPointerException("Can't add a null IdleHandler");
+        }
+        idleHandlers.add(handler);
+        scheduleIdle(handler);
+    }
+
+    private void scheduleIdle(final IdleHandler handler) {
         com.codename1.ui.CN.callSeriallyOnIdle(new Runnable() {
             @Override
             public void run() {
+                if (!idleHandlers.contains(handler)) {
+                    return;
+                }
                 if (handler.queueIdle()) {
-                    addIdleHandler(handler);
+                    scheduleIdle(handler);
+                } else {
+                    idleHandlers.remove(handler);
                 }
             }
         });
     }
 
     public void removeIdleHandler(IdleHandler handler) {
+        idleHandlers.remove(handler);
     }
 
     public boolean isIdle() {

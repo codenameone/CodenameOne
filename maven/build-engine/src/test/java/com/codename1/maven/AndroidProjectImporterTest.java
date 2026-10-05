@@ -80,6 +80,25 @@ public class AndroidProjectImporterTest {
         assertTrue(merged, merged.contains("<application/>"));
     }
 
+    /// A Gradle versionName with XML-sensitive characters is escaped, so the
+    /// copied manifest still parses and carries the value unchanged.
+    @Test
+    public void escapesInjectedAttributeValues() throws Exception {
+        AndroidProjectImporter.Result r = new AndroidProjectImporter.Result();
+        AndroidProjectImporter.readGradle("android {\n  defaultConfig {\n    versionName \"1.0 & <beta>\"\n  }\n}\n", r);
+        assertEquals("1.0 & <beta>", r.versionName);
+        String m = "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">\n</manifest>\n";
+        String merged = AndroidProjectImporter.addManifestAttribute(m, "android:versionName", r.versionName);
+        merged = AndroidProjectImporter.addManifestAttribute(merged, "android:label", "say \"hi\"");
+        javax.xml.parsers.DocumentBuilderFactory f = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+        f.setNamespaceAware(true);
+        org.w3c.dom.Element root = f.newDocumentBuilder()
+                .parse(new java.io.ByteArrayInputStream(merged.getBytes("UTF-8"))).getDocumentElement();
+        String ns = "http://schemas.android.com/apk/res/android";
+        assertEquals("1.0 & <beta>", root.getAttributeNS(ns, "versionName"));
+        assertEquals("say \"hi\"", root.getAttributeNS(ns, "label"));
+    }
+
     @Test
     public void keepsWhatTheManifestAlreadySays() {
         String m = "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
