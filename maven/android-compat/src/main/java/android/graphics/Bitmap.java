@@ -324,6 +324,12 @@ public final class Bitmap {
     }
 
     public boolean compress(CompressFormat format, int quality, OutputStream stream) {
+        // Codename One encodes only PNG and JPEG. A WebP request fails the
+        // way Android reports an encoder failure, rather than writing PNG
+        // bytes the caller will label and serve as WebP.
+        if (format != CompressFormat.JPEG && format != CompressFormat.PNG) {
+            return false;
+        }
         ImageIO io = ImageIO.getImageIO();
         if (io == null) {
             return false;

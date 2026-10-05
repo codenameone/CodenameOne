@@ -88,10 +88,26 @@ public class EditText extends TextView {
     @Override
     void onTextReplaced(CharSequence text) {
         if (text instanceof SpannableStringBuilder) {
-            ((SpannableStringBuilder) text).addChangeHook(new Runnable() {
+            ((SpannableStringBuilder) text).addChangeHook(new SpannableStringBuilder.ChangeHook() {
                 @Override
-                public void run() {
+                public void beforeChange(SpannableStringBuilder t, int start, int before, int after) {
+                    // A native edit (onPeerTextChanged) notifies the
+                    // watchers itself; a live-Editable mutation from app
+                    // code (getText().clear(), replace(), append()) is
+                    // reported here, as Android does.
+                    if (!mSyncing && t == mText) {
+                        sendBeforeTextChanged(t, start, before, after);
+                    }
+                }
+
+                @Override
+                public void afterChange(SpannableStringBuilder t, int start, int before, int after) {
+                    boolean notify = !mSyncing && t == mText;
                     pushTextToPeer();
+                    if (notify) {
+                        sendOnTextChanged(t, start, before, after);
+                        sendAfterTextChanged();
+                    }
                     textChanged();
                 }
             });

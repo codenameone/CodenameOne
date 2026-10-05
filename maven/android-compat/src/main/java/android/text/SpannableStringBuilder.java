@@ -28,7 +28,18 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
     private final StringBuilder text;
     private final SpanSet spans;
     private InputFilter[] filters = new InputFilter[0];
-    private final java.util.ArrayList<Runnable> watchers = new java.util.ArrayList<Runnable>();
+    private final java.util.ArrayList<ChangeHook> watchers = new java.util.ArrayList<ChangeHook>();
+
+    /// Runtime use: told before and after every change, with the range
+    /// replaced (`start`, `before` characters) and the length of what
+    /// replaced it (`after`), so an EditText can notify its TextWatchers.
+    public interface ChangeHook {
+        /// The text is about to change.
+        void beforeChange(SpannableStringBuilder text, int start, int before, int after);
+
+        /// The text has changed.
+        void afterChange(SpannableStringBuilder text, int start, int before, int after);
+    }
 
     public SpannableStringBuilder() {
         text = new StringBuilder();
@@ -57,14 +68,8 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
     }
 
     /// Runtime use: called after every change, so an EditText can follow.
-    public void addChangeHook(Runnable r) {
+    public void addChangeHook(ChangeHook r) {
         watchers.add(r);
-    }
-
-    private void changed() {
-        for (Runnable r : watchers) {
-            r.run();
-        }
     }
 
     @Override
@@ -101,11 +106,17 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
                 src = r;
             }
         }
+        int after = src.length();
+        for (int i = 0; i < watchers.size(); i++) {
+            watchers.get(i).beforeChange(this, st, en - st, after);
+        }
         // StringBuilder.replace is not in the Codename One runtime.
         text.delete(st, en);
         text.insert(st, src.toString());
-        spans.replaced(st, en, src.length());
-        changed();
+        spans.replaced(st, en, after);
+        for (int i = 0; i < watchers.size(); i++) {
+            watchers.get(i).afterChange(this, st, en - st, after);
+        }
         return this;
     }
 

@@ -225,7 +225,9 @@ public final class ObjectAnimator extends ValueAnimator {
                     other.cancel();
                 }
             }
-            AUTO_CANCEL.add(this);
+            if (!AUTO_CANCEL.contains(this)) {
+                AUTO_CANCEL.add(this);
+            }
         }
         super.start();
     }
@@ -295,9 +297,14 @@ public final class ObjectAnimator extends ValueAnimator {
                 v.setAnimatedValue(target);
             }
         }
-        if (!isStarted()) {
-            AUTO_CANCEL.remove(this);
-        }
+    }
+
+    // Every way an animator ends, a natural finish included, goes through
+    // here, so the static registry never keeps a finished animator (and
+    // its target view tree) alive.
+    @Override
+    void animationEnded() {
+        AUTO_CANCEL.remove(this);
     }
 
     @Override
@@ -310,6 +317,11 @@ public final class ObjectAnimator extends ValueAnimator {
     public void cancel() {
         super.cancel();
         AUTO_CANCEL.remove(this);
+    }
+
+    /// Test hook: whether the auto-cancel registry still holds this animator.
+    boolean isAutoCancelRegistered() {
+        return AUTO_CANCEL.contains(this);
     }
 
     @Override

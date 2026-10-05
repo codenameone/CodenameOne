@@ -73,7 +73,12 @@ public class HandlerThread extends Thread {
     }
 
     public boolean quitSafely() {
-        return quit();
+        Looper l = getLooper();
+        if (l != null) {
+            l.quitSafely();
+            return true;
+        }
+        return false;
     }
 
     public int getThreadId() {

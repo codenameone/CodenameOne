@@ -498,12 +498,18 @@ public class ValueAnimator extends Animator {
         mStartListenersCalled = false;
         mReversing = false;
         mSeekFraction = -1;
+        animationEnded();
         if (notify) {
             ArrayList<AnimatorListener> l = listenersCopy();
             for (AnimatorListener a : l) {
                 a.onAnimationEnd(this);
             }
         }
+    }
+
+    /// Called once the animator has ended, however it ended: naturally,
+    /// through end() or through cancel().
+    void animationEnded() {
     }
 
     @Override

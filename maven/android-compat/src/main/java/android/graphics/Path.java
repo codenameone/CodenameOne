@@ -387,6 +387,15 @@ public class Path {
 
     public void transform(Matrix matrix) {
         matrix.mapPoints(pts, 0, pts, 0, nPts / 2);
+        // The current point and contour start move with the path, so a
+        // relative command or a close appended later continues from the
+        // transformed position.
+        float[] cached = {lastX, lastY, startX, startY};
+        matrix.mapPoints(cached);
+        lastX = cached[0];
+        lastY = cached[1];
+        startX = cached[2];
+        startY = cached[3];
     }
 
     public void transform(Matrix matrix, Path dst) {

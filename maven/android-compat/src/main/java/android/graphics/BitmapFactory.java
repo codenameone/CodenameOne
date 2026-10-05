@@ -82,7 +82,7 @@ public class BitmapFactory {
         if (img == null) {
             return null;
         }
-        return finish(img, opts, 0);
+        return finish(img, opts, 0, mimeType(data, offset, length));
     }
 
     public static Bitmap decodeResource(Resources res, int id) {
@@ -103,7 +103,7 @@ public class BitmapFactory {
         try {
             byte[] data = readAll(in);
             Image img = Image.createImage(data, 0, data.length);
-            return finish(img, opts, bucket);
+            return finish(img, opts, bucket, mimeType(data, 0, data.length));
         } catch (IOException e) {
             return null;
         } finally {
@@ -132,7 +132,32 @@ public class BitmapFactory {
         }
     }
 
-    private static Bitmap finish(Image img, Options opts, int bucketDensity) {
+    /// The MIME type of encoded image data, read from its signature bytes
+    /// the way Android's decoder reports it; null when unrecognized.
+    static String mimeType(byte[] d, int off, int len) {
+        if (d == null || len < 3 || off < 0 || off + len > d.length) {
+            return null;
+        }
+        if (len >= 8 && (d[off] & 0xff) == 0x89 && d[off + 1] == 'P' && d[off + 2] == 'N' && d[off + 3] == 'G') {
+            return "image/png";
+        }
+        if ((d[off] & 0xff) == 0xff && (d[off + 1] & 0xff) == 0xd8 && (d[off + 2] & 0xff) == 0xff) {
+            return "image/jpeg";
+        }
+        if (len >= 6 && d[off] == 'G' && d[off + 1] == 'I' && d[off + 2] == 'F' && d[off + 3] == '8') {
+            return "image/gif";
+        }
+        if (len >= 12 && d[off] == 'R' && d[off + 1] == 'I' && d[off + 2] == 'F' && d[off + 3] == 'F'
+                && d[off + 8] == 'W' && d[off + 9] == 'E' && d[off + 10] == 'B' && d[off + 11] == 'P') {
+            return "image/webp";
+        }
+        if (d[off] == 'B' && d[off + 1] == 'M') {
+            return "image/bmp";
+        }
+        return null;
+    }
+
+    private static Bitmap finish(Image img, Options opts, int bucketDensity, String mimeType) {
         int w = img.getWidth();
         int h = img.getHeight();
         int sample = opts == null || opts.inSampleSize < 1 ? 1 : opts.inSampleSize;
@@ -150,7 +175,7 @@ public class BitmapFactory {
             opts.outWidth = tw;
             opts.outHeight = th;
             opts.outConfig = Bitmap.Config.ARGB_8888;
-            opts.outMimeType = "image/png";
+            opts.outMimeType = mimeType;
             if (opts.inJustDecodeBounds) {
                 return null;
             }

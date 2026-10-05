@@ -270,6 +270,13 @@ public class RecyclerView extends ViewGroup {
         return mEdgeEffectFactory;
     }
 
+    /// Stored, not applied: like every view group here, a RecyclerView's
+    /// children paint in child order. Their Codename One peers are painted
+    /// by Container in component order, and this runtime honours no
+    /// per-child paint order anywhere -- ViewGroup.getChildDrawingOrder,
+    /// elevation and translationZ are ignored too -- so this callback stays
+    /// consistent with the rest rather than reordering one widget's peers.
+    /// The runtime's own ItemTouchHelper does not rely on it.
     public void setChildDrawingOrderCallback(ChildDrawingOrderCallback callback) {
         mChildDrawingOrderCallback = callback;
     }

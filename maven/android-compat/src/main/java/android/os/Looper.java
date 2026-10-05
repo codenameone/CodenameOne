@@ -34,6 +34,9 @@ public final class Looper {
     private final boolean main;
     final java.util.ArrayList<Message> queue = new java.util.ArrayList<Message>();
     private boolean quitting;
+    /// The uptime quitSafely() was called at, or -1: messages due by then
+    /// are still delivered, later ones are dropped.
+    private long safeQuitAt = -1;
     private Thread thread;
 
     private Looper(boolean main) {
@@ -100,6 +103,9 @@ public final class Looper {
                     return;
                 }
                 long now = SystemClock.uptimeMillis();
+                if (l.safeQuitAt >= 0) {
+                    now = l.safeQuitAt;
+                }
                 for (int i = 0; i < l.queue.size(); i++) {
                     Message m = l.queue.get(i);
                     if (m.when <= now && (next == null || m.when < next.when)) {
@@ -108,6 +114,11 @@ public final class Looper {
                 }
                 if (next != null) {
                     l.queue.remove(next);
+                } else if (l.safeQuitAt >= 0) {
+                    // Everything due when quitSafely() ran has been delivered.
+                    l.quitting = true;
+                    l.queue.clear();
+                    return;
                 } else {
                     wait = 50;
                     for (Message m : l.queue) {
@@ -135,7 +146,12 @@ public final class Looper {
     }
 
     public void quitSafely() {
-        quit();
+        synchronized (queue) {
+            if (!quitting && safeQuitAt < 0) {
+                safeQuitAt = SystemClock.uptimeMillis();
+            }
+            queue.notifyAll();
+        }
     }
 
     public boolean isCurrentThread() {

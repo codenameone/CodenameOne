@@ -51,6 +51,15 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The image encoder `ImageIO.getImageIO()` answers; none by default. A
+    /// test that sets it must reset it.
+    public static com.codename1.ui.util.ImageIO imageIO;
+
+    @Override
+    public com.codename1.ui.util.ImageIO getImageIO() {
+        return imageIO;
+    }
+
     @Override
     public InputStream getResourceAsStream(Class cls, String resource) {
         Class c = cls == null ? HeadlessImplementation.class : cls;
