@@ -55,6 +55,28 @@
     }
    }
   },
+  "linux-x64@amd-epyc-9v74-80-core-processor": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.388,
+      "time": 4.756,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.388,
+     "reason": "#5940's hybrid collector, measured on a CPU model #5940 never ran on: objectAllocation time fell from 4.76x to 1.21x of JDK 25 on AMD EPYC 9V74 (rounds 1.198-1.471x), the same drop #5940 recorded on every other linux-x64 model (EPYC 7763 5.01 -> 1.65x, EPYC 9V45 5.57 -> 1.61x, Xeon 8573C 2.63 -> 1.03x). This pull request does not touch the collector; RAM stayed in band. Time recalibrated from this run.",
+     "runs": 1,
+     "time": 1.206,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "macos-arm64": {
    "objectAllocation": {
     "all": {
