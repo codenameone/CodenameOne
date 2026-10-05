@@ -176,6 +176,10 @@ public final class ActivityThread {
         boolean reuseInStack = info.launchMode >= android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK;
         boolean singleTop = (intent.getFlags() & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0
                 || info.launchMode == android.content.pm.ActivityInfo.LAUNCH_SINGLE_TOP;
+        // A standard-mode target of a plain CLEAR_TOP is finished and a new
+        // instance created in its place, as Android does; onCreate then sees
+        // the new intent. Only a single-top or single-task target is reused.
+        Record recreated = null;
         if (clearTopFlag || reuseInStack) {
             for (int i = STACK.size() - 1; i >= 0; i--) {
                 if (STACK.get(i).activity.getClass() == info.type) {
@@ -187,11 +191,15 @@ public final class ActivityThread {
                     while (STACK.size() - 1 > i) {
                         destroy(STACK.remove(STACK.size() - 1), false);
                     }
-                    // Android finishes and recreates the target unless
-                    // SINGLE_TOP is set; delivering the intent to the live
-                    // instance keeps its state, which is what callers of
-                    // CLEAR_TOP rely on in practice. A launch mode reuse
-                    // keeps the original intent, as Android does.
+                    if (!singleTop && !reuseInStack) {
+                        // Destroyed once the new instance is showing, so
+                        // the display never falls back to the host form.
+                        recreated = STACK.remove(i);
+                        recreated.activity.mFinished = true;
+                        break;
+                    }
+                    // A launch mode reuse keeps the original intent, as
+                    // Android does.
                     if (clearTopFlag) {
                         target.activity.setIntent(intent);
                     }
@@ -225,7 +233,7 @@ public final class ActivityThread {
         r.requestCode = requestCode;
         r.info = info;
         attach(r, intent);
-        if (STACK.isEmpty()) {
+        if (STACK.isEmpty() && recreated == null) {
             // The first activity of an application hosted inside a Codename
             // One app: remember the host's form to return to.
             AndroidRuntime.getInstance().noteHostForm(com.codename1.ui.Display.getInstance().getCurrent());
@@ -236,6 +244,9 @@ public final class ActivityThread {
         resumeRecord(r, false);
         if (prev != null) {
             stop(prev);
+        }
+        if (recreated != null) {
+            destroy(recreated, false);
         }
         if (clearTask) {
             for (int i = STACK.size() - 2; i >= 0; i--) {

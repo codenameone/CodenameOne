@@ -318,6 +318,27 @@ public class Path {
             r[i] = Math.max(0, Math.min(radii[i], (i % 2 == 0 ? w : h) / 2));
         }
         moveTo(left + r[0], top);
+        if (dir == Direction.CCW) {
+            // The same outline walked the other way: direction decides the
+            // winding, so an inner CCW contour cuts a hole in a CW one.
+            if (r[0] > 0 || r[1] > 0) {
+                appendArc(left + r[0], top + r[1], r[0], r[1], -90, -90);
+            }
+            lineTo(left, bottom - r[7]);
+            if (r[6] > 0 || r[7] > 0) {
+                appendArc(left + r[6], bottom - r[7], r[6], r[7], 180, -90);
+            }
+            lineTo(right - r[4], bottom);
+            if (r[4] > 0 || r[5] > 0) {
+                appendArc(right - r[4], bottom - r[5], r[4], r[5], 90, -90);
+            }
+            lineTo(right, top + r[3]);
+            if (r[2] > 0 || r[3] > 0) {
+                appendArc(right - r[2], top + r[3], r[2], r[3], 0, -90);
+            }
+            close();
+            return;
+        }
         lineTo(right - r[2], top);
         if (r[2] > 0 || r[3] > 0) {
             appendArc(right - r[2], top + r[3], r[2], r[3], -90, 90);

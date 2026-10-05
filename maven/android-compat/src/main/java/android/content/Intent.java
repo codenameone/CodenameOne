@@ -297,10 +297,15 @@ public class Intent implements Parcelable, Cloneable {
         return extras;
     }
 
-    /// A copy of the extras, or null when there are none. A copy on purpose:
-    /// Android's `Intent.getExtras()` is `new Bundle(mExtras)` too, so code
-    /// that changes the returned bundle has never changed the intent there;
-    /// `putExtra`, `removeExtra` and `replaceExtras` are the way to.
+    /// A copy of the extras, or null when there are none.
+    ///
+    /// Deliberately NOT the live bundle (review claim re-checked against
+    /// AOSP): `Intent.getExtras()` there is
+    /// `return (mExtras != null) ? new Bundle(mExtras) : null;`, so on a
+    /// device a change to the returned bundle never reaches the intent
+    /// either. Callers mutate an intent's extras through `putExtra`,
+    /// `putExtras`, `removeExtra` and `replaceExtras`; returning the live
+    /// bundle would make code behave differently here than on Android.
     public Bundle getExtras() {
         return extras == null ? null : new Bundle(extras);
     }

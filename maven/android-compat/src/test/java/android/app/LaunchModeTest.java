@@ -88,6 +88,57 @@ public class LaunchModeTest {
     }
 
     @Test
+    public void clearTopRecreatesAStandardTarget() {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                Context app = AndroidTestSupport.context().getApplicationContext();
+                app.startActivity(new Intent(app, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                Activity target = ActivityThread.getTopActivity();
+                int count = ActivityThread.getActivityCount();
+                target.startActivity(new Intent(target, AndroidTestSupport.UiModeHandlingActivity.class));
+                Activity above = ActivityThread.getTopActivity();
+                Intent again = new Intent(above, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                above.startActivity(again);
+                Activity now = ActivityThread.getTopActivity();
+                assertTrue(now instanceof AndroidTestSupport.TestActivity);
+                assertTrue("a standard target is recreated", now != target);
+                assertTrue(target.isDestroyed());
+                assertTrue(above.isDestroyed());
+                assertSame(again, now.getIntent());
+                assertEquals(count, ActivityThread.getActivityCount());
+                assertSame(now, ActivityThread.getTopActivity());
+            }
+        });
+    }
+
+    @Test
+    public void clearTopWithSingleTopReusesAStandardTarget() {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                Context app = AndroidTestSupport.context().getApplicationContext();
+                app.startActivity(new Intent(app, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                Activity target = ActivityThread.getTopActivity();
+                int count = ActivityThread.getActivityCount();
+                target.startActivity(new Intent(target, AndroidTestSupport.UiModeHandlingActivity.class));
+                Activity above = ActivityThread.getTopActivity();
+                Intent again = new Intent(above, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                above.startActivity(again);
+                assertSame(target, ActivityThread.getTopActivity());
+                assertTrue(!target.isDestroyed());
+                assertTrue(above.isDestroyed());
+                assertSame(again, target.getIntent());
+                assertEquals(count, ActivityThread.getActivityCount());
+            }
+        });
+    }
+
+    @Test
     public void singleTaskClearsWhatIsAboveIt() {
         onEdt(new Runnable() {
             @Override
