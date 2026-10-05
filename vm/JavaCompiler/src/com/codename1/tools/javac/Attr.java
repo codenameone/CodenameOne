@@ -1133,6 +1133,38 @@ final class Attr {
         return r.method;
     }
 
+    private boolean initializerExceptionDeclared(ClassSymbol c, Type exc) {
+        boolean anyCtor = false;
+        for (MethodSymbol m : c.methods) {
+            if (!m.isConstructor()) {
+                continue;
+            }
+            anyCtor = true;
+            if (m.decl != null && delegatesToThis(m.decl)) {
+                continue;
+            }
+            boolean declared = false;
+            for (Type th : m.thrown) {
+                if (th.tag == Type.Tag.TYPEVAR || types.isSubtype(exc, types.erased(th))) {
+                    declared = true;
+                }
+            }
+            if (!declared) {
+                return false;
+            }
+        }
+        return anyCtor;
+    }
+
+    private static boolean delegatesToThis(Tree.MethodDecl d) {
+        if (d.body == null || d.body.stats.isEmpty() || !(d.body.stats.get(0) instanceof Tree.ExpressionStatement)) {
+            return false;
+        }
+        Tree x = ((Tree.ExpressionStatement) d.body.stats.get(0)).expr;
+        return x instanceof Tree.MethodCall && "<init>".equals(((Tree.MethodCall) x).name)
+                && !((Tree.MethodCall) x).superCall;
+    }
+
     private boolean isSubclassOfAnyEnclosing(ClassSymbol c, ClassSymbol target) {
         for (ClassSymbol k = c; k != null; k = k.outer) {
             if (types.isSubClass(k, target)) {
@@ -1676,6 +1708,7 @@ final class Attr {
                 clause = new ArrayList<Type>();
                 clause.add(pt);
             }
+            checkCatchDominance(p, clause, earlier, env);
             sym.preciseThrown = preciseThrown(thrownInTry, clause, earlier);
             sym.pendingRethrows = new ArrayList<Object[]>();
             earlier.addAll(clause);
@@ -1696,6 +1729,38 @@ final class Attr {
         }
         if (t.finalizer != null) {
             attribStat(t.finalizer, env.dup());
+        }
+    }
+
+    /**
+     * JLS 14.20: a catch type an earlier clause already catches makes the clause unreachable,
+     * and two alternatives of one multi-catch may not be subclasses of each other.
+     */
+    private void checkCatchDominance(Tree.VarDef p, List<Type> clause, List<Type> earlier, Env env) {
+        boolean union = p.unionTypes != null && !p.unionTypes.isEmpty();
+        for (int i = 0; i < clause.size(); i++) {
+            Type alt = clause.get(i);
+            int pos = union ? p.unionTypes.get(i).pos : p.vartype.pos;
+            if (alt == null || alt.isErroneous()) {
+                continue;
+            }
+            Type ea = types.erased(alt);
+            for (Type e : earlier) {
+                if (!e.isErroneous() && types.isSubtype(ea, types.erased(e))) {
+                    error(env, pos, "exception " + alt + " has already been caught");
+                    return;
+                }
+            }
+            if (union) {
+                for (int j = 0; j < clause.size(); j++) {
+                    Type other = clause.get(j);
+                    if (j != i && other != null && !other.isErroneous() && types.isSubtype(ea, types.erased(other))) {
+                        error(env, pos, "Alternatives in a multi-catch statement cannot be related by subclassing\n"
+                                + "  Alternative " + alt + " is a subclass of alternative " + other);
+                        return;
+                    }
+                }
+            }
         }
     }
 
@@ -2063,11 +2128,12 @@ final class Attr {
             }
             if (e.methodBoundary) {
                 if (e.enclMethod == null) {
-                    // An initializer: instance initializers of anonymous classes may throw anything.
-                    if (e.isStatic || !e.enclClass.anonymous) {
-                        if (e.isStatic) {
-                            error(env, pos, "unreported exception " + exc + "; must be caught or declared to be thrown");
-                        }
+                    // An initializer. An anonymous class's instance initializer may throw anything
+                    // (its constructor is the expression that creates it); a named class's runs in
+                    // every constructor that does not delegate with this(...), so each of those must
+                    // declare it (JLS 11.2.3) -- an implicit constructor declares nothing.
+                    if (e.isStatic || !e.enclClass.anonymous && !initializerExceptionDeclared(e.enclClass, ee)) {
+                        error(env, pos, "unreported exception " + exc + "; must be caught or declared to be thrown");
                     }
                     return;
                 }

@@ -59,6 +59,9 @@ final class Enter {
             enterHeader(sourceClasses.get(i));
         }
         for (int i = 0; i < sourceClasses.size(); i++) {
+            checkCyclicInheritance(sourceClasses.get(i));
+        }
+        for (int i = 0; i < sourceClasses.size(); i++) {
             enterMembers(sourceClasses.get(i));
         }
     }
@@ -114,6 +117,9 @@ final class Enter {
             Type.TypeVar tv = new Type.TypeVar(tp.name);
             tp.tvar = tv;
             rawTypeParams(c).add(tv);
+        }
+        if (decl.mods != null) {
+            checkClassModifiers(decl, c, outer);
         }
         compiler.symtab.enter(c);
         sourceClasses.add(c);
@@ -278,6 +284,100 @@ final class Enter {
         }
     }
 
+    /**
+     * Class modifiers (JLS 8.1.1, 8.9, 8.10, 9.1.1): which a declaration may carry depends on
+     * whether it is top level, a member or local, and on its kind; the JVM refuses a class whose
+     * flags conflict (abstract and final) and an enum or interface that is final.
+     */
+    private void checkClassModifiers(Tree.ClassDecl decl, ClassSymbol c, ClassSymbol outer) {
+        int flags = decl.mods.flags;
+        int allowed = Symbol.ACC_ABSTRACT | Symbol.ACC_FINAL | Symbol.ACC_STRICT | JavaSourceParser.SEALED
+                | JavaSourceParser.NON_SEALED;
+        if (decl.local) {
+            allowed &= ~(JavaSourceParser.SEALED | JavaSourceParser.NON_SEALED);
+        } else if (outer == null) {
+            allowed |= Symbol.ACC_PUBLIC;
+        } else {
+            allowed |= ACCESS | Symbol.ACC_STATIC;
+        }
+        switch (decl.kind) {
+            case INTERFACE:
+            case ANNOTATION:
+                allowed &= ~Symbol.ACC_FINAL;
+                break;
+            case ENUM:
+                allowed &= ~(Symbol.ACC_ABSTRACT | Symbol.ACC_FINAL | JavaSourceParser.SEALED
+                        | JavaSourceParser.NON_SEALED);
+                break;
+            case RECORD:
+                allowed &= ~(Symbol.ACC_ABSTRACT | JavaSourceParser.SEALED | JavaSourceParser.NON_SEALED);
+                break;
+            default:
+                break;
+        }
+        if ((decl.kind == Tree.ClassKind.INTERFACE || decl.kind == Tree.ClassKind.ANNOTATION)
+                && (flags & Symbol.ACC_FINAL) != 0) {
+            compiler.error(c.unit, decl.pos, "illegal combination of modifiers: interface and final");
+            return;
+        }
+        for (int i = 0; i < MODIFIER_FLAGS.length; i++) {
+            if ((flags & MODIFIER_FLAGS[i]) != 0 && (allowed & MODIFIER_FLAGS[i]) == 0) {
+                compiler.error(c.unit, decl.pos, "modifier " + MODIFIER_NAMES[i] + " not allowed here");
+                return;
+            }
+        }
+        int access = flags & ACCESS;
+        int restrictions = flags & (Symbol.ACC_FINAL | JavaSourceParser.SEALED | JavaSourceParser.NON_SEALED);
+        String a = null;
+        String b = null;
+        if ((access & (access - 1)) != 0) {
+            a = name(access, 0);
+            b = name(access, 1);
+        } else if ((flags & Symbol.ACC_ABSTRACT) != 0 && (flags & Symbol.ACC_FINAL) != 0) {
+            a = "abstract";
+            b = "final";
+        } else if ((restrictions & (restrictions - 1)) != 0) {
+            a = name(restrictions, 0);
+            b = name(restrictions, 1);
+        }
+        if (a != null) {
+            compiler.error(c.unit, decl.pos, "illegal combination of modifiers: " + a + " and " + b);
+        }
+    }
+
+    /**
+     * A class that is its own supertype (JLS 8.1.4, 9.1.3): the JVM refuses to load it with
+     * ClassCircularityError. Reported once, on the first class of the cycle, which then loses
+     * its supertypes so nothing later walks the cycle forever.
+     */
+    private void checkCyclicInheritance(ClassSymbol c) {
+        if (reachesItself(c, c, new java.util.HashSet<ClassSymbol>())) {
+            compiler.error(c.unit, c.decl.extending != null ? c.decl.extending.pos : c.decl.pos,
+                    "cyclic inheritance involving " + c.javaName());
+            c.setSuperclass(compiler.symtab.objectType);
+            c.interfaces().clear();
+        }
+    }
+
+    private static boolean reachesItself(ClassSymbol target, ClassSymbol from, java.util.Set<ClassSymbol> seen) {
+        if (from.decl == null || !seen.add(from)) {
+            return false;
+        }
+        List<Type> supers = new ArrayList<Type>(from.interfaces());
+        if (from.superclass() != null) {
+            supers.add(from.superclass());
+        }
+        for (Type t : supers) {
+            if (t instanceof Type.ClassType) {
+                ClassSymbol s = ((Type.ClassType) t).sym;
+                if (s == target || reachesItself(target, s, seen)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** The name of the n-th modifier set in flags, in javac's order. */
     private static String name(int flags, int n) {
         for (int i = 0; i < MODIFIER_FLAGS.length; i++) {
@@ -367,7 +467,8 @@ final class Enter {
     }
 
     MethodSymbol enterMethod(Tree.MethodDecl m, ClassSymbol c, Env classEnv) {
-        checkModifiers(m.mods.flags, c.isInterface() ? INTERFACE_METHOD_MODIFIERS : METHOD_MODIFIERS, c, m.pos);
+        checkModifiers(m.mods.flags, "<init>".equals(m.name) ? ACCESS
+                : c.isInterface() ? INTERFACE_METHOD_MODIFIERS : METHOD_MODIFIERS, c, m.pos);
         int flags = m.mods.flags & 0xFFFF;
         boolean isInterface = c.isInterface();
         if (isInterface) {

@@ -245,6 +245,11 @@ final class Gen {
                 attrs.add(a);
             }
         }
+        // No RuntimeVisibleAnnotations, deliberately, here or on members. ParparVM's
+        // Class.getAnnotation answers null and isAnnotationPresent false on every type, so
+        // the browser could never read them; emitting them would only make the simulator see
+        // annotations its translated twin cannot, and code that depends on them work in one
+        // and silently not in the other. Codename One's annotations are compile-time.
         String classSig = classSignature(c);
         if (classSig != null) {
             ByteBuf a = new ByteBuf();
