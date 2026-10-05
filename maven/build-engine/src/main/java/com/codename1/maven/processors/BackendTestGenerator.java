@@ -302,7 +302,10 @@ final class BackendTestGenerator {
            .append(spec.profile).append('|').append(spec.webEnvironment).append('|');
         List<String> mockTypes = new ArrayList<String>();
         for (String[] m : spec.mocks) {
-            mockTypes.add(m[1]);
+            // The field name too: it names the mock bean when the type alone does
+            // not pick one, so two classes mocking one type under different names
+            // are different contexts.
+            mockTypes.add(m[1] + " " + m[0]);
         }
         Collections.sort(mockTypes);
         key.append(mockTypes);

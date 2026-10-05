@@ -91,6 +91,11 @@ final class BackendPackageSupport {
             // Mockito) and compiles the rest with the tests.
             t.getTestClasspath().from(test.getCompileClasspath());
             t.getTestSources().from(test.getJava().getSrcDirs());
+            // What test annotation processors generated, as configure() adds the
+            // main ones: the compiled run recompiles the tests from source.
+            t.getTestSources().from(project.getTasks().named(test.getCompileJavaTaskName(),
+                    org.gradle.api.tasks.compile.JavaCompile.class)
+                    .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
             // The Kotlin test directory too, so the packager can refuse Kotlin
             // tests by name instead of compiling the run without them.
             t.getTestSources().from(new File(layout.projectDir(), "src/test/kotlin"));

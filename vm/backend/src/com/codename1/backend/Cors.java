@@ -152,7 +152,13 @@ final class Cors {
             return varyByOrigin(HttpServer.Response.text(403, "origin not allowed"));
         }
         if (!allowsMethod(method)) {
-            return varyByOrigin(HttpServer.Response.text(403, "method not allowed"));
+            HttpServer.Response denied = varyByOrigin(HttpServer.Response.text(403, "method not allowed"));
+            if (asked != null) {
+                // A preflight refused for its requested method: another method's
+                // preflight to the same URL must not be answered from a cache.
+                denied.appendToken("Vary", "Access-Control-Request-Method");
+            }
+            return denied;
         }
         return null;
     }
@@ -273,7 +279,11 @@ final class Cors {
             response.appendToken("Vary", "Origin");
         }
         String origin = request.getHeader("Origin");
-        if (origin == null || !allows(origin)) {
+        boolean wildcard = anyOrigin && !credentials;
+        // Under a wildcard policy the answer is the same "*" for every request,
+        // one without Origin included, so a cache needs no Vary: a copy cached
+        // from a request with no Origin is still right for a browser's.
+        if (origin == null ? !wildcard : !allows(origin)) {
             return;
         }
         allowOrigin(response, origin);

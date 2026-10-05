@@ -337,6 +337,24 @@ class HttpBodiesTest {
                 + "Content-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
         assertTrue(answer.contains("Access-Control-Allow-Origin: *"), answer);
         assertTrue(!answer.contains("Vary: Origin"), answer);
+        // Without Vary, a copy cached from a request with no Origin must be right
+        // for a browser's too.
+        String noOrigin = raw("POST /text HTTP/1.1\r\nHost: x\r\n"
+                + "Content-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
+        assertTrue(noOrigin.contains("Access-Control-Allow-Origin: *"), noOrigin);
+    }
+
+    @Test
+    @DisplayName("a preflight refused for its method varies by the requested method")
+    void aRefusedPreflightVariesByMethod() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.cors.allowedOrigins", "http://app.example");
+        p.setProperty("cn1.cors.allowedMethods", "GET,POST");
+        start(p);
+        String refused = raw("OPTIONS /text HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Access-Control-Request-Method: DELETE\r\nConnection: close\r\n\r\n");
+        assertTrue(refused.startsWith("HTTP/1.1 403"), refused);
+        assertTrue(refused.matches("(?s).*Vary: [^\r]*Access-Control-Request-Method.*"), refused);
     }
 
     @Test

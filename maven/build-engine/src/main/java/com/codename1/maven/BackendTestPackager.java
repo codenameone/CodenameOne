@@ -385,16 +385,27 @@ public abstract class BackendTestPackager extends BackendPackager {
     /// a targeted run (`-Dtest=ApiTest`) writes reports only for what it ran, and
     /// the rest from a previous full run read as if they had run this time.
     private void clearCompiledReports() {
-        File[] old = new File(host.buildDirectory(), "surefire-reports").listFiles();
+        for (File f : clearCompiledReports(host.buildDirectory())) {
+            getLog().warn("cn1: could not remove the stale report " + f);
+        }
+    }
+
+    /// Deletes the compiled run's reports under `buildDirectory`, answering the
+    /// ones that would not go. Also called by a build whose compiled run is off:
+    /// a report a previous run left would otherwise be collected as this one's.
+    public static List<File> clearCompiledReports(File buildDirectory) {
+        List<File> stuck = new ArrayList<File>();
+        File[] old = new File(buildDirectory, "surefire-reports").listFiles();
         if (old == null) {
-            return;
+            return stuck;
         }
         for (File f : old) {
             String name = f.getName();
             if (name.startsWith("TEST-") && name.endsWith("-compiled.xml") && !f.delete()) {
-                getLog().warn("cn1: could not remove the stale report " + f);
+                stuck.add(f);
             }
         }
+        return stuck;
     }
 
     /// The test sources the compiled run names to javac: the ones whose class the
