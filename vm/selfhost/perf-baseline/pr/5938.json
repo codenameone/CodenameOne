@@ -9,9 +9,9 @@
       "time": 0.625
      },
      "memory": 0.447,
-     "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM and its JavaScript generator is no longer stubbed out of the self-hosted build, so 'translator (self)' now translates a corpus about twice as large (both arms take ~2x as long: ParparVM 955 -> 1890ms, JDK 1.8 -> 3.0-3.75s on linux-x64). Translating a real application did not slow down: the hello row stayed in band on linux and macOS, arm64 hello got faster (9.5 -> 8.7s), and Windows x64's out-of-band hello RAM was the JDK arm swinging 832-987MB between rounds while ParparVM held 835-857MB.",
-     "runs": 1,
-     "time": 0.625
+     "reason": "The workload changed, not the VM: 'translator (self)' translates the translator's own classes, which on this pull request no longer go through ASM and include the no-longer-stubbed JavaScript generator, a corpus about twice as large; the other CPUs' rows were recalibrated for the same change. Every linux-arm64 run of this pull request has read this row high against master's 0.625x -- medians 0.697x, 0.689x, 0.698x and 0.721x, rounds 0.665-0.766x -- the last after merging #5940 tipped it past tolerance. Time recalibrated from all four runs; RAM keeps its earlier recalibration.",
+     "runs": 4,
+     "time": 0.698
     }
    }
   },
