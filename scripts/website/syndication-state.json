@@ -2522,6 +2522,18 @@
         "url": "https://medium.com/p/64969a8c089f/edit",
         "syndicated_at": "2026-10-04T19:01:24+00:00"
       }
+    },
+    "follow-a-tap-with-opentelemetry": {
+      "hashnode": {
+        "url": "https://debugagent.com/opentelemetry-support-from-app-to-database",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac2e88c43534655f808e9a1",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-05T00:01:09+00:00"
+      }
     }
   }
 }
