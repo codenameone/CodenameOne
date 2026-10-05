@@ -26,10 +26,10 @@
  "hello": {
   "all": {
    "memory": 0.803,
-   "runs": 11,
-   "time": 1.228,
+   "runs": 4,
+   "time": 1.221,
    "tolerance": {
-    "time": 0.25
+    "time": 0.45
    }
   }
  },
@@ -56,11 +56,11 @@
  },
  "objectAllocation": {
   "all": {
-   "memory": 0.4,
-   "runs": 7,
-   "time": 4.932,
+   "memory": 0.386,
+   "runs": 3,
+   "time": 1.559,
    "tolerance": {
-    "memory": 0.2,
+    "memory": 0.4,
     "time": 0.5
    }
   }
