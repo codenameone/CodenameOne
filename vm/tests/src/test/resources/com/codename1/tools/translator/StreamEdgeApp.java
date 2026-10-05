@@ -190,6 +190,11 @@ public class StreamEdgeApp {
         return 20000;
     }
 
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> void sneaky(Throwable t) throws E {
+        throw (E) t;
+    }
+
     /** flatMap closes every stream its mapper returns; sorted(null) is an error, not natural order. */
     private static int closeSemantics() {
         final StringBuilder log = new StringBuilder();
@@ -215,6 +220,26 @@ public class StreamEdgeApp {
         closing.close();
         closing.close();
         check("ab".equals(log.toString()));
+        try {
+            Stream.of(1).collect(() -> new StringBuilder(), (sb, v) -> sb.append(v), null);
+            throw new AssertionError("collect(.., null)");
+        } catch (NullPointerException expected) {
+        }
+        try {
+            Optional.of(1).or(null);
+            throw new AssertionError("or(null)");
+        } catch (NullPointerException expected) {
+        }
+        Stream<Integer> failing = Stream.of(1).onClose(() -> sneaky(new java.io.IOException("io")))
+                .onClose(() -> log.append("second-ran"));
+        log.setLength(0);
+        try {
+            failing.close();
+            throw new AssertionError("close swallowed a checked failure");
+        } catch (Throwable t) {
+            check(t instanceof java.io.IOException && "io".equals(t.getMessage()));
+        }
+        check("second-ran".equals(log.toString()));
         try {
             Stream.of(2, 1).sorted(null).collect(Collectors.toList());
             throw new AssertionError("sorted(null)");

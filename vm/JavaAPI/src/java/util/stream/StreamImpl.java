@@ -352,6 +352,8 @@ final class StreamImpl<T> implements Stream<T> {
     public <R> R collect(Supplier<R> supplier, BiConsumer<R, ? super T> accumulator, BiConsumer<R, R> combiner) {
         require(supplier);
         require(accumulator);
+        // Never called on a sequential stream, but required all the same, as on the JDK.
+        require(combiner);
         R container = supplier.get();
         Iterator<T> values = iterator();
         while (values.hasNext()) accumulator.accept(container, values.next());
@@ -397,7 +399,15 @@ final class StreamImpl<T> implements Stream<T> {
                 }
             }
         }
-        if (failure instanceof RuntimeException) throw (RuntimeException) failure;
-        if (failure instanceof Error) throw (Error) failure;
+        if (failure != null) {
+            // A handler can throw a checked exception (a generic "sneaky throw"); it is rethrown
+            // as it is, never dropped, as the JDK's close() does.
+            StreamImpl.<RuntimeException>rethrow(failure);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> void rethrow(Throwable t) throws E {
+        throw (E) t;
     }
 }

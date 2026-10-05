@@ -115,6 +115,10 @@ public final class Optional<T> {
     }
 
     public Optional<T> or(Supplier<? extends Optional<? extends T>> supplier) {
+        // Checked first, as the JDK does: a null supplier is an error whether or not it is needed.
+        if (supplier == null) {
+            throw new NullPointerException();
+        }
         if (value != null) {
             return this;
         }
