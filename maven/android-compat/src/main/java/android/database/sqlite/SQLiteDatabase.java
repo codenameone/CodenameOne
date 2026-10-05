@@ -180,7 +180,13 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// Wraps a Codename One database that is already open.
     static SQLiteDatabase wrap(Database database, String path, CursorFactory factory,
                                DatabaseErrorHandler errorHandler) {
-        SQLiteDatabase db = new SQLiteDatabase(path, CREATE_IF_NECESSARY, factory, errorHandler, false);
+        return wrap(database, path, CREATE_IF_NECESSARY, factory, errorHandler);
+    }
+
+    /// Wraps a Codename One database that is already open, with open flags.
+    static SQLiteDatabase wrap(Database database, String path, int flags, CursorFactory factory,
+                               DatabaseErrorHandler errorHandler) {
+        SQLiteDatabase db = new SQLiteDatabase(path, flags, factory, errorHandler, false);
         db.mDb = database;
         return db;
     }
@@ -250,6 +256,10 @@ public final class SQLiteDatabase extends SQLiteClosable {
     }
 
     public void setVersion(int version) {
+        if (isReadOnly()) {
+            throw new SQLiteReadOnlyDatabaseException(
+                    "attempt to write a readonly database (code 8 SQLITE_READONLY): cannot set the version");
+        }
         execSQL("PRAGMA user_version = " + version);
     }
 
@@ -691,6 +701,10 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
     void runStatement(String sql, Object[] bindArgs) {
         Database d = db();
+        if (isReadOnly() && !isReadOnlyStatement(sql)) {
+            throw new SQLiteReadOnlyDatabaseException(
+                    "attempt to write a readonly database (code 8 SQLITE_READONLY), while executing: " + sql);
+        }
         Object[] args = normalize(bindArgs);
         try {
             if (args == null) {
@@ -701,6 +715,41 @@ public final class SQLiteDatabase extends SQLiteClosable {
         } catch (IOException e) {
             throw toSqlException(e, sql);
         }
+    }
+
+    /// Statement kinds an `OPEN_READONLY` database still runs. Codename One's
+    /// `Database` has no read-only open mode on every platform, so the
+    /// runtime refuses everything else itself, by leading keyword, before it
+    /// reaches the engine: every write the Android API makes (`execSQL`,
+    /// `insert`, `update`, `delete`, `setVersion`, compiled statements) goes
+    /// through `runStatement`. `PRAGMA` is let through because the settings
+    /// methods (`setForeignKeyConstraintsEnabled`) are legal on a read-only
+    /// database; `setVersion` refuses on its own. Queries (`rawQuery`) are
+    /// not inspected.
+    private static final String[] READ_ONLY_KEYWORDS = {"SELECT", "PRAGMA", "EXPLAIN", "VALUES", "BEGIN",
+        "COMMIT", "END", "ROLLBACK", "SAVEPOINT", "RELEASE"};
+
+    static boolean isReadOnlyStatement(String sql) {
+        int start = 0;
+        int n = sql.length();
+        while (start < n && (sql.charAt(start) <= ' ' || sql.charAt(start) == '(')) {
+            start++;
+        }
+        int end = start;
+        while (end < n) {
+            char c = sql.charAt(end);
+            if ((c < 'A' || c > 'Z') && (c < 'a' || c > 'z')) {
+                break;
+            }
+            end++;
+        }
+        int len = end - start;
+        for (String k : READ_ONLY_KEYWORDS) {
+            if (k.length() == len && sql.regionMatches(true, start, k, 0, len)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     com.codename1.db.Cursor runQuery(String sql, Object[] bindArgs) {

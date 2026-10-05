@@ -226,6 +226,11 @@ final class SharedPreferencesImpl implements SharedPreferences {
             return this;
         }
 
+        // Deliberately unsynchronized. Codename One code is single threaded:
+        // preferences are edited on the EDT, the runtime adds no locks, and the
+        // platform Storage layer serializes its own writes. Two worker threads
+        // committing the same file at once is outside that model and is not
+        // guarded here.
         @Override
         public boolean commit() {
             ArrayList<String> changed = new ArrayList<String>();

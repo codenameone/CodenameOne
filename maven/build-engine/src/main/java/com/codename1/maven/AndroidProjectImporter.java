@@ -73,6 +73,8 @@ public final class AndroidProjectImporter {
         COVERED.put("androidx.annotation:annotation", "annotations");
         COVERED.put("androidx.cardview:cardview", "CardView");
         COVERED.put("org.jetbrains.kotlin:kotlin-stdlib", "Kotlin standard library");
+        COVERED.put("org.jetbrains.kotlin:kotlin-stdlib-jdk7", "Kotlin standard library");
+        COVERED.put("org.jetbrains.kotlin:kotlin-stdlib-jdk8", "Kotlin standard library");
     }
 
     /// Dependencies that only matter to Android tooling and tests.
@@ -256,12 +258,11 @@ public final class AndroidProjectImporter {
             if (ignored) {
                 continue;
             }
-            String covered = null;
-            for (Map.Entry<String, String> e : COVERED.entrySet()) {
-                if (coord.startsWith(e.getKey())) {
-                    covered = e.getValue();
-                }
-            }
+            // The pattern captured the whole group:artifact, so the lookup is exact:
+            // a prefix match reported androidx.core:core-splashscreen as covered by
+            // androidx.core:core and suppressed the warning for a library the
+            // runtime does not implement.
+            String covered = COVERED.get(coord);
             if (covered != null) {
                 r.covered.add(coord + " (" + covered + ")");
             } else {

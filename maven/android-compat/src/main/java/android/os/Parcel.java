@@ -25,8 +25,11 @@ package android.os;
 import java.util.ArrayList;
 import java.util.List;
 
-/// An in-memory parcel: values are appended to a list and read back in order,
-/// which is all `writeToParcel` / `createFromParcel` round trips need.
+/// An in-memory parcel: one list slot per written value. Positions count slots
+/// rather than bytes, so `dataPosition()` / `setDataPosition()` are consistent
+/// with each other but not with Android's byte offsets. As on Android, reads
+/// and writes share one position: rewind with `setDataPosition(0)` before
+/// reading back what was written.
 public final class Parcel {
 
     private final ArrayList<Object> values = new ArrayList<Object>();
@@ -56,12 +59,28 @@ public final class Parcel {
         pos = p;
     }
 
+    /// Writes at the current position and advances it, overwriting a value
+    /// already there: a Parcelable that reserves a size slot and seeks back to
+    /// fill it in must replace the slot, not append after the payload. Seeking
+    /// past the end pads with nulls, as Android pads with zeros.
+    private void put(Object v) {
+        while (values.size() < pos) {
+            values.add(null);
+        }
+        if (pos < values.size()) {
+            values.set(pos, v);
+        } else {
+            values.add(v);
+        }
+        pos++;
+    }
+
     private Object next() {
         return pos < values.size() ? values.get(pos++) : null;
     }
 
     public void writeInt(int v) {
-        values.add(Integer.valueOf(v));
+        put(Integer.valueOf(v));
     }
 
     public int readInt() {
@@ -70,7 +89,7 @@ public final class Parcel {
     }
 
     public void writeLong(long v) {
-        values.add(Long.valueOf(v));
+        put(Long.valueOf(v));
     }
 
     public long readLong() {
@@ -79,7 +98,7 @@ public final class Parcel {
     }
 
     public void writeFloat(float v) {
-        values.add(Float.valueOf(v));
+        put(Float.valueOf(v));
     }
 
     public float readFloat() {
@@ -88,7 +107,7 @@ public final class Parcel {
     }
 
     public void writeDouble(double v) {
-        values.add(Double.valueOf(v));
+        put(Double.valueOf(v));
     }
 
     public double readDouble() {
@@ -97,7 +116,7 @@ public final class Parcel {
     }
 
     public void writeByte(byte v) {
-        values.add(Byte.valueOf(v));
+        put(Byte.valueOf(v));
     }
 
     public byte readByte() {
@@ -106,7 +125,7 @@ public final class Parcel {
     }
 
     public void writeString(String v) {
-        values.add(v);
+        put(v);
     }
 
     public String readString() {
@@ -115,7 +134,7 @@ public final class Parcel {
     }
 
     public void writeBoolean(boolean v) {
-        values.add(Boolean.valueOf(v));
+        put(Boolean.valueOf(v));
     }
 
     public boolean readBoolean() {
@@ -124,7 +143,7 @@ public final class Parcel {
     }
 
     public void writeValue(Object v) {
-        values.add(v);
+        put(v);
     }
 
     public Object readValue(ClassLoader loader) {
@@ -132,7 +151,7 @@ public final class Parcel {
     }
 
     public void writeBundle(Bundle b) {
-        values.add(b);
+        put(b);
     }
 
     public Bundle readBundle() {
@@ -145,7 +164,7 @@ public final class Parcel {
     }
 
     public void writeParcelable(Parcelable p, int flags) {
-        values.add(p);
+        put(p);
     }
 
     @SuppressWarnings("unchecked")
@@ -155,7 +174,7 @@ public final class Parcel {
     }
 
     public void writeStringList(List<String> list) {
-        values.add(list == null ? null : new ArrayList<String>(list));
+        put(list == null ? null : new ArrayList<String>(list));
     }
 
     @SuppressWarnings("unchecked")
@@ -172,7 +191,7 @@ public final class Parcel {
     }
 
     public void writeList(List<?> list) {
-        values.add(list == null ? null : new ArrayList<Object>(list));
+        put(list == null ? null : new ArrayList<Object>(list));
     }
 
     @SuppressWarnings("unchecked")
@@ -194,7 +213,7 @@ public final class Parcel {
     }
 
     public void writeIntArray(int[] v) {
-        values.add(v == null ? null : v.clone());
+        put(v == null ? null : v.clone());
     }
 
     public int[] createIntArray() {
@@ -203,7 +222,7 @@ public final class Parcel {
     }
 
     public void writeStringArray(String[] v) {
-        values.add(v == null ? null : v.clone());
+        put(v == null ? null : v.clone());
     }
 
     public String[] createStringArray() {
@@ -212,7 +231,7 @@ public final class Parcel {
     }
 
     public void writeByteArray(byte[] v) {
-        values.add(v == null ? null : v.clone());
+        put(v == null ? null : v.clone());
     }
 
     public byte[] createByteArray() {
@@ -221,7 +240,7 @@ public final class Parcel {
     }
 
     public void writeSerializable(Object s) {
-        values.add(s);
+        put(s);
     }
 
     public Object readSerializable() {

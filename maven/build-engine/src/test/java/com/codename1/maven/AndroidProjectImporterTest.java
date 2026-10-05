@@ -46,6 +46,19 @@ public class AndroidProjectImporterTest {
     }
 
     @Test
+    public void coveredDependenciesMatchTheWholeCoordinate() {
+        AndroidProjectImporter.Result r = new AndroidProjectImporter.Result();
+        AndroidProjectImporter.readGradle("dependencies {\n"
+                + "    implementation 'androidx.core:core:1.13.1'\n"
+                + "    implementation 'androidx.core:core-splashscreen:1.0.1'\n"
+                + "    implementation(\"androidx.appcompat:appcompat-resources:1.7.0\")\n}\n", r);
+        assertEquals(1, r.covered.size());
+        assertTrue(r.covered.toString(), r.covered.get(0).startsWith("androidx.core:core ("));
+        assertTrue(r.uncovered.toString(), r.uncovered.contains("androidx.core:core-splashscreen"));
+        assertTrue(r.uncovered.toString(), r.uncovered.contains("androidx.appcompat:appcompat-resources"));
+    }
+
+    @Test
     public void readsKotlinBuildScript() {
         AndroidProjectImporter.Result r = new AndroidProjectImporter.Result();
         AndroidProjectImporter.readGradle("android {\n    namespace = \"com.example.kts\"\n"

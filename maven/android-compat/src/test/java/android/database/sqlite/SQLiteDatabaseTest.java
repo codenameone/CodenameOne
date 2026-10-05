@@ -431,6 +431,60 @@ public class SQLiteDatabaseTest {
         assertEquals(2, DatabaseUtils.queryNumEntries(db, "notes"));
     }
 
+    /// A database opened `OPEN_READONLY` refuses writes through the Android
+    /// API. It used to report `isReadOnly()` and still insert, update, drop
+    /// tables and bump the version.
+    @Test
+    public void readOnlyDatabaseRefusesWrites() throws Exception {
+        JdbcDatabase engine = new JdbcDatabase();
+        SQLiteDatabase rw = SQLiteDatabase.wrap(engine, "ro.db", null, null);
+        rw.execSQL("CREATE TABLE t (v INTEGER)");
+        rw.execSQL("INSERT INTO t VALUES (1)");
+        SQLiteDatabase ro = SQLiteDatabase.wrap(engine, "ro.db", SQLiteDatabase.OPEN_READONLY, null, null);
+        assertTrue(ro.isReadOnly());
+        ContentValues v = new ContentValues();
+        v.put("v", Integer.valueOf(2));
+        try {
+            ro.insertOrThrow("t", null, v);
+            fail("insert into a read-only database");
+        } catch (SQLiteReadOnlyDatabaseException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().indexOf("readonly") >= 0);
+        }
+        assertEquals(-1, ro.insert("t", null, v));
+        try {
+            ro.update("t", v, null, null);
+            fail("update in a read-only database");
+        } catch (SQLiteReadOnlyDatabaseException expected) {
+            // refused
+        }
+        try {
+            ro.delete("t", null, null);
+            fail("delete in a read-only database");
+        } catch (SQLiteReadOnlyDatabaseException expected) {
+            // refused
+        }
+        try {
+            ro.execSQL("DROP TABLE t");
+            fail("schema change in a read-only database");
+        } catch (SQLiteReadOnlyDatabaseException expected) {
+            // refused
+        }
+        try {
+            ro.setVersion(7);
+            fail("version change in a read-only database");
+        } catch (SQLiteReadOnlyDatabaseException expected) {
+            // refused
+        }
+        // Reads, settings pragmas and transactions still work.
+        ro.setForeignKeyConstraintsEnabled(true);
+        ro.beginTransaction();
+        ro.endTransaction();
+        assertEquals(0, ro.getVersion());
+        assertEquals(1, DatabaseUtils.longForQuery(ro, "SELECT COUNT(*) FROM t", null));
+        assertEquals(1, DatabaseUtils.longForQuery(ro, "SELECT v FROM t", null));
+        rw.close();
+    }
+
     private static final class Helper extends SQLiteOpenHelper {
         private final List<String> calls;
 

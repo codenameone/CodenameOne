@@ -81,6 +81,11 @@ public abstract class SQLiteOpenHelper implements AutoCloseable {
         return getDatabaseLocked(false);
     }
 
+    // Deliberately unsynchronized. Codename One code is single threaded: the
+    // runtime adds no locks, and the platform database layer serializes its own
+    // I/O. mIsInitializing therefore only detects a recursive call from
+    // onCreate/onUpgrade/onOpen, as on Android; first-time opens racing from
+    // two threads are outside that model and are not guarded here.
     private SQLiteDatabase getDatabaseLocked(boolean writable) {
         if (mDatabase != null) {
             if (!mDatabase.isOpen()) {
