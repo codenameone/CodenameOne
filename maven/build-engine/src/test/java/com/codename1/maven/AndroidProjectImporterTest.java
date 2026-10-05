@@ -128,6 +128,33 @@ public class AndroidProjectImporterTest {
         assertEquals(original, new String(java.nio.file.Files.readAllBytes(backup.toPath()), "UTF-8"));
     }
 
+    /// The developer may customize the generated entry point once the first
+    /// import has backed up the application's own class; a re-import must not
+    /// overwrite that edit, since the backup slot is already taken.
+    @Test
+    public void reimportKeepsACustomizedEntryPoint() throws Exception {
+        java.io.File root = java.nio.file.Files.createTempDirectory("reimport-custom").toFile();
+        java.io.File main = new java.io.File(root, "droid/src/main");
+        assertTrue(main.mkdirs());
+        write(new java.io.File(main, "AndroidManifest.xml"),
+                "<manifest package=\"com.example.droid\"><application/></manifest>");
+        java.io.File common = new java.io.File(root, "common");
+        java.io.File own = new java.io.File(common, "src/main/java/com/example/MyApp.java");
+        assertTrue(own.getParentFile().mkdirs());
+        write(own, "package com.example; public class MyApp {}");
+        AndroidProjectImporter importer = new AndroidProjectImporter(new com.codename1.build.SystemStreamLog());
+        importer.importProject(new java.io.File(root, "droid"), null, common, "com.example", "MyApp");
+        String generated = new String(java.nio.file.Files.readAllBytes(own.toPath()), "UTF-8");
+        String customized = generated.replace("    }\n}", "        installCrashReporting();\n    }\n}");
+        assertFalse(customized.equals(generated));
+        write(own, customized);
+        importer.importProject(new java.io.File(root, "droid"), null, common, "com.example", "MyApp");
+        assertEquals("the customized entry point was overwritten", customized,
+                new String(java.nio.file.Files.readAllBytes(own.toPath()), "UTF-8"));
+        assertEquals("package com.example; public class MyApp {}", new String(java.nio.file.Files.readAllBytes(
+                new java.io.File(own.getPath() + ".pre-android-import").toPath()), "UTF-8"));
+    }
+
     /// A re-import removes what the earlier import copied and the project no
     /// longer has, but never a file the developer added or edited.
     @Test

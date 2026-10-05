@@ -215,7 +215,7 @@ final class AppSupport {
             // bytecode-compliance in the Maven build.
             compile.doLast("cn1RemapAndroid", new com.codename1.gradle.tasks.RemapAndroidAction(
                     compile.getDestinationDirectory().getAsFile().get(), main.getCompileClasspath(),
-                    new File(androidState, "onclick.txt"), false, main.getOutput().getClassesDirs()));
+                    onClickNamesFile(androidState), false, main.getOutput().getClassesDirs()));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
@@ -266,7 +266,7 @@ final class AppSupport {
             // Captured outside the action: the configuration cache cannot store a
             // SourceSet, so the action must not reach the classpath through one.
             final org.gradle.api.file.FileCollection compileClasspath = main.getCompileClasspath();
-            final File onClickNames = new File(androidState, "onclick.txt");
+            final File onClickNames = onClickNamesFile(androidState);
             registerKotlinRelocation(project.getTasks(), main.getCompileJavaTaskName(), main.getClassesTaskName(),
                     t -> new com.codename1.gradle.tasks.RemapAndroidAction(
                             kotlinDir.get(), compileClasspath, onClickNames, true, null).execute(t));
@@ -640,6 +640,14 @@ final class AppSupport {
     /// Where the annotation processors write generated stub sources. Asked for
     /// inside the compile tasks' configuration, after the build script has had
     /// its say about the build directory.
+    /// The `android:onClick` names compileAndroidRes writes. The task hands
+    /// `androidState` to [com.codename1.maven.AndroidResourceRunner] as its build
+    /// directory, and the runner nests its files under that, so the path comes
+    /// from the runner rather than being rebuilt here.
+    static File onClickNamesFile(File androidState) {
+        return com.codename1.maven.AndroidResourceRunner.onClickNamesFile(androidState);
+    }
+
     static File stubsDir(ProjectLayout layout) {
         return new File(layout.buildDir(), "generated/sources/cn1-annotations");
     }

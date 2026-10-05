@@ -52,7 +52,7 @@ public class RemapAndroidMojo extends AbstractCN1Mojo {
         // Freshly compiled Kotlin (incremental compilation keeps its own
         // output tree) must be in place before it is relocated.
         copyKotlinIncrementalCompileOutputToOutputDir();
-        File onClick = new File(project.getBuild().getDirectory(), "android-res/onclick.txt");
+        File onClick = AndroidResourceRunner.onClickNamesFile(new File(project.getBuild().getDirectory()));
         try {
             new AndroidRemapper(classes, jar, onClick, MavenLog.of(getLog())).run();
         } catch (com.codename1.builders.BuildException ex) {

@@ -258,12 +258,19 @@ public final class AndroidProjectImporter {
         byte[] bytes = src.getBytes(Charset.forName("UTF-8"));
         if (f.isFile()) {
             File backup = new File(f.getPath() + ".pre-android-import");
+            boolean unchanged = java.util.Arrays.equals(bytes, Files.readAllBytes(f.toPath()));
             if (backup.exists()) {
                 // A repeated import: the backup already holds the application's
-                // original class and the file is what an earlier import wrote.
-                // Overwriting the backup would lose the only copy of the original.
-                log.info("Kept the existing " + backup.getName() + " from an earlier import");
-            } else if (!java.util.Arrays.equals(bytes, Files.readAllBytes(f.toPath()))) {
+                // original class, and overwriting it would lose the only copy.
+                // The file itself is what an earlier import wrote -- unless the
+                // developer has customized it since. Like an imported file they
+                // edited, that is kept: there is no free backup slot to save it to.
+                if (!unchanged) {
+                    log.warn(f.getName() + " was changed after an earlier import and was left as it is; "
+                            + "delete it and import again to regenerate it");
+                    return;
+                }
+            } else if (!unchanged) {
                 Files.copy(f.toPath(), backup.toPath());
                 log.info("Saved the previous " + f.getName() + " as " + backup.getName());
             }

@@ -128,6 +128,13 @@ public class AndroidResourceRunner {
     }
 
     public File onClickNamesFile() {
+        return onClickNamesFile(buildDir);
+    }
+
+    /// Where a runner given `buildDir` writes the `android:onClick` names the
+    /// remap step reads. Both build plugins locate the file through this, so the
+    /// writer and the reader cannot disagree on its path.
+    public static File onClickNamesFile(File buildDir) {
         return new File(buildDir, "android-res/onclick.txt");
     }
 
