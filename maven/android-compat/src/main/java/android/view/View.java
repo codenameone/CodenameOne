@@ -2476,6 +2476,11 @@ public class View implements Drawable.Callback {
     // ------------------------------------------------------------ touch
 
     public void setOnClickListener(OnClickListener l) {
+        // Deliberately unconditional, null included: Android's own
+        // View.setOnClickListener makes the view clickable for any argument,
+        // and apps that clear a listener also call setClickable(false) for
+        // exactly that reason. Diverging would change which view consumes a
+        // touch relative to the real platform.
         if (!isClickable()) {
             setClickable(true);
         }

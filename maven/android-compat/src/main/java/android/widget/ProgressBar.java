@@ -323,7 +323,9 @@ public class ProgressBar extends View {
         if (mColors == null) {
             return;
         }
-        if (isCircular()) {
+        if (mIndeterminate && mIndeterminateDrawable != null) {
+            drawIndeterminateDrawable(canvas);
+        } else if (isCircular()) {
             drawCircular(canvas);
         } else {
             drawHorizontal(canvas);
@@ -332,6 +334,21 @@ public class ProgressBar extends View {
             postInvalidateDelayed(16);
         }
     }
+
+    /// The app's own indeterminate artwork, over the content box. Android
+    /// animates a drawable that is not itself animatable by sweeping its level
+    /// 0..10000 linearly (default `indeterminateDuration`, 3500ms), which is
+    /// what turns a rotate or clip drawable into a spinner; do the same.
+    private void drawIndeterminateDrawable(Canvas canvas) {
+        Drawable d = mIndeterminateDrawable;
+        d.setBounds(getPaddingLeft(), getPaddingTop(), getWidth() - getPaddingRight(),
+                getHeight() - getPaddingBottom());
+        long t = (System.currentTimeMillis() - mAnimStart) % INDETERMINATE_DURATION;
+        d.setLevel((int) (t * 10000L / INDETERMINATE_DURATION));
+        d.draw(canvas);
+    }
+
+    private static final long INDETERMINATE_DURATION = 3500L;
 
     private void drawHorizontal(Canvas canvas) {
         if (mProgressDrawable != null && !mIndeterminate) {

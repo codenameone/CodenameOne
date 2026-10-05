@@ -33,6 +33,8 @@ import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.SpannedString;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -100,6 +102,7 @@ public class TextView extends View {
     private OnEditorActionListener mEditorActionListener;
     private ArrayList<TextWatcher> mWatchers;
     private InputFilter[] mFilters = new InputFilter[0];
+    private static final Spanned EMPTY_SPANNED = new SpannedString("");
     private TransformationMethod mTransformation;
     private int mAutoLink;
     private boolean mHorizontallyScrolling;
@@ -396,8 +399,20 @@ public class TextView extends View {
         if (text == null) {
             text = "";
         }
+        // Android runs the filter chain over the replacement itself, so
+        // android:maxLength and custom filters bind programmatic and XML text
+        // too -- not just later edits of an Editable.
+        for (int i = 0; i < mFilters.length; i++) {
+            CharSequence out = mFilters[i].filter(text, 0, text.length(), EMPTY_SPANNED, 0, 0);
+            if (out != null) {
+                text = out;
+            }
+        }
         CharSequence old = mText;
-        if (type == BufferType.EDITABLE || this instanceof EditText) {
+        // As on Android, a view with watchers keeps an editable buffer, so
+        // afterTextChanged always has the Editable it is declared to receive.
+        boolean needEditable = mWatchers != null && !mWatchers.isEmpty();
+        if (type == BufferType.EDITABLE || needEditable || this instanceof EditText) {
             SpannableStringBuilder sb = new SpannableStringBuilder(text);
             sb.setFilters(mFilters);
             text = sb;
@@ -440,7 +455,19 @@ public class TextView extends View {
 
     public void append(CharSequence text, int start, int end) {
         if (mText instanceof Editable) {
-            ((Editable) mText).append(text, start, end);
+            Editable e = (Editable) mText;
+            // EditText's buffer reports its own mutations to the watchers;
+            // any other TextView's editable buffer is reported here.
+            boolean notify = !(this instanceof EditText);
+            int at = e.length();
+            if (notify) {
+                sendBeforeTextChanged(e, at, 0, end - start);
+            }
+            e.append(text, start, end);
+            if (notify) {
+                sendOnTextChanged(e, at, 0, e.length() - at);
+                sendAfterTextChanged();
+            }
             textChanged();
         } else {
             setText(mText.toString() + text.subSequence(start, end));

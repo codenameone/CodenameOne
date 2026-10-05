@@ -65,6 +65,13 @@ public class ImageView extends android.view.View {
     private ColorStateList mTint;
     private PorterDuff.Mode mTintMode = PorterDuff.Mode.SRC_IN;
     private ColorFilter mColorFilter;
+    /// Whether this view has ever set a tint / color filter on its drawable.
+    /// Once it has, the current value (null included) is pushed to every
+    /// drawable, so clearing one really clears it; until then the drawable's
+    /// own tint and filter are left alone, as on Android.
+    private boolean mHasTint;
+    private boolean mHasTintMode;
+    private boolean mHasColorFilter;
     private int mAlpha = 255;
     private boolean mCropToPadding;
     private int mLevel;
@@ -94,7 +101,9 @@ public class ImageView extends android.view.View {
         }
         if (a.hasValue(android.R.styleable.ImageView_tint)) {
             mTint = a.getColorStateList(android.R.styleable.ImageView_tint);
+            mHasTint = true;
             mTintMode = PorterDuff.intToMode(a.getInt(android.R.styleable.ImageView_tintMode, 5));
+            mHasTintMode = true;
         }
         mCropToPadding = a.getBoolean(android.R.styleable.ImageView_cropToPadding, false);
         a.recycle();
@@ -183,6 +192,7 @@ public class ImageView extends android.view.View {
 
     public void setImageTintList(ColorStateList tint) {
         mTint = tint;
+        mHasTint = true;
         applyColorMod();
         invalidate();
     }
@@ -193,6 +203,7 @@ public class ImageView extends android.view.View {
 
     public void setImageTintMode(PorterDuff.Mode mode) {
         mTintMode = mode;
+        mHasTintMode = true;
         applyColorMod();
         invalidate();
     }
@@ -211,6 +222,7 @@ public class ImageView extends android.view.View {
 
     public void setColorFilter(ColorFilter cf) {
         mColorFilter = cf;
+        mHasColorFilter = true;
         applyColorMod();
         invalidate();
     }
@@ -242,11 +254,16 @@ public class ImageView extends android.view.View {
         if (mDrawable == null) {
             return;
         }
-        if (mColorFilter != null) {
-            mDrawable.setColorFilter(mColorFilter);
-        } else if (mTint != null) {
+        // A color filter takes precedence over the tint inside the drawable,
+        // so both are pushed independently.
+        if (mHasTint) {
             mDrawable.setTintList(mTint);
+        }
+        if (mHasTint || mHasTintMode) {
             mDrawable.setTintMode(mTintMode);
+        }
+        if (mHasColorFilter) {
+            mDrawable.setColorFilter(mColorFilter);
         }
         mDrawable.setAlpha(mAlpha);
     }
