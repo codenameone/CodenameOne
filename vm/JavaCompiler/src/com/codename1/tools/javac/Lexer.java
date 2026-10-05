@@ -72,22 +72,40 @@ final class Lexer {
 
     private final Source source;
     private final String s;
+    /**
+     * Where each character of {@code s} sits in the source, when unicode escapes made the two
+     * differ; null otherwise. Every position a token or diagnostic carries goes through it, so
+     * the editor's markers and the line table point at the text the user wrote.
+     */
+    private final int[] origin;
     private final Log log;
     private int i;
 
     Lexer(Source source, Log log) {
         this.source = source;
-        this.s = translateUnicodeEscapes(source.text);
+        int[][] origin = new int[1][];
+        this.s = translateUnicodeEscapes(source.text, origin);
+        this.origin = origin[0];
         this.log = log;
     }
 
     /** Applies the \\uXXXX pass Java performs before lexing (an odd run of backslashes only). */
     static String translateUnicodeEscapes(String text) {
+        return translateUnicodeEscapes(text, null);
+    }
+
+    /**
+     * The same, also recording in {@code origin[0]} where each translated character came from
+     * in {@code text} (one entry per character plus one for the end), or leaving it null when
+     * nothing was translated.
+     */
+    static String translateUnicodeEscapes(String text, int[][] origin) {
         if (text.indexOf("\\u") < 0) {
             return text;
         }
-        StringBuilder b = new StringBuilder(text.length());
         int n = text.length();
+        StringBuilder b = new StringBuilder(n);
+        int[] map = new int[n + 1];
         int i = 0;
         while (i < n) {
             char c = text.charAt(i);
@@ -97,7 +115,7 @@ final class Lexer {
                     run++;
                 }
                 if ((run & 1) == 1 && i + run < n && text.charAt(i + run) == 'u') {
-                    b.append(text, i, i + run - 1);
+                    append(b, map, text, i, i + run - 1);
                     int j = i + run;
                     while (j < n && text.charAt(j) == 'u') {
                         j++;
@@ -114,23 +132,36 @@ final class Lexer {
                             value = value * 16 + d;
                         }
                         if (ok) {
+                            map[b.length()] = i + run - 1;
                             b.append((char) value);
                             i = j + 4;
                             continue;
                         }
                     }
-                    b.append(text, i + run - 1, j);
+                    append(b, map, text, i + run - 1, j);
                     i = j;
                     continue;
                 }
-                b.append(text, i, i + run);
+                append(b, map, text, i, i + run);
                 i += run;
                 continue;
             }
+            map[b.length()] = i;
             b.append(c);
             i++;
         }
+        map[b.length()] = n;
+        if (origin != null) {
+            origin[0] = map;
+        }
         return b.toString();
+    }
+
+    private static void append(StringBuilder b, int[] map, String text, int from, int to) {
+        for (int k = from; k < to; k++) {
+            map[b.length()] = k;
+            b.append(text.charAt(k));
+        }
     }
 
     List<Token> tokenize() {
@@ -144,8 +175,16 @@ final class Lexer {
         }
     }
 
+    private int orig(int pos) {
+        return origin == null || pos < 0 || pos >= origin.length ? pos : origin[pos];
+    }
+
+    private Token token(Token.Kind kind, int start, int end, String name, Object value) {
+        return new Token(kind, orig(start), orig(end), name, value);
+    }
+
     private CompileError error(int pos, String message) {
-        log.error(source, pos, message);
+        log.error(source, orig(pos), message);
         return new CompileError(message);
     }
 
@@ -175,7 +214,7 @@ final class Lexer {
         skipTrivia();
         int n = s.length();
         if (i >= n) {
-            return new Token(Token.Kind.EOF, n, n, "<EOF>", null);
+            return token(Token.Kind.EOF, n, n, "<EOF>", null);
         }
         int start = i;
         char c = s.charAt(i);
@@ -186,7 +225,7 @@ final class Lexer {
             }
             String word = s.substring(start, i);
             Token.Kind kw = KEYWORDS.get(word);
-            return new Token(kw == null ? Token.Kind.IDENT : kw, start, i, word, null);
+            return token(kw == null ? Token.Kind.IDENT : kw, start, i, word, null);
         }
         if (c >= '0' && c <= '9' || c == '.' && i + 1 < n && s.charAt(i + 1) >= '0' && s.charAt(i + 1) <= '9') {
             return number(start);
@@ -211,12 +250,12 @@ final class Lexer {
                 throw error(start, "unclosed character literal");
             }
             i++;
-            return new Token(Token.Kind.CHAR_LITERAL, start, i, s.substring(start, i), Character.valueOf(value));
+            return token(Token.Kind.CHAR_LITERAL, start, i, s.substring(start, i), Character.valueOf(value));
         }
         for (int k = 0; k < OPERATORS.length; k++) {
             if (s.startsWith(OPERATORS[k], i)) {
                 i += OPERATORS[k].length();
-                return new Token(OPERATOR_KINDS[k], start, i, OPERATORS[k], null);
+                return token(OPERATOR_KINDS[k], start, i, OPERATORS[k], null);
             }
         }
         i++;
@@ -296,7 +335,7 @@ final class Lexer {
                 i++;
             }
         }
-        return new Token(Token.Kind.STRING_LITERAL, start, i, s.substring(start, i), b.toString());
+        return token(Token.Kind.STRING_LITERAL, start, i, s.substring(start, i), b.toString());
     }
 
     /** A text block: incidental indentation stripped, trailing spaces removed, escapes applied last. */
@@ -305,13 +344,17 @@ final class Lexer {
         while (i < s.length() && (s.charAt(i) == ' ' || s.charAt(i) == '\t' || s.charAt(i) == '\f')) {
             i++;
         }
+        // CR, LF and CRLF are all line terminators (JLS 3.4).
         if (i < s.length() && s.charAt(i) == '\r') {
             i++;
-        }
-        if (i >= s.length() || s.charAt(i) != '\n') {
+            if (i < s.length() && s.charAt(i) == '\n') {
+                i++;
+            }
+        } else if (i < s.length() && s.charAt(i) == '\n') {
+            i++;
+        } else {
             throw error(start, "illegal text block open delimiter sequence, missing line terminator");
         }
-        i++;
         int contentStart = i;
         int end = -1;
         while (i < s.length()) {
@@ -330,7 +373,9 @@ final class Lexer {
         if (end < 0) {
             throw error(start, "unclosed text block");
         }
-        String raw = s.substring(contentStart, end).replace("\r\n", "\n");
+        // Every line terminator becomes \n before indentation is measured (JLS 3.10.6), a lone
+        // CR included, so the CR never reaches the string and the line after it is its own line.
+        String raw = s.substring(contentStart, end).replace("\r\n", "\n").replace('\r', '\n');
         String[] lines = splitLines(raw);
         // The closing delimiter's line counts for indentation when it is blank.
         int indent = Integer.MAX_VALUE;
@@ -390,7 +435,7 @@ final class Lexer {
             out.append(escapeAt(text, cursor, start));
             k = cursor[0];
         }
-        return new Token(Token.Kind.STRING_LITERAL, start, i, s.substring(start, i), out.toString());
+        return token(Token.Kind.STRING_LITERAL, start, i, s.substring(start, i), out.toString());
     }
 
     private Token number(int start) {
@@ -446,7 +491,7 @@ final class Lexer {
                 i++;
                 float v = hex ? (float) parseHexDouble(text) : Float.parseFloat(text);
                 checkFloatRange(Float.isInfinite(v), v == 0f, text, hex, start);
-                return new Token(Token.Kind.FLOAT_LITERAL, start, i, s.substring(start, i), Float.valueOf(v));
+                return token(Token.Kind.FLOAT_LITERAL, start, i, s.substring(start, i), Float.valueOf(v));
             }
             if (suffix == 'd' || suffix == 'D' || floating) {
                 if (suffix == 'd' || suffix == 'D') {
@@ -454,7 +499,7 @@ final class Lexer {
                 }
                 double v = hex ? parseHexDouble(text) : Double.parseDouble(text);
                 checkFloatRange(Double.isInfinite(v), v == 0d, text, hex, start);
-                return new Token(Token.Kind.DOUBLE_LITERAL, start, i, s.substring(start, i), Double.valueOf(v));
+                return token(Token.Kind.DOUBLE_LITERAL, start, i, s.substring(start, i), Double.valueOf(v));
             }
             boolean isLong = suffix == 'l' || suffix == 'L';
             if (isLong) {
@@ -467,9 +512,9 @@ final class Lexer {
             }
             long value = parseUnsigned(body, radix, isLong ? 64 : 32, start);
             if (isLong) {
-                return new Token(Token.Kind.LONG_LITERAL, start, i, s.substring(start, i), Long.valueOf(value));
+                return token(Token.Kind.LONG_LITERAL, start, i, s.substring(start, i), Long.valueOf(value));
             }
-            return new Token(Token.Kind.INT_LITERAL, start, i, s.substring(start, i), Integer.valueOf((int) value));
+            return token(Token.Kind.INT_LITERAL, start, i, s.substring(start, i), Integer.valueOf((int) value));
         } catch (NumberFormatException e) {
             throw error(start, "malformed number: " + s.substring(start, i));
         }

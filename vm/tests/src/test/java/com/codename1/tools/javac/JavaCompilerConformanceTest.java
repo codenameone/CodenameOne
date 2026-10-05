@@ -180,6 +180,48 @@ class JavaCompilerConformanceTest {
         assertTrue(packed.classBytes("Main$\u7ec4\u4ef6") != null, "the packed classes lost the nested class");
     }
 
+    @Test
+    void diagnosticsPointAtTheSourceTheUserWroteAfterUnicodeEscapes() {
+        // The escape is written as backslash + "u0078" so this file's own javac does not translate it.
+        String line = "    void f() { int " + "\\" + "u0078 = missing; }";
+        String src = "public class E {\n" + line + "\n}\n";
+        JavaCompiler.Result r = new JavaCompiler(RuntimeLibraryCompile.RUNTIME).addSource("E.java", src).compile();
+        assertFalse(r.isSuccess());
+        Diagnostic d = r.getDiagnostics().get(0);
+        assertEquals(2, d.line, String.valueOf(r.getDiagnostics()));
+        assertEquals(line.indexOf("missing") + 1, d.column, "the column must count the escape as written: " + d);
+    }
+
+    @Test
+    void textBlocksNormalizeEveryLineTerminator() throws Exception {
+        // CR, LF and CRLF all end a line (JLS 3.4); a text block turns each into \n.
+        String q = "\"\"\"";
+        String src = "public class T {\n    public static String s() {\n        return " + q + "\r"
+                + "            a\r            b\r\n            c\n            " + q + ";\n    }\n}\n";
+        JavaCompiler.Result r = new JavaCompiler(RuntimeLibraryCompile.RUNTIME).addSource("T.java", src).compile();
+        assertTrue(r.isSuccess(), String.valueOf(r.getDiagnostics()));
+        // The string constant, as its CONSTANT_Utf8 entry (tag 1, length 6): read from the class
+        // file rather than by loading it, since this test may run on a JVM older than the output.
+        byte[] bytes = r.getClasses().get("T");
+        byte[] entry = {1, 0, 6, 'a', '\n', 'b', '\n', 'c', '\n'};
+        assertTrue(indexOf(bytes, entry) >= 0, "T has no constant \"a\\nb\\nc\\n\"");
+        assertTrue(indexOf(bytes, new byte[] {'a', '\r'}) < 0 && indexOf(bytes, new byte[] {'b', '\r'}) < 0,
+                "a carriage return survived into the text block");
+    }
+
+    private static int indexOf(byte[] hay, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= hay.length; i++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (hay[i + j] != needle[j]) {
+                    continue outer;
+                }
+            }
+            return i;
+        }
+        return -1;
+    }
+
     private static Path jdkAtLeast(int major) {
         for (CompilerHelper.CompilerConfig c : CompilerHelper.getAvailableCompilers(String.valueOf(major))) {
             if (CompilerHelper.parseJavaMajor(c.jdkVersion) >= major) {

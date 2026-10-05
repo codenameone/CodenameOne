@@ -237,6 +237,24 @@ final class Flow {
         }
     }
 
+    /**
+     * JLS 14.22: the body of a while or for loop whose condition is the constant false can
+     * never run, and javac reports it (unlike if (false), which is allowed on purpose).
+     */
+    private void deadWhenFalse(Tree cond, Tree body) {
+        if (alive && cond.constant instanceof Boolean && !((Boolean) cond.constant).booleanValue()) {
+            if (body != null && body.pos >= 0) {
+                error(body.pos, "unreachable statement");
+                // One diagnostic for the body, not another for its first statement.
+                deadBodyReported = true;
+            }
+            markDead();
+        }
+    }
+
+    /** Set while scanning a loop body already reported unreachable. */
+    private boolean deadBodyReported;
+
     /** An assignment to v here: unless v is definitely unassigned, v is not effectively final. */
     private void assignedHere(VarSymbol v) {
         Integer i = v == null ? null : index.get(v);
@@ -394,7 +412,7 @@ final class Flow {
     // ------------------------------------------------------------------ statements
 
     private void scanStats(List<Tree> stats) {
-        boolean reported = false;
+        boolean reported = deadBodyReported;
         for (Tree s : stats) {
             if (!alive && !reported && !(s instanceof Tree.Empty) && !(s instanceof Tree.ClassDecl) && s.pos >= 0) {
                 error(s.pos, "unreachable statement");
@@ -452,8 +470,10 @@ final class Flow {
             scanCond(w.cond);
             BitSet f = whenFalse;
             inits = whenTrue;
+            deadWhenFalse(w.cond, w.body);
             pushTarget(w, null);
             scanStat(w.body);
+            deadBodyReported = false;
             popTarget();
             BitSet back = backEdge(w);
             boolean[] any = new boolean[1];
@@ -494,11 +514,13 @@ final class Flow {
                 scanCond(f.cond);
                 falseInits = whenFalse;
                 inits = whenTrue;
+                deadWhenFalse(f.cond, f.body);
             } else {
                 falseInits = null;
             }
             pushTarget(f, null);
             scanStat(f.body);
+            deadBodyReported = false;
             popTarget();
             boolean[] any = new boolean[1];
             BitSet conts = takeExits(f, true, any);
@@ -524,6 +546,7 @@ final class Flow {
             assign(f.var.sym);
             pushTarget(f, null);
             scanStat(f.body);
+            deadBodyReported = false;
             popTarget();
             BitSet back = backEdge(f);
             boolean[] any = new boolean[1];

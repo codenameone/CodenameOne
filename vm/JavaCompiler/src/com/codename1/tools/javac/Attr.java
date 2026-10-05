@@ -1649,10 +1649,10 @@ final class Attr {
             Tree.VarDef p = c.param;
             if (p.unionTypes != null && !p.unionTypes.isEmpty()) {
                 for (Tree u : p.unionTypes) {
-                    caught.add(attribType(u, env));
+                    caught.add(catchType(u, env));
                 }
             } else {
-                caught.add(attribType(p.vartype, env));
+                caught.add(catchType(p.vartype, env));
             }
         }
         tryEnv.caught = caught;
@@ -1796,6 +1796,19 @@ final class Attr {
             }
         }
         return out;
+    }
+
+    /**
+     * A catch type must be a class (JLS 14.20): a type variable is erased to its bound, so the
+     * handler would catch exceptions of the wrong type and hand them on as the variable's type.
+     */
+    private Type catchType(Tree t, Env env) {
+        Type ct = attribType(t, env);
+        if (ct.tag == Type.Tag.TYPEVAR) {
+            error(env, t.pos, "unexpected type\n  required: class\n  found:    type parameter " + ct);
+            return Type.ERROR;
+        }
+        return ct;
     }
 
     private void checkAutoCloseable(Type t, Env env, int pos) {
@@ -3109,13 +3122,36 @@ final class Attr {
                 // Java 21 allows an unconditional pattern in instanceof; Java 17 rejected it.
                 error(env, io.pos, "expression type " + et + " is a subtype of pattern type " + pt);
             }
+            if (io.pattern instanceof Tree.BindingPattern) {
+                checkSafelyCheckable(et, pt, io.pos, env);
+            }
         } else {
             Type tt = attribType(io.pattern, env);
             if (!et.isErroneous() && !tt.isErroneous() && !types.isCastable(et, tt)) {
                 error(env, io.pos, "incompatible types: " + et + " cannot be converted to " + tt);
+            } else {
+                checkSafelyCheckable(et, tt, io.pos, env);
             }
         }
         return Type.BOOLEAN;
+    }
+
+    /**
+     * JLS 15.20.2: instanceof may only test a type it can check at run time. A non-reifiable
+     * target ({@code List<String>}) is allowed only when the expression's own type already
+     * fixes its arguments; otherwise the test is erased to the raw type and would claim to
+     * have checked what it never did. Approximated conservatively: the target is a supertype,
+     * or the expression's type is itself parameterized (Collection&lt;String&gt; to List&lt;String&gt;).
+     */
+    private void checkSafelyCheckable(Type et, Type tt, int pos, Env env) {
+        if (et.isErroneous() || tt.isErroneous() || isReifiable(tt)) {
+            return;
+        }
+        Type re = types.resolveInference(et);
+        if (types.isSubtype(re, tt) || re instanceof Type.ClassType && ((Type.ClassType) re).isParameterized()) {
+            return;
+        }
+        error(env, pos, et + " cannot be safely cast to " + tt);
     }
 
     private Type attribCast(Tree.Cast c, Env env) {
@@ -4035,10 +4071,9 @@ final class Attr {
     }
 
     private boolean moreSpecific(MethodSymbol m1, MethodSymbol m2, List<Tree> args, boolean varargs, Env env) {
-        int n = Math.max(args.size(), Math.max(m1.params.size(), m2.params.size()));
-        if (!varargs) {
-            n = args.size();
-        }
+        // JLS 15.12.2.5: the k argument positions, each compared through the expanded
+        // variable-arity formals; the declared parameter counts do not matter on their own.
+        int n = args.size();
         for (int i = 0; i < n; i++) {
             Type f1 = formal(m1, i, varargs);
             Type f2 = formal(m2, i, varargs);
@@ -4092,8 +4127,15 @@ final class Attr {
                 return false;
             }
         }
-        if (varargs && m1.params.size() < m2.params.size()) {
-            return false;
+        // ...and when m2 declares k + 1 parameters, m1's next variable-arity formal must be a
+        // subtype of m2's k+1-th: m(Object...) is not more specific than m(Object, Object...)
+        // for one argument unless that holds.
+        if (varargs && m2.params.size() == n + 1) {
+            Type f1 = formal(m1, n, true);
+            Type f2 = formal(m2, n, true);
+            if (!f1.isErroneous() && !f2.isErroneous() && !types.isSubtype(types.erased(f1), types.erased(f2))) {
+                return false;
+            }
         }
         return true;
     }
