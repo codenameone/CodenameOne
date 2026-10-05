@@ -228,17 +228,39 @@ final class StreamImpl<T> implements Stream<T> {
          * A terminal operation ended -- early, or by an exception from a callback: close the
          * mapped streams still open upstream. Every terminal operation calls it in a finally.
          */
-        void release() {
-            closeInner();
-            if (input instanceof Cursor) {
-                ((Cursor) input).release();
+        void release(Throwable primary) {
+            // Every open mapped stream up the pipeline is closed even when one close throws.
+            // A close failure never replaces the exception that ended the traversal: it is
+            // added to it as suppressed, as the JDK's try-with-resources does; with no such
+            // exception the first close failure is thrown, the rest suppressed into it.
+            Throwable first = null;
+            Cursor c = this;
+            while (c != null) {
+                try {
+                    c.closeInner();
+                } catch (Throwable t) {
+                    if (first == null) {
+                        first = t;
+                    } else if (first != t) {
+                        first.addSuppressed(t);
+                    }
+                }
+                c = c.input instanceof Cursor ? (Cursor) c.input : null;
+            }
+            if (first == null) {
+                return;
+            }
+            if (primary == null) {
+                StreamImpl.<RuntimeException>rethrow(first);
+            } else if (primary != first) {
+                primary.addSuppressed(first);
             }
         }
     }
 
-    private static void release(Iterator<?> values) {
+    private static void release(Iterator<?> values, Throwable failure) {
         if (values instanceof Cursor) {
-            ((Cursor) values).release();
+            ((Cursor) values).release(failure);
         }
     }
 
@@ -256,81 +278,109 @@ final class StreamImpl<T> implements Stream<T> {
     public void forEach(Consumer<? super T> action) {
         require(action);
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             while (values.hasNext()) action.accept(values.next());
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public Object[] toArray() {
         List<T> result = new ArrayList<T>();
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             while (values.hasNext()) result.add(values.next());
             return result.toArray();
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public T reduce(T identity, BinaryOperator<T> accumulator) {
         require(accumulator);
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             T result = identity;
             while (values.hasNext()) result = accumulator.apply(result, values.next());
             return result;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public <A, R> R collect(Collector<? super T, A, R> collector) {
         require(collector);
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             A container = collector.supplier().get();
             BiConsumer<A, ? super T> accumulator = collector.accumulator();
             while (values.hasNext()) accumulator.accept(container, values.next());
             return collector.finisher().apply(container);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public long count() {
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             long count = 0;
             while (values.hasNext()) { values.next(); count++; }
             return count;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public boolean anyMatch(Predicate<? super T> predicate) {
         require(predicate);
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             boolean found = false;
             while (!found && values.hasNext()) found = predicate.test(values.next());
             return found;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public boolean allMatch(Predicate<? super T> predicate) {
         require(predicate);
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             boolean all = true;
             while (all && values.hasNext()) all = predicate.test(values.next());
             return all;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
@@ -338,11 +388,15 @@ final class StreamImpl<T> implements Stream<T> {
 
     public Optional<T> findFirst() {
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             Optional<T> first = values.hasNext() ? Optional.of(values.next()) : Optional.<T>empty();
             return first;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
@@ -351,6 +405,7 @@ final class StreamImpl<T> implements Stream<T> {
     public Optional<T> min(Comparator<? super T> comparator) {
         require(comparator);
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             if (!values.hasNext()) return Optional.<T>empty();
             T best = values.next();
@@ -359,14 +414,18 @@ final class StreamImpl<T> implements Stream<T> {
                 if (comparator.compare(v, best) < 0) best = v;
             }
             return Optional.of(best);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public Optional<T> max(Comparator<? super T> comparator) {
         require(comparator);
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             if (!values.hasNext()) return Optional.<T>empty();
             T best = values.next();
@@ -375,21 +434,28 @@ final class StreamImpl<T> implements Stream<T> {
                 if (comparator.compare(v, best) > 0) best = v;
             }
             return Optional.of(best);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public Optional<T> reduce(BinaryOperator<T> accumulator) {
         require(accumulator);
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             if (!values.hasNext()) return Optional.<T>empty();
             T result = values.next();
             while (values.hasNext()) result = accumulator.apply(result, values.next());
             return Optional.of(result);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
@@ -400,22 +466,30 @@ final class StreamImpl<T> implements Stream<T> {
         require(combiner);
         R container = supplier.get();
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             while (values.hasNext()) accumulator.accept(container, values.next());
             return container;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
 
     public List<T> toList() {
         List<T> result = new ArrayList<T>();
         Iterator<T> values = iterator();
+        Throwable failure = null;
         try {
             while (values.hasNext()) result.add(values.next());
             return Collections.unmodifiableList(result);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
-            release(values);
+            release(values, failure);
         }
     }
     public Stream<T> sequential() { return this; }

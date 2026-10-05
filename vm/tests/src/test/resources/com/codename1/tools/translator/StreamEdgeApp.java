@@ -229,6 +229,21 @@ public class StreamEdgeApp {
         } catch (IllegalStateException expected) {
         }
         check("close-p1 ".equals(log.toString()));
+        log.setLength(0);
+        try {
+            Stream.of(1)
+                    .flatMap(v -> Stream.of(v).onClose(() -> {
+                        log.append("outer ");
+                        throw new IllegalStateException("close");
+                    }))
+                    .flatMap(w -> Stream.of(w).onClose(() -> log.append("inner ")))
+                    .anyMatch(v -> { throw new IllegalArgumentException("predicate"); });
+            throw new AssertionError("predicate exception swallowed");
+        } catch (IllegalArgumentException e) {
+            // The close failure rides along as suppressed; it does not replace the original.
+            check(e.getSuppressed().length == 1 && "close".equals(e.getSuppressed()[0].getMessage()));
+        }
+        check("inner outer ".equals(log.toString()));
         try {
             java.util.Comparator.<String, Integer>comparing(String::length, null);
             throw new AssertionError("comparing(f, null)");
