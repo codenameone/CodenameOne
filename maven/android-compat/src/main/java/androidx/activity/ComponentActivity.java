@@ -80,6 +80,9 @@ public class ComponentActivity extends Activity
     });
     private final Map<Integer, Registration<?, ?>> mRegistrations = new HashMap<Integer, Registration<?, ?>>();
     private int mNextRequestCode = 0xA000;
+    /// Keyed registrations take codes from 0x8000 up, below the ordered ones.
+    private static final int KEYED_CODE_BASE = 0x8000;
+    private static final int KEYED_CODES = 0x2000;
 
     public ComponentActivity() {
     }
@@ -266,6 +269,28 @@ public class ComponentActivity extends Activity
     public final <I, O> ActivityResultLauncher<I> registerForActivityResult(ActivityResultContract<I, O> contract,
                                                                             ActivityResultCallback<O> callback) {
         int code = mNextRequestCode++;
+        Registration<I, O> r = new Registration<I, O>(code, contract, callback);
+        mRegistrations.put(Integer.valueOf(code), r);
+        return r;
+    }
+
+    /// Registers under a request code derived from `key` rather than from
+    /// the registration order, for the runtime's fragments. A fragment
+    /// recreated with its activity registers at a different point of the
+    /// replacement's start-up than the original did -- during
+    /// `super.onCreate`, before launchers the activity registers after it --
+    /// so an order-allotted code would hand a pending result to whichever
+    /// callback now holds it. The same key gives the same code in every
+    /// instance, unless two live keys share a slot, when the later one
+    /// takes the next free code.
+    public final <I, O> ActivityResultLauncher<I> registerForActivityResult(String key,
+            ActivityResultContract<I, O> contract, ActivityResultCallback<O> callback) {
+        int slot = (key.hashCode() & 0x7fffffff) % KEYED_CODES;
+        int code = KEYED_CODE_BASE + slot;
+        for (int i = 0; i < KEYED_CODES && mRegistrations.containsKey(Integer.valueOf(code)); i++) {
+            slot = (slot + 1) % KEYED_CODES;
+            code = KEYED_CODE_BASE + slot;
+        }
         Registration<I, O> r = new Registration<I, O>(code, contract, callback);
         mRegistrations.put(Integer.valueOf(code), r);
         return r;

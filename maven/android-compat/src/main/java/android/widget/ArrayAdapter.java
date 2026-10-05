@@ -45,6 +45,8 @@ public class ArrayAdapter<T> extends BaseAdapter implements Filterable {
     private int mFieldId;
     private List<T> mObjects;
     private ArrayList<T> mOriginalValues;
+    /// The constraint of the filter result on display, or null.
+    private String mConstraint;
     private boolean mNotifyOnChange = true;
     private ArrayFilter mFilter;
 
@@ -88,9 +90,30 @@ public class ArrayAdapter<T> extends BaseAdapter implements Filterable {
         return mOriginalValues != null ? mOriginalValues : mObjects;
     }
 
+    /// Whether `item` belongs in the filtered list on display. Android adds
+    /// to the unfiltered values only, so an item added under any filter --
+    /// even an empty one -- stays invisible until the next filter pass; here
+    /// it appears at once exactly when the active constraint keeps it.
+    private boolean matchesConstraint(T item) {
+        return mConstraint == null || mConstraint.length() == 0 || matches(String.valueOf(item), mConstraint);
+    }
+
+    /// Whether `text`, or any word of it, starts with `prefix`, ignoring case.
+    static boolean matches(String text, String prefix) {
+        if (text.regionMatches(true, 0, prefix, 0, prefix.length())) {
+            return true;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == ' ' && text.regionMatches(true, i + 1, prefix, 0, prefix.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void add(T object) {
         target().add(object);
-        if (mOriginalValues != null) {
+        if (mOriginalValues != null && matchesConstraint(object)) {
             mObjects.add(object);
         }
         if (mNotifyOnChange) {
@@ -101,7 +124,11 @@ public class ArrayAdapter<T> extends BaseAdapter implements Filterable {
     public void addAll(Collection<? extends T> collection) {
         target().addAll(collection);
         if (mOriginalValues != null) {
-            mObjects.addAll(collection);
+            for (T v : collection) {
+                if (matchesConstraint(v)) {
+                    mObjects.add(v);
+                }
+            }
         }
         if (mNotifyOnChange) {
             notifyDataSetChanged();
@@ -114,7 +141,7 @@ public class ArrayAdapter<T> extends BaseAdapter implements Filterable {
 
     public void insert(T object, int index) {
         target().add(index, object);
-        if (mOriginalValues != null) {
+        if (mOriginalValues != null && matchesConstraint(object)) {
             mObjects.add(Math.min(index, mObjects.size()), object);
         }
         if (mNotifyOnChange) {
@@ -252,16 +279,8 @@ public class ArrayAdapter<T> extends BaseAdapter implements Filterable {
             String p = prefix.toString();
             ArrayList<T> kept = new ArrayList<T>();
             for (T v : values) {
-                String text = String.valueOf(v);
-                if (text.regionMatches(true, 0, p, 0, p.length())) {
+                if (matches(String.valueOf(v), p)) {
                     kept.add(v);
-                    continue;
-                }
-                for (int i = 0; i < text.length(); i++) {
-                    if (text.charAt(i) == ' ' && text.regionMatches(true, i + 1, p, 0, p.length())) {
-                        kept.add(v);
-                        break;
-                    }
                 }
             }
             results.values = kept;
@@ -274,6 +293,7 @@ public class ArrayAdapter<T> extends BaseAdapter implements Filterable {
         protected void publishResults(CharSequence constraint, FilterResults results) {
             if (results.values instanceof List) {
                 mObjects = (List<T>) results.values;
+                mConstraint = constraint == null ? null : constraint.toString();
             }
             if (results.count > 0) {
                 notifyDataSetChanged();

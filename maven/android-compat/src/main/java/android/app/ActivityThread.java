@@ -59,6 +59,9 @@ public final class ActivityThread {
         Activity activity;
         Activity caller;
         int requestCode = -1;
+        /// Launched with `FLAG_ACTIVITY_NO_HISTORY`: finished, rather than
+        /// stopped, as soon as another activity covers it.
+        boolean noHistory;
         ActivityForm form;
         FrameLayout decor;
         FrameLayout content;
@@ -240,6 +243,7 @@ public final class ActivityThread {
         r.caller = requestCode >= 0 ? callerActivity : null;
         r.requestCode = requestCode;
         r.info = info;
+        r.noHistory = (intent.getFlags() & Intent.FLAG_ACTIVITY_NO_HISTORY) != 0;
         attach(r, intent);
         if (STACK.isEmpty() && recreated == null) {
             // The first activity of an application hosted inside a Codename
@@ -251,7 +255,14 @@ public final class ActivityThread {
         start(r);
         resumeRecord(r, false);
         if (prev != null) {
-            stop(prev);
+            if (prev.noHistory && STACK.remove(prev)) {
+                // Never returned to, as on Android: finishing the new
+                // activity resumes the one beneath. A result it asked for
+                // is lost with it, which Android documents too.
+                destroy(prev, false);
+            } else {
+                stop(prev);
+            }
         }
         if (recreated != null) {
             destroy(recreated, false);
@@ -730,8 +741,18 @@ public final class ActivityThread {
             return;
         }
         Activity a = r.activity;
-        if (a.dispatchKeyEvent(new android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,
-                android.view.KeyEvent.KEYCODE_BACK))) {
+        // Both halves of the key, as on Android: a handler that claims the
+        // down and acts in onKeyUp() (an activity's or a focused view's) is
+        // otherwise a no-op. The up is not sent to an activity the down
+        // already finished -- on Android it would reach the next window,
+        // which never saw the down and ignores it.
+        boolean handled = a.dispatchKeyEvent(new android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,
+                android.view.KeyEvent.KEYCODE_BACK));
+        if (!a.isFinishing()) {
+            handled |= a.dispatchKeyEvent(new android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,
+                    android.view.KeyEvent.KEYCODE_BACK));
+        }
+        if (handled) {
             return;
         }
         a.onBackPressed();

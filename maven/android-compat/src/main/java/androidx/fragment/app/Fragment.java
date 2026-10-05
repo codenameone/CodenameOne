@@ -72,6 +72,8 @@ public class Fragment extends android.app.Fragment
     private ViewModelStore mViewModelStore;
     private ViewModelProvider.Factory mDefaultFactory;
     private final int mContentLayoutId;
+    private int mNextLauncher;
+    private final java.util.ArrayList<FragmentLauncher<?, ?>> mLaunchers = new java.util.ArrayList<FragmentLauncher<?, ?>>();
 
     public Fragment() {
         mContentLayoutId = 0;
@@ -230,35 +232,104 @@ public class Fragment extends android.app.Fragment
                     + "being created. Fragments must call registerForActivityResult() before they are created (i.e. "
                     + "initialization, onAttach(), or onCreate()).");
         }
-        return new ActivityResultLauncher<I>() {
-            private ActivityResultLauncher<I> mDelegate;
+        FragmentLauncher<I, O> l = new FragmentLauncher<I, O>(mNextLauncher++, contract, callback);
+        mLaunchers.add(l);
+        return l;
+    }
 
-            @Override
-            public void launch(I input, Object options) {
-                if (mDelegate == null) {
-                    Activity a = Fragment.super.getActivity();
-                    if (!(a instanceof ComponentActivity)) {
-                        throw new IllegalStateException("Fragment " + Fragment.this + " is not attached to a "
-                                + "ComponentActivity; it cannot launch for a result");
-                    }
-                    mDelegate = ((ComponentActivity) a).registerForActivityResult(contract, callback);
-                }
-                mDelegate.launch(input, options);
+    /// Binds every launcher to the activity the fragment is now in. Called
+    /// once the fragment is created, so a fragment recreated with its
+    /// activity -- a configuration change while the launched activity runs
+    /// -- registers before the result comes back, under the request code
+    /// the original launched with (see [#launcherKey(int)]). Binding on
+    /// first launch instead left the replacement with no registration and
+    /// the result was dropped.
+    private void bindLaunchers() {
+        for (int i = 0; i < mLaunchers.size(); i++) {
+            mLaunchers.get(i).bind();
+        }
+    }
+
+    /// What identifies launcher `ordinal` of this fragment in every
+    /// instance of its activity: its class, id and tag, those of the
+    /// fragments it is nested in, and the launcher's declaration order.
+    private String launcherKey(int ordinal) {
+        StringBuilder sb = new StringBuilder("fragment");
+        for (android.app.Fragment f = this; f != null; f = f.getParentFragment()) {
+            sb.append('/').append(f.getClass().getName()).append(':').append(f.getId()).append(':')
+                    .append(f.getTag());
+        }
+        return sb.append("#").append(ordinal).toString();
+    }
+
+    private void unbindLaunchers() {
+        for (int i = 0; i < mLaunchers.size(); i++) {
+            mLaunchers.get(i).unbind();
+        }
+    }
+
+    /// A fragment's launcher: registered with the activity the fragment is
+    /// in, and again with the next one when the fragment moves (a retained
+    /// fragment across a configuration change).
+    private final class FragmentLauncher<I, O> extends ActivityResultLauncher<I> {
+        private final int mOrdinal;
+        private final ActivityResultContract<I, O> mContract;
+        private final ActivityResultCallback<O> mCallback;
+        private ActivityResultLauncher<I> mDelegate;
+        private Activity mBoundTo;
+
+        FragmentLauncher(int ordinal, ActivityResultContract<I, O> contract, ActivityResultCallback<O> callback) {
+            mOrdinal = ordinal;
+            mContract = contract;
+            mCallback = callback;
+        }
+
+        /// The registration with the activity the fragment is in, or null
+        /// when that is not an activity this launcher can use.
+        ActivityResultLauncher<I> bind() {
+            Activity a = Fragment.super.getActivity();
+            if (!(a instanceof ComponentActivity)) {
+                return null;
             }
-
-            @Override
-            public void unregister() {
+            if (mDelegate == null || mBoundTo != a) {
                 if (mDelegate != null) {
                     mDelegate.unregister();
-                    mDelegate = null;
                 }
+                mDelegate = ((ComponentActivity) a).registerForActivityResult(launcherKey(mOrdinal), mContract,
+                        mCallback);
+                mBoundTo = a;
             }
+            return mDelegate;
+        }
 
-            @Override
-            public ActivityResultContract<I, ?> getContract() {
-                return contract;
+        void unbind() {
+            if (mDelegate != null) {
+                mDelegate.unregister();
+                mDelegate = null;
+                mBoundTo = null;
             }
-        };
+        }
+
+        @Override
+        public void launch(I input, Object options) {
+            ActivityResultLauncher<I> delegate = bind();
+            if (delegate == null) {
+                throw new IllegalStateException("Fragment " + Fragment.this + " is not attached to a "
+                        + "ComponentActivity; it cannot launch for a result");
+            }
+            delegate.launch(input, options);
+        }
+
+        @Override
+        public void unregister() {
+            unbind();
+            mLaunchers.remove(this);
+        }
+
+        @Override
+        public ActivityResultContract<I, ?> getContract() {
+            return mContract;
+        }
     }
 
     // ------------------------------------------------------------ lifecycles
@@ -305,6 +376,7 @@ public class Fragment extends android.app.Fragment
         switch (step) {
             case RUNTIME_STEP_CREATE:
                 mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE);
+                bindLaunchers();
                 break;
             case RUNTIME_STEP_CREATE_VIEW:
                 mViewLifecycleOwner = new ViewLifecycleOwner();
@@ -357,6 +429,7 @@ public class Fragment extends android.app.Fragment
                     mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
                 }
                 clearViewModelsIfGone();
+                unbindLaunchers();
                 break;
             default:
                 break;

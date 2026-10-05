@@ -45,6 +45,10 @@ public final class AndroidTestSupport {
         /// Fills the options menu of the next activities started, or null.
         public static OptionsMenu optionsMenu;
 
+        /// Handles the key events of the next activities started instead of
+        /// the platform's defaults, or null.
+        public static KeyHandler keys;
+
         /// The request code of the last result delivered, or -1.
         public int resultRequestCode = -1;
 
@@ -85,6 +89,23 @@ public final class AndroidTestSupport {
             resultRequestCode = requestCode;
             this.resultCode = resultCode;
         }
+
+        @Override
+        public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
+            KeyHandler k = keys;
+            return k != null ? k.onKey(this, event) : super.onKeyDown(keyCode, event);
+        }
+
+        @Override
+        public boolean onKeyUp(int keyCode, android.view.KeyEvent event) {
+            KeyHandler k = keys;
+            return k != null ? k.onKey(this, event) : super.onKeyUp(keyCode, event);
+        }
+    }
+
+    /// Handles a test activity's key events.
+    public interface KeyHandler {
+        boolean onKey(Activity activity, android.view.KeyEvent event);
     }
 
     /// An activity that declares `android:configChanges="uiMode"`, so a dark

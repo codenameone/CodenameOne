@@ -200,8 +200,11 @@ public class Dialog implements DialogInterface, Window.Callback {
         mShowListener = listener;
     }
 
+    /// False after `hide()`, as on Android, which answers from the decor's
+    /// visibility. `mShowing` stays true across a hide so that `show()`
+    /// reuses the host and `dismiss()` still tears it down.
     public boolean isShowing() {
-        return mShowing;
+        return mShowing && mHost != null && mHost.isVisible();
     }
 
     public void show() {

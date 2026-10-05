@@ -66,6 +66,16 @@ public class RadioGroup extends LinearLayout {
             if (mProtectFromCheckedChange) {
                 return;
             }
+            if (!isChecked) {
+                // A button unchecked from code leaves the group with no
+                // selection, so it must not keep reporting that button's id.
+                // Android records the id regardless, which leaves
+                // getCheckedRadioButtonId() naming an unchecked child.
+                if (buttonView.getId() == mCheckedId) {
+                    setCheckedId(View.NO_ID);
+                }
+                return;
+            }
             mProtectFromCheckedChange = true;
             try {
                 if (mCheckedId != View.NO_ID) {

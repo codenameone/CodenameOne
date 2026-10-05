@@ -198,6 +198,10 @@ public abstract class AbstractCursor implements Cursor {
         return mPos == (cnt - 1) && cnt != 0;
     }
 
+    // An empty cursor is both before the first row and after the last one:
+    // AOSP's AbstractCursor answers true from both predicates when getCount()
+    // is 0, and code written against Android (`while (!c.isAfterLast())`)
+    // relies on it. Deliberately not changed to "neither".
     @Override
     public final boolean isBeforeFirst() {
         return getCount() == 0 || mPos == -1;
