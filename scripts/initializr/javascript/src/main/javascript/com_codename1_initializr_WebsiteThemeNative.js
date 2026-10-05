@@ -154,33 +154,65 @@ var o = {};
         callback.complete(true);
     };
 
-    // Horizontal clearance (CSS px) the host page's Crisp chat launcher needs at
-    // the bottom-right, so the generate button can be nudged left of it. The
-    // default Crisp launcher bubble (~64px) sits ~24px from the page edge;
-    // CHAT_CLEARANCE_PX reserves enough to clear it with a small visual gap.
-    var CHAT_CLEARANCE_PX = 96;
+    // Horizontal clearance (CSS px) the host page's Crisp widget needs so the
+    // generate button can sit to its left. Measured, not assumed: the round
+    // launcher is ~64px, but a first-time visitor usually sees Crisp folded
+    // with a greeting/"chat with us" pill several times wider, and a fixed
+    // 96px reservation left the button underneath that, where the folded
+    // widget is also awkward to dismiss. So find every visible Crisp element
+    // that overlaps the bottom band of this frame (where the action bar is)
+    // and clear the leftmost of them. 0 when Crisp is absent, hidden, or not
+    // over the bar.
+    var CHAT_BAND_PX = 140;   // bottom strip of the frame that holds the action bar
+    var CHAT_GAP_PX = 16;     // visual gap between the widget and the button
+    var CHAT_MAX_FRACTION = 0.6; // never push the button past 60% of the width
 
-    function chatLauncherVisible() {
+    function chatLauncherClearancePx() {
         try {
             var parentWindow = (window.parent && window.parent !== window) ? window.parent : window;
             var doc = parentWindow.document;
             var client = doc ? doc.querySelector(".crisp-client") : null;
-            if (!client) {
-                return false;
+            if (!client || !parentWindow.getComputedStyle) {
+                return 0;
             }
-            var cs = parentWindow.getComputedStyle ? parentWindow.getComputedStyle(client) : null;
-            if (cs && (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity || "1") === 0)) {
-                return false;
+            var hidden = function(el) {
+                var cs = parentWindow.getComputedStyle(el);
+                return !cs || cs.display === "none" || cs.visibility === "hidden"
+                    || parseFloat(cs.opacity || "1") === 0;
+            };
+            if (hidden(client)) {
+                return 0;
             }
-            return true;
+            var frame = window.frameElement && window.frameElement.getBoundingClientRect
+                ? window.frameElement.getBoundingClientRect()
+                : { left: 0, right: parentWindow.innerWidth, bottom: parentWindow.innerHeight };
+            var bandTop = frame.bottom - CHAT_BAND_PX;
+            var minLeft = Infinity;
+            var nodes = client.querySelectorAll("*");
+            for (var i = 0; i < nodes.length; i++) {
+                var r = nodes[i].getBoundingClientRect();
+                if (r.width < 1 || r.height < 1 || r.bottom <= bandTop || r.top >= frame.bottom
+                        || r.right <= frame.left || r.left >= frame.right || r.left >= minLeft) {
+                    continue;
+                }
+                if (!hidden(nodes[i])) {
+                    minLeft = r.left;
+                }
+            }
+            if (minLeft === Infinity) {
+                return 0;
+            }
+            var clearance = Math.ceil(frame.right - minLeft + CHAT_GAP_PX);
+            var max = Math.floor((frame.right - frame.left) * CHAT_MAX_FRACTION);
+            return Math.max(0, Math.min(clearance, max));
         } catch (ignored) {
             // Cross-origin / sandbox / missing widget: reserve nothing.
-            return false;
+            return 0;
         }
     }
 
     o.chatLauncherClearance_ = function(callback) {
-        callback.complete(chatLauncherVisible() ? CHAT_CLEARANCE_PX : 0);
+        callback.complete(chatLauncherClearancePx());
     };
 
     o.isSupported_ = function(callback) {
