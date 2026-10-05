@@ -84,6 +84,10 @@ public final class ActivityThread {
         AndroidApp.ActivityInfo info;
         /// Shows the options menu instead of the form's toolbar, or null.
         com.codename1.androidcompat.runtime.MenuPresenter menuPresenter;
+        /// Results of activities this one started that finished while it was
+        /// not resumed, as `{requestCode, resultCode, data}`: delivered before
+        /// its next `onResume`, as Android queues them on the caller.
+        ArrayList<Object[]> pendingResults;
     }
 
     private static final ArrayList<Record> STACK = new ArrayList<Record>();
@@ -331,6 +335,7 @@ public final class ActivityThread {
             }
             start(r);
         }
+        deliverPendingResults(r);
         if (!r.menuCreated) {
             r.menuCreated = true;
             buildOptionsMenu(r);
@@ -351,11 +356,16 @@ public final class ActivityThread {
             cb.onActivityResumed(a);
         }
         a.onWindowFocusChanged(true);
+        r.decor.dispatchWindowFocusChanged(true);
     }
 
     private static void pause(Record r) {
         Activity a = r.activity;
+        // The activity first, then its views, as Android's decor view does;
+        // without the views, hasWindowFocus() stayed true under a covering
+        // activity and focus-guarded work kept running.
         a.onWindowFocusChanged(false);
+        r.decor.dispatchWindowFocusChanged(false);
         a.hostsDispatchPause();
         a.onPause();
         r.resumed = false;
@@ -437,10 +447,34 @@ public final class ActivityThread {
             }
         } else {
             destroy(r, false);
-            Record t = top();
-            if (t != null) {
-                deliverResult(r, t);
+            // The caller need not be on top -- A starts B, B starts C, and A
+            // finishes B with finishActivity -- so the result goes to the
+            // caller's own record, and waits there unless it is resumed.
+            Record caller = r.caller == null || r.requestCode < 0 ? null : recordOf(r.caller);
+            if (caller != null) {
+                if (caller.resumed) {
+                    deliverResult(r, caller);
+                } else {
+                    if (caller.pendingResults == null) {
+                        caller.pendingResults = new ArrayList<Object[]>();
+                    }
+                    caller.pendingResults.add(new Object[] {Integer.valueOf(r.requestCode),
+                        Integer.valueOf(a.mResultCode), a.mResultData});
+                }
             }
+        }
+    }
+
+    /// Delivers the results queued on `r` while it was not resumed.
+    private static void deliverPendingResults(Record r) {
+        ArrayList<Object[]> pending = r.pendingResults;
+        if (pending == null) {
+            return;
+        }
+        r.pendingResults = null;
+        for (Object[] p : pending) {
+            Intent data = p[2] instanceof Intent ? (Intent) p[2] : null;
+            r.activity.dispatchActivityResult(((Integer) p[0]).intValue(), ((Integer) p[1]).intValue(), data);
         }
     }
 
@@ -521,6 +555,7 @@ public final class ActivityThread {
         n.caller = r.caller;
         n.requestCode = r.requestCode;
         n.info = r.info;
+        n.pendingResults = r.pendingResults;
         attach(n, a.getIntent());
         STACK.set(index, n);
         for (Record other : STACK) {

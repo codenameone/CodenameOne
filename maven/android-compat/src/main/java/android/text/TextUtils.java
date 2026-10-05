@@ -171,12 +171,10 @@ public class TextUtils {
         if (p.measureText(s) <= avail) {
             return text;
         }
-        String ell = "\u2026";
-        int n = s.length();
-        while (n > 0 && p.measureText(s.substring(0, n) + ell) > avail) {
-            n--;
-        }
-        return s.substring(0, n) + ell;
+        int mode = where == TruncateAt.START ? com.codename1.androidcompat.runtime.TextLayout.ELLIPSIZE_START
+                : where == TruncateAt.MIDDLE ? com.codename1.androidcompat.runtime.TextLayout.ELLIPSIZE_MIDDLE
+                : com.codename1.androidcompat.runtime.TextLayout.ELLIPSIZE_END;
+        return com.codename1.androidcompat.runtime.TextLayout.ellipsize(s, p, avail, mode);
     }
 
     public static String substring(CharSequence source, int start, int end) {

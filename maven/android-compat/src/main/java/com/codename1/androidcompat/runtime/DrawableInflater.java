@@ -144,8 +144,30 @@ public final class DrawableInflater {
     }
 
     private static Drawable fromFile(Resources res, int id, ResTable.FileRef f) {
-        int bucket = densityOf(res, id);
-        int device = res.getDisplayMetrics().densityDpi;
+        return fromFile(res, f, densityOf(res, id), res.getDisplayMetrics().densityDpi);
+    }
+
+    /// `getDrawableForDensity`: an image file chosen and scaled for `density`
+    /// instead of the device's, so its bitmap has the pixel size a screen of
+    /// that density would get. Drawable XML (vectors, shapes) is sized in dp
+    /// against the device and loads as [#load(Resources, int, Resources.Theme)]
+    /// does.
+    public static Drawable loadForDensity(Resources res, int id, int density, Resources.Theme theme) {
+        ResTable.Entry e = density <= 0 ? null : res.getManager().entry(id);
+        if (e == null) {
+            return load(res, id, theme);
+        }
+        DeviceConfig d = res.getManager().device().withDensity(density);
+        Object it = e.bestUncached(d);
+        if (!(it instanceof ResTable.FileRef)) {
+            return load(res, id, theme);
+        }
+        ResConfigSpec c = e.bestConfigUncached(d);
+        int bucket = c == null || c.getDensity() == 0 ? 160 : c.getDensity();
+        return fromFile(res, (ResTable.FileRef) it, bucket, density);
+    }
+
+    private static Drawable fromFile(Resources res, ResTable.FileRef f, int bucket, int device) {
         float scale = bucket == 0xffff || bucket == 0xfffe || bucket <= 0 ? 1f : device / (float) bucket;
         if (f.name.endsWith(".9.png")) {
             return new NinePatchDrawable(rawImage(f.name), scale);

@@ -423,11 +423,21 @@ public final class AndroidRuntime {
             this.intent = intent;
         }
 
+        /// A receiver gets the broadcast only when its filter matches whole --
+        /// action, data, MIME type and categories -- as an activity's filter
+        /// must for an implicit start: a receiver registered for `ACTION_VIEW`
+        /// on one scheme takes no other `ACTION_VIEW` broadcast. Unlike an
+        /// activity start, no `CATEGORY_DEFAULT` is added.
         @Override
         public void run() {
+            String action = intent.getAction();
+            if (action == null) {
+                return;
+            }
             for (Object[] r : receivers) {
                 if (r[1] instanceof IntentFilter && r[0] instanceof BroadcastReceiver
-                        && ((IntentFilter) r[1]).matchAction(intent.getAction())) {
+                        && ((IntentFilter) r[1]).match(action, intent.getType(), intent.getScheme(),
+                        intent.getData(), intent.getCategories(), null) >= 0) {
                     ((BroadcastReceiver) r[0]).onReceive(from, intent);
                 }
             }

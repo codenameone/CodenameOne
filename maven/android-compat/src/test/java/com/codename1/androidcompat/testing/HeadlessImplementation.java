@@ -149,8 +149,18 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return new Object();
     }
 
+    /// With [#pixelImages] set, an encoded image (a PNG resource) is decoded
+    /// to its pixels, so tests can check the size a drawable comes out at.
     @Override
     public java.lang.Object createImage(java.io.InputStream a0) throws java.io.IOException {
+        if (pixelImages) {
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(a0);
+            if (img != null) {
+                int w = img.getWidth();
+                int h = img.getHeight();
+                return createImage(img.getRGB(0, 0, w, h, null, 0, w), w, h);
+            }
+        }
         return new Object();
     }
 

@@ -29,8 +29,20 @@ import java.util.List;
 
 /// Breaks text into lines for a width: hard breaks at newlines, soft breaks
 /// at the last space that fits, and a character break for a word wider than
-/// the line. Optional end ellipsis when the line count is capped.
+/// the line. Optional end ellipsis when the line count is capped, and an
+/// ellipsis at the end, start or middle of a single line that does not fit.
 public final class TextLayout {
+
+    /// No ellipsis.
+    public static final int ELLIPSIZE_NONE = 0;
+    /// `TruncateAt.END` (and `MARQUEE`): the end of the text is cut.
+    public static final int ELLIPSIZE_END = 1;
+    /// `TruncateAt.START`: the start is cut, keeping the end of a path.
+    public static final int ELLIPSIZE_START = 2;
+    /// `TruncateAt.MIDDLE`: both ends are kept.
+    public static final int ELLIPSIZE_MIDDLE = 3;
+
+    private static final char ELLIPSIS = (char) 0x2026;
 
     public final List<String> lines = new ArrayList<String>();
     public float maxLineWidth;
@@ -41,6 +53,15 @@ public final class TextLayout {
     /// `width` <= 0 means unbounded (no soft wrapping).
     public static TextLayout layout(String text, Paint paint, int width, boolean singleLine, int maxLines,
                                     boolean ellipsizeEnd) {
+        return layout(text, paint, width, singleLine, maxLines, ellipsizeEnd ? ELLIPSIZE_END : ELLIPSIZE_NONE);
+    }
+
+    /// As [#layout(String, Paint, int, boolean, int, boolean)], with an
+    /// `ELLIPSIZE_*` mode. START and MIDDLE apply to a single line, as on
+    /// Android; text capped by `maxLines` is always cut at its end.
+    public static TextLayout layout(String text, Paint paint, int width, boolean singleLine, int maxLines,
+                                    int ellipsize) {
+        boolean ellipsizeEnd = ellipsize != ELLIPSIZE_NONE;
         TextLayout l = new TextLayout();
         if (text == null) {
             text = "";
@@ -72,7 +93,7 @@ public final class TextLayout {
             }
         } else if (ellipsizeEnd && singleLine && width > 0 && !l.lines.isEmpty()
                 && paint.measureText(l.lines.get(0)) > width) {
-            l.ellipsizeLast(paint, width);
+            l.lines.set(0, ellipsize(l.lines.get(0), paint, width, ellipsize));
         }
         l.maxLineWidth = 0;
         for (String s : l.lines) {
@@ -88,19 +109,46 @@ public final class TextLayout {
     private void ellipsizeLast(Paint paint, int width) {
         int last = lines.size() - 1;
         String s = lines.get(last);
-        String ell = "\u2026";
         if (width <= 0) {
-            lines.set(last, s + ell);
+            lines.set(last, s + ELLIPSIS);
             return;
         }
-        int end = s.length();
+        lines.set(last, ellipsize(s, paint, width, ELLIPSIZE_END));
+    }
+
+    /// `s` with an ellipsis at `where` (an `ELLIPSIZE_*` mode) replacing as
+    /// many characters as it takes to fit `width`.
+    public static String ellipsize(String s, Paint paint, float width, int where) {
+        String ell = String.valueOf(ELLIPSIS);
+        int n = s.length();
+        if (where == ELLIPSIZE_START) {
+            int start = 0;
+            while (start < n && paint.measureText(ell + s.substring(start)) > width) {
+                start++;
+            }
+            while (start < n && s.charAt(start) == ' ') {
+                start++;
+            }
+            return ell + s.substring(start);
+        }
+        if (where == ELLIPSIZE_MIDDLE) {
+            for (int keep = n; keep > 0; keep--) {
+                int head = (keep + 1) / 2;
+                String candidate = s.substring(0, head) + ell + s.substring(n - (keep - head));
+                if (paint.measureText(candidate) <= width) {
+                    return candidate;
+                }
+            }
+            return ell;
+        }
+        int end = n;
         while (end > 0 && paint.measureText(s.substring(0, end) + ell) > width) {
             end--;
         }
         while (end > 0 && s.charAt(end - 1) == ' ') {
             end--;
         }
-        lines.set(last, s.substring(0, end) + ell);
+        return s.substring(0, end) + ell;
     }
 
     private static void wrap(TextLayout l, String para, Paint paint, int width) {

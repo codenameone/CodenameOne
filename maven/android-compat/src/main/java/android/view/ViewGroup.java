@@ -841,6 +841,14 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     }
 
     @Override
+    public void dispatchWindowFocusChanged(boolean hasFocus) {
+        super.dispatchWindowFocusChanged(hasFocus);
+        for (View v : new ArrayList<View>(mChildren)) {
+            v.dispatchWindowFocusChanged(hasFocus);
+        }
+    }
+
+    @Override
     protected void dispatchSetPressed(boolean pressed) {
         for (View v : mChildren) {
             if (!pressed || (!v.isClickable() && !v.isLongClickable())) {

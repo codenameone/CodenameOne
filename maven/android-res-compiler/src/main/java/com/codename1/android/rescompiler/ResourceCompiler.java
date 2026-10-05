@@ -835,6 +835,16 @@ public final class ResourceCompiler {
                             warn("W0302", file, a.line, "<activity-alias> is not supported; ignored");
                             continue;
                         }
+                        // android:enabled="false" makes an activity unreachable:
+                        // no filter selects it, an explicit start fails and it
+                        // is never the launcher. The runtime has no
+                        // setComponentEnabledSetting to switch it back on, so
+                        // it is left out entirely. A resource reference
+                        // (@bool/...) can differ per configuration and is
+                        // kept, as an enabled activity.
+                        if ("false".equals(a.attr(RawNode.NS_KEY_ANDROID, "enabled"))) {
+                            continue;
+                        }
                         m.activities.add(parseActivity(a, m.packageName, file));
                     }
                 }

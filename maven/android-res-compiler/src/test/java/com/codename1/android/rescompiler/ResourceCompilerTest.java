@@ -242,6 +242,27 @@ public class ResourceCompilerTest {
         assertTrue(r.diagnostics.toString(), r.diagnostics.toString().contains("W0304"));
     }
 
+    /// An activity the manifest disables is never registered: it used to be
+    /// selectable by its filters, startable by name, and a disabled launcher
+    /// started at boot.
+    @Test
+    public void disabledActivitiesAreLeftOut() throws IOException {
+        File res = project();
+        File manifest = new File(res.getParentFile(), "AndroidManifest.xml");
+        String m = new String(Files.readAllBytes(manifest.toPath()), "UTF-8");
+        write(manifest, m.replace("<activity android:name=\".Main\">",
+                "<activity android:name=\".Main\" android:enabled=\"false\">")
+                .replace("<activity android:name=\"com.other.Second\"/>",
+                        "<activity android:name=\"com.other.Second\"/>"
+                                + "<activity android:name=\"com.other.Third\" android:enabled=\"@bool/third\"/>"));
+        ResourceCompiler.Result r = compile(res);
+        assertFalse(r.diagnostics.toString(), r.hasErrors());
+        String impl = new String(Files.readAllBytes(r.javaFiles.get(1).toPath()), "UTF-8");
+        assertFalse("a disabled activity was registered: " + impl, impl.contains("com.x.Main"));
+        assertTrue(impl, impl.contains("activity(com.other.Second.class"));
+        assertTrue("a configuration-dependent enabled flag was dropped", impl.contains("com.other.Third.class"));
+    }
+
     /// Two assets whose paths have the same `String.hashCode()` -- `Aa` and
     /// `BB` collide -- each keep their own output file.
     @Test

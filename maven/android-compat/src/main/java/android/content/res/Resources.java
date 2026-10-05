@@ -440,12 +440,14 @@ public class Resources {
         return DrawableInflater.load(this, id, theme);
     }
 
+    /// An image chosen and scaled for `density` (a `DisplayMetrics.DENSITY_*`
+    /// value) instead of the device's; 0 means the device's.
     public Drawable getDrawableForDensity(int id, int density) {
-        return getDrawable(id, null);
+        return getDrawableForDensity(id, density, null);
     }
 
     public Drawable getDrawableForDensity(int id, int density, Theme theme) {
-        return getDrawable(id, theme);
+        return DrawableInflater.loadForDensity(this, id, density, theme);
     }
 
     /// A parser over the compiled XML resource `id` (`res/xml`, or any

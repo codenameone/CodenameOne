@@ -102,7 +102,12 @@ public class PackageManager {
         return rt != null && rt.canResolve(intent) ? new ResolveInfo() : null;
     }
 
+    /// This application's launcher intent; null for any other package, which
+    /// does not exist here.
     public Intent getLaunchIntentForPackage(String packageName) {
+        if (packageName == null || !packageName.equals(context.getPackageName())) {
+            return null;
+        }
         AndroidRuntime rt = AndroidRuntime.getInstance();
         return rt == null ? null : rt.getLaunchIntent();
     }

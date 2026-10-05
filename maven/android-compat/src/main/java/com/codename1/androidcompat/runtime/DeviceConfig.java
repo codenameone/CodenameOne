@@ -42,4 +42,23 @@ public final class DeviceConfig {
     public int sdkVersion = android.os.Build.VERSION.SDK_INT;
     /// Bumped on every change so cached best-variant choices can be dropped.
     public int generation;
+
+    /// A copy of this configuration at another density, for resolving a
+    /// resource as `getDrawableForDensity` asks.
+    public DeviceConfig withDensity(int dpi) {
+        DeviceConfig c = new DeviceConfig();
+        c.language = language;
+        c.region = region;
+        c.script = script;
+        c.rtl = rtl;
+        c.smallestWidthDp = smallestWidthDp;
+        c.widthDp = widthDp;
+        c.heightDp = heightDp;
+        c.orientation = orientation;
+        c.night = night;
+        c.densityDpi = dpi;
+        c.sdkVersion = sdkVersion;
+        c.generation = generation;
+        return c;
+    }
 }

@@ -98,16 +98,7 @@ public final class ResTable {
         /// The best variant for the device, or null when none matches.
         public Object best(DeviceConfig d) {
             if (cachedGeneration != d.generation) {
-                int best = -1;
-                for (int i = 0; i < configs.length; i++) {
-                    if (!configs[i].matches(d)) {
-                        continue;
-                    }
-                    if (best < 0 || configs[i].isBetterThan(configs[best], d)) {
-                        best = i;
-                    }
-                }
-                cachedIndex = best;
+                cachedIndex = bestIndex(d);
                 cachedGeneration = d.generation;
             }
             return cachedIndex < 0 ? null : items[cachedIndex];
@@ -117,6 +108,33 @@ public final class ResTable {
         public ResConfigSpec bestConfig(DeviceConfig d) {
             best(d);
             return cachedIndex < 0 ? null : configs[cachedIndex];
+        }
+
+        /// The best variant for a configuration other than the device's (a
+        /// requested density), chosen without touching the device's cached
+        /// choice; null when none matches.
+        public Object bestUncached(DeviceConfig d) {
+            int i = bestIndex(d);
+            return i < 0 ? null : items[i];
+        }
+
+        /// The configuration [#bestUncached(DeviceConfig)] picks, or null.
+        public ResConfigSpec bestConfigUncached(DeviceConfig d) {
+            int i = bestIndex(d);
+            return i < 0 ? null : configs[i];
+        }
+
+        private int bestIndex(DeviceConfig d) {
+            int best = -1;
+            for (int i = 0; i < configs.length; i++) {
+                if (!configs[i].matches(d)) {
+                    continue;
+                }
+                if (best < 0 || configs[i].isBetterThan(configs[best], d)) {
+                    best = i;
+                }
+            }
+            return best;
         }
     }
 

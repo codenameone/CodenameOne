@@ -1128,15 +1128,22 @@ public class TextView extends View {
         return s;
     }
 
-    private TextLayout layoutFor(int width) {
+    /// The layout for a content width, rebuilt when the text or width changed.
+    /// Package private for the tests that check what a line shows.
+    TextLayout layoutFor(int width) {
         String s = shownText();
         if (mLayout == null || mLayoutWidth != width || !s.equals(mLayoutText)) {
             boolean single = mSingleLine || mHorizontallyScrolling;
             int maxLines = mMaxLines == Integer.MAX_VALUE ? 0 : mMaxLines;
-            boolean ellipsize = mEllipsize == TextUtils.TruncateAt.END || mEllipsize == TextUtils.TruncateAt.MARQUEE
-                    || (mEllipsize != null && single);
-            mLayout = TextLayout.layout(s, mTextPaint, single ? (ellipsize ? width : 0) : width, single,
-                    maxLines, ellipsize);
+            int ellipsize = TextLayout.ELLIPSIZE_NONE;
+            if (mEllipsize == TextUtils.TruncateAt.END || mEllipsize == TextUtils.TruncateAt.MARQUEE) {
+                ellipsize = TextLayout.ELLIPSIZE_END;
+            } else if (mEllipsize != null && single) {
+                ellipsize = mEllipsize == TextUtils.TruncateAt.START ? TextLayout.ELLIPSIZE_START
+                        : TextLayout.ELLIPSIZE_MIDDLE;
+            }
+            mLayout = TextLayout.layout(s, mTextPaint,
+                    single ? (ellipsize != TextLayout.ELLIPSIZE_NONE ? width : 0) : width, single, maxLines, ellipsize);
             mLayoutWidth = width;
             mLayoutText = s;
         }

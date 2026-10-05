@@ -276,6 +276,9 @@ public class View implements Drawable.Callback {
     boolean mLayoutRequested = true;
     boolean mForceLayout = true;
     private boolean mAttached;
+    /// Set by [#dispatchWindowFocusChanged(boolean)] while the window has lost
+    /// focus; read on the root by [#hasWindowFocus()].
+    private boolean mWindowFocusLost;
     private boolean mHasPerformedLongPress;
     private boolean mWillNotDraw;
     protected int mScrollX;
@@ -2727,8 +2730,18 @@ public class View implements Drawable.Callback {
     public void onWindowFocusChanged(boolean hasWindowFocus) {
     }
 
+    /// Tells this view, and a view group's whole subtree, that its window
+    /// gained or lost focus: an activity covered by another one loses it.
+    public void dispatchWindowFocusChanged(boolean hasFocus) {
+        mWindowFocusLost = !hasFocus;
+        onWindowFocusChanged(hasFocus);
+    }
+
+    /// Whether the window holding this view has focus. The root's state is
+    /// the window's; a root nothing has reported on (a dialog's or a popup's)
+    /// counts as focused while it is attached.
     public boolean hasWindowFocus() {
-        return mAttached;
+        return mAttached && !getRootView().mWindowFocusLost;
     }
 
     public void onWindowVisibilityChanged(int visibility) {
