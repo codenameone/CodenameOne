@@ -146,6 +146,10 @@ final class SurefireSelection implements java.util.function.Predicate<String> {
                 }
             }
         }
+        // Not supported, and documented in the testing guide: includesFile and
+        // excludesFile, comma-separated or "!"-negated entries inside one
+        // <include>, and a regex that names a .java path (tried against both
+        // forms here). The common inline lists are what the compiled run reads.
         List<String> includes = patterns(config, "includes", "include");
         List<String> excludes = patterns(config, "excludes", "exclude");
         return new SurefireSelection(includes == null ? DEFAULT_INCLUDES : includes,

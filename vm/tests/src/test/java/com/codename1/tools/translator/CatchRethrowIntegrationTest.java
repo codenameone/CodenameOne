@@ -46,8 +46,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class CatchRethrowIntegrationTest {
 
+    /// One compiler, not the diagonal: the bug is in how the translator emits
+    /// handlers, which no javac version changes, and each configuration costs a
+    /// full translate and native build -- across all of them this test alone was
+    /// ten minutes of a job that has a ninety-minute limit.
+    static java.util.stream.Stream<CompilerHelper.CompilerConfig> oneCompilerConfig() {
+        return CompilerHelper.getDiagonalCompilers().stream()
+                .filter(CompilerHelper::isJavaApiCompatible)
+                .limit(1);
+    }
+
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    @org.junit.jupiter.params.provider.MethodSource("oneCompilerConfig")
     void anExceptionFromAHandlerLeavesTheTryStatement(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

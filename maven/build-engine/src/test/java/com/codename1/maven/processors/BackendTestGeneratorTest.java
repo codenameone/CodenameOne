@@ -419,6 +419,38 @@ public class BackendTestGeneratorTest {
     }
 
     @Test
+    public void aClassWithTwoConstructorsIsNotRun() throws Exception {
+        // JUnit refuses such a class, so the compiled run must not pass it.
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("c.TwoCtorTest", "package c;\n"
+                + "public class TwoCtorTest {\n"
+                + "    public static final java.util.List<String> calls = new java.util.ArrayList<String>();\n"
+                + "    public TwoCtorTest() { }\n"
+                + "    public TwoCtorTest(int x) { }\n"
+                + "    @org.junit.jupiter.api.Test void ran() { calls.add(\"ran\"); }\n"
+                + "}\n");
+        File tests = tmp.newFolder();
+        List<File> cp = new ArrayList<File>(classpath());
+        JavaSourceCompiler.compile(t, tests, cp);
+        List<String> elements = new ArrayList<String>();
+        elements.add(tests.getAbsolutePath());
+        for (File f : cp) {
+            elements.add(f.getAbsolutePath());
+        }
+        BackendTests.process(tmp.newFolder(), tests, tmp.newFolder(), tmp.newFolder(),
+                Collections.<String>emptyList(), "UTF-8", elements, true, new SystemStreamLog());
+        java.net.URLClassLoader loader = new java.net.URLClassLoader(new java.net.URL[] {tests.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            loader.loadClass("c.TwoCtorTestCn1TestRunner").getMethod("run").invoke(null);
+            assertTrue("a class JUnit refuses ran in the compiled run",
+                    ((List) loader.loadClass("c.TwoCtorTest").getField("calls").get(null)).isEmpty());
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
     public void aTestThatInjectsTheDatabaseGetsOne() throws Exception {
         // The application has no entities and nothing else that needs a database;
         // the test asking for one is what starts it.

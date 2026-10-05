@@ -97,7 +97,9 @@ final class BackendPackageSupport {
                     org.gradle.api.tasks.compile.JavaCompile.class)
                     .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
             // The Kotlin test directory too, so the packager can refuse Kotlin
-            // tests by name instead of compiling the run without them.
+            // tests by name instead of compiling the run without them. Only the
+            // conventional one: a Kotlin source set moved elsewhere is not looked
+            // up (documented in the testing guide).
             t.getTestSources().from(new File(layout.projectDir(), "src/test/kotlin"));
             t.getTestResources().from(project.provider(() -> test.getOutput().getResourcesDir()));
             t.getTestResources().builtBy(test.getProcessResourcesTaskName());

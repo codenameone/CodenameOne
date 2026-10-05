@@ -709,7 +709,7 @@ final class BackendTestGenerator {
         } else if (spec != null && !spec.mocks.isEmpty()) {
             skip = "@MockitoBean needs Mockito, which runs only on the JVM";
         } else if (!hasNoArgConstructor(cls)) {
-            skip = "the class has no constructor without arguments";
+            skip = "a test class needs exactly one constructor, without arguments";
         }
         StringBuilder sb = new StringBuilder();
         if (pkg.length() > 0) {
@@ -1098,13 +1098,19 @@ final class BackendTestGenerator {
         return false;
     }
 
+    /// Whether the class has the single, no-argument, non-private constructor
+    /// both runs can use. JUnit refuses a test class with two constructors, so
+    /// the compiled run skips one too rather than passing what the JVM fails.
     private static boolean hasNoArgConstructor(AnnotatedClass cls) {
+        boolean usable = false;
+        int count = 0;
         for (MethodInfo m : cls.getMethods()) {
-            if (m.isConstructor() && "()V".equals(m.getDescriptor()) && !m.isPrivate()) {
-                return true;
+            if (m.isConstructor()) {
+                count++;
+                usable = "()V".equals(m.getDescriptor()) && !m.isPrivate();
             }
         }
-        return false;
+        return count == 1 && usable;
     }
 
     private String mainSource() {

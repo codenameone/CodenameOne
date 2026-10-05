@@ -101,12 +101,13 @@ public class BackendTestMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        // Whatever an earlier compiled run reported is not this build's result,
+        // however this one ends: disabled, on Windows, or with no tests left.
+        for (java.io.File f : BackendTestPackager.clearCompiledReports(
+                new java.io.File(project.getBuild().getDirectory()))) {
+            getLog().warn("cn1: could not remove the stale report " + f);
+        }
         if (!enabled || skip || skipTests) {
-            // Whatever an earlier compiled run reported is not this build's result.
-            for (java.io.File f : BackendTestPackager.clearCompiledReports(
-                    new java.io.File(project.getBuild().getDirectory()))) {
-                getLog().warn("cn1: could not remove the stale report " + f);
-            }
             return;
         }
         String os = System.getProperty("os.name", "");

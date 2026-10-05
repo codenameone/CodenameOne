@@ -5808,7 +5808,17 @@ function cn1ssWsConnect() {
   sock.onerror = function () { /* failures surface via onclose -> status=failed */ };
   sock.onclose = function () {
     emitDiagLine("CN1SS:WSJS:close priorStatus=" + cn1ssWs.status + " queued=" + cn1ssWs.queue.length);
-    if (cn1ssWs.status !== "open") {
+    if (cn1ssWs.socket !== sock) {
+      return;
+    }
+    cn1ssWs.socket = null;
+    if (cn1ssWs.status === "open") {
+      // A socket that was up and dropped is reconnected by the next send. Left
+      // "open", every later screenshot went to a closed socket, which drops a
+      // send without throwing, and the rest of the run produced none.
+      cn1ssWs.status = "idle";
+      cn1ssWs.pending = 0;
+    } else {
       cn1ssWs.status = "failed";
     }
   };
@@ -5826,7 +5836,7 @@ function cn1ssBase64ToBytes(base64) {
 
 function cn1ssWsSendNow(test, bytes) {
   const sock = cn1ssWs.socket;
-  if (!sock || cn1ssWs.status !== "open") {
+  if (!sock || cn1ssWs.status !== "open" || sock.readyState !== 1) {
     return false;
   }
   try {

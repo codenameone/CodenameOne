@@ -287,13 +287,17 @@ A compiled run has these limits:
   annotations and Surefire selections, not every one. Repeating `@Tag` on a
   class or method stops the compiled run from compiling, so use one per element. A
   `-Dtest` regex selector with a method part, such as `%regex[.*Api.*#one.*]`,
-  selects nothing in the compiled run. The JVM run handles both.
+  selects nothing in the compiled run. The JVM run handles both. The compiled run
+  reads the inline `<includes>` and `<excludes>` lists one pattern per entry: it
+  ignores `includesFile` and `excludesFile`, and doesn't split comma-separated
+  or `!`-negated patterns inside one entry.
 * **Nested classes.** The compiled run doesn't run the tests of a `@Nested` class.
   A `@Nested` class inside a `@BackendTest` class isn't supported on either run;
   give it a top-level `@BackendTest` class of its own.
 * **Java tests only.** The binary is compiled from Java test sources. A module
   with Kotlin tests runs them on the JVM, and the compiled run reports them by
-  name and stops rather than running without them.
+  name and stops rather than running without them. Gradle builds look for Kotlin
+  tests in `src/test/kotlin` only.
 * **Toolchain.** The binary needs what `cn1:backend-package` needs: clang, and
   the OpenSSL, libcurl and nghttp2 headers. It builds on Linux and macOS. On
   Windows, which has no native backend, the goal reports that and does nothing.

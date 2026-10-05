@@ -130,7 +130,11 @@ static int cn1HttpProgressCb(void* userdata, curl_off_t dltotal, curl_off_t dlno
     curl_off_t connected = 0;
     (void) dltotal;
     (void) ultotal;
-    if (curl_easy_getinfo(c->easy, CURLINFO_CONNECT_TIME_T, &connected) != CURLE_OK || connected == 0) {
+    /* Connected means every handshake done: for https the TLS one too, which is
+     * still the connect timeout's business however long it stalls. */
+    if (curl_easy_getinfo(c->easy, c->url != NULL && strncasecmp(c->url, "https:", 6) == 0
+                ? CURLINFO_APPCONNECT_TIME_T : CURLINFO_CONNECT_TIME_T, &connected) != CURLE_OK
+            || connected == 0) {
         c->lastActivityMs = now;
         return 0;
     }
