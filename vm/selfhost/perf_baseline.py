@@ -518,6 +518,23 @@ def summary(rows):
             'platforms': out}
 
 
+def effective_base(base_ref, repo=REPO):
+    """The commit a pull request's diff is taken against. CI checks out the pull request
+    MERGED into the current base branch, but `pull_request.base.sha` is not refreshed when
+    that branch moves -- it can be days old -- so `base...HEAD` also lists everything the
+    base branch gained since, and another pull request's overlay merged in the meantime
+    reads as this one writing it. On a merge commit whose first parent descends from
+    base_ref, that first parent is the base branch as actually merged."""
+    out = subprocess.run(['git', 'rev-list', '--parents', '-n', '1', 'HEAD'],
+                         capture_output=True, text=True, cwd=str(repo))
+    parents = out.stdout.split()[1:] if out.returncode == 0 else []
+    if len(parents) != 2:
+        return base_ref
+    ancestor = subprocess.run(['git', 'merge-base', '--is-ancestor', base_ref, parents[0]],
+                              capture_output=True, cwd=str(repo))
+    return parents[0] if ancestor.returncode == 0 else base_ref
+
+
 def changed_files(base_ref, root=ROOT):
     rel = Path(root).resolve().relative_to(REPO).as_posix()
     out = subprocess.run(['git', 'diff', '--name-only', '--no-renames', '%s...HEAD' % base_ref,
@@ -555,6 +572,7 @@ def check(root=ROOT, base_ref=None, number=None):
     except BaselineError as error:
         problems.append(str(error))
     if base_ref:
+        base_ref = effective_base(base_ref)
         try:
             changed = changed_files(base_ref, root)
         except BaselineError as error:
