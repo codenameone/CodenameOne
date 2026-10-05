@@ -46,10 +46,12 @@ public final class PluralRules {
             lang = "en";
         }
         if (lang.equals("ja") || lang.equals("zh") || lang.equals("ko") || lang.equals("vi") || lang.equals("th")
-                || lang.equals("id") || lang.equals("ms") || lang.equals("tr") || lang.equals("fa")) {
+                || lang.equals("id") || lang.equals("ms") || lang.equals("tr")) {
             return lang.equals("tr") && abs == 1 ? ONE : OTHER;
         }
-        if (lang.equals("fr") || lang.equals("pt") || lang.equals("hi") || lang.equals("bn")) {
+        // Persian shares Hindi's "i = 0 or n = 1" rule: 0 and 1 are ONE.
+        if (lang.equals("fr") || lang.equals("pt") || lang.equals("hi") || lang.equals("bn")
+                || lang.equals("fa")) {
             return abs == 0 || abs == 1 ? ONE : (abs % 1000000 == 0 && lang.equals("fr") ? MANY : OTHER);
         }
         if (lang.equals("ru") || lang.equals("uk") || lang.equals("be")) {

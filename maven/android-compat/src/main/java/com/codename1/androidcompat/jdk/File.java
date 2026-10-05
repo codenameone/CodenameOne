@@ -150,12 +150,50 @@ public class File implements Comparable<File>, java.io.Serializable {
         return new File(getAbsolutePath());
     }
 
+    /// The absolute path with `.` and `..` segments resolved, as the JDK
+    /// does: code checks a canonical path against a directory to reject a
+    /// name like `root/../outside`, and the native file system would resolve
+    /// the `..` the check never saw. A `..` at the root stays at the root.
+    /// Symbolic links are not followed.
     public String getCanonicalPath() throws IOException {
-        return getAbsolutePath();
+        return resolveDots(getAbsolutePath());
     }
 
     public File getCanonicalFile() throws IOException {
-        return getAbsoluteFile();
+        return new File(getCanonicalPath());
+    }
+
+    private static String resolveDots(String p) {
+        // The prefix is the scheme and the slashes that follow it (`file:///`
+        // or `file://` before an authority-less home such as `home/`).
+        int start = p.startsWith("file:") ? 5 : 0;
+        while (start < p.length() && p.charAt(start) == '/') {
+            start++;
+        }
+        ArrayList<String> segs = new ArrayList<String>();
+        int s = start;
+        for (int i = start; i <= p.length(); i++) {
+            if (i == p.length() || p.charAt(i) == '/') {
+                String seg = p.substring(s, i);
+                if (seg.equals("..")) {
+                    if (!segs.isEmpty()) {
+                        segs.remove(segs.size() - 1);
+                    }
+                } else if (seg.length() > 0 && !seg.equals(".")) {
+                    segs.add(seg);
+                }
+                s = i + 1;
+            }
+        }
+        StringBuilder sb = new StringBuilder(p.length());
+        sb.append(p.substring(0, start));
+        for (int i = 0; i < segs.size(); i++) {
+            if (i > 0) {
+                sb.append('/');
+            }
+            sb.append(segs.get(i));
+        }
+        return sb.toString();
     }
 
     public String getParent() {

@@ -50,7 +50,11 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
     }
 
     public static Uri fromFile(Object file) {
-        return new Uri("file://" + file);
+        // A shim directory (`getFilesDir()`) is already a `file:` path;
+        // prefixing another scheme gave `file://file:///...`.
+        String s = file instanceof com.codename1.androidcompat.jdk.File
+                ? ((com.codename1.androidcompat.jdk.File) file).storagePath() : String.valueOf(file);
+        return new Uri(s.startsWith("file:") ? s : "file://" + s);
     }
 
     public String getScheme() {

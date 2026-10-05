@@ -300,7 +300,9 @@ public final class ResourceManager {
             // A script (`zh_Hans_CN`, `zh-Hans-CN`) sits where the region
             // usually is; the region is the next segment.
             if (segs[i].length() >= 2 && !isScript(segs[i])) {
-                region = asciiUpper(segs[i].substring(0, 2));
+                // A UN M49 region (`es_419`) keeps all three digits, as the
+                // compiler keeps them for `values-b+es+419`.
+                region = isNumericRegion(segs[i]) ? segs[i] : asciiUpper(segs[i].substring(0, 2));
                 break;
             }
         }
@@ -328,6 +330,19 @@ public final class ResourceManager {
             return r.equals("TW") || r.equals("HK") || r.equals("MO") ? "Hant" : "Hans";
         }
         return null;
+    }
+
+    private static boolean isNumericRegion(String seg) {
+        if (seg.length() != 3) {
+            return false;
+        }
+        for (int i = 0; i < 3; i++) {
+            char c = seg.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isScript(String seg) {

@@ -736,7 +736,9 @@ Traps that have already cost a fix:
   *unrelocated*. Maven restores them from `target/kotlin-ic` in
   `compile-android-res`, and copies that tree back only when newer
   (`copyKotlinIncrementalCompileOutputToOutputDir`); Gradle relocates
-  Kotlin's directory in `compileJava`'s actions. Kotlin's `@Metadata` strings
+  Kotlin's directory in `cn1RemapAndroidKotlin`, a task that finalizes
+  `compileJava` and runs every build -- never an action of `compileJava`,
+  which an ABI-unchanged Kotlin edit leaves up to date. Kotlin's `@Metadata` strings
   are remapped too.
 - **`maven/integration-tests/android-compat-test.sh`** imports
   `scripts/android-compat-samples/*` and stages every target's upload jar

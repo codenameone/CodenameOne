@@ -153,6 +153,8 @@ public class Intent implements Parcelable, Cloneable {
         i.type = type;
         i.component = component;
         i.componentClass = componentClass;
+        i.pkg = pkg;
+        i.categories = categories == null ? null : new HashSet<String>(categories);
         return i;
     }
 

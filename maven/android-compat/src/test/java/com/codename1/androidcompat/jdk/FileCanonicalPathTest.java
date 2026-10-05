@@ -20,38 +20,35 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.androidcompat.runtime;
+package com.codename1.androidcompat.jdk;
 
 import com.codename1.androidcompat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertNull;
+import java.io.IOException;
 
-/// Device locale to resource qualifiers: `values-fil` must match a Filipino
-/// device, which a fixed two-letter cut turned into `fi`.
-public class LocaleQualifierTest {
+import static org.junit.Assert.assertEquals;
+
+/// The canonical path resolves `.` and `..`: a check that a name stays
+/// inside a directory accepted `root/../outside`, which the native file
+/// system then resolved outside it.
+public class FileCanonicalPathTest {
 
     @Rule
     public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
-    public void keepsTheWholeLanguage() {
-        assertArrayEquals(new String[] {"en", "US"}, ResourceManager.languageAndRegion("en_US"));
-        assertArrayEquals(new String[] {"fil", "PH"}, ResourceManager.languageAndRegion("fil_PH"));
-        assertArrayEquals(new String[] {"pt", "BR"}, ResourceManager.languageAndRegion("pt-br"));
-        assertArrayEquals(new String[] {"haw", ""}, ResourceManager.languageAndRegion("haw"));
-        assertNull(ResourceManager.languageAndRegion("x"));
-        assertNull(ResourceManager.languageAndRegion(null));
+    public void resolvesDotSegments() throws IOException {
+        assertEquals("file:///outside", new File("file:///root/../outside").getCanonicalPath());
+        assertEquals("file:///a/c", new File("/a/./b/../c").getCanonicalPath());
+        assertEquals("file:///a/c", new File(new File("file:///a/b"), "../c").getCanonicalFile().getPath());
+        assertEquals("file:///", new File("/a/../..").getCanonicalPath());
+        assertEquals("file:///data/files/x", new File("file:///data/files/x").getCanonicalPath());
     }
 
-    /// A UN M49 region keeps its three digits, so `values-b+es+419` can
-    /// match a Latin-American Spanish device; it was cut to `41`.
     @Test
-    public void keepsANumericRegion() {
-        assertArrayEquals(new String[] {"es", "419"}, ResourceManager.languageAndRegion("es_419"));
-        assertArrayEquals(new String[] {"es", "419"}, ResourceManager.languageAndRegion("es-419"));
-        assertArrayEquals(new String[] {"zh", "CN"}, ResourceManager.languageAndRegion("zh_CN_#Hans"));
+    public void keepsAnAuthorityLessHome() throws IOException {
+        assertEquals("file://home/x", new File("file://home/files/../x").getCanonicalPath());
     }
 }

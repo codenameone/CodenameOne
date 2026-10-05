@@ -20,38 +20,37 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.androidcompat.runtime;
+package android.content;
 
 import com.codename1.androidcompat.testing.MainThreadRule;
+
 import org.junit.Rule;
 import org.junit.Test;
 
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
-/// Device locale to resource qualifiers: `values-fil` must match a Filipino
-/// device, which a fixed two-letter cut turned into `fi`.
-public class LocaleQualifierTest {
+/// `cloneFilter()` copies every field intent resolution reads; the package
+/// and categories were dropped, so the clone could resolve elsewhere.
+public class IntentCloneFilterTest {
 
     @Rule
     public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
-    public void keepsTheWholeLanguage() {
-        assertArrayEquals(new String[] {"en", "US"}, ResourceManager.languageAndRegion("en_US"));
-        assertArrayEquals(new String[] {"fil", "PH"}, ResourceManager.languageAndRegion("fil_PH"));
-        assertArrayEquals(new String[] {"pt", "BR"}, ResourceManager.languageAndRegion("pt-br"));
-        assertArrayEquals(new String[] {"haw", ""}, ResourceManager.languageAndRegion("haw"));
-        assertNull(ResourceManager.languageAndRegion("x"));
-        assertNull(ResourceManager.languageAndRegion(null));
-    }
+    public void keepsPackageAndCategoriesButNotExtras() {
+        Intent src = new Intent(Intent.ACTION_VIEW);
+        src.setPackage("com.example.viewer");
+        src.addCategory(Intent.CATEGORY_BROWSABLE);
+        src.putExtra("k", "v");
+        Intent clone = src.cloneFilter();
+        assertEquals("com.example.viewer", clone.getPackage());
+        assertTrue(clone.hasCategory(Intent.CATEGORY_BROWSABLE));
+        assertNull(clone.getStringExtra("k"));
 
-    /// A UN M49 region keeps its three digits, so `values-b+es+419` can
-    /// match a Latin-American Spanish device; it was cut to `41`.
-    @Test
-    public void keepsANumericRegion() {
-        assertArrayEquals(new String[] {"es", "419"}, ResourceManager.languageAndRegion("es_419"));
-        assertArrayEquals(new String[] {"es", "419"}, ResourceManager.languageAndRegion("es-419"));
-        assertArrayEquals(new String[] {"zh", "CN"}, ResourceManager.languageAndRegion("zh_CN_#Hans"));
+        // The clone's category set is its own.
+        clone.addCategory(Intent.CATEGORY_DEFAULT);
+        assertEquals(1, src.getCategories().size());
     }
 }

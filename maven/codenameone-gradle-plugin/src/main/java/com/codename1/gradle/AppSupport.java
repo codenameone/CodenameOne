@@ -267,9 +267,9 @@ final class AppSupport {
             // SourceSet, so the action must not reach the classpath through one.
             final org.gradle.api.file.FileCollection compileClasspath = main.getCompileClasspath();
             final File onClickNames = new File(androidState, "onclick.txt");
-            project.getTasks().named(main.getCompileJavaTaskName()).configure(javac ->
-                    javac.doLast("cn1RemapAndroidKotlin", t -> new com.codename1.gradle.tasks.RemapAndroidAction(
-                            kotlinDir.get(), compileClasspath, onClickNames, true, null).execute(t)));
+            registerKotlinRelocation(project.getTasks(), main.getCompileJavaTaskName(), main.getClassesTaskName(),
+                    t -> new com.codename1.gradle.tasks.RemapAndroidAction(
+                            kotlinDir.get(), compileClasspath, onClickNames, true, null).execute(t));
         });
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
@@ -682,6 +682,30 @@ final class AppSupport {
     /// [#kotlinDestination(org.gradle.api.Task, ProjectLayout)], lazily: the task's own
     /// `destinationDirectory` provider, which follows a build script that sets
     /// it after the plugin configured the task.
+    /// Relocates Kotlin's classes in a task of its own, after javac. Not an
+    /// action of `compileJava`: javac's classpath is compared by ABI, so a
+    /// Kotlin change to method bodies alone -- or no change at all, since the
+    /// previous relocation makes `compileKotlin` rerun and write its classes
+    /// unrelocated again -- leaves `compileJava` up to date, its actions never
+    /// run, and the packaged Kotlin classes keep their `android/` names. This
+    /// task declares no outputs, so it runs on every build, as the Maven
+    /// build relocates on every build; relocating classes already relocated
+    /// changes nothing. It finalizes `compileJava`, so javac and its
+    /// processing always see the classes as Kotlin wrote them, and `classes`
+    /// (which every Codename One task depends on) waits for it.
+    static TaskProvider<org.gradle.api.Task> registerKotlinRelocation(org.gradle.api.tasks.TaskContainer tasks,
+            String compileJavaName, String classesName, org.gradle.api.Action<? super org.gradle.api.Task> remap) {
+        TaskProvider<org.gradle.api.Task> relocate = tasks.register("cn1RemapAndroidKotlin", t -> {
+            t.setDescription("Relocates Android references in Kotlin's classes onto the compatibility runtime");
+            t.dependsOn("compileKotlin");
+            t.mustRunAfter(compileJavaName);
+            t.doLast(remap);
+        });
+        tasks.named(compileJavaName).configure(javac -> javac.finalizedBy(relocate));
+        tasks.named(classesName).configure(classes -> classes.dependsOn(relocate));
+        return relocate;
+    }
+
     static Provider<File> kotlinDestinationProvider(final org.gradle.api.Task compile, final ProjectLayout layout) {
         try {
             Object dir = compile.getClass().getMethod("getDestinationDirectory").invoke(compile);
