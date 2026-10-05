@@ -93,6 +93,30 @@ public final class AndroidTestSupport {
     public static final class UiModeHandlingActivity extends Activity {
     }
 
+    /// An activity declared `android:launchMode="singleTop"`.
+    public static final class SingleTopActivity extends Activity {
+        /// How many intents `onNewIntent` delivered to this instance.
+        public int newIntents;
+
+        @Override
+        protected void onNewIntent(android.content.Intent intent) {
+            super.onNewIntent(intent);
+            newIntents++;
+        }
+    }
+
+    /// An activity declared `android:launchMode="singleTask"`.
+    public static final class SingleTaskActivity extends Activity {
+        /// How many intents `onNewIntent` delivered to this instance.
+        public int newIntents;
+
+        @Override
+        protected void onNewIntent(android.content.Intent intent) {
+            super.onNewIntent(intent);
+            newIntents++;
+        }
+    }
+
     /// Builds a test activity's options menu.
     public interface OptionsMenu {
         void fill(android.view.Menu menu);
@@ -106,6 +130,12 @@ public final class AndroidTestSupport {
             activity(UiModeHandlingActivity.class, UiModeHandlingActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "UiMode", null, null, false);
             configChanges(UiModeHandlingActivity.class, android.content.pm.ActivityInfo.CONFIG_UI_MODE);
+            activity(SingleTopActivity.class, SingleTopActivity.class.getName(),
+                    android.R.style.Theme_Material_Light_DarkActionBar, 0, "SingleTop", null, null, false);
+            launchMode(SingleTopActivity.class, android.content.pm.ActivityInfo.LAUNCH_SINGLE_TOP);
+            activity(SingleTaskActivity.class, SingleTaskActivity.class.getName(),
+                    android.R.style.Theme_Material_Light_DarkActionBar, 0, "SingleTask", null, null, false);
+            launchMode(SingleTaskActivity.class, android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK);
         }
 
         @Override
@@ -122,6 +152,12 @@ public final class AndroidTestSupport {
         public Activity createActivity(Class<?> type) {
             if (type == TestActivity.class) {
                 return new TestActivity();
+            }
+            if (type == SingleTopActivity.class) {
+                return new SingleTopActivity();
+            }
+            if (type == SingleTaskActivity.class) {
+                return new SingleTaskActivity();
             }
             return type == UiModeHandlingActivity.class ? new UiModeHandlingActivity() : null;
         }

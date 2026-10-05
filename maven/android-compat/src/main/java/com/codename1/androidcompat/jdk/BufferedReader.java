@@ -32,10 +32,17 @@ import java.io.Reader;
 public class BufferedReader extends Reader {
 
     private final Reader in;
-    private final char[] buf;
+    private static final int UNMARKED = -1;
+    private static final int INVALIDATED = -2;
+
+    private char[] buf;
     private int pos;
     private int count;
     private boolean skipLf;
+    /// Index in `buf` of the marked character, or `UNMARKED`/`INVALIDATED`.
+    private int markedChar = UNMARKED;
+    private int readAheadLimit;
+    private boolean markedSkipLf;
 
     public BufferedReader(Reader in) {
         this(in, 8192);
@@ -49,13 +56,36 @@ public class BufferedReader extends Reader {
         this.buf = new char[size];
     }
 
+    /// Refills the buffer once it is consumed. A valid mark keeps the
+    /// characters from the mark on at the start of the buffer, growing it up
+    /// to the read-ahead limit; reading past that limit drops the mark.
     private boolean fill() throws IOException {
-        int n = in.read(buf, 0, buf.length);
+        int dst = 0;
+        if (markedChar >= 0) {
+            int delta = pos - markedChar;
+            if (delta >= readAheadLimit) {
+                markedChar = INVALIDATED;
+                readAheadLimit = 0;
+            } else {
+                if (readAheadLimit > buf.length) {
+                    char[] grown = new char[readAheadLimit];
+                    System.arraycopy(buf, markedChar, grown, 0, delta);
+                    buf = grown;
+                } else {
+                    System.arraycopy(buf, markedChar, buf, 0, delta);
+                }
+                markedChar = 0;
+                pos = delta;
+                count = delta;
+                dst = delta;
+            }
+        }
+        int n = in.read(buf, dst, buf.length - dst);
         if (n <= 0) {
             return false;
         }
-        pos = 0;
-        count = n;
+        pos = dst;
+        count = dst + n;
         return true;
     }
 
@@ -147,7 +177,26 @@ public class BufferedReader extends Reader {
 
     @Override
     public boolean markSupported() {
-        return false;
+        return true;
+    }
+
+    @Override
+    public void mark(int readAheadLimit) throws IOException {
+        if (readAheadLimit < 0) {
+            throw new IllegalArgumentException("Read-ahead limit < 0");
+        }
+        this.readAheadLimit = readAheadLimit;
+        markedChar = pos;
+        markedSkipLf = skipLf;
+    }
+
+    @Override
+    public void reset() throws IOException {
+        if (markedChar < 0) {
+            throw new IOException(markedChar == INVALIDATED ? "Mark invalid" : "Stream not marked");
+        }
+        pos = markedChar;
+        skipLf = markedSkipLf;
     }
 
     @Override

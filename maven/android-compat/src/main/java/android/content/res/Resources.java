@@ -206,6 +206,10 @@ public class Resources {
     }
 
     public String getString(int id, Object... formatArgs) {
+        // Not formatted with the resource locale on purpose: neither vm/JavaAPI
+        // nor CLDC11 has String.format(Locale, ...), and the device formatter
+        // is locale independent ('.' decimals, ',' grouping). Formatting is the
+        // same on every target that way, rather than localized on one only.
         return String.format(getString(id), formatArgs);
     }
 

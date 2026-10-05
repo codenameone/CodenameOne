@@ -862,6 +862,16 @@ public final class ResourceCompiler {
         a.label = encodeManifestRef(n.attr(RawNode.NS_KEY_ANDROID, "label"), p);
         a.screenOrientation = n.attr(RawNode.NS_KEY_ANDROID, "screenOrientation");
         a.windowSoftInputMode = n.attr(RawNode.NS_KEY_ANDROID, "windowSoftInputMode");
+        String mode = n.attr(RawNode.NS_KEY_ANDROID, "launchMode");
+        if (mode != null) {
+            int idx = java.util.Arrays.asList("standard", "singleTop", "singleTask", "singleInstance",
+                    "singleInstancePerTask").indexOf(mode.trim());
+            if (idx < 0) {
+                warn("W0305", file, n.line, "launchMode '" + mode + "' is not one Android defines; using standard");
+            } else {
+                a.launchMode = idx;
+            }
+        }
         String changes = n.attr(RawNode.NS_KEY_ANDROID, "configChanges");
         if (changes != null) {
             for (String flag : changes.split("\\|")) {

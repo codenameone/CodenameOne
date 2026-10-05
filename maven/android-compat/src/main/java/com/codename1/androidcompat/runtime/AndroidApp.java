@@ -53,6 +53,11 @@ public abstract class AndroidApp {
         /// The `android:configChanges` the activity handles itself, as
         /// `ActivityInfo.CONFIG_*` bits; any other change recreates it.
         public int configChanges;
+        /// `android:launchMode` as `ActivityInfo.LAUNCH_*`. There is one
+        /// task here, so singleTask, singleInstance and singleInstancePerTask
+        /// all mean "reuse the instance in the stack, clearing what is above
+        /// it"; none of them opens a separate task.
+        public int launchMode;
         /// The manifest's `<intent-filter>`s, data and categories included.
         public final List<android.content.IntentFilter> filters = new ArrayList<android.content.IntentFilter>();
     }
@@ -103,6 +108,13 @@ public abstract class AndroidApp {
         ActivityInfo a = activityInfo(type);
         if (a != null) {
             a.configChanges = mask;
+        }
+    }
+
+    protected final void launchMode(Class<?> type, int mode) {
+        ActivityInfo a = activityInfo(type);
+        if (a != null) {
+            a.launchMode = mode;
         }
     }
 

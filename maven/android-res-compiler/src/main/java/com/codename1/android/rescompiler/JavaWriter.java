@@ -152,6 +152,10 @@ final class JavaWriter {
                     sb.append("        configChanges(").append(a.className).append(".class, 0x")
                             .append(hex8(a.configChanges)).append(");\n");
                 }
+                if (a.launchMode != 0) {
+                    sb.append("        launchMode(").append(a.className).append(".class, ")
+                            .append(a.launchMode).append(");\n");
+                }
                 for (ManifestInfo.IntentFilter f : a.filters) {
                     writeIntentFilter(sb, a.className, f);
                 }

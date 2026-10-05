@@ -246,8 +246,12 @@ final class SharedPreferencesImpl implements SharedPreferences {
                         changed.add(e.getKey());
                     }
                 } else {
-                    values.put(e.getKey(), v);
-                    changed.add(e.getKey());
+                    // As on Android, writing the value a key already holds is
+                    // not a change and notifies no listener.
+                    Object old = values.put(e.getKey(), v);
+                    if (!v.equals(old)) {
+                        changed.add(e.getKey());
+                    }
                 }
             }
             if (cleared != null) {

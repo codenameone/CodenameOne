@@ -168,7 +168,15 @@ public final class ActivityThread {
                     + (intent.getComponent() == null ? "" : intent.getComponent().getClassName())
                     + "; have you declared this activity in your AndroidManifest.xml?");
         }
-        if ((intent.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0) {
+        // The manifest's launchMode, on the one task this runtime has:
+        // singleTop behaves as FLAG_ACTIVITY_SINGLE_TOP, and singleTask /
+        // singleInstance as CLEAR_TOP onto the existing instance (no separate
+        // task, no task affinity).
+        boolean clearTopFlag = (intent.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0;
+        boolean reuseInStack = info.launchMode >= android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK;
+        boolean singleTop = (intent.getFlags() & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0
+                || info.launchMode == android.content.pm.ActivityInfo.LAUNCH_SINGLE_TOP;
+        if (clearTopFlag || reuseInStack) {
             for (int i = STACK.size() - 1; i >= 0; i--) {
                 if (STACK.get(i).activity.getClass() == info.type) {
                     Record target = STACK.get(i);
@@ -182,15 +190,18 @@ public final class ActivityThread {
                     // Android finishes and recreates the target unless
                     // SINGLE_TOP is set; delivering the intent to the live
                     // instance keeps its state, which is what callers of
-                    // CLEAR_TOP rely on in practice.
-                    target.activity.setIntent(intent);
+                    // CLEAR_TOP rely on in practice. A launch mode reuse
+                    // keeps the original intent, as Android does.
+                    if (clearTopFlag) {
+                        target.activity.setIntent(intent);
+                    }
                     target.activity.onNewIntent(intent);
                     resumeRecord(target, true);
                     return;
                 }
             }
         }
-        if ((intent.getFlags() & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0) {
+        if (singleTop) {
             Record t = top();
             if (t != null && t.activity.getClass() == info.type) {
                 t.activity.onNewIntent(intent);

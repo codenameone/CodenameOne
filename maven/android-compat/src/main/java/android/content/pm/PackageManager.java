@@ -91,15 +91,30 @@ public class PackageManager {
     public List<ResolveInfo> queryIntentActivities(Intent intent, int flags) {
         List<ResolveInfo> out = new ArrayList<ResolveInfo>();
         AndroidRuntime rt = AndroidRuntime.getInstance();
-        if (rt != null && rt.canResolve(intent)) {
-            out.add(new ResolveInfo());
+        ResolveInfo r = rt == null ? null : resolveInfo(rt, intent);
+        if (r != null) {
+            out.add(r);
         }
         return out;
     }
 
     public ResolveInfo resolveActivity(Intent intent, int flags) {
         AndroidRuntime rt = AndroidRuntime.getInstance();
-        return rt != null && rt.canResolve(intent) ? new ResolveInfo() : null;
+        return rt == null ? null : resolveInfo(rt, intent);
+    }
+
+    /// The component the runtime would start for `intent`, as a
+    /// `ResolveInfo` whose `activityInfo` names its class and package; null
+    /// when nothing can take the intent.
+    private static ResolveInfo resolveInfo(AndroidRuntime rt, Intent intent) {
+        android.content.ComponentName c = rt.resolveComponent(intent);
+        if (c == null) {
+            return null;
+        }
+        ResolveInfo r = new ResolveInfo();
+        r.activityInfo.name = c.getClassName();
+        r.activityInfo.packageName = c.getPackageName();
+        return r;
     }
 
     /// This application's launcher intent; null for any other package, which

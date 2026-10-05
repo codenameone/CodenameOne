@@ -220,12 +220,20 @@ public final class AndroidProjectImporter {
                 + "        super(new com.codename1.generated.android.AndroidAppImpl());\n"
                 + "    }\n"
                 + "}\n";
+        byte[] bytes = src.getBytes(Charset.forName("UTF-8"));
         if (f.isFile()) {
             File backup = new File(f.getPath() + ".pre-android-import");
-            Files.copy(f.toPath(), backup.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            log.info("Saved the previous " + f.getName() + " as " + backup.getName());
+            if (backup.exists()) {
+                // A repeated import: the backup already holds the application's
+                // original class and the file is what an earlier import wrote.
+                // Overwriting the backup would lose the only copy of the original.
+                log.info("Kept the existing " + backup.getName() + " from an earlier import");
+            } else if (!java.util.Arrays.equals(bytes, Files.readAllBytes(f.toPath()))) {
+                Files.copy(f.toPath(), backup.toPath());
+                log.info("Saved the previous " + f.getName() + " as " + backup.getName());
+            }
         }
-        Files.write(f.toPath(), src.getBytes(Charset.forName("UTF-8")));
+        Files.write(f.toPath(), bytes);
     }
 
     static void readGradle(String gradle, Result r) {

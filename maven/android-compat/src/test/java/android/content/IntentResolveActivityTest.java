@@ -59,4 +59,19 @@ public class IntentResolveActivityTest {
                 explicit.resolveActivity(c.getPackageManager()).getClassName());
         assertNull(new Intent("com.example.NO_SUCH_ACTION").resolveActivity(c.getPackageManager()));
     }
+
+    /// The package manager's answers name the selected activity, so code can
+    /// build an explicit component or restrict an intent to its package.
+    @Test
+    public void packageManagerResolveInfoNamesTheActivity() {
+        Context c = AndroidTestSupport.context();
+        Intent explicit = new Intent(c, AndroidTestSupport.TestActivity.class);
+        android.content.pm.ResolveInfo r = c.getPackageManager().resolveActivity(explicit, 0);
+        assertEquals(AndroidTestSupport.TestActivity.class.getName(), r.activityInfo.name);
+        assertEquals(c.getPackageName(), r.activityInfo.packageName);
+        java.util.List<android.content.pm.ResolveInfo> all = c.getPackageManager().queryIntentActivities(explicit, 0);
+        assertEquals(1, all.size());
+        assertEquals(AndroidTestSupport.TestActivity.class.getName(), all.get(0).activityInfo.name);
+        assertEquals(c.getPackageName(), all.get(0).activityInfo.packageName);
+    }
 }

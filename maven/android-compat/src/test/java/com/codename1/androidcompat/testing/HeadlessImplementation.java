@@ -441,9 +441,23 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return 0;
     }
 
+    /// In-memory file system: what was written through `openOutputStream`
+    /// with a String path, readable back through `openInputStream` under the
+    /// exact same path, so tests can see which path the runtime addressed.
+    public static final java.util.Map<String, byte[]> FILES = new java.util.HashMap<String, byte[]>();
+
     @Override
-    public java.io.OutputStream openOutputStream(java.lang.Object a0) throws java.io.IOException {
-        return null;
+    public java.io.OutputStream openOutputStream(final java.lang.Object a0) throws java.io.IOException {
+        if (!(a0 instanceof String)) {
+            return null;
+        }
+        return new java.io.ByteArrayOutputStream() {
+            @Override
+            public void close() throws java.io.IOException {
+                super.close();
+                FILES.put((String) a0, toByteArray());
+            }
+        };
     }
 
     @Override
@@ -453,7 +467,8 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.io.InputStream openInputStream(java.lang.Object a0) throws java.io.IOException {
-        return null;
+        byte[] b = a0 instanceof String ? FILES.get(a0) : null;
+        return b == null ? null : new java.io.ByteArrayInputStream(b);
     }
 
     @Override

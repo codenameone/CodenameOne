@@ -37,26 +37,37 @@ public class ContentResolver {
     }
 
     public final java.io.InputStream openInputStream(Uri uri) throws java.io.FileNotFoundException {
-        String s = uri.toString();
+        String path = storagePath(uri);
         try {
-            if ("file".equals(uri.getScheme())) {
-                return com.codename1.io.FileSystemStorage.getInstance().openInputStream(uri.getPath());
-            }
-            if (s.startsWith("file:") || s.startsWith("/")) {
-                return com.codename1.io.FileSystemStorage.getInstance().openInputStream(uri.getPath());
-            }
-        } catch (java.io.IOException e) {
-            throw new java.io.FileNotFoundException(s);
-        }
-        throw new java.io.FileNotFoundException("No content provider: " + s);
-    }
-
-    public final java.io.OutputStream openOutputStream(Uri uri) throws java.io.FileNotFoundException {
-        try {
-            return com.codename1.io.FileSystemStorage.getInstance().openOutputStream(uri.getPath());
+            return com.codename1.io.FileSystemStorage.getInstance().openInputStream(path);
         } catch (java.io.IOException e) {
             throw new java.io.FileNotFoundException(uri.toString());
         }
+    }
+
+    public final java.io.OutputStream openOutputStream(Uri uri) throws java.io.FileNotFoundException {
+        String path = storagePath(uri);
+        try {
+            return com.codename1.io.FileSystemStorage.getInstance().openOutputStream(path);
+        } catch (java.io.IOException e) {
+            throw new java.io.FileNotFoundException(uri.toString());
+        }
+    }
+
+    /// The `FileSystemStorage` path for a `file:` URI or a bare absolute path.
+    /// A `file:` URI keeps its authority: a sandboxed port's app home is
+    /// `file://home/`, and its path alone (`/files/x`) names another file.
+    private static String storagePath(Uri uri) throws java.io.FileNotFoundException {
+        String s = uri.toString();
+        if (SCHEME_FILE.equals(uri.getScheme())) {
+            String authority = uri.getEncodedAuthority() == null ? "" : uri.getAuthority();
+            String path = uri.getPath();
+            return "file://" + authority + (path == null ? "" : path);
+        }
+        if (s.startsWith("/")) {
+            return uri.getPath();
+        }
+        throw new java.io.FileNotFoundException("No content provider: " + s);
     }
 
     public final String getType(Uri uri) {

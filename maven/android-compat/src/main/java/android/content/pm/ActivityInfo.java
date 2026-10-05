@@ -37,6 +37,11 @@ public class ActivityInfo {
     public static final int SCREEN_ORIENTATION_REVERSE_PORTRAIT = 9;
     public static final int SCREEN_ORIENTATION_FULL_SENSOR = 10;
     public static final int SCREEN_ORIENTATION_LOCKED = 14;
+    public static final int LAUNCH_MULTIPLE = 0;
+    public static final int LAUNCH_SINGLE_TOP = 1;
+    public static final int LAUNCH_SINGLE_TASK = 2;
+    public static final int LAUNCH_SINGLE_INSTANCE = 3;
+    public static final int LAUNCH_SINGLE_INSTANCE_PER_TASK = 4;
     public static final int CONFIG_MCC = 0x0001;
     public static final int CONFIG_MNC = 0x0002;
     public static final int CONFIG_LOCALE = 0x0004;

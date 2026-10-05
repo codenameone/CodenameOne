@@ -88,6 +88,27 @@ public class AndroidProjectImporterTest {
         assertEquals(m, AndroidProjectImporter.addManifestAttribute(m, "android:versionName", "1.2"));
     }
 
+    /// Importing twice keeps the backup of the application's own main class;
+    /// the second run must not replace it with the class the first one generated.
+    @Test
+    public void repeatedImportKeepsTheOriginalBackup() throws Exception {
+        java.io.File root = java.nio.file.Files.createTempDirectory("reimport").toFile();
+        java.io.File main = new java.io.File(root, "droid/src/main");
+        assertTrue(main.mkdirs());
+        java.nio.file.Files.write(new java.io.File(main, "AndroidManifest.xml").toPath(),
+                "<manifest package=\"com.example.droid\"><application/></manifest>".getBytes("UTF-8"));
+        java.io.File common = new java.io.File(root, "common");
+        java.io.File own = new java.io.File(common, "src/main/java/com/example/MyApp.java");
+        assertTrue(own.getParentFile().mkdirs());
+        String original = "package com.example; public class MyApp {}";
+        java.nio.file.Files.write(own.toPath(), original.getBytes("UTF-8"));
+        AndroidProjectImporter importer = new AndroidProjectImporter(new com.codename1.build.SystemStreamLog());
+        importer.importProject(new java.io.File(root, "droid"), null, common, "com.example", "MyApp");
+        importer.importProject(new java.io.File(root, "droid"), null, common, "com.example", "MyApp");
+        java.io.File backup = new java.io.File(own.getPath() + ".pre-android-import");
+        assertEquals(original, new String(java.nio.file.Files.readAllBytes(backup.toPath()), "UTF-8"));
+    }
+
     /// A module's own src/main, built where it stands, takes its package from
     /// the module's build script, as the Android Gradle plugin does.
     @Test

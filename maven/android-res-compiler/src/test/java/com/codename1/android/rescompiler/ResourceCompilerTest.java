@@ -126,6 +126,35 @@ public class ResourceCompilerTest {
                 "onclick.txt").toPath()), "UTF-8"));
     }
 
+    /// `android:launchMode` reaches the runtime, so a singleTop or singleTask
+    /// activity receives `onNewIntent` instead of a duplicate screen.
+    @Test
+    public void compilesLaunchMode() throws IOException {
+        File res = project();
+        File manifest = new File(res.getParentFile(), "AndroidManifest.xml");
+        String m = new String(Files.readAllBytes(manifest.toPath()), "UTF-8");
+        write(manifest, m.replace("<activity android:name=\".Main\">",
+                "<activity android:name=\".Main\" android:launchMode=\"singleTask\">"));
+        ResourceCompiler.Result r = compile(res);
+        assertFalse(r.diagnostics.toString(), r.hasErrors());
+        String impl = new String(Files.readAllBytes(r.javaFiles.get(1).toPath()), "UTF-8");
+        assertTrue(impl, impl.contains("launchMode(com.x.Main.class, 2);"));
+        assertFalse(impl, impl.contains("launchMode(com.other.Second.class"));
+    }
+
+    @Test
+    public void unknownLaunchModeWarnsAndStaysStandard() throws IOException {
+        File res = project();
+        File manifest = new File(res.getParentFile(), "AndroidManifest.xml");
+        String m = new String(Files.readAllBytes(manifest.toPath()), "UTF-8");
+        write(manifest, m.replace("<activity android:name=\".Main\">",
+                "<activity android:name=\".Main\" android:launchMode=\"sometimes\">"));
+        ResourceCompiler.Result r = compile(res);
+        assertTrue(r.diagnostics.toString(), r.diagnostics.toString().contains("W0305"));
+        String impl = new String(Files.readAllBytes(r.javaFiles.get(1).toPath()), "UTF-8");
+        assertFalse(impl, impl.contains("launchMode("));
+    }
+
     @Test
     public void compilesConfigChangesAndAcceptsFragments() throws IOException {
         File res = project();
