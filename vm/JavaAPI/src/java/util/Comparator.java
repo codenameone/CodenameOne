@@ -92,6 +92,10 @@ public interface Comparator<T> {
      * @return the combined comparator
      */
     default Comparator<T> thenComparing(final Comparator<? super T> other) {
+        // Arguments are checked here, not when the comparator is first used, as on the JDK.
+        if (other == null) {
+            throw new NullPointerException();
+        }
         final Comparator<T> self = this;
         return new Comparator<T>() {
             public int compare(T a, T b) {
@@ -144,6 +148,9 @@ public interface Comparator<T> {
      */
     static <T, U> Comparator<T> comparing(final java.util.function.Function<? super T, ? extends U> keyExtractor,
             final Comparator<? super U> keyComparator) {
+        if (keyExtractor == null || keyComparator == null) {
+            throw new NullPointerException();
+        }
         return new Comparator<T>() {
             public int compare(T a, T b) {
                 return keyComparator.compare(keyExtractor.apply(a), keyExtractor.apply(b));

@@ -224,7 +224,10 @@ final class StreamImpl<T> implements Stream<T> {
             }
         }
 
-        /** A terminal operation stopped early: close the mapped streams still open upstream. */
+        /**
+         * A terminal operation ended -- early, or by an exception from a callback: close the
+         * mapped streams still open upstream. Every terminal operation calls it in a finally.
+         */
         void release() {
             closeInner();
             if (input instanceof Cursor) {
@@ -253,65 +256,94 @@ final class StreamImpl<T> implements Stream<T> {
     public void forEach(Consumer<? super T> action) {
         require(action);
         Iterator<T> values = iterator();
-        while (values.hasNext()) action.accept(values.next());
+        try {
+            while (values.hasNext()) action.accept(values.next());
+        } finally {
+            release(values);
+        }
     }
 
     public Object[] toArray() {
         List<T> result = new ArrayList<T>();
         Iterator<T> values = iterator();
-        while (values.hasNext()) result.add(values.next());
-        return result.toArray();
+        try {
+            while (values.hasNext()) result.add(values.next());
+            return result.toArray();
+        } finally {
+            release(values);
+        }
     }
 
     public T reduce(T identity, BinaryOperator<T> accumulator) {
         require(accumulator);
         Iterator<T> values = iterator();
-        T result = identity;
-        while (values.hasNext()) result = accumulator.apply(result, values.next());
-        return result;
+        try {
+            T result = identity;
+            while (values.hasNext()) result = accumulator.apply(result, values.next());
+            return result;
+        } finally {
+            release(values);
+        }
     }
 
     public <A, R> R collect(Collector<? super T, A, R> collector) {
         require(collector);
         Iterator<T> values = iterator();
-        A container = collector.supplier().get();
-        BiConsumer<A, ? super T> accumulator = collector.accumulator();
-        while (values.hasNext()) accumulator.accept(container, values.next());
-        return collector.finisher().apply(container);
+        try {
+            A container = collector.supplier().get();
+            BiConsumer<A, ? super T> accumulator = collector.accumulator();
+            while (values.hasNext()) accumulator.accept(container, values.next());
+            return collector.finisher().apply(container);
+        } finally {
+            release(values);
+        }
     }
 
     public long count() {
         Iterator<T> values = iterator();
-        long count = 0;
-        while (values.hasNext()) { values.next(); count++; }
-        return count;
+        try {
+            long count = 0;
+            while (values.hasNext()) { values.next(); count++; }
+            return count;
+        } finally {
+            release(values);
+        }
     }
 
     public boolean anyMatch(Predicate<? super T> predicate) {
         require(predicate);
         Iterator<T> values = iterator();
-        boolean found = false;
-        while (!found && values.hasNext()) found = predicate.test(values.next());
-        release(values);
-        return found;
+        try {
+            boolean found = false;
+            while (!found && values.hasNext()) found = predicate.test(values.next());
+            return found;
+        } finally {
+            release(values);
+        }
     }
 
     public boolean allMatch(Predicate<? super T> predicate) {
         require(predicate);
         Iterator<T> values = iterator();
-        boolean all = true;
-        while (all && values.hasNext()) all = predicate.test(values.next());
-        release(values);
-        return all;
+        try {
+            boolean all = true;
+            while (all && values.hasNext()) all = predicate.test(values.next());
+            return all;
+        } finally {
+            release(values);
+        }
     }
 
     public boolean noneMatch(Predicate<? super T> predicate) { return !anyMatch(predicate); }
 
     public Optional<T> findFirst() {
         Iterator<T> values = iterator();
-        Optional<T> first = values.hasNext() ? Optional.of(values.next()) : Optional.<T>empty();
-        release(values);
-        return first;
+        try {
+            Optional<T> first = values.hasNext() ? Optional.of(values.next()) : Optional.<T>empty();
+            return first;
+        } finally {
+            release(values);
+        }
     }
 
     public Optional<T> findAny() { return findFirst(); }
@@ -319,34 +351,46 @@ final class StreamImpl<T> implements Stream<T> {
     public Optional<T> min(Comparator<? super T> comparator) {
         require(comparator);
         Iterator<T> values = iterator();
-        if (!values.hasNext()) return Optional.<T>empty();
-        T best = values.next();
-        while (values.hasNext()) {
-            T v = values.next();
-            if (comparator.compare(v, best) < 0) best = v;
+        try {
+            if (!values.hasNext()) return Optional.<T>empty();
+            T best = values.next();
+            while (values.hasNext()) {
+                T v = values.next();
+                if (comparator.compare(v, best) < 0) best = v;
+            }
+            return Optional.of(best);
+        } finally {
+            release(values);
         }
-        return Optional.of(best);
     }
 
     public Optional<T> max(Comparator<? super T> comparator) {
         require(comparator);
         Iterator<T> values = iterator();
-        if (!values.hasNext()) return Optional.<T>empty();
-        T best = values.next();
-        while (values.hasNext()) {
-            T v = values.next();
-            if (comparator.compare(v, best) > 0) best = v;
+        try {
+            if (!values.hasNext()) return Optional.<T>empty();
+            T best = values.next();
+            while (values.hasNext()) {
+                T v = values.next();
+                if (comparator.compare(v, best) > 0) best = v;
+            }
+            return Optional.of(best);
+        } finally {
+            release(values);
         }
-        return Optional.of(best);
     }
 
     public Optional<T> reduce(BinaryOperator<T> accumulator) {
         require(accumulator);
         Iterator<T> values = iterator();
-        if (!values.hasNext()) return Optional.<T>empty();
-        T result = values.next();
-        while (values.hasNext()) result = accumulator.apply(result, values.next());
-        return Optional.of(result);
+        try {
+            if (!values.hasNext()) return Optional.<T>empty();
+            T result = values.next();
+            while (values.hasNext()) result = accumulator.apply(result, values.next());
+            return Optional.of(result);
+        } finally {
+            release(values);
+        }
     }
 
     public <R> R collect(Supplier<R> supplier, BiConsumer<R, ? super T> accumulator, BiConsumer<R, R> combiner) {
@@ -356,15 +400,23 @@ final class StreamImpl<T> implements Stream<T> {
         require(combiner);
         R container = supplier.get();
         Iterator<T> values = iterator();
-        while (values.hasNext()) accumulator.accept(container, values.next());
-        return container;
+        try {
+            while (values.hasNext()) accumulator.accept(container, values.next());
+            return container;
+        } finally {
+            release(values);
+        }
     }
 
     public List<T> toList() {
         List<T> result = new ArrayList<T>();
         Iterator<T> values = iterator();
-        while (values.hasNext()) result.add(values.next());
-        return Collections.unmodifiableList(result);
+        try {
+            while (values.hasNext()) result.add(values.next());
+            return Collections.unmodifiableList(result);
+        } finally {
+            release(values);
+        }
     }
     public Stream<T> sequential() { return this; }
     public Stream<T> parallel() { return this; }

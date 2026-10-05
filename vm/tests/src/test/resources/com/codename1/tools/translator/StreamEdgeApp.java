@@ -220,6 +220,25 @@ public class StreamEdgeApp {
         closing.close();
         closing.close();
         check("ab".equals(log.toString()));
+        log.setLength(0);
+        try {
+            Stream.of(1, 2)
+                    .flatMap(v -> Stream.of(v, v).onClose(() -> log.append("close-p").append(v).append(' ')))
+                    .anyMatch(v -> { throw new IllegalStateException("predicate"); });
+            throw new AssertionError("predicate exception swallowed");
+        } catch (IllegalStateException expected) {
+        }
+        check("close-p1 ".equals(log.toString()));
+        try {
+            java.util.Comparator.<String, Integer>comparing(String::length, null);
+            throw new AssertionError("comparing(f, null)");
+        } catch (NullPointerException expected) {
+        }
+        try {
+            java.util.Comparator.<String>naturalOrder().thenComparing((java.util.Comparator<String>) null);
+            throw new AssertionError("thenComparing(null)");
+        } catch (NullPointerException expected) {
+        }
         try {
             Stream.of(1).collect(() -> new StringBuilder(), (sb, v) -> sb.append(v), null);
             throw new AssertionError("collect(.., null)");
