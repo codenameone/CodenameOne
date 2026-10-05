@@ -328,14 +328,29 @@ class GcOverflowSpiralIntegrationTest {
         // this guard fail on a collector that had removed the hazard outright. The bar
         // for the second is a per-cycle average above the 65536-entry worklist the
         // spiral was reported on: that much, pushed the old way, overflows every cycle.
+        //
+        // A third way, under the default collector: this workload is exactly what the
+        // hybrid collector runs as stop-the-world generational MINORS, which never put a
+        // fresh object on the worklist -- the hazard removed outright again. The volume is
+        // still measured, so the guard still fails on a workload that stopped churning:
+        // more than 65536 young objects per minor is the same bar. Which collector carried
+        // the churn is printed rather than chosen: the test runs what ships.
         long graceTraced = parseTrace(output, "graceTraced=");
-        assertTrue(graceDrains > 0 || (cycles > 0 && graceTraced / cycles > 65536),
-                "The grace pass neither drained mid-walk nor traced more than 65536 fresh"
-                        + " objects per cycle in place (graceTraced=" + graceTraced
-                        + " cycles=" + cycles + "), so this workload never produced the"
-                        + " volume that overflowed the worklist and the assertion above"
-                        + " proves nothing. Check that the app still allocates small"
-                        + " reference-carrying objects at volume.\n--- run ---\n" + output);
+        long minorCycles = parseTrace(output, "minorCycles=");
+        long minorYoung = parseTrace(output, "minorYoung=");
+        System.err.println("[GcOverflowSpiralIntegrationTest] graceTraced=" + graceTraced
+                + " minorCycles=" + minorCycles + " minorYoung=" + minorYoung);
+        assertTrue(graceDrains > 0 || (cycles > 0 && graceTraced / cycles > 65536)
+                        || (minorCycles > 0 && minorYoung / minorCycles > 65536),
+                "Neither the grace pass (drained mid-walk, or traced more than 65536 fresh"
+                        + " objects per cycle in place: graceTraced=" + graceTraced
+                        + " cycles=" + cycles + ") nor the stop-the-world minors (more"
+                        + " than 65536 young objects each: minorYoung=" + minorYoung
+                        + " minorCycles=" + minorCycles + ") handled the volume that"
+                        + " overflowed the worklist, so this workload never produced it and"
+                        + " the assertion above proves nothing. Check that the app still"
+                        + " allocates small reference-carrying objects at volume."
+                        + "\n--- run ---\n" + output);
 
         // AND THAT THE PERIODIC DRAIN STAYED CHEAP. gcMarkDrain is not "drain the
         // worklist": every call also rescans allObjectsInHeap from index 0 and re-runs the
