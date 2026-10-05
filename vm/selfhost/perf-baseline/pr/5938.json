@@ -184,6 +184,24 @@
       "time": 0.2
      }
     }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.546,
+      "time": 0.611,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.467,
+     "reason": "The workload changed, not the VM: 'translator (self)' translates the translator's own classes, which on this pull request no longer go through ASM and include the no-longer-stubbed JavaScript generator, a corpus about twice as large; every other CPU's row was recalibrated for the same change. All three runs of this pull request on AMD Family 26 Model 2 read it the same way: time medians 0.645x, 0.729x and 0.773x (rounds 0.49-0.89x) against master's 0.611x, RAM 0.461-0.471x against 0.546x. Time and RAM recalibrated from the three.",
+     "runs": 3,
+     "time": 0.729,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
    }
   }
  }
