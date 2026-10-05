@@ -26,8 +26,19 @@ import fs from "node:fs";
 import path from "node:path";
 
 const publicDir = path.resolve(process.argv[2] || "docs/website/public");
+const initializrUrl = "/initializr/";
 const registerUrl = "https://cloud.codenameone.com/register";
 
+/*
+ * Build-first: every primary CTA sends a visitor to Initializr, and the account
+ * is created by the first cloud build (the build tool's sign-in offers "Create
+ * an account"). That is how first-time builders converted before the
+ * 2026-08-29 switch to signup-first (#5625), which grew signups ~5x while new
+ * builders fell to 5-8 a month: people signed up with no project, landed in
+ * the console, and 69% of them left without downloading anything. The
+ * Initializr download beacon (#5935) and BuildCloud's first-build telemetry
+ * make this path measurable, which is what it lacked before.
+ */
 function page(name) {
   const file = name === "home"
     ? path.join(publicDir, "index.html")
@@ -53,41 +64,42 @@ function anchorElements(html) {
   });
 }
 
-function assertSignupCta(html, event) {
+function assertProjectCta(html, event) {
   const found = anchorElements(html).some(({ attributes }) =>
-    attributes.href === registerUrl && attributes["data-cn1-conversion"] === event
+    attributes.href === initializrUrl && attributes["data-cn1-conversion"] === event
   );
-  assert.ok(found, `${event} must send directly to registration`);
+  assert.ok(found, `${event} must send to Initializr`);
 }
 
-assertSignupCta(
-  `<a href="${registerUrl}" data-cn1-conversion="quoted-signup">Create account</a>`,
-  "quoted-signup"
+assertProjectCta(
+  `<a href="${initializrUrl}" data-cn1-conversion="quoted-project">Create</a>`,
+  "quoted-project"
 );
-assertSignupCta(
-  `<a href=${registerUrl} data-cn1-conversion=minified-signup>Create account</a>`,
-  "minified-signup"
+assertProjectCta(
+  `<a href=${initializrUrl} data-cn1-conversion=minified-project>Create</a>`,
+  "minified-project"
 );
 
 const home = page("home");
 const pricing = page("pricing");
 const compare = page("compare");
 
-assertSignupCta(home, "home-primary-signup");
-assertSignupCta(home, "home-final-signup");
-assertSignupCta(pricing, "pricing-free-signup");
-assertSignupCta(compare, "compare-signup");
-assertSignupCta(compare, "compare-final-signup");
+assertProjectCta(home, "home-primary-project");
+assertProjectCta(home, "home-final-project");
+assertProjectCta(pricing, "pricing-free-project");
+assertProjectCta(compare, "compare-project");
+assertProjectCta(compare, "compare-final-project");
 
 assert.ok(anchorElements(home).some(({ attributes, text }) =>
-  attributes.href === registerUrl && text === "Sign Up"
-), "the global header must expose registration");
-assert.ok(anchorElements(home).some(({ attributes }) => attributes.href === "/initializr/"),
-  "Initializr must remain available as an explicit project-generation tool");
+  attributes.href === initializrUrl && text === "Create Project"
+), "the global header must lead with Create Project");
 
 for (const html of [home, pricing, compare]) {
-  assert.doesNotMatch(html, /(?:home-(?:primary|final)|pricing-free|compare(?:-final)?)-project/i,
-    "primary funnel CTAs must not regress to the project-first route");
+  assert.doesNotMatch(html, /(?:home-(?:primary|final)|pricing-free|compare(?:-final)?)-signup/i,
+    "primary funnel CTAs must not regress to signup-first");
+  assert.ok(!anchorElements(html).some(({ attributes }) =>
+    attributes.href === registerUrl && attributes["data-cn1-conversion"]
+  ), "no primary CTA may send straight to registration");
 }
 
-console.log(`Validated signup-first routing in ${publicDir}`);
+console.log(`Validated build-first routing in ${publicDir}`);
