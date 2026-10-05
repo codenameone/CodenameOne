@@ -244,6 +244,14 @@ public class StreamEdgeApp {
             check(e.getSuppressed().length == 1 && "close".equals(e.getSuppressed()[0].getMessage()));
         }
         check("inner outer ".equals(log.toString()));
+        log.setLength(0);
+        Stream<Integer> partly = Stream.of(1, 2).onClose(() -> log.append("outer "))
+                .flatMap(i -> Stream.of(i, i * 10).onClose(() -> log.append("inner").append(i).append(' ')));
+        java.util.Iterator<Integer> it = partly.iterator();
+        check(it.next().intValue() == 1);
+        partly.close();
+        // An iterator abandoned mid-way through a mapped stream: close() still closes it.
+        check("inner1 outer ".equals(log.toString()));
         try {
             java.util.Comparator.<String, Integer>comparing(String::length, null);
             throw new AssertionError("comparing(f, null)");

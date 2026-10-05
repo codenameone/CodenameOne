@@ -48,6 +48,12 @@ final class StreamImpl<T> implements Stream<T> {
         boolean closed;
         /** onClose handlers, shared by every stage of the pipeline, run once by the first close(). */
         List<Runnable> closeHandlers;
+        /**
+         * The pipeline's flatMap cursors. A cursor holds the mapped stream it is reading until
+         * that stream runs out, so one left mid-way by an iterator the caller stopped using
+         * would never close it; close() releases them all.
+         */
+        List<Cursor> flatMapCursors;
         Source(List<?> values) { this.values = values; }
     }
 
@@ -266,7 +272,12 @@ final class StreamImpl<T> implements Stream<T> {
 
     private Iterator<?> open() {
         if (operation == SOURCE) return new Cursor(source.values.iterator(), SOURCE, null, 0);
-        return new Cursor(upstream.open(), operation, callback, amount);
+        Cursor cursor = new Cursor(upstream.open(), operation, callback, amount);
+        if (operation == FLATMAP) {
+            if (source.flatMapCursors == null) source.flatMapCursors = new ArrayList<Cursor>();
+            source.flatMapCursors.add(cursor);
+        }
+        return cursor;
     }
 
     @SuppressWarnings("unchecked")
@@ -507,11 +518,28 @@ final class StreamImpl<T> implements Stream<T> {
         linkedOrConsumed = true;
         if (source.closed) return;
         source.closed = true;
+        Throwable failure = null;
+        // Mapped streams a stopped iterator still holds come first (the JDK has closed them
+        // by now: it reads each one to the end as soon as it opens it), then the handlers.
+        List<Cursor> cursors = source.flatMapCursors;
+        source.flatMapCursors = null;
+        if (cursors != null) {
+            for (int i = 0; i < cursors.size(); i++) {
+                Cursor cursor = cursors.get(i);
+                try {
+                    cursor.release(null);
+                } catch (Throwable t) {
+                    if (failure == null) {
+                        failure = t;
+                    } else if (failure != t) {
+                        failure.addSuppressed(t);
+                    }
+                }
+            }
+        }
         List<Runnable> handlers = source.closeHandlers;
         source.closeHandlers = null;
-        if (handlers == null) return;
-        Throwable failure = null;
-        for (int i = 0; i < handlers.size(); i++) {
+        for (int i = 0; handlers != null && i < handlers.size(); i++) {
             // Fetched outside the try: the generic get() is a checkcast, which ParparVM does not
             // check, so it must never sit under a handler that would catch its failure.
             Runnable handler = handlers.get(i);
