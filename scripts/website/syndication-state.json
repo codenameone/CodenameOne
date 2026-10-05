@@ -2521,6 +2521,11 @@
       "medium": {
         "url": "https://medium.com/p/64969a8c089f/edit",
         "syndicated_at": "2026-10-04T19:01:24+00:00"
+      },
+      "devto": {
+        "id": 4803360,
+        "url": "https://dev.to/codenameone/jpa-inspired-orm-from-sqlite-to-postgresql-15i9",
+        "syndicated_at": "2026-10-05T21:11:14+00:00"
       }
     },
     "follow-a-tap-with-opentelemetry": {
