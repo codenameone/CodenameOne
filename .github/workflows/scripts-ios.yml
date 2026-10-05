@@ -159,7 +159,8 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15
-    timeout-minutes: 75
+    # The hello suite now also compiles the Android compatibility gallery, its runtime and the Kotlin stdlib; 75 left no margin.
+    timeout-minutes: 95
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -415,7 +416,7 @@ jobs:
             "${{ steps.build-ios-app.outputs.scheme }}"
         # Match the GL envelope; run-ios-ui-tests.sh still fails a stalled
         # DeviceRunner after 12 minutes without CN1SS progress.
-        timeout-minutes: 65
+        timeout-minutes: 80
 
       - name: Upload iOS Metal port status
         if: ${{ !cancelled() }}
@@ -545,7 +546,8 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: xcode-27
-    timeout-minutes: 75
+    # The hello suite now also compiles the Android compatibility gallery, its runtime and the Kotlin stdlib; 75 left no margin.
+    timeout-minutes: 95
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -831,7 +833,7 @@ jobs:
             "${{ steps.build-ios-app.outputs.scheme }}"
         # Match the GL envelope; run-ios-ui-tests.sh still fails a stalled
         # DeviceRunner after 12 minutes without CN1SS progress.
-        timeout-minutes: 65
+        timeout-minutes: 80
 
       # NO port-status upload here, deliberately. The published port report is
       # keyed on the port id `ios-metal`, and there is only one iOS port -- this
