@@ -51,6 +51,8 @@ abstract class Tree {
         String name;
         boolean isStatic;
         boolean onDemand;
+        /** Added by the compiler (a script's default imports), not written in the source. */
+        boolean implicit;
     }
 
     static final class Modifiers extends Tree {
@@ -59,6 +61,8 @@ abstract class Tree {
     }
 
     static final class Annotation extends Tree {
+        /** The annotation interface's name, as written; attribution resolves it. */
+        Tree name;
         final List<Tree> args = new ArrayList<Tree>();
     }
 

@@ -10,7 +10,9 @@ That use sets its constraints:
 - **Translatable.** It is compiled against ParparVM's class library
   (`vm/JavaAPI`) rather than the JDK -- no reflection, no regular expressions, no
   `java.nio`. It reads library classes through the translator's own class-file reader.
-- **Self-contained output.** No annotation processing and no modules. Lambdas and
+- **Self-contained output.** No annotation processing and no modules; annotation
+  types are resolved and `@Override` is checked, but annotations are not written to
+  class files (ParparVM cannot read them at run time). Lambdas and
   method references become `LambdaMetafactory` call sites, which ParparVM lowers;
   everything else the JDK bootstraps at run time (string concatenation, records'
   `toString`/`equals`/`hashCode`, pattern switch) is lowered by the compiler itself.

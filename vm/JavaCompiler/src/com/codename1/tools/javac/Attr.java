@@ -113,11 +113,11 @@ final class Attr {
         }
         if (t instanceof Tree.Ident) {
             String name = ((Tree.Ident) t).name;
-            Type tv = findTypeVar(name, env);
+            Type tv = findTypeVar(name, env, t.pos);
             if (tv != null) {
                 return tv;
             }
-            ClassSymbol c = resolveClassName(name, env);
+            ClassSymbol c = resolveClassName(name, env, t.pos);
             if (c == null) {
                 error(env, t.pos, "cannot find symbol\n  symbol: class " + name);
                 return Type.ERROR;
@@ -179,7 +179,13 @@ final class Attr {
         }
     }
 
-    Type findTypeVar(String name, Env env) {
+    /**
+     * A type variable in scope at env, or null. A class's type variables are not in scope in
+     * its static members, nor in a static nested class (JLS 8.1.3): one static field shared by
+     * every C&lt;T&gt; cannot have type T. That use is reported at pos and answers ERROR.
+     */
+    Type findTypeVar(String name, Env env, int pos) {
+        boolean staticCrossed = false;
         for (Env e = env; e != null; e = e.outer) {
             if (e.enclMethod != null) {
                 for (Type.TypeVar tv : e.enclMethod.typeParams) {
@@ -188,11 +194,22 @@ final class Attr {
                     }
                 }
             }
+            if (e.isStatic) {
+                staticCrossed = true;
+            }
             if (e.classBoundary) {
-                for (Type.TypeVar tv : e.enclClass.typeParams()) {
+                ClassSymbol k = e.enclClass;
+                for (Type.TypeVar tv : k.typeParams()) {
                     if (tv.name.equals(name)) {
+                        if (staticCrossed) {
+                            error(env, pos, "non-static type variable " + name + " cannot be referenced from a static context");
+                            return Type.ERROR;
+                        }
                         return tv;
                     }
+                }
+                if (k.outer != null && (k.isStatic() || k.isInterface() || k.isEnum() || k.isRecord())) {
+                    staticCrossed = true;
                 }
             }
         }
@@ -200,7 +217,7 @@ final class Attr {
     }
 
     /** Resolves a simple class name in env, or null. */
-    ClassSymbol resolveClassName(String name, Env env) {
+    ClassSymbol resolveClassName(String name, Env env, int pos) {
         // Local classes in enclosing scopes.
         for (Env e = env; e != null; e = e.outer) {
             ClassSymbol local = e.localClassHere(name);
@@ -218,10 +235,11 @@ final class Attr {
                 return member;
             }
         }
-        return resolveTopLevelName(name, env.unit);
+        return resolveTopLevelName(name, env, pos);
     }
 
-    ClassSymbol resolveTopLevelName(String name, Tree.CompilationUnit unit) {
+    ClassSymbol resolveTopLevelName(String name, Env env, int pos) {
+        Tree.CompilationUnit unit = env.unit;
         if (unit != null) {
             // Single-type imports.
             for (Tree.Import imp : unit.imports) {
@@ -249,9 +267,27 @@ final class Attr {
             if (same != null) {
                 return same;
             }
-            // On-demand imports. javac rejects a name two of them supply; a script also
-            // gets default imports it never wrote, so pick instead: java.* first
-            // (List means java.util.List, not com.codename1.ui.List), then import order.
+            // On-demand imports. Two the source wrote that supply the name make it ambiguous
+            // (JLS 7.5.2), as javac reports. A script also gets default imports it never
+            // wrote, so where those are involved it picks instead: java.* first (List means
+            // java.util.List, not com.codename1.ui.List), then import order.
+            ClassSymbol explicitMatch = null;
+            for (Tree.Import imp : unit.imports) {
+                if (!imp.onDemand || imp.implicit) {
+                    continue;
+                }
+                ClassSymbol c = onDemandMatch(imp, name);
+                if (c == null) {
+                    continue;
+                }
+                if (explicitMatch != null && explicitMatch != c) {
+                    error(env, pos, "reference to " + name + " is ambiguous\n  both class " + explicitMatch.javaName()
+                            + " in " + packageOf(explicitMatch).replace('/', '.') + " and class " + c.javaName()
+                            + " in " + packageOf(c).replace('/', '.') + " match");
+                    return explicitMatch;
+                }
+                explicitMatch = c;
+            }
             ClassSymbol javaMatch = null;
             ClassSymbol firstMatch = null;
             for (Tree.Import imp : unit.imports) {
@@ -371,11 +407,11 @@ final class Attr {
             if (findVariable(name, env, false, t.pos) != null) {
                 return null;
             }
-            Type tv = findTypeVar(name, env);
+            Type tv = findTypeVar(name, env, t.pos);
             if (tv != null) {
                 return tv;
             }
-            ClassSymbol c = resolveClassName(name, env);
+            ClassSymbol c = resolveClassName(name, env, t.pos);
             if (c != null) {
                 ((Tree.Ident) t).sym = c;
                 t.type = c.erasure();
@@ -623,6 +659,7 @@ final class Attr {
         Tree.ClassDecl decl = c.decl;
         Env cenv = classEnv(c);
         checkClassHeader(c, cenv);
+        attribAnnotations(decl.mods, cenv, false);
         for (Tree member : decl.members) {
             if (member instanceof Tree.VarDef) {
                 Tree.VarDef v = (Tree.VarDef) member;
@@ -630,6 +667,7 @@ final class Attr {
                 if (f == null) {
                     continue;
                 }
+                attribAnnotations(v.mods, cenv, false);
                 Env env = initializerEnv(cenv, f.isStatic());
                 if ((f.flags & Symbol.ACC_ENUM) != 0) {
                     attribEnumConstant(c, v, env);
@@ -650,7 +688,12 @@ final class Attr {
                     }
                 }
             } else if (member instanceof Tree.MethodDecl) {
-                attribMethod(((Tree.MethodDecl) member).sym, cenv);
+                Tree.MethodDecl md = (Tree.MethodDecl) member;
+                attribAnnotations(md.mods, cenv, true);
+                for (Tree.VarDef p : md.params) {
+                    attribAnnotations(p.mods, cenv, false);
+                }
+                attribMethod(md.sym, cenv);
             } else if (member instanceof Tree.Block) {
                 Tree.Block b = (Tree.Block) member;
                 Env env = initializerEnv(cenv, b.isStatic);
@@ -684,9 +727,17 @@ final class Attr {
         List<ClassSymbol> supers = new ArrayList<ClassSymbol>();
         collectSupertypes(c, supers, new LinkedHashSet<ClassSymbol>());
         for (MethodSymbol m : c.methods) {
-            if (m.decl == null || m.isConstructor() || m.isPrivate() || "<clinit>".equals(m.name)) {
+            if (m.decl == null || m.isConstructor() || "<clinit>".equals(m.name)) {
                 continue;
             }
+            Tree.Annotation override = annotation(m.decl.mods, "java/lang/Override");
+            if (m.isPrivate()) {
+                if (override != null) {
+                    error(cenv, override.pos, "method does not override or implement a method from a supertype");
+                }
+                continue;
+            }
+            boolean overrides = c.isRecord() && m.params.isEmpty() && isRecordComponent(c, m.name);
             for (ClassSymbol s : supers) {
                 for (MethodSymbol x : s.methods()) {
                     if (!x.name.equals(m.name) || x.isConstructor() || x.isPrivate()
@@ -694,6 +745,9 @@ final class Attr {
                             || isPackagePrivate(x) && !packageOf(s).equals(packageOf(c))
                             || !sameErasedParamsOrGeneric(m, x, c)) {
                         continue;
+                    }
+                    if (!m.isStatic() && !x.isStatic()) {
+                        overrides = true;
                     }
                     String why = overrideProblem(m, x, c);
                     if (why != null) {
@@ -704,7 +758,56 @@ final class Attr {
                     }
                 }
             }
+            if (override != null && !overrides) {
+                // @Override on a method that overrides nothing: a misspelled override would
+                // otherwise silently become a new method (JLS 9.6.4.4).
+                error(cenv, override.pos, "method does not override or implement a method from a supertype");
+            }
         }
+    }
+
+    private static boolean isRecordComponent(ClassSymbol c, String name) {
+        for (VarSymbol rc : c.recordComponents) {
+            if (rc.name.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Resolves each annotation's interface, so an unknown one is "cannot find symbol" as with
+     * javac. Annotations are otherwise not kept (see Gen.assemble); the compiler acts on
+     * {@code @Override} only.
+     */
+    void attribAnnotations(Tree.Modifiers mods, Env env, boolean onMethod) {
+        if (mods == null) {
+            return;
+        }
+        for (Tree.Annotation a : mods.annotations) {
+            if (a.name == null) {
+                continue;
+            }
+            Type t = attribType(a.name, env);
+            a.type = t;
+            if (!onMethod && t.tag == Type.Tag.CLASS && "java/lang/Override".equals(((Type.ClassType) t).sym.internalName)) {
+                error(env, a.pos, "annotation interface not applicable to this kind of declaration");
+            }
+        }
+    }
+
+    /** The annotation of the given interface among mods, once attributed; null when absent. */
+    private static Tree.Annotation annotation(Tree.Modifiers mods, String internalName) {
+        if (mods == null) {
+            return null;
+        }
+        for (Tree.Annotation a : mods.annotations) {
+            if (a.type != null && a.type.tag == Type.Tag.CLASS
+                    && internalName.equals(((Type.ClassType) a.type).sym.internalName)) {
+                return a;
+            }
+        }
+        return null;
     }
 
     private static boolean isPackagePrivate(Symbol x) {
@@ -1471,6 +1574,7 @@ final class Attr {
     }
 
     private void attribLocalVar(Tree.VarDef v, Env env) {
+        attribAnnotations(v.mods, env, false);
         Type t;
         checkLocalRedeclared(v.name, env, v.pos);
         if (v.vartype == null && v.declaredType == null) {
@@ -3064,7 +3168,11 @@ final class Attr {
         if (types.isSameType(tt, ft) && !Types.containsInference(tt)) {
             return tt;
         }
-        if (tu != null && fu != null && (tt.isPrimitive() || ft.isPrimitive() || pt == null || pt.isPrimitive())) {
+        // JLS 15.25: two numeric operands (primitive or boxed) make a numeric conditional
+        // whatever the target is -- Integer : Double promotes both to double -- and so do a
+        // primitive and its box. Only then does a reference target take over.
+        if (tu != null && fu != null && (tt.isPrimitive() || ft.isPrimitive() || pt == null || pt.isPrimitive()
+                || tu.isNumeric() && fu.isNumeric())) {
             if (tu.tag == Type.Tag.BOOLEAN && fu.tag == Type.Tag.BOOLEAN) {
                 return Type.BOOLEAN;
             }
@@ -3501,6 +3609,13 @@ final class Attr {
                 map.put(tv, iv);
                 r.ivars.add(iv);
                 ivArgs.add(iv);
+            }
+            // The enclosing instance's type arguments are given, not inferred.
+            for (Type.ClassType o = diamondOf.outer; o != null; o = o.outer) {
+                List<Type.TypeVar> otvs = o.sym.typeParams();
+                for (int i = 0; i < otvs.size() && i < o.args.size(); i++) {
+                    map.put(otvs.get(i), o.args.get(i));
+                }
             }
             r.diamondType = new Type.ClassType(diamondOf.sym, ivArgs, diamondOf.outer);
         } else if (site != null && (!m.isStatic() || m.isConstructor())) {
@@ -5115,6 +5230,10 @@ final class Attr {
                     targs.add(attribType(a, env));
                 }
                 ct = new Type.ClassType(member, targs, ot.tag == Type.Tag.CLASS ? (Type.ClassType) ot : null);
+            } else if (diamond && ot.tag == Type.Tag.CLASS && ((Type.ClassType) ot).isParameterized()) {
+                // g.new I<>(...): the diamond infers I's arguments, but the outer instance's are
+                // known -- keep them, so a constructor parameter of the outer's type T resolves.
+                ct = new Type.ClassType(member, new ArrayList<Type>(), (Type.ClassType) ot);
             } else {
                 ct = member.erasure();
             }

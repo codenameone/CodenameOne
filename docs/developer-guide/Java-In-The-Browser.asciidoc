@@ -52,7 +52,7 @@ Some constructs are lowered by the compiler itself rather than left to a run-tim
 
 ==== What the compiler doesn't do
 
-* No annotation processing and no modules. Annotations are parsed and dropped.
+* No annotation processing and no modules. Annotation types are resolved and `@Override` is checked, but no annotation is written to the class files: ParparVM can't read annotations at run time, so the simulator doesn't see them either.
 * No `native` methods. A `native` declaration is a compile error. Codename One reaches platform code through native interfaces (see <<_native_interfaces>>), and neither the browser nor the simulator has a library to bind a Java `native` method to.
 * No API beyond what the page contains. User code compiles against the stub library described below, so a call to a JDK class or method that ParparVM's class library lacks is a compile error rather than a failure at run time. One case compiles and still fails: ParparVM's `java.util.regex.Pattern` exists so code that names it compiles, but its methods throw when called in the browser.
 

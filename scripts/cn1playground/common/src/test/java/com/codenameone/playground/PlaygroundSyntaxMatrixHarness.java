@@ -65,13 +65,19 @@ public final class PlaygroundSyntaxMatrixHarness {
         }
     }
 
-    /** Standard imports + root container, returning root at the end. */
+    /**
+     * Standard imports + root container, returning root at the end. com.codename1.ui.* and
+     * java.util.* both have a List, which makes a bare List ambiguous in Java (javac rejects
+     * it, and so does the Playground's compiler for imports the source writes); the
+     * single-type import says which one is meant, as an application has to. It shares a line
+     * with the wildcard so the cases' expected line numbers stay put.
+     */
     private static String ui(String body) {
         return ""
                 + "import com.codename1.ui.*;\n"
                 + "import com.codename1.ui.events.*;\n"
                 + "import com.codename1.ui.layouts.*;\n"
-                + "import java.util.*;\n"
+                + "import java.util.*; import java.util.List;\n"
                 + "import java.io.*;\n"
                 + "Container root = new Container(BoxLayout.y());\n"
                 + body

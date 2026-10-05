@@ -50,6 +50,7 @@ final class Enter {
 
     void enterUnits(List<Tree.CompilationUnit> units) {
         for (Tree.CompilationUnit unit : units) {
+            checkPublicTypeFileName(unit);
             String pkg = unit.packageName.replace('.', '/');
             for (Tree.ClassDecl decl : unit.types) {
                 enterClass(decl, unit, null, pkg.isEmpty() ? decl.name : pkg + "/" + decl.name);
@@ -63,6 +64,30 @@ final class Enter {
         }
         for (int i = 0; i < sourceClasses.size(); i++) {
             enterMembers(sourceClasses.get(i));
+        }
+    }
+
+    /**
+     * JLS 7.6: a public top-level type lives in the file named after it, so at most one per
+     * file. A script is exempt -- its source name is a label, and the class it becomes is
+     * generated.
+     */
+    private void checkPublicTypeFileName(Tree.CompilationUnit unit) {
+        if (unit.source == null || compiler.scripts.containsKey(unit.source)) {
+            return;
+        }
+        String file = unit.source.name;
+        int slash = Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\'));
+        file = file.substring(slash + 1);
+        if (!file.endsWith(".java")) {
+            return;
+        }
+        String base = file.substring(0, file.length() - 5);
+        for (Tree.ClassDecl decl : unit.types) {
+            if (decl.mods != null && (decl.mods.flags & Symbol.ACC_PUBLIC) != 0 && !decl.name.equals(base)) {
+                compiler.error(unit, decl.pos, "class " + decl.name + " is public, should be declared in a file named "
+                        + decl.name + ".java");
+            }
         }
     }
 
@@ -413,6 +438,11 @@ final class Enter {
                 Type t;
                 if ((flags & Symbol.ACC_ENUM) != 0) {
                     t = c.erasure();
+                } else if ((flags & Symbol.ACC_STATIC) != 0 || isInterface) {
+                    // A static field's type is in a static context: the class's type variables are not.
+                    Env staticEnv = new Env(env, env.unit, c, null);
+                    staticEnv.isStatic = true;
+                    t = attr.attribType(v.vartype, staticEnv);
                 } else {
                     t = attr.attribType(v.vartype, env);
                 }
@@ -539,7 +569,15 @@ final class Enter {
         }
         ms.returnType = m.returnType == null ? Type.VOID : attr.attribType(m.returnType, env);
         for (Tree t : m.thrown) {
-            ms.thrown.add(attr.attribType(t, env));
+            Type th = attr.attribType(t, env);
+            // Only a Throwable may be thrown (JLS 8.4.6); anything else would reach the
+            // Exceptions attribute and make the method uncallable from javac-compiled code.
+            if (!th.isErroneous() && th.tag != Type.Tag.TYPEVAR
+                    && !compiler.types.isSubtype(Types.erasure(th), compiler.symtab.type("java/lang/Throwable"))) {
+                compiler.error(c.unit, t.pos, "incompatible types: " + th + " cannot be converted to Throwable");
+                continue;
+            }
+            ms.thrown.add(th);
         }
         for (MethodSymbol existing : c.methods) {
             if (existing.name.equals(ms.name) && existing.params.size() == ms.params.size() && existing.decl != null) {

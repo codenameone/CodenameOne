@@ -646,6 +646,7 @@ final class JavaSourceParser {
             sel.name = ident();
             name = sel;
         }
+        a.name = name;
         if (accept(Kind.LPAREN)) {
             if (!is(Kind.RPAREN)) {
                 do {

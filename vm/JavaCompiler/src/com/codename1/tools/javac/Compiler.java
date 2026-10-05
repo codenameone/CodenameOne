@@ -129,6 +129,7 @@ final class Compiler {
                 for (String d : defaultImports) {
                     Tree.Import imp = new Tree.Import();
                     imp.pos = 0;
+                    imp.implicit = true;
                     if (d.startsWith("static ")) {
                         imp.isStatic = true;
                         d = d.substring(7);
