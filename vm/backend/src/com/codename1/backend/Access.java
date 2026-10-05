@@ -157,13 +157,22 @@ final class Access extends BackendAccess {
         while (it.hasNext()) {
             Map.Entry e = (Map.Entry) it.next();
             Object value = e.getValue();
+            String name = String.valueOf(e.getKey());
+            // Only what the writers would put on the wire: a server-owned field
+            // (Content-Type, Content-Length...) or an unsafe name or value is
+            // dropped there, so a test must not see it either.
+            if (e.getKey() == null || HttpServer.isServerOwnedHeader(name) || !HttpServer.isHeaderName(name)) {
+                continue;
+            }
             if (value instanceof List) {
                 List values = (List) value;
                 for (Object one : values) {
-                    out.add(new String[] {String.valueOf(e.getKey()), String.valueOf(one)});
+                    if (one != null && HttpServer.isHeaderSafe(String.valueOf(one))) {
+                        out.add(new String[] {name, String.valueOf(one)});
+                    }
                 }
-            } else if (value != null) {
-                out.add(new String[] {String.valueOf(e.getKey()), String.valueOf(value)});
+            } else if (value != null && HttpServer.isHeaderSafe(String.valueOf(value))) {
+                out.add(new String[] {name, String.valueOf(value)});
             }
         }
         return out;
@@ -191,7 +200,8 @@ final class Access extends BackendAccess {
 
     @Override
     public String contentType(HttpServer.Response response) {
-        return response.contentType;
+        // As both writers send it: a null or unsafe type goes out as the default.
+        return HttpServer.safeContentType(response.contentType);
     }
 
     @Override

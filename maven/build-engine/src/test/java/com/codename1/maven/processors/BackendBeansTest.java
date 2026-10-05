@@ -752,6 +752,17 @@ public class BackendBeansTest {
         proc.setDevTools(false);
         assertNoErrors(process(classes, proc));
         assertTrue(proc.generateBootstrap("com.example").contains("cn1Access.management(cn1Builder)"));
+
+        // With no base file at all: Config still loads the profile's file.
+        classes = compile(plain);
+        w = new java.io.FileWriter(new File(classes, "application-dev.properties"));
+        w.write("cn1.management.enabled=true\n");
+        w.close();
+        proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(classes, proc));
+        assertTrue("a profile file without a base file was not read",
+                proc.generateBootstrap("com.example").contains("cn1Access.management(cn1Builder)"));
     }
 
     @Test

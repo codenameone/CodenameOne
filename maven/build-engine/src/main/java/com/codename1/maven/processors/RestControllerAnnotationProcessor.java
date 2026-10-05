@@ -2970,39 +2970,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
     }
 
-    /// `cn1.otel.enabled` from `application.properties` beside the module, the
-    /// file Config reads at run time. Only a literal truth value counts: a
+    /// `cn1.otel.enabled` from the module's application properties, the files
+    /// Config reads at run time. Only a literal truth value counts: a
     /// `${...}` reference cannot be resolved at build time, and building the
     /// tracer in on a guess would make the switch mean nothing.
     private static boolean propertyEnablesTelemetry(ProcessorContext ctx) {
-        File file = applicationProperties(ctx);
-        if (file == null) {
-            return false;
-        }
-        java.util.Properties props = new java.util.Properties();
-        InputStream in = null;
-        try {
-            in = new java.io.FileInputStream(file);
-            props.load(in);
-        } catch (IOException err) {
-            ctx.getLog().warn("cn1: could not read " + file + ": " + err.getMessage());
-            return false;
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignored) {
-                    // Closing a file that was only read cannot lose anything.
-                }
-            }
-        }
-        String value = props.getProperty(OTEL_ENABLED_PROPERTY);
-        if (value == null) {
-            return false;
-        }
-        String v = value.trim();
-        return "true".equalsIgnoreCase(v) || "yes".equalsIgnoreCase(v)
-                || "on".equalsIgnoreCase(v) || "1".equals(v);
+        // Every profile file too, as for the other linked features: a backend
+        // that turns tracing on only in application-prod.properties still needs
+        // the tracer built in.
+        return applicationPropertyTrue(ctx, OTEL_ENABLED_PROPERTY);
     }
 
     /// Whether `key` is set to a literal truth value in the module's
@@ -3040,23 +3016,53 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     /// The module's `application.properties` and every
     /// `application-<profile>.properties` beside it.
+    ///
+    /// The first of the searched directories holding either kind is the one read:
+    /// a backend may keep only `application-dev.properties`, which Config loads
+    /// for that profile, and its settings still need their generated linkage.
     private static List<File> applicationPropertyFiles(ProcessorContext ctx) {
         List<File> files = new ArrayList<File>();
-        File base = applicationProperties(ctx);
-        if (base == null) {
-            return files;
-        }
-        files.add(base);
-        File[] siblings = base.getParentFile() == null ? null : base.getParentFile().listFiles();
-        if (siblings != null) {
-            for (File f : siblings) {
-                String n = f.getName();
-                if (n.startsWith("application-") && n.endsWith(".properties")) {
-                    files.add(f);
+        for (File dir : propertiesDirectories(ctx)) {
+            File base = new File(dir, "application.properties");
+            if (base.isFile()) {
+                files.add(base);
+            }
+            File[] siblings = dir.listFiles();
+            if (siblings != null) {
+                java.util.Arrays.sort(siblings);
+                for (File f : siblings) {
+                    String n = f.getName();
+                    if (f.isFile() && n.startsWith("application-") && n.endsWith(".properties")) {
+                        files.add(f);
+                    }
                 }
+            }
+            if (!files.isEmpty()) {
+                return files;
             }
         }
         return files;
+    }
+
+    /// The directories [#findProperties] searches, in its order.
+    private static List<File> propertiesDirectories(ProcessorContext ctx) {
+        List<File> dirs = new ArrayList<File>();
+        File classes = ctx.getOutputClassDir();
+        if (classes != null) {
+            dirs.add(classes);
+            if (classes.getParentFile() != null
+                    && "target".equals(classes.getParentFile().getName())) {
+                File module = classes.getParentFile().getParentFile();
+                dirs.add(new File(module, "src/main/resources"));
+                dirs.add(module);
+            }
+        }
+        File dir = ctx.getProjectDir();
+        if (dir != null) {
+            dirs.add(new File(dir, "src/main/resources"));
+            dirs.add(dir);
+        }
+        return dirs;
     }
 
     /// Whether `key` is set in the module's `application.properties` or any

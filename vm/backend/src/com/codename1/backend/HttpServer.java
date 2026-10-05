@@ -6750,7 +6750,7 @@ public final class HttpServer {
     ///
     /// Dropped rather than merged. There is no sensible merge of two lengths, and a
     /// handler wanting a different body should return a different body.
-    private static boolean isServerOwnedHeader(String name) {
+    static boolean isServerOwnedHeader(String name) {
         return "content-length".equalsIgnoreCase(name)
                 || "transfer-encoding".equalsIgnoreCase(name)
                 || "connection".equalsIgnoreCase(name)
@@ -6766,7 +6766,7 @@ public final class HttpServer {
     /// the other left the same response-splitting hole open through a different
     /// argument. A rejected type falls back rather than being dropped, because a
     /// response without Content-Type is its own problem.
-    private static String safeContentType(String contentType) {
+    static String safeContentType(String contentType) {
         if (contentType == null) {
             return DEFAULT_CONTENT_TYPE;
         }
@@ -6792,7 +6792,7 @@ public final class HttpServer {
     /// folding, so the name and value are appended to the PREVIOUS header
     /// instead of forming their own. Over HTTP/2 nghttp2 rejects the name, and
     /// that can cost the whole response rather than the one header.
-    private static boolean isHeaderName(String name) {
+    static boolean isHeaderName(String name) {
         if (name.length() == 0) {
             return false;
         }
@@ -6828,7 +6828,7 @@ public final class HttpServer {
     /// defect the comment beside the caller says is being prevented. Anything
     /// above 0xFF cannot be spelled in one byte at all and is refused for the same
     /// reason rather than being narrowed into whatever it happens to alias.
-    private static boolean isHeaderSafe(String value) {
+    static boolean isHeaderSafe(String value) {
         for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
             if (c == '\t') {

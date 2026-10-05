@@ -51,6 +51,9 @@ public final class BackendTestExtension implements TestInstancePostProcessor, Af
 
     @Override
     public void afterEach(ExtensionContext extension) throws Exception {
+        // Found from a method context however the instance was made: a store
+        // lookup falls back to the parent contexts, so with PER_CLASS the entry
+        // put in the class context is read here too (PerClassMockedStoreTest).
         Object stored = extension.getStore(NAMESPACE).get("environment");
         if (!(stored instanceof TestEnvironment)) {
             return;
