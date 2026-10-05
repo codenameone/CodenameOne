@@ -74,9 +74,9 @@
  },
  "objectAllocation": {
   "all": {
-   "memory": 0.562,
+   "memory": 0.369,
    "runs": 1,
-   "time": 2.613,
+   "time": 1.217,
    "tolerance": {
     "memory": 0.3,
     "time": 0.5
@@ -96,8 +96,8 @@
  "recursion": {
   "all": {
    "memory": 0.059,
-   "runs": 1,
-   "time": 1.204,
+   "runs": 2,
+   "time": 0.943,
    "tolerance": {
     "time": 0.2
    }
