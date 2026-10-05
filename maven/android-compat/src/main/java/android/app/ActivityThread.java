@@ -200,7 +200,12 @@ public final class ActivityThread {
                         pause(current);
                     }
                     while (STACK.size() - 1 > i) {
-                        destroy(STACK.remove(STACK.size() - 1), false);
+                        // Finished, not just destroyed, as Android does: a
+                        // result the removed activity owes (RESULT_CANCELED
+                        // unless it set one) still reaches its caller.
+                        Record removed = STACK.remove(STACK.size() - 1);
+                        destroy(removed, false);
+                        queueResult(removed);
                     }
                     if (!singleTop && !reuseInStack) {
                         // Destroyed once the new instance is showing, so
@@ -498,21 +503,28 @@ public final class ActivityThread {
             }
         } else {
             destroy(r, false);
-            // The caller need not be on top -- A starts B, B starts C, and A
-            // finishes B with finishActivity -- so the result goes to the
-            // caller's own record, and waits there unless it is resumed.
-            Record caller = r.caller == null || r.requestCode < 0 ? null : recordOf(r.caller);
-            if (caller != null) {
-                if (caller.resumed) {
-                    deliverResult(r, caller);
-                } else {
-                    if (caller.pendingResults == null) {
-                        caller.pendingResults = new ArrayList<Object[]>();
-                    }
-                    caller.pendingResults.add(new Object[] {Integer.valueOf(r.requestCode),
-                        Integer.valueOf(a.mResultCode), a.mResultData});
-                }
+            queueResult(r);
+        }
+    }
+
+    /// Hands the result of `r`, just finished below the top, to its caller.
+    /// The caller need not be on top -- A starts B, B starts C, and A
+    /// finishes B with finishActivity -- so the result goes to the caller's
+    /// own record, and waits there unless it is resumed.
+    private static void queueResult(Record r) {
+        Record caller = r.caller == null || r.requestCode < 0 ? null : recordOf(r.caller);
+        if (caller == null) {
+            return;
+        }
+        if (caller.resumed) {
+            deliverResult(r, caller);
+        } else {
+            if (caller.pendingResults == null) {
+                caller.pendingResults = new ArrayList<Object[]>();
             }
+            Activity a = r.activity;
+            caller.pendingResults.add(new Object[] {Integer.valueOf(r.requestCode),
+                Integer.valueOf(a.mResultCode), a.mResultData});
         }
     }
 

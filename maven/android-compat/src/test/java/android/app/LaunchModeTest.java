@@ -142,6 +142,29 @@ public class LaunchModeTest {
     }
 
     @Test
+    public void clearTopDeliversTheResultOfARemovedActivity() {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                Context app = AndroidTestSupport.context().getApplicationContext();
+                app.startActivity(new Intent(app, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                AndroidTestSupport.TestActivity target = (AndroidTestSupport.TestActivity) ActivityThread.getTopActivity();
+                target.startActivityForResult(new Intent(target, AndroidTestSupport.UiModeHandlingActivity.class), 7);
+                Activity child = ActivityThread.getTopActivity();
+                child.startActivity(new Intent(child, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                assertSame(target, ActivityThread.getTopActivity());
+                assertTrue(child.isDestroyed());
+                // As on Android, the cleared child is finished: its caller
+                // still hears RESULT_CANCELED for the request it made.
+                assertEquals(7, target.resultRequestCode);
+                assertEquals(Activity.RESULT_CANCELED, target.resultCode);
+            }
+        });
+    }
+
+    @Test
     public void singleTaskClearsWhatIsAboveIt() {
         onEdt(new Runnable() {
             @Override

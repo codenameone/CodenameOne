@@ -209,9 +209,11 @@ public final class AndroidRuntime {
         if (app.activityForIntent(intent) != null) {
             return true;
         }
-        return Intent.ACTION_VIEW.equals(action) || Intent.ACTION_DIAL.equals(action)
-                || Intent.ACTION_CALL.equals(action) || Intent.ACTION_SENDTO.equals(action)
-                || Intent.ACTION_SEND.equals(action) || Intent.ACTION_CHOOSER.equals(action);
+        // The same test startActivity() applies, without acting on it, so a
+        // `resolveActivity(pm) != null` guard never passes an intent whose
+        // start then throws ActivityNotFoundException (a dial without a
+        // number, a chooser without an intent).
+        return platformHandle(intent, false);
     }
 
     /// The package Android reports for an implicit intent the runtime hands
@@ -244,13 +246,23 @@ public final class AndroidRuntime {
     /// app registered for them), phone numbers to the dialer, mail and text
     /// to the share sheet. Returns false when nothing can take it.
     public boolean handleImplicitIntent(Intent intent) {
+        return platformHandle(intent, true);
+    }
+
+    /// Whether the platform takes `intent`, handing it over when `perform`
+    /// is true. One method answers both [#canResolve(Intent)] and
+    /// [#handleImplicitIntent(Intent)], so the two cannot disagree.
+    private boolean platformHandle(Intent intent, boolean perform) {
         String action = intent.getAction();
         Uri data = intent.getData();
         if (Intent.ACTION_CHOOSER.equals(action)) {
             Intent inner = intent.getParcelableExtra(Intent.EXTRA_INTENT);
-            return inner != null && handleImplicitIntent(inner);
+            return inner != null && platformHandle(inner, perform);
         }
         if (Intent.ACTION_VIEW.equals(action) && data != null) {
+            if (!perform) {
+                return true;
+            }
             String scheme = data.getScheme();
             if ("tel".equals(scheme)) {
                 Display.getInstance().dial(data.getSchemeSpecificPart());
@@ -263,14 +275,19 @@ public final class AndroidRuntime {
             return true;
         }
         if ((Intent.ACTION_DIAL.equals(action) || Intent.ACTION_CALL.equals(action)) && data != null) {
-            Display.getInstance().dial(data.getSchemeSpecificPart());
+            if (perform) {
+                Display.getInstance().dial(data.getSchemeSpecificPart());
+            }
             return true;
         }
         if (Intent.ACTION_SENDTO.equals(action) && data != null) {
             if ("mailto".equals(data.getScheme())) {
-                return sendMail(data, intent);
+                return !perform || sendMail(data, intent);
             }
             if ("sms".equals(data.getScheme()) || "smsto".equals(data.getScheme())) {
+                if (!perform) {
+                    return true;
+                }
                 try {
                     Display.getInstance().sendSMS(data.getSchemeSpecificPart(), intent.getStringExtra("sms_body"), true);
                     return true;
@@ -292,6 +309,9 @@ public final class AndroidRuntime {
                 if (path == null) {
                     return false;
                 }
+                if (!perform) {
+                    return true;
+                }
                 String type = intent.getType();
                 if (type != null && type.startsWith("image/")) {
                     Display.getInstance().share(message, path, type);
@@ -300,7 +320,9 @@ public final class AndroidRuntime {
                 }
                 return true;
             }
-            Display.getInstance().share(message, null, intent.getType());
+            if (perform) {
+                Display.getInstance().share(message, null, intent.getType());
+            }
             return true;
         }
         return false;

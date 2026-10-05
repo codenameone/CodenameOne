@@ -244,7 +244,7 @@ public class ComponentActivity extends Activity
                         ActivityResultContracts.RequestMultiplePermissions.EXTRA_PERMISSIONS);
                 requestPermissions(permissions == null ? new String[0] : permissions, requestCode);
             } else if (Intent.ACTION_GET_CONTENT.equals(action)) {
-                pickContent(this, intent.getType());
+                pickContent(requestCode, intent.getType());
             } else {
                 startActivityForResult(intent, requestCode);
             }
@@ -297,8 +297,11 @@ public class ComponentActivity extends Activity
     }
 
     /// Content picking through the platform's gallery: images, videos, or
-    /// anything for other MIME types.
-    private static void pickContent(final Registration<?, ?> r, String mimeType) {
+    /// anything for other MIME types. The result goes to whatever is
+    /// registered under `requestCode` when the picker returns, as
+    /// `onActivityResult` does, so a launcher unregistered while the gallery
+    /// was open hears nothing.
+    private void pickContent(final int requestCode, String mimeType) {
         int type = CN.GALLERY_ALL;
         if (mimeType != null && mimeType.regionMatches(true, 0, "image/", 0, 6)) {
             type = CN.GALLERY_IMAGE;
@@ -308,6 +311,10 @@ public class ComponentActivity extends Activity
         CN.openGallery(new ActionListener<ActionEvent>() {
             @Override
             public void actionPerformed(ActionEvent evt) {
+                Registration<?, ?> r = mRegistrations.get(Integer.valueOf(requestCode));
+                if (r == null) {
+                    return;
+                }
                 Object source = evt == null ? null : evt.getSource();
                 if (source instanceof String) {
                     Intent data = new Intent();

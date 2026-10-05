@@ -51,6 +51,16 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The listener of the last `openGallery` call, which the headless
+    /// implementation never answers itself. A test that reads it must reset
+    /// it.
+    public static com.codename1.ui.events.ActionListener gallery;
+
+    @Override
+    public void openGallery(com.codename1.ui.events.ActionListener response, int type) {
+        gallery = response;
+    }
+
     /// The image encoder `ImageIO.getImageIO()` answers; none by default. A
     /// test that sets it must reset it.
     public static com.codename1.ui.util.ImageIO imageIO;

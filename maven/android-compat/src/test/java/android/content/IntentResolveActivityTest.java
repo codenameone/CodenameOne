@@ -51,6 +51,22 @@ public class IntentResolveActivityTest {
         assertNotNull(dial.resolveActivity(c.getPackageManager()));
     }
 
+    /// Resolution answers what starting the intent would do: a payload the
+    /// platform cannot take resolves to nothing, rather than passing the
+    /// guard and then throwing ActivityNotFoundException.
+    @Test
+    public void implicitIntentsWithoutAPayloadDoNotResolve() {
+        Context c = AndroidTestSupport.context();
+        assertNull(new Intent(Intent.ACTION_DIAL).resolveActivity(c.getPackageManager()));
+        assertNull(new Intent(Intent.ACTION_VIEW).resolveActivity(c.getPackageManager()));
+        assertNull(new Intent(Intent.ACTION_SENDTO, Uri.parse("geo:0,0")).resolveActivity(c.getPackageManager()));
+        assertNull(new Intent(Intent.ACTION_CHOOSER).resolveActivity(c.getPackageManager()));
+        Intent send = new Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, "hi");
+        assertNotNull(Intent.createChooser(send, "Share").resolveActivity(c.getPackageManager()));
+        assertNull(Intent.createChooser(new Intent(Intent.ACTION_DIAL), "Dial")
+                .resolveActivity(c.getPackageManager()));
+    }
+
     @Test
     public void explicitIntentsResolveToTheirActivityAndUnknownActionsToNothing() {
         Context c = AndroidTestSupport.context();
