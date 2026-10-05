@@ -7,23 +7,34 @@ setupModules(rootPom);
 def resolvedJava = resolveJavaVersion(rootDir);
 applyJavaVersionTransforms(rootDir, rootPom, resolvedJava);
 
+def projectType = (request.getProperties().getProperty("projectType", "app") ?: "app").trim()
+def platformModules = (request.getProperties().getProperty("platformModules", "none") ?: "none").trim()
+if (!(projectType in ["app", "app-with-backend", "backend-only"])) {
+    throw new IllegalArgumentException("projectType must be app, app-with-backend or backend-only, not '"
+            + projectType + "'")
+}
+def keptModules = parsePlatformModules(platformModules)
+if (projectType == "backend-only") {
+    if (!keptModules.isEmpty()) {
+        throw new IllegalArgumentException("A backend-only project has no platform modules; drop -DplatformModules")
+    }
+    assembleBackendOnly(rootDir, request)
+} else {
+    pruneModules(rootDir, rootPom, keptModules, projectType == "app-with-backend")
+}
+deleteRecursively(new java.io.File(rootDir, ".cn1-backend-only"))
+
 /**
  * There are a few scripts that need to be executable (or should be)
  */
+["mvnw", "run.sh", "build.sh"].each { name ->
+    def script = new java.io.File(rootDir, name)
+    if (script.exists()) {
+        script.setExecutable(true, false)
+    }
+}
 
-// The maven wrapper scripts should be executable
-def mvnw = new java.io.File(rootDir, "mvnw")
-mvnw.setExecutable(true, false)
-
-// run.sh should be executable
-def runSh = new java.io.File(rootDir, "run.sh")
-runSh.setExecutable(true, false)
-
-// The build.sh should be executable
-def buildSh = new java.io.File(rootDir, "build.sh")
-buildSh.setExecutable(true, false)
-
-if (request.getProperties().getProperty("ide", null) == "netbeans") {
+if (projectType != "backend-only" && request.getProperties().getProperty("ide", null) == "netbeans") {
     def netbeansDir = new java.io.File(rootDir, "tools/netbeans");
     if (netbeansDir.exists()) {
         netbeansDir.listFiles().each {
@@ -180,6 +191,134 @@ def deleteRecursively(file) {
         file.listFiles().each { deleteRecursively(it) }
     }
     file.delete()
+}
+
+/**
+ * The platform modules a project is generated with. The default, none, is the
+ * minimal layout: common builds every platform itself (see the cn1-host-*
+ * profiles in common/pom.xml), and a module can be added later. "all" is the
+ * full multi-module layout; a comma-separated list keeps just those.
+ */
+def parsePlatformModules(value) {
+    def all = ["javase", "android", "ios", "javascript", "win", "linux"]
+    if (value == "" || value == "none") {
+        return []
+    }
+    if (value == "all") {
+        return all
+    }
+    def out = []
+    value.split(",").each { raw ->
+        def id = raw.trim()
+        if (id.length() == 0) {
+            return
+        }
+        if (!(id in all)) {
+            throw new IllegalArgumentException("platformModules: unknown platform '" + id
+                    + "'; expected none, all, or a list of " + all.join(","))
+        }
+        out << id
+    }
+    return out
+}
+
+/**
+ * Removes the platform modules the project was not asked to keep, and the
+ * backend module unless it was. A module that is gone is simply not in the
+ * reactor: each root profile also needs <root>/<module>/pom.xml. The javase
+ * profile's activeByDefault goes with the javase module, because Maven applies
+ * it even when the profile's own conditions fail.
+ */
+def pruneModules(rootDir, rootPom, keptModules, keepBackend) {
+    def javase = new java.io.File(rootDir, "javase")
+    if (!("javase" in keptModules) && javase.exists()) {
+        // The packaged desktop app's native theme moves to common, where the
+        // desktop goals look for it when there is no javase module.
+        def theme = new java.io.File(javase, "src/desktop/resources")
+        if (theme.isDirectory()) {
+            def dest = new java.io.File(rootDir, "common/src/desktop/resources")
+            dest.mkdirs()
+            theme.listFiles().each { f ->
+                if (f.isFile()) {
+                    java.nio.file.Files.copy(f.toPath(), new java.io.File(dest, f.getName()).toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+        }
+        def content = rootPom.text.replaceAll(/\n[ \t]*<activeByDefault>true<\/activeByDefault>/, "")
+        rootPom.newWriter("UTF-8").withWriter { w -> w << content }
+    }
+    ["javase", "android", "ios", "javascript", "win", "linux"].each { id ->
+        if (!(id in keptModules)) {
+            def dir = new java.io.File(rootDir, id)
+            if (dir.exists()) {
+                deleteRecursively(dir)
+            }
+        }
+    }
+    if (!keepBackend) {
+        def backend = new java.io.File(rootDir, "backend")
+        if (backend.exists()) {
+            deleteRecursively(backend)
+        }
+    }
+}
+
+/**
+ * Turns the generated tree into a backend-only project: one module, the server,
+ * at the root. Its files are the ones the initializr and the Gradle generators
+ * use, staged into .cn1-backend-only/ when the archetype is built.
+ */
+def assembleBackendOnly(rootDir, request) {
+    def staged = new java.io.File(rootDir, ".cn1-backend-only")
+    def pkg = request.getPackage()
+    def props = request.getProperties()
+    def maven = { String text ->
+        text.replace("./gradlew __BACKEND__runBackend", "./mvnw cn1:backend")
+            .replace("./gradlew __BACKEND__backendPackage", "./mvnw cn1:backend-package")
+            .replace("under `runBackend`", "under `cn1:backend`")
+            .replace("\${package}", pkg)
+    }
+    def pom = new java.io.File(staged, "backend-only-pom.xml").getText("UTF-8")
+            .replace("<groupId>com.example.myapp</groupId>", "<groupId>" + request.getGroupId() + "</groupId>")
+            .replace("myappname", request.getArtifactId())
+            .replace("<version>1.0-SNAPSHOT</version>", "<version>" + request.getVersion() + "</version>")
+            .replace("<cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>",
+                    "<cn1.plugin.version>" + props.getProperty("cn1PluginVersion") + "</cn1.plugin.version>")
+            .replace("<cn1.version>8.0-SNAPSHOT</cn1.version>",
+                    "<cn1.version>" + props.getProperty("cn1Version") + "</cn1.version>")
+
+    def keep = ["pom.xml", "mvnw", "mvnw.cmd", ".mvn", ".gitignore", ".cn1-backend-only"] as Set
+    rootDir.listFiles().each { f ->
+        if (!(f.getName() in keep)) {
+            deleteRecursively(f)
+        }
+    }
+    new java.io.File(rootDir, "pom.xml").newWriter("UTF-8").withWriter { w -> w << pom }
+    ["application.properties", "application-dev.properties"].each { name ->
+        new java.io.File(rootDir, name).newWriter("UTF-8").withWriter { w ->
+            w << maven(new java.io.File(staged, name + ".txt").getText("UTF-8"))
+        }
+    }
+    def srcDir = new java.io.File(rootDir, "src/main/java/" + pkg.replace('.', '/'))
+    srcDir.mkdirs()
+    ["Api", "Greeter"].each { name ->
+        new java.io.File(srcDir, name + ".java").newWriter("UTF-8").withWriter { w ->
+            w << maven(new java.io.File(staged, name + ".java.txt").getText("UTF-8"))
+        }
+    }
+    def gitignore = new java.io.File(rootDir, ".gitignore")
+    if (!gitignore.exists()) {
+        gitignore.newWriter("UTF-8").withWriter { w -> w << "target/\n" }
+    }
+    new java.io.File(rootDir, "README.md").newWriter("UTF-8").withWriter { w ->
+        w << "# " + request.getArtifactId() + "\n\n" +
+             "A Codename One backend. The routes are the @RestController classes under src/main/java.\n\n" +
+             "    ./mvnw cn1:backend                   # run it on this JVM\n" +
+             "    CN1_PROFILE=dev ./mvnw cn1:backend   # with application-dev.properties\n" +
+             "    ./mvnw cn1:backend-package           # build a single native binary\n\n" +
+             "Settings are read from application.properties, beside this file.\n"
+    }
 }
 
 def setupModules(pomFile) {

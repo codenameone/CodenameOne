@@ -189,6 +189,43 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         protected void overlayCommandLineBuildHints(Properties target) {
             CN1BuildMojo.this.overlayCommandLineBuildHints(target);
         }
+
+        /**
+         * When {@code common} builds a platform the application has no module for, the
+         * platform's own files ride the upload beside {@code common}'s classpath, exactly as
+         * that module would have packaged them: the compiled JavaSE natives for the desktop
+         * targets, and otherwise the native sources and resources directories. Elements
+         * that do not exist are skipped by the engine.
+         */
+        @Override
+        protected List<String> compileClasspathElements() throws Exception {
+            List<String> elements = super.compileClasspathElements();
+            if (!isHosting()) {
+                return elements;
+            }
+            List<String> out = new ArrayList<String>(elements);
+            out.addAll(hostedUploadElements(projectHost().layout(), hostedPlatform.trim(), hostedNativesDir()));
+            return out;
+        }
+    }
+
+    /**
+     * The extra classpath elements a build from {@code common} uploads for {@code platform}.
+     */
+    static List<String> hostedUploadElements(com.codename1.project.ProjectLayout layout, String platform,
+                                             File javaseNatives) {
+        List<String> out = new ArrayList<String>();
+        if ("javase".equals(platform)) {
+            out.add(javaseNatives.getAbsolutePath());
+            return out;
+        }
+        com.codename1.project.NativePlatform p = com.codename1.project.NativePlatform.fromId(platform);
+        if (p != null) {
+            for (File dir : layout.platformUploadDirs(p)) {
+                out.add(dir.getAbsolutePath());
+            }
+        }
+        return out;
     }
 
     @Override

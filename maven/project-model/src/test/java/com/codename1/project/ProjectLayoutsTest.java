@@ -130,6 +130,81 @@ class ProjectLayoutsTest {
         assertEquals(new File(common, "target/css/theme.css.merged"), l.cssMergeFile(l.themeCss()));
     }
 
+    private static final String BACKEND_POM = "<project><dependencies><dependency>"
+            + "<groupId>com.codenameone</groupId><artifactId>codenameone-backend</artifactId>"
+            + "</dependency></dependencies></project>";
+
+    @Test
+    void minimalMavenAppIsAnAppAndHostsEveryPlatform() throws IOException {
+        File root = new File(tmp, "minimal");
+        touch(root, "pom.xml");
+        touch(root, "common/pom.xml");
+        touch(root, "common/codenameone_settings.properties");
+        dir(root, "common/src/main/java/com/example");
+        ProjectLayout l = ProjectLayouts.detect(new File(root, "common/src/main/java/com/example"));
+        assertEquals(BuildSystem.MAVEN, l.buildSystem());
+        assertEquals(ProjectKind.APP, l.kind());
+        assertEquals(new File(root, "common").getCanonicalFile(), l.projectDir());
+        for (NativePlatform p : NativePlatform.values()) {
+            assertFalse(l.hasPlatformModule(p), p.id());
+        }
+        // Native sources written later without a pom are still sources common hosts,
+        // not a module.
+        dir(root, "android/src/main/java");
+        assertFalse(l.hasPlatformModule(NativePlatform.ANDROID));
+        assertEquals(Arrays.asList(new File(root, "android/src/main/java").getCanonicalFile(),
+                        new File(root, "android/src/main/resources").getCanonicalFile()),
+                l.platformUploadDirs(NativePlatform.ANDROID));
+        touch(root, "android/pom.xml");
+        assertTrue(l.hasPlatformModule(NativePlatform.ANDROID));
+    }
+
+    @Test
+    void fullMavenAppHasItsModulesAndGradleHasNone() throws IOException {
+        ProjectLayout maven = ProjectLayouts.detect(mavenApp());
+        assertTrue(maven.hasPlatformModule(NativePlatform.ANDROID));
+        assertFalse(maven.hasPlatformModule(NativePlatform.IOS));
+        ProjectLayout gradle = ProjectLayouts.detect(gradleApp());
+        assertFalse(gradle.hasPlatformModule(NativePlatform.ANDROID));
+        assertEquals(new File(gradle.projectDir(), "src/android/resources"),
+                gradle.nativeResourcesDir(NativePlatform.ANDROID));
+    }
+
+    @Test
+    void mavenBackendOnlyRootIsABackend() throws IOException {
+        File root = new File(tmp, "server");
+        touch(root, "pom.xml", BACKEND_POM);
+        touch(root, "application.properties");
+        dir(root, "src/main/java/com/example");
+        ProjectLayout l = ProjectLayouts.detect(new File(root, "src/main/java/com/example"));
+        assertNotNull(l);
+        assertEquals(BuildSystem.MAVEN, l.buildSystem());
+        assertEquals(ProjectKind.BACKEND, l.kind());
+        assertEquals(root.getCanonicalFile(), l.rootDir());
+        assertEquals(root.getCanonicalFile(), l.projectDir());
+        assertEquals(new File(root, "application.properties").getCanonicalFile(), l.settingsFile());
+        assertEquals(root.getCanonicalFile(), l.backendDir());
+    }
+
+    @Test
+    void aBackendModuleWithItsOwnDependencyStillBelongsToTheApp() throws IOException {
+        File root = mavenApp();
+        touch(root, "backend/pom.xml", BACKEND_POM);
+        ProjectLayout l = ProjectLayouts.detect(new File(root, "backend/src/main/java"));
+        assertEquals(ProjectKind.BACKEND, l.kind());
+        assertEquals(root.getCanonicalFile(), l.rootDir());
+        assertEquals(new File(root, "backend").getCanonicalFile(), l.projectDir());
+    }
+
+    @Test
+    void aServerThatIsNotOursIsNotClaimed() throws IOException {
+        File root = new File(tmp, "spring");
+        touch(root, "pom.xml", "<project><artifactId>spring-boot-starter-web</artifactId></project>");
+        touch(root, "application.properties");
+        dir(root, "src/main/java");
+        assertNull(ProjectLayouts.detect(new File(root, "src/main/java")));
+    }
+
     @Test
     void gradleAppIsNotMistakenForAnt() throws IOException {
         File root = gradleApp().getCanonicalFile();

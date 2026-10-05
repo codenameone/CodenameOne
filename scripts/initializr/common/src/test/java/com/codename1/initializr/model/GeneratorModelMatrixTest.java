@@ -49,7 +49,19 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateCoordinateGuardRejectsBrokenArtifacts();
         validateLocaleIndependentArtifactIds();
         validateGradleRefusesUnsupportedCombinations();
-        validateMavenIgnoresAppProjectType();
+        validateVersionGate();
+        validateMavenProjectTypeBeforeTheGate();
+        validateMavenRefusals();
+        for (Template template : Template.values()) {
+            for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
+                for (IDE ide : IDE.values()) {
+                    validateMavenLayoutCombination(template, type, false, ide);
+                    if (type != ProjectOptions.ProjectType.BACKEND_ONLY) {
+                        validateMavenLayoutCombination(template, type, true, ide);
+                    }
+                }
+            }
+        }
         validateGradleTemplateDependencies();
         validateAgentsMdMatchesBuildTool();
         validateGradleLocalization();
@@ -117,7 +129,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertTrue(unixMode(zipData, "gradlew.bat") == 0100644, label + "gradlew.bat is not a Unix executable");
 
         String settings = getText(entries, "settings.gradle.kts");
-        assertContains(settings, "id(\"com.codenameone\") version \"7.0.273\"",
+        assertContains(settings, "id(\"com.codenameone\") version \"" + GeneratorModel.cn1PluginVersion() + "\"",
                 label + "settings.gradle.kts should apply the Codename One plugin at the generated version");
         assertContains(settings, "rootProject.name = \"" + GeneratorModel.toLowerCaseInvariant(mainClassName) + "\"",
                 label + "settings.gradle.kts should name the project like the Maven artifactId");
@@ -256,9 +268,18 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     gradleOptions(ProjectOptions.ProjectType.APP)), template.GRADLE_UNSUPPORTED_REASON,
                     template + " cannot be generated for Gradle and must say why");
         }
-        assertRefused(GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "NoMavenBackend", "com.acme.nomavenbackend",
-                ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN, ProjectOptions.ProjectType.BACKEND_ONLY)),
-                "backend-only", "Maven has no backend-only scaffold");
+    }
+
+    /// Maven refusals on each side of the version gate.
+    private void validateMavenRefusals() {
+        ProjectOptions backendOnly = ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN,
+                ProjectOptions.ProjectType.BACKEND_ONLY);
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.BAREBONES, "NoMavenBackend",
+                "com.acme.nomavenbackend", backendOnly, LEGACY_VERSION),
+                "backend-only", "Before the gate Maven has no backend-only scaffold");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.BAREBONES, "NoMavenBackend",
+                "com.acme.nomavenbackend", backendOnly.withPlatformModules(true), LAYOUTS_VERSION),
+                "platform modules", "A backend-only project with every platform module makes no sense");
     }
 
     private void assertRefused(GeneratorModel model, String expectedReason, String message) {
@@ -272,16 +293,213 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(reason, expectedReason, message);
     }
 
-    /// Maven projects always carry the backend module, so "App" and "App + backend"
-    /// are the same Maven download.
-    private void validateMavenIgnoresAppProjectType() throws Exception {
-        Map<String, byte[]> app = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "SameApp", "com.acme.same",
-                ProjectOptions.defaults()).collectProjectEntries();
-        Map<String, byte[]> withBackend = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "SameApp", "com.acme.same",
-                ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN,
-                        ProjectOptions.ProjectType.APP_WITH_BACKEND)).collectProjectEntries();
+    /// The last plugin without the Maven layouts, and the first with them. Fixed
+    /// rather than read from GeneratorModel so both sides stay covered whatever
+    /// release the initializr generates against.
+    private static final String LEGACY_VERSION = "7.0.274";
+    private static final String LAYOUTS_VERSION = "7.0.275";
+
+    private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {
+        return ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN, type).withPlatformModules(allModules);
+    }
+
+    /// The full multi-module layout. Tests that read a platform module's pom ask for
+    /// it, so they hold on both sides of the version gate.
+    private static ProjectOptions fullMaven(ProjectOptions options) {
+        return options.withBuild(ProjectOptions.BuildTool.MAVEN, ProjectOptions.ProjectType.APP_WITH_BACKEND)
+                .withPlatformModules(true);
+    }
+
+    private static Map<String, byte[]> mavenEntries(String pluginVersion, Template template, IDE ide, String appName,
+                                                    String packageName, ProjectOptions options) throws IOException {
+        return readZipEntries(mavenZip(pluginVersion, template, ide, appName, packageName, options));
+    }
+
+    private static byte[] mavenZip(String pluginVersion, Template template, IDE ide, String appName,
+                                   String packageName, ProjectOptions options) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        GeneratorModel.createForPluginVersion(ide, template, appName, packageName, options, pluginVersion)
+                .writeProjectZip(output);
+        return output.toByteArray();
+    }
+
+    private void validateVersionGate() throws Exception {
+        assertTrue(GeneratorModel.isVersionAtLeast("7.0.275", "7.0.275"), "the gate's own release is in");
+        assertFalse(GeneratorModel.isVersionAtLeast("7.0.274", "7.0.275"), "the release before it is not");
+        assertTrue(GeneratorModel.isVersionAtLeast("7.0.1000", "7.0.275"), "parts compare as numbers");
+        assertFalse(GeneratorModel.isVersionAtLeast("7.0.99", "7.0.275"), "parts compare as numbers, not text");
+        assertTrue(GeneratorModel.isVersionAtLeast("7.1", "7.0.275"), "a newer minor is in");
+        assertTrue(GeneratorModel.isVersionAtLeast("8.0-SNAPSHOT", "7.0.275"), "a snapshot reads as its number");
+        assertFalse(GeneratorModel.isVersionAtLeast("", "7.0.275"), "no version is not newer");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(), LAYOUTS_VERSION)),
+                Boolean.valueOf(GeneratorModel.isMavenLayoutChoiceOffered()),
+                "the UI offers the layouts exactly when the current plugin has them");
+
+        // Before the gate a download is exactly today's, whatever the options say.
+        byte[] defaults = mavenZip(LEGACY_VERSION, Template.BAREBONES, IDE.INTELLIJ, "GateApp", "com.acme.gate",
+                ProjectOptions.defaults());
+        byte[] minimalAsked = mavenZip(LEGACY_VERSION, Template.BAREBONES, IDE.INTELLIJ, "GateApp", "com.acme.gate",
+                mavenOptions(ProjectOptions.ProjectType.APP, false));
+        byte[] fullAsked = mavenZip(LEGACY_VERSION, Template.BAREBONES, IDE.INTELLIJ, "GateApp", "com.acme.gate",
+                mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, true));
+        assertTrue(java.util.Arrays.equals(defaults, minimalAsked) && java.util.Arrays.equals(defaults, fullAsked),
+                "Before the gate the project type and modules choice must not change a Maven download");
+        Map<String, byte[]> legacy = readZipEntries(defaults);
+        assertNotNull(legacy.get("javase/pom.xml"), "Before the gate a Maven app keeps its platform modules");
+        assertNotNull(legacy.get("backend/pom.xml"), "Before the gate a Maven app keeps its backend module");
+        String legacyRoot = getText(legacy, "pom.xml");
+        assertFalse(legacyRoot.indexOf("<exists>${basedir}/javase/pom.xml</exists>") >= 0,
+                "Before the gate the root pom is not touched");
+        assertContains(legacyRoot, "<activeByDefault>true</activeByDefault>", "Before the gate javase stays the default");
+        String legacyCommon = getText(legacy, "common/pom.xml");
+        assertFalse(legacyCommon.indexOf("compile-javase-natives") >= 0,
+                "Before the gate common/pom.xml must not bind goals the plugin does not have");
+        assertNull(legacy.get("common/src/desktop/resources/NativeTheme.res"), "Before the gate nothing moves");
+
+        // From the gate on the default is the minimal layout.
+        Map<String, byte[]> minimal = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.INTELLIJ, "GateApp",
+                "com.acme.gate", ProjectOptions.defaults());
+        assertNull(minimal.get("javase/pom.xml"), "From the gate a Maven app is minimal by default");
+        assertNull(minimal.get("backend/pom.xml"), "From the gate the backend module is opt-in");
+        assertContains(getText(minimal, "common/pom.xml"), "<goal>compile-javase-natives</goal>",
+                "From the gate common/pom.xml hosts the missing platforms");
+    }
+
+    /// Before the gate Maven projects always carry the backend module, so "App" and
+    /// "App + backend" are the same Maven download.
+    private void validateMavenProjectTypeBeforeTheGate() throws Exception {
+        Map<String, byte[]> app = mavenEntries(LEGACY_VERSION, Template.BAREBONES, IDE.INTELLIJ, "SameApp",
+                "com.acme.same", ProjectOptions.defaults());
+        Map<String, byte[]> withBackend = mavenEntries(LEGACY_VERSION, Template.BAREBONES, IDE.INTELLIJ, "SameApp",
+                "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
         assertEqual(app.keySet(), withBackend.keySet(), "Maven App and App + backend should be the same download");
         assertNotNull(app.get("backend/pom.xml"), "Maven projects keep the backend module");
+
+        Map<String, byte[]> minimal = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.INTELLIJ, "SameApp",
+                "com.acme.same", ProjectOptions.defaults());
+        Map<String, byte[]> minimalWithBackend = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.INTELLIJ,
+                "SameApp", "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
+        for (String path : minimalWithBackend.keySet()) {
+            if (!minimal.containsKey(path)) {
+                assertTrue(path.startsWith("backend/"), "From the gate App + backend adds only backend/: " + path);
+            }
+        }
+        assertNotNull(minimalWithBackend.get("backend/pom.xml"), "From the gate App + backend has the backend module");
+    }
+
+    private static final String[] PLATFORM_DIRS = {"android/", "ios/", "javase/", "javascript/", "linux/", "win/"};
+
+    /// Every Maven download from the gate on, per template, project type, layout and IDE.
+    private void validateMavenLayoutCombination(Template template, ProjectOptions.ProjectType type, boolean allModules,
+                                                IDE ide) throws Exception {
+        String mainClassName = "Mvn" + template.ordinal() + type.ordinal() + (allModules ? 1 : 0) + ide.ordinal() + "App";
+        String packageName = "com.acme.m" + template.ordinal() + ".t" + type.ordinal() + ".i" + ide.ordinal();
+        String label = template + "/" + type + "/" + (allModules ? "full" : "minimal") + "/" + ide + ": ";
+        byte[] zipData = mavenZip(LAYOUTS_VERSION, template, ide, mainClassName, packageName,
+                mavenOptions(type, allModules));
+        Map<String, byte[]> entries = readZipEntries(zipData);
+        String rootPom = getText(entries, "pom.xml");
+        assertContains(rootPom, "<cn1.plugin.version>" + LAYOUTS_VERSION + "</cn1.plugin.version>",
+                label + "the root pom should name the plugin the download was generated against");
+        assertCodenameOneRepository(rootPom, label);
+        assertNotNull(entries.get("mvnw"), label + "missing mvnw");
+        assertTrue(unixMode(zipData, "mvnw") == 0100755, label + "mvnw must extract executable");
+        for (String path : entries.keySet()) {
+            assertFalse(path.indexOf("com/example/myapp") >= 0, label + "unrefactored placeholder path: " + path);
+            assertFalse(path.startsWith("gradle") || path.endsWith(".kts"), label + "Gradle file leaked: " + path);
+        }
+
+        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            validateMavenBackendOnly(entries, ide, packageName, label);
+            return;
+        }
+
+        for (String path : entries.keySet()) {
+            for (int i = 0; i < PLATFORM_DIRS.length; i++) {
+                if (!allModules) {
+                    assertFalse(path.startsWith(PLATFORM_DIRS[i]), label + "minimal app has a platform module: " + path);
+                }
+            }
+            if (type != ProjectOptions.ProjectType.APP_WITH_BACKEND) {
+                assertFalse(path.startsWith("backend/"), label + "backend module without asking: " + path);
+            }
+        }
+        if (allModules) {
+            assertGeneratedPomCoordinates(entries, packageName, mainClassName);
+            assertContains(rootPom, "<activeByDefault>true</activeByDefault>", label + "full keeps javase as the default");
+        } else {
+            assertFalse(rootPom.indexOf("<activeByDefault>") >= 0,
+                    label + "a minimal root pom must not activate a javase module it does not have");
+            assertNotNull(entries.get("common/src/desktop/resources/NativeTheme.res"),
+                    label + "the desktop native theme moves to common");
+            assertContains(getText(entries, "README.md"), "every platform is built from it",
+                    label + "README should describe the minimal layout");
+            for (String ideFile : new String[] {".idea/compiler.xml", ".idea/encodings.xml"}) {
+                if (entries.containsKey(ideFile)) {
+                    assertFalse(getText(entries, ideFile).indexOf("javase") >= 0,
+                            label + ideFile + " names a javase module the project does not have");
+                }
+            }
+        }
+        if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
+            assertNotNull(entries.get("backend/pom.xml"), label + "App + backend has the backend module");
+            assertContains(getText(entries, "README.md"), "## Backend", label + "README should explain the backend");
+        }
+        String[] modules = {"javascript", "ios", "win", "linux", "backend", "android", "javase"};
+        for (int i = 0; i < modules.length; i++) {
+            assertContains(removeWhitespace(rootPom), "<file><exists>${basedir}/" + modules[i] + "/pom.xml</exists></file>",
+                    label + "the " + modules[i] + " profile should add the module only when it exists");
+        }
+        String commonPom = getText(entries, "common/pom.xml");
+        assertContains(commonPom, "<goal>compile-javase-natives</goal>", label + "common should host javase");
+        assertContains(commonPom, "<id>cn1-host-android</id>", label + "common should host android");
+        assertTrue(commonPom.indexOf("<id>simulator</id>") == commonPom.lastIndexOf("<id>simulator</id>"),
+                label + "common/pom.xml must declare the simulator profile once");
+        assertCommonPom(entries, template, packageName, mainClassName, true);
+        assertNotNull(entries.get("build.sh"), label + "an app keeps its launchers");
+        assertNotNull(entries.get("common/codenameone_settings.properties"), label + "missing app settings");
+    }
+
+    private void validateMavenBackendOnly(Map<String, byte[]> entries, IDE ide, String packageName, String label) {
+        String packagePath = packageName.replace('.', '/');
+        for (String path : entries.keySet()) {
+            assertFalse(path.startsWith("common/") || path.startsWith("backend/"),
+                    label + "a backend-only project is the server alone: " + path);
+            assertFalse(path.endsWith("/pom.xml"), label + "a backend-only project has one pom: " + path);
+            assertFalse(path.equals("build.sh") || path.equals("run.sh") || path.equals("build.bat")
+                    || path.equals("run.bat") || path.equals("AGENTS.md") || path.startsWith(".agent-skills/"),
+                    label + "app file leaked into a backend-only project: " + path);
+            if (path.endsWith(".java") || path.endsWith(".properties") || path.endsWith(".md")
+                    || path.endsWith(".xml") || path.endsWith(".json")) {
+                String text = getText(entries, path);
+                assertFalse(text.indexOf("gradle") >= 0 || text.indexOf("Gradle") >= 0,
+                        label + path + " mentions Gradle");
+                assertFalse(text.indexOf("__BACKEND__") >= 0 || text.indexOf("${package}") >= 0,
+                        label + path + " has an unrendered token");
+            }
+        }
+        String pom = removeWhitespace(getText(entries, "pom.xml"));
+        assertFalse(pom.indexOf("<parent>") >= 0, label + "a backend-only pom has no parent");
+        assertContains(pom, "<artifactId>codenameone-backend</artifactId>", label + "the backend runtime");
+        assertContains(pom, "<goal>process-annotations</goal>", label + "the generated entry point");
+        assertContains(pom, "<groupId>" + packageName + "</groupId>", label + "the chosen groupId");
+        assertNotNull(entries.get("application.properties"), label + "settings at the root");
+        assertNotNull(entries.get("application-dev.properties"), label + "dev profile at the root");
+        String api = getText(entries, "src/main/java/" + packagePath + "/Api.java");
+        assertContains(api, "package " + packageName + ";", label + "Api.java in the chosen package");
+        assertContains(api, "./mvnw cn1:backend", label + "Api.java should give the Maven command");
+        assertNotNull(entries.get("src/main/java/" + packagePath + "/Greeter.java"), label + "missing Greeter.java");
+        assertContains(getText(entries, "README.md"), "./mvnw cn1:backend-package", label + "README should give the goals");
+        assertNotNull(entries.get(".gitignore"), label + "missing .gitignore");
+        if (ide == IDE.INTELLIJ) {
+            assertContains(getText(entries, ".idea/runConfigurations/Run_Backend.xml"), "<option value=\"cn1:backend\" />",
+                    label + "IntelliJ should run the backend");
+            assertNull(entries.get(".idea/workspace.xml"), label + "the app's IntelliJ workspace must not ship");
+        } else if (ide == IDE.VS_CODE) {
+            assertContains(getText(entries, ".vscode/tasks.json"), "cn1:backend-package", label + "VS Code tasks");
+        } else if (ide == IDE.NETBEANS) {
+            assertNull(entries.get("nbactions.xml"), label + "the app's NetBeans actions must not ship");
+        }
     }
 
     /// No template that has cn1libs generates for Gradle yet (see Template), so the
@@ -617,7 +835,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private void validateCoordinateGuardRejectsBrokenArtifacts() throws Exception {
         String mainClassName = "CoordinateGuardApp";
         String packageName = "com.acme.coordinate.guard";
-        GeneratorModel model = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName);
+        GeneratorModel model = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName,
+                fullMaven(ProjectOptions.defaults()));
         Map<String, byte[]> entries = model.collectProjectEntries();
         String javascriptPom = getText(entries, "javascript/pom.xml");
 
@@ -742,15 +961,17 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertFalse(themeCss.indexOf("Initializr Theme Overrides") >= 0, "Default theme must not carry baked-in top-level theme overrides");
     }
 
+    /// A download at the current plugin version. A Maven one is the full layout, which
+    /// these tests read module poms from; the layouts themselves are covered by
+    /// validateMavenLayoutCombination.
     private static byte[] createProjectZip(IDE ide, Template template, String appName, String packageName) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        GeneratorModel.create(ide, template, appName, packageName).writeProjectZip(output);
-        return output.toByteArray();
+        return createProjectZip(ide, template, appName, packageName, ProjectOptions.defaults());
     }
 
     private static byte[] createProjectZip(IDE ide, Template template, String appName, String packageName, ProjectOptions options) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        GeneratorModel.create(ide, template, appName, packageName, options).writeProjectZip(output);
+        GeneratorModel.create(ide, template, appName, packageName,
+                options.isGradle() ? options : fullMaven(options)).writeProjectZip(output);
         return output.toByteArray();
     }
 
@@ -862,8 +1083,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Root pom should include app artifact/name");
-        assertContains(pom, "<cn1.plugin.version>7.0.274</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
-        assertContains(pom, "<cn1.version>7.0.274</cn1.version>", "Root pom should align CN1 runtime version with plugin version");
+        assertContains(pom, "<cn1.plugin.version>" + GeneratorModel.cn1PluginVersion() + "</cn1.plugin.version>",
+                "Root pom should use current CN1 plugin version");
+        assertContains(pom, "<cn1.version>" + GeneratorModel.cn1PluginVersion() + "</cn1.version>",
+                "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");
     }

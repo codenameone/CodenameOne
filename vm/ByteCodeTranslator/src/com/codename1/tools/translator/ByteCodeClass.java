@@ -2099,6 +2099,10 @@ public class ByteCodeClass {
             b.append(".vtable);\n");
 
         }
+        // Register the class in both class registries BEFORE `initialized` is published:
+        // CN1_FAST_NEW tests only that flag, so this is what lets the inline allocation
+        // and the init-before-publish class stamp skip their per-object registry tests.
+        b.append("    cn1ClassReady(&class__").append(clsName).append(");\n");
         b.append("    __atomic_store_n(&class__");
         b.append(clsName);
         // This flag means STARTED, not completed: the JLS requires a class whose
@@ -2767,6 +2771,12 @@ public class ByteCodeClass {
         }
         
         b.append("\n\n");
+
+        // 1 when a dead instance must reach the sweep's per-slot reclaim (a finalizer or
+        // native-block storage). CN1_FAST_NEW tests it to flag the object's page, and it
+        // is a constant so every other class's allocation path compiles exactly as before.
+        b.append("#define CN1_FINALIZABLE_").append(clsName)
+                .append(hasRealFinalizerInHierarchy() ? " 1\n" : " 0\n");
 
         // object struct contains instace field variables
         b.append("struct obj__");

@@ -24,6 +24,9 @@ on:
       - 'maven/backend/**'
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/cn1app-staged-jar-test.sh'
+      - 'maven/integration-tests/cn1app-minimal-layout-test.sh'
+      - 'scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml'
+      - 'scripts/initializr/common/src/main/resources/backend-only-pom.xml'
       # What a generated project stages for upload also depends on the
       # dependency versions and aggregators the archetype pulls in.
       - 'maven/pom.xml'
@@ -46,6 +49,9 @@ on:
       - 'maven/backend/**'
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/cn1app-staged-jar-test.sh'
+      - 'maven/integration-tests/cn1app-minimal-layout-test.sh'
+      - 'scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml'
+      - 'scripts/initializr/common/src/main/resources/backend-only-pom.xml'
       # What a generated project stages for upload also depends on the
       # dependency versions and aggregators the archetype pulls in.
       - 'maven/pom.xml'
@@ -131,3 +137,12 @@ jobs:
           cd maven/integration-tests
           # The project's CSS compile opens an AWT frame, so it needs a display.
           xvfb-run -a bash cn1app-staged-jar-test.sh
+      # The archetype's default layouts: an app with no platform modules, whose
+      # common module builds, tests and stages every platform, and a backend-only
+      # project. Nothing is submitted and the simulator is never launched.
+      - name: Build the minimal and backend-only layouts
+        env:
+          CN1_BACKEND_PACKAGE_REQUIRED: '1'
+        run: |
+          cd maven/integration-tests
+          xvfb-run -a bash cn1app-minimal-layout-test.sh
