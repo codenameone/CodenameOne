@@ -38,9 +38,13 @@ public final class Looper {
     /// are still delivered, later ones are dropped.
     private long safeQuitAt = -1;
     private Thread thread;
+    /// One queue per looper, so an idle handler added through one
+    /// `getQueue()` call can be removed through another.
+    private final MessageQueue messageQueue;
 
     private Looper(boolean main) {
         this.main = main;
+        this.messageQueue = new MessageQueue(this);
     }
 
     public static Looper getMainLooper() {
@@ -95,9 +99,13 @@ public final class Looper {
         if (l == null || l.main) {
             return;
         }
+        // True when the queue has not gone idle since the last message: idle
+        // handlers run once each time the queue runs out of due work.
+        boolean idleDue = true;
         while (true) {
             Message next = null;
             long wait = 0;
+            boolean runIdle = false;
             synchronized (l.queue) {
                 if (l.quitting) {
                     return;
@@ -119,6 +127,11 @@ public final class Looper {
                     l.quitting = true;
                     l.queue.clear();
                     return;
+                } else if (idleDue) {
+                    // Run outside the lock, then look at the queue again:
+                    // an idle handler may have posted work.
+                    idleDue = false;
+                    runIdle = true;
                 } else {
                     wait = 50;
                     for (Message m : l.queue) {
@@ -131,8 +144,11 @@ public final class Looper {
                     }
                 }
             }
-            if (next != null) {
+            if (runIdle) {
+                l.messageQueue.runIdleHandlers();
+            } else if (next != null) {
                 next.target.dispatchMessage(next);
+                idleDue = true;
             }
         }
     }
@@ -166,7 +182,22 @@ public final class Looper {
     }
 
     public MessageQueue getQueue() {
-        return new MessageQueue();
+        return messageQueue;
+    }
+
+    /// The calling thread's looper's queue.
+    public static MessageQueue myQueue() {
+        Looper l = myLooper();
+        if (l == null) {
+            throw new IllegalStateException("The current thread must have a looper!");
+        }
+        return l.messageQueue;
+    }
+
+    /// True once `quit()` or `quitSafely()` has been called: the queue
+    /// accepts no new messages. Called holding `queue`.
+    boolean isQuittingLocked() {
+        return quitting || safeQuitAt >= 0;
     }
 
     boolean isMain() {

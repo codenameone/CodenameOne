@@ -155,7 +155,8 @@ public abstract class LayoutInflater {
             if (root == null || !attachToRoot) {
                 throw new InflateException("<merge /> can be used only with a valid ViewGroup root and attachToRoot=true");
             }
-            rInflate(node, root, mContext);
+            // The children join an existing parent: it is not finished here.
+            rInflate(node, root, mContext, false);
             return root;
         }
         CompiledAttributeSet attrs = new CompiledAttributeSet(node);
@@ -176,10 +177,15 @@ public abstract class LayoutInflater {
     }
 
     private void rInflateChildren(XmlNode node, View parent, AttributeSet attrs) {
-        rInflate(node, parent, parent.getContext());
+        rInflate(node, parent, parent.getContext(), true);
     }
 
-    private void rInflate(XmlNode node, View parent, Context context) {
+    /// Inflates `node`'s children into `parent`. `finishInflate` is false
+    /// when the children come from a `<merge>` root: they join a parent
+    /// whose own inflation finishes elsewhere (or already has), so calling
+    /// its `onFinishInflate()` here would run it early, before the siblings
+    /// after an `<include>`, and a second time later.
+    private void rInflate(XmlNode node, View parent, Context context, boolean finishInflate) {
         for (XmlNode child : node.children) {
             String name = child.tag;
             if (name.equals("requestFocus")) {
@@ -206,7 +212,9 @@ public abstract class LayoutInflater {
                 viewGroup.addView(view, params);
             }
         }
-        parent.onFinishInflate();
+        if (finishInflate) {
+            parent.onFinishInflate();
+        }
     }
 
     private void parseTag(XmlNode node, View view) {
@@ -238,7 +246,7 @@ public abstract class LayoutInflater {
         boolean themeOverride = themed != context;
         context = themed;
         if (child.tag.equals("merge")) {
-            rInflate(child, group, context);
+            rInflate(child, group, context, false);
             return;
         }
         CompiledAttributeSet childAttrs = new CompiledAttributeSet(child);

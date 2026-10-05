@@ -23,25 +23,48 @@
 package android.os;
 
 /// The queue behind a looper; exposed only for `addIdleHandler`.
+///
+/// Idle handlers run on the looper that owns the queue. The main queue runs
+/// them on Codename One's event dispatch thread when it goes idle. A
+/// background looper's queue runs them on its own thread, from
+/// [Looper#loop()], each time it runs out of due messages; there the list
+/// is confined to that thread, so a registration made from another thread
+/// is handed over as a message rather than shared.
 public final class MessageQueue {
 
     public interface IdleHandler {
         boolean queueIdle();
     }
 
+    private final Looper looper;
+
     /// The handlers registered and not yet removed. An idle run checks it
     /// first, so a removed handler is neither invoked again nor rescheduled.
     private final java.util.ArrayList<IdleHandler> idleHandlers = new java.util.ArrayList<IdleHandler>();
 
-    MessageQueue() {
+    MessageQueue(Looper looper) {
+        this.looper = looper;
     }
 
     public void addIdleHandler(final IdleHandler handler) {
         if (handler == null) {
             throw new NullPointerException("Can't add a null IdleHandler");
         }
-        idleHandlers.add(handler);
-        scheduleIdle(handler);
+        if (looper.isMain()) {
+            idleHandlers.add(handler);
+            scheduleIdle(handler);
+            return;
+        }
+        if (looper.isCurrentThread()) {
+            idleHandlers.add(handler);
+            return;
+        }
+        new Handler(looper).post(new Runnable() {
+            @Override
+            public void run() {
+                idleHandlers.add(handler);
+            }
+        });
     }
 
     private void scheduleIdle(final IdleHandler handler) {
@@ -60,8 +83,31 @@ public final class MessageQueue {
         });
     }
 
-    public void removeIdleHandler(IdleHandler handler) {
-        idleHandlers.remove(handler);
+    /// Runs a background looper's idle handlers once, on its own thread.
+    /// Called by [Looper#loop()] when no message is due.
+    void runIdleHandlers() {
+        if (idleHandlers.isEmpty()) {
+            return;
+        }
+        IdleHandler[] snapshot = idleHandlers.toArray(new IdleHandler[idleHandlers.size()]);
+        for (IdleHandler h : snapshot) {
+            if (idleHandlers.contains(h) && !h.queueIdle()) {
+                idleHandlers.remove(h);
+            }
+        }
+    }
+
+    public void removeIdleHandler(final IdleHandler handler) {
+        if (looper.isMain() || looper.isCurrentThread()) {
+            idleHandlers.remove(handler);
+            return;
+        }
+        new Handler(looper).post(new Runnable() {
+            @Override
+            public void run() {
+                idleHandlers.remove(handler);
+            }
+        });
     }
 
     public boolean isIdle() {

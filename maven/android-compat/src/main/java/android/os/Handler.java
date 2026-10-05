@@ -173,6 +173,11 @@ public class Handler {
         msg.when = uptimeMillis;
         if (!looper.isMain()) {
             synchronized (looper.queue) {
+                if (looper.isQuittingLocked()) {
+                    // The loop has stopped (or is draining for quitSafely)
+                    // and will never deliver it; Android refuses the message.
+                    return false;
+                }
                 if (front) {
                     looper.queue.add(0, msg);
                 } else {
