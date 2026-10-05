@@ -125,6 +125,46 @@
     }
    }
   },
+  "windows-x64@amd64-family-25-model-17-authenticamd": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.422,
+      "time": 6.089,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.295,
+     "reason": "#5940's hybrid collector, measured on a CPU model #5940 never ran on: objectAllocation time fell from 6.09x to 1.25x of JDK 25 (rounds 1.245-1.28x) and RAM from 0.42x to 0.30x on AMD Family 25 Model 17, the drop #5940 recorded on the other models (Family 25 Model 1, Family 26). This pull request does not touch the collector. Recalibrated from this run.",
+     "runs": 1,
+     "time": 1.254,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.551,
+      "time": 0.636,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.551,
+     "reason": "The workload changed, not the VM: 'translator (self)' translates the translator's own classes, which on this pull request no longer go through ASM and include the no-longer-stubbed JavaScript generator, a corpus about twice as large; every other CPU's row was recalibrated for the same change. First run on this model (AMD Family 25 Model 17): median 0.777x, rounds 0.728-0.902x, against master's 0.636x; RAM in band. Time recalibrated from this run.",
+     "runs": 1,
+     "time": 0.777,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "windows-x64@amd64-family-26-model-2-authenticamd": {
    "stringBuilding": {
     "all": {
