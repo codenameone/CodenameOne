@@ -567,7 +567,27 @@ public class ValueAnimator extends Animator {
             long currentTime = now();
             long currentPlayTime = currentTime - mStartTime;
             long timeLeft = mDuration - currentPlayTime;
+            if (mDuration > 0 && mRepeatCount == INFINITE) {
+                // No end to mirror from: mirror inside the current iteration
+                // and keep its index, so the iteration's direction (REVERSE
+                // mode) flips with mReversing and the value carries over.
+                long iteration = currentPlayTime / mDuration;
+                timeLeft = (2 * iteration + 1) * mDuration - currentPlayTime;
+            } else if (mRepeatCount > 0) {
+                // The time left is measured from the end of the last
+                // iteration, not of the first. AOSP subtracts from one
+                // duration, which moves the start into the future once a
+                // repeat has begun and snaps the value to an endpoint.
+                // REVERSE mode with an odd repeat count still jumps: its
+                // reversed iterations alternate the other way round, as
+                // on AOSP, which is not worth a special case.
+                timeLeft = mDuration * (mRepeatCount + 1) - currentPlayTime;
+            }
             mStartTime = currentTime - timeLeft;
+            if (mDuration > 0) {
+                // The new iteration index must not read as a repeat.
+                mOverallFraction = clampFraction((float) timeLeft / mDuration);
+            }
             mReversing = !mReversing;
         } else if (mStarted) {
             mReversing = !mReversing;

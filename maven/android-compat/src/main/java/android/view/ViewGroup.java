@@ -945,6 +945,29 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     public void endViewTransition(View view) {
     }
 
+    /// As AOSP: an ancestor's visibility change reaches every descendant's
+    /// onVisibilityChanged, so a child can stop or restart its own work.
+    @Override
+    protected void dispatchVisibilityChanged(View changedView, int visibility) {
+        super.dispatchVisibilityChanged(changedView, visibility);
+        for (int i = 0, n = getChildCount(); i < n; i++) {
+            getChildAt(i).dispatchVisibilityChanged(changedView, visibility);
+        }
+    }
+
+    /// Relays a direction change to the children that inherit it; a child
+    /// with its own direction, and so its subtree, is unaffected.
+    @Override
+    void dispatchLayoutDirectionChanged(boolean relayout) {
+        super.dispatchLayoutDirectionChanged(relayout);
+        for (int i = 0, n = getChildCount(); i < n; i++) {
+            View child = getChildAt(i);
+            if (child.getRawLayoutDirection() == LAYOUT_DIRECTION_INHERIT) {
+                child.dispatchLayoutDirectionChanged(relayout);
+            }
+        }
+    }
+
     /// Resolves every child's start/end margins and relative rules against
     /// this group's layout direction before it measures, so parameters an
     /// application changed after adding the child are seen, as on Android.

@@ -193,9 +193,12 @@ public class GridView extends AbsListView {
                         break;
                     case STRETCH_SPACING_UNIFORM:
                         mColumnWidth = Math.max(0, requestedColumnWidth);
-                        mHorizontalSpacing = mNumColumns > 1
-                                ? requestedHorizontalSpacing + spaceLeftOver / (mNumColumns + 1)
-                                : requestedHorizontalSpacing + spaceLeftOver;
+                        // The leftover is shared by the n + 1 gaps, the
+                        // leading and trailing ones included, for one column
+                        // too. AOSP gives a single column the whole leftover
+                        // as its leading gap, which pushes it against the far
+                        // edge; this keeps it centred like every other count.
+                        mHorizontalSpacing = requestedHorizontalSpacing + spaceLeftOver / (mNumColumns + 1);
                         break;
                     default:
                         break;

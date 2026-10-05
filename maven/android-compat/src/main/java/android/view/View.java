@@ -721,6 +721,12 @@ public class View implements Drawable.Callback {
 
     void assignParent(ViewParent parent) {
         mParent = parent;
+        if (parent != null && mLayoutDirection == LAYOUT_DIRECTION_INHERIT) {
+            // Relative padding set before the view had a parent (inflation
+            // does that) was resolved against the locale; the parent may
+            // say otherwise. Whoever adds the view lays it out already.
+            dispatchLayoutDirectionChanged(false);
+        }
     }
 
     public View getRootView() {
@@ -1392,7 +1398,13 @@ public class View implements Drawable.Callback {
             requestLayout();
         }
         invalidateParent();
-        onVisibilityChanged(this, visibility);
+        dispatchVisibilityChanged(this, visibility);
+    }
+
+    /// Tells this view, and every descendant through ViewGroup's override,
+    /// that `changedView` (this view or an ancestor) changed visibility.
+    protected void dispatchVisibilityChanged(View changedView, int visibility) {
+        onVisibilityChanged(changedView, visibility);
     }
 
     protected void onVisibilityChanged(View changedView, int visibility) {
@@ -1686,8 +1698,22 @@ public class View implements Drawable.Callback {
 
     public void setLayoutDirection(int layoutDirection) {
         mLayoutDirection = layoutDirection;
+        dispatchLayoutDirectionChanged(true);
+    }
+
+    /// Re-resolves this view's start/end padding against its current
+    /// direction and relays it to every descendant that inherits the
+    /// direction (ViewGroup's override), so a parent switching to RTL
+    /// mirrors the whole inheriting subtree, not only itself. Each view is
+    /// asked to lay out again: a child is only re-measured when forced, and
+    /// a nested group re-resolves its children's margins when it measures.
+    /// `relayout` is false when the caller lays the subtree out anyway.
+    void dispatchLayoutDirectionChanged(boolean relayout) {
         resolvePaddingStartEnd();
-        requestLayout();
+        if (relayout) {
+            requestLayout();
+            invalidate();
+        }
     }
 
     public boolean isLayoutRtl() {
