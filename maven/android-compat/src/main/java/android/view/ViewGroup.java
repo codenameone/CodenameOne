@@ -998,9 +998,11 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
                 if (child.getVisibility() != VISIBLE) {
                     continue;
                 }
-                float cx = x - child.getLeft() - child.getTranslationX();
-                float cy = y - child.getTop() - child.getTranslationY();
-                if (cx < 0 || cy < 0 || cx >= child.getWidth() || cy >= child.getHeight()) {
+                // Hit-tested in the child's own coordinates, so a scaled or
+                // rotated child is touchable where it is drawn.
+                float[] p = {x, y};
+                if (!child.parentToLocal(p) || p[0] < 0 || p[1] < 0
+                        || p[0] >= child.getWidth() || p[1] >= child.getHeight()) {
                     continue;
                 }
                 if (dispatchTransformed(child, ev)) {
@@ -1040,12 +1042,22 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         return handled;
     }
 
+    /// Hands `ev` to `child` in the child's coordinates -- through the
+    /// inverse of its matrix when it is scaled or rotated -- and puts the
+    /// event's location back afterwards.
     private boolean dispatchTransformed(View child, MotionEvent ev) {
-        float dx = mScrollX - child.getLeft() - child.getTranslationX();
-        float dy = mScrollY - child.getTop() - child.getTranslationY();
-        ev.offsetLocation(dx, dy);
+        float ox = ev.getX();
+        float oy = ev.getY();
+        float[] p = {ox + mScrollX, oy + mScrollY};
+        if (!child.parentToLocal(p)) {
+            // A zero scale maps no point back; the events of a gesture that
+            // began before it still flow, offset by the position alone.
+            p[0] = ox + mScrollX - child.getLeft() - child.getTranslationX();
+            p[1] = oy + mScrollY - child.getTop() - child.getTranslationY();
+        }
+        ev.setLocation(p[0], p[1]);
         boolean r = child.dispatchTouchEvent(ev);
-        ev.offsetLocation(-dx, -dy);
+        ev.setLocation(ox, oy);
         return r;
     }
 

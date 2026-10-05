@@ -50,7 +50,16 @@ public class Canvas {
     private int height;
     private final Matrix matrix = new Matrix();
     private final ArrayList<float[]> stack = new ArrayList<float[]>();
+    /// The shape clip each [#stack] record restores, or null for its
+    /// rectangle; parallel to the stack.
+    private final ArrayList<GeneralPath> clipShapes = new ArrayList<GeneralPath>();
     private int alphaLayer = 255;
+    /// The shape the last `clipPath` installed, and the clip bounds it gave;
+    /// it is the current clip while those bounds are unchanged.
+    private GeneralPath clipShape;
+    private final int[] clipShapeBounds = new int[4];
+    /// Whether this canvas draws into a bitmap rather than onto a view.
+    private boolean bitmapTarget;
 
     public Canvas() {
     }
@@ -74,7 +83,10 @@ public class Canvas {
         this.height = height;
         matrix.reset();
         stack.clear();
+        clipShapes.clear();
+        clipShape = null;
         alphaLayer = 255;
+        bitmapTarget = false;
     }
 
     public Graphics getGraphics() {
@@ -85,6 +97,7 @@ public class Canvas {
         if (bitmap != null) {
             Image img = bitmap.getImage();
             bind(img.getGraphics(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+            bitmapTarget = true;
         } else {
             g = null;
         }
@@ -130,6 +143,8 @@ public class Canvas {
         state[12] = g.getClipWidth();
         state[13] = g.getClipHeight();
         stack.add(state);
+        // A clipPath clip is restored as its shape, not its bounds.
+        clipShapes.add(currentClipShape());
         return stack.size();
     }
 
@@ -168,7 +183,32 @@ public class Canvas {
         System.arraycopy(state, 0, m, 0, 9);
         matrix.setValues(m);
         alphaLayer = (int) state[9];
-        g.setClip((int) state[10], (int) state[11], (int) state[12], (int) state[13]);
+        GeneralPath shape = clipShapes.remove(clipShapes.size() - 1);
+        if (shape != null) {
+            g.setClip(shape);
+            rememberClipShape(shape);
+        } else {
+            g.setClip((int) state[10], (int) state[11], (int) state[12], (int) state[13]);
+            clipShape = null;
+        }
+    }
+
+    /// The shape clip in effect, or null when the clip is a rectangle (or
+    /// was changed since `clipPath` set it).
+    private GeneralPath currentClipShape() {
+        if (clipShape != null && g.getClipX() == clipShapeBounds[0] && g.getClipY() == clipShapeBounds[1]
+                && g.getClipWidth() == clipShapeBounds[2] && g.getClipHeight() == clipShapeBounds[3]) {
+            return clipShape;
+        }
+        return null;
+    }
+
+    private void rememberClipShape(GeneralPath shape) {
+        clipShape = shape;
+        clipShapeBounds[0] = g.getClipX();
+        clipShapeBounds[1] = g.getClipY();
+        clipShapeBounds[2] = g.getClipWidth();
+        clipShapeBounds[3] = g.getClipHeight();
     }
 
     public int getSaveCount() {
@@ -233,6 +273,7 @@ public class Canvas {
         int x = (int) Math.floor(originX + r.left);
         int y = (int) Math.floor(originY + r.top);
         g.clipRect(x, y, (int) Math.ceil(originX + r.right) - x, (int) Math.ceil(originY + r.bottom) - y);
+        clipShape = null;
         return g.getClipWidth() > 0 && g.getClipHeight() > 0;
     }
 
@@ -277,6 +318,7 @@ public class Canvas {
                 return false;
             }
             g.setClip(shape);
+            rememberClipShape(shape);
             return true;
         }
         RectF b = new RectF();
@@ -414,6 +456,17 @@ public class Canvas {
 
     public void drawColor(int color, PorterDuff.Mode mode) {
         if (mode == PorterDuff.Mode.CLEAR) {
+            // Into a bitmap, CLEAR erases the clip to transparent: what an
+            // eraser or a reused drawing buffer relies on. Graphics.clearRect
+            // does that on the JavaSE, iOS/Mac and JavaScript ports; the
+            // others do not implement it and the pixels stay, as before.
+            // On a view it stays a no-op: Codename One paints the parent
+            // first, so clearing would punch a hole through the parent's
+            // background (Android shows black there), never what the
+            // "clear before redrawing" idiom wants.
+            if (bitmapTarget) {
+                g.clearRect(g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());
+            }
             return;
         }
         drawColor(color);

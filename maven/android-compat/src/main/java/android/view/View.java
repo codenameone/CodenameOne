@@ -1306,17 +1306,44 @@ public class View implements Drawable.Callback {
     private Matrix paintMatrix() {
         Matrix m = mAnimResidual == null ? null : new Matrix(mAnimResidual);
         if (mScaleX != 1f || mScaleY != 1f || mRotation != 0f) {
-            float px = Float.isNaN(mPivotX) ? getWidth() / 2f : mPivotX;
-            float py = Float.isNaN(mPivotY) ? getHeight() / 2f : mPivotY;
             if (m == null) {
                 m = new Matrix();
             }
-            m.preTranslate(px, py);
-            m.preRotate(mRotation);
-            m.preScale(mScaleX, mScaleY);
-            m.preTranslate(-px, -py);
+            preConcatProperties(m);
         }
         return m;
+    }
+
+    /// Pre-concatenates the view's own rotation and scale about its pivot.
+    private void preConcatProperties(Matrix m) {
+        float px = Float.isNaN(mPivotX) ? getWidth() / 2f : mPivotX;
+        float py = Float.isNaN(mPivotY) ? getHeight() / 2f : mPivotY;
+        m.preTranslate(px, py);
+        m.preRotate(mRotation);
+        m.preScale(mScaleX, mScaleY);
+        m.preTranslate(-px, -py);
+    }
+
+    /// Maps `pt`, a point in the parent's content coordinates, into this
+    /// view's own: the inverse of its position, translation, rotation and
+    /// scale. A legacy animation is left out, as on Android, where it moves
+    /// only the drawing and the view stays touchable where it was laid out.
+    /// Answers false when the matrix cannot be inverted (a zero scale), so
+    /// the view covers no area and cannot be touched.
+    boolean parentToLocal(float[] pt) {
+        pt[0] -= mLeft + mTranslationX;
+        pt[1] -= mTop + mTranslationY;
+        if (mScaleX == 1f && mScaleY == 1f && mRotation == 0f) {
+            return true;
+        }
+        Matrix m = new Matrix();
+        preConcatProperties(m);
+        Matrix inverse = new Matrix();
+        if (!m.invert(inverse)) {
+            return false;
+        }
+        inverse.mapPoints(pt);
+        return true;
     }
 
     /// The alpha painting applies: the view's own times its animation's.

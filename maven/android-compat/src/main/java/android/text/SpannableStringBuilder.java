@@ -114,6 +114,15 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
         text.delete(st, en);
         text.insert(st, src.toString());
         spans.replaced(st, en, after);
+        if (src instanceof Spanned) {
+            // The inserted text keeps its own styling, moved to where it
+            // landed, as Android's replace copies the source's spans.
+            Spanned sp = (Spanned) src;
+            Object[] inserted = sp.getSpans(0, after, Object.class);
+            for (Object what : inserted) {
+                spans.set(what, st + sp.getSpanStart(what), st + sp.getSpanEnd(what), sp.getSpanFlags(what));
+            }
+        }
         for (int i = 0; i < watchers.size(); i++) {
             watchers.get(i).afterChange(this, st, en - st, after);
         }

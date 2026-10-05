@@ -280,6 +280,20 @@ public class Matrix {
     }
 
     public void mapPoints(float[] dst, int dstIndex, float[] src, int srcIndex, int pointCount) {
+        // Each point is read before it is written, so mapping in place is
+        // safe point by point; but when the ranges overlap with the
+        // destination further along, a forward pass would overwrite source
+        // points it has not mapped yet. Walking backwards reads each of
+        // them first.
+        if (dst == src && dstIndex > srcIndex) {
+            for (int i = pointCount - 1; i >= 0; i--) {
+                float x = src[srcIndex + i * 2];
+                float y = src[srcIndex + i * 2 + 1];
+                dst[dstIndex + i * 2] = m[0] * x + m[1] * y + m[2];
+                dst[dstIndex + i * 2 + 1] = m[3] * x + m[4] * y + m[5];
+            }
+            return;
+        }
         for (int i = 0; i < pointCount; i++) {
             float x = src[srcIndex + i * 2];
             float y = src[srcIndex + i * 2 + 1];

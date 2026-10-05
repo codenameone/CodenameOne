@@ -346,6 +346,15 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public void fillRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
     }
 
+    /// The rectangles `clearRect` was asked to erase, as `{x, y, w, h}`.
+    /// Tests that check erasing clear it first.
+    public static final java.util.List<int[]> clearedRects = new java.util.ArrayList<int[]>();
+
+    @Override
+    public void clearRect(java.lang.Object graphics, int x, int y, int width, int height) {
+        clearedRects.add(new int[]{x, y, width, height});
+    }
+
     @Override
     public void drawRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
     }
