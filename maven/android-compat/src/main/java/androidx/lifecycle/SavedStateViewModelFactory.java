@@ -44,6 +44,14 @@ public final class SavedStateViewModelFactory implements ViewModelProvider.Facto
     }
 
     public SavedStateViewModelFactory(Application application, SavedStateRegistryOwner owner, Bundle defaultArgs) {
+        // The owner is not kept on purpose: AndroidX writes a handle through
+        // the saved-state registry for the case where saved state outlives
+        // the view model store, which is process death. This runtime has no
+        // process death -- saved state only exists for a relaunch, and
+        // ActivityThread.relaunch always carries the store over with it
+        // (onRetainNonConfigurationInstance), so the view model and its
+        // handle come back as they were and a recreated handle never has a
+        // bundle to restore from.
         mApplication = application;
         mDefaultArgs = defaultArgs;
     }

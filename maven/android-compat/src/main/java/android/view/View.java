@@ -2753,8 +2753,21 @@ public class View implements Drawable.Callback {
     public void onConfigurationChanged(android.content.res.Configuration newConfig) {
     }
 
+    /// The main-thread handler every view posts through, as the views of an
+    /// Android window share their root's: `removeCallbacks` has to search
+    /// the queue `post` used, and a handler made per call left delayed work
+    /// impossible to cancel.
+    private static Handler sHandler;
+
+    private static Handler mainHandler() {
+        if (sHandler == null) {
+            sHandler = new Handler(Looper.getMainLooper());
+        }
+        return sHandler;
+    }
+
     public Handler getHandler() {
-        return new Handler(Looper.getMainLooper());
+        return mainHandler();
     }
 
     public boolean post(Runnable action) {

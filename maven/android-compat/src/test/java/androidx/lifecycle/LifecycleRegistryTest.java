@@ -113,4 +113,20 @@ public class LifecycleRegistryTest {
         o.registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
         assertEquals("[ON_CREATE]", log.toString());
     }
+
+    @Test
+    public void anObserverRemovingItselfDoesNotSkipTheNext() {
+        final Owner o = new Owner();
+        final List<String> log = new ArrayList<String>();
+        o.registry.addObserver(new LifecycleEventObserver() {
+            @Override
+            public void onStateChanged(LifecycleOwner source, Lifecycle.Event event) {
+                log.add("a:" + event);
+                o.registry.removeObserver(this);
+            }
+        });
+        o.registry.addObserver(recorder("b", log));
+        o.registry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE);
+        assertEquals("[a:ON_CREATE, b:ON_CREATE]", log.toString());
+    }
 }

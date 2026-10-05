@@ -77,6 +77,10 @@ public final class ActivityThread {
         /// comes back.
         int relaunchPending;
         Bundle savedState;
+        /// Set by create(): the first start still owes `onRestoreInstanceState`
+        /// (with [#restoreState], when there is one) and `onPostCreate`.
+        boolean postCreatePending;
+        Bundle restoreState;
         AndroidApp.ActivityInfo info;
         /// Shows the options menu instead of the form's toolbar, or null.
         com.codename1.androidcompat.runtime.MenuPresenter menuPresenter;
@@ -290,10 +294,12 @@ public final class ActivityThread {
         for (Application.ActivityLifecycleCallbacks cb : app.callbacks()) {
             cb.onActivityCreated(a, saved);
         }
-        if (saved != null) {
-            a.onRestoreInstanceState(saved);
-        }
-        a.onPostCreate(saved);
+        // Android restores the instance state and calls onPostCreate after
+        // onStart, so they run in the first start(): a relaunched activity
+        // further down the stack stays created and gets them when it comes
+        // back.
+        r.postCreatePending = true;
+        r.restoreState = saved;
     }
 
     private static void start(Record r) {
@@ -305,6 +311,15 @@ public final class ActivityThread {
         r.started = true;
         for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
             cb.onActivityStarted(a);
+        }
+        if (r.postCreatePending) {
+            r.postCreatePending = false;
+            Bundle saved = r.restoreState;
+            r.restoreState = null;
+            if (saved != null) {
+                a.onRestoreInstanceState(saved);
+            }
+            a.onPostCreate(saved);
         }
     }
 

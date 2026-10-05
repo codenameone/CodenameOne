@@ -323,4 +323,80 @@ public class FragmentManagerTest {
         a.getFragmentManager().executePendingTransactions();
         assertTrue(a.getFragmentManager().findFragmentByTag("y") != null);
     }
+
+    /// A headless activity with one container view, id 1.
+    static final class ContainerActivity extends Activity {
+        private android.view.LayoutInflater inflater;
+        private android.widget.FrameLayout container;
+
+        @Override
+        public android.view.LayoutInflater getLayoutInflater() {
+            if (inflater == null) {
+                inflater = new com.codename1.androidcompat.runtime.PhoneLayoutInflater(this);
+            }
+            return inflater;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T extends android.view.View> T findViewById(int id) {
+            if (id != 1) {
+                return null;
+            }
+            if (container == null) {
+                container = new android.widget.FrameLayout(
+                        com.codename1.androidcompat.testing.AndroidTestSupport.context());
+                container.setId(1);
+            }
+            return (T) container;
+        }
+    }
+
+    @Test
+    public void replacingAFragmentWithItselfOnTheBackStackLeavesItCountable() {
+        List<String> log = new ArrayList<String>();
+        Activity a = new ContainerActivity();
+        a.mFragments.dispatchCreate();
+        a.mFragments.dispatchActivityCreated();
+        a.mFragments.dispatchStart();
+        a.mFragments.dispatchResume();
+        FragmentManager fm = a.getFragmentManager();
+        Recorder f = new Recorder(log, "A");
+        fm.beginTransaction().add(1, f, "a").commit();
+        fm.executePendingTransactions();
+        fm.beginTransaction().replace(1, f).addToBackStack(null).commit();
+        fm.executePendingTransactions();
+        assertTrue(fm.popBackStackImmediate());
+        assertFalse("no back stack entry references the fragment any more", f.isInBackStack());
+
+        // Removed without the back stack, it is destroyed rather than kept
+        // created for a back stack entry that is gone.
+        log.clear();
+        fm.beginTransaction().remove(f).commit();
+        fm.executePendingTransactions();
+        assertEquals("A:pause A:stop A:destroyView A:destroy A:detach", join(log));
+    }
+
+    @Test
+    public void poppingAPrimaryNavigationChangeKeepsThePreviousOneCountable() {
+        List<String> log = new ArrayList<String>();
+        Activity a = resumedActivity();
+        FragmentManager fm = a.getFragmentManager();
+        Recorder first = new Recorder(log, "A");
+        Recorder second = new Recorder(log, "B");
+        fm.beginTransaction().add(first, "a").add(second, "b").setPrimaryNavigationFragment(first).commit();
+        fm.executePendingTransactions();
+        fm.beginTransaction().setPrimaryNavigationFragment(second).addToBackStack(null).commit();
+        fm.executePendingTransactions();
+        assertTrue(fm.popBackStackImmediate());
+        assertSame(first, fm.getPrimaryNavigationFragment());
+
+        // The pop used to uncount the previous primary fragment without the
+        // commit having counted it, so a later back stack entry holding it
+        // did not count and the fragment was destroyed instead of kept.
+        log.clear();
+        fm.beginTransaction().remove(first).addToBackStack(null).commit();
+        fm.executePendingTransactions();
+        assertEquals("A:pause A:stop A:destroyView", join(log));
+    }
 }

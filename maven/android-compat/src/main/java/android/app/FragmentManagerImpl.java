@@ -138,7 +138,23 @@ public final class FragmentManagerImpl extends FragmentManager implements Layout
 
     public void setFacade(Object facade) {
         mFacade = facade;
+        if (mFacadeState != null && facade instanceof StatefulFacade) {
+            Bundle state = mFacadeState;
+            mFacadeState = null;
+            ((StatefulFacade) facade).restoreFacadeState(state);
+        }
     }
+
+    /// Runtime use: a facade with state of its own (the AndroidX manager's
+    /// pending fragment results), saved and restored with this manager's.
+    public interface StatefulFacade {
+        void saveFacadeState(Bundle out);
+
+        void restoreFacadeState(Bundle state);
+    }
+
+    /// Facade state restored before any facade was set, for the first one.
+    private Bundle mFacadeState;
 
     /// Runtime use: the fragment whose children this manager holds, or null
     /// for an activity's manager.
@@ -1258,6 +1274,15 @@ public final class FragmentManagerImpl extends FragmentManager implements Layout
         if (mPrimaryNav != null && mPrimaryNav.mIndex >= 0) {
             state.putInt("primary", mPrimaryNav.mIndex);
         }
+        if (mFacade instanceof StatefulFacade) {
+            Bundle facade = new Bundle();
+            ((StatefulFacade) mFacade).saveFacadeState(facade);
+            if (!facade.isEmpty()) {
+                state.putBundle("facade", facade);
+            }
+        } else if (mFacadeState != null) {
+            state.putBundle("facade", mFacadeState);
+        }
         return state;
     }
 
@@ -1367,5 +1392,13 @@ public final class FragmentManagerImpl extends FragmentManager implements Layout
         }
         int primary = state.getInt("primary", -1);
         mPrimaryNav = primary >= 0 && primary < mActive.size() ? mActive.get(primary) : null;
+        Bundle facade = state.getBundle("facade");
+        if (facade != null) {
+            if (mFacade instanceof StatefulFacade) {
+                ((StatefulFacade) mFacade).restoreFacadeState(facade);
+            } else {
+                mFacadeState = facade;
+            }
+        }
     }
 }

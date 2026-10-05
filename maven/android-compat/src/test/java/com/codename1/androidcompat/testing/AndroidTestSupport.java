@@ -51,6 +51,27 @@ public final class AndroidTestSupport {
         /// The result code of the last result delivered.
         public int resultCode;
 
+        /// The start and restore callbacks this instance received, in order.
+        public final java.util.List<String> calls = new java.util.ArrayList<String>();
+
+        @Override
+        protected void onStart() {
+            super.onStart();
+            calls.add("start");
+        }
+
+        @Override
+        protected void onRestoreInstanceState(android.os.Bundle savedInstanceState) {
+            super.onRestoreInstanceState(savedInstanceState);
+            calls.add("restore");
+        }
+
+        @Override
+        protected void onPostCreate(android.os.Bundle savedInstanceState) {
+            super.onPostCreate(savedInstanceState);
+            calls.add("postCreate");
+        }
+
         @Override
         public boolean onCreateOptionsMenu(android.view.Menu menu) {
             if (optionsMenu != null) {

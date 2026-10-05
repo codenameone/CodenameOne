@@ -106,15 +106,20 @@ public class LifecycleRegistry extends Lifecycle {
 
     private void sync() {
         // Down in reverse order of addition, up in order, as AndroidX.
+        // Over a snapshot: an observer may remove itself, or another, from
+        // its callback, and indexing the live list then skipped the next
+        // observer (or revisited one). catchUp and goDown pass over an entry
+        // that is no longer registered; one added meanwhile caught up in
+        // addObserver.
         if (state.compareTo(State.CREATED) < 0 || anyAbove()) {
-            for (int i = entries.size() - 1; i >= 0; i--) {
-                if (i < entries.size()) {
-                    goDown(entries.get(i));
-                }
+            List<Entry> down = new ArrayList<Entry>(entries);
+            for (int i = down.size() - 1; i >= 0; i--) {
+                goDown(down.get(i));
             }
         }
-        for (int i = 0; i < entries.size(); i++) {
-            catchUp(entries.get(i));
+        List<Entry> up = new ArrayList<Entry>(entries);
+        for (int i = 0; i < up.size(); i++) {
+            catchUp(up.get(i));
         }
     }
 

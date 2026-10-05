@@ -427,7 +427,12 @@ final class BackStackRecord extends FragmentTransaction
                 case OP_SET_PRIMARY_NAV:
                     op.removed.clear();
                     if (mManager.getPrimaryNavigationFragment() != null) {
-                        op.removed.add(mManager.getPrimaryNavigationFragment());
+                        Fragment previous = mManager.getPrimaryNavigationFragment();
+                        op.removed.add(previous);
+                        // The pop uncounts every removed fragment, so count it.
+                        if (mAddToBackStack) {
+                            previous.mBackStackNesting += 1;
+                        }
                     }
                     mManager.setPrimaryNavigationFragment(f);
                     break;
@@ -457,7 +462,12 @@ final class BackStackRecord extends FragmentTransaction
                 continue;
             }
             if (old == f) {
-                // Replacing a fragment with itself leaves it in place.
+                // Replacing a fragment with itself leaves it in place. run()
+                // already counted it as on the back stack, and with no
+                // fragment left in the op the pop cannot uncount it.
+                if (mAddToBackStack) {
+                    f.mBackStackNesting -= 1;
+                }
                 op.fragment = null;
                 f = null;
             } else {

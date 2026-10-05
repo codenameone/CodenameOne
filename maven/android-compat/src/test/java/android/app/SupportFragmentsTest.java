@@ -187,4 +187,54 @@ public class SupportFragmentsTest {
         assertTrue(activityCounter.cleared);
         assertTrue(pageCounter.cleared);
     }
+
+    @Test
+    public void aPendingFragmentResultSurvivesRecreation() {
+        HeadlessActivity a = new HeadlessActivity();
+        a.onCreate(null);
+        resume(a);
+        a.getSupportFragmentManager().beginTransaction().add(new Page(), "page").commitNow();
+        Bundle result = new Bundle();
+        result.putInt("v", 5);
+        // Nobody listens yet: the manager keeps it for the next listener.
+        a.getSupportFragmentManager().setFragmentResult("request", result);
+
+        Bundle saved = new Bundle();
+        Activity base = a;
+        base.hostsDispatchPause();
+        a.onSaveInstanceState(saved);
+        base.hostsDispatchStop();
+        Object nonConfig = a.onRetainNonConfigurationInstance();
+        base.mChangingConfigurations = true;
+        base.hostsDispatchDestroy();
+        a.onDestroy();
+
+        HeadlessActivity b = new HeadlessActivity();
+        ((Activity) b).mLastNonConfigurationInstance = nonConfig;
+        b.getSupportFragmentManager().setFragmentFactory(new FragmentFactory() {
+            @Override
+            public androidx.fragment.app.Fragment instantiate(ClassLoader classLoader, String className) {
+                return new Page();
+            }
+        });
+        b.onCreate(saved);
+        resume(b);
+        Page restored = (Page) b.getSupportFragmentManager().findFragmentByTag("page");
+        assertNotNull(restored);
+        final int[] received = {-1};
+        b.getSupportFragmentManager().setFragmentResultListener("request", restored,
+                new androidx.fragment.app.FragmentResultListener() {
+                    @Override
+                    public void onFragmentResult(String requestKey, Bundle bundle) {
+                        received[0] = bundle.getInt("v");
+                    }
+                });
+        assertEquals("the result posted before the recreation was lost", 5, received[0]);
+
+        Activity bBase = b;
+        bBase.hostsDispatchPause();
+        bBase.hostsDispatchStop();
+        bBase.hostsDispatchDestroy();
+        b.onDestroy();
+    }
 }

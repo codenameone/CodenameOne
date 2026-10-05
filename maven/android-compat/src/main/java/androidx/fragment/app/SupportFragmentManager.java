@@ -39,7 +39,7 @@ import java.util.Map;
 /// The AndroidX `FragmentManager` over the platform fragment engine: every
 /// call goes to the wrapped manager, and answers are narrowed to the
 /// AndroidX types.
-final class SupportFragmentManager extends FragmentManager {
+final class SupportFragmentManager extends FragmentManager implements FragmentManagerImpl.StatefulFacade {
 
     /// The keyed view tag holding the fragment a view belongs to.
     static final int VIEW_FRAGMENT_TAG = 0x0f7e0001;
@@ -441,6 +441,26 @@ final class SupportFragmentManager extends FragmentManager {
             l.mListener.onFragmentResult(requestKey, result);
         } else {
             mResults.put(requestKey, result);
+        }
+    }
+
+    /// Results nobody has received yet go with the platform manager's saved
+    /// state, so a listener registered by the recreated activity or
+    /// fragment still gets them, as in AndroidX.
+    @Override
+    public void saveFacadeState(Bundle out) {
+        for (Map.Entry<String, Bundle> e : mResults.entrySet()) {
+            out.putBundle(e.getKey(), e.getValue());
+        }
+    }
+
+    @Override
+    public void restoreFacadeState(Bundle state) {
+        for (String key : state.keySet()) {
+            Bundle result = state.getBundle(key);
+            if (result != null) {
+                mResults.put(key, result);
+            }
         }
     }
 

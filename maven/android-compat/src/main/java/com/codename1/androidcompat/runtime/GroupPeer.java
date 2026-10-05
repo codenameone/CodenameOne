@@ -112,6 +112,9 @@ public class GroupPeer extends Container {
 
     @Override
     public void paint(Graphics g) {
+        if (isRoot()) {
+            dispatchTreeDraw();
+        }
         // Codename One paints the children translated by this peer's origin.
         childClipX = g.getClipX() - getX();
         childClipY = g.getClipY() - getY();
@@ -121,6 +124,24 @@ public class GroupPeer extends Container {
         view.beginGroupChildren(g);
         super.paint(g);
         view.paintGroupAbove(g, getX(), getY());
+    }
+
+    /// The tree observer's pre-draw and draw listeners, before a root group
+    /// paints. A pre-draw listener that cancels gets another pass at the
+    /// next paint, which is scheduled now. The frame is painted all the same:
+    /// Android keeps the previous frame on screen, but Codename One repaints
+    /// this area from nothing, so skipping it would show a blank frame
+    /// instead. A child repainted alone does not dispatch -- the root's next
+    /// paint does.
+    private void dispatchTreeDraw() {
+        ViewTreeObserver obs = view.peekViewTreeObserver();
+        if (obs == null) {
+            return;
+        }
+        if (obs.dispatchOnPreDraw()) {
+            repaint();
+        }
+        obs.dispatchOnDraw();
     }
 
     /// The Android background and `onDraw`. Codename One paints it before the
