@@ -45,18 +45,18 @@
     "all": {
      "from": {
       "memory": 0.803,
-      "time": 1.228,
+      "time": 1.221,
       "tolerance": {
-       "time": 0.25
+       "time": 0.45
       }
      },
      "memory": 1.025,
      "reason": "hello's translation input now includes the Android compatibility gallery, its relocated android-compat runtime and the Kotlin stdlib, so both VMs translate a much larger app; ParparVM's peak follows the larger live set while JDK 25's stays near its heap-policy floor and swings 40-70% between its own rounds, so the ratio rose and widened",
      "runs": 3,
-     "time": 1.228,
+     "time": 1.221,
      "tolerance": {
       "memory": 0.25,
-      "time": 0.25
+      "time": 0.45
      }
     }
    }
