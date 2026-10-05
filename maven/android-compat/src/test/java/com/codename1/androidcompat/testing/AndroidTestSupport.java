@@ -58,6 +58,15 @@ public final class AndroidTestSupport {
         /// The start and restore callbacks this instance received, in order.
         public final java.util.List<String> calls = new java.util.ArrayList<String>();
 
+        /// What `isFinishing()` answered in `onDestroy`, or null before it.
+        public Boolean finishingWhenDestroyed;
+
+        @Override
+        protected void onDestroy() {
+            finishingWhenDestroyed = Boolean.valueOf(isFinishing());
+            super.onDestroy();
+        }
+
         @Override
         protected void onStart() {
             super.onStart();

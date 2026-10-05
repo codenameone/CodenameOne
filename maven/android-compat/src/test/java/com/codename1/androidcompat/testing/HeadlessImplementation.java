@@ -353,6 +353,15 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     @Override
     public void clearRect(java.lang.Object graphics, int x, int y, int width, int height) {
         clearedRects.add(new int[]{x, y, width, height});
+        if (graphics instanceof int[][]) {
+            // A pixel image's graphics (see getNativeGraphics) really erases.
+            int[][] rows = (int[][]) graphics;
+            for (int row = Math.max(0, y); row < Math.min(rows.length, y + height); row++) {
+                for (int col = Math.max(0, x); col < Math.min(rows[row].length, x + width); col++) {
+                    rows[row][col] = 0;
+                }
+            }
+        }
     }
 
     @Override
@@ -394,6 +403,11 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.lang.Object getNativeGraphics(java.lang.Object a0) {
+        // With pixelImages, drawing into a pixel image draws into its rows;
+        // only clearRect writes pixels so far.
+        if (pixelImages && a0 instanceof int[][]) {
+            return a0;
+        }
         return new Object();
     }
 

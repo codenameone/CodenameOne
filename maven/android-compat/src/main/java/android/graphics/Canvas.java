@@ -60,6 +60,11 @@ public class Canvas {
     private final int[] clipShapeBounds = new int[4];
     /// Whether this canvas draws into a bitmap rather than onto a view.
     private boolean bitmapTarget;
+    /// The bitmap this canvas draws into, told of every draw so its cached
+    /// pixel array is re-read; null on a view.
+    private Bitmap target;
+    /// The image of [#target] that `g` draws into.
+    private Image targetImage;
 
     public Canvas() {
     }
@@ -87,6 +92,8 @@ public class Canvas {
         clipShape = null;
         alphaLayer = 255;
         bitmapTarget = false;
+        target = null;
+        targetImage = null;
     }
 
     public Graphics getGraphics() {
@@ -98,8 +105,12 @@ public class Canvas {
             Image img = bitmap.getImage();
             bind(img.getGraphics(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
             bitmapTarget = true;
+            target = bitmap;
+            targetImage = img;
         } else {
             g = null;
+            target = null;
+            targetImage = null;
         }
     }
 
@@ -400,7 +411,35 @@ public class Canvas {
         return tmp;
     }
 
+    /// Every draw goes through here (most through [#apply]): drawing
+    /// changes a target bitmap's pixels, so its cached copy is dropped.
+    private void drawing() {
+        if (target == null) {
+            return;
+        }
+        // setPixel writes since the last draw replace the bitmap's image when
+        // it is next asked for; draw into that image, clip carried over, or
+        // this drawing would land in the discarded one.
+        Image img = target.getImage();
+        if (img != targetImage) {
+            GeneralPath shape = currentClipShape();
+            Graphics ng = img.getGraphics();
+            if (shape != null) {
+                ng.setClip(shape);
+            } else {
+                ng.setClip(g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());
+            }
+            g = ng;
+            targetImage = img;
+            if (shape != null) {
+                rememberClipShape(shape);
+            }
+        }
+        target.contentChanged();
+    }
+
     private int apply(Paint paint) {
+        drawing();
         int color = paint == null ? 0xff000000 : paint.getColor();
         ColorFilter cf = paint == null ? null : paint.getColorFilter();
         if (cf instanceof PorterDuffColorFilter) {
@@ -447,6 +486,7 @@ public class Canvas {
     // ------------------------------------------------------------ primitives
 
     public void drawColor(int color) {
+        drawing();
         int old = g.getAlpha();
         g.setColor(color & 0xffffff);
         g.setAlpha((color >>> 24) * alphaLayer / 255 * old / 255);
@@ -465,6 +505,7 @@ public class Canvas {
             // background (Android shows black there), never what the
             // "clear before redrawing" idiom wants.
             if (bitmapTarget) {
+                drawing();
                 g.clearRect(g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());
             }
             return;
@@ -774,6 +815,7 @@ public class Canvas {
             if (w <= 0 || h <= 0) {
                 return;
             }
+            drawing();
             int old = g.getAlpha();
             int a = paint == null ? 255 : paint.getAlpha();
             g.setAlpha(a * alphaLayer / 255 * old / 255);

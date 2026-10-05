@@ -407,12 +407,20 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
             if (c < 0x80) {
                 out.write(c);
             } else {
+                // A supplementary character is encoded whole: its surrogates
+                // encoded one at a time are not UTF-8 and decode as '?'.
+                int end = i + 1;
+                if (Character.isHighSurrogate(c) && end < s.length()
+                        && Character.isLowSurrogate(s.charAt(end))) {
+                    end++;
+                }
                 try {
-                    byte[] b = String.valueOf(c).getBytes("UTF-8");
+                    byte[] b = s.substring(i, end).getBytes("UTF-8");
                     out.write(b, 0, b.length);
                 } catch (java.io.UnsupportedEncodingException e) {
                     out.write('?');
                 }
+                i = end - 1;
             }
         }
         try {

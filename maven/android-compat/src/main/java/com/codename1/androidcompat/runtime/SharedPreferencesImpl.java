@@ -233,13 +233,21 @@ final class SharedPreferencesImpl implements SharedPreferences {
         // guarded here.
         @Override
         public boolean commit() {
+            // As on Android, a commit consumes the editor's batch: an editor
+            // reused afterwards starts empty, so a later commit neither
+            // re-applies these values nor repeats this clear() over what
+            // another editor wrote in between.
+            HashMap<String, Object> batch = new HashMap<String, Object>(pending);
+            boolean clearAll = clear;
+            pending.clear();
+            clear = false;
             ArrayList<String> changed = new ArrayList<String>();
             ArrayList<String> cleared = null;
-            if (clear) {
+            if (clearAll) {
                 cleared = new ArrayList<String>(values.keySet());
                 values.clear();
             }
-            for (Map.Entry<String, Object> e : pending.entrySet()) {
+            for (Map.Entry<String, Object> e : batch.entrySet()) {
                 Object v = e.getValue();
                 if (v == REMOVED || v == null) {
                     if (values.remove(e.getKey()) != null) {

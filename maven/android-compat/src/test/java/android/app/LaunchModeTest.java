@@ -120,8 +120,9 @@ public class LaunchModeTest {
             @Override
             public void run() {
                 Context app = AndroidTestSupport.context().getApplicationContext();
-                app.startActivity(new Intent(app, AndroidTestSupport.TestActivity.class)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                Intent original = new Intent(app, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                app.startActivity(original);
                 Activity target = ActivityThread.getTopActivity();
                 int count = ActivityThread.getActivityCount();
                 target.startActivity(new Intent(target, AndroidTestSupport.UiModeHandlingActivity.class));
@@ -132,7 +133,9 @@ public class LaunchModeTest {
                 assertSame(target, ActivityThread.getTopActivity());
                 assertTrue(!target.isDestroyed());
                 assertTrue(above.isDestroyed());
-                assertSame(again, target.getIntent());
+                // As on Android, a reused instance keeps its launch intent;
+                // the new one reaches onNewIntent only.
+                assertSame(original, target.getIntent());
                 assertEquals(count, ActivityThread.getActivityCount());
             }
         });

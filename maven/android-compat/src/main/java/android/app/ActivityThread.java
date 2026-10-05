@@ -209,11 +209,10 @@ public final class ActivityThread {
                         recreated.activity.mFinished = true;
                         break;
                     }
-                    // A launch mode reuse keeps the original intent, as
-                    // Android does.
-                    if (clearTopFlag) {
-                        target.activity.setIntent(intent);
-                    }
+                    // Reuse keeps the original intent, as Android does, with
+                    // or without CLEAR_TOP: the new one reaches onNewIntent
+                    // only, and getIntent() changes when the activity calls
+                    // setIntent() itself.
                     target.activity.onNewIntent(intent);
                     resumeRecord(target, true);
                     return;
@@ -440,12 +439,15 @@ public final class ActivityThread {
         }
     }
 
-    private static void destroy(Record r, boolean deliverResult) {
+    private static void destroy(Record r, boolean relaunching) {
         Activity a = r.activity;
         // Finishing from the first callback on, as on Android: isFinishing()
-        // is true in onPause, and stop() skips the state save. A relaunch has
-        // already stopped (and saved) the instance before it gets here.
-        a.mFinished = true;
+        // is true in onPause, and stop() skips the state save. A relaunch is
+        // not finishing (isFinishing() stays false, isChangingConfigurations()
+        // is true), and has already stopped and saved the instance.
+        if (!relaunching) {
+            a.mFinished = true;
+        }
         if (r.resumed) {
             pause(r);
         }
@@ -595,7 +597,7 @@ public final class ActivityThread {
         int[] requests = a.snapshotFragmentRequests();
         Object nonConfig = a.onRetainNonConfigurationInstance();
         java.util.HashMap<String, ArrayList<Fragment>> retained = a.hostsRetainNonConfig();
-        destroy(r, false);
+        destroy(r, true);
         Activity fresh = AndroidRuntime.getInstance().getApp().createActivity(r.info.type);
         fresh.mLastNonConfigurationInstance = nonConfig;
         fresh.mLastRetainedFragments = retained;

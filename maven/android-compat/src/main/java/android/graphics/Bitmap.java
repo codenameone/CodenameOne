@@ -297,10 +297,13 @@ public final class Bitmap {
         pixelsDirty = true;
     }
 
-    /// Called by `Canvas` after drawing into a mutable bitmap, so a cached
-    /// pixel array does not go stale.
+    /// Called by `Canvas` on every draw into this bitmap, so a cached pixel
+    /// array is re-read rather than going stale. The canvas has flushed
+    /// pending pixel writes (through `getImage`) by then.
     void contentChanged() {
-        pixels = null;
+        if (!pixelsDirty) {
+            pixels = null;
+        }
     }
 
     void flushPixelsForDrawing() {
