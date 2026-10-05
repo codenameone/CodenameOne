@@ -94,7 +94,7 @@ final class Cors {
                     throw new IOException(ALLOWED_ORIGINS + " names \"" + origin + "\"; an origin "
                             + "is scheme://host[:port], with no path");
                 }
-                origins.add(origin);
+                origins.add("*".equals(origin) ? origin : canonicalOrigin(origin));
             }
             if (comma < 0) {
                 break;
@@ -124,8 +124,9 @@ final class Cors {
         if (anyOrigin) {
             return true;
         }
+        String canonical = canonicalOrigin(origin);
         for (Object listed : origins) {
-            if (origin.equalsIgnoreCase((String) listed)) {
+            if (canonical.equalsIgnoreCase((String) listed)) {
                 return true;
             }
         }
@@ -215,6 +216,22 @@ final class Cors {
         String authority = origin.substring(scheme + 3);
         boolean https = "https".equalsIgnoreCase(requestScheme);
         return withoutDefaultPort(authority, https).equalsIgnoreCase(withoutDefaultPort(host.trim(), https));
+    }
+
+    /// `origin` without its scheme's default port, the way a browser serializes
+    /// it: a policy listing `https://app.example:443` admits the
+    /// `https://app.example` the browser sends, as sameOrigin already treats them.
+    static String canonicalOrigin(String origin) {
+        int scheme = origin.indexOf("://");
+        if (scheme < 0) {
+            return origin;
+        }
+        String name = origin.substring(0, scheme);
+        boolean https = "https".equalsIgnoreCase(name);
+        if (!https && !"http".equalsIgnoreCase(name)) {
+            return origin;
+        }
+        return name + "://" + withoutDefaultPort(origin.substring(scheme + 3), https);
     }
 
     private static String withoutDefaultPort(String authority, boolean https) {

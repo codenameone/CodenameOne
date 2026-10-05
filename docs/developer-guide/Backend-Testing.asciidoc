@@ -145,8 +145,10 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/t
 
 === Testing over a real port
 
-`MockMvc` skips the socket, the HTTP parser and the response writer. To test
-through them, serve the application on a free port:
+`MockMvc` skips the socket, the HTTP parser and the response writer. It also
+skips the checks the parser makes on a request target, so a malformed one such as
+`/users/%FF` reaches the routes instead of getting a 400. To test through them,
+serve the application on a free port:
 
 [source,java]
 ----
@@ -258,7 +260,7 @@ compiled classes and generates the calls JUnit would make: `@BeforeAll`,
 `@BeforeEach`, `@Test`, `@AfterEach` and `@AfterAll`, with `@Disabled` and
 assumptions honored. The tests compile against a subset of JUnit 5 that the test
 library provides for the purpose. It covers those annotations, `@DisplayName`
-and `@Tag`, `Assumptions`, and the `Assertions` methods: `assertEquals`,
+(reports keep the method name, as Surefire's do by default) and `@Tag`, `Assumptions`, and the `Assertions` methods: `assertEquals`,
 `assertNotEquals`, `assertTrue`, `assertFalse`, `assertNull`, `assertNotNull`,
 `assertSame`, `assertNotSame`, `assertArrayEquals`, `assertIterableEquals`,
 `assertInstanceOf`, `assertThrows`, `assertThrowsExactly`, `assertDoesNotThrow`,

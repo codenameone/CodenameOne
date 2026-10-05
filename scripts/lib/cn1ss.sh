@@ -192,11 +192,25 @@ cn1ss_server_mode() {
   esac
 }
 
-# Builds the server once per leg, before anything waits on it.
+# The copy `server.sh dist` made in another job, when this one was handed it.
+cn1ss_server_dist() {
+  if [ -n "${CN1SS_SERVER_DIST:-}" ] && [ -d "$CN1SS_SERVER_DIST/classes" ]; then
+    echo "$CN1SS_SERVER_DIST"
+  fi
+}
+
+# Builds the server once per leg, before anything waits on it. A job handed a
+# prebuilt copy (CN1SS_SERVER_DIST) builds nothing: it may have no Maven
+# repository to build with, which is why it was handed one.
 cn1ss_ws_prepare() {
   local mode
   mode="$(cn1ss_server_mode)" || return 1
   if [ "${CN1SS_WS_PREPARED:-}" = "$mode" ]; then
+    return 0
+  fi
+  if [ -n "$(cn1ss_server_dist)" ]; then
+    cn1ss_log "Using the prebuilt test server in $(cn1ss_server_dist)"
+    CN1SS_WS_PREPARED="$mode"
     return 0
   fi
   cn1ss_log "Building the test server ($mode)"
@@ -259,8 +273,13 @@ cn1ss_start_ws_server() {
   fi
   local log_file bind_port="${CN1SS_WS_BIND_PORT:-8765}"
   log_file="$(mktemp)"
-  "$(cn1ss_server_script)" run "$mode" --prebuilt --port "$bind_port" --out "$out_dir" \
-    >"$log_file" 2>&1 &
+  if [ -n "$(cn1ss_server_dist)" ]; then
+    "$(cn1ss_server_script)" exec-dist "$(cn1ss_server_dist)" --port "$bind_port" --out "$out_dir" \
+      >"$log_file" 2>&1 &
+  else
+    "$(cn1ss_server_script)" run "$mode" --prebuilt --port "$bind_port" --out "$out_dir" \
+      >"$log_file" 2>&1 &
+  fi
   CN1SS_WS_PID=$!
   local attempt line
   for attempt in $(seq 1 300); do

@@ -110,6 +110,10 @@ final class Access extends BackendAccess {
                 lower.put(asciiLower(String.valueOf(e.getKey())), e.getValue());
             }
         }
+        // The target is not validated as the HTTP/1 and HTTP/2 parsers validate a
+        // wire target (bad escapes, fragments, control characters): MockMvc tests
+        // the application, as Spring's does, and the testing guide sends protocol
+        // tests to a real port.
         HttpServer.Request request = new HttpServer.Request(method, target, "HTTP/1.1", lower,
                 null);
         if (body != null && body.length > 0) {

@@ -27,7 +27,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/// The name a test is reported under.
+/// The name JUnit shows for a test. Reports keep the class and method names: the
+/// compiled run's, as Surefire's default XML reports do for the JVM run.
 ///
 /// Part of the subset of JUnit 5's API that a compiled backend test translates
 /// against. On the JVM the real JUnit runs the same source; under ParparVM there is
@@ -37,6 +38,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface DisplayName {
-    /// The name the report shows.
+    /// The name to show.
     String value();
 }

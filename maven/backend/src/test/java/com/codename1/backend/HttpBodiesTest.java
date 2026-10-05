@@ -345,6 +345,21 @@ class HttpBodiesTest {
     }
 
     @Test
+    @DisplayName("an allowed origin written with its default port admits the browser's form")
+    void aDefaultPortInTheAllowListMatches() throws Exception {
+        assertEquals("https://app.example", Cors.canonicalOrigin("https://app.example:443"));
+        assertEquals("http://app.example", Cors.canonicalOrigin("http://app.example:80"));
+        assertEquals("http://app.example:443", Cors.canonicalOrigin("http://app.example:443"));
+        Properties p = new Properties();
+        p.setProperty("cn1.cors.allowedOrigins", "http://app.example:80");
+        start(p);
+        String answer = raw("POST /text HTTP/1.1\r\nHost: x\r\nOrigin: http://app.example\r\n"
+                + "Content-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
+        assertTrue(answer.startsWith("HTTP/1.1 200"), answer);
+        assertTrue(answer.contains("Access-Control-Allow-Origin: http://app.example"), answer);
+    }
+
+    @Test
     @DisplayName("a preflight refused for its method varies by the requested method")
     void aRefusedPreflightVariesByMethod() throws Exception {
         Properties p = new Properties();

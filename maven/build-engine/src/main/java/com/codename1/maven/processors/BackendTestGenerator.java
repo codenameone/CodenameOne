@@ -816,6 +816,8 @@ final class BackendTestGenerator {
                 }
                 sb.append("        }\n");
             }
+            // Reported under the method name, never @DisplayName: Surefire's default
+            // XML names JVM tests the same way, so the two runs' reports line up.
             sb.append("        com.codename1.impl.backend.test.TestRun.finished(CLS, ")
               .append(quote(m.getName())).append(", started, failure);\n    }\n\n");
         }
