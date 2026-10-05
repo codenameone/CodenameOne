@@ -22,6 +22,8 @@
  */
 package android.text;
 
+import com.codename1.util.regex.RE;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -89,24 +91,62 @@ public class TextUtils {
         return sb.toString();
     }
 
-    /// Splits on a literal separator (Android treats it as a regular
-    /// expression; plain separators are by far the common use).
+    /// Splits around matches of the regular expression `expression`, keeping
+    /// trailing empty strings, as Android does (`text.split(expression, -1)`).
+    /// An empty text gives an empty array. The expression is evaluated by
+    /// Codename One's `RE`, which covers the usual separators (`"\\s+"`,
+    /// `"[,;]"`, `"\\|"`); constructs it lacks, such as lookaround, are not
+    /// supported.
     public static String[] split(String text, String expression) {
         if (text.length() == 0) {
             return new String[0];
         }
         ArrayList<String> out = new ArrayList<String>();
-        int start = 0;
-        while (true) {
-            int i = text.indexOf(expression, start);
-            if (i < 0 || expression.length() == 0) {
-                out.add(text.substring(start));
-                break;
+        if (expression.length() == 0 || !hasRegexMeta(expression)) {
+            int start = 0;
+            while (true) {
+                int i = text.indexOf(expression, start);
+                if (i < 0 || expression.length() == 0) {
+                    out.add(text.substring(start));
+                    break;
+                }
+                out.add(text.substring(start, i));
+                start = i + expression.length();
             }
-            out.add(text.substring(start, i));
-            start = i + expression.length();
+            return out.toArray(new String[out.size()]);
         }
+        RE re = new RE(expression);
+        int len = text.length();
+        int last = 0;
+        int pos = 0;
+        while (pos < len && re.match(text, pos)) {
+            int ms = re.getParenStart(0);
+            int me = re.getParenEnd(0);
+            if (me == ms) {
+                // A zero-width match splits between characters; one at the
+                // very start yields no leading empty string, as in Java.
+                if (ms > 0) {
+                    out.add(text.substring(last, ms));
+                    last = ms;
+                }
+                pos = ms + 1;
+            } else {
+                out.add(text.substring(last, ms));
+                last = me;
+                pos = me;
+            }
+        }
+        out.add(text.substring(last));
         return out.toArray(new String[out.size()]);
+    }
+
+    private static boolean hasRegexMeta(String expression) {
+        for (int i = 0; i < expression.length(); i++) {
+            if (".$|()[]{}^?*+\\".indexOf(expression.charAt(i)) >= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static CharSequence concat(CharSequence... text) {

@@ -84,12 +84,14 @@ public final class Bitmap {
     }
 
     public static Bitmap createBitmap(Bitmap src) {
-        return new Bitmap(src.getImage(), false, src.config);
+        return new Bitmap(src.snapshot(), false, src.config);
     }
 
     public static Bitmap createBitmap(Bitmap source, int x, int y, int width, int height) {
         if (x == 0 && y == 0 && width == source.width && height == source.height) {
-            return source;
+            // As on Android, only an immutable source is handed back as is;
+            // a mutable one is copied so later drawing does not reach it.
+            return source.mutable ? new Bitmap(source.snapshot(), false, source.config) : source;
         }
         return new Bitmap(source.getImage().subImage(x, y, width, height, true), false, source.config);
     }
@@ -312,7 +314,15 @@ public final class Bitmap {
             copy.getGraphics().drawImage(src, 0, 0);
             return new Bitmap(copy, true, config);
         }
-        return new Bitmap(src, false, config);
+        return new Bitmap(snapshot(), false, config);
+    }
+
+    /// The current image, copied when this bitmap is mutable: drawing into a
+    /// mutable bitmap changes its image in place, so an immutable bitmap that
+    /// shared it would change too.
+    private Image snapshot() {
+        Image src = getImage();
+        return mutable ? src.subImage(0, 0, width, height, true) : src;
     }
 
     public Bitmap extractAlpha() {

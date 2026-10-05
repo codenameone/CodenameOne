@@ -47,7 +47,15 @@ public interface InputFilter {
             if (keep >= end - start) {
                 return null;
             }
-            return source.subSequence(start, start + keep);
+            int cut = start + keep;
+            if (Character.isHighSurrogate(source.charAt(cut - 1))) {
+                // Never keep half of a surrogate pair, as on Android.
+                cut--;
+                if (cut == start) {
+                    return "";
+                }
+            }
+            return source.subSequence(start, cut);
         }
     }
 

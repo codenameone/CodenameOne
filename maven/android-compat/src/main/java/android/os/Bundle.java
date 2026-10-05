@@ -38,6 +38,17 @@ public final class Bundle implements Parcelable, Cloneable {
     public Bundle() {
     }
 
+    /// The map, for a write. [#EMPTY] is shared by every caller that asks for
+    /// an empty bundle, so, as on Android, writing to it throws instead of
+    /// handing the value to all of them. Removing from it or clearing it has
+    /// nothing to change and is allowed.
+    private HashMap<String, Object> writable() {
+        if (this == EMPTY) {
+            throw new UnsupportedOperationException("Bundle.EMPTY is immutable");
+        }
+        return map;
+    }
+
     public Bundle(int capacity) {
     }
 
@@ -139,7 +150,7 @@ public final class Bundle implements Parcelable, Cloneable {
     }
 
     public void putAll(Bundle b) {
-        map.putAll(b.map);
+        writable().putAll(b.map);
     }
 
     public Set<String> keySet() {
@@ -149,115 +160,115 @@ public final class Bundle implements Parcelable, Cloneable {
     // ------------------------------------------------------------ put
 
     public void putBoolean(String key, boolean v) {
-        map.put(key, Boolean.valueOf(v));
+        writable().put(key, Boolean.valueOf(v));
     }
 
     public void putByte(String key, byte v) {
-        map.put(key, Byte.valueOf(v));
+        writable().put(key, Byte.valueOf(v));
     }
 
     public void putChar(String key, char v) {
-        map.put(key, Character.valueOf(v));
+        writable().put(key, Character.valueOf(v));
     }
 
     public void putShort(String key, short v) {
-        map.put(key, Short.valueOf(v));
+        writable().put(key, Short.valueOf(v));
     }
 
     public void putInt(String key, int v) {
-        map.put(key, Integer.valueOf(v));
+        writable().put(key, Integer.valueOf(v));
     }
 
     public void putLong(String key, long v) {
-        map.put(key, Long.valueOf(v));
+        writable().put(key, Long.valueOf(v));
     }
 
     public void putFloat(String key, float v) {
-        map.put(key, Float.valueOf(v));
+        writable().put(key, Float.valueOf(v));
     }
 
     public void putDouble(String key, double v) {
-        map.put(key, Double.valueOf(v));
+        writable().put(key, Double.valueOf(v));
     }
 
     public void putString(String key, String v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putCharSequence(String key, CharSequence v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putParcelable(String key, Parcelable v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putSerializable(String key, java.io.Serializable v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putBundle(String key, Bundle v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putIntArray(String key, int[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putLongArray(String key, long[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putFloatArray(String key, float[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putDoubleArray(String key, double[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putBooleanArray(String key, boolean[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putByteArray(String key, byte[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putCharArray(String key, char[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putStringArray(String key, String[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putCharSequenceArray(String key, CharSequence[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putParcelableArray(String key, Parcelable[] v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putStringArrayList(String key, ArrayList<String> v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putIntegerArrayList(String key, ArrayList<Integer> v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putCharSequenceArrayList(String key, ArrayList<CharSequence> v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putParcelableArrayList(String key, ArrayList<? extends Parcelable> v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     public void putSparseParcelableArray(String key, android.util.SparseArray<? extends Parcelable> v) {
-        map.put(key, v);
+        writable().put(key, v);
     }
 
     // ------------------------------------------------------------ get

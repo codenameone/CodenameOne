@@ -128,6 +128,43 @@ public class AndroidProjectImporterTest {
         assertEquals(original, new String(java.nio.file.Files.readAllBytes(backup.toPath()), "UTF-8"));
     }
 
+    /// A re-import removes what the earlier import copied and the project no
+    /// longer has, but never a file the developer added or edited.
+    @Test
+    public void reimportRemovesOnlyStaleImportedFiles() throws Exception {
+        java.io.File root = java.nio.file.Files.createTempDirectory("reimport-stale").toFile();
+        java.io.File main = new java.io.File(root, "droid/src/main");
+        java.io.File pkg = new java.io.File(main, "java/com/example/droid");
+        assertTrue(pkg.mkdirs());
+        java.io.File moved = new java.io.File(main, "java/com/example/old");
+        assertTrue(moved.mkdirs());
+        java.nio.file.Files.write(new java.io.File(main, "AndroidManifest.xml").toPath(),
+                "<manifest package=\"com.example.droid\"><application/></manifest>".getBytes("UTF-8"));
+        write(new java.io.File(pkg, "Kept.java"), "class Kept {}");
+        write(new java.io.File(pkg, "Edited.java"), "class Edited {}");
+        write(new java.io.File(moved, "Moved.java"), "class Moved {}");
+        java.io.File common = new java.io.File(root, "common");
+        AndroidProjectImporter importer = new AndroidProjectImporter(new com.codename1.build.SystemStreamLog());
+        importer.importProject(new java.io.File(root, "droid"), null, common, null, null);
+
+        java.io.File android = new java.io.File(common, "src/main/android/java/com/example");
+        write(new java.io.File(android, "droid/Added.java"), "class Added {}");
+        write(new java.io.File(android, "droid/Edited.java"), "class Edited { int local; }");
+        assertTrue(new java.io.File(moved, "Moved.java").delete());
+        assertTrue(new java.io.File(pkg, "Edited.java").delete());
+        importer.importProject(new java.io.File(root, "droid"), null, common, null, null);
+
+        assertFalse("a class deleted upstream stayed behind", new java.io.File(android, "old/Moved.java").exists());
+        assertFalse("its emptied package directory stayed behind", new java.io.File(android, "old").exists());
+        assertTrue(new java.io.File(android, "droid/Kept.java").isFile());
+        assertTrue("a file the developer added was removed", new java.io.File(android, "droid/Added.java").isFile());
+        assertTrue("a file the developer edited was removed", new java.io.File(android, "droid/Edited.java").isFile());
+    }
+
+    private static void write(java.io.File f, String s) throws java.io.IOException {
+        java.nio.file.Files.write(f.toPath(), s.getBytes("UTF-8"));
+    }
+
     /// A module's own src/main, built where it stands, takes its package from
     /// the module's build script, as the Android Gradle plugin does.
     @Test

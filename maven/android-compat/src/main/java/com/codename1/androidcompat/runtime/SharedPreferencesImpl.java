@@ -62,7 +62,7 @@ final class SharedPreferencesImpl implements SharedPreferences {
         }
     }
 
-    private void persist() {
+    private boolean persist() {
         Hashtable<String, Object> out = new Hashtable<String, Object>();
         for (Map.Entry<String, Object> e : values.entrySet()) {
             Object v = e.getValue();
@@ -77,7 +77,7 @@ final class SharedPreferencesImpl implements SharedPreferences {
                 out.put(e.getKey(), v);
             }
         }
-        Storage.getInstance().writeObject(file, out);
+        return Storage.getInstance().writeObject(file, out);
     }
 
     @Override
@@ -266,7 +266,10 @@ final class SharedPreferencesImpl implements SharedPreferences {
                     }
                 }
             }
-            persist();
+            // As on Android, the in-memory values and the listeners reflect
+            // the edit even when writing it out fails; only the result says
+            // whether it will survive a restart.
+            boolean persisted = persist();
             if (!listeners.isEmpty()) {
                 for (String k : changed) {
                     for (OnSharedPreferenceChangeListener l
@@ -275,7 +278,7 @@ final class SharedPreferencesImpl implements SharedPreferences {
                     }
                 }
             }
-            return true;
+            return persisted;
         }
 
         @Override
