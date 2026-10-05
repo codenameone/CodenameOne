@@ -53,6 +53,26 @@
     }
    }
   },
+  "linux-x64@amd-epyc-9v45-96-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.539,
+      "time": 0.495,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.539,
+     "reason": "The workload changed, not the VM: 'translator (self)' translates the translator's own classes, and on this pull request it no longer reads them through ASM, its JavaScript generator is no longer stubbed out of the self-hosted build, and default interface methods are culled -- a corpus about twice as large. First run on this CPU model (AMD EPYC 9V45): median 0.641x with rounds spread 0.56-0.76x, the same upward move the EPYC 7763 row made (0.484 -> 0.515x) for the same change; RAM moved down (0.463x against 0.539x), as on every other CPU. Time recalibrated from this run, RAM untouched.",
+     "runs": 1,
+     "time": 0.641,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "macos-arm64": {
    "translator": {
     "all": {
@@ -64,6 +84,20 @@
      "reason": "The workload changed, not the VM: the translator no longer reads class files through ASM, its JavaScript generator is no longer stubbed out of the self-hosted build, and default interface methods are now culled -- each changes what 'translator (self)' translates and how much work it is. Time recalibrated from the two macOS runs on this pull request's code (run medians 0.613x and 0.633x on Apple M1 virtual runners, against the 0.54x master baseline the earlier RAM-only rebaseline left in place); RAM unchanged at 0.566x.",
      "runs": 2,
      "time": 0.623
+    }
+   }
+  },
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.539,
+      "time": 0.751
+     },
+     "memory": 0.451,
+     "reason": "The workload changed, not the VM: 'translator (self)' translates the translator's own classes, which on this pull request no longer go through ASM and include the no-longer-stubbed JavaScript generator, a corpus about twice as large. RAM median 0.451x (rounds 0.43-0.49x) against master's 0.539x on this runner, matching linux-arm64's recalibrated 0.447x for the same change; time stayed in band (0.819x against 0.751x). RAM recalibrated from this run, time untouched.",
+     "runs": 1,
+     "time": 0.751
     }
    }
   },
