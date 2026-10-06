@@ -25,6 +25,10 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendClientTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendConnectionRequestTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendRestTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendAuthTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendDeviceGrantTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendTokenRefreshTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendTotpTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendTransferTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendTypedClientTest;
 import com.codename1.testing.DeviceRunner;
@@ -548,6 +552,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BackendTypedClientTest(),
             new BackendConnectionRequestTest(),
             new BackendTransferTest(),
+            // The backend's security layer from the app's side: signing in with
+            // an authorization code and PKCE, the request authorizer on a
+            // generated client, a refused token renewed behind a call, the device
+            // grant, and a one-time code computed here and verified there. One
+            // class per scenario, so a port that fails one names it.
+            new BackendAuthTest(),
+            new BackendTokenRefreshTest(),
+            new BackendDeviceGrantTest(),
+            new BackendTotpTest(),
             // The contact picker's request contract, and the only thing in
             // this suite that references com.codename1.contacts.ContactPicker
             // -- which is what makes the iOS build compile and link its
