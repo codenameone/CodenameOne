@@ -1919,6 +1919,26 @@
     if (!doc || doc.__cn1NativeTextInteractions) return;
     doc.__cn1NativeTextInteractions = true;
     var touch = null;
+    var mouseOwned = false, lastMouseReleaseOwned = false, pointers = {};
+    function ownGesture(event) {
+      var type = event.type, native = !!nativeSelectionElement(event.target);
+      if (type.indexOf('pointer') === 0) {
+        if (event.pointerType === 'touch') return; // touch scrolling is relayed separately
+        if (type === 'pointerdown') pointers[event.pointerId] = native;
+        event.__cn1NativeTextGesture = !!pointers[event.pointerId];
+        if (type === 'pointerup' || type === 'pointercancel') delete pointers[event.pointerId];
+      } else {
+        if (type === 'mousedown') { mouseOwned = native; lastMouseReleaseOwned = false; }
+        event.__cn1NativeTextGesture = mouseOwned || ((type === 'click' || type === 'dblclick') && event.detail > 0 && lastMouseReleaseOwned);
+        if (type === 'mouseup') { lastMouseReleaseOwned = mouseOwned; mouseOwned = false; }
+      }
+    }
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mousemove', 'mouseup', 'click', 'dblclick']
+      .forEach(function(type) { doc.addEventListener(type, ownGesture, true); });
+    if (global.addEventListener) global.addEventListener('blur', function() {
+      mouseOwned = lastMouseReleaseOwned = false; pointers = {};
+    });
+    doc.addEventListener('selectionchange', reconcileNativeTextOrder);
     function canvas() { return doc.getElementById('codenameone-canvas'); }
     function relayTouch(type, event) {
       var target = canvas();
@@ -2012,6 +2032,7 @@
       // Native text owns its gesture on the host. Forwarding the document/window
       // listeners too starts CN1's selection or moves focus after the browser has
       // already selected text. Copy must likewise stay inside this dispatch.
+      if (event && event.__cn1NativeTextGesture && !nativeSelectionElement(event.currentTarget)) return;
       var nativeText = nativeSelectionElement(event && event.target);
       if (!nativeText && event && event.type === 'copy' && global.getSelection) {
         var selection = global.getSelection();
@@ -2495,7 +2516,7 @@
     // Text-layer DOM mutations. They ride the draw stream so the elements and the pixels of
     // one frame are applied in one task; see SurfaceCommandRecorder.OP_TEXT_* and TextLayerOp.
     TEXT_ATTACH: 90, TEXT_DETACH: 91, TEXT_CLIP_CSS: 92, TEXT_RUN_CSS: 93,
-    TEXT_CONTENT: 94, TEXT_CLEAR: 95, TEXT_DISPLAY: 96, TEXT_SCROLL: 97
+    TEXT_CONTENT: 94, TEXT_CLEAR: 95, TEXT_DISPLAY: 96, TEXT_SCROLL: 97, TEXT_ORDER: 98
   };
   // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
   var SURF_DISPLAY_ID = 1;
@@ -3266,6 +3287,22 @@
   }
 
   // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
+  function reconcileNativeTextOrder() {
+    var doc = global.document;
+    var layer = doc && doc.getElementById('cn1-text-layer');
+    if (!layer || !layer.__cn1OrderDirty) return;
+    var selection = global.getSelection && global.getSelection();
+    if (selection && !selection.isCollapsed
+        && (layer.contains(selection.anchorNode) || layer.contains(selection.focusNode))) return;
+    var ordered = Array.prototype.slice.call(layer.children).sort(function(a, b) {
+      return Number(a.__cn1TextOrder || 0) - Number(b.__cn1TextOrder || 0);
+    });
+    for (var i = 0; i < ordered.length; i++) {
+      if (layer.children[i] !== ordered[i]) layer.insertBefore(ordered[i], layer.children[i] || null);
+    }
+    layer.__cn1OrderDirty = false;
+  }
+
   function replaySurfaceCommands(ctx, ops, opCount, nums, objs) {
     var ni = 0; // num cursor
     var oi = 0; // obj cursor
@@ -3492,6 +3529,7 @@
           // it, which drops any selection or focus inside it.
           if (taParent && taChild && taChild.parentNode !== taParent) {
             taParent.appendChild(taChild);
+            taParent.__cn1OrderDirty = true;
           }
           break;
         }
@@ -3509,6 +3547,15 @@
           var tcCss = objs[oi++];
           if (tcEl && tcEl.style) {
             tcEl.style.cssText = tcCss == null ? '' : String(tcCss);
+          }
+          break;
+        }
+        case SURF.TEXT_ORDER: {
+          var toEl = surfaceTextElement(objs[oi++]);
+          var toOrder = Number(objs[oi++]);
+          if (toEl) {
+            toEl.__cn1TextOrder = toOrder;
+            if (toEl.parentNode) toEl.parentNode.__cn1OrderDirty = true;
           }
           break;
         }
@@ -3551,6 +3598,7 @@
           break;
       }
     }
+    reconcileNativeTextOrder();
   }
 
   // Create / resize a surface. Fire-and-forget. Idempotent: an existing surface

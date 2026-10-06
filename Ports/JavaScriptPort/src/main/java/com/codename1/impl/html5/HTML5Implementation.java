@@ -1139,7 +1139,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     private boolean allowsSelectionOverlay(TextArea ta) {
-        return nativeSelectionRequested() && Accessor.allowsNativeTextSelection(ta)
+        return nativeSelectionRequested() && Accessor.allowsNativeTextSelection(ta) && hasOpaqueAncestors(ta)
                 && (!(ta instanceof TextField) || TextField.isUseNativeTextInput())
                 && ta.getDoneListener() == null
                 && !ta.isEndsWith3Points()
@@ -1148,6 +1148,34 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 && (ta.getConstraint() & TextArea.PASSWORD) == 0
                 && (ta.isEditable() || ta.isTextSelectionEnabled() && ta.getComponentForm() != null
                     && ta.getComponentForm().getTextSelection().isEnabled());
+    }
+
+    // Canvas opacity is applied by the component paint stack, including animations.
+    // Keep faded fields in that stack instead of approximating its compositing in CSS.
+    private boolean hasOpaqueAncestors(Component c) {
+        for (; c != null; c = c.getParent()) {
+            if (c.getStyle().getOpacity() != 255) return false;
+        }
+        return true;
+    }
+
+    static HTMLElement visibleSelectionEditor(Component c) {
+        if (c != null && c.getNativeOverlay() instanceof SelectionTextOverlay) {
+            SelectionTextOverlay overlay = (SelectionTextOverlay) c.getNativeOverlay();
+            if (overlay.visible) return overlay.el;
+        }
+        return null;
+    }
+
+    private boolean elevatedDescendantOverlaps(Component c, int left, int top, int right, int bottom) {
+        if (!c.isVisible() || c.isHidden()) return false;
+        if (c.getStyle().getElevation() > 0 && overlapsNativeEditor(c, left, top, right, bottom)) return true;
+        if (c instanceof Container) {
+            for (Component child : ((Container)c).getChildrenAsList(false)) {
+                if (elevatedDescendantOverlaps(child, left, top, right, bottom)) return true;
+            }
+        }
+        return false;
     }
 
     private boolean hasNativeEditorOcclusion(Component target, int left, int top, int right, int bottom) {
@@ -1161,8 +1189,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             int index = siblings.indexOf(branch);
             for (int i = 0; i < siblings.size(); i++) {
                 Component sibling = siblings.get(i);
-                if (i != index && (i > index || sibling.getStyle().getElevation() > branch.getStyle().getElevation())
+                if (i == index) continue;
+                if ((i > index || sibling.getStyle().getElevation() > branch.getStyle().getElevation())
                         && overlapsNativeEditor(sibling, left, top, right, bottom)) return true;
+                // Elevated descendants can paint above later branches even when
+                // their transparent parent has no elevation of its own.
+                if (elevatedDescendantOverlaps(sibling, left, top, right, bottom)) return true;
             }
         }
         return false;
@@ -1213,7 +1245,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             el.setAttribute("data-cn1-native-selection", "true");
             el.setAttribute("data-cn1-single-line", ta.isSingleLineTextArea() ? "true" : "false");
             el.setAttribute("aria-label", ta.getName() == null ? ta.getHint() : ta.getName());
-            el.setTabIndex(-1); // the semantic overlay owns keyboard traversal
+            el.setTabIndex(-1); // updated with visibility and CN1 focusability
             updateConstraints();
             el.getStyle().setProperty("display", "none");
             selectionEditorContainer.appendChild(el);
@@ -1283,8 +1315,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                 currentEditingField = ta;
                                 currentInputField = el;
                                 isEditing = true;
-                                ta.requestFocus();
                             }
+                            if (ta.isFocusable() && ta.isEnabled()) ta.requestFocus();
                             ta.repaint();
                         }
                     });
@@ -1333,7 +1365,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
             browserEdit = true;
             try {
                 lastValue = value;
-                if (!value.equals(ta.getText())) ta.setText(value);
+                if (!value.equals(ta.getText())) {
+                    ta.setText(value);
+                    ta.repaint(); // Native editing otherwise skips hint/alignment painting.
+                }
             } finally {
                 browserEdit = false;
             }
@@ -1345,6 +1380,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             if (!value.equals(lastValue)) {
                 el.setValue(value);
                 lastValue = value;
+                ta.repaint(); // Hints still belong to the canvas beneath this editor.
             }
         }
 
@@ -1354,6 +1390,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         @Override
         void update() {
             Form form = ta.getComponentForm();
+            boolean wasVisible = visible;
             visible = singleLine == ta.isSingleLineTextArea() && allowsSelectionOverlay(ta)
                     && form != null && form == getCurrentForm()
                     && Accessor.isDisplayable(ta) && !Display.getInstance().isInTransition()
@@ -1374,6 +1411,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 Component hit = form.getComponentAt((left + right) / 2, (top + bottom) / 2);
                 visible = hit == ta;
             }
+            if (wasVisible != visible) {
+                com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidateAll();
+            }
             if (!visible) {
                 if (lastCss != null) {
                     graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_RUN_CSS, el, null, "display:none");
@@ -1392,6 +1432,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             } else if (ta.isSingleLineTextArea() && ta.getVerticalAlignment() == Component.BOTTOM) {
                 pt = Math.max(pt, ta.getHeight() - pb - font.fontHeight());
             }
+            if (!ta.isSingleLineTextArea()) {
+                int lines = ta.getLines();
+                int contentHeight = font.fontHeight() * lines + ta.getRowsGap() * Math.max(0, lines - 1);
+                int remaining = Math.max(0, ta.getInnerHeight() - contentHeight);
+                if (lines > 0 && ta.getVerticalAlignment() == Component.CENTER) pt += remaining / 2;
+                else if (lines > 0 && ta.getVerticalAlignment() == Component.BOTTOM) pt += remaining;
+            }
             int alignment = DefaultLookAndFeel.reverseAlignForBidi(ta, style.getAlignment());
             String css = "position:absolute;box-sizing:border-box;border:0;margin:0;outline:0;resize:none;"
                     + "background:transparent;overflow:hidden;pointer-events:auto;user-select:text;cursor:text;"
@@ -1409,6 +1456,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_RUN_CSS, el, null, css);
                 lastCss = css;
             }
+            el.setAttribute("aria-disabled", ta.isEnabled() ? "false" : "true");
+            el.setTabIndex(ta.isFocusable() && ta.isEnabled() ? 0 : -1);
             boolean readOnly = !ta.isEditable() || !ta.isEnabled();
             if (lastReadOnly == null || lastReadOnly.booleanValue() != readOnly) {
                 if (readOnly) el.setAttribute("readonly", "readonly");
@@ -1439,6 +1488,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         @Override
         void uninstall() {
+            if (visible) com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidateAll();
             visible = false;
             focused = false;
             releaseEditingOwnership();
@@ -6566,6 +6616,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void resizeNativeEditor() {
+        // Persistent editors own their clipped bounds and alignment in the paint batch.
+        // The legacy editor's content-box sizing would overwrite that CSS after focus.
+        if (currentEditingField != null && currentEditingField.getNativeOverlay() instanceof SelectionTextOverlay) return;
         if (isEditing && currentInputField != null && currentEditingField != null) {
             HTMLInputElement inputEl = currentInputField;
             TextArea ta = currentEditingField;

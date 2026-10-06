@@ -121,6 +121,7 @@ vm.runInContext(
   + extractFunction('drawableImageSource') + '\n'
   + extractFunction('safeDrawImage') + '\n'
   + 'var surfaceDrawImageDropped = 0;\n'
+  + extractFunction('reconcileNativeTextOrder') + '\n'
   + extractFunction('replaySurfaceCommands') + '\n',
   sandbox);
 

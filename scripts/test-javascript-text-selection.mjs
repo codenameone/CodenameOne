@@ -67,6 +67,81 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('elevated');
+    assert.equal(await page.locator('.cn1-selection-editor[aria-label="elevatedArea"]:visible').count(), 0);
+    console.log('PASS', name, 'elevated descendants in earlier branches exclude native editor coverage');
+
+    await openReview('runorder');
+    const order = () => page.evaluate(() => [...document.querySelectorAll('#cn1-text-layer span')]
+      .map(el => el.textContent).filter(t => t.startsWith('Order ')));
+    assert.deepEqual(await order(), ['Order alpha', 'Order beta']);
+    await clickButton('Reverse labels');
+    await page.waitForFunction(() => [...document.querySelectorAll('#cn1-text-layer span')]
+      .filter(el => el.textContent.startsWith('Order '))[0]?.textContent === 'Order beta');
+    await page.evaluate(() => {
+      const spans = [...document.querySelectorAll('#cn1-text-layer span')].filter(el => el.textContent.startsWith('Order '));
+      const range = document.createRange(); range.setStart(spans[0].firstChild, 0); range.setEnd(spans[1].firstChild, spans[1].textContent.length);
+      getSelection().removeAllRanges(); getSelection().addRange(range);
+    });
+    const selected = await page.evaluate(() => getSelection().toString());
+    assert.ok(selected.indexOf('Order beta') < selected.indexOf('Order alpha'));
+    await clickButton('Reverse labels');
+    await page.waitForTimeout(500);
+    assert.equal(await page.evaluate(() => getSelection().toString()), selected, 'reorder defers while selection is active');
+    await page.evaluate(() => getSelection().removeAllRanges());
+    await page.waitForFunction(() => [...document.querySelectorAll('#cn1-text-layer span')]
+      .filter(el => el.textContent.startsWith('Order '))[0]?.textContent === 'Order alpha');
+    console.log('PASS', name, 'selection order follows component reordering without disturbing active ranges');
+
+    await openReview('pointerfocus');
+    const focusLabel = page.locator('#cn1-text-layer span').filter({hasText: /^Focusable label$/});
+    assert.equal(await focusLabel.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+    await page.locator('.cn1-selection-editor[aria-label="focusReadonly"]').click();
+    await page.waitForFunction(() => document.body.innerText.includes('Readonly focused'));
+    console.log('PASS', name, 'focusable labels retain canvas routing and readonly text synchronizes CN1 focus');
+
+    await openReview('multialign');
+    for (const [label, factor] of [['multiCenter', 0.5], ['multiBottom', 1]]) {
+      const metrics = await page.locator('.cn1-selection-editor[aria-label="' + label + '"]').evaluate(el => {
+        const css = getComputedStyle(el);
+        return {height: el.getBoundingClientRect().height, top: parseFloat(css.paddingTop), bottom: parseFloat(css.paddingBottom), line: parseFloat(css.lineHeight)};
+      });
+      // Two lines, seven-pixel row gap, and asymmetric original padding.
+      const content = metrics.line * 2 - 7;
+      assert.ok(Math.abs(metrics.top - (11 + Math.floor((metrics.height - 11 - 19 - content) * factor))) <= 1, JSON.stringify(metrics));
+    }
+    console.log('PASS', name, 'multiline center and bottom alignment match canvas content height');
+
+    await openReview('opacity');
+    const faded = page.locator('.cn1-selection-editor[aria-label="opacityArea"]');
+    for (const action of ['Fade field', 'Fade ancestor']) {
+      await faded.waitFor({state: 'visible'});
+      await clickButton(action);
+      await faded.waitFor({state: 'hidden'});
+      await clickButton('Reset opacity');
+    }
+    await faded.waitFor({state: 'visible'});
+    console.log('PASS', name, 'field and ancestor opacity use canvas compositing and restore native editing');
+
+    await openReview('uniqueeditor');
+    const unique = page.locator('.cn1-selection-editor[aria-label="uniqueEditor"]');
+    await unique.waitFor({state: 'visible'});
+    await page.waitForFunction(() => !document.querySelector('#cn1-accessibility-tree input, #cn1-accessibility-tree textarea'));
+    assert.equal(await page.getByRole('textbox').count(), 1, 'one accessible textbox while promoted');
+    for (const [action, disabled] of [['Disable editor', 'true'], ['Enable editor', 'false']]) {
+      await clickButton(action);
+      await page.waitForFunction(disabled => document.querySelector('.cn1-selection-editor[aria-label="uniqueEditor"]').getAttribute('aria-disabled') === disabled, disabled);
+    }
+    await clickButton('Canvas fallback');
+    await unique.waitFor({state: 'hidden'});
+    await page.waitForFunction(() => document.querySelector('#cn1-accessibility-tree input, #cn1-accessibility-tree textarea'));
+    assert.ok(await page.getByRole('textbox').count() > 0, 'semantic editing remains available on canvas');
+    await clickButton('Restore editor');
+    await unique.waitFor({state: 'visible'});
+    await page.waitForFunction(() => !document.querySelector('#cn1-accessibility-tree input, #cn1-accessibility-tree textarea'));
+    assert.equal(await page.getByRole('textbox').count(), 1);
+    console.log('PASS', name, 'one accessible editor with live disabled semantics and semantic fallback');
+
     await openReview('traversal');
     const firstTab = page.locator('.cn1-selection-editor[aria-label="tabFirst"]');
     const lastTab = page.locator('.cn1-selection-editor[aria-label="tabLast"]');

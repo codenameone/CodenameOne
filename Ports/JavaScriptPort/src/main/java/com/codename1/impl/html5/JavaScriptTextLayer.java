@@ -92,6 +92,7 @@ public final class JavaScriptTextLayer {
         // The stacking index this run carries. A repaint of part of the screen leaves it alone:
         // the run keeps the place in the order it already had.
         private int zIndex;
+        private int selectionOrder = -1;
         private int claimedPass;
         // Where the run landed, in Codename One pixels, and the draw order it was promoted at.
         // Both are needed to tell whether something drawn on the canvas afterwards covers it.
@@ -569,6 +570,7 @@ public final class JavaScriptTextLayer {
      * @param form the form currently displayed, may be null
      */
     public void syncToForm(Form form) {
+        if (form != null) syncSelectionOrder(form, 0);
         for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
                 it.hasNext();) {
             Map.Entry<Component, ComponentRuns> entry = it.next();
@@ -594,6 +596,26 @@ public final class JavaScriptTextLayer {
                 it.remove();
             }
         }
+    }
+
+    private int syncSelectionOrder(Component component, int order) {
+        ComponentRuns componentRuns = byComponent.get(component);
+        if (componentRuns != null) {
+            for (Run run : componentRuns.runs) {
+                if (!run.attached) continue;
+                if (run.selectionOrder != order) {
+                    run.selectionOrder = order;
+                    sink.record(SurfaceCommandRecorder.OP_TEXT_ORDER, run.clip, null, "" + order);
+                }
+                order++;
+            }
+        }
+        if (component instanceof com.codename1.ui.Container) {
+            for (Component child : ((com.codename1.ui.Container)component).getChildrenAsList(false)) {
+                order = syncSelectionOrder(child, order);
+            }
+        }
+        return order;
     }
 
     /**

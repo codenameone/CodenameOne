@@ -4257,6 +4257,7 @@ public class Component implements Animation, StyleListener, Editable {
     public final void setFocusable(boolean focusable) {
         this.focusable = focusable;
         onSetFocusable(focusable);
+        repaintTextSelection();
     }
 
     /// Since setFocusable is final this callback is invoked when

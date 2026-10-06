@@ -68,7 +68,7 @@ context.global.Touch = function(data) { Object.assign(this, data); };
 context.global.WheelEvent = function(type, data) { Object.assign(this, data, { type, target: canvas }); };
 context.global.TouchEvent = function(type, data) { Object.assign(this, data, { type, target: canvas }); };
 canvas.dispatchEvent = e => { relayed.push(e.type); listeners[e.type](e); };
-vm.runInContext(extract('installNativeTextInteractions'), context);
+vm.runInContext(extract('reconcileNativeTextOrder') + '\n' + extract('installNativeTextInteractions'), context);
 context.installNativeTextInteractions();
 text.tagName = 'TEXTAREA';
 const tab = Object.assign(event('keydown', text), { key: 'Tab' });
@@ -136,3 +136,25 @@ for (const [tagName, readOnly, disabled, shouldFocus] of [
   assert.equal(focusCalls, shouldFocus ? 1 : 0, `${tagName} readonly=${readOnly} disabled=${disabled} focus handoff`);
 }
 console.log('PASS semantic focus protection only applies to editable native controls');
+
+// A browser selection owns its entire gesture even after leaving the glyphs.
+for (const prefix of ['mouse', 'pointer']) {
+  for (const [suffix, target] of [['down', text], ['move', canvas], ['up', canvas]]) {
+    const e = Object.assign(event(prefix + suffix, target), {pointerId: 7, pointerType: 'mouse'});
+    listeners[e.type](e); callback(e);
+    assert.equal(messages.length, 0, e.type + ' stays native across the canvas boundary');
+  }
+  const fresh = Object.assign(event(prefix + 'down', canvas), {pointerId: 7, pointerType: 'mouse'});
+  listeners[fresh.type](fresh); callback(fresh);
+  assert.equal(messages.pop().args[0].type, fresh.type, 'the next canvas gesture starts normally');
+}
+console.log('PASS native selection owns move and release beyond the text hit region');
+
+const down = event('mousedown', text), up = event('mouseup', canvas);
+listeners.mousedown(down); callback(down); listeners.mouseup(up); callback(up);
+const nativeClick = Object.assign(event('click', canvas), {detail: 1});
+listeners.click(nativeClick); callback(nativeClick);
+assert.equal(messages.length, 0, 'the terminating mouse click stays native');
+const semanticClick = Object.assign(event('click', canvas), {detail: 0});
+listeners.click(semanticClick); callback(semanticClick);
+assert.equal(messages.pop().args[0].type, 'click', 'keyboard and semantic activation are not mouse gesture continuations');

@@ -93,7 +93,65 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=traversal") >= 0) {
+        if (query.indexOf("review=elevated") >= 0) {
+            com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
+            Container layers = new Container(layout); layers.setPreferredH(160);
+            layers.getAllStyles().setSurface(true);
+            Container earlier = new Container(new com.codename1.ui.layouts.BorderLayout());
+            earlier.getAllStyles().setBgTransparency(0);
+            Button cover = new Button("Elevated edge"); cover.getAllStyles().setElevation(5);
+            cover.addActionListener(e -> status.setText("Elevated clicked"));
+            earlier.add(com.codename1.ui.layouts.BorderLayout.NORTH, cover);
+            TextArea area = new TextArea("Covered by elevated descendant", 3, 24); area.setName("elevatedArea");
+            layers.addAll(earlier, area);
+            layout.setInsets(earlier, "0 0 auto auto"); layout.setInsets(area, "0");
+            form.addAll(layers, status);
+        } else if (query.indexOf("review=runorder") >= 0) {
+            Label first = new Label("Order alpha"), second = new Label("Order beta");
+            Container labels = BoxLayout.encloseY(first, second);
+            Button reverse = new Button("Reverse labels");
+            reverse.addActionListener(e -> {
+                Component moved = labels.getComponentAt(0);
+                labels.removeComponent(moved); labels.add(moved); labels.revalidate();
+            });
+            form.addAll(labels, reverse);
+        } else if (query.indexOf("review=pointerfocus") >= 0) {
+            Label label = new Label("Focusable label"); label.setFocusable(true);
+            TextArea area = new TextArea("Focusable readonly"); area.setEditable(false); area.setFocusable(true);
+            area.setName("focusReadonly");
+            com.codename1.ui.events.FocusListener listener = new com.codename1.ui.events.FocusListener() {
+                public void focusGained(Component c) { status.setText(c == label ? "Label focused" : "Readonly focused"); }
+                public void focusLost(Component c) { }
+            };
+            label.addFocusListener(listener); area.addFocusListener(listener);
+            form.addAll(new Button("Initial focus"), label, area, status);
+        } else if (query.indexOf("review=multialign") >= 0) {
+            for (int alignment : new int[] {Component.CENTER, Component.BOTTOM}) {
+                TextArea area = new TextArea("First line\nSecond line", 2, 24);
+                area.setName(alignment == Component.CENTER ? "multiCenter" : "multiBottom");
+                area.setGrowByContent(false); area.setPreferredH(160); area.setEditable(false);
+                area.setVerticalAlignment(alignment); area.setRowsGap(7);
+                area.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+                area.getAllStyles().setPadding(11, 19, 5, 5);
+                form.add(area);
+            }
+        } else if (query.indexOf("review=opacity") >= 0) {
+            TextArea area = new TextArea("Fading field"); area.setName("opacityArea");
+            Container parent = BoxLayout.encloseY(area);
+            Button fade = new Button("Fade field"), ancestor = new Button("Fade ancestor"), reset = new Button("Reset opacity");
+            fade.addActionListener(e -> area.getAllStyles().setOpacity(100));
+            ancestor.addActionListener(e -> parent.getAllStyles().setOpacity(100));
+            reset.addActionListener(e -> { area.getAllStyles().setOpacity(255); parent.getAllStyles().setOpacity(255); });
+            form.addAll(parent, fade, ancestor, reset);
+        } else if (query.indexOf("review=uniqueeditor") >= 0) {
+            TextArea area = new TextArea("Single accessible field"); area.setName("uniqueEditor");
+            Button hide = new Button("Canvas fallback"), restore = new Button("Restore editor");
+            hide.addActionListener(e -> area.setEndsWith3Points(true));
+            restore.addActionListener(e -> area.setEndsWith3Points(false));
+            Button disable = new Button("Disable editor"), enable = new Button("Enable editor");
+            disable.addActionListener(e -> area.setEnabled(false)); enable.addActionListener(e -> area.setEnabled(true));
+            form.addAll(area, hide, restore, disable, enable);
+        } else if (query.indexOf("review=traversal") >= 0) {
             TextField first = new TextField("First"); first.setName("tabFirst");
             TextField last = new TextField("Last"); last.setName("tabLast");
             form.addAll(first, new Button("Middle button"), new CheckBox("Middle check"), last);

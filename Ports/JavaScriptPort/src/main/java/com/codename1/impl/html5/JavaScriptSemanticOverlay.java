@@ -237,7 +237,9 @@ public final class JavaScriptSemanticOverlay {
             boolean nativeEditing = focusedOwner instanceof TextArea
                     && focusedOwner.getNativeOverlay() != null && ((TextArea) focusedOwner).isEditing();
             pendingFocus = null;
-            if (!nativeEditing) target.focus();
+            HTMLElement nativeEditor = HTML5Implementation.visibleSelectionEditor(focusedOwner);
+            if (nativeEditor != null) nativeEditor.focus();
+            else if (!nativeEditing) target.focus();
         }
     }
 
@@ -327,6 +329,8 @@ public final class JavaScriptSemanticOverlay {
     private void applyAttributes(Entry entry, AccessibilityNodeSnapshot node,
             Map<Long, AccessibilityNodeSnapshot> nodes, AccessibilityNodeSnapshot parent) {
         Map<String, String> desired = describe(node, nodes, parent);
+        boolean nativeEditor = HTML5Implementation.visibleSelectionEditor(node.getComponent()) != null;
+        if (nativeEditor) desired.put("aria-hidden", "true");
         for (Iterator<Map.Entry<String, String>> it = desired.entrySet().iterator(); it.hasNext();) {
             Map.Entry<String, String> attribute = it.next();
             String name = attribute.getKey();
@@ -348,7 +352,7 @@ public final class JavaScriptSemanticOverlay {
         // semantic element carries none -- so leaving both tabbable would stop a keyboard user
         // on a textbox that announces the field and then refuses every keystroke, before
         // reaching the one that works.
-        int tabIndex = node.isFocusable() && !hasEditingControl(node) ? 0 : -1;
+        int tabIndex = !nativeEditor && node.isFocusable() && !hasEditingControl(node) ? 0 : -1;
         if (entry.tabIndex != tabIndex) {
             entry.element.setTabIndex(tabIndex);
             entry.tabIndex = tabIndex;
@@ -668,7 +672,9 @@ public final class JavaScriptSemanticOverlay {
         List<AccessibilityAction> actions = node.getActions();
         for (int i = 0; i < actions.size(); i++) {
             AccessibilityAction action = actions.get(i);
-            if (!usable || !action.isEnabled() || isStandardWebAction(action.getId())) {
+            if (!usable || !action.isEnabled() || isStandardWebAction(action.getId())
+                    || AccessibilityAction.SET_TEXT.equals(action.getId())
+                        && HTML5Implementation.visibleSelectionEditor(node.getComponent()) != null) {
                 continue;
             }
             if (desired == null) {
