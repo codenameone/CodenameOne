@@ -39,6 +39,20 @@ import java.util.Map;
 
 public class GeneratorModelMatrixTest extends AbstractTest {
 
+    // BuildCloud's /api/v2/funnel/initializr-steps accepts exactly these IDE
+    // names (InitializrStepsService.IDES) and treats anything else as "no IDE",
+    // which drops the IDE-specific step from the email. VS_CODE.name() lower-
+    // cased is "vs_code", which it would not recognise.
+    private void validateIdeIdsMatchTheStepsEndpoint() {
+        String[] expected = {"intellij", "eclipse", "netbeans", "vscode"};
+        IDE[] ides = {IDE.INTELLIJ, IDE.ECLIPSE, IDE.NETBEANS, IDE.VS_CODE};
+        for (int i = 0; i < ides.length; i++) {
+            String id = GeneratorModel.create(ides[i], Template.BAREBONES, "IdeIds", "com.acme.ideids").ideId();
+            assertEqual(expected[i], id, "ideId for " + ides[i]);
+        }
+        assertEqual(ides.length, IDE.values().length, "a new IDE needs a name BuildCloud's steps email knows");
+    }
+
     @Override
     public boolean runTest() throws Exception {
         // Run the targeted regression checks first so they don't get masked when an
@@ -47,6 +61,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateSha256Vectors();
         validateLauncherTelemetry();
         validateNextSteps();
+        validateIdeIdsMatchTheStepsEndpoint();
         validateJava17DefaultRegressionFixes();
         validateLegacyJava8Generation();
         validateCoordinateGuardRejectsBrokenArtifacts();

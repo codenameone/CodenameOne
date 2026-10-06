@@ -348,8 +348,14 @@ public class GeneratorModel {
 
     /// The IDE identifier the "email me these steps" request reports, e.g.
     /// "intellij" or "vs_code": the enum constant, lower-cased.
+    /// The IDE as BuildCloud's "email me these steps" endpoint names it. It
+    /// accepts a closed set (intellij, netbeans, eclipse, vscode) and treats
+    /// anything else as "no IDE", so VS_CODE must not become "vs_code".
     public String ideId() {
-        return ide == null ? "" : toLowerCaseInvariant(ide.name());
+        if (ide == null) {
+            return "";
+        }
+        return ide == IDE.VS_CODE ? "vscode" : toLowerCaseInvariant(ide.name());
     }
 
     public String getPackageName() {
