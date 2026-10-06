@@ -9,6 +9,7 @@ on:
       - 'vm/backend/src/**/*.java'
       - 'vm/backend/impl/**/*.java'
       - 'vm/backend/shared-sources.sh'
+      - 'vm/backend/package-docs/**'
       - 'maven/**/src/main/java/**/*.java'
       - '.github/scripts/build_javadocs.sh'
       - 'scripts/check-package-info.sh'
