@@ -463,6 +463,76 @@ public class SQLiteDatabaseTest {
         assertEquals(0, DatabaseUtils.queryNumEntries(db, "notes"));
     }
 
+    /// The owner is claimed before the engine's BEGIN and released only after
+    /// its COMMIT, so another thread's statement is refused across the whole
+    /// engine transaction. It used to be published after BEGIN and cleared
+    /// before COMMIT: a statement from another thread inside either window
+    /// passed the check and ran inside this thread's transaction. Each
+    /// window runs the other thread to completion from inside the engine
+    /// call, so the outcome does not depend on timing.
+    @Test
+    public void anotherThreadsStatementIsRefusedWhileTheEngineTransactionBeginsAndCommits() throws Exception {
+        final SQLiteDatabase[] shared = new SQLiteDatabase[1];
+        final List<String> outcomes = new ArrayList<String>();
+        final boolean[] armed = new boolean[1];
+        JdbcDatabase engine = new JdbcDatabase() {
+            @Override
+            public void beginTransaction() throws java.io.IOException {
+                if (armed[0]) {
+                    outcomes.add("begin: " + insertFromAnotherThread(shared[0], "during-begin"));
+                }
+                super.beginTransaction();
+            }
+
+            @Override
+            public void commitTransaction() throws java.io.IOException {
+                if (armed[0]) {
+                    outcomes.add("commit: " + insertFromAnotherThread(shared[0], "during-commit"));
+                }
+                super.commitTransaction();
+            }
+        };
+        shared[0] = SQLiteDatabase.wrap(engine, "owner.db", null, null);
+        shared[0].execSQL("CREATE TABLE t (v TEXT)");
+        armed[0] = true;
+        shared[0].beginTransaction();
+        shared[0].execSQL("INSERT INTO t VALUES ('mine')");
+        shared[0].setTransactionSuccessful();
+        shared[0].endTransaction();
+        armed[0] = false;
+        assertEquals("[begin: refused, commit: refused]", outcomes.toString());
+        assertEquals(1, DatabaseUtils.queryNumEntries(shared[0], "t"));
+        // Released once the transaction ended: the other thread writes now.
+        assertEquals("ran", insertFromAnotherThread(shared[0], "after"));
+        shared[0].close();
+    }
+
+    /// Inserts `value` from a new thread and waits for it: "refused" for
+    /// the locked-database refusal, "ran" when the insert went through.
+    private static String insertFromAnotherThread(final SQLiteDatabase d, final String value) {
+        final String[] result = new String[1];
+        Thread other = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    d.execSQL("INSERT INTO t VALUES ('" + value + "')");
+                    result[0] = "ran";
+                } catch (SQLiteDatabaseLockedException e) {
+                    result[0] = "refused";
+                } catch (Throwable t) {
+                    result[0] = String.valueOf(t);
+                }
+            }
+        });
+        other.start();
+        try {
+            other.join();
+        } catch (InterruptedException e) {
+            throw new IllegalStateException(e);
+        }
+        return result[0];
+    }
+
     /// A database opened `OPEN_READONLY` refuses writes through the Android
     /// API. It used to report `isReadOnly()` and still insert, update, drop
     /// tables and bump the version.

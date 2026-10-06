@@ -349,4 +349,17 @@ public abstract class AdapterView<T extends Adapter> extends ViewGroup {
     public CharSequence getAccessibilityClassName() {
         return AdapterView.class.getName();
     }
+
+    /// The rows are recycled views that share ids and take their state from
+    /// the adapter, so only the adapter view itself is saved, as on Android: one
+    /// row's saved state would otherwise be restored into every row.
+    @Override
+    protected void dispatchSaveInstanceState(android.util.SparseArray<android.os.Parcelable> container) {
+        dispatchFreezeSelfOnly(container);
+    }
+
+    @Override
+    protected void dispatchRestoreInstanceState(android.util.SparseArray<android.os.Parcelable> container) {
+        dispatchThawSelfOnly(container);
+    }
 }

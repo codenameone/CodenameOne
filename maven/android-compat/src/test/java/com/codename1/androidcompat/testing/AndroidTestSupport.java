@@ -64,6 +64,18 @@ public final class AndroidTestSupport {
         /// What `isFinishing()` answered in `onDestroy`, or null before it.
         public Boolean finishingWhenDestroyed;
 
+        /// Builds the content view of the next activities created, or null.
+        public static Content content;
+
+        @Override
+        protected void onCreate(android.os.Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            Content c = content;
+            if (c != null) {
+                setContentView(c.create(this));
+            }
+        }
+
         @Override
         protected void onDestroy() {
             finishingWhenDestroyed = Boolean.valueOf(isFinishing());
@@ -190,6 +202,11 @@ public final class AndroidTestSupport {
                         }
                     });
         }
+    }
+
+    /// Builds a test activity's content view.
+    public interface Content {
+        View create(Activity activity);
     }
 
     /// Builds a test activity's options menu.

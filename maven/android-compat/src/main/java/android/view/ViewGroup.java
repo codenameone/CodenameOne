@@ -472,10 +472,23 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     }
 
     private void removeViewInternal(int index, boolean notify) {
-        View child = mChildren.remove(index);
+        View child = mChildren.get(index);
         if (child == mTouchTarget) {
+            // The child consumed the DOWN of a gesture still in progress: it
+            // gets ACTION_CANCEL so it drops its pressed and drag state, as
+            // Android's cancelTouchTarget does before unlinking it.
             mTouchTarget = null;
+            long now = android.os.SystemClock.uptimeMillis();
+            MotionEvent cancel = MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, 0, 0, 0);
+            child.dispatchTouchEvent(cancel);
+            cancel.recycle();
+            // The cancel handler may have changed the children itself.
+            index = mChildren.indexOf(child);
+            if (index < 0) {
+                return;
+            }
         }
+        mChildren.remove(index);
         if (child.isFocused()) {
             child.clearFocus();
         }
@@ -994,6 +1007,36 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
 
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
         return false;
+    }
+
+    // ------------------------------------------------------------ saved state
+
+    @Override
+    protected void dispatchSaveInstanceState(android.util.SparseArray<android.os.Parcelable> container) {
+        super.dispatchSaveInstanceState(container);
+        for (int i = 0; i < mChildren.size(); i++) {
+            mChildren.get(i).dispatchSaveInstanceState(container);
+        }
+    }
+
+    @Override
+    protected void dispatchRestoreInstanceState(android.util.SparseArray<android.os.Parcelable> container) {
+        super.dispatchRestoreInstanceState(container);
+        for (int i = 0; i < mChildren.size(); i++) {
+            mChildren.get(i).dispatchRestoreInstanceState(container);
+        }
+    }
+
+    /// Saves this group's own state and none of its children's; for a group
+    /// whose children are recycled rows sharing ids, which restore their
+    /// state from the adapter instead.
+    protected void dispatchFreezeSelfOnly(android.util.SparseArray<android.os.Parcelable> container) {
+        super.dispatchSaveInstanceState(container);
+    }
+
+    /// The restoring counterpart of [#dispatchFreezeSelfOnly].
+    protected void dispatchThawSelfOnly(android.util.SparseArray<android.os.Parcelable> container) {
+        super.dispatchRestoreInstanceState(container);
     }
 
     // ------------------------------------------------------------ touch

@@ -190,6 +190,18 @@ public class EditText extends TextView {
         setSelection(index, index);
     }
 
+    /// An editable view's text is always saved with its state.
+    @Override
+    public boolean getFreezesText() {
+        return true;
+    }
+
+    @Override
+    void restoreSelection(int start, int end) {
+        int len = length();
+        setSelection(Math.max(0, Math.min(start, len)), Math.max(0, Math.min(end, len)));
+    }
+
     public void selectAll() {
         setSelection(0, length());
     }

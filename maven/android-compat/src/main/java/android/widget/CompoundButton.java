@@ -101,6 +101,43 @@ public abstract class CompoundButton extends Button implements Checkable {
     }
 
     @Override
+    protected android.os.Parcelable onSaveInstanceState() {
+        return new SavedState(super.onSaveInstanceState(), mChecked);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(android.os.Parcelable state) {
+        if (!(state instanceof SavedState)) {
+            super.onRestoreInstanceState(state);
+            return;
+        }
+        SavedState ss = (SavedState) state;
+        super.onRestoreInstanceState(ss.mSuperState);
+        setChecked(ss.mChecked);
+    }
+
+    /// A compound button's saved state: whether it is checked. Held in
+    /// memory for a recreation, never written to a parcel.
+    static final class SavedState implements android.os.Parcelable {
+        final android.os.Parcelable mSuperState;
+        final boolean mChecked;
+
+        SavedState(android.os.Parcelable superState, boolean checked) {
+            mSuperState = superState;
+            mChecked = checked;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(android.os.Parcel dest, int flags) {
+        }
+    }
+
+    @Override
     public void setChecked(boolean checked) {
         if (mChecked == checked) {
             return;

@@ -159,8 +159,21 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
         mCalled = true;
     }
 
-    /// Saves the fragments; subclasses must call through.
+    /// Where [#onSaveInstanceState(Bundle)] keeps the view hierarchy's state,
+    /// under Android's own key.
+    private static final String VIEW_HIERARCHY_STATE = "android:viewHierarchyState";
+    private static final String VIEWS_TAG = "android:views";
+
+    /// Saves the state of every view with an id, and the fragments;
+    /// subclasses must call through.
     protected void onSaveInstanceState(Bundle outState) {
+        if (mRecord != null) {
+            android.util.SparseArray<android.os.Parcelable> views = new android.util.SparseArray<android.os.Parcelable>();
+            mRecord.decor.saveHierarchyState(views);
+            Bundle hierarchy = new Bundle();
+            hierarchy.putSparseParcelableArray(VIEWS_TAG, views);
+            outState.putBundle(VIEW_HIERARCHY_STATE, hierarchy);
+        }
         for (int i = 0; i < mFragmentHosts.size(); i++) {
             FragmentManagerImpl host = mFragmentHosts.get(i);
             Bundle p = host.saveAllState();
@@ -170,7 +183,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
         }
     }
 
+    /// Restores the views' state [#onSaveInstanceState(Bundle)] saved, into
+    /// the views the new instance created with the same ids; subclasses
+    /// must call through.
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        Bundle hierarchy = savedInstanceState == null ? null : savedInstanceState.getBundle(VIEW_HIERARCHY_STATE);
+        if (hierarchy == null || mRecord == null) {
+            return;
+        }
+        android.util.SparseArray<android.os.Parcelable> views = hierarchy.getSparseParcelableArray(VIEWS_TAG);
+        if (views != null) {
+            mRecord.decor.restoreHierarchyState(views);
+        }
     }
 
     protected void onNewIntent(Intent intent) {
@@ -329,7 +353,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
         Object[] f = mFragmentRequests.remove(Integer.valueOf(requestCode));
         if (f != null) {
             Fragment frag = (Fragment) f[0];
-            if (frag.isAdded()) {
+            // Delivered while the fragment is still active -- detached
+            // included, as Android finds it by its active-fragment id --
+            // and dropped once it has been removed for good.
+            if (frag.mIndex >= 0) {
                 frag.onActivityResult(((Integer) f[1]).intValue(), resultCode, data);
             }
             return;

@@ -239,6 +239,7 @@ public class View implements Drawable.Callback {
     protected Context mContext;
     ViewParent mParent;
     int mID = NO_ID;
+    private boolean mSaveEnabled = true;
     Object mTag;
     private SparseArray<Object> mKeyedTags;
     protected int mLeft;
@@ -3038,12 +3039,15 @@ public class View implements Drawable.Callback {
     }
 
     public void setSaveEnabled(boolean enabled) {
+        mSaveEnabled = enabled;
     }
 
     public boolean isSaveEnabled() {
-        return true;
+        return mSaveEnabled;
     }
 
+    /// The state this view keeps across a recreation, or null for none.
+    /// Saved only for a view with an id, keyed by that id.
     protected Parcelable onSaveInstanceState() {
         return null;
     }
@@ -3051,10 +3055,34 @@ public class View implements Drawable.Callback {
     protected void onRestoreInstanceState(Parcelable state) {
     }
 
+    /// Saves the state of this view and, for a group, its descendants
+    /// into `container`, keyed by view id; see [#onSaveInstanceState()].
     public void saveHierarchyState(SparseArray<Parcelable> container) {
+        dispatchSaveInstanceState(container);
     }
 
+    /// Hands every view with an id the state [#saveHierarchyState] saved
+    /// for that id.
     public void restoreHierarchyState(SparseArray<Parcelable> container) {
+        dispatchRestoreInstanceState(container);
+    }
+
+    protected void dispatchSaveInstanceState(SparseArray<Parcelable> container) {
+        if (mID != NO_ID && mSaveEnabled) {
+            Parcelable state = onSaveInstanceState();
+            if (state != null) {
+                container.put(mID, state);
+            }
+        }
+    }
+
+    protected void dispatchRestoreInstanceState(SparseArray<Parcelable> container) {
+        if (mID != NO_ID) {
+            Parcelable state = container.get(mID);
+            if (state != null) {
+                onRestoreInstanceState(state);
+            }
+        }
     }
 
     public boolean isHardwareAccelerated() {

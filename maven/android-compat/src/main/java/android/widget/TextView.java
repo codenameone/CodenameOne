@@ -696,6 +696,72 @@ public class TextView extends View {
         return false;
     }
 
+    // ------------------------------------------------------------ saved state
+
+    private boolean mFreezesText;
+
+    /// Whether the text is saved with the view's state, so it survives a
+    /// recreation; an [EditText] always saves it.
+    public void setFreezesText(boolean freezesText) {
+        mFreezesText = freezesText;
+    }
+
+    public boolean getFreezesText() {
+        return mFreezesText;
+    }
+
+    @Override
+    protected android.os.Parcelable onSaveInstanceState() {
+        android.os.Parcelable superState = super.onSaveInstanceState();
+        if (!getFreezesText()) {
+            return superState;
+        }
+        CharSequence text = mText instanceof Spanned ? new SpannedString(mText) : mText.toString();
+        return new SavedState(superState, text, getSelectionStart(), getSelectionEnd());
+    }
+
+    @Override
+    protected void onRestoreInstanceState(android.os.Parcelable state) {
+        if (!(state instanceof SavedState)) {
+            super.onRestoreInstanceState(state);
+            return;
+        }
+        SavedState ss = (SavedState) state;
+        super.onRestoreInstanceState(ss.mSuperState);
+        setText(ss.mText);
+        restoreSelection(ss.mSelStart, ss.mSelEnd);
+    }
+
+    /// Puts back a selection [#onSaveInstanceState()] saved; only an
+    /// editable view has one to put back.
+    void restoreSelection(int start, int end) {
+    }
+
+    /// A text view's saved state: its text and selection. Held in memory
+    /// for a recreation, never written to a parcel.
+    static final class SavedState implements android.os.Parcelable {
+        final android.os.Parcelable mSuperState;
+        final CharSequence mText;
+        final int mSelStart;
+        final int mSelEnd;
+
+        SavedState(android.os.Parcelable superState, CharSequence text, int selStart, int selEnd) {
+            mSuperState = superState;
+            mText = text;
+            mSelStart = selStart;
+            mSelEnd = selEnd;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(android.os.Parcel dest, int flags) {
+        }
+    }
+
     // ------------------------------------------------------------ appearance
 
     public void setTextSize(float size) {

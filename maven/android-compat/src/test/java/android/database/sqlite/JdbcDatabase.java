@@ -37,7 +37,7 @@ import java.sql.Statement;
 /// A Codename One database over a JDBC SQLite connection with typed
 /// binding, the way the JavaSE port behaves, for running the
 /// android.database layer against a real engine without a device.
-final class JdbcDatabase extends Database {
+class JdbcDatabase extends Database {
 
     private final Connection conn;
 

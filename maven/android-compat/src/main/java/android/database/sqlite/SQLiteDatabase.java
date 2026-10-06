@@ -36,6 +36,7 @@ import com.codename1.db.RowExt;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// An SQLite database, backed by a Codename One `Database`.
 ///
@@ -98,20 +99,15 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// wait runs out -- rather than silently folding the second thread's
     /// work into the first one's transaction.
     ///
-    /// This field is deliberately neither volatile nor guarded by a lock.
-    /// Codename One is single threaded by design (the runtime and its ports
-    /// add no memory-model fences of their own), and the owner check is a
-    /// best-effort diagnostic for apps that share one database across
-    /// threads, not the mechanism that makes such sharing safe. A stale read
-    /// on another thread has two cases. In `beginTransaction` it is
-    /// harmless: the engine refuses the second BEGIN on the one connection.
-    /// In a plain statement or query it lets that statement run on the
-    /// connection inside the open transaction -- exactly what happens with
-    /// no check at all, i.e. what this runtime did before the check
-    /// existed. An app that needs strict isolation between threads must
-    /// confine the database to one thread or serialize its own access, as
-    /// it must for every other Codename One API.
-    private Thread mTransactionOwner;
+    /// An atomic rather than a lock: the outermost `beginTransaction` claims
+    /// it with `compareAndSet(null, current)` before the engine's BEGIN, so
+    /// of two threads beginning at once exactly one wins and the other is
+    /// refused, and every thread reads the current owner -- the refusal of
+    /// another thread's statement does not depend on a stale read. It is
+    /// released with `set(null)` only after the engine transaction has
+    /// ended (committed or rolled back), so no statement from another
+    /// thread can slip in between the last statement and the COMMIT.
+    private final AtomicReference<Thread> mTransactionOwner = new AtomicReference<Thread>();
 
     /// Refuses a statement or query from a thread other than the one whose
     /// transaction is open. With one engine connection it would otherwise
@@ -121,7 +117,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// no-lock reason as `beginTransaction` this refuses it with the same
     /// [SQLiteDatabaseLockedException].
     private void checkNotInOtherThreadsTransaction(String sql) {
-        Thread owner = mTransactionOwner;
+        Thread owner = mTransactionOwner.get();
         if (owner != null && owner != Thread.currentThread()) {
             throw new SQLiteDatabaseLockedException("database is locked: another thread's transaction is open, "
                     + "while executing: " + sql);
@@ -387,16 +383,18 @@ public final class SQLiteDatabase extends SQLiteClosable {
         ArrayList<Transaction> stack = transactions();
         if (stack.isEmpty()) {
             Thread current = Thread.currentThread();
-            Thread owner = mTransactionOwner;
-            if (owner != null && owner != current) {
+            if (!mTransactionOwner.compareAndSet(null, current)) {
                 throw new SQLiteDatabaseLockedException("database is locked: another thread's transaction is open");
             }
             try {
                 d.beginTransaction();
             } catch (IOException e) {
+                mTransactionOwner.set(null);
                 throw toSqlException(e, "BEGIN");
+            } catch (RuntimeException e) {
+                mTransactionOwner.set(null);
+                throw e;
             }
-            mTransactionOwner = current;
         }
         Transaction t = new Transaction();
         t.listener = transactionListener;
@@ -407,8 +405,8 @@ public final class SQLiteDatabase extends SQLiteClosable {
             } catch (RuntimeException ex) {
                 stack.remove(stack.size() - 1);
                 if (stack.isEmpty()) {
-                    mTransactionOwner = null;
                     rollbackQuietly();
+                    mTransactionOwner.set(null);
                 }
                 throw ex;
             }
@@ -456,16 +454,21 @@ public final class SQLiteDatabase extends SQLiteClosable {
             }
         } else {
             // The engine transaction ends here either way, so the database
-            // is free for another thread's even if the commit throws.
-            mTransactionOwner = null;
-            if (successful) {
-                try {
-                    d.commitTransaction();
-                } catch (IOException e) {
-                    throw toSqlException(e, "COMMIT");
+            // is free for another thread's even if the commit throws -- but
+            // only once it has ended, so no other thread's statement runs
+            // inside it.
+            try {
+                if (successful) {
+                    try {
+                        d.commitTransaction();
+                    } catch (IOException e) {
+                        throw toSqlException(e, "COMMIT");
+                    }
+                } else {
+                    rollbackQuietly();
                 }
-            } else {
-                rollbackQuietly();
+            } finally {
+                mTransactionOwner.set(null);
             }
         }
         if (listenerException != null) {
