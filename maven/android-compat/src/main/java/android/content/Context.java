@@ -273,8 +273,12 @@ public abstract class Context {
         return names == null ? new String[0] : names;
     }
 
+    /// Android refuses only `/`. A backslash is refused too: the remapped
+    /// `java.io.File` turns it into `/` (as does the Windows simulator's real
+    /// one), so a name such as `..\shared_prefs\x` would leave the files
+    /// directory.
     private static void checkFileName(String name) {
-        if (name.indexOf('/') >= 0) {
+        if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0) {
             throw new IllegalArgumentException("File " + name + " contains a path separator");
         }
     }

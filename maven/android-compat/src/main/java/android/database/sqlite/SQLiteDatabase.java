@@ -722,12 +722,25 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// runtime refuses everything else itself, by leading keyword, before it
     /// reaches the engine: every write the Android API makes (`execSQL`,
     /// `insert`, `update`, `delete`, `setVersion`, compiled statements) goes
-    /// through `runStatement`. `PRAGMA` is let through because the settings
-    /// methods (`setForeignKeyConstraintsEnabled`) are legal on a read-only
-    /// database; `setVersion` refuses on its own. Queries (`rawQuery`) are
-    /// not inspected.
-    private static final String[] READ_ONLY_KEYWORDS = {"SELECT", "PRAGMA", "EXPLAIN", "VALUES", "BEGIN",
+    /// through `runStatement`. A `PRAGMA` that only reads is let through, and
+    /// so is one that sets a connection-local option (`CONNECTION_PRAGMAS`)
+    /// because the settings methods (`setForeignKeyConstraintsEnabled`) are
+    /// legal on a read-only database. Any other `PRAGMA` with a value
+    /// (`user_version = 3`, `journal_mode = WAL`, `page_size = 8192`) is
+    /// refused: those are stored in the database file, and the connection
+    /// underneath is writable. Queries (`rawQuery`) are not inspected.
+    private static final String[] READ_ONLY_KEYWORDS = {"SELECT", "EXPLAIN", "VALUES", "BEGIN",
         "COMMIT", "END", "ROLLBACK", "SAVEPOINT", "RELEASE"};
+
+    /// Pragmas whose value lives in the connection, not in the database file,
+    /// plus the read-only pragmas that take an argument (`table_info(t)`).
+    /// Setting any of them never writes the file.
+    private static final String[] CONNECTION_PRAGMAS = {"foreign_keys", "recursive_triggers", "cache_size",
+        "synchronous", "temp_store", "busy_timeout", "case_sensitive_like", "defer_foreign_keys", "query_only",
+        "reverse_unordered_selects", "ignore_check_constraints", "automatic_index", "cell_size_check",
+        "cache_spill", "mmap_size", "threads", "soft_heap_limit", "hard_heap_limit", "trusted_schema",
+        "analysis_limit", "table_info", "table_xinfo", "table_list", "index_info", "index_xinfo", "index_list",
+        "foreign_key_list", "foreign_key_check", "integrity_check", "quick_check"};
 
     static boolean isReadOnlyStatement(String sql) {
         int start = 0;
@@ -744,12 +757,61 @@ public final class SQLiteDatabase extends SQLiteClosable {
             end++;
         }
         int len = end - start;
+        if (len == 6 && sql.regionMatches(true, start, "PRAGMA", 0, 6)) {
+            return isReadOnlyPragma(sql, end);
+        }
         for (String k : READ_ONLY_KEYWORDS) {
             if (k.length() == len && sql.regionMatches(true, start, k, 0, len)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /// `pos` is just past the `PRAGMA` keyword. A pragma without a value
+    /// (`PRAGMA user_version`) reads; one with a value (`= v` or `(v)`) is
+    /// read-only only when it names a `CONNECTION_PRAGMAS` entry. A schema
+    /// prefix (`main.`) is skipped.
+    private static boolean isReadOnlyPragma(String sql, int pos) {
+        int n = sql.length();
+        int nameStart = pos;
+        int nameEnd;
+        while (true) {
+            while (nameStart < n && sql.charAt(nameStart) <= ' ') {
+                nameStart++;
+            }
+            nameEnd = nameStart;
+            while (nameEnd < n && isPragmaNameChar(sql.charAt(nameEnd))) {
+                nameEnd++;
+            }
+            int dot = nameEnd;
+            while (dot < n && sql.charAt(dot) <= ' ') {
+                dot++;
+            }
+            if (dot < n && sql.charAt(dot) == '.') {
+                nameStart = dot + 1;
+                continue;
+            }
+            break;
+        }
+        int rest = nameEnd;
+        while (rest < n && sql.charAt(rest) <= ' ') {
+            rest++;
+        }
+        if (rest >= n || sql.charAt(rest) == ';') {
+            return true;
+        }
+        int len = nameEnd - nameStart;
+        for (String k : CONNECTION_PRAGMAS) {
+            if (k.length() == len && sql.regionMatches(true, nameStart, k, 0, len)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isPragmaNameChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
     }
 
     com.codename1.db.Cursor runQuery(String sql, Object[] bindArgs) {

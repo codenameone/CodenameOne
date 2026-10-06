@@ -475,7 +475,22 @@ public class SQLiteDatabaseTest {
         } catch (SQLiteReadOnlyDatabaseException expected) {
             // refused
         }
+        // A pragma stored in the database file is a write too: the engine
+        // underneath is writable, so it would otherwise change the file.
+        String[] persistent = {"PRAGMA user_version = 123", "pragma main.user_version=5;",
+            "PRAGMA application_id = 9", "PRAGMA journal_mode = WAL", "PRAGMA incremental_vacuum(1)"};
+        for (String sql : persistent) {
+            try {
+                ro.execSQL(sql);
+                fail("persistent pragma on a read-only database: " + sql);
+            } catch (SQLiteReadOnlyDatabaseException expected) {
+                // refused
+            }
+        }
         // Reads, settings pragmas and transactions still work.
+        ro.execSQL("PRAGMA user_version");
+        ro.execSQL("PRAGMA cache_size = 100");
+        ro.execSQL("PRAGMA table_info(t)");
         ro.setForeignKeyConstraintsEnabled(true);
         ro.beginTransaction();
         ro.endTransaction();

@@ -44,11 +44,25 @@ public class Handler {
     private final ArrayList<Message> pending = new ArrayList<Message>();
 
     public Handler() {
-        this(Looper.myLooper() != null ? Looper.myLooper() : Looper.getMainLooper(), null);
+        this(currentLooper(), null);
     }
 
     public Handler(Callback callback) {
-        this(Looper.myLooper() != null ? Looper.myLooper() : Looper.getMainLooper(), callback);
+        this(currentLooper(), callback);
+    }
+
+    /// The calling thread's looper, refusing a thread without one as Android
+    /// does. The event dispatch thread is the main looper's thread, so
+    /// `new Handler()` in an activity or view still binds to it; a worker
+    /// thread used to be bound to the main looper silently, which ran its
+    /// callbacks on the UI thread instead of failing.
+    private static Looper currentLooper() {
+        Looper l = Looper.myLooper();
+        if (l == null) {
+            throw new RuntimeException("Can't create handler inside thread " + Thread.currentThread()
+                    + " that has not called Looper.prepare()");
+        }
+        return l;
     }
 
     public Handler(Looper looper) {

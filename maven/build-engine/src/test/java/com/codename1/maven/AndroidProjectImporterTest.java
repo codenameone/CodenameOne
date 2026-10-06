@@ -208,7 +208,8 @@ public class AndroidProjectImporterTest {
     /// The application writes its own main class after a build generated one:
     /// the generated copy in the persistent generated-sources tree must go,
     /// even on a run the unchanged Android inputs would otherwise skip, or
-    /// javac sees two definitions until a clean build.
+    /// javac sees two definitions until a clean build. Deleting it again must
+    /// restore the generated one, or the project has no entry point.
     @Test
     public void ownMainClassRetiresTheGeneratedOne() throws Exception {
         java.io.File root = java.nio.file.Files.createTempDirectory("mainclass").toFile();
@@ -237,5 +238,11 @@ public class AndroidProjectImporterTest {
         java.nio.file.Files.write(own.toPath(), "package com.example; public class MyApp {}".getBytes("UTF-8"));
         assertTrue(runner.run());
         assertFalse("the generated entry point stayed beside the application's own", generated.isFile());
+
+        // Deleting the application's own class brings the generated one back,
+        // with the Android inputs still unchanged.
+        assertTrue(own.delete());
+        assertTrue(runner.run());
+        assertTrue("no entry point after the application's own was deleted", generated.isFile());
     }
 }

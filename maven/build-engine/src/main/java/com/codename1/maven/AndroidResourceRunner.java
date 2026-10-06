@@ -153,12 +153,15 @@ public class AndroidResourceRunner {
         try {
             if (state.isFile() && digest.equals(new String(Files.readAllBytes(state.toPath()), "UTF-8"))
                     && new File(resourcesOut, ResourceCompiler.APP_TABLE).isFile() && javaOut.isDirectory()) {
-                log.debug("Android resources unchanged; skipping");
                 // The digest covers the Android sources, not the
                 // application's own: a main class written since the last
-                // build must still retire the generated one.
-                removeGeneratedMainClassIfWritten();
-                return true;
+                // build must still retire the generated one, and one deleted
+                // since must bring it back. The latter falls through to a
+                // full run, which is what writes the generated class.
+                if (removeGeneratedMainClassIfWritten() || !entryPointMissing()) {
+                    log.debug("Android resources unchanged; skipping");
+                    return true;
+                }
             }
         } catch (IOException e) {
             log.debug("Cannot read " + state + ": " + e);
@@ -261,6 +264,14 @@ public class AndroidResourceRunner {
             }
         }
         return false;
+    }
+
+    /// True when a full run would generate the main class but it is absent:
+    /// the application deleted its own after an earlier run retired the
+    /// generated one. Only a manifest makes a run generate it.
+    private boolean entryPointMissing() {
+        return mainPackage != null && mainClass != null && new File(androidDir, "AndroidManifest.xml").isFile()
+                && !generatedMainClass().isFile();
     }
 
     /// Generates the Codename One main class when the project does not have

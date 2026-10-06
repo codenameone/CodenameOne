@@ -264,11 +264,22 @@ public final class Bitmap {
         return pixels;
     }
 
+    /// Refuses a pixel read on a recycled bitmap the way Android does. The
+    /// image is still held (a `Canvas` may share it), so without this a
+    /// recycled bitmap would quietly re-read the pixels it was told to drop.
+    private void checkNotRecycled(String message) {
+        if (recycled) {
+            throw new IllegalStateException(message);
+        }
+    }
+
     public int getPixel(int x, int y) {
+        checkNotRecycled("Can't call getPixel() on a recycled bitmap");
         return pixels()[y * width + x];
     }
 
     public void getPixels(int[] out, int offset, int stride, int x, int y, int w, int h) {
+        checkNotRecycled("Can't call getPixels() on a recycled bitmap");
         int[] p = pixels();
         for (int row = 0; row < h; row++) {
             System.arraycopy(p, (y + row) * width + x, out, offset + row * stride, w);
@@ -327,6 +338,7 @@ public final class Bitmap {
     }
 
     public Bitmap copy(Config config, boolean isMutable) {
+        checkNotRecycled("Can't copy a recycled bitmap");
         Image src = getImage();
         if (isMutable) {
             Image copy = Image.createImage(width, height, 0);
@@ -345,6 +357,7 @@ public final class Bitmap {
     }
 
     public Bitmap extractAlpha() {
+        checkNotRecycled("Can't extractAlpha on a recycled bitmap");
         int[] p = pixels().clone();
         for (int i = 0; i < p.length; i++) {
             p[i] = p[i] & 0xff000000;
@@ -353,6 +366,7 @@ public final class Bitmap {
     }
 
     public boolean compress(CompressFormat format, int quality, OutputStream stream) {
+        checkNotRecycled("Can't compress a recycled bitmap");
         // Codename One encodes only PNG and JPEG. A WebP request fails the
         // way Android reports an encoder failure, rather than writing PNG
         // bytes the caller will label and serve as WebP.

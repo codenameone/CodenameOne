@@ -117,4 +117,36 @@ public class BitmapImmutableWriteTest {
             assertEquals("Can't call setPixel() on a recycled bitmap", expected.getMessage());
         }
     }
+    /// Reads refuse too. `recycle()` dropped only the cached pixel array, so
+    /// the next read used to fill it again from the retained image.
+    @Test
+    public void recycledBitmapRejectsReads() {
+        Bitmap m = red(true);
+        assertEquals(RED, m.getPixel(0, 0));
+        m.recycle();
+        try {
+            m.getPixel(0, 0);
+            fail("getPixel on a recycled bitmap");
+        } catch (IllegalStateException expected) {
+            assertEquals("Can't call getPixel() on a recycled bitmap", expected.getMessage());
+        }
+        try {
+            m.getPixels(new int[12], 0, 4, 0, 0, 4, 3);
+            fail("getPixels on a recycled bitmap");
+        } catch (IllegalStateException expected) {
+            assertEquals("Can't call getPixels() on a recycled bitmap", expected.getMessage());
+        }
+        try {
+            m.copy(Bitmap.Config.ARGB_8888, true);
+            fail("copy of a recycled bitmap");
+        } catch (IllegalStateException expected) {
+            assertEquals("Can't copy a recycled bitmap", expected.getMessage());
+        }
+        try {
+            m.compress(Bitmap.CompressFormat.PNG, 100, new java.io.ByteArrayOutputStream());
+            fail("compress of a recycled bitmap");
+        } catch (IllegalStateException expected) {
+            assertEquals("Can't compress a recycled bitmap", expected.getMessage());
+        }
+    }
 }
