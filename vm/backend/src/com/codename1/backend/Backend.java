@@ -1234,6 +1234,8 @@ public final class Backend {
         /// The executors a start in progress opened, until a Backend owns them.
         private Tasks.Registry startingTasks;
         private boolean createTablesGiven;
+        private boolean migrations;
+        private boolean migrationsGiven;
         private boolean handlersNeedADatabase;
         private boolean quiet;
         private Tracer tracer;
@@ -1393,6 +1395,14 @@ public final class Backend {
         public Builder createTables(boolean create) {
             this.createTables = create;
             this.createTablesGiven = true;
+            return this;
+        }
+
+        /// Whether to apply pending migrations at start-up. Otherwise
+        /// cn1.flyway.enabled, which defaults to true. See [Migrations].
+        public Builder migrations(boolean migrate) {
+            this.migrations = migrate;
+            this.migrationsGiven = true;
             return this;
         }
 
@@ -1674,6 +1684,11 @@ public final class Backend {
 
         /// [#start] once the database, if any, is open.
         private Backend startWith(DataSource pool, Tracer active) throws Exception {
+            // BEFORE the entity manager: createTables fills in what is missing and
+            // validateSchema reads what is there, so both have to see the schema the
+            // migrations leave. Before the session store too, which creates its own
+            // table on first use.
+            runMigrations(pool);
             EntityManager manager = openEntityManager(pool);
             List routers = new ArrayList();
             HttpServer.Handler relay = active != null ? active.relay() : null;
@@ -2134,10 +2149,27 @@ public final class Backend {
             // server that needs none starts. One that needs one fails below, in
             // fromConfig, with the message naming the variable.
             boolean configured = config.resolves(Config.DATASOURCE_URL);
-            if (!configured && !handlersNeedADatabase && EntityManager.registered().length == 0) {
+            if (!configured && !handlersNeedADatabase && EntityManager.registered().length == 0
+                    && !Migrations.isRegistered()) {
                 return null;
             }
             return DataSource.fromConfig(config);
+        }
+
+        /// Applies pending migrations, when there are any registered and they have not
+        /// been switched off.
+        ///
+        /// A failure here fails the start. A server that came up on a schema it could
+        /// not migrate would answer requests against tables that are not the ones its
+        /// code was written for.
+        private void runMigrations(DataSource pool) throws IOException {
+            if (pool == null || !Migrations.isRegistered()) {
+                return;
+            }
+            boolean run = migrationsGiven ? migrations : config.getBoolean(Config.FLYWAY_ENABLED, true);
+            if (run) {
+                Migrations.migrate(pool, config);
+            }
         }
 
         private EntityManager openEntityManager(DataSource pool) throws IOException {

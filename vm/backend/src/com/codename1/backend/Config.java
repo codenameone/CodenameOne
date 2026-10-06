@@ -140,6 +140,38 @@ public final class Config {
     /// whatever runs migrations.
     public static final String ORM_CREATE_TABLES = "cn1.orm.createTables";
 
+    /// Whether pending migrations run at start-up. Defaults to true when the build found
+    /// migrations or a library registered some, which is the only time there is anything to
+    /// run. See [Migrations].
+    public static final String FLYWAY_ENABLED = "cn1.flyway.enabled";
+    /// The application's schema history table. `flyway_schema_history` unless set.
+    public static final String FLYWAY_TABLE = "cn1.flyway.table";
+    /// Whether a database that has tables and no history is adopted at the baseline version
+    /// instead of refused. Off unless set.
+    public static final String FLYWAY_BASELINE_ON_MIGRATE = "cn1.flyway.baselineOnMigrate";
+    /// The version an adopted database is taken to be at. `1` unless set.
+    public static final String FLYWAY_BASELINE_VERSION = "cn1.flyway.baselineVersion";
+    /// The description written on the baseline row.
+    public static final String FLYWAY_BASELINE_DESCRIPTION = "cn1.flyway.baselineDescription";
+    /// Whether applied migrations are checked against the scripts before migrating. On
+    /// unless set.
+    public static final String FLYWAY_VALIDATE_ON_MIGRATE = "cn1.flyway.validateOnMigrate";
+    /// Whether a migration older than the newest applied one is applied instead of refused.
+    public static final String FLYWAY_OUT_OF_ORDER = "cn1.flyway.outOfOrder";
+    /// Whether dropping the whole schema through [com.codename1.migration.Migrator#clean()]
+    /// is refused. On unless set.
+    public static final String FLYWAY_CLEAN_DISABLED = "cn1.flyway.cleanDisabled";
+    /// The highest version to migrate to; `latest`, the default, means all of them.
+    public static final String FLYWAY_TARGET = "cn1.flyway.target";
+    /// Whether a schema migrated by a newer build is tolerated. On unless set, because a
+    /// rolling deployment runs the old build against the new schema.
+    public static final String FLYWAY_IGNORE_FUTURE_MIGRATIONS = "cn1.flyway.ignoreFutureMigrations";
+    /// The name recorded as having applied each migration. The database user unless set.
+    public static final String FLYWAY_INSTALLED_BY = "cn1.flyway.installedBy";
+    /// How many one-second attempts to wait for another process that is migrating. 50 unless
+    /// set.
+    public static final String FLYWAY_LOCK_RETRY_COUNT = "cn1.flyway.lockRetryCount";
+
     /// The profiles that mean "this is somebody's laptop or a test".
     private static final String[] DEVELOPMENT_PROFILES = {"dev", "development", "test", "local"};
 

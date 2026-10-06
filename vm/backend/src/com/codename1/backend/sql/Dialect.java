@@ -499,6 +499,29 @@ public abstract class Dialect {
                 executableComments());
     }
 
+    /// Cuts a script into its statements, by this engine's lexical rules.
+    ///
+    /// For migration scripts: everything else hands
+    /// [com.codename1.backend.Database] one statement at a time. Semicolons
+    /// inside literals, comments, dollar-quoted bodies and trigger bodies do not
+    /// split, and a piece that holds only comments is dropped. MySQL's
+    /// `DELIMITER` is a directive of its command-line client, not SQL, and is
+    /// not understood here.
+    ///
+    /// @param script the script
+    /// @return the statements in order, without their terminators; empty for a
+    ///     script that holds none
+    /// @throws IOException if a literal or comment in the script is never closed
+    public String[] splitStatements(String script) throws IOException {
+        if (script == null) {
+            throw new IOException("No script");
+        }
+        return Placeholders.split(script, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
     /// Whether `sql` updates an existing row when it conflicts.
     ///
     /// What [com.codename1.backend.Database#insert] needs before it
