@@ -74,17 +74,12 @@ public final class DefaultJwtEncoder implements JwtEncoder {
         JwsAlgorithm algorithm = header == null ? null : header.getAlgorithm();
         String keyId = header == null ? null : header.getKeyId();
         for (Jwk candidate : candidates) {
-            if (!candidate.isPrivate()) {
-                continue;
+            // The first that can sign, has the id asked for and fits the algorithm.
+            if (key == null && candidate.isPrivate()
+                    && (keyId == null || keyId.equals(candidate.getKeyId()))
+                    && (algorithm == null || Jose.fits(candidate, algorithm))) {
+                key = candidate;
             }
-            if (keyId != null && !keyId.equals(candidate.getKeyId())) {
-                continue;
-            }
-            if (algorithm != null && !Jose.fits(candidate, algorithm)) {
-                continue;
-            }
-            key = candidate;
-            break;
         }
         if (key == null) {
             throw new JwtEncodingException("There is no key to sign with"

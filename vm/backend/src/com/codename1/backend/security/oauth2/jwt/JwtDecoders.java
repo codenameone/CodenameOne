@@ -109,12 +109,12 @@ public final class JwtDecoders {
                 continue;
             }
             Object named = metadata.get("issuer");
-            if (!issuer.equals(named)) {
-                throw new IllegalArgumentException("The Issuer \"" + named + "\" provided in the "
-                        + "configuration metadata did not match the requested issuer \"" + issuer
-                        + "\"");
+            if (issuer.equals(named)) {
+                return metadata;
             }
-            return metadata;
+            throw new IllegalArgumentException("The Issuer \"" + named + "\" provided in the "
+                    + "configuration metadata did not match the requested issuer \"" + issuer
+                    + "\"");
         }
         throw new IllegalArgumentException("Unable to resolve the Configuration with the provided "
                 + "Issuer of \"" + issuer + "\": " + last);

@@ -24,7 +24,7 @@ package com.codename1.backend.security;
 
 /// The request's CSRF token is not the one the server issued.
 public class InvalidCsrfTokenException extends CsrfException {
-    public InvalidCsrfTokenException(CsrfToken expected, String actualToken) {
+    public InvalidCsrfTokenException(CsrfToken expected, String actualToken) { //NOPMD UnusedFormalParameter - Spring's signature; what was sent is not repeated
         super("Invalid CSRF Token found on the request parameter '"
                 + expected.getParameterName() + "' or header '" + expected.getHeaderName()
                 + "'.");

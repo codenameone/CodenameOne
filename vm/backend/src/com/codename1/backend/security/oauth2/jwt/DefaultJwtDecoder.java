@@ -280,9 +280,10 @@ public final class DefaultJwtDecoder implements JwtDecoder {
         // handful is every key a real issuer has current at once.
         int tried = 0;
         for (Jwk key : candidates) {
-            if (tried++ == 4) {
+            if (tried == 4) {
                 break;
             }
+            tried++;
             try {
                 if (Jose.verify(algorithm, key, signingInput, signature)) {
                     return;

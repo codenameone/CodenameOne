@@ -25,7 +25,7 @@ package com.codename1.backend.security;
 /// The request carried a CSRF token and the server holds none to compare it
 /// with -- the session it belonged to is gone -- or carried none at all.
 public class MissingCsrfTokenException extends CsrfException {
-    public MissingCsrfTokenException(String actualToken) {
+    public MissingCsrfTokenException(String actualToken) { //NOPMD UnusedFormalParameter - Spring's signature; what was sent is not repeated
         super("Could not verify the provided CSRF token because no token was found to compare.");
     }
 }

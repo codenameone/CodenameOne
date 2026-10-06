@@ -172,7 +172,9 @@ public class DaoAuthenticationProvider implements AuthenticationProvider {
         } catch (UsernameNotFoundException missing) {
             mitigateAgainstTimingAttack(encoder, presented);
             if (hideUserNotFoundExceptions) {
-                throw new BadCredentialsException("Bad credentials");
+                // The cause stays on the exception, for the server's log; what
+                // is answered is the message, which says no more than this.
+                throw new BadCredentialsException("Bad credentials", missing);
             }
             throw missing;
         } catch (AuthenticationException refused) {

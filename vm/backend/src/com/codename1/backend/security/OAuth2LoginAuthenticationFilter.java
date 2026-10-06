@@ -176,8 +176,9 @@ public final class OAuth2LoginAuthenticationFilter implements SecurityFilter {
         try {
             complete = ClientRegistrations.resolve(registration, RemoteJwkSet.WEB);
         } catch (RuntimeException err) {
-            throw refused(OAuth2ErrorCodes.SERVER_ERROR, "The provider's metadata could not be "
-                    + "read");
+            throw new OAuth2AuthenticationException(new OAuth2Error(
+                    OAuth2ErrorCodes.SERVER_ERROR), "The provider's metadata could not be read",
+                    err);
         }
         synchronized (resolved) {
             resolved.put(registration.getRegistrationId(), complete);
@@ -253,7 +254,8 @@ public final class OAuth2LoginAuthenticationFilter implements SecurityFilter {
                     OAuth2ErrorCodes.INVALID_ID_TOKEN), "The ID token did not verify: "
                     + err.getMessage(), err);
         } catch (IllegalArgumentException err) {
-            throw refused(OAuth2ErrorCodes.INVALID_ID_TOKEN, "The ID token cannot be verified");
+            throw new OAuth2AuthenticationException(new OAuth2Error(
+                    OAuth2ErrorCodes.INVALID_ID_TOKEN), "The ID token cannot be verified", err);
         }
         // The nonce ties the token to this browser's request: a token issued
         // for another sign-in, replayed here, has another one.

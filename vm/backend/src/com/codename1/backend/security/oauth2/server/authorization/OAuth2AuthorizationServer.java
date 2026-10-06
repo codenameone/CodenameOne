@@ -154,8 +154,8 @@ public final class OAuth2AuthorizationServer {
             if (path.equals(settings.getOidcUserInfoEndpoint())) {
                 return userInfo(request);
             }
-            if (path.equals("/.well-known/openid-configuration")
-                    || path.equals("/.well-known/oauth-authorization-server")) {
+            if ("/.well-known/openid-configuration".equals(path)
+                    || "/.well-known/oauth-authorization-server".equals(path)) {
                 return metadata(request);
             }
             return null;
@@ -924,7 +924,11 @@ public final class OAuth2AuthorizationServer {
         try {
             token = decoder.decode(header.substring(7).trim());
         } catch (JwtException bad) {
-            throw bearer(401, OAuth2ErrorCodes.INVALID_TOKEN, "The access token is not valid");
+            Refusal refusal = bearer(401, OAuth2ErrorCodes.INVALID_TOKEN,
+                    "The access token is not valid");
+            // Why, for the server's log; the answer says only that it is not.
+            refusal.initCause(bad);
+            throw refusal;
         }
         String grant = grantOf(token);
         OAuth2Authorization authorization = grant == null ? null : authorizations.findById(grant);

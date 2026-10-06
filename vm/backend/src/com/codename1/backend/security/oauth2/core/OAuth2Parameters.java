@@ -46,8 +46,8 @@ public final class OAuth2Parameters {
     public static String encode(String value) {
         byte[] bytes = utf8(value);
         StringBuilder sb = new StringBuilder(bytes.length + 16);
-        for (int iter = 0 ; iter < bytes.length ; iter++) {
-            int b = bytes[iter] & 0xff;
+        for (byte one : bytes) {
+            int b = one & 0xff;
             if ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
                     || b == '-' || b == '.' || b == '_' || b == '~') {
                 sb.append((char) b);

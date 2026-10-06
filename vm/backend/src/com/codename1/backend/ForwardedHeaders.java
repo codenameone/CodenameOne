@@ -272,7 +272,8 @@ final class ForwardedHeaders {
                 digits = 0;
             } else if (c >= '0' && c <= '9') {
                 number = (number < 0 ? 0 : number * 10) + (c - '0');
-                if (++digits > 3 || number > 255) {
+                digits++;
+                if (digits > 3 || number > 255) {
                     return null;
                 }
             } else {

@@ -152,23 +152,23 @@ public final class PersistentTokenBasedRememberMeServices
         int colon = cookie.indexOf(':');
         if (colon <= 0 || colon == cookie.length() - 1 || cookie.length() > 200
                 || cookie.indexOf(':', colon + 1) >= 0) {
-            cancelCookie(request);
+            cancelCookie();
             return null;
         }
         String series = cookie.substring(0, colon);
         String presented = hash(cookie.substring(colon + 1));
         PersistentRememberMeToken stored = tokenRepository.getTokenForSeries(series);
         if (stored == null) {
-            cancelCookie(request);
+            cancelCookie();
             return null;
         }
         long now = clock.currentTimeMillis();
         if (!sameHash(presented, stored.getTokenHash())) {
-            return stolen(request, stored);
+            return stolen(stored);
         }
         if (stored.getLastUsed() + tokenValiditySeconds * 1000L < now) {
             tokenRepository.removeToken(series);
-            cancelCookie(request);
+            cancelCookie();
             return null;
         }
         UserDetails user;
@@ -181,22 +181,22 @@ public final class PersistentTokenBasedRememberMeServices
                 || !user.isAccountNonExpired() || !user.isCredentialsNonExpired()) {
             // An account that could not sign in is not signed in by its cookie.
             tokenRepository.removeToken(series);
-            cancelCookie(request);
+            cancelCookie();
             return null;
         }
         String next = random();
         if (!tokenRepository.updateToken(series, stored.getTokenHash(), hash(next), now)) {
             // Somebody replaced it between the read and the write: the same
             // cookie, presented twice.
-            return stolen(request, stored);
+            return stolen(stored);
         }
-        setCookie(request, series + ":" + next);
+        setCookie(series + ":" + next);
         return new RememberMeAuthenticationToken(key, user, user.getAuthorities());
     }
 
-    private Authentication stolen(HttpServer.Request request, PersistentRememberMeToken stored) {
+    private Authentication stolen(PersistentRememberMeToken stored) {
         tokenRepository.removeUserTokens(stored.getUsername());
-        cancelCookie(request);
+        cancelCookie();
         System.err.println("cn1: a remember-me cookie of " + stored.getUsername() + " was "
                 + "presented with a token that had already been used, which means it was "
                 + "copied; every remembered sign-in of that user has been deleted");
@@ -236,13 +236,13 @@ public final class PersistentTokenBasedRememberMeServices
         tokenRepository.createNewToken(new PersistentRememberMeToken(
                 successfulAuthentication.getName(), series, hash(token),
                 clock.currentTimeMillis()));
-        setCookie(request, series + ":" + token);
+        setCookie(series + ":" + token);
     }
 
     @Override
     public void loginFail(HttpServer.Request request) {
         if (request.getCookie(cookieName) != null) {
-            cancelCookie(request);
+            cancelCookie();
         }
     }
 
@@ -254,21 +254,21 @@ public final class PersistentTokenBasedRememberMeServices
             tokenRepository.removeUserTokens(authentication.getName());
         }
         if (request.getCookie(cookieName) != null) {
-            cancelCookie(request);
+            cancelCookie();
         }
     }
 
     // ----------------------------------------------------------------- cookie
 
-    private void setCookie(HttpServer.Request request, String value) {
-        writeCookie(request, value, tokenValiditySeconds);
+    private void setCookie(String value) {
+        writeCookie(value, tokenValiditySeconds);
     }
 
-    private void cancelCookie(HttpServer.Request request) {
-        writeCookie(request, "", 0);
+    private void cancelCookie() {
+        writeCookie("", 0);
     }
 
-    private void writeCookie(HttpServer.Request request, String value, int maxAge) {
+    private void writeCookie(String value, int maxAge) {
         SecurityExchange exchange = SecurityExchange.current();
         if (exchange == null) {
             // Not under a chain: there is no response to put a cookie on.

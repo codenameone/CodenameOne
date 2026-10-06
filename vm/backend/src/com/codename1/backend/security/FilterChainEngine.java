@@ -45,9 +45,7 @@ final class FilterChainEngine implements RequestSecurity {
                 throw new IllegalArgumentException("Not a SecurityFilterChain: " + chain);
             }
             this.chains[iter] = (SecurityFilterChain) chain;
-            if (iter > 0 && this.chains[iter - 1] instanceof DefaultSecurityFilterChain
-                    && ((DefaultSecurityFilterChain) this.chains[iter - 1]).getRequestMatcher()
-                    == AnyRequestMatcher.INSTANCE) { //NOPMD CompareObjectsWithEquals - the singleton
+            if (iter > 0 && matchesAnyRequest(this.chains[iter - 1])) {
                 throw new IllegalStateException("A filter chain that matches any request has "
                         + "already been configured, which means that this filter chain ["
                         + chain + "] will never be invoked. Please use "
@@ -59,6 +57,15 @@ final class FilterChainEngine implements RequestSecurity {
         this.tls = tls;
         com.codename1.impl.backend.security.SecuritySupport.developmentProfile(
                 config != null && config.isDevelopmentProfile());
+    }
+
+    /// Whether `chain` is one that guards every request.
+    private static boolean matchesAnyRequest(SecurityFilterChain chain) {
+        if (!(chain instanceof DefaultSecurityFilterChain)) {
+            return false;
+        }
+        RequestMatcher matcher = ((DefaultSecurityFilterChain) chain).getRequestMatcher();
+        return matcher == AnyRequestMatcher.INSTANCE; //NOPMD CompareObjectsWithEquals - the singleton
     }
 
     private SecurityFilterChain match(HttpServer.Request request) {
