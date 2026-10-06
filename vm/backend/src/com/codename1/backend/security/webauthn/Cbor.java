@@ -163,10 +163,9 @@ final class Cbor {
                 case 21: out[0] = Boolean.TRUE; return major;
                 case 22: out[0] = null; return major;
                 case 31: return BREAK;
-                case 25:
-                case 26:
-                case 27: throw malformed("a floating point number");
-                default: throw malformed("the simple value " + info);
+                default:
+                    throw malformed(info >= 25 && info <= 27 ? "a floating point number"
+                            : "the simple value " + info);
             }
         }
         long argument = argument(info);

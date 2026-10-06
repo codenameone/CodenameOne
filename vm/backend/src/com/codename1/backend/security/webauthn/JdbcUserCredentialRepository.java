@@ -26,14 +26,14 @@ import com.codename1.backend.Base64Url;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.security.AuthenticationServiceException;
-import com.codename1.backend.security.SecuritySchema;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /// Credentials kept in the server's database, in the
-/// `cn1_webauthn_credential` table of [SecuritySchema].
+/// `cn1_webauthn_credential` table of
+/// [com.codename1.backend.security.SecuritySchema].
 ///
 /// A row holds nothing secret: a public key verifies and cannot sign.
 ///
@@ -91,12 +91,8 @@ public final class JdbcUserCredentialRepository implements UserCredentialReposit
         } catch (IOException refused) {
             // The key refused the row, when a credential with this id is there:
             // that is the answer. Anything else is the store failing.
-            try {
-                if (read(record.getCredentialId()) != null) {
-                    return false;
-                }
-            } catch (IOException err) {
-                throw failed(err);
+            if (findByCredentialId(record.getCredentialId()) != null) {
+                return false;
             }
             throw failed(refused);
         }
