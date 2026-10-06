@@ -252,6 +252,24 @@ class OAuth2LoginTest {
     }
 
     @Test
+    @DisplayName("a server whose settings declare Sign in with Apple does not start, and says why")
+    void appleInTheSettingsStopsTheStart() {
+        Properties settings = SecuredServer.settings();
+        settings.setProperty("cn1.security.oauth2.client.registration.apple.client-id",
+                "com.example.web");
+        settings.setProperty("cn1.security.oauth2.client.registration.apple.client-secret",
+                "a-static-secret");
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                () -> SecuredServer.start(settings, "prod", new Object[0], APP,
+                        http -> http.authorizeHttpRequests(auth -> auth.anyRequest()
+                                .authenticated()).oauth2Login(Customizer.withDefaults()).build()));
+        assertTrue(refused.getMessage().startsWith("Sign in with Apple cannot be declared in "
+                + "the configuration"), refused.getMessage());
+        assertTrue(refused.getMessage().contains("AppleClientSecret.fromFile("),
+                refused.getMessage());
+    }
+
+    @Test
     @DisplayName("sign-in through this layer's own authorization server, end to end")
     void endToEnd() throws Exception {
         try (SecuredServer server = start(o -> { })) {

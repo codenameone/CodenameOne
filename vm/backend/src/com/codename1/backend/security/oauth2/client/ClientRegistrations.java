@@ -61,7 +61,10 @@ import java.util.Map;
 /// Sign in with Apple is declared in code, as a
 /// [ClientRegistrationRepository] bean, because its secret is a token signed
 /// with a key and not a setting -- see [AppleClientSecret] -- and a server
-/// that does not sign in with Apple should not carry what signs one.
+/// that does not sign in with Apple should not carry what signs one. A
+/// registration here whose provider is `apple`, or whose provider block names
+/// Apple's issuer or token endpoint, is refused when the configuration is
+/// read, with the code to write in its place.
 public final class ClientRegistrations {
     /// The prefix of every registration's settings.
     public static final String REGISTRATION = "cn1.security.oauth2.client.registration.";
@@ -74,7 +77,8 @@ public final class ClientRegistrations {
     /// The registrations the configuration declares; empty when it declares
     /// none.
     ///
-    /// - `IllegalArgumentException`: when one of them is incomplete
+    /// - `IllegalArgumentException`: when one of them is incomplete, or is
+    /// for Sign in with Apple
     public static List<ClientRegistration> fromConfig(Config config) throws IOException {
         List<String> ids = new ArrayList<String>();
         for (Object key : config.keys()) {
@@ -98,6 +102,11 @@ public final class ClientRegistrations {
         String prefix = REGISTRATION + id + ".";
         String providerId = config.get(prefix + "provider", id);
         CommonOAuth2Provider common = CommonOAuth2Provider.of(providerId);
+        String provider = PROVIDER + providerId + ".";
+        if (common == CommonOAuth2Provider.APPLE || isApple(config.get(provider + "issuer-uri"))
+                || isApple(config.get(provider + "token-uri"))) {
+            throw new IllegalArgumentException(appleInConfiguration(id));
+        }
         ClientRegistration.Builder b = common != null ? common.getBuilder(id)
                 : ClientRegistration.withRegistrationId(id);
         b.clientId(config.get(prefix + "client-id"));
@@ -125,7 +134,6 @@ public final class ClientRegistrations {
         if (value != null) {
             b.responseMode(value);
         }
-        String provider = PROVIDER + providerId + ".";
         value = config.get(provider + "issuer-uri");
         if (value != null) {
             b.issuerUri(value);
@@ -159,6 +167,35 @@ public final class ClientRegistrations {
             b.authorizationResponseIssParameterSupported("true".equals(value.trim()));
         }
         return b.build();
+    }
+
+    private static boolean isApple(String address) {
+        return address != null && address.trim().regionMatches(true, 0,
+                "https://appleid.apple.com", 0, 25);
+    }
+
+    /// Why a registration for Sign in with Apple is refused when it is found
+    /// in the configuration, and what to write instead. A `client-secret`
+    /// there would be sent to Apple as it stands and refused at the first
+    /// sign-in, and nothing here may sign one: this class is in every server
+    /// that signs in elsewhere.
+    static String appleInConfiguration(String id) {
+        return "Sign in with Apple cannot be declared in the configuration (" + REGISTRATION
+                + id + ".*). Apple's client secret is not a text: it is a token this server "
+                + "signs with the .p8 key of the developer account, so a client-secret setting "
+                + "could never be right. Remove the settings and declare the registration in "
+                + "code, beside the ones the configuration holds:\n\n"
+                + "    @Bean\n"
+                + "    ClientRegistrationRepository providers(Config config) throws IOException {\n"
+                + "        List<ClientRegistration> all = new ArrayList<ClientRegistration>(\n"
+                + "                ClientRegistrations.fromConfig(config));\n"
+                + "        all.add(CommonOAuth2Provider.APPLE.getBuilder(\"" + id + "\")\n"
+                + "                .clientId(\"com.example.web\")   // the Services ID\n"
+                + "                .clientSecretSupplier(AppleClientSecret.fromFile(\n"
+                + "                        teamId, keyId, \"/path/to/AuthKey.p8\"))\n"
+                + "                .build());\n"
+                + "        return new InMemoryClientRegistrationRepository(all);\n"
+                + "    }\n";
     }
 
     /// A builder with the endpoints of `issuer` read from its metadata now.

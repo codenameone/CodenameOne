@@ -706,6 +706,11 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/s
 A `ClientRegistrationRepository` bean replaces the registrations read from the
 configuration, which is why this one adds them itself.
 
+A registration for Apple in the configuration is refused when the server
+starts, whether it names the `apple` provider or spells out Apple's endpoints.
+A `client-secret` setting could never be right for it, and the error shows the
+bean to declare instead.
+
 Apple answers with a form that the browser posts from Apple's page, and a
 browser doesn't send the session cookie with such a request. The pending
 sign-in is therefore kept in a signed cookie of its own. Set
@@ -1396,7 +1401,8 @@ That keeps the binary small, and it has consequences you can see:
   `clientSecretEncoder`. It doesn't bring the password encoders with it.
 * **Sign in with Apple is declared in code.** A registration read from the
   configuration never signs a client secret, so a server that doesn't declare
-  `AppleClientSecret` carries nothing that signs one.
+  `AppleClientSecret` carries nothing that signs one. Declaring Apple in the
+  configuration stops the start.
 * **The configured user belongs to the password mechanisms.** The
   `cn1.security.user.*` keys are read by `formLogin`, `httpBasic` and
   `rememberMe` only.

@@ -221,6 +221,45 @@ class OAuth2ClientTest {
     // -------------------------------------------------------- registrations
 
     @Test
+    @DisplayName("Sign in with Apple in the settings is refused at start-up, with the code to write")
+    void appleFromConfigIsRefused() throws Exception {
+        String r = ClientRegistrations.REGISTRATION;
+        // By its own id, by naming the provider, and by a block spelling out
+        // Apple's endpoints -- with a secret or without one.
+        String[][] spellings = {
+            {r + "apple.client-id", "com.example.web", r + "apple.client-secret", "static"},
+            {r + "apple.client-id", "com.example.web"},
+            {r + "ios.provider", "apple", r + "ios.client-id", "com.example.web",
+                r + "ios.client-secret", "static"},
+            {r + "ios.provider", "fruit", r + "ios.client-id", "com.example.web",
+                r + "ios.client-secret", "static",
+                ClientRegistrations.PROVIDER + "fruit.issuer-uri", "https://appleid.apple.com"},
+            {r + "ios.provider", "fruit", r + "ios.client-id", "com.example.web",
+                ClientRegistrations.PROVIDER + "fruit.authorization-uri",
+                "https://appleid.apple.com/auth/authorize",
+                ClientRegistrations.PROVIDER + "fruit.token-uri",
+                "https://APPLEID.apple.com/auth/token"}};
+        for (String[] spelling : spellings) {
+            Properties p = new Properties();
+            p.setProperty(r + "google.client-id", "g-id");
+            p.setProperty(r + "google.client-secret", "g-secret");
+            for (int iter = 0 ; iter < spelling.length ; iter += 2) {
+                p.setProperty(spelling[iter], spelling[iter + 1]);
+            }
+            String id = spelling[0].substring(r.length(), spelling[0].indexOf('.', r.length()));
+            IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                    () -> ClientRegistrations.fromConfig(Config.of(p, "prod")));
+            String message = refused.getMessage();
+            assertTrue(message.startsWith("Sign in with Apple cannot be declared in the "
+                    + "configuration (cn1.security.oauth2.client.registration." + id + ".*)."),
+                    message);
+            assertTrue(message.contains("CommonOAuth2Provider.APPLE.getBuilder(\"" + id + "\")")
+                    && message.contains(".clientSecretSupplier(AppleClientSecret.fromFile("),
+                    message);
+        }
+    }
+
+    @Test
     @DisplayName("registrations are read from the settings, by common provider or by a provider block")
     void fromConfig() throws Exception {
         Properties p = new Properties();
@@ -231,7 +270,6 @@ class OAuth2ClientTest {
         p.setProperty(r + "work.client-id", "m-id");
         p.setProperty(r + "work.client-secret", "m-secret");
         p.setProperty(r + "work.scope", "openid, email");
-        p.setProperty(r + "apple.client-id", "com.example.web");
         p.setProperty(r + "acme.client-id", "web");
         p.setProperty(r + "acme.client-authentication-method", "none");
         p.setProperty(r + "acme.provider", "acme-id");
@@ -244,7 +282,7 @@ class OAuth2ClientTest {
         for (ClientRegistration registration : all) {
             byId.put(registration.getRegistrationId(), registration);
         }
-        assertEquals("[acme, apple, google, work]", byId.keySet().toString());
+        assertEquals("[acme, google, work]", byId.keySet().toString());
 
         ClientRegistration google = byId.get("google");
         assertEquals("g-id", google.getClientId());
@@ -261,7 +299,9 @@ class OAuth2ClientTest {
         assertEquals("https://login.microsoftonline.com/{tenantid}/v2.0",
                 work.getProviderDetails().getIssuerTemplate());
 
-        ClientRegistration apple = byId.get("apple");
+        // Sign in with Apple is declared in code, with what signs its secret.
+        ClientRegistration apple = CommonOAuth2Provider.APPLE.getBuilder("apple")
+                .clientId("com.example.web").build();
         assertEquals(ClientRegistration.FORM_POST, apple.getResponseMode());
         assertEquals(ClientAuthenticationMethod.CLIENT_SECRET_POST,
                 apple.getClientAuthenticationMethod());
