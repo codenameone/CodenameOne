@@ -334,10 +334,11 @@ public final class OAuth2AuthorizationServer {
     /// is sent to a redirect address only once that address is known to be the
     /// client's own.
     ///
-    /// @param authentication who is signed in; null for nobody
     /// - `InsufficientAuthenticationException`: when nobody is signed in and
     /// the request is a browser's, so that the chain sends it to sign in and
     /// back
+    ///
+    /// @param authentication who is signed in; null for nobody
     public HttpServer.Response authorize(HttpServer.Request request,
                                          Authentication authentication) {
         try {
@@ -983,7 +984,7 @@ public final class OAuth2AuthorizationServer {
         return json(200, answer);
     }
 
-    /// Eight letters of [#USER_CODE_ALPHABET], each chosen evenly: a byte is
+    /// Eight letters of the user code alphabet, each chosen evenly: a byte is
     /// used only when it is below the largest multiple of twenty, so that no
     /// letter is likelier than another.
     static String newUserCode() {
@@ -1071,11 +1072,12 @@ public final class OAuth2AuthorizationServer {
     /// The chain's CSRF protection covers the two posts; the token to put in
     /// the forms is passed in.
     ///
+    /// - `InsufficientAuthenticationException`: when nobody is signed in, so
+    /// that the chain sends the browser to sign in and back
+    ///
     /// @param authentication who is signed in; null for nobody
     /// @param csrfParameter the name of the CSRF form field, or null
     /// @param csrfToken its value
-    /// - `InsufficientAuthenticationException`: when nobody is signed in, so
-    /// that the chain sends the browser to sign in and back
     public HttpServer.Response deviceVerification(HttpServer.Request request,
             Authentication authentication, String csrfParameter, String csrfToken) {
         if (authentication == null) {

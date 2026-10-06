@@ -139,7 +139,9 @@ public final class DefaultAuthorizationCodeTokenResponseClient
         return code;
     }
 
-    /// [#errorCode(Object)] for the `error` parameter of a callback.
+    /// The `error` parameter of a callback, reduced to an error code as RFC
+    /// 6749 spells one: anything else a provider sent comes back as
+    /// `invalid_request`.
     public static String sanitizeErrorCode(String error) {
         return errorCode(error);
     }

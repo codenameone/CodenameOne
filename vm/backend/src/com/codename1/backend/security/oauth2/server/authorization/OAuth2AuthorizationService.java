@@ -48,7 +48,7 @@ public interface OAuth2AuthorizationService {
     /// The kind of an RFC 8628 user code.
     String USER_CODE = "user_code";
 
-    /// One stored secret, as [#findToken] reports it.
+    /// One stored secret, as [OAuth2AuthorizationService#findToken] reports it.
     final class StoredToken {
         private final String authorizationId;
         private final boolean used;
@@ -77,8 +77,8 @@ public interface OAuth2AuthorizationService {
             return expiresAt;
         }
 
-        /// When it was used up, or [#touchToken] was last called for it; 0
-        /// when neither has happened.
+        /// When it was used up, or [OAuth2AuthorizationService#touchToken]
+        /// was last called for it; 0 when neither has happened.
         public long getPolledAt() {
             return polledAt;
         }
