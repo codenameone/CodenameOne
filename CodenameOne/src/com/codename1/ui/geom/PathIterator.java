@@ -52,13 +52,13 @@ public interface PathIterator {
     /// as t varies from 0 to 1 over the current point (CP), first control point
     /// (P1), and final interpolated control point (P2):
     ///
-    /// ```java
-    /// `P(t) = B(2,0)*CP + B(2,1)*P1 + B(2,2)*P2
+    /// ```text
+    /// P(t) = B(2,0)*CP + B(2,1)*P1 + B(2,2)*P2
     /// 0 <= t <= 1
     /// B(n,m) = mth coefficient of nth degree Bernstein polynomial
     /// = C(n,m) * t^(m) * (1 - t)^(n-m)
     /// C(n,m) = Combinations of n things, taken m at a time
-    /// = n! / (m! * (n-m)!)`
+    /// = n! / (m! * (n-m)!)
     /// ```
     int SEG_QUADTO = 2;
 
@@ -67,13 +67,13 @@ public interface PathIterator {
     /// current point (CP), first control point (P1), the second control point
     /// (P2), and final interpolated control point (P3):
     ///
-    /// ```java
-    /// `P(t) = B(3,0)*CP + B(3,1)*P1 + B(3,2)*P2 + B(3,3)*P3
+    /// ```text
+    /// P(t) = B(3,0)*CP + B(3,1)*P1 + B(3,2)*P2 + B(3,3)*P3
     /// 0 <= t <= 1
     /// B(n,m) = mth coefficient of nth degree Bernstein polynomial
     /// = C(n,m) * t^(m) * (1 - t)^(n-m)
     /// C(n,m) = Combinations of n things, taken m at a time
-    /// = n! / (m! * (n-m)!)`
+    /// = n! / (m! * (n-m)!)
     /// ```
     int SEG_CUBICTO = 3;
     /// The current segment closes a loop by an implicit line to the previous `#SEG_MOVETO` coordinate.

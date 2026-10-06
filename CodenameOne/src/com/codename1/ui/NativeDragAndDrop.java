@@ -61,7 +61,7 @@ import com.codename1.ui.events.ActionEvent;
 /// inbox.addNativeDropListener(e -> {
 ///     NativeDropEvent drop = (NativeDropEvent)e;
 ///     String[] files = drop.getFiles();
-///     ...
+///     // ...
 /// });
 /// ```
 ///

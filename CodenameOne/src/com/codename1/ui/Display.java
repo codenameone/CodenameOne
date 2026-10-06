@@ -6528,9 +6528,10 @@ public final class Display extends CN1Constants {
     /// ```
     ///
     /// ```java
-    /// `public class GeofenceListenerImpl implements GeofenceListener {
+    /// public class GeofenceListenerImpl implements GeofenceListener {
     /// public void onExit(String id) {
-    /// System.out.println("Exited "+id);`
+    /// System.out.println("Exited "+id);
+    /// }
     ///
     /// public void onEntered(String id) {
     /// System.out.println("Entered "+id);
@@ -6547,7 +6548,7 @@ public final class Display extends CN1Constants {
     ///
     /// LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
     ///
-    /// hi.show();}
+    /// hi.show();
     /// ```
     ///
     /// #### Returns
@@ -9097,15 +9098,15 @@ public final class Display extends CN1Constants {
     /// Example
     ///
     /// ```java
-    /// `onCanInstallOnHomescreen(()->{
+    /// onCanInstallOnHomescreen(()->{
     ///      if (canInstallOnHomescreen()) {
     ///           if (promptInstallOnHomescreen()) {
-    ///               // User accepted installation` else {
+    ///               // User accepted installation
+    ///           } else {
     ///               // user rejected installation
     ///           }
     ///      }
     /// });
-    /// }
     /// ```
     ///
     /// https://developers.google.com/web/fundamentals/app-install-banners/

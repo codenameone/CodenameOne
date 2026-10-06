@@ -30,14 +30,14 @@ import com.codename1.tools.translator.bytecodes.Invoke;
 import com.codename1.tools.translator.bytecodes.Jump;
 import com.codename1.tools.translator.bytecodes.SwitchInstruction;
 import com.codename1.tools.translator.bytecodes.TryCatch;
-import org.objectweb.asm.Label;
+import com.codename1.tools.translator.classfile.Label;
 import com.codename1.tools.translator.bytecodes.LabelInstruction;
 import com.codename1.tools.translator.bytecodes.LineNumber;
 import com.codename1.tools.translator.bytecodes.LocalVariable;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /// Does a reference escape the frame that produced it?
 ///

@@ -29,16 +29,6 @@
          must NOT touch this pin - update-cn1-version.sh refuses to change
          a SNAPSHOT pin. -->
     <cn1.version>8.0-SNAPSHOT</cn1.version>
-    <!-- The bean-shell access registry is generated against the same
-         Codename One sources the playground ships. The deployed
-         JavaScript bundle now builds with the local ParparVM
-         `local-javascript` target (no longer the lagging cloud TeaVM
-         build), so the registry tracks the current API directly and the
-         old one-release `cn1.registry.version` pin is gone. When building
-         against the local workspace (cn1.localWorkspace=true) the registry
-         is generated from the repo's own sources; see
-         cn1.accessRegistry.useLocalSources below. -->
-    <cn1.accessRegistry.useLocalSources>false</cn1.accessRegistry.useLocalSources>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java.version>1.8</java.version>
     <java-tests.version>11</java-tests.version>
@@ -64,6 +54,19 @@
       <dependency>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone-javase</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <!-- The Java compiler and the ParparVM translator run INSIDE the Playground:
+           user code is compiled in-process and, on the web, translated to
+           JavaScript and loaded into the running VM. -->
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-javac</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-parparvm</artifactId>
         <version>${cn1.version}</version>
       </dependency>
       <dependency>
@@ -137,10 +140,6 @@
       </activation>
       <properties>
         <cn1.version>8.0-SNAPSHOT</cn1.version>
-        <!-- The local 8.0-SNAPSHOT has no source jars on Maven Central, so
-             generate the bean-shell registry from the repo's own CN1 sources
-             (which are what the local-javascript ParparVM build compiles). -->
-        <cn1.accessRegistry.useLocalSources>true</cn1.accessRegistry.useLocalSources>
       </properties>
     </profile>
     <profile>

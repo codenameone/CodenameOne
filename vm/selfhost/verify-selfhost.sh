@@ -47,20 +47,6 @@ PARPAR="${CN1_SELFHOST_BIN:-}"
 echo "verify-selfhost: subject $PARPAR"
 JAPI="$REPO/vm/selfhost/target/javaapi-classes"
 TR="$REPO/vm/ByteCodeTranslator/target/classes"
-ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt"
-# A MISSING CLASSPATH FILE IS A SETUP ERROR, NOT A CORRECTNESS FAILURE, and it did
-# not read as one: `mvn clean package` (which translate-and-build.sh runs whenever
-# the translator sources change, i.e. after running the gauntlet) deletes target/
-# and takes this file with it. The bare `cat` that used to be here then failed with
-# one line of shell noise, the gate exited non-zero, and perf-guard's own message
-# said to "treat this as a correctness failure". It is not; it just needs the
-# regenerating build to have run.
-[ -r "$ASM_CP_FILE" ] || {
-    echo "missing $ASM_CP_FILE" >&2
-    echo "  mvn clean package removes target/, and the gauntlet triggers one." >&2
-    echo "  Run $REPO/vm/selfhost/build-selfhost.sh -O3 first; it regenerates it." >&2
-    exit 1; }
-ASM="$(cat "$ASM_CP_FILE")"
 
 # The JVM side of gate A runs target/classes, which nothing in this script builds
 # -- build-selfhost.sh compiles the translator only for the NATIVE side. A source
@@ -71,12 +57,16 @@ ASM="$(cat "$ASM_CP_FILE")"
 # here either -- it answered "Nothing to compile - all classes are up to date"
 # for a source three hours newer than its class, so this compares the trees
 # directly rather than trusting it.
-newest_src="$(find "$REPO/vm/ByteCodeTranslator/src" -name '*.java' -newer "$TR" -print -quit 2>/dev/null || true)"
+# Every file, not just *.java: the JVM side reads its runtime RESOURCES (parparvm_runtime.js,
+# nativeMethods.m, ...) from target/classes while the native side reads them from src/
+# through CN1_RESOURCE_PATH, so an edited resource that has not been packaged makes the
+# two sides emit different runtimes -- which Gate J reported as a divergence the first
+# time a JavaScript runtime file was edited.
+newest_src="$(find "$REPO/vm/ByteCodeTranslator/src" -type f -newer "$TR" -print -quit 2>/dev/null || true)"
 if [ -n "$newest_src" ]; then
     echo "STALE: $TR is older than $newest_src" >&2
     echo "gate A would compare the new translator against the old one. Run:" >&2
     echo "  (cd $REPO/vm && mvn -q -B -pl ByteCodeTranslator clean package -DskipTests)" >&2
-    echo "and restore target/selfhost-asm-classpath.txt, which clean removes." >&2
     exit 1
 fi
 
@@ -119,7 +109,7 @@ run() {
     mv "$OUT" "$W/$tag-tree"
 }
 
-jvm_args=( "$J8/bin/java" -cp "$TR:$ASM" com.codename1.tools.translator.ByteCodeTranslator )
+jvm_args=( "$J8/bin/java" -cp "$TR" com.codename1.tools.translator.ByteCodeTranslator )
 common=( clean "$JAPI;$CLASSES" "$OUT" "$APP" "$PKG" "$APP" 1.0 clean none )
 
 run parpar1 "$PARPAR" "${common[@]}"
@@ -158,5 +148,35 @@ else
     echo "NEGATIVE CONTROL: PASS -- corruption detected"
 fi
 cp "$W/victim.bak" "$victim"
+
+# GATE J: the same comparison for the JavaScript target. The JS backend compiles
+# against vm/JavaAPI like the rest of the translator (its regex, SHA-256 and file I/O
+# are the translator's own), so the native translator carries it and must emit the
+# same bundle. CN1_SELFHOST_JS=0 skips it.
+#
+# One file is compared modulo a section: the suspension report's CAUSE/SIG/"M SUSP"
+# attribution records which rule FIRST classified a method, in a worklist seeded from
+# an IdentityHashMap -- identity-hash order, which is not the same on two runtimes (or
+# two JVM runs with a different allocation history). Which methods suspend is part of
+# the generated code and is compared in full through the bundle itself.
+if [ "${CN1_SELFHOST_JS:-1}" != "0" ]; then
+    common_js=( javascript "$JAPI;$CLASSES" "$OUT" "$APP" "$PKG" "$APP" 1.0 ios none )
+    run jsparpar "$PARPAR" "${common_js[@]}"
+    run jsjvm "${jvm_args[@]}" "${common_js[@]}"
+    js_files=$(find "$W/jsjvm-tree" -type f | wc -l | tr -d ' ')
+    [ "$js_files" -gt 5 ] || { echo "VACUOUS: only $js_files JavaScript files emitted"; exit 1; }
+    for side in jsjvm jsparpar; do
+        find "$W/$side-tree" -name '*-suspension-report.txt' | while read -r report; do
+            grep -v '^CAUSE \|^SIG \|^M SUSP ' "$report" > "$report.tmp" && mv "$report.tmp" "$report"
+        done
+    done
+    if diff -rq "$W/jsjvm-tree" "$W/jsparpar-tree" > "$W/gateJ.txt" 2>&1; then
+        echo "GATE J (jvm vs parpar, JS): PASS -- $js_files files byte-identical"
+    else
+        echo "GATE J (jvm vs parpar, JS): FAIL -- $(grep -c . "$W/gateJ.txt") of $js_files paths differ"
+        head -20 "$W/gateJ.txt"
+        fail=1
+    fi
+fi
 
 exit $fail

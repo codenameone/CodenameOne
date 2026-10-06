@@ -105,6 +105,28 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- The in-tree Java compiler (vm/JavaCompiler), compiled into the tests so
+                 JavaCompilerConformanceTest can hold it to javac. Its own artifact is
+                 built by maven/javac, which this reactor does not reach. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>add-java-compiler-sources</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>../JavaCompiler/src</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

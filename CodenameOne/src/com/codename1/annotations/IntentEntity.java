@@ -41,7 +41,7 @@ import java.lang.annotation.Target;
 ///     public static Playlist byId(String id) { return Library.playlist(id); }
 ///
 ///     @EntityQuery(EntityQuery.Kind.SUGGESTED)
-///     public static List&lt;Playlist&gt; recent() { return Library.recentPlaylists(); }
+///     public static List<Playlist> recent() { return Library.recentPlaylists(); }
 /// }
 /// ```
 ///

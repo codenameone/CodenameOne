@@ -20,6 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class StreamEdgeApp {
@@ -187,7 +190,107 @@ public class StreamEdgeApp {
         return 20000;
     }
 
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> void sneaky(Throwable t) throws E {
+        throw (E) t;
+    }
+
+    /** flatMap closes every stream its mapper returns; sorted(null) is an error, not natural order. */
+    private static int closeSemantics() {
+        final StringBuilder log = new StringBuilder();
+        List<Integer> all = Stream.of(1, 2, 3)
+                .flatMap(v -> Stream.of(v, v * 10).onClose(() -> log.append("close-s").append(v).append(' ')))
+                .collect(Collectors.toList());
+        check(all.size() == 6 && all.get(5).intValue() == 30);
+        check("close-s1 close-s2 close-s3 ".equals(log.toString()));
+        log.setLength(0);
+        Optional<Integer> first = Stream.of(1, 2, 3)
+                .flatMap(v -> Stream.of(v, v * 10).onClose(() -> log.append("close-t").append(v).append(' ')))
+                .filter(v -> v.intValue() >= 10)
+                .findFirst();
+        check(first.get().intValue() == 10);
+        check("close-t1 ".equals(log.toString()));
+        log.setLength(0);
+        check(Stream.of(1, 2, 3)
+                .flatMap(v -> Stream.of(v).onClose(() -> log.append("close-u").append(v).append(' ')))
+                .anyMatch(v -> v.intValue() == 2));
+        check("close-u1 close-u2 ".equals(log.toString()));
+        log.setLength(0);
+        Stream<Integer> closing = Stream.of(1).onClose(() -> log.append("a")).onClose(() -> log.append("b"));
+        closing.close();
+        closing.close();
+        check("ab".equals(log.toString()));
+        log.setLength(0);
+        try {
+            Stream.of(1, 2)
+                    .flatMap(v -> Stream.of(v, v).onClose(() -> log.append("close-p").append(v).append(' ')))
+                    .anyMatch(v -> { throw new IllegalStateException("predicate"); });
+            throw new AssertionError("predicate exception swallowed");
+        } catch (IllegalStateException expected) {
+        }
+        check("close-p1 ".equals(log.toString()));
+        log.setLength(0);
+        try {
+            Stream.of(1)
+                    .flatMap(v -> Stream.of(v).onClose(() -> {
+                        log.append("outer ");
+                        throw new IllegalStateException("close");
+                    }))
+                    .flatMap(w -> Stream.of(w).onClose(() -> log.append("inner ")))
+                    .anyMatch(v -> { throw new IllegalArgumentException("predicate"); });
+            throw new AssertionError("predicate exception swallowed");
+        } catch (IllegalArgumentException e) {
+            // The close failure rides along as suppressed; it does not replace the original.
+            check(e.getSuppressed().length == 1 && "close".equals(e.getSuppressed()[0].getMessage()));
+        }
+        check("inner outer ".equals(log.toString()));
+        log.setLength(0);
+        Stream<Integer> partly = Stream.of(1, 2).onClose(() -> log.append("outer "))
+                .flatMap(i -> Stream.of(i, i * 10).onClose(() -> log.append("inner").append(i).append(' ')));
+        java.util.Iterator<Integer> it = partly.iterator();
+        check(it.next().intValue() == 1);
+        partly.close();
+        // An iterator abandoned mid-way through a mapped stream: close() still closes it.
+        check("inner1 outer ".equals(log.toString()));
+        try {
+            java.util.Comparator.<String, Integer>comparing(String::length, null);
+            throw new AssertionError("comparing(f, null)");
+        } catch (NullPointerException expected) {
+        }
+        try {
+            java.util.Comparator.<String>naturalOrder().thenComparing((java.util.Comparator<String>) null);
+            throw new AssertionError("thenComparing(null)");
+        } catch (NullPointerException expected) {
+        }
+        try {
+            Stream.of(1).collect(() -> new StringBuilder(), (sb, v) -> sb.append(v), null);
+            throw new AssertionError("collect(.., null)");
+        } catch (NullPointerException expected) {
+        }
+        try {
+            Optional.of(1).or(null);
+            throw new AssertionError("or(null)");
+        } catch (NullPointerException expected) {
+        }
+        Stream<Integer> failing = Stream.of(1).onClose(() -> sneaky(new java.io.IOException("io")))
+                .onClose(() -> log.append("second-ran"));
+        log.setLength(0);
+        try {
+            failing.close();
+            throw new AssertionError("close swallowed a checked failure");
+        } catch (Throwable t) {
+            check(t instanceof java.io.IOException && "io".equals(t.getMessage()));
+        }
+        check("second-ran".equals(log.toString()));
+        try {
+            Stream.of(2, 1).sorted(null).collect(Collectors.toList());
+            throw new AssertionError("sorted(null)");
+        } catch (NullPointerException expected) {
+        }
+        return 0;
+    }
+
     public static void main(String[] args) {
-        System.out.println("RESULT=" + (calculate() + lazySemantics() + fusionSemantics()));
+        System.out.println("RESULT=" + (calculate() + lazySemantics() + fusionSemantics() + closeSemantics()));
     }
 }

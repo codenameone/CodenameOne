@@ -751,6 +751,13 @@ public class CN1Playground extends Lifecycle {
                     message -> loggedMessages.add(new PlaygroundRunner.InlineMessage(0, message, "info")),
                     this::reportLambdaRuntimeError
             );
+            // A form the code shows later (a button that opens a second screen) becomes the preview.
+            context.setFormShownListener(shown -> CN.callSerially(() -> {
+                replacePreview(shown);
+                topBar.showLive();
+                previewColumn.setStale(false);
+            }));
+            installListenerErrorReporting();
 
             PlaygroundRunner.RunResult result = runner.run(currentScript, context);
 
@@ -785,9 +792,32 @@ public class CN1Playground extends Lifecycle {
         });
     }
 
-    /** Receives runtime errors raised by lambdas after a script's initial
-     * eval — the most common cause is a missing import (so an identifier
-     * like {@code Util} is unresolved when the event listener fires). The
+    private boolean listenerErrorReportingInstalled;
+
+    /**
+     * Exceptions thrown by user code after the run -- a listener firing on a tap,
+     * a timer -- reach the EDT's error handler. Report them like a failed run
+     * (once each) instead of letting the default handler pop a dialog over the
+     * Playground.
+     */
+    private void installListenerErrorReporting() {
+        if (listenerErrorReportingInstalled) {
+            return;
+        }
+        listenerErrorReportingInstalled = true;
+        Display.getInstance().addEdtErrorHandler(evt -> {
+            Object source = evt.getSource();
+            if (source instanceof Throwable && PlaygroundContext.getActive() != null) {
+                Throwable t = (Throwable) source;
+                String m = t.getMessage();
+                reportLambdaRuntimeError(t.getClass().getName() + (m == null ? "" : ": " + m), t);
+                evt.consume();
+            }
+        });
+    }
+
+    /** Receives runtime errors raised by user code after a script's initial
+     * run -- typically a listener that throws when the event fires. The
      * EDT would otherwise swallow these silently, leaving the user with
      * a UI that no longer reacts. We surface each unique error as an
      * inline editor message and flip the top bar to its failed state. */

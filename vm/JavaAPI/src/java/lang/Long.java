@@ -253,4 +253,37 @@ public final class Long extends Number implements Comparable<Long> {
         long cn1b = another.cn1Value();
         return cn1a < cn1b ? -1 : cn1a > cn1b ? 1 : 0;
     }
+
+    /**
+     * {@code a + b}; a method reference target for reductions ({@code Long::sum}).
+     *
+     * @param a an operand
+     * @param b an operand
+     * @return the sum
+     */
+    public static long sum(long a, long b) {
+        return a + b;
+    }
+
+    /**
+     * The greater of two values (Math.max), as a method reference target.
+     *
+     * @param a a value
+     * @param b a value
+     * @return the greater
+     */
+    public static long max(long a, long b) {
+        return Math.max(a, b);
+    }
+
+    /**
+     * The smaller of two values (Math.min), as a method reference target.
+     *
+     * @param a a value
+     * @param b a value
+     * @return the smaller
+     */
+    public static long min(long a, long b) {
+        return Math.min(a, b);
+    }
 }

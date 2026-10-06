@@ -46,16 +46,18 @@ import java.util.Vector;
 /// To integrate this into your code you can use something like:
 ///
 /// ```java
-/// private final EventDispatcher listeners = new EventDispatcher();
+/// public class MyComponent extends Component {
+///     private final EventDispatcher listeners = new EventDispatcher();
 ///
-/// public void addActionListener(ActionListener a) {
-///     listeners.addListener(a);
-/// }
-/// public void removeActionListener(ActionListener a) {
-///     listeners.removeListener(a);
-/// }
-/// private void fireEvent(ActionEvent ev) {
-///     listeners.fireActionEvent(ev);
+///     public void addActionListener(ActionListener a) {
+///         listeners.addListener(a);
+///     }
+///     public void removeActionListener(ActionListener a) {
+///         listeners.removeListener(a);
+///     }
+///     private void fireEvent(ActionEvent ev) {
+///         listeners.fireActionEvent(ev);
+///     }
 /// }
 /// ```
 public class EventDispatcher {

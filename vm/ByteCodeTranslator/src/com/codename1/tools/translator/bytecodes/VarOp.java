@@ -24,7 +24,7 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.BytecodeMethod;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class VarOp extends Instruction implements AssignableExpression {
     private int var;
@@ -153,8 +153,8 @@ public class VarOp extends Instruction implements AssignableExpression {
                 return false;
             }
             return value instanceof String
-                    || value instanceof org.objectweb.asm.Type
-                    || value instanceof org.objectweb.asm.Handle;
+                    || value instanceof com.codename1.tools.translator.classfile.Type
+                    || value instanceof com.codename1.tools.translator.classfile.Handle;
         }
         if (ex instanceof BasicInstruction) {
             return ((BasicInstruction) ex).getOpcode() == Opcodes.ACONST_NULL;

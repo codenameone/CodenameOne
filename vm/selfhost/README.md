@@ -1,8 +1,15 @@
 # Self-hosting ParparVM
 
-This directory builds the Java bytecode translator and ASM with ParparVM, then
-compiles the generated C into a native translator. The benchmark runs complete,
+This directory builds the Java bytecode translator with ParparVM, then compiles
+the generated C into a native translator. The benchmark runs complete,
 fresh-process translation jobs against the same translator classes on HotSpot.
+
+The translator reads class files with its own `classfile` package and has no
+dependency on ASM. ASM still appears here as **corpus**: `build-selfhost.sh`
+fetches the ASM jars by the version `vm/pom.xml` pins and extracts them into
+`target/asm-classes`, because the benchmarks and Gate A translate the translator's
+classes plus ASM's. A translator built before that change still needs ASM on its
+classpath, so the comparisons against older trees put `target/asm-classes` there.
 
 ## Build
 
@@ -20,8 +27,11 @@ class-directory, binary, compiler and toolchain fingerprints in
 `target/parpar-O3.build.json`. Source changes during a build reject its manifest.
 
 The self-host build substitutes the classes in `stubs/` for facilities outside
-its supported translation targets: JavaScript generation, archive scanning and
-debug-symbol compression. It translates class directories; it does not read JARs.
+its supported translation targets: archive scanning and debug-symbol
+compression. It translates class directories; it does not read JARs. JavaScript
+generation is built in: the JS backend uses the translator's own regex engine
+(`regex/`), SHA-256 and `java.io`, so it compiles against `vm/JavaAPI` like the
+rest of the translator.
 The native executable locates runtime resources through `CN1_RESOURCE_PATH`.
 
 ## Reproducible comparisons
@@ -73,6 +83,50 @@ whole-workload comparison, including rejected changes and remaining gaps.
 The [17 September follow-up](NATIVE-LOWERING-2026-09-17.md) covers native builder
 ownership across helper calls and exceptions, concurrent tracing changes, linked
 assembly evidence, and the subsequent whole-workload comparison.
+
+## Self-hosting on JavaScript
+
+The translator also runs as a JavaScript program. ParparVM's JavaScript target
+translates it (from the same JavaAPI-compiled classes the native build uses), and
+`js/run-program.js` runs the bundle under Node as a command-line program:
+
+```bash
+CN1_RESOURCE_PATH=vm/ByteCodeTranslator/src \
+  node --max-old-space-size=8192 --stack-size=65500 vm/selfhost/js/run-program.js \
+  <bundle-dir> clean "<inputs>" <out> <App> <package> <App> 1.0 clean none
+```
+
+Nothing in the translator knows it is not running natively. `java.io.File` and
+its streams reach the file system through the runtime's file natives, which work
+on whatever `jvm.fileSystem` the host installs (`run-program.js` installs one
+backed by Node's `fs`; a page can use `jvm.createMemoryFileSystem()`), and
+`System.getenv` answers from `jvm.env`. With no file system installed the natives
+throw exactly as before, so ordinary JavaScript applications are unaffected.
+
+Three things made the translator translatable at all, and stay load-bearing:
+
+- **It reads class files with its own `classfile` package**, not ASM. That
+  package is a rewrite of the parts of ASM the translator uses, keeping ASM's
+  visitor API and design and retaining ASM's BSD license notice in every file
+  (see its `README.md` and the repository `NOTICE`), including the subroutine
+  inliner (`tree/JsrInliner`): the Codename One core was compiled
+  for a target old enough to use `JSR`/`RET` for `finally`, and the translator's
+  output for those methods is built from the inlined layout, so it must not drift.
+  `ClassReaderConformanceTest` holds it to ASM, which survives only as that test's
+  oracle and as benchmark corpus.
+- **The JavaScript backend uses the translator's own regex engine** (`regex/`),
+  SHA-256 and `java.io`, because JavaAPI has no `java.util.regex`,
+  `java.security` or `java.nio.file`. `TranslatorRegexTest` holds the engine to
+  `java.util.regex` over every operation the backend uses.
+- **`verify-selfhost-js.sh` is the gate.** Gate C (the C target) and Gate S (the
+  JavaScript target) require the Node-hosted translator to emit byte-identical
+  output to the JVM translator. Its first runs found four JavaScript-target
+  defects no test had: a String built at runtime from Latin-1 characters read back
+  with U+FFxx characters, `String.getBytes` answered unsigned bytes
+  (`JsLatin1StringApp`), `int` multiplication was computed as a double, so a
+  product past 2^53 lost its low bits (`JsIntMultiplyApp`), and the per-method
+  peephole passes rewrote string literals that looked like emitted code -- the
+  translator's own patterns were the first victims (`JsStringLiteralIntegrityApp`).
 
 ## The CI performance gate
 

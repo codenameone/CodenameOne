@@ -23,7 +23,7 @@
 
 package com.codename1.tools.translator.bytecodes;
 
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class IInc extends Instruction {
     private int var;

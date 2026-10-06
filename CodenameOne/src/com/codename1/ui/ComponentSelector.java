@@ -101,15 +101,15 @@ import java.util.Set;
 /// For example, the following two snippets are equivalent:
 ///
 /// ```java
-/// `for (Component c : $("Label")) {
-///     c.getStyle().setFgColor(0xff0000);`
+/// for (Component c : $("Label")) {
+///     c.getStyle().setFgColor(0xff0000);
 /// }
 /// ```
 ///
 /// and
 ///
 /// ```java
-/// `$("Label").setFgColor(0xff0000);`
+/// $("Label").setFgColor(0xff0000);
 /// ```
 ///
 /// The second snippet is clearly easier to type and more compact.  But we can take it further.  The Fluent API
@@ -117,12 +117,12 @@ import java.util.Set;
 /// single-element sets.  E.g.:
 ///
 /// ```java
-/// `Button myButton = $(new Button("Some text"))
+/// Button myButton = $(new Button("Some text"))
 /// .setUIID("Label")
 /// .addTags("cell", "row-"+rowNum, "col-"+colNum, rowNum%2==0 ? "even":"odd")
 /// .putClientProperty("row", rowNum)
 /// .putClientProperty("col", colNum)
-/// .asComponent(Button.class);`
+/// .asComponent(Button.class);
 /// ```
 ///
 /// The above snippet wraps a new Button in a ComponentSelector, then uses the fluent API to apply several properties
@@ -326,8 +326,8 @@ import java.util.Set;
 /// Example Modifying Text Color of All Buttons in a container when they are pressed only
 ///
 /// ```java
-/// `Style pressed = $("Button", myContainer).getPressedStyle();
-/// pressed.setFgColor(0xff0000);`
+/// Style pressed = $("Button", myContainer).getPressedStyle();
+/// pressed.setFgColor(0xff0000);
 /// ```
 ///
 /// A slightly more elegant pattern would be to use the `#selectPressedStyle()` method to set the default
@@ -335,20 +335,20 @@ import java.util.Set;
 /// mutations.  E.g.:
 ///
 /// ```java
-/// `$("Button", myContainer)
+/// $("Button", myContainer)
 ///     .selectPressedStyle()
 ///     .setFgColor(0xffffff)
 ///     .setBgColor(0x0)
-///     .setBgTransparency(255);`
+///     .setBgTransparency(255);
 /// ```
 ///
 /// A short-hand for this would be to add the :pressed pseudo-class to the selector.  E.g.
 ///
 /// ```java
-/// `$("Button:pressed", myContainer)
+/// $("Button:pressed", myContainer)
 ///     .setFgColor(0xffffff)
 ///     .setBgColor(0x0)
-///     .setBgTransparency(255);`
+///     .setBgTransparency(255);
 /// ```
 ///
 /// The following style pseudo-classes are supported:
@@ -369,11 +369,11 @@ import java.util.Set;
 /// style properties.  E.g  To change the pressed foreground color, and then change the selected foreground color, you could do:
 ///
 /// ```java
-/// `$("Button", myContainer)
+/// $("Button", myContainer)
 ///    .selectPressedStyle()
 ///    .setFgColor(0x0000ff)
 ///    .selectSelectedStyle()
-///    .setFgColor(0x00ff00);`
+///    .setFgColor(0x00ff00);
 /// ```
 ///
 /// Filtering Sets
@@ -382,25 +382,25 @@ import java.util.Set;
 /// to explicitly remove components from your set:
 ///
 /// ```java
-/// `ComponentSelector sel = $("Button").remove(myButton, true);
-///     // The set of all buttons on the current form, except myButton`
+/// ComponentSelector sel = $("Button").remove(myButton, true);
+///     // The set of all buttons on the current form, except myButton
 /// ```
 ///
 /// or
 ///
 /// ```java
-/// `ComponentSelector sel = $("Button").removeAll($(".some-tag"), true);
-///    // The set of all buttons that do NOT contain the tag ".some-tag"`
+/// ComponentSelector sel = $("Button").removeAll($(".some-tag"), true);
+///    // The set of all buttons that do NOT contain the tag ".some-tag"
 /// ```
 ///
 /// You could also use the `#filter(com.codename1.ui.ComponentSelector.Filter)` to explicitly
 /// declare which elements should be kept, and which should be discarded:
 ///
 /// ```java
-/// `ComponentSelector sel = $("Button").filter(c->{
-///     return c.isVisible();`);
+/// ComponentSelector sel = $("Button").filter(c->{
+///     return c.isVisible();
+/// });
 ///     // The set of all buttons that are currently visible.
-/// }
 /// ```
 ///
 /// Tree Navigation
@@ -1958,7 +1958,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     ///
     /// E.g.
     /// ```java
-    /// `ComponentSelector sel = new ComponentSelector("Button:pressed");
+    /// ComponentSelector sel = new ComponentSelector("Button:pressed");
     /// Style style = sel.getStyle(sel.get(0));
     ///     // This should be equivalent to sel.get(0).getPressedStyle()
     ///
@@ -1969,7 +1969,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// sel = new ComponentSelector("Button:pressed, Button:selected");
     /// style = sel.getStyle(sel.get(0));
     ///     // This should be same as
-    ///     // Style.createProxyStyle(sel.get(0).getPressedStyle(), sel.get(0).getSelectedStyle())`
+    ///     // Style.createProxyStyle(sel.get(0).getPressedStyle(), sel.get(0).getSelectedStyle())
     /// ```
     ///
     /// #### Parameters

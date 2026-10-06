@@ -1,27 +1,27 @@
 # Playground
 
-The Playground is an interactive scripting environment that lets developers write, test, and iterate on Codename One UI code using a custom [BeanShell](https://github.com/beanshell/beanshell) interpreter. It provides instant feedback for UI development without requiring full app rebuilds.
+The Playground is an interactive environment for writing, running and iterating on Codename One UI code. The code is real Java: an in-tree Java compiler (`vm/JavaCompiler`) compiles it to class files in the running Playground, which loads and runs them immediately -- on the JavaSE simulator through a class loader, and in the browser by translating the classes to JavaScript with the ParparVM translator, also running in the page, and loading them into the live VM. Nothing is sent to a server.
 
 ## Features
 
 ### Script Execution
 
-- **Loose scripts**: Write imperative code that returns a Component, and the playground renders it immediately:
+- **Scripts**: write statements, classes and methods at the top level. The value of a trailing expression is the preview; without one, the form the script shows (or the first form or component it creates) is used:
   ```java
   Container root = new Container(BoxLayout.y());
   Button btn = new Button("Click me");
   btn.addActionListener(e -> Dialog.show("Hello", "World", "OK", null));
   root.add(btn);
-  root;  // Return the component
+  root
   ```
 
-- **Lifecycle scripts**: Define a class with `init(Object)` and `start()` methods for more structured applications:
+- **Lifecycle classes**: a class with `init(Object)` and `start()` runs like an application:
   ```java
   public class MyApp {
       private Label status;
-      
+
       public void init(Object context) {}
-      
+
       public void start() {
           Form form = new Form("My App", BoxLayout.y());
           status = new Label("Ready");
@@ -33,7 +33,7 @@ The Playground is an interactive scripting environment that lets developers writ
   }
   ```
 
-- **`build(PlaygroundContext)` contract**: Return a Component from a method named `build`:
+- **`build(PlaygroundContext)`**: return a Component from a method named `build`:
   ```java
   Component build(PlaygroundContext ctx) {
       Container root = new Container(BoxLayout.y());
@@ -43,111 +43,39 @@ The Playground is an interactive scripting environment that lets developers writ
   }
   ```
 
-### Lambda Support
+`form.show()` and `showBack()` make that form the preview rather than replacing the Playground, including when a listener shows a second form after the run.
 
-The playground supports Java 8 lambda syntax for functional interfaces:
+### Language
 
-```java
-button.addActionListener(e -> Dialog.show("Clicked", "Button pressed", "OK", null));
-button.addActionListener(() -> doSomething());
-```
+User code is Java 17 and later, compiled with javac's rules and diagnostics: classes, interfaces, enums, records (with compact constructors), sealed hierarchies, nested, inner, local and anonymous classes, generics, lambdas and method references for any functional interface, switch expressions and `yield`, pattern `instanceof`, pattern switch and record patterns, text blocks, `var`, try-with-resources and multi-catch.
 
-#### How Lambdas Are Transformed
+Not supported: annotation processing, modules and reflection (`java.lang.reflect`, `Class.forName`), which Codename One does not offer on devices either.
 
-BeanShell does not natively support Java 8 lambda expressions. The playground transforms lambda syntax into SAM (Single Abstract Method) adapters at script evaluation time:
+### Available API
 
-1. **Lambda-to-SAM conversion**: A lambda like `e -> doSomething(e)` is converted to a call like `__lambdaSupport.lambda(new String[]{"e"}, "doSomething(e)")`. The `PlaygroundLambdaBridge` evaluates the body in a sandboxed interpreter with access to the enclosing scope's variables.
+Code compiles against exactly the API the running VM contains -- the Codename One framework and ParparVM's Java class library -- so a call that compiles here also exists on device. It is the API the browser build ships, which is narrower than a desktop JDK (there is no `List.of` or `IntStream`, for example); `Collection.stream()`, `Optional`, `Comparator`'s combinators and the common `Stream` operations are available.
 
-2. **Scope capture**: Variables from the enclosing scope are captured by running the lambda body through the same BeanShell interpreter that has access to those variables. A `CURRENT_NAMESPACE` thread-local ensures the correct call stack is used.
+These are imported by default; other imports can be declared anywhere in a script:
+- `java.util.*`, `java.io.*`
+- `com.codename1.ui.*`, `com.codename1.ui.layouts.*`, `com.codename1.ui.events.*`, `com.codename1.ui.geom.*`
+- `com.codename1.components.*`
+- `com.codename1.ui.plaf.Style`, `com.codename1.ui.plaf.UIManager`, `com.codename1.ui.util.Resources`
+- `PlaygroundContext`, `GameScripting` and `GpuScripting`
 
-3. **Known SAM type rewriting**: For commonly used listener interfaces (`ActionListener`, `NetworkListener`, `Runnable`, `OnComplete`), the playground rewrites calls like `button.addActionListener(evt -> ...)` to use factory methods on `PlaygroundListenerBridge` that create properly typed adapter objects.
+### Diagnostics
 
-4. **Nested lambda handling**: Inner lambdas are rewritten before outer lambdas execute, ensuring correct evaluation order.
-
-5. **Anonymous inner class conversion**: Anonymous inner classes with a single method are detected and converted to the same lambda-to-SAM pattern:
-   ```java
-   // This:
-   button.addActionListener(new ActionListener() {
-       public void actionPerformed(ActionEvent evt) { doSomething(); }
-   });
-   // Becomes:
-   button.addActionListener(__listenerSupport.actionListener(__lambdaSupport.lambda(new String[]{"evt"}, "doSomething();")));
-   ```
-
-#### Performance Considerations
-
-Lambda bodies are evaluated lazily by the BeanShell interpreter, which means:
-- Each lambda invocation incurs interpreter overhead
-- Complex expressions in lambda bodies should be extracted to named methods when possible
-- The first invocation of a lambda may be slower due to expression parsing
-
-#### Lambda Caveats
-
-The lambda transformation has some edge cases that may not work as expected:
-
-**Variables referenced after modification**:
-```java
-// May fail to capture updated value:
-int counter = 0;
-button.addActionListener(e -> {
-    counter++;  // Modifies captured variable
-    System.out.println(counter);
-});
-```
-
-**Lambdas passed to unrecognized SAM methods**:
-```java
-// Supported - recognized SAM type:
-button.addActionListener(e -> { });  // ActionListener is recognized
-
-// May not work - unrecognized SAM type:
-someObject.customCallback(x -> { });  // Not pre-wired, might fail
-```
-For unrecognized SAM types, use anonymous inner class syntax instead.
-
-**Break/continue in lambda bodies**:
-```java
-// Not supported - break/continue don't work in lambda bodies:
-button.addActionListener(e -> {
-    for (int i = 0; i < 10; i++) {
-        if (i == 5) break;  // Break may not work correctly
-    }
-});
-```
-
-### Anonymous Inner Class Support
-
-Traditional anonymous inner classes are also supported:
-
-```java
-button.addActionListener(new ActionListener() {
-    public void actionPerformed(ActionEvent evt) {
-        Dialog.show("Clicked", "Button pressed", "OK", null);
-    }
-});
-```
+Compile errors are reported with javac's wording at their line and column, and marked in the editor. An exception thrown at run time -- during the run, or later by a listener or timer -- is reported in the message panel below the editor.
 
 ### REST APIs
 
-The playground includes pre-configured access to Codename One's REST APIs:
-
 ```java
-RequestBuilder builder = Rest.get("https://example.com/api/data");
-builder.fetchAsString(response -> {
+import com.codename1.io.rest.Rest;
+
+Rest.get("https://example.com/api/data").fetchAsString(response -> {
     String text = response.getResponseData();
     // Process the response
 });
 ```
-
-### Available Imports
-
-The following packages are pre-imported:
-- `com.codename1.ui.*`
-- `com.codename1.ui.layouts.*`
-- `com.codename1.components.*`
-- `com.codename1.ui.geom.*`
-
-Additional imports can be declared in scripts as needed.
 
 ### Shareable Links
 
@@ -187,20 +115,21 @@ The playground includes an **Inspector** tab that displays the component hierarc
 
 Changes made in the property editor are immediately reflected in the preview. The component tree updates automatically when your script re-runs.
 
+## How It Works
+
+The developer guide's "Java in the browser" chapter (`docs/developer-guide/Java-In-The-Browser.asciidoc`) describes the whole pipeline -- compiler, stub library, in-page translator, open-world bundle and loader -- and the gates that keep each part correct. In short:
+
+1. `PlaygroundRunner` compiles the editor's text with `com.codename1.tools.javac.JavaCompiler` in script mode: top-level statements become the body of an entry method, top-level methods and classes become members and nested classes, and the script's trailing value is returned. A class-shaped entry (lifecycle or `build`) gets a small generated launcher.
+2. The compiler reads the API from `playground-api.cn1stubs`, a stub library the `common` build generates (`BuildStubLibrary`) from the framework jar and ParparVM's Java class library: signatures, generic signatures and constants, no code.
+3. The class files are loaded:
+   - **JavaSE**: `PlaygroundClassDefiner` defines them in a fresh class loader per run. The simulator registers it through `PlaygroundLoaderNativeImpl`; the test harnesses through `HarnessSupport`.
+   - **JavaScript**: `JavascriptIncremental` translates them against the running bundle and `PlaygroundJs.loadClasses` evaluates the result in the VM, redefining classes of the same name on every run.
+
+The JavaScript bundle is built **open-world** for the API user code may call (`javascript/translator-opts.txt`, read by `build.sh` and the website build): every class under the listed prefixes keeps all its methods and fields under their canonical names, and methods user code may override stay suspendable. Everything else -- the compiler and translator themselves, the port implementation -- is culled and minified as usual. See `JavascriptOpenWorld` in the translator.
+
 ## JavaScript Port
 
-The `javascript` module builds with the local ParparVM JavaScript target
-(`codename1.buildTarget=local-javascript`), the same path the initializr uses.
-The build translates the app's ParparVM bytecode to JavaScript locally instead
-of routing through the legacy `javascript` cloud build target, so it tracks the
-current Codename One sources directly — there is no longer an old-version pin or
-a class-exclusion list working around the cloud TeaVM backend lagging the
-release channel. The cloud `javascript` target remains available as a fallback.
-
-The bean-shell access registry (`GeneratedCN1Access`) is generated against the
-same sources the bundle is built from. When building against the local
-workspace (`-Dcn1.localWorkspace=true`) it is generated from the repo's own CN1
-sources; see [`tools/README.md`](tools/README.md).
+The `javascript` module builds with the local ParparVM JavaScript target (`codename1.buildTarget=local-javascript`), the same path the initializr uses, so it tracks the current Codename One sources directly.
 
 To compare a bundle's size against another ParparVM artifact:
 
@@ -211,162 +140,6 @@ PLAYGROUND_PARPARVM_BUNDLE=/path/to/parparvm/dist ./build.sh javascript_compare
 This uses
 [`compare-javascript-bundles.sh`](tools/compare-javascript-bundles.sh)
 to report total and JavaScript payload sizes.
-
-## BeanShell Interpreter Tradeoffs
-
-The playground uses a customized version of [BeanShell](https://github.com/beanshell/beanshell) with several Codename One-specific adaptations.
-
-### What Works
-
-- **Method dispatch**: Calls to Codename One APIs work transparently
-- **Constructor invocation**: `new Container()`, `new Button("text")`, etc.
-- **Static methods**: `BoxLayout.y()`, `Display.getInstance()`, etc.
-- **Static fields**: `Style.UNIT_TYPE_DIPS`, etc.
-- **Lambda expressions**: Converted to SAM (Single Abstract Method) adapters at runtime
-- **Anonymous inner classes**: Converted to lambda adapters for single-method interfaces
-- **Variable capture**: Lambdas capture variables from enclosing scopes
-- **Nested lambdas**: Inner lambdas are rewritten before outer lambdas execute
-
-### Class, Interface, Enum, and Record Support
-
-The playground includes a CN1-safe scripted-class runtime so user-declared
-types work without runtime bytecode generation or reflection. The
-`PlaygroundSyntaxMatrixHarness` (in `common/src/test/java/...`) is a
-table-driven matrix that pins exactly what is supported — every entry
-either reaches `SUCCESS` or documents a known gap with its diagnostic.
-
-What works:
-
-- **Classes** with fields, constructors (overloaded), methods (overloaded),
-  generic type parameters (`class Pair<T>`), inheritance with method
-  overrides, and `super.method()` / `super(args)` dispatch.
-- **Static nested classes** (`Outer.Inner`) with `Outer.Inner.staticField` /
-  `new Outer.Inner()` access.
-- **Interfaces** with static methods, default methods, and anonymous
-  implementations (`new Greeter() { public String greet() { ... } }`).
-- **Enums** with simple constants, constants taking constructor args,
-  per-constant method bodies, and built-in `name()` / `ordinal()` /
-  `values()` / `valueOf()`.
-- **Records** (`record Point(int x, int y) {}`) with auto-generated
-  accessors, an optional body block, and the compact-constructor form
-  (`Range { if (lo > hi) { ... } }`) which runs validation/normalisation
-  before the implicit field assignments.
-- **Sealed / non-sealed / permits** with runtime-enforced permit lists:
-  declaring a subclass that isn't named in the parent's `permits` clause
-  fails at evaluation time with a clear diagnostic.
-- **Pattern-matching switch statements** with type bindings:
-  `switch (o) { case Integer i -> useInt(i); case String s -> useStr(s); default -> ...; }`.
-- **Non-static inner classes** — `class Outer { class Inner { ... } }`
-  works, with Inner's methods reading/writing Outer's instance fields
-  through the namespace chain. Construction via
-  `new Outer().new Inner()` is supported; `new Inner()` inside an
-  Outer method also works (the enclosing `this` is auto-resolved).
-- **Interface method enforcement at declaration time** — a concrete
-  class that says `implements Iface` must provide every abstract
-  method Iface declares. Fires for both Java interfaces (signatures
-  pulled from the CN1 registry) and scripted interfaces (abstract
-  methods read from the interface's own `ScriptedClass`). A bare
-  `class Other implements ActionListener {}` now fails with
-  `class 'Other' is not abstract and does not implement all methods
-  from com.codename1.ui.events.ActionListener. Missing:
-  actionPerformed.`
-- **Diagnostic suggestions** — missing static fields, static methods,
-  and instance methods on scripted classes all produce a "Did you
-  mean: X?" hint drawn from the relevant name table. Helps spot
-  typos like `Display.PICKER_TYP_DATE` or `myObj.sayz()`.
-
-What still doesn't work:
-
-- Reflection APIs (`java.lang.reflect.*`, `Class.forName`) — forbidden in
-  CN1 and out of scope.
-- Cross-snippet sealed hierarchies — sealed enforcement operates on a
-  single snippet because the Interpreter is per-run.
-- JDK surface that isn't in CN1's runtime (`Optional`, `List.of`,
-  `Map.of`, `Set.of`, `Stream.of`, `IntStream.range`, extended
-  Collectors, etc.). The playground mirrors CN1's actual API surface
-  rather than full JDK parity — scripts that compile here also run
-  on device.
-
-### Streams
-
-`Collection.stream()` is wired through a minimal in-process shim
-(`bsh.cn1.CN1StreamBridge`) because CN1's collection backport doesn't
-expose `stream()` natively. Supported intermediate ops: `filter`,
-`map`, `flatMap`, `peek`, `sorted` / `sorted(Comparator)`, `distinct`,
-`limit`, `skip`. Supported terminal ops: `forEach`, `count`, `collect`
-(returns a `List`, ignores the collector argument), `toList`,
-`toArray`, `iterator`, `anyMatch` / `allMatch` / `noneMatch`,
-`findFirst` / `findAny`, `min` / `max`, `reduce(BinaryOperator)`,
-`reduce(identity, BinaryOperator)`. Methods that ordinarily return
-`Optional` return the value directly, or `null` when the stream is
-empty — CN1's runtime omits `java.util.Optional`. `reduce` keys off
-`BinaryOperator` rather than `BiFunction` for the same reason.
-
-### Lambdas and Method References
-
-- Lambdas in any context: assignment (`Runnable r = () -> {};`), return
-  expressions, method-call arguments, and as fields.
-- Lambdas implement common SAM types directly: `Runnable`, `Supplier`,
-  `Consumer`, `BiConsumer`, `Function`, `Predicate`, `Comparator`. Other
-  CN1-specific listener interfaces are wrapped via `PlaygroundListenerBridge`.
-- Method references for static (`System.out::println`), bound-instance
-  (`prefix::concat`), unbound-instance (`String::length` →
-  `(s) -> s.length()`), and constructor (`ArrayList::new`) forms.
-
-### Switch and Pattern Matching
-
-- Classic switch statements (int, String, fall-through with explicit break).
-- Switch expression arrow form: `String s = switch (x) { case 1 -> "one"; default -> "?"; };`.
-- Switch expression yield form: `case 1: yield "one"; default: yield "?";`.
-- Arrow-form switch statements (no result value).
-- Pattern matching for instanceof: `if (o instanceof String s) { use(s); }`.
-
-### Try-with-resources, Multi-catch, var
-
-- `try (Reader r = ...)` with single, multiple, and trailing-semicolon
-  resource lists.
-- Multi-catch `catch (E1 | E2 e)`.
-- Local variable type inference with `var` (BSH already treats `var` as a
-  loose type).
-
-### Generic Type Parameters Are Erased
-
-Generic type parameters are not enforced at runtime. Methods that rely on
-specific generic types may require casting:
-
-```java
-// Generic types are erased, so explicit casting may be needed:
-List<String> items = (List<String>) someMethod();
-```
-
-### Error Diagnostics
-
-When a static field, static method, or instance method on a scripted
-class misses, the playground searches the relevant name table (CN1
-registry for Java types, the scripted class's own method list for
-user types) for the closest match by case-insensitive prefix or
-short Levenshtein distance and appends up to three suggestions.
-Typos like `Display.PICKER_TYP_DATE` surface as `... (did you mean:
-PICKER_TYPE_DATE, PICKER_TYPE_DATE_AND_TIME?)`, and
-`myThing.sayz()` surfaces as `No instance method Thing.sayz/0. Did
-you mean: say?`.
-
-Interface-method enforcement fires at class-declaration time, so
-`class X implements ActionListener {}` fails immediately with
-`Missing: actionPerformed.` rather than deferring to the first
-invocation site.
-
-### Cold-start Performance
-
-`PlaygroundColdStartHarness` in the test sources prints baseline
-timings for the cold-start phases (registry first use, first
-package-helper load, first FIELD_INDEX lookup, CN1 `Display.init`,
-first full `PlaygroundRunner.run`). Run it against a fresh JVM via
-`java -cp ...` to catch regressions. Typical median on a dev
-laptop: first registry hit ~27 ms, first `PlaygroundRunner.run`
-~60 ms, CN1's own `Display.init` ~800 ms. Only the
-playground-controlled phases are actionable; the rest is CN1
-runtime wiring.
 
 ## JavaScript Port Considerations
 
@@ -396,104 +169,37 @@ The JavaScript port runs in a browser and is subject to [Same-Origin Policy (SOP
 
 **The playground's REST demo** uses endpoints that support CORS, so networking examples work in the JavaScript port. Your own URLs may need CORS configuration on the server side.
 
-## Architecture
-
-### CN1 Access Registry
-
-The playground generates a hardcoded registry of accessible Codename One APIs at build time. This registry (`bsh.cn1.gen.GeneratedCN1Access`) provides:
-
-- Class lookup
-- Constructor invocation
-- Method dispatch
-- Static method calls
-- Field access
-
-The registry is generated by `tools/generate-cn1-access-registry.sh` and includes commonly used classes. To add more classes, modify the generation configuration and rebuild.
-
-### Lambda Bridge
-
-`PlaygroundLambdaBridge` provides factory methods that create SAM adapters for functional interfaces:
-
-- `lambda(String[] paramNames, String body)` - Creates a lambda from parameter names and expression body
-- `actionListener(Runnable r)` - Wraps a Runnable as an ActionListener
-- `networkListener(Consumer<NetworkEvent> c)` - Wraps a Consumer as a NetworkListener
-- `onComplete(Consumer<T> c)` - Wraps a Consumer for async callbacks
-
-### Known SAM Types
-
-The playground pre-wires common listener interfaces:
-
-- `addActionListener`
-- `addResponseListener`
-- `callSerially`
-- `callSeriallyAndWait`
-- `fetchAsString`
-
-For other SAM interfaces, use anonymous inner class syntax or the lambda bridge directly.
-
 ## Building
 
 ```bash
 cd scripts/cn1playground
 mvn clean install
+./build.sh javascript   # the browser bundle
 ```
 
 ## Testing
 
 ```bash
 cd scripts/cn1playground
-bash tools/run-playground-smoke-tests.sh
+bash tools/run-playground-smoke-tests.sh     # JavaSE harnesses
+bash tools/run-playground-browser-tests.sh   # the browser bundle, in headless Chromium
 ```
 
-This smoke command currently runs:
+The smoke command runs `PlaygroundSmokeHarness`, `PlaygroundSyntaxMatrixHarness`, `PlaygroundLayoutHarness`, `PlaygroundPreviewResolutionHarness` and `PlaygroundSamplesHarness`. The browser command is described in [`tools/README.md`](tools/README.md). The `CN1 Playground Language Tests` workflow runs both.
 
-1. CN1 access registry generation (`tools/generate-cn1-access-registry.sh`).
-2. Registry sanity checks (expected/forbidden class entries).
-3. `PlaygroundSmokeHarness` end-to-end behavior checks.
-4. `PlaygroundSyntaxMatrixHarness` syntax regression checks.
+The compiler has its own tests under `vm/JavaCompiler/tests`: a corpus whose output must match javac's, and negative cases whose diagnostics must match javac's wording and position.
 
-## Language Feature Rollout Process
+## Language Feature Process
 
-Use this process when adding or fixing Java syntax support in Playground:
-
-1. **Add/adjust matrix coverage first**  
-   Update `common/src/test/java/com/codenameone/playground/PlaygroundSyntaxMatrixHarness.java` with a focused snippet for the target syntax.
-   - For currently unsupported syntax, add as `ExpectedOutcome.FAILURE`.
-   - When support lands, flip that case to `ExpectedOutcome.SUCCESS`.
-
-2. **Implement parser/runtime change in small steps**  
-   Prefer one syntax feature per PR (e.g. method references only) to keep regressions easy to isolate.
-
-3. **Run smoke + syntax matrix locally**  
-   Run `bash tools/run-playground-smoke-tests.sh` from `scripts/cn1playground`.
-
-4. **Require CI green before merge**  
-   The `CN1 Playground Language Tests` workflow runs the same smoke command under CI (`xvfb-run`) and should pass before merging syntax updates.
-
-5. **Document behavior changes**  
-   Update this README's known issues/limitations when syntax support changes so users know what is now supported.
+1. Add a focused case to `PlaygroundSyntaxMatrixHarness` with the outcome javac would give: `SUCCESS`, `PARSE_ERROR` (rejected at compile time) or `EVAL_ERROR` (compiles, fails at run time).
+2. Fix the compiler, adding a corpus or negative case under `vm/JavaCompiler/tests`.
+3. Run the smoke and browser tests locally, and require CI green before merging.
 
 ## Known Issues
 
-1. **Parse errors with complex expressions**: BeanShell's parser may fail on some Java syntax. Simplify complex expressions or break them into multiple statements.
-
-2. **Type ambiguity in overloaded methods**: When a method has overloads like `method(String)` and `method(String[])`, BeanShell may select the wrong overload. Cast arguments explicitly: `method((String) myValue)`.
-
-3. **EDT warnings**: The playground runs script execution on the EDT. Long-running operations should use `CN.callSerially()` or background threads.
+1. **EDT**: scripts run on the EDT. Long-running work belongs on a background thread, with UI updates through `CN.callSerially()`.
+2. **Older share links**: a link written for the earlier BeanShell-based Playground that relies on syntax BeanShell accepted but Java does not now reports a compile error at the offending line.
 
 ## Contributing
 
 See the main Codename One repository for contribution guidelines.
-
-## JavaScript Browser Input Check
-
-To verify the JavaScript playground's lightweight editor in a real browser, serve a built
-`CN1Playground-js` directory and run:
-
-```bash
-node tools/verify-lightweight-editor-input.mjs http://127.0.0.1:8767/
-```
-
-The Playwright check types spaces without a delay, moves the caret with arrow keys, replaces the
-document with a rapid marker, negotiates a multi-flavor clipboard paste, and verifies that the editor
-canvas visibly repaints.

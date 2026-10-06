@@ -70,4 +70,125 @@ public interface Comparator<T> {
      * @see Object#equals
      */
     public boolean equals(Object object);
+
+    /**
+     * This ordering, reversed.
+     *
+     * @return the reversed comparator
+     */
+    default Comparator<T> reversed() {
+        final Comparator<T> self = this;
+        return new Comparator<T>() {
+            public int compare(T a, T b) {
+                return self.compare(b, a);
+            }
+        };
+    }
+
+    /**
+     * This ordering, ties broken by {@code other}.
+     *
+     * @param other the tie breaker
+     * @return the combined comparator
+     */
+    default Comparator<T> thenComparing(final Comparator<? super T> other) {
+        // Arguments are checked here, not when the comparator is first used, as on the JDK.
+        if (other == null) {
+            throw new NullPointerException();
+        }
+        final Comparator<T> self = this;
+        return new Comparator<T>() {
+            public int compare(T a, T b) {
+                int r = self.compare(a, b);
+                return r != 0 ? r : other.compare(a, b);
+            }
+        };
+    }
+
+    /**
+     * This ordering, ties broken by the natural order of a key.
+     *
+     * @param keyExtractor extracts the key
+     * @param <U> the key type
+     * @return the combined comparator
+     */
+    default <U extends Comparable<? super U>> Comparator<T> thenComparing(
+            java.util.function.Function<? super T, ? extends U> keyExtractor) {
+        return thenComparing(Comparator.<T, U>comparing(keyExtractor));
+    }
+
+    /**
+     * Compares by the natural order of a key.
+     *
+     * @param keyExtractor extracts the key
+     * @param <T> the compared type
+     * @param <U> the key type
+     * @return the comparator
+     */
+    static <T, U extends Comparable<? super U>> Comparator<T> comparing(
+            final java.util.function.Function<? super T, ? extends U> keyExtractor) {
+        if (keyExtractor == null) {
+            throw new NullPointerException();
+        }
+        return new Comparator<T>() {
+            public int compare(T a, T b) {
+                return keyExtractor.apply(a).compareTo(keyExtractor.apply(b));
+            }
+        };
+    }
+
+    /**
+     * Compares by a key, using the given comparator for the keys.
+     *
+     * @param keyExtractor extracts the key
+     * @param keyComparator orders the keys
+     * @param <T> the compared type
+     * @param <U> the key type
+     * @return the comparator
+     */
+    static <T, U> Comparator<T> comparing(final java.util.function.Function<? super T, ? extends U> keyExtractor,
+            final Comparator<? super U> keyComparator) {
+        if (keyExtractor == null || keyComparator == null) {
+            throw new NullPointerException();
+        }
+        return new Comparator<T>() {
+            public int compare(T a, T b) {
+                return keyComparator.compare(keyExtractor.apply(a), keyExtractor.apply(b));
+            }
+        };
+    }
+
+    /**
+     * The natural order of comparable values.
+     *
+     * @param <T> the compared type
+     * @return the comparator
+     */
+    @SuppressWarnings("unchecked")
+    static <T extends Comparable<? super T>> Comparator<T> naturalOrder() {
+        return (Comparator<T>) NaturalOrder.INSTANCE;
+    }
+
+    /**
+     * The reverse of the natural order.
+     *
+     * @param <T> the compared type
+     * @return the comparator
+     */
+    @SuppressWarnings("unchecked")
+    static <T extends Comparable<? super T>> Comparator<T> reverseOrder() {
+        // Not Collections.reverseOrder(): naming Collections here makes the translator
+        // load it, and with it classes (Collections.SetFromMap) whose presence the native
+        // collection traversal keys on, in every application.
+        return (Comparator<T>) NaturalOrder.INSTANCE.reversed();
+    }
+}
+
+/** The natural ordering {@link Comparator#naturalOrder()} hands out. */
+final class NaturalOrder implements Comparator<Comparable<Object>> {
+    static final NaturalOrder INSTANCE = new NaturalOrder();
+
+    public int compare(Comparable<Object> a, Comparable<Object> b) {
+        return a.compareTo(b);
+    }
 }

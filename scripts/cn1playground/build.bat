@@ -40,12 +40,11 @@ goto :EOF
 
 goto :EOF
 :javascript
-rem The Playground keeps nearly the whole Codename One API reachable via its
-rem bean-shell registry, so the ParparVM JS RTA tree-shaking pass runs for over
-rem an hour without pruning much. Disable it (parparvm.js.rta.off); the un-pruned
-rem bundle is large, so raise the translator heap above the 512m default to avoid
-rem an OutOfMemoryError mid-emit. See README.md "JavaScript Port".
-if not defined CN1_TRANSLATOR_OPTS set CN1_TRANSLATOR_OPTS=-Dparparvm.js.rta.off -Xmx6g
+rem The Playground compiles user code in the browser and loads it into its own
+rem running VM, so the bundle is open-world for the API user code may call. The
+rem settings live in javascript\translator-opts.txt, shared with build.sh and the
+rem website build. See README.md "How It Works".
+if not defined CN1_TRANSLATOR_OPTS set /p CN1_TRANSLATOR_OPTS=<"%~dp0javascript\translator-opts.txt"
 !MVNW! package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=local-javascript -U -e
 
 goto :EOF

@@ -43,6 +43,8 @@ import java.lang.annotation.Target;
 /// ```java
 /// @com.codename1.impl.SharedWithBackend
 /// public final class SessionImpl implements Session {
+///     // ...
+/// }
 /// ```
 ///
 /// `@SharedWithBackend` with an import matches too; that is the form this file

@@ -56,7 +56,7 @@ import java.util.Map;
 ///         "YOUR_AUTH0_CLIENT_ID",
 ///         "com.example.app:/oauth2redirect",
 ///         "openid", "email", "profile")
-///     .ready(new SuccessCallback<OidcTokens>() { ... });
+///     .ready(new SuccessCallback<OidcTokens>() { /* ... */ });
 /// ```
 ///
 /// To request an Auth0 *audience* (so the access token can be used against
