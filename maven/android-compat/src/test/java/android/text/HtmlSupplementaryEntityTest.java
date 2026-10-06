@@ -20,29 +20,35 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.androidcompat.runtime;
+package android.text;
 
-import android.view.MenuItem;
-import android.view.View;
+import org.junit.Test;
 
-/// Placeholder for the `android:onClick` dispatcher. The `remap-android`
-/// build goal replaces this class in the application with one generated from
-/// the compiled classes, which calls each `public void name(View)` method a
-/// layout names directly, and each `name(MenuItem)` method a menu item names.
-/// Without that step (for example in the runtime's own tests) no handler is
-/// found.
-public final class OnClickDispatch {
+import static org.junit.Assert.assertEquals;
 
-    private OnClickDispatch() {
+/// A numeric entity past `U+FFFF` decodes to its surrogate pair; casting the
+/// code point to `char` used to truncate it to an unrelated BMP character.
+public class HtmlSupplementaryEntityTest {
+
+    private static final String GRINNING = new String(Character.toChars(0x1F600));
+
+    @Test
+    public void hexEntityAboveBmpIsASurrogatePair() {
+        assertEquals("a" + GRINNING + "b", Html.fromHtml("a&#x1F600;b").toString());
     }
 
-    public static boolean dispatch(Object target, String method, View view) {
-        return false;
+    @Test
+    public void decimalEntityAboveBmpIsASurrogatePair() {
+        assertEquals(GRINNING, Html.fromHtml("&#128512;").toString());
     }
 
-    /// -1 when `target` has no such handler, else its result: 1 for true
-    /// (or a void handler), 0 for false.
-    public static int dispatchMenu(Object target, String method, MenuItem item) {
-        return -1;
+    @Test
+    public void bmpEntityStillDecodes() {
+        assertEquals("A", Html.fromHtml("&#x41;").toString());
+    }
+
+    @Test
+    public void outOfRangeEntityStaysLiteral() {
+        assertEquals("&#x110000;", Html.fromHtml("&#x110000;").toString());
     }
 }

@@ -488,7 +488,9 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         dest.writeString(string);
     }
 
-    /// Builds a URI piece by piece.
+    /// Builds a URI piece by piece. As on Android, setting an authority, path
+    /// or query makes the URI hierarchical and drops any opaque part, so
+    /// `mailto:a@b` rebuilt with a path does not keep its stale opaque part.
     public static final class Builder {
         String scheme;
         String authority;
@@ -503,21 +505,25 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         }
 
         public Builder authority(String authority) {
+            this.opaque = null;
             this.authority = encode(authority, "@:[]");
             return this;
         }
 
         public Builder encodedAuthority(String authority) {
+            this.opaque = null;
             this.authority = authority;
             return this;
         }
 
         public Builder path(String path) {
+            this.opaque = null;
             this.path = encode(path, "/");
             return this;
         }
 
         public Builder encodedPath(String path) {
+            this.opaque = null;
             this.path = path;
             return this;
         }
@@ -527,6 +533,7 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         }
 
         public Builder appendEncodedPath(String segment) {
+            opaque = null;
             if (path == null || path.length() == 0) {
                 path = segment.startsWith("/") ? segment : "/" + segment;
             } else {
@@ -542,22 +549,26 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         }
 
         public Builder query(String query) {
+            this.opaque = null;
             this.query = encode(query, "=&");
             return this;
         }
 
         public Builder encodedQuery(String query) {
+            this.opaque = null;
             this.query = query;
             return this;
         }
 
         public Builder appendQueryParameter(String key, String value) {
+            opaque = null;
             String pair = encode(key) + "=" + encode(value);
             query = query == null || query.length() == 0 ? pair : query + "&" + pair;
             return this;
         }
 
         public Builder clearQuery() {
+            opaque = null;
             query = null;
             return this;
         }

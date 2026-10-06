@@ -126,6 +126,22 @@ public class ResourceCompilerTest {
                 "onclick.txt").toPath()), "UTF-8"));
     }
 
+    /// A menu item's `android:onClick` is recorded too, marked as a menu
+    /// handler, so the build generates a `name(MenuItem)` dispatch for it
+    /// instead of looking for a `name(View)` one.
+    @Test
+    public void recordsMenuItemOnClickNames() throws IOException {
+        File res = project();
+        write(new File(res, "menu/main.xml"), "<menu xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                + "<item android:id=\"@+id/settings\" android:onClick=\"picked\"/>"
+                + "</menu>");
+        ResourceCompiler.Result r = compile(res);
+        assertFalse(r.diagnostics.toString(), r.hasErrors());
+        assertEquals(ResourceCompiler.MENU_ON_CLICK_PREFIX + "picked\ntapped\n",
+                new String(Files.readAllBytes(new File(r.resourceFiles.get(0).getParentFile(),
+                "onclick.txt").toPath()), "UTF-8"));
+    }
+
     /// `android:launchMode` reaches the runtime, so a singleTop or singleTask
     /// activity receives `onNewIntent` instead of a duplicate screen.
     @Test

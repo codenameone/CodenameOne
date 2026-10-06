@@ -199,11 +199,12 @@ public class IntentFilter {
 
     /// Matches an intent's action, type, data and categories; a negative
     /// `NO_MATCH_*` code, or a `MATCH_CATEGORY_*` quality (higher is more
-    /// specific) plus `MATCH_ADJUSTMENT_NORMAL`. An intent with no action
-    /// passes the action test when the filter lists at least one.
+    /// specific) plus `MATCH_ADJUSTMENT_NORMAL`. As on Android, a null action
+    /// skips the action test, even against a filter that lists none; the
+    /// runtime's own resolvers never start or deliver an actionless intent.
     public final int match(String action, String type, String scheme, Uri data, Set<String> intentCategories,
                            String logTag) {
-        if (action == null ? actions.isEmpty() : !actions.contains(action)) {
+        if (action != null && !actions.contains(action)) {
             return NO_MATCH_ACTION;
         }
         int dataMatch = matchData(type, scheme, data);

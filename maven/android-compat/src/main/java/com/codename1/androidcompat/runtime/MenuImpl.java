@@ -735,8 +735,30 @@ public class MenuImpl implements Menu {
                 if (cd != null) {
                     item.setContentDescription(cd);
                 }
+                String onClick = a.getString(android.R.styleable.MenuItem_onClick);
+                if (onClick != null && onClick.length() > 0) {
+                    item.setOnMenuItemClickListener(new XmlClickListener(context, onClick));
+                }
                 a.recycle();
             }
+        }
+    }
+
+    /// A menu item's `android:onClick`, called through the dispatcher the
+    /// build generates (there is no reflection on the device).
+    static final class XmlClickListener implements MenuItem.OnMenuItemClickListener {
+        private final Context context;
+        private final String method;
+
+        XmlClickListener(Context context, String method) {
+            this.context = context;
+            this.method = method;
+        }
+
+        @Override
+        public boolean onMenuItemClick(MenuItem item) {
+            AndroidRuntime rt = AndroidRuntime.getInstance();
+            return rt != null && rt.dispatchMenuOnClick(context, method, item);
         }
     }
 

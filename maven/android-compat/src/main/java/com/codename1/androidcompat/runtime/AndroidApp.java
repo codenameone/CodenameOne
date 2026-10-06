@@ -293,4 +293,10 @@ public abstract class AndroidApp {
     public boolean dispatchOnClick(Object target, String method, View view) {
         return OnClickDispatch.dispatch(target, method, view);
     }
+
+    /// Calls a menu item's `android:onClick` method `method` on `target`;
+    /// see [OnClickDispatch#dispatchMenu(Object, String, android.view.MenuItem)].
+    public int dispatchMenuOnClick(Object target, String method, android.view.MenuItem item) {
+        return OnClickDispatch.dispatchMenu(target, method, item);
+    }
 }

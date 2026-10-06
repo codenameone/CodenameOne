@@ -130,19 +130,29 @@ public class Html {
         }
         if (e.startsWith("#x") || e.startsWith("#X")) {
             try {
-                return String.valueOf((char) Integer.parseInt(e.substring(2), 16));
+                return codePoint(Integer.parseInt(e.substring(2), 16));
             } catch (NumberFormatException ex) {
                 return null;
             }
         }
         if (e.startsWith("#")) {
             try {
-                return String.valueOf((char) Integer.parseInt(e.substring(1)));
+                return codePoint(Integer.parseInt(e.substring(1)));
             } catch (NumberFormatException ex) {
                 return null;
             }
         }
         return null;
+    }
+
+    /// A numeric entity's character; one past `U+FFFF` becomes its surrogate
+    /// pair rather than a truncated BMP character. Out of range, it is left
+    /// undecoded.
+    private static String codePoint(int cp) {
+        if (cp < 0 || cp > 0x10FFFF) {
+            return null;
+        }
+        return new String(Character.toChars(cp));
     }
 
     public static String toHtml(Spanned text) {

@@ -20,29 +20,31 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.androidcompat.runtime;
+package android.net;
 
-import android.view.MenuItem;
-import android.view.View;
+import org.junit.Test;
 
-/// Placeholder for the `android:onClick` dispatcher. The `remap-android`
-/// build goal replaces this class in the application with one generated from
-/// the compiled classes, which calls each `public void name(View)` method a
-/// layout names directly, and each `name(MenuItem)` method a menu item names.
-/// Without that step (for example in the runtime's own tests) no handler is
-/// found.
-public final class OnClickDispatch {
+import static org.junit.Assert.assertEquals;
 
-    private OnClickDispatch() {
+/// A builder taken from an opaque URI becomes hierarchical once an authority,
+/// path or query is set, as on Android; the stale opaque part used to win in
+/// `build()` and silently discard the new path.
+public class UriBuilderOpaqueResetTest {
+
+    @Test
+    public void pathReplacesOpaquePart() {
+        assertEquals("mailto:/inbox", Uri.parse("mailto:a@b").buildUpon().path("/inbox").build().toString());
     }
 
-    public static boolean dispatch(Object target, String method, View view) {
-        return false;
+    @Test
+    public void authorityAndQueryReplaceOpaquePart() {
+        Uri u = Uri.parse("mailto:a@b").buildUpon().scheme("https").authority("example.com")
+                .appendQueryParameter("q", "1").build();
+        assertEquals("https://example.com?q=1", u.toString());
     }
 
-    /// -1 when `target` has no such handler, else its result: 1 for true
-    /// (or a void handler), 0 for false.
-    public static int dispatchMenu(Object target, String method, MenuItem item) {
-        return -1;
+    @Test
+    public void opaqueRoundTripIsUnchanged() {
+        assertEquals("mailto:a@b#f", Uri.parse("mailto:a@b#f").buildUpon().build().toString());
     }
 }

@@ -193,6 +193,25 @@ public final class AndroidRuntime {
                 + " for android:onClick attribute defined on view class " + v.getClass().getName());
     }
 
+    /// A menu item's `android:onClick`: calls the named `name(MenuItem)`
+    /// method on the activity the menu was inflated for (the context itself
+    /// when it wraps none), and answers what the method returned; a void one
+    /// counts as handled. The handler is found by the build, never by
+    /// reflection, so a missing one is reported when the item is selected
+    /// rather than when the menu is inflated.
+    public boolean dispatchMenuOnClick(Context context, String method, android.view.MenuItem item) {
+        Object target = activityOf(context);
+        if (target == null) {
+            target = context;
+        }
+        int r = app.dispatchMenuOnClick(target, method, item);
+        if (r < 0) {
+            throw new IllegalStateException("Couldn't resolve menu item onClick handler " + method
+                    + "(MenuItem) in class " + (target == null ? "null" : target.getClass().getName()));
+        }
+        return r != 0;
+    }
+
     // ------------------------------------------------------------ implicit intents
 
     public boolean canResolve(Intent intent) {

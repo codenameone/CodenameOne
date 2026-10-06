@@ -119,10 +119,17 @@ public final class ResourceCompiler {
         public File assetsDir;
         /// Where to write the `android:onClick` method names the layouts use,
         /// one per line, for the build step that generates their dispatcher.
+        /// A name a menu item uses instead (a `name(MenuItem)` handler) is
+        /// written after [#MENU_ON_CLICK_PREFIX].
         public File onClickNamesOut;
     }
 
     public static final String ASSET_INDEX = "cn1_android_assets.idx";
+
+    /// Marks a menu item's `android:onClick` name in the onClick names file.
+    /// No Java method name contains a colon, so it cannot be mistaken for a
+    /// layout's name.
+    public static final String MENU_ON_CLICK_PREFIX = "menu:";
 
     public static final class Result {
         public final List<Diagnostic> diagnostics = new ArrayList<Diagnostic>();
@@ -289,7 +296,9 @@ public final class ResourceCompiler {
             collectIds(root, rel(f));
             if (type == ResType.LAYOUT) {
                 collectViewTags(root, rel(f));
-                collectOnClick(root);
+                collectOnClick(root, "");
+            } else if (type == ResType.MENU) {
+                collectOnClick(root, MENU_ON_CLICK_PREFIX);
             }
             item = new Resource.Xml(rel(f), root.line, root);
         } else {
@@ -1124,13 +1133,13 @@ public final class ResourceCompiler {
 
     private final Set<String> onClickNames = new java.util.TreeSet<String>();
 
-    private void collectOnClick(RawNode n) {
+    private void collectOnClick(RawNode n, String prefix) {
         String v = n.attr(RawNode.NS_KEY_ANDROID, "onClick");
         if (v != null && v.trim().length() > 0 && !v.trim().startsWith("@")) {
-            onClickNames.add(v.trim());
+            onClickNames.add(prefix + v.trim());
         }
         for (RawNode c : n.children) {
-            collectOnClick(c);
+            collectOnClick(c, prefix);
         }
     }
 

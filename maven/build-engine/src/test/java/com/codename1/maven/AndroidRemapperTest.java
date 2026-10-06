@@ -162,6 +162,77 @@ public class AndroidRemapperTest {
         assertEquals(before.length, Files.readAllBytes(new File(classes, "com/x/Main.class").toPath()).length);
     }
 
+    private static void menuHandler(ClassWriter cw, String name, boolean returnsBoolean) {
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, name,
+                "(Landroid/view/MenuItem;)" + (returnsBoolean ? "Z" : "V"), null, null);
+        mv.visitCode();
+        if (returnsBoolean) {
+            mv.visitInsn(Opcodes.ICONST_0);
+            mv.visitInsn(Opcodes.IRETURN);
+        } else {
+            mv.visitInsn(Opcodes.RETURN);
+        }
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    /// A menu item's `android:onClick` names a `name(MenuItem)` method; the
+    /// generated `dispatchMenu` calls it directly and answers its result (a
+    /// void handler counts as handled), or -1 when nothing matches. A name a
+    /// layout uses is not a menu handler, even with the right signature.
+    @Test
+    public void generatesTheMenuItemOnClickDispatcher() throws Exception {
+        File classes = tmp.newFolder("classes");
+        new File(classes, "com/x").mkdirs();
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER, "com/x/Host", null, "java/lang/Object", null);
+        MethodVisitor ctor = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        ctor.visitCode();
+        ctor.visitVarInsn(Opcodes.ALOAD, 0);
+        ctor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        ctor.visitInsn(Opcodes.RETURN);
+        ctor.visitMaxs(0, 0);
+        ctor.visitEnd();
+        menuHandler(cw, "chosen", false);
+        menuHandler(cw, "declined", true);
+        menuHandler(cw, "tapped", false);
+        cw.visitEnd();
+        Files.write(new File(classes, "com/x/Host.class").toPath(), cw.toByteArray());
+        File jar = tmp.newFile("codenameone-android-compat-8.jar");
+        ZipOutputStream z = new ZipOutputStream(new FileOutputStream(jar));
+        z.putNextEntry(new ZipEntry("android/view/View.class"));
+        z.write(runtimeClass("android/view/View", "java/lang/Object"));
+        z.closeEntry();
+        ClassWriter item = new ClassWriter(0);
+        item.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT,
+                "android/view/MenuItem", null, "java/lang/Object", null);
+        item.visitEnd();
+        z.putNextEntry(new ZipEntry("android/view/MenuItem.class"));
+        z.write(item.toByteArray());
+        z.closeEntry();
+        z.close();
+        File onClick = tmp.newFile("menu-onclick.txt");
+        Files.write(onClick.toPath(), ("menu:chosen\nmenu:declined\nmenu:absent\ntapped\n").getBytes("UTF-8"));
+
+        new AndroidRemapper(classes, jar, onClick, LOG).run();
+
+        java.net.URLClassLoader loader = new java.net.URLClassLoader(new java.net.URL[] {classes.toURI().toURL()},
+                null);
+        try {
+            Class<?> dispatch = loader.loadClass(AndroidRemapper.ON_CLICK_DISPATCH.replace('/', '.'));
+            Class<?> menuItem = loader.loadClass(AndroidRemapper.MENU_ITEM.replace('/', '.'));
+            java.lang.reflect.Method m = dispatch.getMethod("dispatchMenu", Object.class, String.class, menuItem);
+            Object host = loader.loadClass("com.x.Host").newInstance();
+            assertEquals(1, m.invoke(null, host, "chosen", null));
+            assertEquals(0, m.invoke(null, host, "declined", null));
+            assertEquals(-1, m.invoke(null, host, "absent", null));
+            assertEquals(-1, m.invoke(null, host, "tapped", null));
+            assertEquals(-1, m.invoke(null, "not a host", "chosen", null));
+        } finally {
+            loader.close();
+        }
+    }
+
     /// A class with a constructor that calls its superclass's, so the
     /// generated factory's `new` really runs.
     private static byte[] classWithCtor(String name, String superName, int access, int ctorAccess) {

@@ -74,6 +74,7 @@ public final class AndroidRemapper {
     public static final String RUNTIME_TARGET = "com/codename1/androidcompat/rt/";
     public static final String ON_CLICK_DISPATCH = RUNTIME_TARGET + "OnClickDispatch";
     static final String VIEW = TARGET + "android/view/View";
+    static final String MENU_ITEM = TARGET + "android/view/MenuItem";
     public static final String FRAGMENT_FACTORY = RUNTIME_TARGET + "FragmentFactory";
     /// The generated replacement for the runtime's `JsInterfaceDispatch`
     /// placeholder, and the conversions it calls.
@@ -391,20 +392,36 @@ public final class AndroidRemapper {
 
     /// Writes `OnClickDispatch.dispatch(Object, String, View)`: for each layout
     /// `android:onClick` name and each class declaring a public instance
-    /// `name(View)` method, a type test and a direct call.
+    /// `name(View)` method, a type test and a direct call. Menu items'
+    /// `android:onClick` names get `dispatchMenu(Object, String, MenuItem)`
+    /// the same way, for `name(MenuItem)` methods returning `boolean` or
+    /// `void`; it answers -1 when no handler matches, else the handler's
+    /// result as 0 or 1 (a void handler counts as handled, as on Android).
     private int writeOnClickDispatch(List<String> appClasses) throws IOException {
         Set<String> names = new LinkedHashSet<String>();
+        Set<String> menuNames = new LinkedHashSet<String>();
+        String menuPrefix = com.codename1.android.rescompiler.ResourceCompiler.MENU_ON_CLICK_PREFIX;
         if (onClickNames != null && onClickNames.isFile()) {
             for (String line : new String(Files.readAllBytes(onClickNames.toPath()), Charset.forName("UTF-8"))
                     .split("\n")) {
-                if (line.trim().length() > 0) {
-                    names.add(line.trim());
+                String n = line.trim();
+                if (n.startsWith(menuPrefix)) {
+                    n = n.substring(menuPrefix.length()).trim();
+                    if (n.length() > 0) {
+                        menuNames.add(n);
+                    }
+                } else if (n.length() > 0) {
+                    names.add(n);
                 }
             }
         }
         final List<String[]> handlers = new ArrayList<String[]>();
-        if (!names.isEmpty()) {
+        final List<String[]> menuHandlers = new ArrayList<String[]>();
+        if (!names.isEmpty() || !menuNames.isEmpty()) {
             final String viewDesc = "(L" + VIEW + ";)V";
+            final String menuVoidDesc = "(L" + MENU_ITEM + ";)V";
+            final String menuBoolDesc = "(L" + MENU_ITEM + ";)Z";
+            final Set<String> wantedMenu = menuNames;
             List<File> classFiles = new ArrayList<File>();
             for (String cls : appClasses) {
                 classFiles.add(new File(classesDir, cls + ".class"));
@@ -422,11 +439,17 @@ public final class AndroidRemapper {
                 cr.accept(new ClassVisitor(Opcodes.ASM9) {
                     @Override
                     public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
-                        if ((access & Opcodes.ACC_PUBLIC) != 0 && (access & Opcodes.ACC_STATIC) == 0
-                                && REMAPPER.mapMethodDesc(desc).equals(viewDesc) && wanted.contains(name)) {
-                            // Mapped first: a handler directory's classes may not
-                            // be relocated yet (Gradle relocates Kotlin's after javac).
+                        if ((access & Opcodes.ACC_PUBLIC) == 0 || (access & Opcodes.ACC_STATIC) != 0) {
+                            return null;
+                        }
+                        // Mapped first: a handler directory's classes may not
+                        // be relocated yet (Gradle relocates Kotlin's after javac).
+                        String mapped = REMAPPER.mapMethodDesc(desc);
+                        if (mapped.equals(viewDesc) && wanted.contains(name)) {
                             handlers.add(new String[] {cls, name});
+                        } else if ((mapped.equals(menuVoidDesc) || mapped.equals(menuBoolDesc))
+                                && wantedMenu.contains(name)) {
+                            menuHandlers.add(new String[] {cls, name, mapped});
                         }
                         return null;
                     }
@@ -467,10 +490,49 @@ public final class AndroidRemapper {
         mv.visitInsn(Opcodes.IRETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+        mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "dispatchMenu",
+                "(Ljava/lang/Object;Ljava/lang/String;L" + MENU_ITEM + ";)I", null, null);
+        mv.visitCode();
+        for (String[] h : menuHandlers) {
+            Label next = new Label();
+            mv.visitVarInsn(Opcodes.ALOAD, 1);
+            mv.visitLdcInsn(h[1]);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
+            mv.visitJumpInsn(Opcodes.IFEQ, next);
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitTypeInsn(Opcodes.INSTANCEOF, h[0]);
+            mv.visitJumpInsn(Opcodes.IFEQ, next);
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitTypeInsn(Opcodes.CHECKCAST, h[0]);
+            mv.visitVarInsn(Opcodes.ALOAD, 2);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, h[0], h[1], h[2], false);
+            if (h[2].endsWith(")V")) {
+                mv.visitInsn(Opcodes.ICONST_1);
+            }
+            mv.visitInsn(Opcodes.IRETURN);
+            mv.visitLabel(next);
+        }
+        mv.visitInsn(Opcodes.ICONST_M1);
+        mv.visitInsn(Opcodes.IRETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
         cw.visitEnd();
         File out = new File(classesDir, ON_CLICK_DISPATCH + ".class");
         out.getParentFile().mkdirs();
         write(out, cw.toByteArray());
+        for (String n : menuNames) {
+            boolean found = false;
+            for (String[] h : menuHandlers) {
+                if (h[1].equals(n)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                log.warn("Menu item android:onClick=\"" + n + "\" names no public " + n
+                        + "(MenuItem) method in any compiled class; selecting it will throw");
+            }
+        }
         for (String n : names) {
             boolean found = false;
             for (String[] h : handlers) {
@@ -484,7 +546,7 @@ public final class AndroidRemapper {
                         + "(View) method in any compiled class; clicking will throw, as on Android");
             }
         }
-        return handlers.size();
+        return handlers.size() + menuHandlers.size();
     }
 
     /// Writes `FragmentFactory.instantiate(String)`: for every public,

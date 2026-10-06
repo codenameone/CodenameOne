@@ -20,29 +20,27 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.androidcompat.runtime;
+package android.content;
 
-import android.view.MenuItem;
-import android.view.View;
+import org.junit.Test;
 
-/// Placeholder for the `android:onClick` dispatcher. The `remap-android`
-/// build goal replaces this class in the application with one generated from
-/// the compiled classes, which calls each `public void name(View)` method a
-/// layout names directly, and each `name(MenuItem)` method a menu item names.
-/// Without that step (for example in the runtime's own tests) no handler is
-/// found.
-public final class OnClickDispatch {
+import static org.junit.Assert.assertEquals;
 
-    private OnClickDispatch() {
+/// A null action skips the action test, as on Android, so an actionless
+/// filter matches an actionless intent on its data and categories alone.
+public class IntentFilterNullActionTest {
+
+    @Test
+    public void actionlessFilterMatchesActionlessIntent() {
+        assertEquals(IntentFilter.MATCH_CATEGORY_EMPTY + IntentFilter.MATCH_ADJUSTMENT_NORMAL,
+                new IntentFilter().match(null, null, null, null, null, null));
     }
 
-    public static boolean dispatch(Object target, String method, View view) {
-        return false;
-    }
-
-    /// -1 when `target` has no such handler, else its result: 1 for true
-    /// (or a void handler), 0 for false.
-    public static int dispatchMenu(Object target, String method, MenuItem item) {
-        return -1;
+    @Test
+    public void namedActionStillHasToBeListed() {
+        assertEquals(IntentFilter.NO_MATCH_ACTION,
+                new IntentFilter().match("a.B", null, null, null, null, null));
+        assertEquals(IntentFilter.NO_MATCH_ACTION,
+                new IntentFilter("a.C").match("a.B", null, null, null, null, null));
     }
 }

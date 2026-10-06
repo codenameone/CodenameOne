@@ -958,6 +958,7 @@
         <attr name="alphabeticShortcut"/>
         <attr name="numericShortcut"/>
         <attr name="contentDescription"/>
+        <attr name="onClick"/>
     </declare-styleable>
     <declare-styleable name="MenuGroup">
         <attr name="id"/>
