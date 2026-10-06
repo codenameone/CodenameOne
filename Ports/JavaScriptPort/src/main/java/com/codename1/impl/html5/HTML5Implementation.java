@@ -773,6 +773,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * Holds the DOM elements carrying the visible text that was promoted off the canvas.
      */
     private HTMLElement textLayerContainer;
+    private HTMLElement selectionEditorContainer;
 
     /**
      * Promotes text runs off the canvas into real DOM text. Non-null once {@code __init()} has
@@ -1141,6 +1142,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return nativeSelectionRequested() && Accessor.allowsNativeTextSelection(ta)
                 && (!(ta instanceof TextField) || TextField.isUseNativeTextInput())
                 && ta.getDoneListener() == null
+                && !Accessor.isBitmapFont(ta.getStyle().getFont())
+                && ta.getStyle().getTextDecoration() == Style.TEXT_DECORATION_NONE
                 && (ta.getConstraint() & TextArea.PASSWORD) == 0
                 && (ta.isEditable() || ta.isTextSelectionEnabled() && ta.getComponentForm() != null
                     && ta.getComponentForm().getTextSelection().isEnabled());
@@ -1175,7 +1178,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             el.setTabIndex(-1); // the semantic overlay owns keyboard traversal
             updateConstraints();
             el.getStyle().setProperty("display", "none");
-            textLayerContainer.appendChild(el);
+            selectionEditorContainer.appendChild(el);
             selectionTextOverlays.add(this);
             changes = new DataChangedListener() {
                 public void dataChanged(int type, int index) {
@@ -1255,13 +1258,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     callSerially(new Runnable() {
                         public void run() {
                             focused = false;
+                            releaseEditingOwnership();
                             if (ta.isEditable() && ta.isEnabled()) {
                                 commit(value);
-                                if (currentEditingField == ta) {
-                                    currentEditingField = null;
-                                    currentInputField = null;
-                                    isEditing = false;
-                                }
                                 Display.getInstance().onEditingComplete(ta, value);
                             }
                             ta.repaint();
@@ -1277,7 +1276,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             String name = ta.getName() == null ? "" : ta.getName();
             if (lastConstraint != ta.getConstraint() || (override == null ? lastAutocomplete != null : !override.equals(lastAutocomplete))
                     || !name.equals(lastName)) {
-                applyInputConstraints(el, ta);
+                applyTextInputConstraints(el, ta, singleLine, true);
                 lastConstraint = ta.getConstraint();
                 lastAutocomplete = override;
                 lastName = name;
@@ -1337,7 +1336,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 return;
             }
-            if (el.getParentNode() == null) textLayerContainer.appendChild(el);
+            if (el.getParentNode() == null) selectionEditorContainer.appendChild(el);
             updateConstraints();
             Style style = ta.getStyle();
             NativeFont font = resolveNativeFont(style.getFont().getNativeFont());
@@ -1383,8 +1382,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
 
+        private void releaseEditingOwnership() {
+            // A removed control may deliver blur after its replacement gains focus.
+            if (currentInputField == el) {
+                currentEditingField = null;
+                currentInputField = null;
+                isEditing = false;
+            }
+        }
+
         @Override
         void uninstall() {
+            visible = false;
+            focused = false;
+            releaseEditingOwnership();
+            el.blur();
             ta.removeDataChangedListener(changes);
             ta.removeFocusListener(focus);
             selectionTextOverlays.remove(this);
@@ -1730,6 +1742,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 && c.getAbsoluteX() <= 0 && c.getAbsoluteY() <= 0
                 && c.getWidth() >= displayWidth && c.getHeight() >= displayHeight) {
             paintCoversScreen = true;
+        }
+        if (isDisplayGraphics(g) && c.getNativeOverlay() instanceof SelectionTextOverlay
+                && ((SelectionTextOverlay) c.getNativeOverlay()).singleLine != ((TextArea) c).isSingleLineTextArea()) {
+            Accessor.hideNativeTextOverlay(c);
         }
         if (c instanceof TextArea && c.getNativeOverlay() == null && textLayerContainer != null
                 && isDisplayGraphics(g) && allowsSelectionOverlay((TextArea) c)) {
@@ -2118,6 +2134,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         textLayerContainer.setAttribute("aria-hidden", "true");
         textLayerContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
         outputCanvas.getParentNode().insertBefore(textLayerContainer, outputCanvas);
+        // Interactive editors must remain exposed to assistive technology when focused.
+        // Keep the duplicate, noninteractive glyph layer aria-hidden.
+        selectionEditorContainer = (HTMLElement)document.createElement("div");
+        selectionEditorContainer.setAttribute("id", "cn1-selection-editors");
+        selectionEditorContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
+        outputCanvas.getParentNode().insertBefore(selectionEditorContainer, outputCanvas);
         // ?cn1TextLayer=0 / ?cn1Semantics=0 turn the two DOM layers off at runtime. Both are
         // new behaviour layered onto a canvas renderer, so being able to take one out without
         // rebuilding is what makes a rendering or timing regression bisectable.
@@ -6944,6 +6966,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @return the resolved input type, "text" for anything without one of its own
      */
     static String applyTextInputConstraints(HTMLElement inputEl, TextArea ta, boolean singleLine) {
+        return applyTextInputConstraints(inputEl, ta, singleLine, false);
+    }
+
+    private static String applyTextInputConstraints(HTMLElement inputEl, TextArea ta, boolean singleLine, boolean persistent) {
         int constraint = ta.getConstraint();
         int base = constraint & 0xffff;
         boolean password = (constraint & TextArea.PASSWORD) != 0;
@@ -6956,7 +6982,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             resolvedType = "password";
         } else if (base == TextArea.EMAILADDR) {
             resolvedType = "email";
-        } else if (base == TextArea.NUMERIC) {
+        } else if (base == TextArea.NUMERIC && !persistent) {
+            // Persistent controls also render the model while unfocused. Constraints
+            // are keyboard hints; type=number would erase nonnumeric model text.
             resolvedType = "number";
         } else if (base == TextArea.PHONENUMBER) {
             resolvedType = "tel";

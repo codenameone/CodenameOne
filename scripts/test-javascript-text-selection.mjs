@@ -67,6 +67,67 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    for (const action of ['Make readonly', 'Disable field']) {
+      await openReview('ownership');
+      const editor = page.locator('.cn1-selection-editor[aria-label="ownershipField"]');
+      await editor.waitFor({state: 'visible'});
+      assert.equal(await editor.evaluate(el => el.closest('[aria-hidden="true"]') === null), true);
+      assert.equal(await page.getByRole('textbox', {name: 'ownershipField', exact: true}).and(editor).count(), 1);
+      await editor.click();
+      await editor.fill('Updated session');
+      await clickButton(action);
+      await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="ownershipField"]').readOnly);
+      await editor.evaluate(el => el.blur());
+      await page.waitForTimeout(300);
+      await clickButton('Edit password');
+      const legacy = page.locator('input.cn1-edit-string[type="password"]:visible');
+      await legacy.waitFor();
+      await legacy.fill('secret');
+      assert.equal(await legacy.inputValue(), 'secret');
+    }
+    console.log('PASS', name, 'native editors are accessible and release ownership after readonly/disabled transitions');
+
+    await openReview('numeric');
+    const numeric = page.locator('.cn1-selection-editor[aria-label="numericModel"]');
+    await numeric.waitFor({state: 'visible'});
+    assert.equal(await numeric.inputValue(), 'Not a number');
+    assert.equal(await numeric.getAttribute('type'), 'text');
+    assert.equal(await numeric.getAttribute('inputmode'), 'numeric');
+    await clickButton('Change numeric model');
+    await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="numericModel"]').value === 'Still not numeric');
+    console.log('PASS', name, 'numeric keyboard hints preserve arbitrary model values');
+
+    await openReview('linemode');
+    for (const tag of ['TEXTAREA', 'INPUT', 'TEXTAREA']) {
+      await page.waitForFunction(tag => {
+        const editors = document.querySelectorAll('.cn1-selection-editor[aria-label="changingLineMode"]');
+        return editors.length === 1 && editors[0].tagName === tag && getComputedStyle(editors[0]).display !== 'none'
+          && editors[0].value === 'Changing line mode';
+      }, tag);
+    }
+    console.log('PASS', name, 'line mode changes recreate one native control on a static form');
+
+    await openReview('canvasstyles');
+    await clickButton('Apply decorations');
+    await page.waitForFunction(() => [...document.querySelectorAll('.cn1-selection-editor')].every(el => getComputedStyle(el).display === 'none'));
+    await page.waitForFunction(() => window.__cn1TextDraws.includes('Decoration 1'));
+    assert.equal(await page.locator('#cn1-text-layer span').filter({hasText: 'ABBA'}).count(), 0);
+    const bitmapPixels = await page.evaluate(() => {
+      const semantic = [...document.querySelectorAll('#cn1-accessibility-tree [role="textbox"]')]
+        .find(el => el.textContent === 'ABBA');
+      const box = semantic.getBoundingClientRect();
+      const canvas = document.getElementById('codenameone-canvas');
+      const pixels = canvas.getContext('2d').getImageData(box.x + 6, box.y + 6, 48, 12).data;
+      let dark = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] < 80 && pixels[i + 1] < 80 && pixels[i + 2] < 80 && pixels[i + 3] > 200) dark++;
+      }
+      return dark;
+    });
+    assert.ok(bitmapPixels > 300, 'bitmap glyph pixels are painted on the canvas');
+    await page.screenshot({path: path.join(artifacts, name + '-canvas-styles.png')});
+    console.log('PASS', name, 'bitmap fonts and decorated text retain canvas rendering');
+
     await openReview('selectionstate');
     async function selectionState(text, enabled) {
       await page.waitForFunction(({ text, enabled }) => {
@@ -204,12 +265,12 @@ async function exercise(context, name, host, mobileDevice = null) {
     assert.match(appearance.color, /^rgba\(18, 52, 86, 0\.37/);
     assert.ok(appearance.top > appearance.height / 2, 'bottom-aligned text leaves space above it');
     await clickButton('Change constraints');
-    await page.waitForFunction(() => document.querySelector('[aria-label="reviewField"].cn1-selection-editor')?.type === 'number');
+    await page.waitForFunction(() => document.querySelector('[aria-label="reviewField"].cn1-selection-editor')?.getAttribute('inputmode') === 'numeric');
     assert.equal(await field.getAttribute('inputmode'), 'numeric');
     assert.equal(await field.getAttribute('autocomplete'), 'off');
     assert.equal(await field.getAttribute('spellcheck'), 'false');
     await clickButton('Reset constraints');
-    await page.waitForFunction(() => document.querySelector('[aria-label="reviewField"].cn1-selection-editor')?.type === 'text');
+    await page.waitForFunction(() => document.querySelector('[aria-label="reviewField"].cn1-selection-editor')?.getAttribute('inputmode') === null);
     assert.equal(await field.getAttribute('inputmode'), null);
     assert.equal(await field.getAttribute('autocomplete'), 'nickname');
     assert.equal(await field.getAttribute('autocapitalize'), 'words');

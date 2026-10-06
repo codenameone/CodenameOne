@@ -93,7 +93,57 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=metadata") >= 0) {
+        if (query.indexOf("review=ownership") >= 0) {
+            TextField field = new TextField("Active session");
+            field.setName("ownershipField");
+            TextField password = new TextField("", "Password", 20, TextArea.PASSWORD);
+            password.setName("legacyPassword");
+            Button readonly = new Button("Make readonly");
+            readonly.addActionListener(e -> field.setEditable(false));
+            Button disable = new Button("Disable field");
+            disable.addActionListener(e -> field.setEnabled(false));
+            Button editPassword = new Button("Edit password");
+            editPassword.addActionListener(e -> password.startEditingAsync());
+            form.addAll(field, password, readonly, disable, editPassword);
+        } else if (query.indexOf("review=numeric") >= 0) {
+            TextField field = new TextField("Not a number", "", 20, TextArea.NUMERIC);
+            field.setName("numericModel");
+            Button change = new Button("Change numeric model");
+            change.addActionListener(e -> field.setText("Still not numeric"));
+            form.addAll(field, change);
+        } else if (query.indexOf("review=linemode") >= 0) {
+            TextArea area = new TextArea("Changing line mode", 2, 24);
+            area.setName("changingLineMode");
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> area.setSingleLineTextArea(true));
+            com.codename1.ui.util.UITimer.timer(5000, false, form, () -> area.setSingleLineTextArea(false));
+            form.add(area);
+        } else if (query.indexOf("review=canvasstyles") >= 0) {
+            Image glyphs = Image.createImage(24, 12, 0xffffffff);
+            Font bitmap = Font.createBitmapFont(glyphs, new int[] {0, 12}, new int[] {12, 12}, "AB");
+            TextArea area = new TextArea("ABBA");
+            area.setName("bitmapArea");
+            area.getAllStyles().setFont(bitmap);
+            area.setEditable(false);
+            form.add(area);
+            int[] decorations = {1, 2, 4, 7, 8, 16, 32};
+            for (int decoration : decorations) {
+                TextArea decorated = new TextArea("Decoration " + decoration);
+                decorated.setName("decoration" + decoration);
+                decorated.setEditable(false);
+                form.add(decorated);
+            }
+            Button apply = new Button("Apply decorations");
+            apply.addActionListener(e -> {
+                // Apply after startup so deferred theme initialization has completed.
+                for (int i = 0; i < decorations.length; i++) {
+                    Component decorated = form.getContentPane().getComponentAt(i + 1);
+                    decorated.getUnselectedStyle().setTextDecoration(decorations[i]);
+                    decorated.getSelectedStyle().setTextDecoration(decorations[i]);
+                }
+                form.repaint();
+            });
+            form.add(apply);
+        } else if (query.indexOf("review=metadata") >= 0) {
             TextField field = new TextField("123", "", 20, TextArea.EMAILADDR);
             field.setName("reviewField");
             field.setPreferredH(200);

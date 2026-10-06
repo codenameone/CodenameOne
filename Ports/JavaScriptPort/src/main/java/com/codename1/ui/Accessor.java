@@ -43,6 +43,16 @@ public class Accessor {
     public static void showNativeTextOverlay(Component c) {
         c.showNativeOverlay();
     }
+    /** Remove an obsolete overlay before rebuilding its native control. */
+    public static void hideNativeTextOverlay(Component c) {
+        c.hideNativeOverlay();
+    }
+
+    /** Bitmap fonts have no browser font representation. */
+    public static boolean isBitmapFont(Font font) {
+        return font instanceof CustomFont;
+    }
+
     public static int getActivePeerCount() {
         return Form.activePeerCount;
     }

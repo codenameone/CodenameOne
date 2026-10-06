@@ -1661,7 +1661,15 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `singleLineTextArea`: set to true to force a single line text
     public void setSingleLineTextArea(boolean singleLineTextArea) {
-        this.singleLineTextArea = singleLineTextArea;
+        if (this.singleLineTextArea != singleLineTextArea) {
+            this.singleLineTextArea = singleLineTextArea;
+            TopLevelContainer top = getTopLevelContainer();
+            if (top != null) {
+                top.asContainer().repaint();
+            } else {
+                repaint();
+            }
+        }
     }
 
     /// Returns the alignment of the TextArea
