@@ -7,6 +7,8 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
@@ -265,17 +267,11 @@ final class PlaygroundPreviewColumn extends Container {
         rebuildStage();
     }
 
-    /// Exclusive scroll direction based on orientation: portrait scrolls Y, landscape
-    /// scrolls X. Never both at once - CN1 doesn't render two-axis scroll well.
+    /// The device fits the stage; scrolling belongs to the sample's content.
+    /// A scrolling stage would lay out at preferred height and hide bottom controls.
     private void applyStageScroll() {
-        boolean landscape = ORIENTATION_LANDSCAPE.equals(orientation) && !DEVICE_NO_SKIN.equals(device);
-        if (landscape) {
-            stageWrapper.setScrollableY(false);
-            stageWrapper.setScrollableX(true);
-        } else {
-            stageWrapper.setScrollableX(false);
-            stageWrapper.setScrollableY(true);
-        }
+        stageWrapper.setScrollableX(false);
+        stageWrapper.setScrollableY(false);
     }
 
     private void rebuildStage() {
@@ -292,11 +288,7 @@ final class PlaygroundPreviewColumn extends Container {
         } else {
             contentHost.setUIID(darkMode ? "PlaygroundDeviceStageDark" : "PlaygroundDeviceStage");
             stageWrapper.setUIID(darkMode ? "PlaygroundDeviceStageDark" : "PlaygroundDeviceStage");
-            Container bezel = buildBezel();
-            Container center = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
-            center.getAllStyles().setBgTransparency(0);
-            center.add(bezel);
-            contentHost.add(BorderLayout.CENTER, center);
+            contentHost.add(BorderLayout.CENTER, buildBezel());
             int[] logical = logicalResolution();
             dimensionsLabel.setText(logical[0] + " x " + logical[1]);
         }
@@ -390,9 +382,38 @@ final class PlaygroundPreviewColumn extends Container {
         bezel.setUIID(darkMode ? "PlaygroundDeviceBezelDark" : "PlaygroundDeviceBezel");
         bezel.setPreferredW(bezelPxW);
         bezel.setPreferredH(bezelPxH);
-        bezel.getAllStyles().setBorder(RoundRectBorder.create().cornerRadius(mm[4]));
+        RoundRectBorder bezelBorder = RoundRectBorder.create().cornerRadius(mm[4]);
+        bezel.getAllStyles().setBorder(bezelBorder);
         bezel.add(screen);
-        return bezel;
+        // Fit the whole device into the available stage. A physical-size bezel can
+        // be taller than a browser window, hiding SOUTH controls (including Start
+        // Camera) below the visible preview. Recompute on layout so resizing and
+        // orientation changes also keep the complete sample reachable.
+        Container fitted = new Container(new Layout() {
+            public Dimension getPreferredSize(Container parent) {
+                return new Dimension(bezelPxW, bezelPxH);
+            }
+
+            public void layoutContainer(Container parent) {
+                int availableW = Math.max(1, parent.getWidth() - 16);
+                int availableH = Math.max(1, parent.getHeight() - 16);
+                float scale = Math.min(1f, Math.min((float) availableW / bezelPxW,
+                        (float) availableH / bezelPxH));
+                int w = Math.max(1, (int) (bezelPxW * scale));
+                int h = Math.max(1, (int) (bezelPxH * scale));
+                screen.setPreferredW(Math.max(1, (int) (screenPxW * scale)));
+                screen.setPreferredH(Math.max(1, (int) (screenPxH * scale)));
+                cornerMask.radius = Math.max(1, (int) (screenCornerPx * scale));
+                bezelBorder.cornerRadius(mm[4] * scale);
+                bezel.setX((parent.getWidth() - w) / 2);
+                bezel.setY((parent.getHeight() - h) / 2);
+                bezel.setWidth(w);
+                bezel.setHeight(h);
+            }
+        });
+        fitted.getAllStyles().setBgTransparency(0);
+        fitted.add(bezel);
+        return fitted;
     }
 
     private static final int BEZEL_FILL_COLOR = 0x1A1A1C;
@@ -419,7 +440,7 @@ final class PlaygroundPreviewColumn extends Container {
         private static final int OVERHANG = 2;
 
         private final int color;
-        private final int radius;
+        private int radius;
 
         CornerMaskOverlay(int color, int radius) {
             this.color = color;

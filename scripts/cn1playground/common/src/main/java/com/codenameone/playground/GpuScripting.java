@@ -23,6 +23,7 @@
 package com.codenameone.playground;
 
 import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Camera;
 import com.codename1.gpu.Renderer;
 
 import java.util.function.Consumer;
@@ -45,6 +46,12 @@ public final class GpuScripting {
     /// Builds a {@link Renderer} that forwards `onInit` / `onFrame` to the given
     /// lambdas (each receives the {@link GraphicsDevice}). Either may be null.
     public static Renderer renderer(final Consumer<GraphicsDevice> onInit, final Consumer<GraphicsDevice> onFrame) {
+        return renderer(null, onInit, onFrame);
+    }
+
+    /// Keeps the camera's projection in step with the render surface on resize.
+    public static Renderer renderer(final Camera camera, final Consumer<GraphicsDevice> onInit,
+            final Consumer<GraphicsDevice> onFrame) {
         return new Renderer() {
             @Override
             public void onInit(GraphicsDevice device) {
@@ -56,6 +63,9 @@ public final class GpuScripting {
             @Override
             public void onResize(GraphicsDevice device, int width, int height) {
                 device.setViewport(0, 0, width, height);
+                if (camera != null && height > 0) {
+                    camera.setAspect((float) width / height);
+                }
             }
 
             @Override
