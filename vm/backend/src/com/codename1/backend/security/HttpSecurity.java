@@ -635,17 +635,23 @@ public final class HttpSecurity {
     private final List<SessionSignIn.Listener> signInListeners =
             new ArrayList<SessionSignIn.Listener>();
     private SecondFactorPolicy secondFactorPolicy;
-    private SessionSignIn signIn;
-
     /// How a mechanism of this chain signs a user in to a session; see
     /// [SessionSignIn]. Asked for from a configurer's configure(), once every
     /// part has said in its init() what it adds to a sign-in.
+    ///
+    /// Kept among the shared objects rather than in a field of its own: a
+    /// field of that type is enough to put the class into a server whose
+    /// chains sign nobody in to a session -- measured, in one that only
+    /// verifies tokens.
     SessionSignIn signIn() {
-        if (signIn == null) {
-            signIn = new SessionSignIn(resolveSecurityContextRepository(), sessionAuthentication(),
-                    signInListeners, secondFactorPolicy);
+        Object shared = sharedObjects.get(SessionSignIn.class);
+        if (shared instanceof SessionSignIn) {
+            return (SessionSignIn) shared;
         }
-        return signIn;
+        SessionSignIn made = new SessionSignIn(resolveSecurityContextRepository(),
+                sessionAuthentication(), signInListeners, secondFactorPolicy);
+        sharedObjects.put(SessionSignIn.class, made);
+        return made;
     }
 
     /// Something to tell of every sign-in; from a configurer's init().

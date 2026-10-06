@@ -68,7 +68,7 @@ class BackendLinkingTest {
     private static final String[] FORM = {"FormLoginConfigurer", "UsernamePasswordAuthenticationFilter",
         "DefaultLoginPageGeneratingFilter", "LoginUrlAuthenticationEntryPoint", "LogoutConfigurer",
         "LogoutFilter", "RequestCacheConfigurer", "HttpSessionRequestCache",
-        "SavedRequestAwareAuthenticationSuccessHandler"};
+        "SavedRequestAwareAuthenticationSuccessHandler", "SessionSignIn"};
 
     /** Token verification. */
     private static final String[] TOKENS = {"OAuth2ResourceServerConfigurer",
