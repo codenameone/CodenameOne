@@ -34,6 +34,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
+@com.codename1.impl.SharedWithBackend
 final public class CRC32 implements Checksum {
 
     // The following logic has come from zlib.1.2.

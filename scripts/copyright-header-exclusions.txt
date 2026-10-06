@@ -304,6 +304,26 @@ maven/android-compat/src/main/java/androidx/constraintlayout/widget/Placeholder.
 maven/android-compat/src/main/java/androidx/constraintlayout/widget/SharedValues.java | Vendored AOSP androidx.constraintlayout (constraintlayout 2.1.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/widget/StateSet.java | Vendored AOSP androidx.constraintlayout (constraintlayout 2.1.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/widget/VirtualLayout.java | Vendored AOSP androidx.constraintlayout (constraintlayout 2.1.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
+CodenameOne/src/com/codename1/io/gzip/Adler32.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/CRC32.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Checksum.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Deflate.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Deflater.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/DeflaterOutputStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/GZIPException.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/GZIPHeader.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/GZIPInputStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/GZIPOutputStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/InfBlocks.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/InfCodes.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/InfTree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Inflate.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Inflater.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/InflaterInputStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/JZlib.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/StaticTree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Tree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/ZStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
 CodenameOne/src/com/codename1/ui/layouts/mig/InCellGapProvider.java | MiG Layout source (Mikael Grev, BSD) retaining its original notice
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/AnnotationVisitor.java | Rewrite of ASM org.objectweb.asm.AnnotationVisitor for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/ClassReader.java | Rewrite of ASM org.objectweb.asm.ClassReader for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)

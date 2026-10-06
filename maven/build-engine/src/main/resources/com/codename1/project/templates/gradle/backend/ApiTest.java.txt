@@ -1,0 +1,46 @@
+package ${package};
+
+import com.codename1.backend.annotations.Autowired;
+import com.codename1.backend.test.BackendTest;
+import com.codename1.backend.test.MockMvc;
+import org.junit.jupiter.api.Test;
+
+import static com.codename1.backend.test.MockMvcRequestBuilders.get;
+import static com.codename1.backend.test.MockMvcResultMatchers.content;
+import static com.codename1.backend.test.MockMvcResultMatchers.jsonPath;
+import static com.codename1.backend.test.MockMvcResultMatchers.status;
+
+/**
+ * Tests for Api, in the shape of Spring Boot's: the annotations and the MockMvc
+ * calls are Spring's, under Codename One's package names.
+ *
+ * &#64;BackendTest starts this module's server, wired exactly as it ships, and
+ * injects what the test asks for. MockMvc dispatches a request in process,
+ * without a socket; TestRestTemplate (with a RANDOM_PORT web environment) sends
+ * it over a real port instead, as ServedApiTest does. Run them with
+ *
+ *     ./gradlew __BACKEND__test
+ *
+ * and `./gradlew __BACKEND__backendTest` to translate the same tests into a native
+ * test binary and run that, which is how the server ships.
+ */
+@BackendTest
+class ApiTest {
+    @Autowired
+    private MockMvc mvc;
+
+    @Test
+    void greetsThroughTheInjectedService() throws Exception {
+        mvc.perform(get("/greet/{name}", "Ada"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Hello, Ada"));
+    }
+
+    @Test
+    void echoAnswersJson() throws Exception {
+        mvc.perform(get("/echo").param("say", "hi"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.say").value("hi"));
+        mvc.perform(get("/echo")).andExpect(jsonPath("$.say").value("hello"));
+    }
+}

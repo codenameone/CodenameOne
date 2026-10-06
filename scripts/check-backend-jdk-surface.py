@@ -35,7 +35,11 @@ def exists(root, fq):
 
 def main():
     missing = {}
-    for path in sorted((REPO / 'vm/backend/src').rglob('*.java')):
+    # The runtime, and the test library's public package, which the same
+    # reference documents.
+    api = sorted((REPO / 'vm/backend/src').rglob('*.java')) + sorted(
+        (REPO / 'vm/backend/test/src/com/codename1/backend/test').rglob('*.java'))
+    for path in api:
         text = path.read_text(encoding='utf-8')
         imports = {m.group(1).split('.')[-1]: m.group(1)
                    for m in re.finditer(r'^import (java\.[\w.]+);', text, re.M)}

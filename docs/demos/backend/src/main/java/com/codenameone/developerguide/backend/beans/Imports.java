@@ -23,15 +23,15 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Propagation;
-import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.Transactional;
 
 import java.io.IOException;
 import java.util.List;
 
 // tag::backend-tx-nested[]
-@Service
+@Component
 public class Imports {
     private final DataSource db;
 

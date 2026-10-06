@@ -14,7 +14,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" ]; then
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/ProcessScreenshots.java" ]; then
   jd_log "CN1SS helper sources not found at $CN1SS_HELPER_SOURCE_DIR" >&2
   exit 2
 fi

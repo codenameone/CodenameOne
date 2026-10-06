@@ -636,6 +636,18 @@
       ]
     },
     {
+      "id": "backend-networking",
+      "category": "Application runtime",
+      "name": "Networking against a Codename One backend",
+      "description": "Drives the CI's own backend with the app's networking APIs: Rest with every verb, headers, JSON and authentication, the generated typed REST client, ConnectionRequest with error statuses, redirects, cookies, sessions and timeouts, a multipart upload, a download to a file and a gzipped answer.",
+      "tests": [
+        "BackendRestTest",
+        "BackendTypedClientTest",
+        "BackendConnectionRequestTest",
+        "BackendTransferTest"
+      ]
+    },
+    {
       "id": "contact-picker",
       "category": "Device APIs",
       "name": "Contact picker",

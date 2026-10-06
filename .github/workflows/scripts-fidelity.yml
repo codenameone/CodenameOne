@@ -57,7 +57,7 @@ name: Native theme fidelity
       # emulator legs as well would buy nothing and cost a great deal: a change to
       # the ORM, the database layer or the HTTP parser cannot reach this
       # transport.
-      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/hellocodenameone/backend/**'
       - 'scripts/lib/cn1ss.sh'
   push:
     branches: [master]
@@ -99,7 +99,7 @@ name: Native theme fidelity
       # emulator legs as well would buy nothing and cost a great deal: a change to
       # the ORM, the database layer or the HTTP parser cannot reach this
       # transport.
-      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/hellocodenameone/backend/**'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

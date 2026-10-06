@@ -57,7 +57,14 @@ public final class WindowsInputStream extends InputStream {
             return closed ? -1 : 0;
         }
         if (http) {
-            return WindowsNative.httpReadBody(peer, b, off, len);
+            int n = WindowsNative.httpReadBody(peer, b, off, len);
+            if (n == -2) {
+                // The read failed -- a body that stalled past the read timeout --
+                // which is an error, not the end of the body.
+                String failure = WindowsNative.httpFailure(peer);
+                throw new IOException(failure != null ? failure : "reading the response failed");
+            }
+            return n;
         }
         return WindowsNative.fileRead(peer, b, off, len);
     }

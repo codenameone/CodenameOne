@@ -29,11 +29,10 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
-import com.codename1.io.Log;
-
 import java.io.IOException;
 import java.io.InputStream;
 
+@com.codename1.impl.SharedWithBackend
 public class GZIPInputStream extends InflaterInputStream {
 
     public GZIPInputStream(InputStream in) throws IOException {
@@ -131,16 +130,14 @@ public class GZIPInputStream extends InflaterInputStream {
         while (inflater.istate.inParsingHeader());
     }
 
-    private int fill(byte[] buf) {
+    private int fill(byte[] buf) throws IOException {
         int len = buf.length;
         int n = 0;
         do {
-            int i = -1;
-            try {
-                i = in.read(buf, n, buf.length - n);
-            } catch (IOException e) {
-                Log.e(e);
-            }
+            // A failed read is the caller's to see: logging it and reporting
+            // end of stream turned a broken connection into "no input", or into
+            // a header that silently parsed short.
+            int i = in.read(buf, n, buf.length - n);
             if (i == -1) {
                 break;
             }

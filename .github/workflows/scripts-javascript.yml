@@ -54,7 +54,7 @@ on:
       # emulator legs as well would buy nothing and cost a great deal: a change to
       # the ORM, the database layer or the HTTP parser cannot reach this
       # transport.
-      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/hellocodenameone/backend/**'
   push:
     branches: [ master ]
     paths:
@@ -95,7 +95,7 @@ on:
       # emulator legs as well would buy nothing and cost a great deal: a change to
       # the ORM, the database layer or the HTTP parser cannot reach this
       # transport.
-      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/hellocodenameone/backend/**'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
@@ -343,14 +343,14 @@ jobs:
       # THIS LEG RUNS THE TRANSLATED SCREENSHOT SERVER, and it is the only one
       # that does. Every other leg runs the same Java on a JVM, which covers the
       # protocol but not the arm that ships. This job is the right host for it: it
-      # is Linux, which is what build.sh targets; it already sets up JDK 8 and
+      # is Linux, where the native backend links; it already sets up the JDKs and
       # builds the ParparVM compiler above; it is a single job rather than a
       # matrix, so the binary is built once; and its client is the browser's own
       # WebSocket rather than one of ours, which makes it the only pairing of our
       # shipping server with a third-party RFC 6455 implementation.
       #
       # NOT with CN1_BACKEND_HTTPS=0, tempting as that is for avoiding these
-      # packages: build.sh deletes cn1_backend_crypto.c in that mode, and a native
+      # packages: the build deletes cn1_backend_crypto.c in that mode, and a native
       # with no C symbol takes its Java method with it -- so Crypto.sha1 would
       # vanish and every handshake would compute the wrong accept value.
       - name: Install the native backend toolchain
@@ -359,21 +359,13 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             clang zlib1g-dev libcurl4-openssl-dev libssl-dev libnghttp2-dev
 
-      - name: Cache the native screenshot server
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/cn1ss-native-cache
-          # The translator and the boot classpath are inputs to build.sh too; a key
-          # without them restores a binary built by a different translator.
-          key: ${{ runner.os }}-cn1ss-native-${{ hashFiles('vm/backend/src/com/codename1/backend/**', 'vm/backend/impl/parparvm/**', 'vm/backend/native/**', 'vm/backend/demo/cn1ss/**', 'vm/backend/build.sh', 'vm/ByteCodeTranslator/src/**', 'vm/JavaAPI/src/**') }}
-
       - name: Run JavaScript screenshot browser tests
         env:
-          # The translated binary, built and self-checked by scripts/lib/cn1ss.sh
-          # before the suite starts, so a broken one costs seconds rather than the
-          # whole 40-minute timeout.
+          # The translated binary, built by scripts/hellocodenameone/backend/server.sh
+          # through the Maven plugin and self-checked by scripts/lib/cn1ss.sh before
+          # the suite starts, so a broken one costs minutes rather than the whole
+          # 40-minute timeout.
           CN1SS_WS_SERVER: native
-          CN1SS_NATIVE_CACHE_DIR: ${{ runner.temp }}/cn1ss-native-cache
         run: |
           mkdir -p "${ARTIFACTS_DIR}"
           ./scripts/run-javascript-browser-tests.sh "${{ steps.locate_bundle.outputs.bundle }}" "${GITHUB_WORKSPACE}/scripts/javascript/screenshots"

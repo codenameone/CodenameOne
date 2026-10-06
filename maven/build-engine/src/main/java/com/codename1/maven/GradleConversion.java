@@ -88,11 +88,12 @@ public final class GradleConversion {
     }
 
     /// Whether `backend` is exactly the generated skeleton: the generated `Api`
-    /// controller with its routes, the `Greeter` service it is given, and nothing
-    /// else.
+    /// controller with its routes, the `Greeter` service it is given, the two
+    /// sample tests of them when the project has them, and nothing else.
     static boolean isUntouchedSkeleton(File backend) {
         // The generated sources and nothing else: Api.java and Greeter.java side by
-        // side, no Kotlin, no resources, no extra profiles.
+        // side, no Kotlin, no resources, no extra profiles. A project generated
+        // before the archetype carried tests has none, and is just as untouched.
         List<File> sources = new ArrayList<File>();
         collectFiles(new File(backend, "src"), sources);
         Map<String, File> byName = new HashMap<String, File>();
@@ -101,8 +102,12 @@ public final class GradleConversion {
         }
         File api = byName.get("Api.java");
         File greeter = byName.get("Greeter.java");
-        if (sources.size() != 2 || api == null || greeter == null
-                || !api.getParentFile().equals(greeter.getParentFile())) {
+        File apiTest = byName.get("ApiTest.java");
+        File servedTest = byName.get("ServedApiTest.java");
+        boolean tests = apiTest != null && servedTest != null;
+        if (sources.size() != (tests ? 4 : 2) || api == null || greeter == null
+                || !api.getParentFile().equals(greeter.getParentFile())
+                || (tests && !apiTest.getParentFile().equals(servedTest.getParentFile()))) {
             return false;
         }
         String[] profiles = backend.list((d, n) -> n.startsWith("application-") && n.endsWith(".properties")
@@ -120,6 +125,10 @@ public final class GradleConversion {
             if (!sameCode(api, "backend/Api.java.txt") || !sameCode(greeter, "backend/Greeter.java.txt")) {
                 return false;
             }
+            if (tests && (!sameCode(apiTest, "backend/ApiTest.java.txt")
+                    || !sameCode(servedTest, "backend/ServedApiTest.java.txt"))) {
+                return false;
+            }
             return sameSettings(new File(backend, "application.properties"), "backend/application.properties.txt")
                     && sameSettings(new File(backend, "application-dev.properties"),
                             "backend/application-dev.properties.txt");
@@ -131,9 +140,11 @@ public final class GradleConversion {
     /// The dependencies and build plugins the archetype's backend pom declares,
     /// as group:artifact. Kept in step with cn1app-archetype's backend/pom.xml.
     private static final java.util.Set<String> GENERATED_BACKEND_DEPENDENCIES = new java.util.HashSet<String>(
-            java.util.Arrays.asList("com.codenameone:codenameone-backend", "org.xerial:sqlite-jdbc"));
+            java.util.Arrays.asList("com.codenameone:codenameone-backend", "org.xerial:sqlite-jdbc",
+                    "com.codenameone:codenameone-backend-test", "org.junit.jupiter:junit-jupiter"));
     private static final java.util.Set<String> GENERATED_BACKEND_PLUGINS = new java.util.HashSet<String>(
-            java.util.Arrays.asList("com.codenameone:codenameone-maven-plugin"));
+            java.util.Arrays.asList("com.codenameone:codenameone-maven-plugin",
+                    "org.apache.maven.plugins:maven-surefire-plugin"));
 
     /// Whether a backend's pom is still what the archetype wrote, as far as the
     /// conversion carries anything over: no dependency, build plugin,
@@ -159,6 +170,36 @@ public final class GradleConversion {
             String group = text(p, "groupId");
             if (!GENERATED_BACKEND_PLUGINS.contains((group == null ? "org.apache.maven.plugins" : group) + ":"
                     + text(p, "artifactId"))) {
+                return false;
+            }
+            if ("maven-surefire-plugin".equals(text(p, "artifactId")) && !surefireAsGenerated(p)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Whether a Surefire declaration is the archetype's, which sets only
+    /// reuseForks=false: by coordinates alone, a backend whose Surefire carried the
+    /// developer's executions, includes or system properties read as untouched,
+    /// and the conversion left it -- their work -- behind.
+    static boolean surefireAsGenerated(Element plugin) {
+        for (org.w3c.dom.Node n = plugin.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element) {
+                String name = ((Element) n).getTagName();
+                if (!"groupId".equals(name) && !"artifactId".equals(name) && !"version".equals(name)
+                        && !"configuration".equals(name)) {
+                    return false;
+                }
+            }
+        }
+        Element config = child(plugin, "configuration");
+        if (config == null) {
+            return true;
+        }
+        for (org.w3c.dom.Node n = config.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element && !("reuseForks".equals(((Element) n).getTagName())
+                    && "false".equals(((Element) n).getTextContent().trim()))) {
                 return false;
             }
         }

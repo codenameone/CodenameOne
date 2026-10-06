@@ -452,7 +452,7 @@ public final class Tracing {
     public static void route(String template) {
         // The request histogram's label, when metrics are on: one static read
         // when they are not.
-        com.codename1.backend.metrics.Metrics.route(template);
+        com.codename1.impl.backend.MetricsAccess.get().route(template);
         // Every generated router calls this on every matched request, traced or
         // not; with no tracer that is this one read and nothing else.
         if (tracer == null && currentOrNull() == null) {

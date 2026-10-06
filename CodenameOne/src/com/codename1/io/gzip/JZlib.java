@@ -34,6 +34,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
+@com.codename1.impl.SharedWithBackend
 final public class JZlib {
     static final public int MAX_WBITS = 15;        // 32K LZ77 window
     static final public int DEF_WBITS = MAX_WBITS;

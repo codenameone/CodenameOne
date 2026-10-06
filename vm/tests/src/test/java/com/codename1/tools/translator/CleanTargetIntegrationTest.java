@@ -925,6 +925,35 @@ class CleanTargetIntegrationTest {
         }
     }
 
+    /** The annotation-framework bootstraps a build can generate, in Executor's order. */
+    static final String[] ANNOTATION_BOOTSTRAPS = {"MapperBootstrap", "BinderBootstrap", "DaoBootstrap",
+        "RestClientBootstrap", "ProtoBootstrap", "GrpcClientBootstrap", "GraphQLClientBootstrap",
+        "IntentBootstrap", "TelemetryBootstrap"};
+
+    /** hellocodenameone-common's compiled classes, which the suite launchers are built against. */
+    static Path helloCommonClasses() {
+        return Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target", "classes")
+                .normalize().toAbsolutePath();
+    }
+
+    /**
+     * Launcher lines instantiating the cn1app bootstraps present in {@code appClasses} --
+     * the typed {@code @RestClient}, {@code @Mapped}, {@code @Entity} and the rest -- as
+     * Executor.annotationFrameworksInstallSource writes them into a real build's stub. The
+     * suites build their own launchers, so without these the features compile in and do
+     * nothing: RestClients.create threw "No RestClient impl registered". Only those present,
+     * because a launcher naming an absent class does not compile.
+     */
+    static String annotationBootstrapLines(Path appClasses) {
+        StringBuilder sb = new StringBuilder();
+        for (String boot : ANNOTATION_BOOTSTRAPS) {
+            if (Files.exists(appClasses.resolve("cn1app/" + boot + ".class"))) {
+                sb.append("        new cn1app.").append(boot).append("();\n");
+            }
+        }
+        return sb.toString();
+    }
+
     /** Launcher main that drives the hellocodenameone Cn1ssDeviceRunner screenshot suite on the Windows port. */
     static String winHelloLauncherSource() {
         return "import com.codename1.ui.Display;\n" +
@@ -998,6 +1027,7 @@ class CleanTargetIntegrationTest {
                 // app's gradient/SVG/Button UIIDs on top. Without this the suite
                 // renders on the bare app theme (no component styling, no dark mode).
                 // initFirstTheme also sets the global Resources so getImage() works.
+                annotationBootstrapLines(helloCommonClasses()) +
                 "        com.codename1.ui.plaf.UIManager.initFirstTheme(\"/theme\");\n" +
                 "        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());\n" +
                 // KotlinUiTest is registered as the prepended test exactly as the
@@ -1265,7 +1295,7 @@ class CleanTargetIntegrationTest {
     /**
      * Full native-Windows screenshot suite over the cn1ss WebSocket: builds the
      * hellocodenameone exe (the same one scripts/windows/run-hello.bat runs),
-     * starts a Cn1ssScreenshotServer on 8765 (the port the device runner defaults
+     * starts the CI test server on 8765 (the port the device runner defaults
      * to), launches the exe, and waits for the CN1SS:SUITE:FINISHED marker on its
      * stdout before tearing the process down. Asserts the suite finished and that
      * a healthy number of PNGs landed. This is the CI counterpart of run-hello.bat.
@@ -1303,27 +1333,15 @@ class CleanTargetIntegrationTest {
                     + " (" + Files.size(performanceBinary) + " bytes)");
         }
 
-        // Compile the shared cn1ss screenshot server with an available JDK.
+        // Start the CI test server with an available JDK: screenshots in, REST out.
         java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
         for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
             configs.addAll(CompilerHelper.getAvailableCompilers(v));
         }
         CompilerHelper.CompilerConfig jdk = configs.get(0);
-        Path serverSrc = Paths.get("..", "..", "scripts", "common", "java", "Cn1ssScreenshotServer.java")
-                .normalize().toAbsolutePath();
-        Path serverClasses = Files.createTempDirectory("cn1ss-server");
-        assertEquals(0, CompilerHelper.compile(jdk.jdkHome, Arrays.asList(
-                "-d", serverClasses.toString(), "-sourcepath", serverSrc.getParent().toString(),
-                serverSrc.toString())), "Cn1ssScreenshotServer should compile");
-
-        // The device runner defaults to ws://127.0.0.1:8765 (Cn1ssDeviceRunnerHelper).
         int port = 8765;
         Path outDir = Files.createTempDirectory("cn1ss-hello-out");
-        String javaBin = jdk.jdkHome.resolve("bin").resolve(CompilerHelper.executableName("java")).toString();
-        ProcessBuilder serverPb = new ProcessBuilder(javaBin, "-cp", serverClasses.toString(),
-                "Cn1ssScreenshotServer", "--port", String.valueOf(port), "--out", outDir.toString());
-        serverPb.redirectErrorStream(true);
-        Process server = serverPb.start();
+        Process server = Cn1ssTestServer.processBuilder(jdk.jdkHome, port, outDir).start();
         Process app = null;
         try {
             final java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(1);
@@ -1335,7 +1353,7 @@ class CleanTargetIntegrationTest {
                         String line;
                         while ((line = r.readLine()) != null) {
                             synchronized (serverLog) { serverLog.append(line).append('\n'); }
-                            if (line.contains("CN1SS_SERVER_PORT")) { ready.countDown(); }
+                            if (line.contains(Cn1ssTestServer.READY)) { ready.countDown(); }
                         }
                     } catch (IOException ignore) {
                     }
@@ -1343,8 +1361,14 @@ class CleanTargetIntegrationTest {
             });
             sreader.setDaemon(true);
             sreader.start();
-            assertTrue(ready.await(30, java.util.concurrent.TimeUnit.SECONDS),
-                    "cn1ss server should start listening");
+            // With the server's own output when it does not: a build or start-up
+            // failure in it otherwise read as a bare timeout.
+            if (!ready.await(900, java.util.concurrent.TimeUnit.SECONDS)) {
+                String log;
+                synchronized (serverLog) { log = serverLog.toString(); }
+                org.junit.jupiter.api.Assertions.fail("cn1ss server should start listening; it printed:\n"
+                        + (log.length() > 6000 ? log.substring(log.length() - 6000) : log));
+            }
 
             // Launch the suite exe and watch its stdout for the end marker. The
             // exe never self-exits (it owns the Win32 message pump), so we kill it

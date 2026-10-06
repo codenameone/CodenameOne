@@ -34,6 +34,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
+@com.codename1.impl.SharedWithBackend
 final public class Adler32 implements Checksum {
 
     // largest prime smaller than 65536

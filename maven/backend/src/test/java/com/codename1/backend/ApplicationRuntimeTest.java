@@ -22,8 +22,17 @@
  */
 package com.codename1.backend;
 
-import com.codename1.backend.mcp.McpServer;
-import com.codename1.backend.mcp.McpTool;
+import com.codename1.impl.backend.AsyncTask;
+import com.codename1.impl.backend.BackendApplication;
+import com.codename1.impl.backend.CronSchedule;
+import com.codename1.impl.backend.ManagedBean;
+import com.codename1.impl.backend.Management;
+import com.codename1.impl.backend.MetricsAccess;
+import com.codename1.impl.backend.Scheduler;
+import com.codename1.impl.backend.WiringEnvironment;
+
+import com.codename1.impl.backend.mcp.McpServer;
+import com.codename1.impl.backend.mcp.McpTool;
 import com.codename1.backend.metrics.Counter;
 import com.codename1.backend.metrics.Histogram;
 import com.codename1.backend.metrics.Metrics;
@@ -221,11 +230,11 @@ class ApplicationRuntimeTest {
     void enumArgumentsByName() {
         Map args = new LinkedHashMap();
         args.put("state", "PENDING");
-        assertEquals(Labelled.PENDING, com.codename1.backend.mcp.McpArgs.enumValue(
+        assertEquals(Labelled.PENDING, com.codename1.impl.backend.mcp.McpArgs.enumValue(
                 Labelled.values(), args, "state", true));
         args.put("state", "Waiting for payment");
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.enumValue(Labelled.values(), args,
+                () -> com.codename1.impl.backend.mcp.McpArgs.enumValue(Labelled.values(), args,
                         "state", true));
     }
 
@@ -277,14 +286,14 @@ class ApplicationRuntimeTest {
                         return 1;
                     }
                 };
-        Metrics.addSource("test.shared.replace", "", "", old);
+        MetricsAccess.get().addSource("test.shared.replace", "", "", old);
         com.codename1.backend.metrics.Gauge replacement = Metrics.gauge("test.shared.replace",
                 "", "", new com.codename1.backend.metrics.Gauge.Source() {
                     public double read() {
                         return 2;
                     }
                 });
-        Metrics.removeSource("test.shared.replace", old);    // the old server stops
+        MetricsAccess.get().removeSource("test.shared.replace", old);    // the old server stops
         assertTrue(Metrics.get("test.shared.replace") == replacement,
                 "removing the replaced source deleted the application's gauge");
     }
@@ -311,10 +320,10 @@ class ApplicationRuntimeTest {
         args.put("f", new Double(1e100));
         args.put("ok", new Double(1.5));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.floatValue(args, "f", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.floatValue(args, "f", true));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.floatObject(args, "f", true));
-        assertEquals(1.5f, com.codename1.backend.mcp.McpArgs.floatValue(args, "ok", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.floatObject(args, "f", true));
+        assertEquals(1.5f, com.codename1.impl.backend.mcp.McpArgs.floatValue(args, "ok", true));
     }
 
     @Test
@@ -330,12 +339,12 @@ class ApplicationRuntimeTest {
         args.put("number", Long.valueOf(42));
         args.put("text", "42");
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.string(args, "list", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.string(args, "list", true));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.string(args, "object", true));
-        assertEquals("42", com.codename1.backend.mcp.McpArgs.string(args, "number", true));
-        assertEquals("42", com.codename1.backend.mcp.McpArgs.string(args, "text", true));
-        assertNull(com.codename1.backend.mcp.McpArgs.string(args, "absent", false));
+                () -> com.codename1.impl.backend.mcp.McpArgs.string(args, "object", true));
+        assertEquals("42", com.codename1.impl.backend.mcp.McpArgs.string(args, "number", true));
+        assertEquals("42", com.codename1.impl.backend.mcp.McpArgs.string(args, "text", true));
+        assertNull(com.codename1.impl.backend.mcp.McpArgs.string(args, "absent", false));
     }
 
     @Test
@@ -366,9 +375,9 @@ class ApplicationRuntimeTest {
             }
         };
         assertThrows(IllegalArgumentException.class,
-                () -> Metrics.addSource("test_shared_x", "", "", src));
+                () -> MetricsAccess.get().addSource("test_shared_x", "", "", src));
         assertThrows(IllegalArgumentException.class,
-                () -> Metrics.addSource("test_shared_x", "", "", src),
+                () -> MetricsAccess.get().addSource("test_shared_x", "", "", src),
                 "a retry found the failed entry and registered no gauge");
     }
 
@@ -382,7 +391,7 @@ class ApplicationRuntimeTest {
         assertThrows(NoClassDefFoundError.class, () -> Backend.builder(
                 Config.of(settings, "test")).quiet()
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         throw new NoClassDefFoundError("com/example/Missing");
                     }
 
@@ -911,7 +920,7 @@ class ApplicationRuntimeTest {
         Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
                 .sessionStore(failing)
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         return new HttpServer.Handler[] {new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request) {
                                 request.getSession(true).setAttribute("seen", "yes");
@@ -961,7 +970,7 @@ class ApplicationRuntimeTest {
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         running[0] = Backend.builder(Config.of(settings, "test")).quiet()
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         return new HttpServer.Handler[] {new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request) {
                                 running[0].stop();
@@ -1048,7 +1057,7 @@ class ApplicationRuntimeTest {
         assertThrows(IllegalStateException.class, () -> Backend.builder(
                 Config.of(settings, "test")).quiet().shutdownTimeoutMillis(5000)
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         // A @PostConstruct that starts work, then a later bean
                         // that refuses its configuration.
                         Tasks.executor("boot", Tasks.PLATFORM).execute(new Runnable() {
@@ -1226,7 +1235,7 @@ class ApplicationRuntimeTest {
         settings.setProperty(Management.TOKEN, "t0k");
         Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().management()
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         environment.registerManaged(cache);
                         return new HttpServer.Handler[0];
                     }
@@ -1591,22 +1600,22 @@ class ApplicationRuntimeTest {
         args.put("b", new Long(-129));
         args.put("ok", new Long(-128));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.shortValue(args, "s", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.shortValue(args, "s", true));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.shortObject(args, "s", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.shortObject(args, "s", true));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.byteValue(args, "b", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.byteValue(args, "b", true));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.byteObject(args, "b", true));
-        assertEquals(-128, com.codename1.backend.mcp.McpArgs.byteValue(args, "ok", true));
-        assertEquals(-128, com.codename1.backend.mcp.McpArgs.shortValue(args, "ok", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.byteObject(args, "b", true));
+        assertEquals(-128, com.codename1.impl.backend.mcp.McpArgs.byteValue(args, "ok", true));
+        assertEquals(-128, com.codename1.impl.backend.mcp.McpArgs.shortValue(args, "ok", true));
         // A JSON number too big for a long must not saturate to Long.MAX_VALUE.
         args.put("huge", new Double(1e20));
         args.put("big", new Double(9.007199254740992E15));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.longValue(args, "huge", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.longValue(args, "huge", true));
         assertEquals(9007199254740992L,
-                com.codename1.backend.mcp.McpArgs.longValue(args, "big", true));
+                com.codename1.impl.backend.mcp.McpArgs.longValue(args, "big", true));
     }
 
     // ---------------------------------------------------------------- metrics
@@ -1759,86 +1768,6 @@ class ApplicationRuntimeTest {
     }
 
     @Test
-    @DisplayName("a claim written after its lease ran out does not run the job")
-    void aClaimThatLandsExpiredIsNotALease(@org.junit.jupiter.api.io.TempDir java.io.File dir)
-            throws Exception {
-        final String path = new java.io.File(dir, "late.db").getAbsolutePath();
-        DataSource pool = DataSource.open(path, 2, 5000, 10000);
-        try {
-            Scheduler scheduler = new Scheduler(pool);
-            Runnable nothing = new Runnable() {
-                public void run() {
-                }
-            };
-            Scheduler.Job job = new Scheduler.Job("late", Scheduler.FIXED_DELAY, null, 1000, 0,
-                    null, Tasks.PLATFORM, "late", 300, nothing);
-            // Creates the table and the row, then frees it.
-            scheduler.release(job, scheduler.claim(job));
-            // Another writer holds the database for longer than the lease, so the
-            // claim's write waits past it, as a replica waiting on a lock would.
-            final java.util.concurrent.CountDownLatch holding =
-                    new java.util.concurrent.CountDownLatch(1);
-            Thread blocker = new Thread() {
-                public void run() {
-                    try {
-                        Database db = Database.open(path);
-                        db.execute("BEGIN IMMEDIATE", null);
-                        holding.countDown();
-                        Thread.sleep(700);
-                        db.execute("COMMIT", null);
-                        db.close();
-                    } catch (Exception err) {
-                        holding.countDown();
-                    }
-                }
-            };
-            blocker.start();
-            assertTrue(holding.await(5, TimeUnit.SECONDS));
-            long started = System.currentTimeMillis();
-            assertNull(scheduler.claim(job),
-                    "a claim written after its lease had run out was returned as a lease");
-            assertTrue(System.currentTimeMillis() - started >= 300,
-                    "the claim did not wait on the held lock, so this proved nothing");
-            blocker.join(5000);
-        } finally {
-            pool.close();
-        }
-    }
-
-    @Test
-    @DisplayName("an expired run releases only its own lease, not a later run's")
-    void anExpiredRunDoesNotReleaseItsSuccessor(@org.junit.jupiter.api.io.TempDir java.io.File dir)
-            throws Exception {
-        DataSource pool = DataSource.open(new java.io.File(dir, "l.db").getAbsolutePath(),
-                2, 5000, 10000);
-        try {
-            Scheduler scheduler = new Scheduler(pool);
-            Runnable nothing = new Runnable() {
-                public void run() {
-                }
-            };
-            // Long enough to still be live once the claim is written -- a claim
-            // that lands already expired is refused -- and short enough to run out.
-            Scheduler.Job slow = new Scheduler.Job("slow", Scheduler.FIXED_DELAY, null, 1000, 0,
-                    null, Tasks.PLATFORM, "shared", 200, nothing);
-            Scheduler.Job next = new Scheduler.Job("next", Scheduler.FIXED_DELAY, null, 1000, 0,
-                    null, Tasks.PLATFORM, "shared", 60000, nothing);
-            String expired = scheduler.claim(slow);
-            assertNotNull(expired);
-            Thread.sleep(260);                       // the lease runs out
-            String current = scheduler.claim(next);
-            assertNotNull(current, "an expired lease was not taken over");
-            scheduler.release(slow, expired);        // the overrun finally ends
-            assertNull(scheduler.claim(slow),
-                    "the overrun released the lease a later run now holds");
-            scheduler.release(next, current);
-            assertNotNull(scheduler.claim(slow), "releasing its own lease freed nothing");
-        } finally {
-            pool.close();
-        }
-    }
-
-    @Test
     @DisplayName("a colon is legal in a Prometheus metric name but not in a label name")
     void prometheusLabelNamesHaveNoColon() {
         Histogram h = Metrics.histogram("test.lbl.render", "", "ms", null,
@@ -1881,9 +1810,9 @@ class ApplicationRuntimeTest {
         args.put("rounded", Double.valueOf(-9223372036854775809.0));
         args.put("exact", Long.valueOf(Long.MIN_VALUE));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.longValue(args, "rounded", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.longValue(args, "rounded", true));
         assertEquals(Long.MIN_VALUE,
-                com.codename1.backend.mcp.McpArgs.longValue(args, "exact", true));
+                com.codename1.impl.backend.mcp.McpArgs.longValue(args, "exact", true));
     }
 
     @Test
@@ -1970,10 +1899,10 @@ class ApplicationRuntimeTest {
         args.put("inf", "-Infinity");
         args.put("ok", "2.5");
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.doubleValue(args, "nan", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.doubleValue(args, "nan", true));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.doubleValue(args, "inf", true));
-        assertEquals(2.5, com.codename1.backend.mcp.McpArgs.doubleValue(args, "ok", true), 0.0);
+                () -> com.codename1.impl.backend.mcp.McpArgs.doubleValue(args, "inf", true));
+        assertEquals(2.5, com.codename1.impl.backend.mcp.McpArgs.doubleValue(args, "ok", true), 0.0);
     }
 
     @Test
@@ -2267,8 +2196,8 @@ class ApplicationRuntimeTest {
         args.put("tiny", Double.valueOf(1e-100));
         args.put("zero", Double.valueOf(0));
         assertThrows(IllegalArgumentException.class,
-                () -> com.codename1.backend.mcp.McpArgs.floatValue(args, "tiny", true));
-        assertEquals(0f, com.codename1.backend.mcp.McpArgs.floatValue(args, "zero", true));
+                () -> com.codename1.impl.backend.mcp.McpArgs.floatValue(args, "tiny", true));
+        assertEquals(0f, com.codename1.impl.backend.mcp.McpArgs.floatValue(args, "zero", true));
     }
 
     @Test
@@ -2377,7 +2306,7 @@ class ApplicationRuntimeTest {
     @DisplayName("a JSON-RPC id that is an object, array or boolean is refused before the method runs")
     void unsupportedIdTypesAreRefused() throws Exception {
         final int[] calls = {0};
-        com.codename1.backend.mcp.McpTool tool = new com.codename1.backend.mcp.McpTool() {
+        com.codename1.impl.backend.mcp.McpTool tool = new com.codename1.impl.backend.mcp.McpTool() {
             public String name() {
                 return "touch";
             }
@@ -2421,7 +2350,7 @@ class ApplicationRuntimeTest {
         try {
             backend = Backend.builder(Config.of(settings, "dev")).quiet()
                     .application(new EmptyApplication())
-                    .mcp(new com.codename1.backend.mcp.DevTools())
+                    .mcp(new com.codename1.impl.backend.mcp.DevTools())
                     .handler(new HttpServer.Handler() {
                         public HttpServer.Response handle(HttpServer.Request request)
                                 throws Exception {
@@ -2460,7 +2389,7 @@ class ApplicationRuntimeTest {
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         return new HttpServer.Handler[] {new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request) {
                                 request.scopedBeans(1)[0] = "a";
@@ -2506,7 +2435,7 @@ class ApplicationRuntimeTest {
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         return new HttpServer.Handler[] {new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request) {
                                 request.scopedBeans(1)[0] = "bean";
@@ -2540,7 +2469,7 @@ class ApplicationRuntimeTest {
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         return new HttpServer.Handler[] {new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request) {
                                 List owned = new ArrayList();
@@ -2572,7 +2501,7 @@ class ApplicationRuntimeTest {
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         return new HttpServer.Handler[] {new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request)
                                     throws Exception {
@@ -2674,7 +2603,7 @@ class ApplicationRuntimeTest {
         Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
                 .sessionStore(store)
                 .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                    public HttpServer.Handler[] create(WiringEnvironment environment) {
                         return new HttpServer.Handler[] {new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request)
                                     throws Exception {
@@ -2776,7 +2705,7 @@ class ApplicationRuntimeTest {
                         return 1;
                     }
                 };
-        Metrics.addSource("test.drain.gauge", "", "", slow);
+        MetricsAccess.get().addSource("test.drain.gauge", "", "", slow);
         Thread reader = new Thread(new Runnable() {
             public void run() {
                 Metrics.snapshot();
@@ -2787,7 +2716,7 @@ class ApplicationRuntimeTest {
         final boolean[] removed = {false};
         Thread remover = new Thread(new Runnable() {
             public void run() {
-                Metrics.removeSource("test.drain.gauge", slow);
+                MetricsAccess.get().removeSource("test.drain.gauge", slow);
                 removed[0] = true;
             }
         });
@@ -2823,8 +2752,8 @@ class ApplicationRuntimeTest {
                         return 2;
                     }
                 };
-        Metrics.addSource("test.stuck.gauge", "", "", stuck);
-        Metrics.addSource("test.quick.gauge", "", "", quick);
+        MetricsAccess.get().addSource("test.stuck.gauge", "", "", stuck);
+        MetricsAccess.get().addSource("test.quick.gauge", "", "", quick);
         Thread reader = new Thread(new Runnable() {
             public void run() {
                 Metrics.snapshot();
@@ -2834,13 +2763,13 @@ class ApplicationRuntimeTest {
         try {
             assertTrue(reading.await(5, TimeUnit.SECONDS));
             long start = System.currentTimeMillis();
-            Metrics.removeSource("test.quick.gauge", quick);
+            MetricsAccess.get().removeSource("test.quick.gauge", quick);
             assertTrue(System.currentTimeMillis() - start < 1000,
                     "another gauge's stuck read delayed this removal");
         } finally {
             release.countDown();
             reader.join(5000);
-            Metrics.removeSource("test.stuck.gauge", stuck);
+            MetricsAccess.get().removeSource("test.stuck.gauge", stuck);
         }
     }
 
@@ -2914,7 +2843,7 @@ class ApplicationRuntimeTest {
     @DisplayName("tools/call with arguments that are not an object is refused, and the tool never runs")
     void nonObjectArgumentsAreRefused() throws Exception {
         final int[] calls = {0};
-        com.codename1.backend.mcp.McpTool tool = new com.codename1.backend.mcp.McpTool() {
+        com.codename1.impl.backend.mcp.McpTool tool = new com.codename1.impl.backend.mcp.McpTool() {
             public String name() {
                 return "touch";
             }
@@ -2963,7 +2892,7 @@ class ApplicationRuntimeTest {
     }
 
     private static Backend startAnswering(int port, final String text,
-            com.codename1.backend.mcp.DevTools tools) throws Exception {
+            com.codename1.impl.backend.mcp.DevTools tools) throws Exception {
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         return Backend.builder(Config.of(settings, "dev")).quiet()
@@ -3238,8 +3167,8 @@ class ApplicationRuntimeTest {
     // ----------------------------------------------------------------- helpers
 
     /** An application with no beans, for tests that only need the hooks. */
-    static class EmptyApplication implements Backend.Application {
-        public HttpServer.Handler[] create(Backend.Environment environment) {
+    static class EmptyApplication implements BackendApplication {
+        public HttpServer.Handler[] create(WiringEnvironment environment) {
             return new HttpServer.Handler[0];
         }
 

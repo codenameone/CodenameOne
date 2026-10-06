@@ -2,7 +2,7 @@
 
 Reference PNGs for the `build-ios-tv` CI job (`scripts/run-tv-ui-tests.sh`),
 captured from the `hellocodenameone` `cn1ss` suite running on the tvOS simulator
-(1920x1080) and streamed through `Cn1ssScreenshotServer`.
+(1920x1080) and streamed to the test server in `scripts/hellocodenameone/backend`.
 
 This set is seeded once the tvOS native slice compiles end-to-end (see
 `Ports/iOSPort/nativeSources/TVOS_PORT.md`), the same way the watch goldens in

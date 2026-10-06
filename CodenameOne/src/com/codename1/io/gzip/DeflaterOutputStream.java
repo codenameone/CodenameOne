@@ -33,6 +33,7 @@ package com.codename1.io.gzip;
 import java.io.IOException;
 import java.io.OutputStream;
 
+@com.codename1.impl.SharedWithBackend
 public class DeflaterOutputStream extends FilterOutputStream {
 
     protected static final int DEFAULT_BUFSIZE = 512;

@@ -23,13 +23,13 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
-import com.codename1.backend.annotations.Service;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 
 import java.io.IOException;
 
 // tag::backend-tx-rules[]
-@Service
+@Component
 public class Orders {
     private final DataSource db;
     private final AuditLog audit;

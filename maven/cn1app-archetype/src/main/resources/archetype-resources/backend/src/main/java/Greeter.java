@@ -22,12 +22,12 @@
  */
 package ${package};
 
-import com.codename1.backend.annotations.Service;
+import com.codename1.backend.annotations.Component;
 
 /**
  * A service: business logic with no HTTP in it, which the controller is given.
  *
- * The build finds every &#64;Service, &#64;Component and &#64;Repository, works out
+ * The build finds every &#64;Component, works out
  * what each one's constructor needs, and writes the `new` calls into the entry
  * point it generates -- so this reads like Spring, and there is no container, no
  * reflection and no start-up scan once it runs. A missing or ambiguous dependency
@@ -38,7 +38,7 @@ import com.codename1.backend.annotations.Service;
  * &#64;McpTool methods an agent can call. See the Backend chapter of the developer
  * guide, or the backend reference in this project's agent skill.
  */
-@Service
+@Component
 public class Greeter {
     /** Greets someone. */
     public String greet(String name) {

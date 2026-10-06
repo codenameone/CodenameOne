@@ -57,6 +57,53 @@ import java.util.Map;
 /// and status), and the server's counters, the database pool, the task executors
 /// and the process's memory are published as gauges.
 public final class Metrics {
+    static {
+        com.codename1.impl.backend.MetricsAccess.install(new com.codename1.impl.backend.MetricsAccess() {
+            @Override
+            public void enableServer(com.codename1.backend.HttpServer server,
+                                     com.codename1.backend.DataSource pool) {
+                Metrics.enableServer(server, pool);
+            }
+
+            @Override
+            public void disableServer(com.codename1.backend.HttpServer server,
+                                      com.codename1.backend.DataSource pool) {
+                Metrics.disableServer(server, pool);
+            }
+
+            @Override
+            public void route(String template) {
+                Metrics.route(template);
+            }
+
+            @Override
+            public long requestStarted() {
+                return Metrics.requestStarted();
+            }
+
+            @Override
+            public void requestEnded(long started, String method, int status) {
+                Metrics.requestEnded(started, method, status);
+            }
+
+            @Override
+            public void jobRan(String job, long millis, boolean failed) {
+                Metrics.jobRan(job, millis, failed);
+            }
+
+            @Override
+            public void addSource(String name, String description, String unit,
+                                  Gauge.Source source) {
+                Metrics.addSource(name, description, unit, source);
+            }
+
+            @Override
+            public void removeSource(String name, Gauge.Source source) {
+                Metrics.removeSource(name, source);
+            }
+        });
+    }
+
     private static final Map INSTRUMENTS = new LinkedHashMap();
     private static final long STARTED = System.currentTimeMillis();
 
@@ -266,7 +313,7 @@ public final class Metrics {
     /// gauges go through here and are removed when it stops, so a stopped
     /// server's bean is never read again and a second live server adds to the
     /// gauge instead of silently replacing the first one's.
-    public static synchronized void addSource(String name, String description, String unit,
+    static synchronized void addSource(String name, String description, String unit,
                                               Gauge.Source source) {
         List sources = (List) SHARED.get(name);
         if (sources != null) {
@@ -316,7 +363,7 @@ public final class Metrics {
     }
 
     /// Removes a source [#addSource] added; the gauge goes with its last one.
-    public static synchronized void removeSource(String name, Gauge.Source source) {
+    static synchronized void removeSource(String name, Gauge.Source source) {
         List sources = (List) SHARED.get(name);
         if (sources == null) {
             return;
@@ -385,7 +432,7 @@ public final class Metrics {
     /// the servers still running, and the request histogram counts both. Each
     /// server used to register its own source under the same name, so the last
     /// one started silently replaced the others' -- and a stopped server's stayed.
-    public static void enableServer(final com.codename1.backend.HttpServer server,
+    static void enableServer(final com.codename1.backend.HttpServer server,
                                     final com.codename1.backend.DataSource pool) {
         synchronized (Metrics.class) {
             if (!LIVE_SERVERS.contains(server)) {
@@ -436,7 +483,7 @@ public final class Metrics {
                         // Only the servers that measure: one with metrics off keeps
                         // its queues out of the others' telemetry, as its
                         // requests and jobs are.
-                        List all = com.codename1.backend.Tasks.executorsOf(liveServers());
+                        List all = com.codename1.impl.backend.BackendAccess.get().executorsOf(liveServers());
                         for (Object element : all) {
                             com.codename1.backend.TaskExecutor e =
                                     (com.codename1.backend.TaskExecutor) element;
@@ -474,7 +521,7 @@ public final class Metrics {
 
     /// A server has stopped: its gauges stop counting it, and once none is left
     /// the server instruments stop recording.
-    public static void disableServer(com.codename1.backend.HttpServer server,
+    static void disableServer(com.codename1.backend.HttpServer server,
                                      com.codename1.backend.DataSource pool) {
         synchronized (Metrics.class) {
             LIVE_SERVERS.remove(server);
@@ -524,19 +571,19 @@ public final class Metrics {
     }
 
     /// Records which route template matched, for the request histogram.
-    public static void route(String template) {
+    static void route(String template) {
         if (serverEnabled) {
             ROUTE.set(template);
         }
     }
 
     /// A request is starting; answers the time to hand to [#requestEnded].
-    public static long requestStarted() {
+    static long requestStarted() {
         return serverEnabled ? System.nanoTime() : 0L;
     }
 
     /// A request has been answered.
-    public static void requestEnded(long started, String method, int status) {
+    static void requestEnded(long started, String method, int status) {
         // The route is cleared on every path: a server that does not measure
         // still has its routers call route(), and a value left behind would be
         // recorded under the next request this thread serves.
@@ -552,7 +599,7 @@ public final class Metrics {
     }
 
     /// A scheduled job has run.
-    public static void jobRan(String job, long millis, boolean failed) {
+    static void jobRan(String job, long millis, boolean failed) {
         if (serverEnabled) {
             jobDuration.record(millis, job, failed ? "failure" : "success", null);
         }

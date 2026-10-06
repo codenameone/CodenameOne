@@ -2583,6 +2583,30 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
+        Object c = connect(url, read, write);
+        LinuxNative.httpSetConnectTimeout(((LinuxHttpConnection) c).peer, timeout);
+        return c;
+    }
+
+    @Override
+    public void setHttpMethod(Object connection, String method) throws IOException {
+        LinuxNative.httpSetCustomMethod(((LinuxHttpConnection) connection).peer, method);
+    }
+
+    /// True: [#setReadTimeout(Object, int)] is honoured, so a caller that checks
+    /// this before setting one gets the timeout it asked for.
+    @Override
+    public boolean isReadTimeoutSupported() {
+        return true;
+    }
+
+    @Override
+    public void setReadTimeout(Object connection, int readTimeout) {
+        LinuxNative.httpSetReadTimeout(((LinuxHttpConnection) connection).peer, readTimeout);
+    }
+
+    @Override
     public void setHeader(Object connection, String key, String val) {
         LinuxNative.httpSetHeader(((LinuxHttpConnection) connection).peer, key, val);
     }
@@ -2681,7 +2705,15 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public int getResponseCode(Object connection) throws IOException {
-        return LinuxNative.httpResponseCode(((LinuxHttpConnection) connection).peer);
+        long peer = ((LinuxHttpConnection) connection).peer;
+        // A transfer that failed has no status: reporting the 0 libcurl leaves
+        // made ConnectionRequest read an empty answer instead of reaching its
+        // error path -- a refused connection or a timeout looked like success.
+        String failure = LinuxNative.httpFailure(peer);
+        if (failure != null) {
+            throw new IOException(failure);
+        }
+        return LinuxNative.httpResponseCode(peer);
     }
 
     @Override

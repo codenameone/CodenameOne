@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// Parses a `@Scheduled(cron = ...)` expression at build time into the bit masks
-/// the generated entry point hands to `com.codename1.backend.CronSchedule`.
+/// the generated entry point hands to `com.codename1.impl.backend.CronSchedule`.
 ///
 /// The same grammar as that class's `parse`, which a server uses for an
 /// expression it reads from configuration. The two are written twice because the

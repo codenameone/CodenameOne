@@ -197,6 +197,21 @@ if [ -f "$STAGE_CLASSES/com/codename1/generated/svg/SVGRegistry.class" ]; then
   bj_log "SVGRegistry detected -- launcher will call installGlobal()"
   SVG_INIT_LINE='        com.codename1.generated.svg.SVGRegistry.installGlobal();'
 fi
+# The annotation-framework bootstraps the build generated (the typed @RestClient,
+# @Mapped, @Entity and the rest), instantiated before the port starts, as
+# Executor.annotationFrameworksInstallSource writes them into every real build's
+# stub -- JavaScriptBuilder's included. Without them those features compile into the
+# bundle and do nothing: RestClients.create threw "No RestClient impl registered".
+# Direct references, so the translator keeps the generated classes.
+BOOTSTRAP_LINES=""
+for boot in MapperBootstrap BinderBootstrap DaoBootstrap RestClientBootstrap ProtoBootstrap \
+            GrpcClientBootstrap GraphQLClientBootstrap IntentBootstrap TelemetryBootstrap; do
+  if [ -f "$STAGE_CLASSES/cn1app/$boot.class" ]; then
+    bj_log "cn1app.$boot detected -- launcher will instantiate it"
+    BOOTSTRAP_LINES="${BOOTSTRAP_LINES}        new cn1app.${boot}();
+"
+  fi
+done
 if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
   BOOT_IMPORT="com.codename1.impl.html5.JavaScriptPortBootstrap"
   BOOT_CALL="JavaScriptPortBootstrap.bootstrap(new HelloCodenameOne());"
@@ -210,7 +225,7 @@ import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
 
 public final class HelloCodenameOneJavaScriptMain {
     public static void main(String[] args) {
-        ${BOOT_CALL}
+${BOOTSTRAP_LINES}        ${BOOT_CALL}
 ${SVG_INIT_LINE}
     }
 }

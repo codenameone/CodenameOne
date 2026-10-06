@@ -99,6 +99,7 @@ public final class MethodInfo {
     public int getAccess() { return access; }
 
     public boolean isPublic() { return (access & Opcodes.ACC_PUBLIC) != 0; }
+    public boolean isProtected() { return (access & Opcodes.ACC_PROTECTED) != 0; }
     public boolean isStatic() { return (access & Opcodes.ACC_STATIC) != 0; }
     public boolean isAbstract() { return (access & Opcodes.ACC_ABSTRACT) != 0; }
     public boolean isSynthetic() { return (access & Opcodes.ACC_SYNTHETIC) != 0; }

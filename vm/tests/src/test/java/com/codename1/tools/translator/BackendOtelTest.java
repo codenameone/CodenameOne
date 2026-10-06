@@ -109,13 +109,13 @@ class BackendOtelTest {
         // The same claim for the server's own endpoints, which the docs make: the
         // generated entry point names them only when the build asked, and a
         // server that never did must not carry them.
-        assertTrue(symbols(traced, "com_codename1_backend_Management_") > 0
-                        && symbols(traced, "com_codename1_backend_mcp_McpServer_") > 0,
+        assertTrue(symbols(traced, "com_codename1_impl_backend_Management_") > 0
+                        && symbols(traced, "com_codename1_impl_backend_mcp_McpServer_") > 0,
                 "the control links management and MCP and carries neither symbol; the "
                         + "check below would be vacuous");
-        assertEquals(0, symbols(untraced, "com_codename1_backend_Management_"),
+        assertEquals(0, symbols(untraced, "com_codename1_impl_backend_Management_"),
                 "a server that never asked for the management endpoints links them anyway");
-        assertEquals(0, symbols(untraced, "com_codename1_backend_mcp_McpServer_"),
+        assertEquals(0, symbols(untraced, "com_codename1_impl_backend_mcp_McpServer_"),
                 "a server that never asked for MCP links the endpoint anyway");
 
         final List exports = Collections.synchronizedList(new ArrayList());
@@ -285,14 +285,24 @@ class BackendOtelTest {
         return symbols(binary, "com_codename1_backend_otel_");
     }
 
-    /** How many of a binary's symbols contain `prefix`. */
+    /**
+     * How many of a binary's symbols BELONG to a class under `prefix`: its methods,
+     * fields, constructors and class records. A symbol's own class is the first
+     * `com_codename1` name in it -- `__NEW_`, `STATIC_FIELD_` and the like come
+     * before it -- while a parameter type comes later, inside a method's name. Counting
+     * every occurrence counted the BackendAccess.mcp bridge, whose signature names
+     * McpServer.Extension, as McpServer being linked.
+     */
     private static int symbols(Path binary, String prefix) throws Exception {
         String symbols = BackendTestSupport.run(Arrays.asList("nm", binary.toString()), 120);
         int count = 0;
-        int at = 0;
-        while ((at = symbols.indexOf(prefix, at)) >= 0) {
-            count++;
-            at++;
+        for (String line : symbols.split("\n")) {
+            String trimmed = line.trim();
+            String name = trimmed.substring(trimmed.lastIndexOf(' ') + 1);
+            int owner = name.indexOf("com_codename1_");
+            if (owner >= 0 && name.startsWith(prefix, owner)) {
+                count++;
+            }
         }
         return count;
     }

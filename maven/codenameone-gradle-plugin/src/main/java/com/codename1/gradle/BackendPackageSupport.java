@@ -66,40 +66,82 @@ final class BackendPackageSupport {
         project.getDependencies().addProvider(runtime.getName(),
                 ext.getVersion().map(v -> PluginInfo.GROUP + ":codenameone-parparvm:" + v + ":bundle"));
         project.getTasks().register("backendPackage", PackageTask.class, t -> {
-            AppSupport.common(t, project, layout, ext, project.provider(Collections::<String, String>emptyMap));
+            configure(t, project, layout, main, ext, runtime);
             t.setDescription("Builds the backend as a single native binary");
-            t.dependsOn(main.getClassesTaskName());
-            t.getToolchain().from(runtime);
-            // The compile classpath, as Maven's backend-package resolves (scope
-            // compile), not the runtime one: the binary is translated by ParparVM,
-            // which loads nothing by name (Class.forName is banned in the backend),
-            // so a runtimeOnly library -- a JDBC driver, say -- could not run in it.
-            t.getCompileClasspath().from(main.getCompileClasspath());
-            t.getArtifacts().set(project.getConfigurations().getByName(main.getCompileClasspathConfigurationName())
-                    .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
-                    .map(set -> AppSupport.encode(set, "compile")));
-            t.getSources().from(main.getJava().getSrcDirs());
-            // What annotation processors (annotationProcessor(...)) generated: the
-            // packager compiles the sources again, without javac's processor path,
-            // so it needs their output the way runBackend has it from the classes.
-            t.getSources().from(project.getTasks().named(main.getCompileJavaTaskName(),
-                    org.gradle.api.tasks.compile.JavaCompile.class)
-                    .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
-            t.getSourceEncoding().set(AppSupport.javaEncoding(project, main));
-            t.getProcessedResources().from(project.provider(() -> main.getOutput().getResourcesDir()));
-            t.getProcessedResources().builtBy(main.getProcessResourcesTaskName());
-            t.getMainClass().set(project.getProviders().gradleProperty("cn1.backend.mainClass"));
-            t.getTarget().set(project.getProviders().gradleProperty("cn1.backend.target"));
-            t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk"));
-            t.getCflags().set(project.getProviders().gradleProperty("cn1.backend.cflags"));
-            t.getSqlite().set(project.getProviders().gradleProperty("cn1.backend.sqlite")
-                    .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
-            t.getCheckedCasts().set(project.getProviders().gradleProperty("cn1.backend.checkedCasts")
-                    .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
-            t.getDevTools().set(project.getProviders().gradleProperty("cn1.backend.devTools")
-                    .map(Boolean::parseBoolean).orElse(Boolean.FALSE));
             t.getBinary().set(new File(layout.buildDir(), project.getName()));
         });
+
+        // The compiled test run: the backend's tests translated with it into one
+        // native binary, run, and reported beside the JVM run's. Opt in, as with
+        // Maven's -Dcn1.backend.compiledTests: it costs what a package costs.
+        final Configuration testRuntime = AppSupport.resolvable(project, "cn1BackendTestToolchain",
+                "The backend test library's sources, for the compiled test run");
+        testRuntime.setTransitive(false);
+        project.getDependencies().addProvider(testRuntime.getName(),
+                ext.getVersion().map(v -> PluginInfo.GROUP + ":codenameone-backend-test:" + v + ":parparvm-sources"));
+        final SourceSet test = project.getExtensions().getByType(org.gradle.api.plugins.JavaPluginExtension.class)
+                .getSourceSets().getByName(SourceSet.TEST_SOURCE_SET_NAME);
+        project.getTasks().register("backendTest", TestTask.class, t -> {
+            configure(t, project, layout, main, ext, runtime);
+            t.setDescription("Runs the backend's tests as a native binary");
+            t.dependsOn(test.getClassesTaskName());
+            t.getToolchain().from(testRuntime);
+            // testImplementation libraries a test imports, as the Maven goal passes
+            // its test classpath; the packager drops the JVM-only ones (JUnit,
+            // Mockito) and compiles the rest with the tests.
+            t.getTestClasspath().from(test.getCompileClasspath());
+            t.getTestSources().from(test.getJava().getSrcDirs());
+            // What test annotation processors generated, as configure() adds the
+            // main ones: the compiled run recompiles the tests from source.
+            t.getTestSources().from(project.getTasks().named(test.getCompileJavaTaskName(),
+                    org.gradle.api.tasks.compile.JavaCompile.class)
+                    .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
+            // The Kotlin test directory too, so the packager can refuse Kotlin
+            // tests by name instead of compiling the run without them. Only the
+            // conventional one: a Kotlin source set moved elsewhere is not looked
+            // up (documented in the testing guide).
+            t.getTestSources().from(new File(layout.projectDir(), "src/test/kotlin"));
+            t.getTestResources().from(project.provider(() -> test.getOutput().getResourcesDir()));
+            t.getTestResources().builtBy(test.getProcessResourcesTaskName());
+            t.getStrict().set(project.getProviders().gradleProperty("cn1.backend.compiledTests.strict")
+                    .map(Boolean::parseBoolean).orElse(Boolean.FALSE));
+            t.getBinary().set(new File(layout.buildDir(), "cn1-backend-test/" + project.getName() + "-tests"));
+        });
+    }
+
+    private static void configure(PackageTask t, Project project, ProjectLayout layout, SourceSet main,
+                                  CodenameOneExtension ext, Configuration runtime) {
+        AppSupport.common(t, project, layout, ext, project.provider(Collections::<String, String>emptyMap));
+        t.dependsOn(main.getClassesTaskName());
+        t.getToolchain().from(runtime);
+        // The compile classpath, as Maven's backend-package resolves (scope
+        // compile), not the runtime one: the binary is translated by ParparVM,
+        // which loads nothing by name (Class.forName is banned in the backend),
+        // so a runtimeOnly library -- a JDBC driver, say -- could not run in it.
+        t.getCompileClasspath().from(main.getCompileClasspath());
+        t.getArtifacts().set(project.getConfigurations().getByName(main.getCompileClasspathConfigurationName())
+                .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
+                .map(set -> AppSupport.encode(set, "compile")));
+        t.getSources().from(main.getJava().getSrcDirs());
+        // What annotation processors (annotationProcessor(...)) generated: the
+        // packager compiles the sources again, without javac's processor path,
+        // so it needs their output the way runBackend has it from the classes.
+        t.getSources().from(project.getTasks().named(main.getCompileJavaTaskName(),
+                org.gradle.api.tasks.compile.JavaCompile.class)
+                .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
+        t.getSourceEncoding().set(AppSupport.javaEncoding(project, main));
+        t.getProcessedResources().from(project.provider(() -> main.getOutput().getResourcesDir()));
+        t.getProcessedResources().builtBy(main.getProcessResourcesTaskName());
+        t.getMainClass().set(project.getProviders().gradleProperty("cn1.backend.mainClass"));
+        t.getTarget().set(project.getProviders().gradleProperty("cn1.backend.target"));
+        t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk"));
+        t.getCflags().set(project.getProviders().gradleProperty("cn1.backend.cflags"));
+        t.getSqlite().set(project.getProviders().gradleProperty("cn1.backend.sqlite")
+                .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
+        t.getCheckedCasts().set(project.getProviders().gradleProperty("cn1.backend.checkedCasts")
+                .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
+        t.getDevTools().set(project.getProviders().gradleProperty("cn1.backend.devTools")
+                .map(Boolean::parseBoolean).orElse(Boolean.FALSE));
     }
 
     /// See [BackendPackageSupport].
@@ -191,7 +233,7 @@ final class BackendPackageSupport {
             final java.util.Set<File> toolchain = getToolchain().getFiles();
             java.util.Iterator<File> resources = getProcessedResources().getFiles().iterator();
             File processed = resources.hasNext() ? resources.next() : layout.resourcesOutputDir();
-            BackendPackager packager = new GradleBackendPackager(host, layout, toolchain, processed);
+            BackendPackager packager = packager(host, layout, toolchain, processed);
             try {
                 packager.mainClass(getMainClass().getOrNull()).output(getBinary().get().getAsFile())
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
@@ -204,6 +246,24 @@ final class BackendPackageSupport {
 
         /// The packager, with the Gradle project's resources and the toolchain
         /// jars the task resolved in place of Maven's repository lookup.
+        /// The packager this task runs.
+        protected BackendPackager packager(ProjectHost host, ProjectLayout layout, java.util.Set<File> toolchain,
+                                           File processed) {
+            return new GradleBackendPackager(host, layout, toolchain, processed);
+        }
+
+        /// Finds a toolchain artifact by name, the way both packagers resolve.
+        static File fromToolchain(java.util.Set<File> toolchain, String groupId, String artifactId, String version,
+                                  String classifier) throws BuildExecutionException {
+            for (File f : toolchain) {
+                if (f.getName().startsWith(artifactId + "-") && f.getName().endsWith("-" + classifier + ".jar")) {
+                    return f;
+                }
+            }
+            throw new BuildExecutionException("Could not resolve " + groupId + ":" + artifactId + ":"
+                    + version + ":" + classifier);
+        }
+
         private static final class GradleBackendPackager extends BackendPackager {
             private final ProjectLayout layout;
             private final java.util.Set<File> toolchain;
@@ -230,14 +290,99 @@ final class BackendPackageSupport {
             @Override
             protected File resolve(String groupId, String artifactId, String version, String classifier)
                     throws BuildExecutionException {
-                for (File f : toolchain) {
-                    if (f.getName().startsWith(artifactId + "-") && f.getName().endsWith("-" + classifier + ".jar")) {
-                        return f;
-                    }
-                }
-                throw new BuildExecutionException("Could not resolve " + groupId + ":" + artifactId + ":"
-                        + version + ":" + classifier);
+                return fromToolchain(toolchain, groupId, artifactId, version, classifier);
             }
+        }
+    }
+
+    /// The test packager, answering from the Gradle task's inputs.
+    private static final class GradleBackendTestPackager extends com.codename1.maven.BackendTestPackager {
+        private final ProjectLayout layout;
+        private final java.util.Set<File> toolchain;
+        private final File processed;
+        private final List<String> roots;
+        private final File testResources;
+        private final List<String> testClasspath;
+
+        GradleBackendTestPackager(ProjectHost host, ProjectLayout layout, java.util.Set<File> toolchain,
+                                  File processed, List<String> roots, File testResources,
+                                  List<String> testClasspath) {
+            super(host);
+            this.layout = layout;
+            this.toolchain = toolchain;
+            this.processed = processed;
+            this.roots = roots;
+            this.testResources = testResources;
+            this.testClasspath = testClasspath;
+        }
+
+        @Override
+        protected List<String> testClasspathElements() {
+            return testClasspath;
+        }
+
+        @Override
+        protected List<String> testSourceRoots() {
+            return roots;
+        }
+
+        @Override
+        protected File testOutputDirectory() {
+            return testResources;
+        }
+
+        @Override
+        protected File processedResourcesDirectory() {
+            return processed;
+        }
+
+        @Override
+        protected boolean declaresResources() {
+            return layout.resourcesDir().isDirectory();
+        }
+
+        @Override
+        protected File resolve(String groupId, String artifactId, String version, String classifier)
+                throws BuildExecutionException {
+            return PackageTask.fromToolchain(toolchain, groupId, artifactId, version, classifier);
+        }
+    }
+
+    /// `backendTest`: the backend's tests as a native binary, through the build
+    /// engine's BackendTestPackager.
+    @DisableCachingByDefault(because = "Runs a native toolchain and the tests")
+    public abstract static class TestTask extends PackageTask {
+        @InputFiles
+        @PathSensitive(PathSensitivity.RELATIVE)
+        public abstract ConfigurableFileCollection getTestSources();
+
+        @InputFiles
+        @PathSensitive(PathSensitivity.RELATIVE)
+        public abstract ConfigurableFileCollection getTestResources();
+
+        @Classpath
+        public abstract ConfigurableFileCollection getTestClasspath();
+
+        @Input
+        public abstract Property<Boolean> getStrict();
+
+        @Override
+        protected BackendPackager packager(ProjectHost host, final ProjectLayout layout,
+                                           final java.util.Set<File> toolchain, final File processed) {
+            final List<String> roots = new ArrayList<String>();
+            for (File dir : getTestSources().getFiles()) {
+                roots.add(dir.getAbsolutePath());
+            }
+            java.util.Iterator<File> resources = getTestResources().getFiles().iterator();
+            final File testResources = resources.hasNext() ? resources.next() : null;
+            final List<String> testClasspath = new ArrayList<String>();
+            for (File f : getTestClasspath().getFiles()) {
+                testClasspath.add(f.getAbsolutePath());
+            }
+            com.codename1.maven.BackendTestPackager p = new GradleBackendTestPackager(host, layout, toolchain,
+                    processed, roots, testResources, testClasspath);
+            p.strict(getStrict().get());
+            return p;
         }
     }
 }

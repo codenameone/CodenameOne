@@ -125,6 +125,8 @@ include::Backend-Web.asciidoc[]
 
 include::Backend-Beans.asciidoc[]
 
+include::Backend-Testing.asciidoc[]
+
 include::Backend-Data.asciidoc[]
 
 include::Backend-Sessions.asciidoc[]

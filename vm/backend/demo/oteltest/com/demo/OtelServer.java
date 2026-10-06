@@ -34,6 +34,7 @@ import com.codename1.backend.WebSocket;
 import com.codename1.backend.WebSocketSession;
 import com.codename1.backend.orm.EntityManager;
 import com.codename1.backend.otel.OtlpTracer;
+import com.codename1.impl.backend.BackendAccess;
 
 /**
  * A traced server, for BackendOtelTest to drive on the PACKAGED runtime.
@@ -58,15 +59,17 @@ public class OtelServer {
         final Database db = Database.open(":memory:");
         db.execute("CREATE TABLE pets (id INTEGER PRIMARY KEY, name TEXT)", null);
         db.execute("INSERT INTO pets (id, name) VALUES (7, 'Rex')", null);
-        Backend.builder()
-                .tracing(new OtlpTracer("oteltest"))
-                // Both off at run time -- this profile is not a development one and
-                // there is no tool -- but LINKED, which is what BackendOtelTest
-                // needs: the control that proves its management and MCP symbol
-                // spellings match something.
-                .management()
-                .mcp(null)
-                .webSockets(new Backend.WebSocketEndpoints() {
+        Backend.Builder builder = Backend.builder()
+                .tracing(new OtlpTracer("oteltest"));
+        // Both off at run time -- this profile is not a development one and there
+        // is no tool -- but LINKED, which is what BackendOtelTest needs: the control
+        // that proves its management and MCP symbol spellings match something.
+        // Through BackendAccess, as the generated entry point links them: neither
+        // is a Builder method an application calls.
+        BackendAccess access = BackendAccess.get();
+        access.management(builder);
+        access.mcp(builder, null);
+        builder.webSockets(new Backend.WebSocketEndpoints() {
                     public void register(HttpServer.WebSocketRegistry registry,
                                          DataSource dataSource, EntityManager entities) {
                         registry.route("/ws", new WebSocket() {

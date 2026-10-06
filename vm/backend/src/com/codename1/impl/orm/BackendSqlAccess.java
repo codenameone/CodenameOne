@@ -23,7 +23,6 @@
 package com.codename1.impl.orm;
 
 import com.codename1.backend.Crypto;
-import com.codename1.backend.Transactions;
 import com.codename1.backend.Database;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.sql.Dialect;
@@ -149,7 +148,7 @@ public final class BackendSqlAccess implements SqlAccess {
     private Database connection() throws IOException {
         Database db = transaction != null ? transaction : supplied != null ? supplied : pool.borrow();
         if (db != transaction && db.isInTransaction() //NOPMD CompareObjectsWithEquals - connection identity
-                && !(pool != null && Transactions.isJoined(pool, db))) {
+                && !(pool != null && com.codename1.impl.backend.BackendAccess.get().isJoined(pool, db))) {
             if (db != supplied) { //NOPMD CompareObjectsWithEquals - connection identity
                 db.close();
                 pool.release(db);
@@ -264,7 +263,7 @@ public final class BackendSqlAccess implements SqlAccess {
         if (supplied == null && pool != null) {
             // Inside a @Transactional method: this session becomes part of that
             // transaction instead of opening one the connection would refuse.
-            Database joined = Transactions.joined(pool);
+            Database joined = com.codename1.impl.backend.BackendAccess.get().joined(pool);
             if (joined != null) {
                 transaction = joined;
                 joinedTransaction = true;
@@ -307,7 +306,7 @@ public final class BackendSqlAccess implements SqlAccess {
             throw new IOException("No transaction");
         }
         if (joinedTransaction) {
-            Transactions.markRollbackOnly(pool);
+            com.codename1.impl.backend.BackendAccess.get().markRollbackOnly(pool);
             unpin();
             return;
         }
@@ -327,7 +326,7 @@ public final class BackendSqlAccess implements SqlAccess {
         if (transaction != null && joinedTransaction) {
             // Closed without committing: its changes were never flushed, and the
             // method's transaction cannot commit as though they had been.
-            Transactions.markRollbackOnly(pool);
+            com.codename1.impl.backend.BackendAccess.get().markRollbackOnly(pool);
             unpin();
             return;
         }

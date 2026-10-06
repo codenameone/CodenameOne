@@ -2,6 +2,8 @@
 //
 //   ./gradlew runBackend       run on this JVM (starts in seconds)
 //   ./gradlew backendPackage   build a single native binary
+//   ./gradlew test             run the tests (@BackendTest, MockMvc, JUnit 5)
+//   ./gradlew backendTest      run the same tests as a native binary
 dependencies {
     // implementation("org.example:library:1.0")
 }

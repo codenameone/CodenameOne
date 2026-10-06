@@ -22,14 +22,16 @@
  */
 package com.codename1.backend;
 
+import com.codename1.impl.backend.AsyncTask;
+
 import java.util.LinkedList;
 
 /// A named place background work runs: a pool of platform threads, or virtual
 /// threads on the server's hosts.
 ///
-/// Configured as `cn1.task.executor..threads` and
-/// `cn1.task.executor..kind` (`platform` or `virtual`),
-/// and obtained through [Tasks#executor]. The threads of a pool start on the
+/// Configured as `cn1.task.executor.<name>.threads` and
+/// `cn1.task.executor.<name>.kind` (`platform` or `virtual`),
+/// and listed by [Tasks#executors]. The threads of a pool start on the
 /// first task, so an executor the configuration names and nothing uses costs a
 /// map entry.
 ///
