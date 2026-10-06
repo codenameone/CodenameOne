@@ -45,6 +45,12 @@ import com.codename1.backend.security.rememberme.RememberMeServices;
 /// they sign in again. Signing out deletes the cookie and forgets the user in
 /// every browser.
 ///
+/// On a chain with a second factor -- [HttpSecurity#mfa] -- the cookie of a
+/// user who has one signs them in only if it was issued by a sign-in that
+/// passed it. One issued for a password alone, before the user enrolled, is
+/// withdrawn when it is presented, and the user signs in again; see
+/// [MfaConfigurer].
+///
 /// Tokens are kept by a [PersistentTokenRepository]: the one given here, the
 /// application's bean of that type, or one in memory -- which forgets everyone
 /// when the server restarts, and is no use to a deployment of several
@@ -202,14 +208,18 @@ public final class RememberMeConfigurer extends SecurityConfigurer {
 
         @Override
         public void success(HttpServer.Request request, Authentication authentication,
-                            boolean requested) {
-            if (requested) {
-                // The request that completes a sign-in in two steps is not the
-                // one that carried the checkbox.
-                SecurityExchange exchange = SecurityExchange.of(request);
-                if (exchange != null) {
+                            boolean requested, boolean secondFactor) {
+            SecurityExchange exchange = SecurityExchange.of(request);
+            if (exchange != null) {
+                if (requested) {
+                    // The request that completes a sign-in in two steps is not
+                    // the one that carried the checkbox.
                     exchange.setAttribute(RememberMeServices.REQUESTED_ATTRIBUTE, Boolean.TRUE);
                 }
+                // Always written, true or not: a sign-in by password alone
+                // must not inherit what an earlier one on this exchange said.
+                exchange.setAttribute(RememberMeServices.SECOND_FACTOR_ATTRIBUTE,
+                        secondFactor ? Boolean.TRUE : null);
             }
             remember.loginSuccess(request, authentication);
         }
@@ -223,7 +233,8 @@ public final class RememberMeConfigurer extends SecurityConfigurer {
     @Override
     public void configure(HttpSecurity http) {
         http.addFilter(new RememberMeAuthenticationFilter(resolve(http),
-                http.resolveSecurityContextRepository(), http.sessionAuthentication()),
+                http.resolveSecurityContextRepository(), http.sessionAuthentication(),
+                http.secondFactorPolicy()),
                 HttpSecurity.ORDER_REMEMBER_ME);
     }
 }

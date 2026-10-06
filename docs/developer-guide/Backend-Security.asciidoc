@@ -977,8 +977,45 @@ signs in as before. The chain serves a plain page at `GET /login/mfa` unless
 `secondFactorPage` names your own. The user has five minutes to enter the
 code, and five attempts.
 
-The second factor applies to every sign-in that ends in a session, including
-one through another provider.
+==== What counts as a sign-in
+
+A declared second factor holds for every way a user of that chain can present
+a first one. None of it affects a user who hasn't enrolled.
+
+[cols="1,3",options="header"]
+|===
+| Mechanism | For a user who has a second factor
+
+| `formLogin`
+| The password is accepted and the sign-in waits for the code.
+
+| `oauth2Login`
+| The other provider's sign-in is accepted and waits for the code here.
+
+| `webAuthn`
+| A passkey whose authenticator verified the user is two factors already, and
+  signs in. One that didn't waits for the code.
+
+| `httpBasic`
+| Refused with a 401. Credentials sent with every request have no step to
+  present a code in.
+
+| `rememberMe`
+| The cookie signs the user in only if the sign-in that issued it passed the
+  second factor. A cookie issued for a password alone, before the user
+  enrolled, is withdrawn.
+
+| `oauth2ResourceServer`, `apiKey`
+| Accepted. A token or a key isn't a user signing in. It was issued by a
+  sign-in that already went through the chain's factors, or by an
+  administrator, and is revoked on its own terms.
+|===
+
+The 401 for HTTP Basic says why, in the body and as
+`error="second_factor_required"` in the challenge. A wrong password gets the
+ordinary challenge, so the answer tells nothing to a caller who doesn't know
+the password. A chain whose Basic callers are scripts on a trusted network
+can opt out with `httpBasic(basic -> basic.secondFactorExempt())`.
 
 ==== Enrolling
 
@@ -1158,6 +1195,10 @@ A remembered user is authenticated, but not fully. `fullyAuthenticated()` in
 the rules and `isFullyAuthenticated()` in a `@PreAuthorize` refuse them until
 they sign in again. Signing out deletes the cookie and forgets the user in
 every browser.
+
+On a chain with `mfa`, the cookie of a user who has a second factor works only
+if the sign-in that issued it passed that factor. The server records which
+kind each cookie is.
 
 Without a `tokenRepository` or a `PersistentTokenRepository` bean, the tokens
 are kept in memory. They're then forgotten when the server restarts, and

@@ -35,6 +35,16 @@ public interface RememberMeServices {
     /// [#loginSuccess] by whatever finishes a sign-in in a second step.
     String REQUESTED_ATTRIBUTE = "com.codename1.backend.security.rememberMe.requested";
 
+    /// The attribute of the request's
+    /// [com.codename1.backend.security.SecurityExchange] that says the sign-in
+    /// being completed passed a second factor: set to `Boolean.TRUE` before
+    /// [#loginSuccess]. A cookie issued then may sign a user who has a second
+    /// factor in later; one issued without it may not. Services that issue
+    /// cookies of their own carry this over, and say so on what [#autoLogin]
+    /// returns -- see
+    /// [com.codename1.backend.security.RememberMeAuthenticationToken#isAfterSecondFactor].
+    String SECOND_FACTOR_ATTRIBUTE = "com.codename1.backend.security.rememberMe.secondFactor";
+
     /// Recognizes the user from the request's cookie.
     ///
     /// @return who it is, or null when the request carries no cookie this

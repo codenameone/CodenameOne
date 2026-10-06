@@ -34,11 +34,21 @@ import java.util.Collection;
 public class RememberMeAuthenticationToken extends AbstractAuthenticationToken {
     private final int keyHash;
     private final Object principal;
+    private final boolean afterSecondFactor;
 
     /// @param key what identifies the services that made the token
     public RememberMeAuthenticationToken(String key, Object principal,
             Collection<? extends GrantedAuthority> authorities) {
+        this(key, principal, authorities, false);
+    }
+
+    /// @param key what identifies the services that made the token
+    /// @param afterSecondFactor whether the cookie was issued by a sign-in
+    /// that passed a second factor; see [#isAfterSecondFactor]
+    public RememberMeAuthenticationToken(String key, Object principal,
+            Collection<? extends GrantedAuthority> authorities, boolean afterSecondFactor) {
         super(authorities);
+        this.afterSecondFactor = afterSecondFactor;
         if (key == null || key.length() == 0) {
             throw new IllegalArgumentException("key cannot be null or empty");
         }
@@ -53,6 +63,13 @@ public class RememberMeAuthenticationToken extends AbstractAuthenticationToken {
     /// The hash of the key the token was made with.
     public int getKeyHash() {
         return keyHash;
+    }
+
+    /// Whether the sign-in that issued the cookie passed a second factor. On a
+    /// chain that asks for one, a user who has a second factor is recognized
+    /// by their cookie only when this is true.
+    public boolean isAfterSecondFactor() {
+        return afterSecondFactor;
     }
 
     @Override

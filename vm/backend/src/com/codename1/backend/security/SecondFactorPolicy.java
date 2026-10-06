@@ -26,9 +26,9 @@ import com.codename1.backend.HttpServer;
 
 /// Stands between a user passing their first factor and being signed in.
 ///
-/// Every way of signing in that ends in a session -- the form login, and a
-/// sign-in through another identity provider -- hands the authentication it
-/// established to the chain's [SessionSignIn] rather than storing it. When the
+/// Every way of signing in that ends in a session -- the form login, a passkey,
+/// and a sign-in through another identity provider -- hands the authentication
+/// it established to the chain's [SessionSignIn] rather than storing it. When the
 /// chain has a policy, the policy is asked first, and may take the request
 /// over: `http.mfa(...)` installs the one that asks for a one-time code.
 ///
@@ -48,4 +48,19 @@ public interface SecondFactorPolicy {
     /// with the sign-in left pending
     HttpServer.Response intercept(HttpServer.Request request, Authentication authentication,
                                   boolean rememberMe) throws Exception;
+
+    /// Whether `authentication` is of a user who has a second factor, so that
+    /// a first factor alone must not make a request theirs.
+    ///
+    /// [#intercept] is for a sign-in that can stop and ask. This is for the
+    /// ways of presenting a first factor that cannot: credentials sent with
+    /// every request, which have no second step to send a code in, and a
+    /// remember-me cookie, which has nobody at the keyboard. Each asks here
+    /// and refuses the user when the answer is true; see [MfaConfigurer] for
+    /// the rule of each mechanism.
+    ///
+    /// A policy that does not say is taken to require one of everybody.
+    default boolean requires(Authentication authentication) {
+        return true;
+    }
 }

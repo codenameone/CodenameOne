@@ -352,6 +352,156 @@ class MfaTest {
         }
     }
 
+    private SecuredServer startWithBasic(boolean exempt) throws Exception {
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
+                User.withUsername("ada").password("{noop}ada-pw").roles("USER", "ADMIN").build(),
+                User.withUsername("ray").password("{noop}ray-pw").roles("USER").build());
+        assertTrue(totp.isEnabled("ada") || enrol("ada"));
+        return SecuredServer.start(SecuredServer.settings(), "dev",
+                new Object[] {users, totp, recovery, tokens}, APP,
+                http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable())
+                        .formLogin(Customizer.withDefaults())
+                        .httpBasic(basic -> {
+                            basic.realmName("Acme");
+                            if (exempt) {
+                                basic.secondFactorExempt();
+                            }
+                        })
+                        .rememberMe(Customizer.withDefaults())
+                        .mfa(mfa -> mfa.clock(clock)).build());
+    }
+
+    private static String basic(String user, String password) throws Exception {
+        return "Basic " + com.codename1.backend.Base64.encode((user + ":" + password)
+                .getBytes("UTF-8"));
+    }
+
+    @Test
+    @DisplayName("HTTP Basic is not a way around the code: a right password alone is refused")
+    void basicCredentialsDoNotSkipTheSecondFactor() throws Exception {
+        try (SecuredServer server = startWithBasic(false)) {
+            Reply held = server.get("/me", "Authorization", basic("ada", "ada-pw"));
+            assertEquals(401, held.status, held.toString());
+            assertEquals("Basic realm=\"Acme\", error=\"second_factor_required\"",
+                    held.header("WWW-Authenticate"));
+            assertEquals("This account has a second factor, which HTTP Basic credentials "
+                    + "cannot present. Sign in through the login page.", held.body);
+            // Nothing was kept of it either: no session a later request rides.
+            assertNull(server.cookies.get("CN1SESSION"));
+            assertEquals("[]", server.reached().toString());
+
+            // A wrong password learns nothing about whether there is a factor.
+            Reply wrong = server.get("/me", "Authorization", basic("ada", "nope"));
+            assertEquals(401, wrong.status);
+            assertEquals("Basic realm=\"Acme\"", wrong.header("WWW-Authenticate"));
+            assertEquals("Unauthorized", wrong.body);
+
+            // A user with no second factor is who they were.
+            assertEquals("/me ray [ROLE_USER]", server.get("/me", "Authorization",
+                    basic("ray", "ray-pw")).body);
+
+            // Signed in with the code, the same header is that user already.
+            server.post("/login", "username=ada&password=ada-pw");
+            assertEquals("/", server.post("/login/mfa", "code=" + totp.currentCode("ada"))
+                    .header("Location"));
+            assertEquals("/me ada [ROLE_USER, ROLE_ADMIN]", server.get("/me", "Authorization",
+                    basic("ada", "ada-pw")).body);
+        }
+    }
+
+    @Test
+    @DisplayName("a chain that exempts HTTP Basic says so, and only then is the password enough")
+    void basicExemptFromTheSecondFactor() throws Exception {
+        try (SecuredServer server = startWithBasic(true)) {
+            assertEquals("/me ada [ROLE_USER, ROLE_ADMIN]", server.get("/me", "Authorization",
+                    basic("ada", "ada-pw")).body);
+            // The form is not exempt with it.
+            assertEquals("/login/mfa", server.post("/login", "username=ada&password=ada-pw")
+                    .header("Location"));
+        }
+    }
+
+    @Test
+    @DisplayName("a remember-me cookie stands for the second factor only if it was issued after one")
+    void rememberMeIsNotAWayAroundTheCode() throws Exception {
+        try (SecuredServer server = start(clock)) {
+            // Ray has no second factor yet, and is remembered for a password.
+            Reply first = server.post("/login", "username=ray&password=ray-pw&remember-me=on");
+            assertTrue(has(first, "remember-me="), first.toString());
+            server.cookies.remove("CN1SESSION");
+            assertEquals("/me ray [ROLE_USER]", server.get("/me").body);
+            String passwordOnly = server.cookies.get("remember-me");
+            assertFalse(passwordOnly.startsWith("2f."), passwordOnly);
+
+            // Ray enrols. The cookie from before stood for a password alone.
+            assertTrue(enrol("ray"));
+            server.cookies.remove("CN1SESSION");
+            Reply refused = server.get("/me", "Accept", "text/html");
+            assertEquals("302 /login", refused.status + " " + refused.header("Location"));
+            boolean withdrawn = false;
+            for (String cookie : refused.headers("Set-Cookie")) {
+                withdrawn |= cookie.startsWith("remember-me=;") && cookie.contains("Max-Age=0");
+            }
+            assertTrue(withdrawn, refused.toString());
+            assertNull(server.cookies.get("remember-me"));
+
+            // Signed in with password and code, and remembered: that cookie
+            // carries both, and signs Ray in on a later visit.
+            server.cookies.clear();
+            server.post("/login", "username=ray&password=ray-pw&remember-me=on");
+            Reply done = server.post("/login/mfa", "code=" + totp.currentCode("ray"));
+            assertEquals("302 /", done.status + " " + done.header("Location"));
+            assertTrue(server.cookies.get("remember-me").startsWith("2f."),
+                    server.cookies.get("remember-me"));
+            server.cookies.remove("CN1SESSION");
+            assertEquals("/me ray [ROLE_USER]", server.get("/me").body);
+        }
+    }
+
+    @Test
+    @DisplayName("a token or an API key of a user with a second factor is accepted: neither is a sign-in")
+    void tokensAndKeysAreNotSignIns() throws Exception {
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
+                User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
+        assertTrue(enrol("ada"));
+        com.codename1.backend.security.apikey.GeneratedApiKey key =
+                new com.codename1.backend.security.apikey.ApiKeyGenerator().generate("ada", "read");
+        com.codename1.backend.security.apikey.InMemoryApiKeyRepository keys =
+                new com.codename1.backend.security.apikey.InMemoryApiKeyRepository(key.getApiKey());
+        long now = System.currentTimeMillis() / 1000L;
+        String jwt = new com.codename1.backend.security.oauth2.jwt.DefaultJwtEncoder(
+                com.codename1.backend.security.crypto.JwkSet.of(
+                        com.codename1.backend.security.crypto.Jwk.ofPrivateKey(
+                                com.codename1.backend.Base64.decode(
+                                        com.codename1.backend.security.crypto.KeyFixtures
+                                                .RSA_PKCS8_DER))))
+                .encode(com.codename1.backend.security.oauth2.jwt.JwtEncoderParameters.from(
+                        com.codename1.backend.security.oauth2.jwt.JwtClaimsSet.builder()
+                                .subject("ada").issuedAt(now).expiresAt(now + 300).build()))
+                .getTokenValue();
+        try (SecuredServer server = SecuredServer.start(SecuredServer.settings(), "dev",
+                new Object[] {users, totp}, APP,
+                http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable())
+                        .formLogin(Customizer.withDefaults())
+                        .apiKey(api -> api.repository(keys))
+                        .oauth2ResourceServer(o -> o.jwt(j -> j.decoder(
+                                com.codename1.backend.security.oauth2.jwt.DefaultJwtDecoder
+                                        .withPublicKey(com.codename1.backend.Base64.decode(
+                                                com.codename1.backend.security.crypto.KeyFixtures
+                                                        .RSA_PUBLIC_DER)).build())))
+                        .mfa(mfa -> mfa.clock(clock)).build())) {
+            // The chain does hold this user's password back for a code.
+            assertEquals("/login/mfa", server.post("/login", "username=ada&password=ada-pw")
+                    .header("Location"));
+            server.cookies.clear();
+            assertEquals("/me ada [SCOPE_read]", server.get("/me", "X-API-Key",
+                    key.getPlaintext()).body);
+            assertEquals("/me ada []", server.get("/me", "Authorization", "Bearer " + jwt).body);
+        }
+    }
+
     @Test
     @DisplayName("mfa() without anything to check codes with is refused when the chain is built")
     void needsATotpService() {

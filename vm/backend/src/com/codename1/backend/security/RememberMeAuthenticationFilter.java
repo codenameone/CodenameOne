@@ -34,17 +34,35 @@ import com.codename1.backend.security.rememberme.RememberMeServices;
 /// authentication becomes the request's and is saved, so the session that
 /// starts here carries it and the cookie is not consulted again until that
 /// session ends.
+///
+/// On a chain with a [SecondFactorPolicy], a user the policy requires a second
+/// factor of is recognized only by a cookie issued after one. Any other cookie
+/// of theirs is withdrawn and the request stays anonymous: a cookie is not a
+/// way around the code.
 public final class RememberMeAuthenticationFilter implements SecurityFilter {
     private final RememberMeServices services;
     private final SecurityContextRepository repository;
     private final SessionAuthentication sessionAuthentication;
+    private final SecondFactorPolicy secondFactor;
 
     RememberMeAuthenticationFilter(RememberMeServices services,
                                    SecurityContextRepository repository,
-                                   SessionAuthentication sessionAuthentication) {
+                                   SessionAuthentication sessionAuthentication,
+                                   SecondFactorPolicy secondFactor) {
         this.services = services;
         this.repository = repository;
         this.sessionAuthentication = sessionAuthentication;
+        this.secondFactor = secondFactor;
+    }
+
+    /// Whether the chain's second factor stands between this cookie and the
+    /// user it names.
+    private boolean held(Authentication remembered) {
+        if (secondFactor == null || !secondFactor.requires(remembered)) {
+            return false;
+        }
+        return !(remembered instanceof RememberMeAuthenticationToken)
+                || !((RememberMeAuthenticationToken) remembered).isAfterSecondFactor();
     }
 
     @Override
@@ -54,6 +72,11 @@ public final class RememberMeAuthenticationFilter implements SecurityFilter {
         Authentication existing = current == null ? null : current.getAuthentication();
         if (existing == null || existing instanceof AnonymousAuthenticationToken) {
             Authentication remembered = services.autoLogin(request);
+            if (remembered != null && held(remembered)) {
+                // The cookie stood for a password and nothing else.
+                services.loginFail(request);
+                remembered = null;
+            }
             if (remembered != null) {
                 // A new session id for the signed-in state, as for any sign-in.
                 sessionAuthentication.onAuthentication(request);

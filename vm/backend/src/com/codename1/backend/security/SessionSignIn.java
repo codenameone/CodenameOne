@@ -46,7 +46,10 @@ public final class SessionSignIn {
         /// remembered. Asked at the first factor, answered back at the end.
         boolean requested(HttpServer.Request request);
 
-        void success(HttpServer.Request request, Authentication authentication, boolean requested);
+        /// @param secondFactor whether the sign-in passed a second factor: a
+        /// code after the first, or a first that was two already
+        void success(HttpServer.Request request, Authentication authentication, boolean requested,
+                     boolean secondFactor);
 
         void failure(HttpServer.Request request);
     }
@@ -101,7 +104,8 @@ public final class SessionSignIn {
                 return held;
             }
         }
-        return complete(request, authentication, remember, handler);
+        return complete(request, authentication, remember, handler,
+                secondFactor != null && secondFactorSatisfied);
     }
 
     /// Signs the user in, with no second factor asked: for the first factor of
@@ -112,13 +116,26 @@ public final class SessionSignIn {
     public HttpServer.Response complete(HttpServer.Request request, Authentication authentication,
                                         boolean rememberMe, AuthenticationSuccessHandler handler)
             throws Exception {
+        return complete(request, authentication, rememberMe, handler, false);
+    }
+
+    /// Signs the user in, and says whether a second factor was part of it.
+    /// What finishes a sign-in that was held back passes true, and so a
+    /// remember-me cookie issued here is one that may stand for both factors
+    /// later; see [MfaConfigurer].
+    ///
+    /// @param rememberMe what [SecondFactorPolicy#intercept] was told
+    /// @param secondFactor whether the user presented a second factor
+    public HttpServer.Response complete(HttpServer.Request request, Authentication authentication,
+                                        boolean rememberMe, AuthenticationSuccessHandler handler,
+                                        boolean secondFactor) throws Exception {
         sessionAuthentication.onAuthentication(request);
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
         repository.saveContext(context, request);
         for (Listener listener : listeners) {
-            listener.success(request, authentication, rememberMe);
+            listener.success(request, authentication, rememberMe, secondFactor);
         }
         return handler.onAuthenticationSuccess(request, authentication);
     }

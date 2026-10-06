@@ -54,6 +54,32 @@ import com.codename1.backend.security.ratelimit.RateLimiter;
 ///
 /// What holds a sign-in back is the chain's [SecondFactorPolicy], which every
 /// sign-in that ends in a session consults; see [SessionSignIn].
+///
+/// #### Every way of presenting a first factor
+///
+/// A second factor that one mechanism of the chain skipped would be optional,
+/// so each mechanism has a rule for a user who has one:
+///
+/// - [HttpSecurity#formLogin] and [HttpSecurity#oauth2Login]: the sign-in is
+///   held back for the code.
+/// - [HttpSecurity#webAuthn]: a passkey whose authenticator verified the user
+///   is two factors in one step and signs in; one that did not is held back.
+/// - [HttpSecurity#httpBasic]: refused, with a 401 that says why once the
+///   password has been checked. Credentials sent with every request have no
+///   second step to present a code in. A chain can exempt it, by name:
+///   [HttpBasicConfigurer#secondFactorExempt].
+/// - [HttpSecurity#rememberMe]: the cookie signs the user in only when the
+///   sign-in that issued it passed the second factor. Any other cookie of
+///   theirs -- one from before they enrolled -- is withdrawn.
+/// - [HttpSecurity#oauth2ResourceServer] and [HttpSecurity#apiKey]: accepted.
+///   A token or a key is not a user signing in: nobody is there to type a
+///   code, and it stands for a sign-in that already happened -- the one that
+///   had the token issued, which went through this policy if it was made
+///   here -- or for a decision of whoever minted the key. What limits them is
+///   their own lifetime and revocation.
+///
+/// A filter or provider of the application's own that makes a request a
+/// user's is outside all of this; it can ask [SecondFactorPolicy#requires].
 public final class MfaConfigurer extends SecurityConfigurer {
     private TotpService totp;
     private RecoveryCodeService recoveryCodes;

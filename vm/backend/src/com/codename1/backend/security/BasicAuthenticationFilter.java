@@ -31,14 +31,28 @@ import com.codename1.backend.HttpServer;
 /// is kept: no session is started. A request without the header passes through
 /// untouched, for the rules further on to judge; one whose credentials are
 /// refused is answered 401 with a challenge.
+///
+/// On a chain with a second factor, the right password of a user who has one
+/// is refused too, with a 401 that says why: see
+/// [HttpBasicConfigurer#secondFactorExempt].
 public final class BasicAuthenticationFilter implements SecurityFilter {
+    /// What a user with a second factor is told when they present a password
+    /// alone.
+    static final String SECOND_FACTOR_REQUIRED = "This account has a second factor, which "
+            + "HTTP Basic credentials cannot present. Sign in through the login page.";
+
     private final AuthenticationManager authenticationManager;
     private final AuthenticationEntryPoint entryPoint;
+    private final SecondFactorPolicy secondFactor;
 
+    /// @param secondFactor the chain's second factor, or null when it has
+    /// none or exempts this mechanism from it
     BasicAuthenticationFilter(AuthenticationManager authenticationManager,
-                              AuthenticationEntryPoint entryPoint) {
+                              AuthenticationEntryPoint entryPoint,
+                              SecondFactorPolicy secondFactor) {
         this.authenticationManager = authenticationManager;
         this.entryPoint = entryPoint;
+        this.secondFactor = secondFactor;
     }
 
     @Override
@@ -71,6 +85,11 @@ public final class BasicAuthenticationFilter implements SecurityFilter {
                 throw new AuthenticationServiceException("The AuthenticationManager returned "
                         + "no authentication");
             }
+            if (secondFactor != null && secondFactor.requires(result)) {
+                // After the password was checked, so this says nothing to a
+                // caller who does not know it.
+                return secondFactorRequired(request);
+            }
             SecurityContext context = SecurityContextHolder.createEmptyContext();
             context.setAuthentication(result);
             SecurityContextHolder.setContext(context);
@@ -79,6 +98,22 @@ public final class BasicAuthenticationFilter implements SecurityFilter {
             return entryPoint.commence(request, refused);
         }
         return chain.doFilter(request);
+    }
+
+    /// The refusal of a right password from a user who has a second factor: a
+    /// 401 with why in the challenge and the body. The challenge stays a Basic
+    /// one -- it is what the request used -- and the extra parameter is one a
+    /// client that does not know it ignores. An entry point of the
+    /// application's own answers instead, and is handed the reason.
+    private HttpServer.Response secondFactorRequired(HttpServer.Request request) throws Exception {
+        SecurityContextHolder.clearContext();
+        if (!(entryPoint instanceof BasicAuthenticationEntryPoint)) {
+            return entryPoint.commence(request,
+                    new InsufficientAuthenticationException(SECOND_FACTOR_REQUIRED));
+        }
+        return Responses.status(401, SECOND_FACTOR_REQUIRED).header("WWW-Authenticate",
+                "Basic realm=\"" + ((BasicAuthenticationEntryPoint) entryPoint).getRealmName()
+                        + "\", error=\"second_factor_required\"");
     }
 
     /// The username and password of a Basic header.

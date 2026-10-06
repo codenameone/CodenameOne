@@ -732,6 +732,12 @@ public final class HttpSecurity {
         secondFactorPolicy = policy;
     }
 
+    /// The chain's second factor, or null: asked for from a configurer's
+    /// configure(), once every init() has run.
+    SecondFactorPolicy secondFactorPolicy() {
+        return secondFactorPolicy;
+    }
+
     private final List<AuthenticationCodec> authenticationCodecs =
             new ArrayList<AuthenticationCodec>();
 

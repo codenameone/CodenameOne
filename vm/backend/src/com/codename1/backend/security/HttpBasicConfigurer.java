@@ -27,9 +27,13 @@ package com.codename1.backend.security;
 /// ```java
 /// http.httpBasic(basic -> basic.realmName("Orders API"));
 /// ```
+///
+/// On a chain that also declares [HttpSecurity#mfa], a user who has a second
+/// factor cannot sign in this way; see [#secondFactorExempt].
 public final class HttpBasicConfigurer extends SecurityConfigurer {
     private final BasicAuthenticationEntryPoint basicEntryPoint = new BasicAuthenticationEntryPoint();
     private AuthenticationEntryPoint authenticationEntryPoint = basicEntryPoint;
+    private boolean secondFactorExempt;
 
     HttpBasicConfigurer() {
     }
@@ -50,6 +54,19 @@ public final class HttpBasicConfigurer extends SecurityConfigurer {
         return this;
     }
 
+    /// Lets a user who has a second factor in with their password alone.
+    ///
+    /// On a chain with [HttpSecurity#mfa], Basic credentials of a user who has
+    /// a second factor are refused: they are a first factor sent with every
+    /// request, with no step to present a code in, and accepting them would
+    /// make the code optional for anyone who knows the password. Call this
+    /// only when that is what is meant -- a chain whose Basic callers are
+    /// scripts the user set up, on a network that is trusted.
+    public HttpBasicConfigurer secondFactorExempt() {
+        this.secondFactorExempt = true;
+        return this;
+    }
+
     @Override
     public void init(HttpSecurity http) {
         ExceptionHandlingConfigurer handling = http.getConfigurer(ExceptionHandlingConfigurer.class);
@@ -62,7 +79,8 @@ public final class HttpBasicConfigurer extends SecurityConfigurer {
     @Override
     public void configure(HttpSecurity http) {
         http.addFilter(new BasicAuthenticationFilter(
-                PasswordAuthentication.require(http, "httpBasic()"), authenticationEntryPoint),
+                PasswordAuthentication.require(http, "httpBasic()"), authenticationEntryPoint,
+                secondFactorExempt ? null : http.secondFactorPolicy()),
                 HttpSecurity.ORDER_BASIC);
     }
 }

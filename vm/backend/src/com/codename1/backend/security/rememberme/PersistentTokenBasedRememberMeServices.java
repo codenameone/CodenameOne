@@ -43,6 +43,10 @@ import java.io.IOException;
 /// -- and every remembered sign-in of that user is deleted, which is the
 /// warning Spring Security raises as a cookie theft.
 ///
+/// A cookie issued by a sign-in that passed a second factor is recorded as
+/// such, and only such a cookie signs in a user who has one; see
+/// [com.codename1.backend.security.MfaConfigurer].
+///
 /// The cookie is `HttpOnly`, `SameSite=Lax` unless changed, and `Secure` when
 /// the request that set it was.
 public final class PersistentTokenBasedRememberMeServices
@@ -53,6 +57,12 @@ public final class PersistentTokenBasedRememberMeServices
     public static final String DEFAULT_PARAMETER = "remember-me";
     /// Two weeks, as in Spring Security.
     public static final int TWO_WEEKS_S = 1209600;
+    /// What the series of a cookie issued after a second factor starts with.
+    /// The series is the server's own record -- a cookie cannot name one that
+    /// was not issued -- so how a sign-in was made is kept there, and every
+    /// [PersistentTokenRepository] keeps it without knowing. A `.` is in no
+    /// series otherwise.
+    private static final String AFTER_SECOND_FACTOR = "2f.";
 
     private final String key;
     private final UserDetailsService userDetailsService;
@@ -191,7 +201,8 @@ public final class PersistentTokenBasedRememberMeServices
             return stolen(stored);
         }
         setCookie(series + ":" + next);
-        return new RememberMeAuthenticationToken(key, user, user.getAuthorities());
+        return new RememberMeAuthenticationToken(key, user, user.getAuthorities(),
+                series.startsWith(AFTER_SECOND_FACTOR));
     }
 
     private Authentication stolen(PersistentRememberMeToken stored) {
@@ -231,7 +242,10 @@ public final class PersistentTokenBasedRememberMeServices
         if (successfulAuthentication == null || !rememberMeRequested(request)) {
             return;
         }
-        String series = random();
+        SecurityExchange exchange = SecurityExchange.current();
+        boolean secondFactor = exchange != null
+                && Boolean.TRUE.equals(exchange.getAttribute(SECOND_FACTOR_ATTRIBUTE));
+        String series = secondFactor ? AFTER_SECOND_FACTOR + random() : random();
         String token = random();
         tokenRepository.createNewToken(new PersistentRememberMeToken(
                 successfulAuthentication.getName(), series, hash(token),

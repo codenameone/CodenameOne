@@ -128,6 +128,11 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         return Responses.redirect(page);
     }
 
+    @Override
+    public boolean requires(Authentication authentication) {
+        return authentication != null && totp.isEnabled(authentication.getName());
+    }
+
     // ------------------------------------------------------------ the filter
 
     @Override
@@ -197,7 +202,7 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
                     + "chain's sign-in; it is installed by http.mfa(...)");
         }
         return complete.complete(request, authentication,
-                Boolean.TRUE.equals(pending.get("remember")), successHandler);
+                Boolean.TRUE.equals(pending.get("remember")), successHandler, true);
     }
 
     private HttpServer.Response expired(HttpServer.Request request, HttpSession session)
