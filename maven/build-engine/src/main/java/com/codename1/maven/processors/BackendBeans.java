@@ -99,6 +99,22 @@ final class BackendBeans {
     static final String REST_CONTROLLER = PKG + "RestController;";
     static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
     static final String GENERATED = PKG + "Generated;";
+    static final String PRE_AUTHORIZE = PKG + "PreAuthorize;";
+    static final String SECURED = PKG + "Secured;";
+    static final String ROLES_ALLOWED = PKG + "RolesAllowed;";
+    static final String PERMIT_ALL = PKG + "PermitAll;";
+    static final String DENY_ALL = PKG + "DenyAll;";
+    static final String P = PKG + "P;";
+    /// The method-security annotations, and how each is written.
+    static final String[] METHOD_SECURITY = {PRE_AUTHORIZE, SECURED, ROLES_ALLOWED, PERMIT_ALL,
+        DENY_ALL};
+    static final String[] METHOD_SECURITY_SHOWN = {"@PreAuthorize", "@Secured", "@RolesAllowed",
+        "@PermitAll", "@DenyAll"};
+    /// Spring Security's annotations that act on what a method returns or is
+    /// given, by simple name: whichever package one comes from, the build has
+    /// nothing that applies it.
+    private static final String[] UNSUPPORTED_SECURITY = {"PostAuthorize", "PreFilter",
+        "PostFilter"};
 
     /// Every annotation this pass reads, for the processor's declared interest.
     static final Set<String> DESCRIPTORS = Collections.unmodifiableSet(
@@ -107,7 +123,8 @@ final class BackendBeans {
                     PROFILE, ON_PROPERTY, ON_MISSING,
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
-                    MCP_TOOL, REST_CONTROLLER, WEBSOCKET_MAPPING)));
+                    MCP_TOOL, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
+                    ROLES_ALLOWED, PERMIT_ALL, DENY_ALL)));
 
     private static final String[] STEREOTYPES = {COMPONENT, CONFIGURATION,
             REST_CONTROLLER, WEBSOCKET_MAPPING};
@@ -349,6 +366,11 @@ final class BackendBeans {
         AnnotationValues timed;
         AnnotationValues counted;
         String asyncTaskBinary;
+        /// The method's authorization check as a Java boolean expression, or
+        /// null when it has none; see [MethodSecurityCompiler].
+        String security;
+        /// Bean name -> Java type, for the beans [#security] calls.
+        Map<String, String> securityBeans = Collections.<String, String>emptyMap();
 
         Aspect(MethodInfo method) {
             this.method = method;
@@ -361,6 +383,9 @@ final class BackendBeans {
     final List<Bean> beans = new ArrayList<Bean>();
     final Map<String, Bean> byName = new LinkedHashMap<String, Bean>();
     final Map<String, Aspects> aspects = new TreeMap<String, Aspects>();
+    /// The beans authorization expressions call, by name: the wiring registers
+    /// each so the woven check can reach the one of its own server.
+    final Set<String> namedBeans = new java.util.TreeSet<String>();
     /// Metric name -> "histogram" or "counter", with where it was declared, for
     /// the @Timed and @Counted instruments the woven code registers.
     private final Map<String, String[]> aspectMetrics = new LinkedHashMap<String, String[]>();
@@ -494,6 +519,9 @@ final class BackendBeans {
             out.resolve();
         }
         if (!ctx.hasErrors()) {
+            out.collectNamedBeans();
+        }
+        if (!ctx.hasErrors()) {
             out.plan();
         }
         if (!ctx.hasErrors()) {
@@ -525,7 +553,8 @@ final class BackendBeans {
             for (MethodInfo m : cls.getMethods()) {
                 if (m.getAnnotation(TRANSACTIONAL) != null || m.getAnnotation(ASYNC) != null
                         || m.getAnnotation(TIMED) != null || m.getAnnotation(COUNTED) != null
-                        || m.getAnnotation(SCHEDULED) != null) {
+                        || m.getAnnotation(SCHEDULED) != null
+                        || methodSecurity(m.getAnnotations(), null, null) != null) {
                     ctx.error(cls, "@TestConfiguration " + cls.getSourceName() + "."
                             + m.getName() + " carries an annotation the build weaves; a test "
                             + "configuration declares beans and nothing else.");
@@ -617,7 +646,7 @@ final class BackendBeans {
     private static boolean usesAnyAnnotation(ProcessorContext ctx) {
         for (AnnotatedClass cls : ctx.getClassIndex().values()) {
             for (String d : cls.getAllAnnotationDescriptors()) {
-                if (DESCRIPTORS.contains(d)) {
+                if (DESCRIPTORS.contains(d) || unsupportedSecurity(d) != null) {
                     return true;
                 }
             }
@@ -2593,8 +2622,10 @@ final class BackendBeans {
     /// Spring's runtime proxies would honour it, so ignoring it silently is the
     /// one answer that cannot be right.
     private void refuseInterfaceAspects(AnnotatedClass cls) {
-        String[] names = {TRANSACTIONAL, ASYNC, TIMED, COUNTED};
-        String[] shown = {"@Transactional", "@Async", "@Timed", "@Counted"};
+        String[] names = {TRANSACTIONAL, ASYNC, TIMED, COUNTED, PRE_AUTHORIZE, SECURED,
+            ROLES_ALLOWED, PERMIT_ALL, DENY_ALL};
+        String[] shown = {"@Transactional", "@Async", "@Timed", "@Counted", "@PreAuthorize",
+            "@Secured", "@RolesAllowed", "@PermitAll", "@DenyAll"};
         for (int i = 0; i < names.length; i++) {
             if (cls.getClassAnnotation(names[i]) != null) {
                 ctx.error(cls, shown[i] + " on interface " + cls.getSourceName() + " is not "
@@ -2778,6 +2809,16 @@ final class BackendBeans {
                 warnInheritedOutsideClassAspect(cls, classTx != null ? "@Transactional"
                         : "@Async");
             }
+            refuseUnsupportedSecurity(cls);
+            String[] classSecurityShown = new String[1];
+            AnnotationValues classSecurity = methodSecurity(cls.getClassAnnotations(), cls,
+                    classSecurityShown);
+            if (classSecurity != null && !PERMIT_ALL.equals(classSecurity.getDescriptor())) {
+                // The one that matters most to hear about: an inherited method of
+                // a guarded class is open.
+                warnInheritedOutsideClassAspect(cls, classSecurityShown[0]);
+            }
+            boolean usesSecurity = classSecurity != null;
             Aspects found = null;
             for (MethodInfo m : cls.getMethods()) {
                 if (m.isConstructor() || m.isSynthetic() || "<clinit>".equals(m.getName())
@@ -2807,10 +2848,33 @@ final class BackendBeans {
                 }
                 AnnotationValues timed = m.getAnnotation(TIMED);
                 AnnotationValues counted = m.getAnnotation(COUNTED);
-                if (tx == null && async == null && timed == null && counted == null) {
+                String where = cls.getSourceName() + "." + m.getName();
+                AnnotationValues security = methodSecurity(m.getAnnotations(), cls, null);
+                boolean lifecycle = m.getAnnotation(POST_CONSTRUCT) != null
+                        || m.getAnnotation(PRE_DESTROY) != null || m.getAnnotation(BEAN) != null
+                        || m.getAnnotation(AUTOWIRED) != null;
+                if (security != null) {
+                    usesSecurity = true;
+                    if (lifecycle && !PERMIT_ALL.equals(security.getDescriptor())) {
+                        ctx.error(cls, where + " is called by the server while it builds and "
+                                + "destroys its beans, with nobody signed in, so an "
+                                + "authorization annotation on it could only ever refuse. "
+                                + "Remove it.");
+                        continue;
+                    }
+                } else if (classSecurity != null && m.isPublic() && !m.isStatic() && !lifecycle) {
+                    // The class's default covers the public methods it declares,
+                    // but not the ones the server itself calls on the bean -- as
+                    // Spring calls those on the object, not through its proxy.
+                    security = classSecurity;
+                }
+                if (security != null && PERMIT_ALL.equals(security.getDescriptor())) {
+                    security = null;
+                }
+                if (tx == null && async == null && timed == null && counted == null
+                        && security == null) {
                     continue;
                 }
-                String where = cls.getSourceName() + "." + m.getName();
                 if (m.isAbstract() || (m.getAccess() & Opcodes.ACC_NATIVE) != 0) {
                     ctx.error(cls, where + " is " + (m.isAbstract() ? "abstract" : "native")
                             + ", so there is no body to wrap. Annotate the implementation.");
@@ -2835,6 +2899,9 @@ final class BackendBeans {
                     aspects.put(cls.getInternalName(), found);
                 }
                 Aspect a = new Aspect(m);
+                if (security != null) {
+                    compileSecurity(cls, m, security, a, where);
+                }
                 a.transactional = tx;
                 a.async = async;
                 a.timed = timed;
@@ -2846,6 +2913,134 @@ final class BackendBeans {
                             + "Cn1Async" + found.methods.size());
                 }
                 found.methods.add(a);
+            }
+            if (usesSecurity && !hasSecurityChains()) {
+                ctx.error(cls, cls.getSourceName() + " uses method security, and this module "
+                        + "has no SecurityFilterChain bean: without a chain nobody ever signs "
+                        + "in, so every guarded method would refuse every caller. Declare "
+                        + "one -- a @Bean method that takes an HttpSecurity and returns "
+                        + "http.build() -- or remove the annotations.");
+            }
+        }
+    }
+
+    /// The simple name of a Spring Security annotation the build has nothing
+    /// for, or null.
+    private static String unsupportedSecurity(String descriptor) {
+        for (String name : UNSUPPORTED_SECURITY) {
+            if (descriptor.endsWith("/" + name + ";")) {
+                return name;
+            }
+        }
+        return null;
+    }
+
+    private void refuseUnsupportedSecurity(AnnotatedClass cls) {
+        for (String d : cls.getClassAnnotations().keySet()) {
+            refuseUnsupportedSecurity(cls, d, cls.getSourceName());
+        }
+        for (MethodInfo m : cls.getMethods()) {
+            for (String d : m.getAnnotations().keySet()) {
+                refuseUnsupportedSecurity(cls, d, cls.getSourceName() + "." + m.getName());
+            }
+        }
+    }
+
+    private void refuseUnsupportedSecurity(AnnotatedClass cls, String descriptor, String where) {
+        String name = unsupportedSecurity(descriptor);
+        if (name == null) {
+            return;
+        }
+        ctx.error(cls, "@" + name + " on " + where + " is not supported: " + ("PostAuthorize"
+                .equals(name) ? "the check is compiled in before the method runs and never "
+                + "sees what it returns. Decide from the arguments with @PreAuthorize, or "
+                + "check the result in the method and throw AccessDeniedException."
+                : "the build does not rewrite a method's collections. Filter in the method, "
+                + "or in the query that loads them."));
+    }
+
+    /// The one method-security annotation among `annotations`, or null. More
+    /// than one is an error when `where` is given: which of two rules wins is
+    /// not something to leave to an order nobody wrote down.
+    private AnnotationValues methodSecurity(Map<String, AnnotationValues> annotations,
+                                            AnnotatedClass where, String[] shown) {
+        AnnotationValues found = null;
+        String foundShown = null;
+        for (int i = 0; i < METHOD_SECURITY.length; i++) {
+            AnnotationValues v = annotations.get(METHOD_SECURITY[i]);
+            if (v == null) {
+                continue;
+            }
+            if (found != null && where != null) {
+                ctx.error(where, where.getSourceName() + " carries both " + foundShown + " and "
+                        + METHOD_SECURITY_SHOWN[i] + " on one element; one rule decides a "
+                        + "call. Combine them in one @PreAuthorize expression.");
+                return found;
+            }
+            if (found == null) {
+                found = v;
+                foundShown = METHOD_SECURITY_SHOWN[i];
+            }
+        }
+        if (shown != null) {
+            shown[0] = foundShown;
+        }
+        return found;
+    }
+
+    /// Turns `security` into the Java expression `a`'s woven check evaluates.
+    private void compileSecurity(AnnotatedClass cls, MethodInfo m, AnnotationValues security,
+                                 Aspect a, String where) {
+        String d = security.getDescriptor();
+        if (DENY_ALL.equals(d)) {
+            a.security = "false";
+            return;
+        }
+        if (SECURED.equals(d) || ROLES_ALLOWED.equals(d)) {
+            boolean roles = ROLES_ALLOWED.equals(d);
+            List<String> names = new ArrayList<String>();
+            for (String name : strings(security.get("value"))) {
+                String trimmed = name.trim();
+                if (trimmed.length() > 0) {
+                    names.add(roles && !trimmed.startsWith("ROLE_") ? "ROLE_" + trimmed : trimmed);
+                }
+            }
+            if (names.isEmpty()) {
+                ctx.error(cls, (roles ? "@RolesAllowed" : "@Secured") + " on " + where
+                        + " names nothing, so nobody could call it; use @DenyAll to say that.");
+                return;
+            }
+            a.security = MethodSecurityCompiler.anyAuthority(names);
+            return;
+        }
+        try {
+            MethodSecurityCompiler.Result compiled = new MethodSecurityCompiler(this, cls, m)
+                    .compile(security.getStringOrDefault("value", ""));
+            a.security = compiled.java;
+            a.securityBeans = compiled.beans;
+            namedBeans.addAll(compiled.beans.keySet());
+        } catch (MethodSecurityCompiler.Refused refused) {
+            ctx.error(cls, "@PreAuthorize(\"" + security.getStringOrDefault("value", "")
+                    + "\") on " + where + ": " + refused.getMessage() + ".");
+        }
+    }
+
+    /// For a test's wiring: the beans the application's expressions call, which
+    /// the main build compiled the checks against and this wiring must register
+    /// under the same names.
+    private void collectNamedBeans() {
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            AnnotationValues onClass = cls.getClassAnnotation(PRE_AUTHORIZE);
+            if (onClass != null) {
+                namedBeans.addAll(MethodSecurityCompiler.beanNames(
+                        onClass.getStringOrDefault("value", "")));
+            }
+            for (MethodInfo m : cls.getMethods()) {
+                AnnotationValues onMethod = m.getAnnotation(PRE_AUTHORIZE);
+                if (onMethod != null) {
+                    namedBeans.addAll(MethodSecurityCompiler.beanNames(
+                            onMethod.getStringOrDefault("value", "")));
+                }
             }
         }
     }

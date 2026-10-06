@@ -51,6 +51,12 @@ final class Access extends SecurityAccess {
     }
 
     @Override
+    public Authentication current() {
+        SecurityContext context = SecurityContextHolder.peek();
+        return context == null ? null : context.getAuthentication();
+    }
+
+    @Override
     public Object principal() {
         SecurityContext context = SecurityContextHolder.peek();
         Authentication authentication = context == null ? null : context.getAuthentication();

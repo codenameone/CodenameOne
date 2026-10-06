@@ -1866,7 +1866,13 @@ public final class Backend {
             WiringEnvironment environment = null;
             if (application != null) {
                 environment = new WiringEnvironment(config, pool, manager, tools, managedBeans);
+                // Before the beans are built, so one that is called while they
+                // are -- from a @PostConstruct -- finds what is registered so
+                // far; and again after, which is what publishes the finished map
+                // to the threads that serve.
+                tasks.namedBeans(environment.namedBeans());
                 HttpServer.Handler[] built = application.create(environment);
+                tasks.namedBeans(environment.namedBeans());
                 if (built != null) {
                     for (HttpServer.Handler element : built) {
                         if (element != null) {

@@ -43,6 +43,7 @@ public final class WiringEnvironment {
     final List gauges = new ArrayList();
     /// {Integer order, chain}, in the order they were registered.
     private final List securityChains = new ArrayList();
+    private final java.util.Map namedBeans = new java.util.HashMap();
 
     public WiringEnvironment(Config config, DataSource dataSource, EntityManager entities,
                 List tools, List managed) {
@@ -101,6 +102,20 @@ public final class WiringEnvironment {
             }
         }
         managed.add(bean);
+    }
+
+    /// Makes a bean reachable by name from woven code: the bean an authorization
+    /// expression calls. Generated code calls this once the beans are built; a
+    /// conditional bean that is off is null and is not registered.
+    public void registerNamedBean(String name, Object bean) {
+        if (bean != null) {
+            namedBeans.put(name, bean);
+        }
+    }
+
+    /// The beans registered with [#registerNamedBean], by name.
+    public java.util.Map namedBeans() {
+        return namedBeans;
     }
 
     /// Hands the server a `SecurityFilterChain` bean and its `@Order`. Generated

@@ -336,6 +336,11 @@ final class Access extends BackendAccess {
     }
 
     @Override
+    public Object namedBean(String name) {
+        return Tasks.namedBean(name);
+    }
+
+    @Override
     public List executorsOf(Collection servers) {
         return Tasks.executorsOf(servers);
     }

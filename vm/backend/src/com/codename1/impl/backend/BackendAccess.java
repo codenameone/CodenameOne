@@ -252,6 +252,12 @@ public abstract class BackendAccess {
     /// The named executor of the calling thread's server, created on first use.
     public abstract TaskExecutor executor(String name, int kind);
 
+    /// The bean the wiring of the calling thread's server registered under
+    /// `name` with [WiringEnvironment#registerNamedBean], or null. Asked on every
+    /// call and never cached in a static: two servers in one process each have
+    /// their own beans.
+    public abstract Object namedBean(String name);
+
     /// Every executor of the given servers.
     public abstract List executorsOf(Collection servers);
 }

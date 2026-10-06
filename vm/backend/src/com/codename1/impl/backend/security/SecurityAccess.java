@@ -86,6 +86,10 @@ public abstract class SecurityAccess {
     /// Who the calling thread's request is from, or null when nobody signed in.
     public abstract Authentication authentication();
 
+    /// The authentication of the calling thread's request as its context holds
+    /// it, the anonymous one included; null when the thread has no context.
+    public abstract Authentication current();
+
     /// The principal of the calling thread's request, the anonymous one included.
     public abstract Object principal();
 

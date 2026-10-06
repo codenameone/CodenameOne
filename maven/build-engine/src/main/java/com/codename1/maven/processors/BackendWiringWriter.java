@@ -257,6 +257,16 @@ final class BackendWiringWriter {
                   .append(", ").append(b.order).append(");\n");
             }
         }
+        for (String name : model.namedBeans) {
+            BackendBeans.Bean b = model.byName.get(name);
+            if (b != null && b.isEager()) {
+                // What an authorization expression calls as @name: reached
+                // through the server the calling thread works for, since a
+                // process may hold several.
+                sb.append("        environment.registerNamedBean(")
+                  .append(BackendSources.quote(name)).append(", ").append(b.var).append(");\n");
+            }
+        }
         for (BackendBeans.Bean b : model.beans) {
             if (b.managed == null && b.tools.isEmpty()) {
                 continue;
