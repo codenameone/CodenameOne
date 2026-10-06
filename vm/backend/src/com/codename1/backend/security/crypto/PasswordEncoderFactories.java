@@ -32,7 +32,8 @@ public final class PasswordEncoderFactories {
     }
 
     /// A [DelegatingPasswordEncoder] that encodes with `{pbkdf2-sha256}` and
-    /// also verifies `{bcrypt}` and, on a development profile, `{noop}`.
+    /// also verifies `{bcrypt}`, Spring's `{pbkdf2}` and
+    /// `{pbkdf2@SpringSecurity_v5_8}` and, on a development profile, `{noop}`.
     public static PasswordEncoder createDelegatingPasswordEncoder() {
         // Spring's default here is bcrypt, and this is deliberately not.
         // PBKDF2-HMAC-SHA256 is the one password hash this runtime computes in
@@ -49,6 +50,11 @@ public final class PasswordEncoderFactories {
         Map<String, PasswordEncoder> encoders = new LinkedHashMap<String, PasswordEncoder>();
         encoders.put(encodingId, new Pbkdf2Sha256PasswordEncoder());
         encoders.put("bcrypt", new BCryptPasswordEncoder());
+        // What a Spring application's user table holds under these two ids,
+        // read as Spring reads them.
+        encoders.put("pbkdf2", Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_5());
+        encoders.put("pbkdf2@SpringSecurity_v5_8",
+                Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8());
         encoders.put("noop", NoOpPasswordEncoder.getInstance());
         return new DelegatingPasswordEncoder(encodingId, encoders);
     }

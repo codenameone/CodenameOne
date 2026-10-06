@@ -34,8 +34,8 @@ import java.io.IOException;
 /// ```
 ///
 /// Registered as `{pbkdf2-sha256}`, the scheme new passwords get. It is not the
-/// format of Spring's `Pbkdf2PasswordEncoder`, whose `{pbkdf2}` hashes this does
-/// not read.
+/// format of Spring's `Pbkdf2PasswordEncoder`; [Pbkdf2PasswordEncoder] reads
+/// that one's `{pbkdf2}` hashes.
 public final class Pbkdf2Sha256PasswordEncoder implements PasswordEncoder {
     @Override
     public String encode(CharSequence rawPassword) {
