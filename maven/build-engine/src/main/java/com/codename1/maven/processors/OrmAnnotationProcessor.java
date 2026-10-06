@@ -70,6 +70,8 @@ import java.util.zip.ZipFile;
 public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     public static final String ENTITY_DESC = "Lcom/codename1/annotations/Entity;";
+    /// A Java migration, registered beside the project's migration scripts.
+    static final String MIGRATION_DESC = "Lcom/codename1/annotations/db/Migration;";
     public static final String ID_DESC = "Lcom/codename1/annotations/Id;";
     public static final String COLUMN_DESC = "Lcom/codename1/annotations/Column;";
     public static final String DB_TRANSIENT_DESC = "Lcom/codename1/annotations/DbTransient;";
@@ -99,8 +101,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     static {
         Set<String> s = new LinkedHashSet<String>();
         s.add(ENTITY_DESC);
+        s.add(MIGRATION_DESC);
         DESCRIPTORS = Collections.unmodifiableSet(s);
     }
+
+    /// The `@Migration` classes of this module, collected for [MigrationGenerator].
+    private final java.util.List<MigrationGenerator.Item> javaMigrations =
+            new java.util.ArrayList<MigrationGenerator.Item>();
 
     private final TreeMap<String, EntityClass> accepted = new TreeMap<String, EntityClass>();
 
@@ -131,6 +138,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
         accepted.clear();
+        javaMigrations.clear();
         try { dependencyOverlays=OrmEnhancer.prepare(ctx); }
         catch(IOException error) { throw new ProcessingException("Could not refresh enhanced dependencies",error); }
         if (forcedFlavour != null) {
@@ -266,6 +274,48 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         processClass(cls, ctx, true);
     }
 
+    /// Records a `@Migration` class for the generated migration set.
+    ///
+    /// Only this module's own: a migration belongs to the application that ships it, and
+    /// one found on the classpath of a second module would run there too.
+    private void collectJavaMigration(AnnotatedClass cls, ProcessorContext ctx) {
+        // The same stale-class rule entities follow: a deleted source leaves its
+        // annotated class file in target/classes until somebody runs clean.
+        if (!BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(),
+                ctx.getSourceEncoding())) {
+            return;
+        }
+        AnnotationValues values = cls.getClassAnnotation(MIGRATION_DESC);
+        String version = values.getString("version");
+        String description = values.getString("description");
+        if (version == null || !MigrationGenerator.isVersion(version)) {
+            ctx.error(cls, "@Migration on " + cls.getBinaryName() + " needs a version made of digits "
+                    + "separated by dots, such as \"4\" or \"2026.05.21\"; got " + version);
+            return;
+        }
+        if (description == null || description.trim().length() == 0) {
+            ctx.error(cls, "@Migration on " + cls.getBinaryName() + " needs a description");
+            return;
+        }
+        if (cls.isInterface() || cls.isAbstract() || !cls.isPublic()
+                || !cls.getSourceName().equals(cls.getBinaryName())) {
+            ctx.error(cls, "@Migration " + cls.getBinaryName() + " must be a public, concrete, top-level "
+                    + "class with a public no-argument constructor: the generated migration set "
+                    + "constructs it by name.");
+            return;
+        }
+        if (!cls.getInterfaceInternalNames().contains("com/codename1/migration/JavaMigration")) {
+            ctx.error(cls, "@Migration " + cls.getBinaryName()
+                    + " must implement com.codename1.migration.JavaMigration");
+            return;
+        }
+        MigrationGenerator.Item item = new MigrationGenerator.Item();
+        item.version = version.replace('_', '.');
+        item.description = description;
+        item.javaClass = cls.getBinaryName();
+        javaMigrations.add(item);
+    }
+
     /// @param fromThisModule whether `cls` came out of this module's own
     ///     `target/classes`, and so must still have a source file behind it.
     ///     False for the classpath scan, whose entities live in a DEPENDENCY and
@@ -274,6 +324,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             throws ProcessingException {
         if (cls.isSynthetic()) return;
         if (fromThisModule && dependencyOverlays.contains(cls.getBinaryName())) return;
+        if (fromThisModule && cls.getClassAnnotation(MIGRATION_DESC) != null) {
+            collectJavaMigration(cls, ctx);
+        }
         AnnotationValues entityAnn = cls.getClassAnnotation(ENTITY_DESC);
         if (entityAnn == null) return;
         // A DELETED ENTITY LEAVES ITS CLASS FILE BEHIND. Maven does not clean
@@ -713,12 +766,21 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 ctx.error("Sequence name conflicts with schema object: "+entity.generator);
         }
         if (ctx.hasErrors()) return;
-        if (accepted.isEmpty()) {
+        // The migration scripts ride the same bootstrap the daos do: it is the one
+        // generated class every build path already knows how to find and invoke, so
+        // a project with scripts and no entity still gets one.
+        java.util.List<MigrationGenerator.Item> migrations = MigrationGenerator.scan(ctx, backend);
+        MigrationGenerator.addJava(ctx, migrations, javaMigrations);
+        if (ctx.hasErrors()) return;
+        if (accepted.isEmpty() && migrations.isEmpty()) {
             removeAStaleBootstrap(ctx);
             return;
         }
 
         Map<String, String> sources = new LinkedHashMap<String, String>();
+        if (!migrations.isEmpty()) {
+            sources.put(MigrationGenerator.binaryName(backend), MigrationGenerator.source(migrations, backend));
+        }
         for (EntityClass ec : accepted.values()) {
             if (backend && wouldReplaceAnExistingClass(ec.daoBinaryName,
                     "dao for " + ec.binaryName, ctx)) {
@@ -743,7 +805,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // developer to rename a class they never wrote. It carries the marker
         // regardless, which is what makes its provenance readable.
         sources.put(backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY,
-                generateBootstrapSource(accepted.values(), backend));
+                generateBootstrapSource(accepted.values(), backend, !migrations.isEmpty()));
         try {
             java.util.List<java.io.File> cp = new java.util.ArrayList<java.io.File>();
             cp.add(ctx.getOutputClassDir());
@@ -763,7 +825,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         ctx.getLog().info("cn1: generated " + accepted.size() + " @Entity "
                 + (backend ? "server-side " : "") + "dao(s) + "
-                + (backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY));
+                + (backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY)
+                + (migrations.isEmpty() ? "" : " + " + migrations.size() + " migration(s) in "
+                        + MigrationGenerator.binaryName(backend)));
     }
 
     // ---------------------------------------------------------------
@@ -2288,7 +2352,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
-    private static String generateBootstrapSource(Iterable<EntityClass> classes, boolean backend) {
+    private static String generateBootstrapSource(Iterable<EntityClass> classes, boolean backend,
+            boolean migrations) {
         StringBuilder sb = new StringBuilder(1024);
         sb.append("package ").append(BOOTSTRAP_PACKAGE).append(";\n\n");
         sb.append("// Auto-generated by cn1:process-annotations. Do not edit.\n");
@@ -2319,6 +2384,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         sb.append("    public ").append(simple).append("() {\n");
         for (EntityClass ec : classes) {
             sb.append("        ").append(ec.daoBinaryName).append(".register();\n");
+        }
+        if (migrations) {
+            // By direct reference, like the daos: nothing may look the set up by name.
+            sb.append("        ").append(backend ? "com.codename1.backend.Migrations" : "com.codename1.db.Migrations")
+                    .append(".register(").append(MigrationGenerator.binaryName(backend)).append(".create());\n");
         }
         sb.append("    }\n");
         sb.append("}\n");

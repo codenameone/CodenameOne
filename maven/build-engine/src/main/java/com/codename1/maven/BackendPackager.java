@@ -550,6 +550,11 @@ public class BackendPackager {
             return;
         }
         try {
+            // NOT the migration scripts. The build compiles those into a class (see
+            // MigrationGenerator), so the copy here would be dead weight in the
+            // translator input and would trip the warning below over files the
+            // server never reads from the classpath.
+            compiledInResources = new File(processed, "db" + File.separator + "migration");
             int staged = copyNonClasses(processed, classes);
             // Staged is not the same as READABLE, and the difference is silent.
             // These files reach the translator, so anything that reads them at
@@ -577,6 +582,9 @@ public class BackendPackager {
         }
     }
 
+    /** A processed-resources directory that is not staged; see stageResources. */
+    private File compiledInResources;
+
     /** @return how many non-class files were copied. */
     private int copyNonClasses(File from, File to) throws IOException {
         if (from == null || !from.isDirectory()) {
@@ -590,6 +598,9 @@ public class BackendPackager {
         for (File child : children) {
             File target = new File(to, child.getName());
             if (child.isDirectory()) {
+                if (child.equals(compiledInResources)) {
+                    continue;
+                }
                 target.mkdirs();
                 copied += copyNonClasses(child, target);
             } else if (!child.getName().endsWith(".class")) {
