@@ -108,23 +108,29 @@ final class FilterChainEngine implements RequestSecurity {
     }
 
     @Override
-    public int upgrade(HttpServer.Request request) throws Exception {
+    public HttpServer.Response upgrade(HttpServer.Request request) throws Exception {
         SecurityFilterChain chain = begin(request);
         if (chain == null) {
-            return SecurityExchange.of(request) != null ? 400 : 0;
+            return SecurityExchange.of(request) != null ? Responses.status(400, "Bad Request")
+                    : null;
         }
         HttpServer.Response response = run(chain, request, ADMIT);
         if (response == ADMITTED) { //NOPMD CompareObjectsWithEquals - the marker itself
-            return 0;
+            return null;
         }
         int status = response == null ? 404 : response.getStatus();
         if (status >= 300 && status < 400) {
             // A redirect to a login page: a socket cannot follow one, and what
             // it means is "sign in first".
-            return 401;
+            return Responses.status(401, "Unauthorized");
         }
-        // A filter that answered the handshake itself did not admit it.
-        return status < 400 ? 403 : status;
+        if (status < 400) {
+            // A filter that answered the handshake itself did not admit it.
+            return Responses.status(403, "Forbidden");
+        }
+        // What the chain's entry point or access-denied handler answered, as
+        // it answered it: the challenge is how the client learns what to send.
+        return response;
     }
 
     /// Starts serving `request`: the chain that guards it, or null -- with the

@@ -50,9 +50,11 @@ public interface RequestSecurity {
     /// [#leave].
     void decorate(HttpServer.Request request, HttpServer.Response response);
 
-    /// Decides a WebSocket handshake: 0 to let it reach its endpoint, otherwise
-    /// the status to refuse it with.
-    int upgrade(HttpServer.Request request) throws Exception;
+    /// Decides a WebSocket handshake: null to let it reach its endpoint,
+    /// otherwise the response to refuse it with -- what the chain's entry point
+    /// or access-denied handler answered, challenge included. The caller copies
+    /// it before [#decorate] writes into it.
+    HttpServer.Response upgrade(HttpServer.Request request) throws Exception;
 
     /// Called before a request, or a WebSocket handshake, is looked at: what the
     /// calling thread holds from before it, to hand to [#leave]. Null -- nothing

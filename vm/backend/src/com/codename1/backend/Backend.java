@@ -902,9 +902,9 @@ public final class Backend {
         /// session it touched is stored and released before a fallback router
         /// looks at the request again.
         @Override
-        public int checkUpgrade(HttpServer.Request request) {
+        public HttpServer.Response checkUpgrade(HttpServer.Request request) {
             if (security == null) {
-                return 0;
+                return null;
             }
             request.sessions = sessions;
             inFlight.enter();
@@ -913,10 +913,22 @@ public final class Backend {
             Object previousServing = HttpSession.enterRequest(request);
             Object previousSecurity = security.enter();
             try {
-                return security.upgrade(request);
+                HttpServer.Response refused = security.upgrade(request);
+                if (refused == null) {
+                    return null;
+                }
+                // A copy, as for any response: an entry point may answer every
+                // request with one object, and the headers below are written
+                // into what is sent. Then what the chain writes on every
+                // answer -- the security headers, a cookie a filter recorded --
+                // so a refused handshake is answered as the same request over
+                // plain HTTP would have been.
+                refused = refused.withHeaders(refused.extraHeaders);
+                security.decorate(request, refused);
+                return refused;
             } catch (Exception err) {
                 System.err.println("websocket security check failed: " + err);
-                return 500;
+                return HttpServer.Response.text(500, "internal error");
             } finally {
                 try {
                     finishHandshakeSessions(sessions, request);

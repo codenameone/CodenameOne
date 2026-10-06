@@ -71,9 +71,10 @@ class SecuritySlotTest {
         }
 
         @Override
-        public int upgrade(HttpServer.Request request) {
+        public HttpServer.Response upgrade(HttpServer.Request request) {
             upgrades.add(request.getTarget());
-            return request.getHeader("X-User") == null ? 401 : 0;
+            return request.getHeader("X-User") == null
+                    ? HttpServer.Response.text(401, "who are you") : null;
         }
 
         @Override

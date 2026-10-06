@@ -1497,9 +1497,12 @@ public final class HttpServer {
     /// met none of what guards the HTTP routes beside it. Package-private: only
     /// Backend's chain is one.
     interface UpgradeGuard {
-        /// 0 to let the handshake reach its endpoint, otherwise the status it is
-        /// refused with.
-        int checkUpgrade(Request request);
+        /// Null to let the handshake reach its endpoint, otherwise the answer it
+        /// is refused with: a whole response -- its status, and the headers that
+        /// tell the client what to do about it, a `WWW-Authenticate` challenge
+        /// above all. The server writes it as the HTTP response it is and
+        /// closes the connection; the response is the caller's to write into.
+        Response checkUpgrade(Request request);
     }
 
     /// A handler that knows whose word is taken for where a request came from;
@@ -4544,9 +4547,9 @@ public final class HttpServer {
         // nothing about which paths have an endpoint behind them -- an HTTP
         // request to a path that does not exist is refused the same way.
         if (handler instanceof UpgradeGuard) {
-            int refused = ((UpgradeGuard) handler).checkUpgrade(request);
-            if (refused != 0) {
-                writeStatusOnly(conn, refused, null);
+            Response refused = ((UpgradeGuard) handler).checkUpgrade(request);
+            if (refused != null) {
+                writeRefusedUpgrade(conn, fd, session, refused);
                 return false;
             }
         }
@@ -7386,6 +7389,34 @@ public final class HttpServer {
             return request.headerContains("connection", "keep-alive");
         }
         return !request.headerContains("connection", "close");
+    }
+
+    /// Answers a handshake its guard refused with the response the guard made:
+    /// an ordinary HTTP response, headers and body, on a connection that then
+    /// closes. Nothing of the upgrade has happened yet -- no 101 was sent, the
+    /// descriptor is still an HTTP connection's -- so the client reads a
+    /// complete answer and an end of stream, never half a socket.
+    private void writeRefusedUpgrade(Conn conn, int fd, long session, Response refused) {
+        int status = refused.status;
+        if (status < 300 || refused.fileFd >= 0) {
+            // Not a refusal anybody can act on: a guard that answered 200, or
+            // with a file. The handshake is refused all the same.
+            refused.discard();
+            writeStatusOnly(conn, 403, null);
+            return;
+        }
+        try {
+            if (refused.hasDeferredJson) {
+                conn.bodySink.reset();
+                Json.write(refused.deferredJson, conn.bodySink);
+            }
+            writeResponse(conn, fd, session, refused, false, false);
+            conn.writtenStatus = status;
+        } catch (IOException err) {
+            // The peer is already gone; there is nowhere to report this.
+        } catch (RuntimeException err) {
+            System.err.println("a refused websocket handshake could not be answered: " + err);
+        }
     }
 
     private void writeStatusOnly(Conn conn, int status, String message) {
