@@ -29,6 +29,8 @@ import com.codename1.backend.security.core.userdetails.UserDetailsPasswordServic
 import com.codename1.backend.security.core.userdetails.UserDetailsService;
 import com.codename1.backend.security.crypto.PasswordEncoder;
 import com.codename1.backend.security.crypto.PasswordEncoderFactories;
+import com.codename1.backend.security.ratelimit.RateLimitKeyResolver;
+import com.codename1.backend.security.ratelimit.RateLimiter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -69,6 +71,10 @@ public final class HttpSecurity {
     public static final String USER_PASSWORD = "cn1.security.user.password";
     /// That user's roles, separated by commas.
     public static final String USER_ROLES = "cn1.security.user.roles";
+    /// The most passwords checked at one time; a sign-in beyond that is
+    /// answered 503 at once. No bound unless set. See
+    /// [DaoAuthenticationProvider#setMaxConcurrentPasswordChecks].
+    public static final String PASSWORD_MAX_CONCURRENT = "cn1.security.password.maxConcurrent";
 
     private final Config config;
     private final Object[] beans;
@@ -173,6 +179,44 @@ public final class HttpSecurity {
     public HttpSecurity apiKey(Customizer<ApiKeyConfigurer> customizer) {
         customizer.customize(getOrApply(ApiKeyConfigurer.class));
         return this;
+    }
+
+    /// Limits how often the requests `matcher` matches may be made under one
+    /// key, and answers 429 with `Retry-After` beyond that.
+    ///
+    /// ```java
+    /// http.rateLimit(AntPathRequestMatcher.antMatcher("/login"),
+    ///         RateLimitKeys.clientAddress(), new InMemoryRateLimiter(5, 60));
+    /// http.rateLimit("/api/**", RateLimitKeys.firstOf(RateLimitKeys.apiKeyId(),
+    ///         RateLimitKeys.principal()), new InMemoryRateLimiter(600, 60));
+    /// ```
+    ///
+    /// A limit keyed by something the request has from the start -- its
+    /// client's address, its session -- is applied before anything else in the
+    /// chain. One keyed by who signed in is applied once that is known, and does
+    /// not apply to a request nobody signed in for. Rules are consulted in the
+    /// order given, and a request counts against every rule that matches it up
+    /// to the one that refuses it.
+    ///
+    /// Two rules given the same limiter share its counts for any key they have
+    /// in common; give each its own unless that is what is meant.
+    ///
+    /// @param keyResolver which key a request counts under; see
+    /// [com.codename1.backend.security.ratelimit.RateLimitKeys]
+    /// @param limiter what counts; null for the application's one
+    /// [RateLimiter] bean. [com.codename1.backend.security.ratelimit.InMemoryRateLimiter]
+    /// counts in this process alone.
+    public HttpSecurity rateLimit(RequestMatcher matcher, RateLimitKeyResolver keyResolver,
+                                  RateLimiter limiter) {
+        getOrApply(RateLimitConfigurer.class).add(matcher, keyResolver, limiter);
+        return this;
+    }
+
+    /// [#rateLimit(RequestMatcher, RateLimitKeyResolver, RateLimiter)] for the
+    /// requests whose path matches an Ant pattern.
+    public HttpSecurity rateLimit(String pattern, RateLimitKeyResolver keyResolver,
+                                  RateLimiter limiter) {
+        return rateLimit(new AntPathRequestMatcher(pattern), keyResolver, limiter);
     }
 
     /// Sign-out; see [LogoutConfigurer].
@@ -330,6 +374,12 @@ public final class HttpSecurity {
         filters.add(new Object[] {filterOrder.get(type), filter});
     }
 
+    /// Adds a filter at a place given as a number: for a part whose one filter
+    /// class stands in two places.
+    void addFilterAtOrder(SecurityFilter filter, int order) {
+        filters.add(new Object[] {Integer.valueOf(order), filter});
+    }
+
     /// Something the parts of a chain share, by its class: one set with
     /// [#setSharedObject], or else the one bean of the application that is an
     /// instance of `sharedType`. Null when there is none, or more than one bean.
@@ -443,6 +493,8 @@ public final class HttpSecurity {
             created = new OAuth2ResourceServerConfigurer();
         } else if (type == ApiKeyConfigurer.class) { //NOPMD CompareObjectsWithEquals
             created = new ApiKeyConfigurer();
+        } else if (type == RateLimitConfigurer.class) { //NOPMD CompareObjectsWithEquals
+            created = new RateLimitConfigurer();
         } else {
             throw new IllegalArgumentException("Not a built-in configurer: " + type.getName());
         }
@@ -556,6 +608,7 @@ public final class HttpSecurity {
         }
         if (users != null) {
             DaoAuthenticationProvider dao = new DaoAuthenticationProvider(users);
+            dao.setMaxConcurrentPasswordChecks(maxConcurrentPasswordChecks());
             PasswordEncoder encoder = getSharedObject(PasswordEncoder.class);
             dao.setPasswordEncoder(encoder != null ? encoder
                     : PasswordEncoderFactories.createDelegatingPasswordEncoder());
@@ -572,6 +625,17 @@ public final class HttpSecurity {
             authenticationManager = new ProviderManager(all, parent);
         }
         return authenticationManager;
+    }
+
+    private int maxConcurrentPasswordChecks() {
+        if (config == null) {
+            return 0;
+        }
+        try {
+            return config.getInt(PASSWORD_MAX_CONCURRENT, 0);
+        } catch (java.io.IOException err) {
+            throw new IllegalStateException(err.getMessage(), err);
+        }
     }
 
     /// The one user `cn1.security.user.*` describes, or null.

@@ -51,6 +51,7 @@ public class AuthCheck {
         signatures();
         aesGcm();
         AuthCheckTokens.run();
+        AuthCheckServer.run();
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
             System.out.println("FAIL " + failures.get(iter));

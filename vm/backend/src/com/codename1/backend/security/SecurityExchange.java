@@ -97,7 +97,8 @@ public final class SecurityExchange {
         return request;
     }
 
-    /// Whether the request arrived over TLS this server terminated.
+    /// Whether the request arrived over TLS: terminated by this server, or by
+    /// a proxy it trusts; see [HttpServer.Request#isSecure].
     public boolean isSecure() {
         return secure;
     }

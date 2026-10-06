@@ -2619,6 +2619,113 @@ public class BackendBeansTest {
         }
     }
 
+    /// A chain that takes tokens and API keys, with what verifies each declared
+    /// as beans rather than handed to the DSL.
+    private static Map<String, String> tokenSecured() {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.TokenConfig", SECURED
+                + "import com.codename1.backend.security.apikey.*;\n"
+                + "import com.codename1.backend.security.oauth2.jwt.*;\n"
+                + "import com.codename1.backend.security.ratelimit.*;\n"
+                + "@Configuration public class TokenConfig {\n"
+                + "    public static final byte[] SECRET = new byte[32];\n"
+                + "    public static final GeneratedApiKey KEY =\n"
+                + "            new ApiKeyGenerator().generate(\"ci-bot\", \"deploy\");\n"
+                + "    @Bean public SecurityFilterChain api(HttpSecurity http) {\n"
+                + "        http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())\n"
+                + "            .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))\n"
+                + "            .apiKey(Customizer.withDefaults())\n"
+                + "            .rateLimit(\"/limited\", RateLimitKeys.principal(), null);\n"
+                + "        return http.build();\n"
+                + "    }\n"
+                + "    @Bean public JwtDecoder decoder() {\n"
+                + "        return DefaultJwtDecoder.withSecretKey(SECRET).build();\n"
+                + "    }\n"
+                + "    @Bean public ApiKeyRepository keys() {\n"
+                + "        return new InMemoryApiKeyRepository(KEY.getApiKey());\n"
+                + "    }\n"
+                + "    @Bean public RateLimiter limiter() { return new InMemoryRateLimiter(1, 3600); }\n"
+                + "}\n");
+        s.put("com.example.TokenApi", SECURED
+                + "import com.codename1.backend.security.apikey.ApiKey;\n"
+                + "import com.codename1.backend.security.oauth2.jwt.Jwt;\n"
+                + "@RestController public class TokenApi {\n"
+                + "    @GetMapping(\"/me\") public String me(Authentication who,\n"
+                + "            @AuthenticationPrincipal Jwt jwt, @AuthenticationPrincipal ApiKey key) {\n"
+                + "        return who.getName() + who.getAuthorities() + \" \"\n"
+                + "                + (jwt == null ? \"-\" : jwt.getClaimAsString(\"tenant\")) + \" \"\n"
+                + "                + (key == null ? \"-\" : key.getOwner());\n"
+                + "    }\n"
+                + "    @GetMapping(\"/limited\") public String limited() { return \"ok\"; }\n"
+                + "}\n");
+        return s;
+    }
+
+    private static String bearer(int port, String path, String credential) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + path)
+                .openConnection();
+        if (credential != null) {
+            c.setRequestProperty("Authorization", "Bearer " + credential);
+        }
+        int status = c.getResponseCode();
+        if (status >= 400) {
+            return status + " " + c.getHeaderField("WWW-Authenticate") + " "
+                    + c.getHeaderField("Retry-After");
+        }
+        return read(c);
+    }
+
+    @Test
+    public void tokenAndApiKeyBeansReachTheChainThatAsksForThem() throws Exception {
+        File classes = compile(tokenSecured());
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(classes, proc));
+        String wiring = proc.generateWiring("com.example");
+        // The decoder, the key repository and the limiter are handed to the
+        // HttpSecurity, which picks each by its type.
+        assertTrue(wiring, wiring.contains(
+                "SecuritySupport.http(config, new Object[] {b_decoder, b_keys, b_limiter})"));
+
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        BackendApplication app = (BackendApplication) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        Object generated = loader.loadClass("com.example.TokenConfig").getField("KEY").get(null);
+        String apiKey = (String) generated.getClass().getMethod("getPlaintext").invoke(generated);
+        long now = System.currentTimeMillis() / 1000L;
+        String token = new com.codename1.backend.security.oauth2.jwt.DefaultJwtEncoder(
+                com.codename1.backend.security.crypto.JwkSet.of(
+                        com.codename1.backend.security.crypto.Jwk.ofSecret(new byte[32])))
+                .encode(com.codename1.backend.security.oauth2.jwt.JwtEncoderParameters.from(
+                        com.codename1.backend.security.oauth2.jwt.JwtClaimsSet.builder()
+                                .subject("ada").expiresAt(now + 300).claim("scope", "read")
+                                .claim("tenant", "acme").build())).getTokenValue();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend.Builder builder = withApplication(Backend.builder(Config.of(settings, "test")).quiet(),
+                app);
+        BackendAccess.get().security(builder);
+        Backend backend = builder.start();
+        try {
+            // A JWT: the principal is the Jwt, and is not an ApiKey.
+            assertEquals("ada[SCOPE_read] acme -", bearer(port, "/me", token));
+            // An API key: the other way round.
+            assertEquals("ci-bot[SCOPE_deploy] - ci-bot", bearer(port, "/me", apiKey));
+            assertEquals("401 Bearer null", bearer(port, "/me", null));
+            assertTrue(bearer(port, "/me", "cn1_wrong").startsWith(
+                    "401 Bearer error=\"invalid_token\", error_description=\"The API key is not valid\""));
+            assertTrue(bearer(port, "/me", "a.b.c").startsWith("401 Bearer error=\"invalid_token\""));
+            // The RateLimiter bean, keyed by who signed in.
+            assertEquals("ok", bearer(port, "/limited", token));
+            assertEquals("429 null 3600", bearer(port, "/limited", token));
+            assertEquals("ok", bearer(port, "/limited", apiKey));
+        } finally {
+            backend.stop();
+        }
+    }
+
     @Test
     public void aServerWithoutAChainLinksNoSecurity() throws Exception {
         Map<String, String> plain = new LinkedHashMap<String, String>();

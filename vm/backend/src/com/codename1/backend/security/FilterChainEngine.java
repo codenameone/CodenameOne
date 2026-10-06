@@ -131,7 +131,9 @@ final class FilterChainEngine implements RequestSecurity {
     /// exchange left in place when the request is refused outright, and removed
     /// when no chain claims it.
     private SecurityFilterChain begin(HttpServer.Request request) {
-        SecurityExchange exchange = new SecurityExchange(request, tls);
+        // Over TLS this server terminated, or TLS a trusted proxy did: see
+        // HttpServer.Request.isSecure.
+        SecurityExchange exchange = new SecurityExchange(request, tls || request.isSecure());
         SecurityExchange.enter(exchange);
         if (!wellFormed(SecurityExchange.path(request))) {
             return null;
@@ -153,6 +155,11 @@ final class FilterChainEngine implements RequestSecurity {
             return outside(chain, request, err, 401, "Unauthorized");
         } catch (AccessDeniedException err) {
             return outside(chain, request, err, 403, "Forbidden");
+        } catch (ServiceBusyException busy) {
+            // Turned away before it cost anything: the client is told to come
+            // back, and nothing about why it would have been refused.
+            return Responses.status(503, "Service Unavailable")
+                    .header("Retry-After", String.valueOf(busy.getRetryAfterSeconds()));
         }
     }
 
@@ -183,7 +190,7 @@ final class FilterChainEngine implements RequestSecurity {
         if (chain == null) {
             return;
         }
-        ResponseHeaders headers = new ResponseHeaders(response, tls);
+        ResponseHeaders headers = new ResponseHeaders(response, tls || request.isSecure());
         List<String[]> recorded = exchange == null ? null : exchange.responseHeaders();
         if (recorded != null) {
             for (String[] header : recorded) {

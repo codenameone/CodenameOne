@@ -28,6 +28,7 @@ import com.codename1.backend.security.core.userdetails.UserDetailsService;
 import com.codename1.backend.security.core.userdetails.UsernameNotFoundException;
 import com.codename1.backend.security.crypto.PasswordEncoder;
 import com.codename1.backend.security.crypto.PasswordEncoderFactories;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /// Checks a username and password against a [UserDetailsService]: loads the user,
 /// compares the password through a [PasswordEncoder], and refuses an account
@@ -47,6 +48,11 @@ public class DaoAuthenticationProvider implements AuthenticationProvider {
     private boolean hideUserNotFoundExceptions = true;
     /// The hash a missing user's password is compared with; made on first use.
     private String userNotFoundEncodedPassword;
+    /// Password checks under way in this process, whichever provider started
+    /// them: the processor they compete for is one.
+    private static final AtomicInteger CHECKING = new AtomicInteger();
+    /// See [#setMaxConcurrentPasswordChecks]; 0 for no bound.
+    private int maxConcurrentPasswordChecks;
 
     public DaoAuthenticationProvider() {
         this.passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
@@ -86,6 +92,47 @@ public class DaoAuthenticationProvider implements AuthenticationProvider {
         this.userDetailsPasswordService = service;
     }
 
+    /// The most password checks this provider lets run in the process at one
+    /// time. A sign-in that would be one more is refused at once with a
+    /// [ServiceBusyException], which a chain answers 503 with `Retry-After`;
+    /// no bound unless set, or with `cn1.security.password.maxConcurrent` for
+    /// the provider a chain makes itself.
+    ///
+    /// Checking a password is tens of milliseconds of processor that cannot be
+    /// interrupted, on purpose. A request's thread is cheap while it waits on
+    /// a socket, and is not while it hashes: every check holds one of the
+    /// server's few host threads for its whole length. Without a bound, a burst
+    /// of sign-ins -- or somebody guessing passwords -- takes them all, and
+    /// every other request waits behind work it has nothing to do with. With
+    /// one, the sign-ins beyond it are told to come back, and the rest of the
+    /// server stays quick.
+    ///
+    /// The bound never queues: a queue of password checks is the same pile of
+    /// work, served later to clients that have already given up. Something
+    /// near the number of processors, less one or two for everything else, is
+    /// a reasonable value.
+    public synchronized void setMaxConcurrentPasswordChecks(int maxConcurrentPasswordChecks) {
+        this.maxConcurrentPasswordChecks = maxConcurrentPasswordChecks < 0 ? 0
+                : maxConcurrentPasswordChecks;
+    }
+
+    private synchronized int maxConcurrentPasswordChecks() {
+        return maxConcurrentPasswordChecks;
+    }
+
+    /// Takes one of the places for a password check, or refuses.
+    private void enterCheck() {
+        int max = maxConcurrentPasswordChecks();
+        if (CHECKING.incrementAndGet() > max && max > 0) {
+            CHECKING.decrementAndGet();
+            throw new ServiceBusyException("Too many sign-ins are being checked at once", 1);
+        }
+    }
+
+    private static void leaveCheck() {
+        CHECKING.decrementAndGet();
+    }
+
     /// Whether an unknown username is reported as bad credentials, which is the
     /// default, rather than as a [UsernameNotFoundException] a client could tell
     /// apart from a wrong password.
@@ -103,6 +150,17 @@ public class DaoAuthenticationProvider implements AuthenticationProvider {
         if (userDetailsService == null) {
             throw new AuthenticationServiceException("A UserDetailsService must be set");
         }
+        // Before the user is even looked up: a sign-in that will be turned away
+        // should cost nothing, and say nothing about the account.
+        enterCheck();
+        try {
+            return check(authentication);
+        } finally {
+            leaveCheck();
+        }
+    }
+
+    private Authentication check(Authentication authentication) {
         String username = authentication.getPrincipal() == null ? "NONE_PROVIDED"
                 : authentication.getName();
         Object credentials = authentication.getCredentials();

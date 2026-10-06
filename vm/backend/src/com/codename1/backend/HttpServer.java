@@ -136,6 +136,17 @@ public final class HttpServer {
         private boolean sessionResolved;
         /// The request's request-scoped beans, by the slot the build gave each.
         private Object[] scopedBeans;
+        /// The descriptor of the connection this request arrived on; -1 for a
+        /// request that arrived on none, which a test dispatching in process
+        /// makes.
+        int peerFd = -1;
+        /// Whether this server terminated TLS for the connection.
+        boolean overTls;
+        /// Whose word is taken for the forwarding headers; null for nobody's.
+        ForwardedHeaders forwarded;
+        /// The peer's address once asked for; see [#getPeerAddress].
+        private byte[] peerBytes;
+        private boolean peerResolved;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
                 int headerCount, String body) {
@@ -570,9 +581,71 @@ public final class HttpServer {
             this.sessionResolved = false;
             this.scopedBeans = null;
             this.sessions = null;
+            this.peerFd = -1;
+            this.overTls = false;
+            this.forwarded = null;
+            this.peerBytes = null;
+            this.peerResolved = false;
             this.endedSessions = null;
             this.sessionsInUse = null;
             this.sessionIdsFound = null;
+        }
+
+        private byte[] peer() {
+            if (!peerResolved) {
+                peerResolved = true;
+                peerBytes = peerFd < 0 ? null : ServerSocket.peerAddress(peerFd);
+            }
+            return peerBytes;
+        }
+
+        /// The address of the other end of the connection this request arrived
+        /// on: the client's when it connected directly, a load balancer's when
+        /// it did not. See [#getRemoteAddress] for the one to act on.
+        ///
+        /// @return the address as text, or null for a request that arrived on
+        /// no connection
+        public String getPeerAddress() {
+            return ForwardedHeaders.format(peer());
+        }
+
+        /// The address of the client this request is from.
+        ///
+        /// That is the other end of the connection, unless this server was told
+        /// it sits behind proxies and the connection is one of theirs. Then it
+        /// is what `X-Forwarded-For` says, read from the right past every
+        /// trusted proxy. From any other connection the header is ignored: it
+        /// is the client's own claim about itself.
+        ///
+        /// | Property | Meaning |
+        /// |---|---|
+        /// | `cn1.server.forwardHeaders` | `true` to read the forwarding headers at all; `false` unless set. |
+        /// | `cn1.server.trustedProxies` | The proxies, as addresses and CIDR ranges separated by commas. Unless set: loopback and the private ranges -- 10/8, 172.16/12, 192.168/16, 169.254/16, 127/8, ::1, fc00::/7 and fe80::/10. |
+        ///
+        /// IPv4 is dotted, IPv6 is eight groups of hexadecimal without `::`, and
+        /// an IPv4 address carried in IPv6 is written as IPv4 -- one spelling
+        /// per address, so the text can be a key.
+        ///
+        /// @return the address, or null for a request that arrived on no
+        /// connection
+        public String getRemoteAddress() {
+            byte[] peer = peer();
+            if (peer == null || forwarded == null) {
+                return ForwardedHeaders.format(peer);
+            }
+            return ForwardedHeaders.format(forwarded.client(peer, getHeader("X-Forwarded-For")));
+        }
+
+        /// Whether the client reached this request's server over TLS: this
+        /// server terminated it, or a trusted proxy did and says so in
+        /// `X-Forwarded-Proto`. The header is believed under the rule
+        /// [#getRemoteAddress] believes `X-Forwarded-For` under.
+        public boolean isSecure() {
+            if (overTls) {
+                return true;
+            }
+            return forwarded != null
+                    && forwarded.secure(peer(), getHeader("X-Forwarded-Proto"));
         }
 
         /// The session of this request, creating one if it has none.
@@ -714,6 +787,11 @@ public final class HttpServer {
             this.sessionResolved = false;
             this.scopedBeans = null;
             this.sessions = null;
+            this.peerFd = -1;
+            this.overTls = false;
+            this.forwarded = null;
+            this.peerBytes = null;
+            this.peerResolved = false;
             this.endedSessions = null;
             this.sessionsInUse = null;
             this.sessionIdsFound = null;
@@ -1424,6 +1502,15 @@ public final class HttpServer {
         int checkUpgrade(Request request);
     }
 
+    /// A handler that knows whose word is taken for where a request came from;
+    /// see [ForwardedHeaders]. Asked once, when the server is made, so every
+    /// request -- a WebSocket handshake included -- carries the answer from the
+    /// first one on. Package-private: only Backend's chain is one.
+    interface Forwarding {
+        /// The policy, or null when the forwarding headers are not read.
+        ForwardedHeaders forwardedHeaders();
+    }
+
     /// The status-only answer for `request`, decorated by the handler when it asks.
     private Response fallback(Request request, int status, String text) {
         Response response = Response.text(status, text);
@@ -1873,6 +1960,8 @@ public final class HttpServer {
     private final Reactor reactor;
     private final ExecutorService workers;
     private final Handler handler;
+    /// See [Forwarding]; null when the forwarding headers are not read.
+    private final ForwardedHeaders forwardedHeaders;
     private final Tls tls;
     /// fd to SSL session. Only written when a connection is established or closed,
     /// never per request. A TLS connection genuinely costs an object; the plain
@@ -2025,6 +2114,8 @@ public final class HttpServer {
         this.workers = workers;
         this.workerCount = workerCount;
         this.handler = handler;
+        this.forwardedHeaders = handler instanceof Forwarding
+                ? ((Forwarding) handler).forwardedHeaders() : null;
         this.tls = tls;
         // Derived from the decision the caller actually made, not recomputed from
         // the statics behind it. Recomputing was right while "plaintext" was the
@@ -5853,6 +5944,9 @@ public final class HttpServer {
                 return;
             }
 
+            request.peerFd = fd;
+            request.overTls = tls != null;
+            request.forwarded = forwardedHeaders;
             boolean keepAlive = wantsKeepAlive(request);
             // BEFORE the handler, or the generated router answers 404 for a path
             // it was never told carried a websocket. After wantsKeepAlive, so
@@ -6291,6 +6385,9 @@ public final class HttpServer {
                 }
                 Request request = new Request(stream.getMethod(), stream.getPath(),
                         "HTTP/2", headers, h2Text, h2Binary);
+                request.peerFd = fd;
+                request.overTls = tls != null;
+                request.forwarded = forwardedHeaders;
                 Response response;
                 inFlightRequests.incrementAndGet();
                 SERVING_FD.set(Integer.valueOf(fd));
@@ -9088,6 +9185,7 @@ public final class HttpServer {
             case 405: return "Method Not Allowed";
             case 409: return "Conflict";
             case 413: return "Payload Too Large";
+            case 429: return "Too Many Requests";
             case 500: return "Internal Server Error";
             case 503: return "Service Unavailable";
             default: return status < 400 ? "OK" : "Error";

@@ -838,7 +838,8 @@ public final class Backend {
     /// the log. Named and static rather than an anonymous class holding the
     /// builder.
     private static final class Serving implements HttpServer.Handler,
-            HttpServer.FallbackDecorator, HttpServer.UpgradeGuard, RequestSecurity.Next {
+            HttpServer.FallbackDecorator, HttpServer.UpgradeGuard, HttpServer.Forwarding,
+            RequestSecurity.Next {
         /// The routes the server answers on its own behalf -- MCP, the OTLP relay,
         /// management -- which keep their own token guards and are tried first.
         private final HttpServer.Handler[] own;
@@ -861,6 +862,14 @@ public final class Backend {
         private final Cors cors;
         /// `cn1.server.compression.*`, or null when compression is off.
         private final Compression compression;
+        /// `cn1.server.forwardHeaders`: whose word is taken for where a request
+        /// came from, or null for nobody's. Set once, before the server starts.
+        ForwardedHeaders forwarded;
+
+        @Override
+        public ForwardedHeaders forwardedHeaders() {
+            return forwarded;
+        }
 
         /// The server's own 404 and 500 get the CORS headers a handler's answer
         /// gets, as Spring's filter puts them on every response.
@@ -2091,6 +2100,7 @@ public final class Backend {
                         instrumented, app,
                         track, active != null ? active : Tracing.NONE, inFlight,
                         cors, Compression.fromConfig(config));
+                serving.forwarded = ForwardedHeaders.fromConfig(config);
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         serving, context, routes, active != null ? active : Tracing.NONE);
                 bound = true;
