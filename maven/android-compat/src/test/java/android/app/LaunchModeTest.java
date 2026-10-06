@@ -244,4 +244,27 @@ public class LaunchModeTest {
             }
         });
     }
+
+    @Test
+    public void reorderToFrontMovesTheExistingInstanceUp() {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                Context app = AndroidTestSupport.context().getApplicationContext();
+                app.startActivity(new Intent(app, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                Activity target = ActivityThread.getTopActivity();
+                target.startActivity(new Intent(target, AndroidTestSupport.UiModeHandlingActivity.class));
+                Activity above = ActivityThread.getTopActivity();
+                above.startActivity(new Intent(above, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+                assertSame("a duplicate instance was stacked", target, ActivityThread.getTopActivity());
+                assertEquals(2, ActivityThread.getActivityCount());
+                assertTrue("the activity it moved past was destroyed", !above.isDestroyed());
+                // The one it moved past is now beneath it.
+                target.finish();
+                assertSame(above, ActivityThread.getTopActivity());
+            }
+        });
+    }
 }

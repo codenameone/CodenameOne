@@ -234,7 +234,19 @@ public class ComponentActivity extends Activity
         public void launch(I input, Object options) {
             ActivityResultContract.SynchronousResult<O> sync = contract.getSynchronousResult(ComponentActivity.this, input);
             if (sync != null) {
-                callback.onActivityResult(sync.getValue());
+                // Posted to the main queue, as AndroidX does, so the callback
+                // runs after launch() returns like every other result, never
+                // inside the caller's own code. A launcher unregistered in
+                // the meantime no longer hears it.
+                final O value = sync.getValue();
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mRegistrations.get(Integer.valueOf(requestCode)) == Registration.this) {
+                            callback.onActivityResult(value);
+                        }
+                    }
+                });
                 return;
             }
             Intent intent = contract.createIntent(ComponentActivity.this, input);

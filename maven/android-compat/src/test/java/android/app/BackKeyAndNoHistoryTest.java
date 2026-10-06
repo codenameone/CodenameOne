@@ -141,4 +141,26 @@ public class BackKeyAndNoHistoryTest {
             }
         });
     }
+
+    /// A no-history activity recreated for a configuration change is still
+    /// no-history: the replacement used to drop the flag and come back once
+    /// the activity it started finished.
+    @Test
+    public void aRecreatedNoHistoryActivityKeepsItsFlag() {
+        onEdt(new StackWork() {
+            @Override
+            public void run(Context app) {
+                Activity root = start(app, Intent.FLAG_ACTIVITY_NEW_TASK);
+                Activity noHistory = start(root, Intent.FLAG_ACTIVITY_NO_HISTORY);
+                noHistory.recreate();
+                Activity fresh = ActivityThread.getTopActivity();
+                assertTrue("recreate() kept the old instance", fresh != noHistory);
+                Activity top = start(fresh, 0);
+                assertTrue("the recreated no-history activity was kept", fresh.isFinishing());
+                assertEquals(2, ActivityThread.getActivityCount());
+                top.finish();
+                assertSame(root, ActivityThread.getTopActivity());
+            }
+        });
+    }
 }

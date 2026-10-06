@@ -142,7 +142,16 @@ public class ArrayAdapter<T> extends BaseAdapter implements Filterable {
     public void insert(T object, int index) {
         target().add(index, object);
         if (mOriginalValues != null && matchesConstraint(object)) {
-            mObjects.add(Math.min(index, mObjects.size()), object);
+            // `index` addresses the unfiltered values; the displayed list
+            // holds only the matching ones, in the same order, so the item
+            // goes after however many of its predecessors are on display.
+            int shown = 0;
+            for (int i = 0; i < index; i++) {
+                if (matchesConstraint(mOriginalValues.get(i))) {
+                    shown++;
+                }
+            }
+            mObjects.add(Math.min(shown, mObjects.size()), object);
         }
         if (mNotifyOnChange) {
             notifyDataSetChanged();

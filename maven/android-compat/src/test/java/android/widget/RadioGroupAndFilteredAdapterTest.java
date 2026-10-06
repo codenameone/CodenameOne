@@ -93,4 +93,19 @@ public class RadioGroupAndFilteredAdapterTest {
         adapter.add("fig");
         assertEquals("an addition under an empty filter stayed hidden", 7, adapter.getCount());
     }
+
+    @Test
+    public void anInsertionUnderAFilterKeepsTheUnfilteredOrder() {
+        Context c = AndroidTestSupport.context();
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(c, android.R.layout.simple_list_item_1,
+                new ArrayList<String>(Arrays.asList("hidden", "alpha")));
+        adapter.getFilter().filter("a");
+        assertEquals(1, adapter.getCount());
+
+        // Index 1 of the unfiltered values sits before "alpha".
+        adapter.insert("able", 1);
+        assertEquals(2, adapter.getCount());
+        assertEquals("the insertion used the unfiltered index on the filtered list", "able", adapter.getItem(0));
+        assertEquals("alpha", adapter.getItem(1));
+    }
 }

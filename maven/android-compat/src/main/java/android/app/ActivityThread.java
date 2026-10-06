@@ -224,6 +224,40 @@ public final class ActivityThread {
                 }
             }
         }
+        if (!clearTopFlag && (intent.getFlags() & Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) != 0) {
+            // The existing instance moves to the top with the activities
+            // above it left in place, and sees the new intent through
+            // onNewIntent(). Android ignores the flag under CLEAR_TOP, which
+            // the branch above already handled. When the instance is
+            // already on top this is the single-top case below.
+            Record current = top();
+            for (int i = STACK.size() - 2; i >= 0; i--) {
+                Record target = STACK.get(i);
+                if (target.activity.getClass() == info.type) {
+                    if (current.resumed) {
+                        pause(current);
+                    }
+                    if (target.relaunchPending != 0) {
+                        // A configuration change it missed while covered,
+                        // as when it comes back through finish().
+                        target = relaunch(target, target.relaunchPending, false);
+                    }
+                    STACK.remove(i);
+                    STACK.add(target);
+                    target.activity.onNewIntent(intent);
+                    resumeRecord(target, false);
+                    if (current.noHistory && STACK.remove(current)) {
+                        destroy(current, false);
+                    } else {
+                        stop(current);
+                    }
+                    return;
+                }
+            }
+            if (current != null && current.activity.getClass() == info.type) {
+                singleTop = true;
+            }
+        }
         if (singleTop) {
             Record t = top();
             if (t != null && t.activity.getClass() == info.type) {
@@ -627,6 +661,7 @@ public final class ActivityThread {
         n.activity = fresh;
         n.caller = r.caller;
         n.requestCode = r.requestCode;
+        n.noHistory = r.noHistory;
         n.info = r.info;
         n.pendingResults = r.pendingResults;
         attach(n, a.getIntent());
