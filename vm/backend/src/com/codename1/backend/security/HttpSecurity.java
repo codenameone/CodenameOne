@@ -101,6 +101,7 @@ public final class HttpSecurity {
         filterOrder.put(LogoutFilter.class, Integer.valueOf(500));
         filterOrder.put(UsernamePasswordAuthenticationFilter.class, Integer.valueOf(1000));
         filterOrder.put(DefaultLoginPageGeneratingFilter.class, Integer.valueOf(1100));
+        filterOrder.put(BearerTokenAuthenticationFilter.class, Integer.valueOf(1300));
         filterOrder.put(BasicAuthenticationFilter.class, Integer.valueOf(1500));
         filterOrder.put(AnonymousAuthenticationFilter.class, Integer.valueOf(2000));
         filterOrder.put(ExceptionTranslationFilter.class, Integer.valueOf(2400));
@@ -157,6 +158,13 @@ public final class HttpSecurity {
     /// Sign-in with HTTP Basic credentials; see [HttpBasicConfigurer].
     public HttpSecurity httpBasic(Customizer<HttpBasicConfigurer> customizer) {
         customizer.customize(getOrApply(HttpBasicConfigurer.class));
+        return this;
+    }
+
+    /// Sign-in with a bearer token that is a JWT; see
+    /// [OAuth2ResourceServerConfigurer].
+    public HttpSecurity oauth2ResourceServer(Customizer<OAuth2ResourceServerConfigurer> customizer) {
+        customizer.customize(getOrApply(OAuth2ResourceServerConfigurer.class));
         return this;
     }
 
@@ -424,6 +432,8 @@ public final class HttpSecurity {
             created = new SecurityContextConfigurer();
         } else if (type == AnonymousConfigurer.class) { //NOPMD CompareObjectsWithEquals
             created = new AnonymousConfigurer();
+        } else if (type == OAuth2ResourceServerConfigurer.class) { //NOPMD CompareObjectsWithEquals
+            created = new OAuth2ResourceServerConfigurer();
         } else {
             throw new IllegalArgumentException("Not a built-in configurer: " + type.getName());
         }

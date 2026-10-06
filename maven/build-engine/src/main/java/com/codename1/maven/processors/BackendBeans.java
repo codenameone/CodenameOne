@@ -130,6 +130,14 @@ final class BackendBeans {
         SECURITY_PKG + "crypto/PasswordEncoder",
         SECURITY_PKG + "AuthenticationProvider",
         SECURITY_PKG + "AuthenticationManager",
+        // What oauth2ResourceServer() uses when the chain names none of its own.
+        SECURITY_PKG + "oauth2/jwt/JwtDecoder",
+        SECURITY_PKG + "oauth2/server/resource/JwtAuthenticationConverter",
+        SECURITY_PKG + "oauth2/server/resource/BearerTokenResolver",
+        // What apiKey() looks keys up in.
+        SECURITY_PKG + "apikey/ApiKeyRepository",
+        // What rateLimit() counts with, when the rule names none.
+        SECURITY_PKG + "ratelimit/RateLimiter",
     };
 
     static final String SINGLETON = "singleton";

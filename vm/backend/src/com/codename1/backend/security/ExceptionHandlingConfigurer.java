@@ -44,6 +44,8 @@ public final class ExceptionHandlingConfigurer extends SecurityConfigurer {
     private AccessDeniedHandler accessDeniedHandler;
     /// {RequestMatcher, AuthenticationEntryPoint}, as the sign-in parts add them.
     private final List<Object[]> defaults = new ArrayList<Object[]>();
+    /// {RequestMatcher, AccessDeniedHandler}, likewise.
+    private final List<Object[]> deniedDefaults = new ArrayList<Object[]>();
 
     ExceptionHandlingConfigurer() {
     }
@@ -72,8 +74,59 @@ public final class ExceptionHandlingConfigurer extends SecurityConfigurer {
         return this;
     }
 
+    /// A handler for the denied requests `preferredMatcher` matches, used when
+    /// no single handler is set. A denied request none of them matches is
+    /// answered 403.
+    public ExceptionHandlingConfigurer defaultAccessDeniedHandlerFor(
+            AccessDeniedHandler handler, RequestMatcher preferredMatcher) {
+        if (handler == null || preferredMatcher == null) {
+            throw new IllegalArgumentException("A handler and a matcher are required");
+        }
+        deniedDefaults.add(new Object[] {preferredMatcher, handler});
+        return this;
+    }
+
     AccessDeniedHandler resolveAccessDeniedHandler() {
-        return accessDeniedHandler != null ? accessDeniedHandler : new AccessDeniedHandlerImpl();
+        if (accessDeniedHandler != null) {
+            return accessDeniedHandler;
+        }
+        if (deniedDefaults.isEmpty()) {
+            return new AccessDeniedHandlerImpl();
+        }
+        RequestMatcher[] matchers = new RequestMatcher[deniedDefaults.size()];
+        AccessDeniedHandler[] handlers = new AccessDeniedHandler[deniedDefaults.size()];
+        for (int iter = 0 ; iter < matchers.length ; iter++) {
+            matchers[iter] = (RequestMatcher) deniedDefaults.get(iter)[0];
+            handlers[iter] = (AccessDeniedHandler) deniedDefaults.get(iter)[1];
+        }
+        return new DelegatingDenied(matchers, handlers);
+    }
+
+    /// The handler of the first matcher that matches the request, or else 403.
+    private static final class DelegatingDenied implements AccessDeniedHandler {
+        private final RequestMatcher[] matchers;
+        private final AccessDeniedHandler[] handlers;
+        private final AccessDeniedHandler otherwise = new AccessDeniedHandlerImpl();
+
+        DelegatingDenied(RequestMatcher[] matchers, AccessDeniedHandler[] handlers) {
+            this.matchers = matchers;
+            this.handlers = handlers;
+        }
+
+        @Override
+        public HttpServer.Response handle(HttpServer.Request request,
+                                          AccessDeniedException denied) throws Exception {
+            // A request refused for want of a CSRF token is not one whose
+            // bearer token granted too little, whatever it carries.
+            if (!(denied instanceof CsrfException)) {
+                for (int iter = 0 ; iter < matchers.length ; iter++) {
+                    if (matchers[iter].matches(request)) {
+                        return handlers[iter].handle(request, denied);
+                    }
+                }
+            }
+            return otherwise.handle(request, denied);
+        }
     }
 
     AuthenticationEntryPoint resolveEntryPoint() {
