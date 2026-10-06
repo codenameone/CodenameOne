@@ -26,6 +26,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <!-- Overridden by -DskipTests; read by the proxy-jar copy below. -->
+        <skipTests>false</skipTests>
     </properties>
 
     <dependencies>
@@ -333,6 +335,12 @@
                             <goal>run</goal>
                         </goals>
                         <configuration>
+                            <!-- Only for the test that reads them. A -DskipTests install
+                                 of this module alone, which the hellocodenameone test
+                                 server does on every screenshot leg, failed here when
+                                 ParparVM's bundle was not built, and its fallback then
+                                 rebuilt every dependency: minutes per leg. -->
+                            <skip>${skipTests}</skip>
                             <target>
                                 <copy file="${maven.multiModuleProjectDirectory}/parparvm/target/bundle/javascript-proxy-javax.jar"
                                       todir="${project.build.testOutputDirectory}"/>
