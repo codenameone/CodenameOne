@@ -47,6 +47,7 @@ import com.codename1.backend.security.mfa.InMemoryTotpRepository;
 import com.codename1.backend.security.mfa.TotpService;
 import com.codename1.backend.security.oauth2.client.AppleClientSecret;
 import com.codename1.backend.security.oauth2.client.ClientRegistration;
+import com.codename1.backend.security.oauth2.client.CommonOAuth2Provider;
 import com.codename1.backend.security.oauth2.client.CookieOAuth2AuthorizationRequestRepository;
 import com.codename1.backend.security.oauth2.client.DefaultOAuth2AuthorizationRequestResolver;
 import com.codename1.backend.security.oauth2.client.InMemoryClientRegistrationRepository;
@@ -456,6 +457,10 @@ class OAuth2LoginTest {
         volatile String tokenAnswer = "{}";
         volatile int tokenStatus = 200;
         volatile String userAnswer = "{}";
+        volatile String emailsAnswer = "[]";
+        volatile int emailsStatus = 200;
+        final java.util.concurrent.atomic.AtomicInteger emailsRequests =
+                new java.util.concurrent.atomic.AtomicInteger();
         final List<String> tokenRequests = new ArrayList<String>();
         final List<String> authorizations = new ArrayList<String>();
         final Jwk key;
@@ -496,6 +501,12 @@ class OAuth2LoginTest {
                     status = ours ? 200 : 401;
                     type = "application/json";
                     answer = ours ? userAnswer : "{}";
+                } else if ("/user/emails".equals(path)) {
+                    emailsRequests.incrementAndGet();
+                    boolean ours = "Bearer stub-access".equals(authorization);
+                    status = ours ? emailsStatus : 401;
+                    type = "application/json";
+                    answer = ours ? emailsAnswer : "{}";
                 }
                 byte[] bytes = answer.getBytes("UTF-8");
                 exchange.getResponseHeaders().set("Content-Type", type);
@@ -825,6 +836,94 @@ class OAuth2LoginTest {
                 new InMemoryClientRegistrationRepository(ClientRegistration
                         .withRegistrationId("x").clientId("c").authorizationUri("https://a/b")
                         .tokenUri("https://a/c").build())));
+    }
+
+    // ------------------------------------ a provider that lists addresses
+
+    @Test
+    @DisplayName("GitHub's user is tied to the primary verified address of its list, and to no other")
+    void linkingThroughTheEmailsEndpoint() throws Exception {
+        final InMemoryFederatedIdentityRepository identities =
+                new InMemoryFederatedIdentityRepository();
+        final InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
+                User.withUsername("ada@example.com").password("{noop}x").roles("ADMIN").build(),
+                User.withUsername("eve@example.com").password("{noop}x").roles("USER").build());
+        final LinkingOAuth2UserService service = new LinkingOAuth2UserService(identities, users);
+        // The preset is what a real registration starts from.
+        ClientRegistration preset = CommonOAuth2Provider.GITHUB.getBuilder("github")
+                .clientId("c").build();
+        assertEquals("https://api.github.com/user/emails",
+                preset.getProviderDetails().getUserEmailsUri());
+        assertTrue(preset.getScopes().contains("user:email"), preset.getScopes().toString());
+
+        try (Stub provider = stubServer() ; SecuredServer app = app(new Object[0], http -> http
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .oauth2Login(o -> o.clientRegistrationRepository(
+                        new InMemoryClientRegistrationRepository(stubRegistration("hub")
+                                .userInfoUri(stubUrl + "/user")
+                                .userEmailsUri(stubUrl + "/user/emails")
+                                .userNameAttributeName("id").scope("read:user", "user:email")
+                                .build()))
+                        .userService(service).failureHandler(recording)).build())) {
+            stub.tokenAnswer = "access_token=stub-access&scope=read%3Auser&token_type=bearer";
+            // What a list must NOT tie anybody with. In every one the user
+            // info itself shows eve's address, as anybody may set theirs to.
+            stub.userAnswer = "{\"id\":583231,\"login\":\"octocat\","
+                    + "\"email\":\"eve@example.com\",\"email_verified\":true}";
+            String[] refusedLists = {
+                "[]",
+                // Verified and not primary; primary and not verified.
+                "[{\"email\":\"ada@example.com\",\"primary\":false,\"verified\":true},"
+                        + "{\"email\":\"eve@example.com\",\"primary\":true,\"verified\":false}]",
+                // Flags that are not the truth value.
+                "[{\"email\":\"ada@example.com\",\"primary\":\"true\",\"verified\":\"true\"}]",
+                "[{\"email\":\"ada@example.com\",\"primary\":1,\"verified\":1}]",
+                // Not a list of entries, and not JSON.
+                "{\"email\":\"ada@example.com\",\"primary\":true,\"verified\":true}",
+                "[\"ada@example.com\", 7, null, [true]]",
+                "[{\"email\":7,\"primary\":true,\"verified\":true}]",
+                "<html>rate limited</html>"};
+            for (String list : refusedLists) {
+                failures.clear();
+                stub.emailsAnswer = list;
+                Map<String, String> sent = begin(app, "hub");
+                Reply reply = app.get("/login/oauth2/code/hub?code=c&state=" + sent.get("state"));
+                assertEquals("/login?error", reply.header("Location"), list);
+                assertEquals(Arrays.asList("email_not_verified"), failures, list);
+            }
+            // The scope was not granted: GitHub answers 404 there.
+            failures.clear();
+            stub.emailsStatus = 404;
+            stub.emailsAnswer = "[{\"email\":\"ada@example.com\",\"primary\":true,"
+                    + "\"verified\":true}]";
+            Map<String, String> sent = begin(app, "hub");
+            app.get("/login/oauth2/code/hub?code=c&state=" + sent.get("state"));
+            assertEquals(Arrays.asList("email_not_verified"), failures);
+            assertNull(identities.findUsername("hub", "583231"));
+
+            // The primary verified address is ada's: signed in as her, whatever
+            // the user info shows.
+            failures.clear();
+            stub.emailsStatus = 200;
+            stub.emailsAnswer = "[{\"email\":\"old@example.com\",\"primary\":false,"
+                    + "\"verified\":true},{\"email\":\"ada@example.com\",\"primary\":true,"
+                    + "\"verified\":true,\"visibility\":\"private\"}]";
+            sent = begin(app, "hub");
+            Reply done = app.get("/login/oauth2/code/hub?code=c&state=" + sent.get("state"));
+            assertEquals("/", done.header("Location"), done.toString() + failures);
+            assertEquals("/who ada@example.com [ROLE_ADMIN, OAUTH2_USER, SCOPE_read:user] via hub",
+                    app.get("/who").body);
+            assertEquals("ada@example.com", identities.findUsername("hub", "583231"));
+
+            // Tied now: the list is not asked again, and what it would say
+            // changes nothing.
+            int asked = stub.emailsRequests.get();
+            stub.emailsAnswer = "[]";
+            sent = begin(app, "hub");
+            done = app.get("/login/oauth2/code/hub?code=c&state=" + sent.get("state"));
+            assertEquals("/", done.header("Location"), done.toString() + failures);
+            assertEquals(asked, stub.emailsRequests.get());
+        }
     }
 
     // ------------------------------- the issuer of an answer, and at_hash

@@ -48,15 +48,21 @@ public enum CommonOAuth2Provider {
     },
     /// GitHub, which is OAuth2 without OpenID Connect: the user is read from
     /// its API, and named by the numeric `id`.
+    ///
+    /// GitHub's user says nothing of whether an address is verified, and may
+    /// show none at all. The verified ones are listed at `/user/emails`, which
+    /// the `user:email` scope asked for here opens; see
+    /// [ClientRegistration.ProviderDetails#getUserEmailsUri].
     GITHUB {
         @Override
         public ClientRegistration.Builder getBuilder(String registrationId) {
             return ClientRegistration.withRegistrationId(registrationId)
                     .clientName("GitHub")
-                    .scope("read:user")
+                    .scope("read:user", "user:email")
                     .authorizationUri("https://github.com/login/oauth/authorize")
                     .tokenUri("https://github.com/login/oauth/access_token")
                     .userInfoUri("https://api.github.com/user")
+                    .userEmailsUri("https://api.github.com/user/emails")
                     .userNameAttributeName("id");
         }
     },

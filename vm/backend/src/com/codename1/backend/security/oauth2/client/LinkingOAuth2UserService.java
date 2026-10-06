@@ -35,6 +35,7 @@ import com.codename1.backend.security.oauth2.core.OAuth2Parameters;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -57,6 +58,14 @@ import java.util.Map;
 ///    [#EMAIL_NOT_VERIFIED], whether or not anybody here has it: tying an
 ///    account to an address somebody merely typed at a provider would hand
 ///    that account to them.
+///
+///    A provider whose registration names a
+///    [ClientRegistration.ProviderDetails#getUserEmailsUri] -- GitHub, whose
+///    user carries no such flag and often no address -- is asked there
+///    instead, with the user's access token: the address is the one the list
+///    marks both `primary` and `verified`, and whatever the user info said of
+///    an address is not consulted. No such entry, or a list that cannot be
+///    read (the `user:email` scope was not granted), is refused the same way.
 /// 3. A verified address that is the name of a local user ties the identity to
 ///    that user, and signs in as them.
 /// 4. A verified address nobody here has makes a new local user of that name
@@ -140,10 +149,27 @@ public final class LinkingOAuth2UserService
             return oidc().loadUser((OidcUserRequest) userRequest);
         }
         OAuth2User remote = oauth2Delegate.loadUser(userRequest);
-        UserDetails local = resolve(userRequest.getClientRegistration().getRegistrationId(),
-                remote.getName(), remote.getAttributes());
-        return new DefaultOAuth2User(local.getUsername(), merge(local, remote),
-                remote.getAttributes());
+        ClientRegistration registration = userRequest.getClientRegistration();
+        Map<String, Object> attributes = remote.getAttributes();
+        if (registration.getProviderDetails().getUserEmailsUri() != null) {
+            // The list decides, and only the list: an address in the user info
+            // is one the user chose to show, which says nothing of whose it is.
+            attributes = new LinkedHashMap<String, Object>(attributes);
+            attributes.remove(emailAttribute);
+            attributes.remove(emailVerifiedAttribute);
+            // Not asked for a user who is tied already: rule 1 needs no address.
+            String address = identities.findUsername(registration.getRegistrationId(),
+                    remote.getName()) != null ? null
+                    : DefaultOAuth2UserService.primaryVerifiedEmail(registration,
+                            userRequest.getAccessToken());
+            if (address != null) {
+                attributes.put(emailAttribute, address);
+                attributes.put(emailVerifiedAttribute, Boolean.TRUE);
+            }
+        }
+        UserDetails local = resolve(registration.getRegistrationId(), remote.getName(),
+                attributes);
+        return new DefaultOAuth2User(local.getUsername(), merge(local, remote), attributes);
     }
 
     /// This service for a provider with OpenID Connect.

@@ -53,7 +53,7 @@ import java.util.Map;
 /// (`client_secret_basic`, `client_secret_post`, `none`), `scope`,
 /// `redirect-uri`, `client-name`, `response-mode` and `provider`. Under a
 /// provider: `issuer-uri`, `authorization-uri`, `token-uri`, `user-info-uri`,
-/// `jwk-set-uri`, `user-name-attribute`, and
+/// `user-emails-uri`, `jwk-set-uri`, `user-name-attribute`, and
 /// `authorization-response-iss-parameter-supported` (`true` for a provider
 /// whose endpoints are named here and that sends `iss` with its answers; one
 /// read from its issuer's metadata says so itself).
@@ -141,6 +141,10 @@ public final class ClientRegistrations {
         value = config.get(provider + "user-info-uri");
         if (value != null) {
             b.userInfoUri(value);
+        }
+        value = config.get(provider + "user-emails-uri");
+        if (value != null) {
+            b.userEmailsUri(value);
         }
         value = config.get(provider + "jwk-set-uri");
         if (value != null) {

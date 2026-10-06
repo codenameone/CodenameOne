@@ -85,6 +85,45 @@ public final class DefaultOAuth2UserService
         return out;
     }
 
+    /// The address the provider has verified and the user has made their
+    /// primary one, read from the registration's
+    /// [ClientRegistration.ProviderDetails#getUserEmailsUri]; null when there
+    /// is none, the list cannot be read, or it is not a list.
+    static String primaryVerifiedEmail(ClientRegistration registration, String accessToken) {
+        String uri = registration.getProviderDetails().getUserEmailsUri();
+        if (uri == null || accessToken == null) {
+            return null;
+        }
+        Object parsed = null;
+        try {
+            Web.Result result = Web.getJson(uri, accessToken);
+            if (result.isSuccess() && result.getBodyAsString() != null) {
+                parsed = Json.parse(result.getBodyAsString());
+            }
+        } catch (IOException unreachable) {
+            return null;
+        } catch (RuntimeException malformed) {
+            return null;
+        }
+        if (!(parsed instanceof List)) {
+            return null;
+        }
+        for (Object entry : (List) parsed) {
+            if (!(entry instanceof Map)) {
+                continue;
+            }
+            Map one = (Map) entry;
+            Object email = one.get("email");
+            // true and nothing else: "true", 1 and a missing flag vouch for nothing.
+            if (email instanceof String && ((String) email).length() > 0
+                    && Boolean.TRUE.equals(one.get("verified"))
+                    && Boolean.TRUE.equals(one.get("primary"))) {
+                return (String) email;
+            }
+        }
+        return null;
+    }
+
     /// What the provider's user info address says of the bearer of
     /// `accessToken`.
     static Map<String, Object> userInfo(ClientRegistration registration, String accessToken) {

@@ -110,6 +110,7 @@ public final class ClientRegistration {
         b.authorizationUri = p.authorizationUri;
         b.tokenUri = p.tokenUri;
         b.userInfoUri = p.userInfoUri;
+        b.userEmailsUri = p.userEmailsUri;
         b.userNameAttributeName = p.userNameAttributeName;
         b.jwkSetUri = p.jwkSetUri;
         b.issuerUri = p.issuerUri;
@@ -181,6 +182,7 @@ public final class ClientRegistration {
         private final String authorizationUri;
         private final String tokenUri;
         private final String userInfoUri;
+        private final String userEmailsUri;
         private final String userNameAttributeName;
         private final String jwkSetUri;
         private final String issuerUri;
@@ -192,6 +194,7 @@ public final class ClientRegistration {
             this.authorizationUri = b.authorizationUri;
             this.tokenUri = b.tokenUri;
             this.userInfoUri = b.userInfoUri;
+            this.userEmailsUri = b.userEmailsUri;
             this.userNameAttributeName = b.userNameAttributeName;
             this.jwkSetUri = b.jwkSetUri;
             this.issuerUri = b.issuerUri;
@@ -215,6 +218,15 @@ public final class ClientRegistration {
 
         /// The attribute that names the user; `sub` for an OpenID Connect
         /// provider that says nothing else.
+        /// Where the provider lists the user's email addresses and says which
+        /// of them it has verified, for one whose user info says nothing of
+        /// that: GitHub's `/user/emails`. Null for a provider that has none.
+        /// It answers a JSON array of `{"email", "primary", "verified"}`, and
+        /// [LinkingOAuth2UserService] reads the primary verified one from it.
+        public String getUserEmailsUri() {
+            return userEmailsUri;
+        }
+
         public String getUserNameAttributeName() {
             return userNameAttributeName;
         }
@@ -308,6 +320,7 @@ public final class ClientRegistration {
         private String authorizationUri;
         private String tokenUri;
         private String userInfoUri;
+        private String userEmailsUri;
         private String userNameAttributeName;
         private String jwkSetUri;
         private String issuerUri;
@@ -400,6 +413,12 @@ public final class ClientRegistration {
 
         public Builder userInfoUri(String userInfoUri) {
             this.userInfoUri = userInfoUri;
+            return this;
+        }
+
+        /// See [ProviderDetails#getUserEmailsUri].
+        public Builder userEmailsUri(String userEmailsUri) {
+            this.userEmailsUri = userEmailsUri;
             return this;
         }
 
