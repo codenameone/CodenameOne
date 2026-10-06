@@ -189,6 +189,52 @@ public class MigrationGeneratorTest {
         assertTrue(com.codename1.backend.Migrations.isRegistered());
     }
 
+    /// What `cn1:migrate` and its siblings launch: the generated class is its own entry point,
+    /// so the goals apply exactly the scripts the server carries.
+    @Test
+    public void theGeneratedEntryPointRunsMigrationCommands() throws Exception {
+        module(true);
+        script(true, "V1__create_notes.sql", "CREATE TABLE notes (id INT PRIMARY KEY, body VARCHAR(100));\n"
+                + "INSERT INTO notes (id, body) VALUES (1, 'one');");
+        ProcessorContext ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        File database = new File(tmp.newFolder(), "cli.db");
+        String[] keys = {"cn1.datasource.url", "cn1.config.location"};
+        String[] before = {System.getProperty(keys[0]), System.getProperty(keys[1])};
+        System.setProperty(keys[0], database.getPath());
+        System.setProperty(keys[1], tmp.newFolder().getPath());
+        try {
+            java.lang.reflect.Method main = load("cn1app.BackendMigrations").getMethod("main", String[].class);
+            main.invoke(null, (Object) new String[] {"info"});
+            main.invoke(null, (Object) new String[] {"migrate"});
+            main.invoke(null, (Object) new String[] {"validate"});
+            main.invoke(null, (Object) new String[] {"repair"});
+            try {
+                main.invoke(null, (Object) new String[] {"upgrade"});
+                org.junit.Assert.fail("an unknown command should be refused");
+            } catch (java.lang.reflect.InvocationTargetException refused) {
+                assertTrue(String.valueOf(refused.getCause()),
+                        refused.getCause().getMessage().contains("Unknown migration command 'upgrade'"));
+            }
+        } finally {
+            for (int i = 0; i < keys.length; i++) {
+                if (before[i] == null) {
+                    System.clearProperty(keys[i]);
+                } else {
+                    System.setProperty(keys[i], before[i]);
+                }
+            }
+        }
+        DataSource pool = DataSource.open(database.getPath());
+        try {
+            assertEquals("one", pool.queryOne("SELECT body FROM notes", null).get("body"));
+            assertEquals(Long.valueOf(1), pool.queryOne("SELECT COUNT(*) AS n FROM flyway_schema_history", null)
+                    .get("n"));
+        } finally {
+            pool.close();
+        }
+    }
+
     @Test
     public void applicationScriptsAreCompiledInAndRegisteredByTheDaoBootstrap() throws Exception {
         module(false);

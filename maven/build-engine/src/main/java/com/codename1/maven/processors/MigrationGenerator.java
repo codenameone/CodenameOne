@@ -462,6 +462,16 @@ final class MigrationGenerator {
         }
         sb.append("        return set.build();\n");
         sb.append("    }\n\n");
+        if (backend) {
+            // What the build's migrate goals launch. It lives here, in generated code,
+            // because this is the one class that can name the project's scripts
+            // without looking anything up; a server never calls it, so the translator
+            // drops it and the command runner behind it.
+            sb.append("    public static void main(String[] args) throws Exception {\n");
+            sb.append("        com.codename1.backend.Migrations.register(create());\n");
+            sb.append("        com.codename1.impl.backend.MigrationCli.run(args);\n");
+            sb.append("    }\n\n");
+        }
         sb.append("    @Override\n");
         sb.append("    public String script(int id) {\n");
         sb.append("        switch (id) {\n");

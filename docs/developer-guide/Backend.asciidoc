@@ -351,6 +351,11 @@ there is nothing next to the binary.
 | Whether the generated daos create their tables at start-up. True on a
   development profile, false everywhere else.
 
+| `cn1.flyway.enabled`
+| Whether pending schema migrations run at start-up. True whenever the project
+  has migrations; the rest of the `cn1.flyway` settings are listed under
+  <<backend-schema-migrations>>.
+
 | `cn1.config.location`
 | The directory the properties files are read from; the working directory by
   default. Read only from a system property or the environment, since it

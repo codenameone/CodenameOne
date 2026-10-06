@@ -160,7 +160,7 @@ Three things this doesn't do, on purpose. Relationships aren't supported --
 fails the build with a message saying to persist the foreign key as a scalar.
 `createTable` creates a table that isn't there and does nothing at all to one
 that is, so it's a convenience for development and for tests rather than a
-migration tool. And a boolean, a date and a char are stored as integers on every
+migration tool; see <<backend-schema-migrations>> for that. And a boolean, a date and a char are stored as integers on every
 engine -- 0 or 1, epoch milliseconds, and the UTF-16 code unit -- because a
 native timestamp comes back as text whose format follows the server's own time
 zone and would not round-trip the same way on three engines, and because a char
@@ -169,6 +169,218 @@ A field declared as a primitive gets a `NOT NULL` column, because a primitive ha
 no null to read: a nullable column would load as `0`, `false` or `\0`, which is
 indistinguishable from a row that holds those. Declare the field as its boxed
 type -- `Integer` rather than `int` -- when the column can be empty.
+
+[[backend-schema-migrations]]
+=== Schema migrations
+
+A schema changes for as long as the application does, and every database the
+server has ever run against has to change with it: the production one, the
+staging one, the file on a colleague's laptop. A migration is one such change,
+written once as a script and applied exactly once to each database, in order.
+The server keeps a table recording which ones a database has had, so starting it
+is all it takes to bring any database up to the schema the code expects.
+
+The file naming, the commands and the history table are Flyway's, so a schema
+that Flyway already manages carries straight over, and the scripts work with
+either.
+
+==== Writing migrations
+
+Scripts go in `src/main/resources/db/migration`:
+
+[source]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.txt[tag=migrations-layout-server,indent=0]
+----
+
+A file called `V<version>__<description>.sql` is a versioned migration. The
+version is digits separated by dots or underscores, so `V2`, `V2_1` and
+`V2026_05_21_1` are all valid, and they sort as numbers: 2.10 comes after 2.9.
+Two underscores separate it from the description, where a single underscore
+reads as a space.
+
+[source,sql]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.sql[tag=migrations-sql-001,indent=0]
+----
+
+A change to the schema is always a new file with a higher version. A script that
+has already run is never edited, because databases that ran the old text would
+no longer match the ones that ran the new text. The server records a checksum of
+every script it applies and refuses to start when an applied script has changed.
+
+[source,sql]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.sql[tag=migrations-sql-002,indent=0]
+----
+
+A file called `R__<description>.sql` is a repeatable migration. It runs after
+the versioned ones, and again whenever its text changes, which suits a view or a
+set of reference rows that you want to edit in place.
+
+The build compiles the scripts into the server. A packaged server can't read
+files from the classpath, so there's nothing to deploy beside the binary and
+nothing that can go missing from it. The build also refuses what could only fail
+later: a file whose name doesn't parse, two files with the same version, an empty
+script.
+
+==== One schema, several engines
+
+A script directly in `db/migration` runs on every engine, so it has to be SQL
+that SQLite, PostgreSQL and MySQL all accept. Where they differ, put one script
+per engine in the `sqlite`, `postgresql` and `mysql` directories instead, under
+the same file name. MariaDB reads the `mysql` directory. A version needs either
+the one common script or a script for each engine the server runs on, never
+both.
+
+==== What happens at start-up
+
+Before the server opens its entity manager or accepts a request, it applies every
+script the database hasn't had. Each one runs in a transaction together with the
+row that records it, so a script that fails leaves no trace and the server
+doesn't start.
+
+MySQL and MariaDB are the exception, because they commit every schema change as
+it runs and can't take it back. A script that fails there may have left part of
+itself behind, so the server records it as failed and refuses to migrate again
+until someone has looked. Remove what the script left, fix it, and call
+`repair`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/MigrationSnippets.java[tag=backend-migrations-repair,indent=0]
+----
+
+Several server processes starting at once against one database take a lock in
+the database, so each migration still runs exactly once and the others wait
+for it.
+
+A script must not open or end a transaction, since the server already runs it
+in one. The rare script that has to manage its own, such as a SQLite table
+rebuild that switches foreign keys off, says so in a file beside it with the
+same name plus `.conf`, containing `executeInTransaction=false`.
+
+==== Adopting an existing database
+
+A database that already has tables and no history is refused, because applying
+`V1` to a schema of unknown shape is how a migration runs against the wrong
+database. To adopt one, tell the server which version it's already at:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.properties[tag=migrations-properties-001,indent=0]
+----
+
+The server records a baseline at that version and applies only the scripts
+above it. Tables whose names start with `cn1_` belong to the framework and
+don't count as an existing schema.
+
+==== Settings
+
+The settings mirror Spring Boot's `spring.flyway` properties.
+
+[cols="2,3"]
+|===
+| Key | What it sets
+
+| `cn1.flyway.enabled`
+| Whether pending migrations run at start-up. True unless set.
+
+| `cn1.flyway.table`
+| The history table, `flyway_schema_history` unless set.
+
+| `cn1.flyway.baselineOnMigrate`, `cn1.flyway.baselineVersion`, `cn1.flyway.baselineDescription`
+| Whether to adopt a database that has tables and no history, at which version,
+  and the description recorded for it. Off, and version 1, unless set.
+
+| `cn1.flyway.validateOnMigrate`
+| Whether applied scripts are checked against the ones in this build before
+  migrating. True unless set.
+
+| `cn1.flyway.outOfOrder`
+| Whether a script older than the newest applied one is applied instead of
+  refused. A branch merged late is the usual reason to want it.
+
+| `cn1.flyway.target`
+| The highest version to migrate to. Every version unless set.
+
+| `cn1.flyway.ignoreFutureMigrations`
+| Whether a database migrated by a newer build is tolerated. True unless set,
+  because a rolling deployment runs the old build against the new schema for a
+  while.
+
+| `cn1.flyway.cleanDisabled`
+| Whether dropping the whole schema through `clean()` is refused. True unless
+  set.
+
+| `cn1.flyway.installedBy`
+| The name recorded against each migration; the database user unless set.
+
+| `cn1.flyway.lockRetryCount`
+| How many one-second attempts to wait for another process that's migrating.
+  50 unless set.
+|===
+
+==== Looking at the schema from the build
+
+The Maven goals run against the database named by `cn1.datasource.url`, with the
+project's scripts:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.sh[tag=migrations-bash-001,indent=0]
+----
+
+`migrate-info` lists every migration with its state and changes nothing.
+`migrate-validate` fails when the database isn't exactly at this build's
+scripts, which makes it a useful check before a deployment. Point any of them at
+another database on the command line:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.sh[tag=migrations-bash-002,indent=0]
+----
+
+The same information is available to code:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/MigrationSnippets.java[tag=backend-migrations-info,indent=0]
+----
+
+==== Migrations in Java
+
+A change that SQL can't express, such as recomputing a column, is a class
+instead of a script. It runs once, in version order with the scripts, inside the
+same transaction a script would get.
+
+[source,java]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.txt[tag=migrations-java,indent=0]
+----
+
+A Java migration has no checksum, so editing one after it has run goes
+unnoticed. Treat it like a script and leave it alone.
+
+==== Migrations a library brings
+
+A library that keeps tables of its own registers a migration set under its own
+name. The set gets its own history table, so its versions never collide with
+the application's, and it runs before the application's scripts so they can
+refer to its tables.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/MigrationSnippets.java[tag=backend-migrations-library,indent=0]
+----
+
+==== What isn't supported
+
+Undo scripts aren't supported: write a forward migration that reverses the
+change. Flyway's placeholders, callbacks and schema management aren't read, and
+neither is MySQL's `DELIMITER`, which is a directive of the `mysql` command-line
+client and not SQL. Scripts are found when the project is built, so a directory
+of scripts added beside a deployed server isn't picked up.
 
 === Transactions
 

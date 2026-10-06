@@ -1,0 +1,31 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::migrations-layout-server[]
+src/main/resources/db/migration/
+    V1__create_note.sql
+    V2__add_note_created.sql
+    R__note_summary_view.sql
+    postgresql/V3__note_search_index.sql
+    mysql/V3__note_search_index.sql
+    sqlite/V3__note_search_index.sql
+// end::migrations-layout-server[]
+
+// tag::migrations-layout-app[]
+common/src/main/db/migration/
+    V1__create_note.sql
+    V2__add_note_created.sql
+// end::migrations-layout-app[]
+
+// tag::migrations-java[]
+@Migration(version = "4", description = "normalize note bodies")
+public class NormalizeNotes implements JavaMigration {
+    @Override
+    public void migrate(MigrationContext context) throws IOException {
+        List<String[]> rows = context.query("SELECT id, body FROM note", null);
+        for (String[] row : rows) {
+            context.execute("UPDATE note SET body = ? WHERE id = ?",
+                    new Object[] { row[1].trim(), Long.valueOf(row[0]) });
+        }
+    }
+}
+// end::migrations-java[]
