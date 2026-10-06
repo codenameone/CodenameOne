@@ -140,4 +140,30 @@ public class OffStackResultAndFocusTest {
             }
         });
     }
+
+    /// A tree observer's window-focus listener hears the activity being
+    /// covered and uncovered; it used to be dropped on registration.
+    @Test
+    public void windowFocusObserverListenersAreNotified() {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                AndroidTestSupport.TestActivity a = startRoot();
+                View v = new View(a);
+                a.setContentView(v);
+                final List<Boolean> calls = new ArrayList<Boolean>();
+                v.getViewTreeObserver().addOnWindowFocusChangeListener(
+                        new android.view.ViewTreeObserver.OnWindowFocusChangeListener() {
+                            @Override
+                            public void onWindowFocusChanged(boolean hasFocus) {
+                                calls.add(Boolean.valueOf(hasFocus));
+                            }
+                        });
+                a.startActivity(new Intent(a, AndroidTestSupport.TestActivity.class));
+                assertEquals("[false]", calls.toString());
+                ActivityThread.getTopActivity().finish();
+                assertEquals("[false, true]", calls.toString());
+            }
+        });
+    }
 }

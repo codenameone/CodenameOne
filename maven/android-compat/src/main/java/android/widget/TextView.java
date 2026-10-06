@@ -95,6 +95,18 @@ public class TextView extends View {
     private int mLineHeight = -1;
     private boolean mIncludePad = true;
     private final Drawable[] mCompound = new Drawable[4];
+
+    /// Set while the horizontal compound drawables were given relative
+    /// (start/end) rather than absolute, so a later layout direction change
+    /// can put them back on the right sides.
+    private boolean mRelativeDrawables;
+    private Drawable mDrawableStart;
+    private Drawable mDrawableEnd;
+    /// The absolute drawables a missing start or end falls back to (XML can
+    /// give `drawableLeft` with `drawableEnd`, say); null after a relative
+    /// setter, which replaces both sides.
+    private Drawable mDrawableLeftFallback;
+    private Drawable mDrawableRightFallback;
     private int mCompoundPadding;
     private ColorStateList mDrawableTint;
     private int mInputType = INPUT_UNSET;
@@ -237,22 +249,20 @@ public class TextView extends View {
         if (password && mInputType == INPUT_UNSET) {
             mInputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;
         }
-        boolean rtl = isLayoutRtl();
-        if (ds != null) {
-            if (rtl) {
-                dr = ds;
-            } else {
-                dl = ds;
-            }
-        }
-        if (de != null) {
-            if (rtl) {
-                dl = de;
-            } else {
-                dr = de;
-            }
-        }
         setCompoundDrawablesWithIntrinsicBounds(dl, dt, dr, db);
+        if (ds != null || de != null) {
+            for (Drawable d : new Drawable[] {ds, de}) {
+                if (d != null) {
+                    d.setBounds(0, 0, Math.max(0, d.getIntrinsicWidth()), Math.max(0, d.getIntrinsicHeight()));
+                }
+            }
+            mRelativeDrawables = true;
+            mDrawableStart = ds;
+            mDrawableEnd = de;
+            mDrawableLeftFallback = dl;
+            mDrawableRightFallback = dr;
+            resolveRelativeDrawables();
+        }
         setText(text, BufferType.NORMAL);
     }
 
@@ -965,6 +975,15 @@ public class TextView extends View {
     // ------------------------------------------------------------ compound drawables
 
     public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
+        mRelativeDrawables = false;
+        mDrawableStart = null;
+        mDrawableEnd = null;
+        mDrawableLeftFallback = null;
+        mDrawableRightFallback = null;
+        applyCompoundDrawables(left, top, right, bottom);
+    }
+
+    private void applyCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
         Drawable[] n = {left, top, right, bottom};
         for (int i = 0; i < 4; i++) {
             if (mCompound[i] != null) {
@@ -1001,20 +1020,49 @@ public class TextView extends View {
     }
 
     public void setCompoundDrawablesRelative(Drawable start, Drawable top, Drawable end, Drawable bottom) {
-        if (isLayoutRtl()) {
-            setCompoundDrawables(end, top, start, bottom);
-        } else {
-            setCompoundDrawables(start, top, end, bottom);
-        }
+        mRelativeDrawables = true;
+        mDrawableStart = start;
+        mDrawableEnd = end;
+        mDrawableLeftFallback = null;
+        mDrawableRightFallback = null;
+        boolean rtl = isLayoutRtl();
+        applyCompoundDrawables(rtl ? end : start, top, rtl ? start : end, bottom);
     }
 
     public void setCompoundDrawablesRelativeWithIntrinsicBounds(Drawable start, Drawable top, Drawable end,
                                                                 Drawable bottom) {
-        if (isLayoutRtl()) {
-            setCompoundDrawablesWithIntrinsicBounds(end, top, start, bottom);
-        } else {
-            setCompoundDrawablesWithIntrinsicBounds(start, top, end, bottom);
+        for (Drawable d : new Drawable[] {start, top, end, bottom}) {
+            if (d != null) {
+                d.setBounds(0, 0, Math.max(0, d.getIntrinsicWidth()), Math.max(0, d.getIntrinsicHeight()));
+            }
         }
+        setCompoundDrawablesRelative(start, top, end, bottom);
+    }
+
+    /// Puts relative compound drawables on the sides the current layout
+    /// direction gives start and end.
+    private void resolveRelativeDrawables() {
+        if (!mRelativeDrawables) {
+            return;
+        }
+        boolean rtl = isLayoutRtl();
+        Drawable left = rtl ? mDrawableEnd : mDrawableStart;
+        Drawable right = rtl ? mDrawableStart : mDrawableEnd;
+        if (left == null) {
+            left = mDrawableLeftFallback;
+        }
+        if (right == null) {
+            right = mDrawableRightFallback;
+        }
+        if (left != mCompound[0] || right != mCompound[2]) {
+            applyCompoundDrawables(left, mCompound[1], right, mCompound[3]);
+        }
+    }
+
+    @Override
+    public void onRtlPropertiesChanged(int layoutDirection) {
+        super.onRtlPropertiesChanged(layoutDirection);
+        resolveRelativeDrawables();
     }
 
     public void setCompoundDrawablesRelativeWithIntrinsicBounds(int start, int top, int end, int bottom) {

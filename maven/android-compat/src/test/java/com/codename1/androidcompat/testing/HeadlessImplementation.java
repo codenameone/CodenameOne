@@ -109,6 +109,19 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return Boolean.valueOf(darkMode);
     }
 
+    /// Whether the last screen saver call kept the screen on.
+    public static boolean screenLocked;
+
+    @Override
+    public void lockScreen() {
+        screenLocked = true;
+    }
+
+    @Override
+    public void unlockScreen() {
+        screenLocked = false;
+    }
+
     @Override
     public void init(java.lang.Object a0) {
         // Nothing to set up: there is no screen.

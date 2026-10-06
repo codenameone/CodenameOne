@@ -871,6 +871,10 @@ public class View implements Drawable.Callback {
         return getGlobalVisibleRect(r, null);
     }
 
+    /// The part of this view on screen: its bounds cut to every ancestor's
+    /// on-screen box (a scrolled-out child of a scroll view is not visible)
+    /// and to the display. Ancestors are always intersected, whatever their
+    /// `clipChildren`, because the peers they map to always clip painting.
     public boolean getGlobalVisibleRect(Rect r, Point globalOffset) {
         int[] loc = new int[2];
         getLocationOnScreen(loc);
@@ -878,12 +882,26 @@ public class View implements Drawable.Callback {
         if (globalOffset != null) {
             globalOffset.set(loc[0], loc[1]);
         }
-        return isShown() && !r.isEmpty();
+        boolean visible = isShown();
+        ViewParent p = mParent;
+        while (visible && p instanceof View) {
+            View a = (View) p;
+            a.getLocationOnScreen(loc);
+            visible = r.intersect(loc[0], loc[1], loc[0] + a.getWidth(), loc[1] + a.getHeight());
+            p = a.mParent;
+        }
+        if (visible) {
+            com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+            visible = r.intersect(0, 0, d.getDisplayWidth(), d.getDisplayHeight());
+        }
+        return visible && !r.isEmpty();
     }
 
     public boolean getLocalVisibleRect(Rect r) {
-        r.set(0, 0, getWidth(), getHeight());
-        return isShown() && !r.isEmpty();
+        Point offset = new Point();
+        boolean visible = getGlobalVisibleRect(r, offset);
+        r.offset(-offset.x, -offset.y);
+        return visible;
     }
 
     public final void getWindowVisibleDisplayFrame(Rect outRect) {
@@ -1711,10 +1729,16 @@ public class View implements Drawable.Callback {
     /// `relayout` is false when the caller lays the subtree out anyway.
     void dispatchLayoutDirectionChanged(boolean relayout) {
         resolvePaddingStartEnd();
+        onRtlPropertiesChanged(getLayoutDirection());
         if (relayout) {
             requestLayout();
             invalidate();
         }
+    }
+
+    /// Called when this view's resolved layout direction may have changed,
+    /// directly or through a parent it inherits the direction from.
+    public void onRtlPropertiesChanged(int layoutDirection) {
     }
 
     public boolean isLayoutRtl() {
@@ -2754,6 +2778,9 @@ public class View implements Drawable.Callback {
             return;
         }
         mAttached = attached;
+        if (mKeepScreenOn) {
+            updateKeepScreenOn(attached ? 1 : -1);
+        }
         if (attached) {
             runPendingActions();
             onAttachedToWindow();
@@ -2803,6 +2830,13 @@ public class View implements Drawable.Callback {
     public void dispatchWindowFocusChanged(boolean hasFocus) {
         mWindowFocusLost = !hasFocus;
         onWindowFocusChanged(hasFocus);
+        if (mParent == null && mTreeObserver != null) {
+            // The root reports once for the whole tree. Android notifies the
+            // observer before the views; here it runs after the root's own
+            // callback and before a root group's children, which only
+            // matters to a listener comparing call order across views.
+            mTreeObserver.dispatchOnWindowFocusChanged(hasFocus);
+        }
     }
 
     /// Whether the window holding this view has focus. The root's state is
@@ -2933,12 +2967,36 @@ public class View implements Drawable.Callback {
         return mTreeObserver;
     }
 
+    /// This view's own keep-screen-on request.
+    private boolean mKeepScreenOn;
+
+    /// How many attached views request the screen stay on. The screen saver
+    /// is held off while any does, so one view clearing its request (or
+    /// detaching) does not override another's, as on Android where the flag
+    /// is aggregated over the window. Views of a covered activity stay
+    /// attached and keep counting; that is deliberate, not tracked further.
+    private static int sKeepScreenOnViews;
+
     public void setKeepScreenOn(boolean keepScreenOn) {
-        com.codename1.ui.Display.getInstance().setScreenSaverEnabled(!keepScreenOn);
+        if (mKeepScreenOn == keepScreenOn) {
+            return;
+        }
+        mKeepScreenOn = keepScreenOn;
+        if (mAttached) {
+            updateKeepScreenOn(keepScreenOn ? 1 : -1);
+        }
     }
 
     public boolean getKeepScreenOn() {
-        return false;
+        return mKeepScreenOn;
+    }
+
+    private static void updateKeepScreenOn(int delta) {
+        int before = sKeepScreenOnViews;
+        sKeepScreenOnViews = Math.max(0, before + delta);
+        if ((before == 0) != (sKeepScreenOnViews == 0)) {
+            com.codename1.ui.Display.getInstance().setScreenSaverEnabled(sKeepScreenOnViews == 0);
+        }
     }
 
     public void setSystemUiVisibility(int visibility) {

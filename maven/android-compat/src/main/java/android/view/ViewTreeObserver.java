@@ -60,6 +60,7 @@ public final class ViewTreeObserver {
     private final ArrayList<OnPreDrawListener> preDraw = new ArrayList<OnPreDrawListener>();
     private final ArrayList<OnDrawListener> draw = new ArrayList<OnDrawListener>();
     private final ArrayList<OnScrollChangedListener> scroll = new ArrayList<OnScrollChangedListener>();
+    private final ArrayList<OnWindowFocusChangeListener> windowFocus = new ArrayList<OnWindowFocusChangeListener>();
 
     public boolean isAlive() {
         return true;
@@ -115,9 +116,21 @@ public final class ViewTreeObserver {
     }
 
     public void addOnWindowFocusChangeListener(OnWindowFocusChangeListener l) {
+        windowFocus.add(l);
     }
 
     public void removeOnWindowFocusChangeListener(OnWindowFocusChangeListener l) {
+        windowFocus.remove(l);
+    }
+
+    /// Runtime use: the root tells its observer the window gained or lost
+    /// focus (an activity covered or uncovered).
+    public void dispatchOnWindowFocusChanged(boolean hasFocus) {
+        if (!windowFocus.isEmpty()) {
+            for (OnWindowFocusChangeListener l : new ArrayList<OnWindowFocusChangeListener>(windowFocus)) {
+                l.onWindowFocusChanged(hasFocus);
+            }
+        }
     }
 
     public void dispatchOnGlobalLayout() {
