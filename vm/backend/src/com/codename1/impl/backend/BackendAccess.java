@@ -117,6 +117,11 @@ public abstract class BackendAccess {
     /// Serves the management endpoints when the configuration turns them on.
     public abstract void management(Backend.Builder builder);
 
+    /// Puts the security layer in front of the application's routes, for a build
+    /// that found a `SecurityFilterChain` bean. The only call that names the
+    /// layer, so a server whose entry point does not make it has none of its code.
+    public abstract void security(Backend.Builder builder);
+
     /// The module's compiled-in settings: the bottom layer of the configuration.
     public abstract void compiledSettings(Backend.Builder builder, String[] keysAndValues);
 
@@ -169,6 +174,17 @@ public abstract class BackendAccess {
     /// Releases what `response` holds without reading it -- the file a static file
     /// response keeps open -- for a caller that sends no body, as a HEAD answer.
     public abstract void discard(HttpServer.Response response);
+
+    /// Whether `response` has a header of this name, in any case.
+    public abstract boolean hasHeader(HttpServer.Response response, String name);
+
+    /// Sets a header of `response`, replacing every value under that name in any
+    /// case. For the server's own copy of a response, never a handler's object.
+    public abstract void setHeader(HttpServer.Response response, String name, String value);
+
+    /// Adds a value to a header of `response`, keeping the ones it has: one more
+    /// `Set-Cookie`. For the server's own copy of a response.
+    public abstract void addHeader(HttpServer.Response response, String name, String value);
 
     /// The response's content type, or null.
     public abstract String contentType(HttpServer.Response response);

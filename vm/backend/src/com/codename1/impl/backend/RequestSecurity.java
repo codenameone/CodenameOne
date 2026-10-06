@@ -47,15 +47,21 @@ public interface RequestSecurity {
     /// Adds the headers the chain of `request` writes to `response`, which is the
     /// caller's own copy: the response a handler returns may be one shared by
     /// every request. Called for the server's own 404 and 500 as well, after
-    /// [#clear].
+    /// [#leave].
     void decorate(HttpServer.Request request, HttpServer.Response response);
 
     /// Decides a WebSocket handshake: 0 to let it reach its endpoint, otherwise
     /// the status to refuse it with.
     int upgrade(HttpServer.Request request) throws Exception;
 
-    /// Forgets what the calling thread holds about the request it served. A
-    /// virtual thread serves a whole keep-alive connection, so whatever stays
-    /// here is what the next request on it would be answered with.
-    void clear();
+    /// Called before a request, or a WebSocket handshake, is looked at: what the
+    /// calling thread holds from before it, to hand to [#leave]. Null -- nothing
+    /// -- on a thread that is only serving.
+    Object enter();
+
+    /// Called when the request ends, however it ends: puts the calling thread
+    /// back to what [#enter] found, which for a serving thread is nothing. A
+    /// virtual thread serves a whole keep-alive connection, so whatever stayed
+    /// here is who the next request on it would be answered as.
+    void leave(Object entered);
 }

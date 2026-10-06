@@ -77,7 +77,15 @@ class SecuritySlotTest {
         }
 
         @Override
-        public void clear() {
+        public Object enter() {
+            return "before";
+        }
+
+        @Override
+        public void leave(Object entered) {
+            if (!"before".equals(entered)) {
+                throw new IllegalStateException("handed back " + entered);
+            }
             cleared++;
         }
     }
@@ -245,19 +253,23 @@ class SecuritySlotTest {
     }
 
     @Test
-    @DisplayName("a CORS preflight goes round the layer; without a policy it is guarded")
+    @DisplayName("a CORS preflight is answered by the policy, round the layer and the application")
     void aPreflightIsNotAskedToAuthenticate() throws Exception {
         Guard guard = new Guard();
         Properties settings = settings();
         settings.setProperty("cn1.cors.allowedOrigins", "https://app.example");
-        Backend backend = start(settings, guard, new ArrayList());
+        List reached = new ArrayList();
+        Backend backend = start(settings, guard, reached);
         try {
-            HttpServer.Response preflight = dispatch(backend, "OPTIONS", "/missing",
+            HttpServer.Response preflight = dispatch(backend, "OPTIONS", "/page",
                     "Origin", "https://app.example",
                     "Access-Control-Request-Method", "POST");
             assertEquals(204, preflight.getStatus());
             assertEquals("https://app.example", header(preflight, "Access-Control-Allow-Origin"));
             assertTrue(guard.served.isEmpty(), "the layer was asked: " + guard.served);
+            // Nor the application: a preflight that went round the layer and on
+            // to a handler would be a way past the layer.
+            assertTrue(reached.isEmpty(), "a preflight reached a handler: " + reached);
             // The request the preflight announced is guarded as usual.
             assertEquals(401, dispatch(backend, "POST", "/page",
                     "Origin", "https://app.example").getStatus());

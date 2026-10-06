@@ -902,6 +902,7 @@ public final class Backend {
             Object previousTasks = Tasks.enter(tasks);
             Object previousOwner = Tracing.own(tracer);
             Object previousServing = HttpSession.enterRequest(request);
+            Object previousSecurity = security.enter();
             try {
                 return security.upgrade(request);
             } catch (Exception err) {
@@ -913,7 +914,7 @@ public final class Backend {
                     sessions.leave(request);
                     request.forgetSession();
                 } finally {
-                    security.clear();
+                    security.leave(previousSecurity);
                     HttpSession.leaveRequest(previousServing);
                     Tracing.disown(previousOwner);
                     Tasks.leave(previousTasks);
@@ -1048,6 +1049,8 @@ public final class Backend {
             Object previousOwner = Tracing.own(tracer);
             // Who rotates a session: see HttpSession.rotatedFor.
             Object previousServing = HttpSession.enterRequest(request);
+            // What the thread holds about who it is serving, to go back to.
+            Object previousSecurity = security == null ? null : security.enter();
             if (track) {
                 previous = CURRENT_REQUEST.get();
                 CURRENT_REQUEST.set(request);
@@ -1070,12 +1073,18 @@ public final class Backend {
                         response = own[i].handle(request);
                     }
                     if (response == null) {
-                        // A preflight carries no credentials -- a browser sends
-                        // none -- so with a CORS policy it goes round the chain
-                        // to the policy's own answer below; without one it is an
-                        // ordinary OPTIONS request and is guarded like any other.
-                        if (security == null || (cors != null && Cors.isPreflight(request))) {
+                        if (security == null) {
                             response = route(request);
+                        } else if (cors != null && Cors.isPreflight(request)) {
+                            // A preflight carries no credentials -- a browser sends
+                            // none -- so with a CORS policy it goes round the chain.
+                            // It goes round the application too, straight to the
+                            // policy's own answer: routed, it would be a request
+                            // that reached a handler without meeting the chain,
+                            // for anyone who adds two headers to an OPTIONS.
+                            // Without a policy it is an ordinary OPTIONS request
+                            // and is guarded like any other.
+                            response = cors.preflight(request);
                         } else {
                             secured = true;
                             response = security.serve(request, this);
@@ -1195,7 +1204,7 @@ public final class Backend {
                             // destroy callbacks may still ask who the caller is, and
                             // always: this thread serves the connection's next
                             // request, which must not inherit this one's identity.
-                            security.clear();
+                            security.leave(previousSecurity);
                         }
                         if (track) {
                             CURRENT_REQUEST.set(previous);
@@ -1603,6 +1612,21 @@ public final class Backend {
                 }
             };
             return this;
+        }
+
+        /// Puts the security layer in front of the application's routes; see
+        /// [com.codename1.backend.security.SecurityFilterChain]. Like [#mcp] and
+        /// [#management], this is the only code that names the layer, and the
+        /// generated entry point calls it only for a build that found a chain
+        /// bean -- so a server without one has none of the layer in its binary.
+        Builder security() {
+            return securityRoute(new SecurityRoute() {
+                @Override
+                RequestSecurity open(Config config, List chains, boolean tls) {
+                    return com.codename1.impl.backend.security.SecurityAccess.get()
+                            .runtime(config, chains, tls);
+                }
+            });
         }
 
         /// Puts `route`'s security layer between the server's own routes and the
