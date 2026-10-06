@@ -40,8 +40,12 @@ from it. Two DOM layers sit above the canvas, which is itself marked
 
 With `javascript.textSelection=true`, eligible label spans receive native selection
 gestures and text areas use persistent native controls. Buttons, lead components,
-passwords and application interaction handlers retain the canvas input path. The
-host distinguishes a prompt vertical swipe from a stationary selection long press.
+passwords, custom label subclasses, draggable components and application interaction
+handlers retain the canvas input path. The host distinguishes prompt horizontal or
+vertical swipes from a stationary selection long press. Persistent fields refresh
+constraint metadata, preserve foreground alpha and vertical alignment, and synchronize
+the native viewport with CN1 scrolling. Non-editing keys reach the form keyboard path;
+modified-wheel gestures retain browser zoom.
 
 Text that stays on the canvas, by design:
 

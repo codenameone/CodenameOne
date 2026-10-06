@@ -1934,7 +1934,7 @@
         touches: copy(event.touches), targetTouches: copy(event.touches), changedTouches: copy(event.changedTouches) }));
     }
     doc.addEventListener('wheel', function(event) {
-      if (!nativeSelectionElement(event.target) || !canvas()) return;
+      if (!nativeSelectionElement(event.target) || !canvas() || event.ctrlKey || event.metaKey) return;
       event.preventDefault();
       canvas().dispatchEvent(new global.WheelEvent('wheel', { bubbles: true, cancelable: true,
         clientX: event.clientX, clientY: event.clientY, deltaX: event.deltaX,
@@ -1958,7 +1958,7 @@
       var t = event.touches[0];
       if (!touch.scrolling) {
         if (Date.now() - touch.at > 350) { touch = null; return; }
-        if (Math.abs(t.clientY - touch.y) < 8 || Math.abs(t.clientY - touch.y) < Math.abs(t.clientX - touch.x)) return;
+        if (Math.max(Math.abs(t.clientY - touch.y), Math.abs(t.clientX - touch.x)) < 8) return;
         touch.scrolling = true;
         relayTouch('touchstart', touch.start);
       }
@@ -1989,6 +1989,21 @@
     }, true);
   }
 
+  function nativeTextOwnsKey(event) {
+    var code = event.keyCode || event.which || 0;
+    var key = event.key || '';
+    if (event.isComposing || code === 229) return true;
+    // Keep editing, selection, clipboard and undo native, including modified
+    // cursor movement. Escape, function keys and other app shortcuts still bubble.
+    if (/^(Tab|Enter|Backspace|Delete|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(key)
+        || [8, 9, 13, 33, 34, 35, 36, 37, 38, 39, 40, 46].indexOf(code) >= 0) return true;
+    if (event.ctrlKey || event.metaKey) {
+      return /^[acvxyz]$/i.test(key) || [65, 67, 86, 88, 89, 90].indexOf(code) >= 0
+          || (event.ctrlKey && event.altKey && key.length === 1); // AltGr text
+    }
+    return key.length === 1 || (!key && (code === 0 || code >= 48 && code <= 90));
+  }
+
   function makeWorkerCallback(callbackId) {
     if (workerCallbackProxies[callbackId]) {
       return workerCallbackProxies[callbackId];
@@ -2003,7 +2018,13 @@
         nativeText = selection && !selection.isCollapsed && nativeSelectionElement(selection.anchorNode);
       }
       if (nativeText && event && /^(mouse|pointer|touch|key|contextmenu|copy|cut|paste)/.test(event.type)
-          && event.currentTarget !== nativeText) return;
+          && event.currentTarget !== nativeText
+          && (!/^key/.test(event.type) || nativeTextOwnsKey(event))) return;
+      // Programmatic scroll replay must not feed the model its browser-clamped
+      // value, especially while a paint or keyboard viewport change is pending.
+      if (nativeText && event.type === 'scroll'
+          && nativeText.scrollTop === nativeText.__cn1AppliedScrollTop) return;
+      if (nativeText && event.type === 'scroll') nativeText.__cn1AppliedScrollTop = nativeText.scrollTop;
       if (event && event.type === 'contextmenu' && event.target
           && event.target.id === 'codenameone-canvas'
           && event.target.getAttribute('data-cn1-text-selection') === 'true') {
@@ -2469,7 +2490,7 @@
     // Text-layer DOM mutations. They ride the draw stream so the elements and the pixels of
     // one frame are applied in one task; see SurfaceCommandRecorder.OP_TEXT_* and TextLayerOp.
     TEXT_ATTACH: 90, TEXT_DETACH: 91, TEXT_CLIP_CSS: 92, TEXT_RUN_CSS: 93,
-    TEXT_CONTENT: 94, TEXT_CLEAR: 95, TEXT_DISPLAY: 96
+    TEXT_CONTENT: 94, TEXT_CLEAR: 95, TEXT_DISPLAY: 96, TEXT_SCROLL: 97
   };
   // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
   var SURF_DISPLAY_ID = 1;
@@ -3498,6 +3519,15 @@
           var tclEl = surfaceTextElement(objs[oi++]);
           if (tclEl) {
             tclEl.innerHTML = '';
+          }
+          break;
+        }
+        case SURF.TEXT_SCROLL: {
+          var tsEl = surfaceTextElement(objs[oi++]);
+          var tsY = Number(objs[oi++]);
+          if (tsEl) {
+            tsEl.scrollTop = tsY;
+            tsEl.__cn1AppliedScrollTop = tsEl.scrollTop;
           }
           break;
         }

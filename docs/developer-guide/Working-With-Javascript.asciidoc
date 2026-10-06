@@ -568,18 +568,15 @@ The generated `index.html` sets up the page for the application:
 
 The app's text is present in the page, so find-in-page matches it and assistive technology reads it. Selecting it with the mouse isn't available by default, because the app itself receives every press and drag.
 
-Set the `javascript.textSelection=true` build hint to enable browser-native selection for labels, span labels and text areas. Eligible text areas use a persistent native input or textarea, including before focus, so the first drag or right click works. Use the browser's word/paragraph selection gestures, context menu and copy shortcut; on touch screens, long-press to select or swipe promptly to scroll. Buttons, password fields, text inside a lead component such as a `MultiButton`, and components with application pointer or action listeners retain their existing interaction.
+Set the `javascript.textSelection=true` build hint to enable browser-native selection for labels, span labels and text areas. Eligible text areas use a persistent native input or textarea, including before focus, so the first drag or right click works. Use the browser's word/paragraph selection gestures, context menu and copy shortcut; on touch screens, long-press to select or swipe promptly to scroll. Buttons, custom `Label` subclasses (including sliders), draggable components, password fields, text inside a lead component such as a `MultiButton`, and components with application pointer or action listeners retain their existing interaction.
 
 The hint also calls `TextSelection.setDefaultSelectable(true)` and enables `Form.getTextSelection()` for canvas text that cannot use the DOM layer. An individual read-only component still decides for itself with `setTextSelectionEnabled()`. Editable native controls retain their normal browser editing selection.
 
 Customize the highlight in the generated application's CSS with the stable `.cn1-native-selection::selection` selector, or override its color variables:
 
-[source,css]
+[source,html]
 ----
-:root {
-    --cn1-selection-color: #ffffff;
-    --cn1-selection-background: #1967d2;
-}
+include::../demos/javascript/src/main/snippets/developer-guide/working-with-javascript.html[tag=javascript-selection-colors,indent=0]
 ----
 
 Choose contrasting foreground and background colors. The browser owns selection handles and native context-menu appearance.

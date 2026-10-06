@@ -17,7 +17,7 @@ const context = {
   diag() {}
 };
 vm.createContext(context);
-vm.runInContext(extract('nativeSelectionElement') + '\n' + extract('makeWorkerCallback'), context);
+vm.runInContext(extract('nativeSelectionElement') + '\n' + extract('nativeTextOwnsKey') + '\n' + extract('makeWorkerCallback'), context);
 const callback = context.makeWorkerCallback(1);
 function node(attributes, parentNode = null) {
   return { parentNode, getAttribute: name => attributes[name] || null, id: attributes.id };
@@ -48,11 +48,24 @@ callback(event('copy', {}));
 assert.equal(messages.length, 0, 'a DOM selection cannot be overwritten by stale CN1 clipboard text');
 callback(event('pointerdown', canvas));
 assert.equal(messages.pop().args[0].type, 'pointerdown', 'canvas controls retain their pointer path');
+for (const key of ['Escape', 'F2']) {
+  for (const type of ['keydown', 'keyup']) {
+    callback(Object.assign(event(type, text), { key }));
+    assert.equal(messages.pop().args[0].type, type, key + ' reaches form key handlers');
+  }
+}
+for (const [key, modifiers, owns] of [['s', { ctrlKey: true }, false], ['c', { metaKey: true }, true],
+    ['ArrowLeft', { ctrlKey: true }, true], ['a', {}, true], ['Dead', { isComposing: true }, true]]) {
+  callback(Object.assign(event('keydown', text), { key }, modifiers));
+  assert.equal(messages.length, owns ? 0 : 1, key + ' keeps the appropriate keyboard owner');
+  messages.length = 0;
+}
 const listeners = {}, relayed = [];
 const doc = { addEventListener(type, listener) { listeners[type] = listener; },
   getElementById() { return canvas; }, activeElement: null };
 context.global.document = doc;
 context.global.Touch = function(data) { Object.assign(this, data); };
+context.global.WheelEvent = function(type, data) { Object.assign(this, data, { type, target: canvas }); };
 context.global.TouchEvent = function(type, data) { Object.assign(this, data, { type, target: canvas }); };
 canvas.dispatchEvent = e => { relayed.push(e.type); listeners[e.type](e); };
 vm.runInContext(extract('installNativeTextInteractions'), context);
@@ -61,8 +74,8 @@ text.tagName = 'TEXTAREA';
 const tab = Object.assign(event('keydown', text), { key: 'Tab' });
 listeners.keydown(tab);
 assert.equal(tab.defaultPrevented, true, 'cancel native Tab synchronously so CN1 chooses the next field');
-function touch(type, y, touches = true) {
-  const point = { identifier: 1, clientX: 20, clientY: y };
+function touch(type, y, touches = true, x = 20) {
+  const point = { identifier: 1, clientX: x, clientY: y };
   const e = Object.assign(event(type, text), { touches: touches ? [point] : [], changedTouches: [point] });
   listeners[type](e);
   return e;
@@ -71,6 +84,20 @@ touch('touchstart', 100);
 assert.equal(touch('touchmove', 80).defaultPrevented, true);
 touch('touchend', 80, false);
 assert.deepEqual(relayed, ['touchstart', 'touchmove', 'touchend'], 'a swipe relays one complete canvas gesture');
+relayed.length = 0;
+touch('touchstart', 100);
+assert.equal(touch('touchmove', 100, true, 70).defaultPrevented, true);
+touch('touchend', 100, false, 70);
+assert.deepEqual(relayed, ['touchstart', 'touchmove', 'touchend'], 'horizontal swipes also reach the canvas');
+relayed.length = 0;
+for (const modifier of ['ctrlKey', 'metaKey']) {
+  const zoom = Object.assign(event('wheel', text), { [modifier]: true });
+  listeners.wheel(zoom);
+  assert.equal(zoom.defaultPrevented, false, 'modified wheel keeps browser zoom');
+  assert.deepEqual(relayed, []);
+}
+listeners.wheel(Object.assign(event('wheel', text), { deltaY: 100 }));
+assert.deepEqual(relayed, ['wheel'], 'ordinary scrolling still reaches CN1');
 relayed.length = 0;
 doc.activeElement = text;
 text.selectionStart = 0;

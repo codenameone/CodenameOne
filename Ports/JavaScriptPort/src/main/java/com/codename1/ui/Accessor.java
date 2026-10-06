@@ -26,9 +26,17 @@ package com.codename1.ui;
 public class Accessor {
     /** Whether the browser may own text gestures without bypassing an app action. */
     public static boolean allowsNativeTextSelection(Component c) {
-        return c != null && !(c instanceof Button) && !c.isCellRenderer()
+        // A Label subclass may override pointer handling without registering listeners
+        // (Slider is one example). Only plain labels are safe to promote by default.
+        return c != null && (!(c instanceof Label) || c.getClass() == Label.class)
+                && !c.isDraggable() && !c.isCellRenderer()
                 && c.getLeadComponent() == null && !c.hasPointerInteractionListeners()
                 && (!(c instanceof TextArea) || !((TextArea) c).hasActionListeners());
+    }
+
+    /** Reflect browser caret/selection scrolling in the CN1 text component. */
+    public static void setNativeTextScrollY(TextArea ta, int scrollY) {
+        if (ta.getScrollY() != scrollY) ta.setScrollY(scrollY);
     }
 
     /** Re-evaluate overlays after the current form's selection hint has been applied. */

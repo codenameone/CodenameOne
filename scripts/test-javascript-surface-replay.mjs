@@ -217,6 +217,18 @@ runColorMatrix('colour matrix, surface mask', 2, 5, null, true, 'mask:surface5')
 runColorMatrix('colour matrix, unreadable image mask', 1, 0, { id: 'img', readable: false }, false);
 runColorMatrix('colour matrix, missing surface mask', 2, 99, null, false);
 
+// Scroll is applied after layout CSS and consumes both object arguments even
+// when an editor has disappeared, without misaligning the remaining paint ops.
+sandbox.surfaceTextElement = el => el;
+const editor = { style: {}, scrollTop: 0 };
+sandbox.replaySurfaceCommands(ctx, [SURF.TEXT_RUN_CSS, SURF.TEXT_SCROLL, SURF.TEXT_CONTENT], 3,
+  [], [editor, 'height:50px', editor, '42', editor, 'after']);
+check('native editor scroll replay', editor.scrollTop === 42 && editor.__cn1AppliedScrollTop === 42);
+check('text after scroll replay keeps its arguments', editor.textContent === 'after');
+sandbox.replaySurfaceCommands(ctx, [SURF.TEXT_SCROLL, SURF.TEXT_CONTENT], 2,
+  [], [null, '99', editor, 'after missing editor']);
+check('missing editor scroll keeps the object cursor aligned', editor.textContent === 'after missing editor');
+
 if (failures.length) {
   console.error('\nFAILED: ' + failures.length + ' assertion(s)');
   process.exit(1);

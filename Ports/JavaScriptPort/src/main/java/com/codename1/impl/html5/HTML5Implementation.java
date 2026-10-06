@@ -1156,6 +1156,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String lastCss;
         Boolean lastReadOnly;
         int lastMaxSize = -1;
+        int lastConstraint = -1;
+        String lastAutocomplete;
+        String lastName;
+        int lastScrollY = Integer.MIN_VALUE;
 
         SelectionTextOverlay(final TextArea ta) {
             super(ta);
@@ -1167,7 +1171,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             el.setAttribute("data-cn1-single-line", ta.isSingleLineTextArea() ? "true" : "false");
             el.setAttribute("aria-label", ta.getName() == null ? ta.getHint() : ta.getName());
             el.setTabIndex(-1); // the semantic overlay owns keyboard traversal
-            applyInputConstraints(el, ta);
+            updateConstraints();
             el.getStyle().setProperty("display", "none");
             textLayerContainer.appendChild(el);
             selectionTextOverlays.add(this);
@@ -1202,6 +1206,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                 SelectionTextOverlay overlay = (SelectionTextOverlay) next.getNativeOverlay();
                                 if (overlay.visible) overlay.el.focus();
                             }
+                        }
+                    });
+                }
+            });
+            el.addEventListener("scroll", new EventListener() {
+                public void handleEvent(Event event) {
+                    if (singleLine) return;
+                    final int scrollY = unscaleCoord(el.getScrollTop());
+                    callSerially(new Runnable() {
+                        public void run() {
+                            // Caret movement and selection can scroll the browser editor too.
+                            lastScrollY = scrollY;
+                            Accessor.setNativeTextScrollY(ta, scrollY);
                         }
                     });
                 }
@@ -1252,6 +1269,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
             });
         }
 
+        private void updateConstraints() {
+            Object autocomplete = ta.getClientProperty("cn1$autocomplete");
+            String override = autocomplete == null ? null : autocomplete.toString();
+            String name = ta.getName() == null ? "" : ta.getName();
+            if (lastConstraint != ta.getConstraint() || (override == null ? lastAutocomplete != null : !override.equals(lastAutocomplete))
+                    || !name.equals(lastName)) {
+                applyInputConstraints(el, ta);
+                lastConstraint = ta.getConstraint();
+                lastAutocomplete = override;
+                lastName = name;
+            }
+        }
+
         private void commit(String value) {
             if (!ta.isEditable() || !ta.isEnabled()) return;
             browserEdit = true;
@@ -1282,13 +1312,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     && form != null && form == getCurrentForm()
                     && Accessor.isDisplayable(ta) && !Display.getInstance().isInTransition()
                     && !Accessor.paintsOverChildren(form) && Accessor.getActivePeerCount() == 0;
-            int x = ta.getAbsoluteX(), y = ta.getAbsoluteY();
+            // Absolute coordinates include the component's own content scroll.
+            // The DOM viewport stays fixed; scrollTop moves its contents.
+            int x = ta.getAbsoluteX() + ta.getScrollX(), y = ta.getAbsoluteY() + ta.getScrollY();
             int left = x, top = y, right = x + ta.getWidth(), bottom = y + ta.getHeight();
             for (Container parent = ta.getParent(); parent != null; parent = parent.getParent()) {
-                left = Math.max(left, parent.getAbsoluteX());
-                top = Math.max(top, parent.getAbsoluteY());
-                right = Math.min(right, parent.getAbsoluteX() + parent.getWidth());
-                bottom = Math.min(bottom, parent.getAbsoluteY() + parent.getHeight());
+                left = Math.max(left, parent.getAbsoluteX() + parent.getScrollX());
+                top = Math.max(top, parent.getAbsoluteY() + parent.getScrollY());
+                right = Math.min(right, parent.getAbsoluteX() + parent.getScrollX() + parent.getWidth());
+                bottom = Math.min(bottom, parent.getAbsoluteY() + parent.getScrollY() + parent.getHeight());
             }
             visible &= right > left && bottom > top;
             if (visible) {
@@ -1299,15 +1331,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (lastCss != null) {
                     graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_RUN_CSS, el, null, "display:none");
                     lastCss = null;
+                    lastScrollY = Integer.MIN_VALUE;
                 }
                 return;
             }
             if (el.getParentNode() == null) textLayerContainer.appendChild(el);
+            updateConstraints();
             Style style = ta.getStyle();
             NativeFont font = resolveNativeFont(style.getFont().getNativeFont());
             int pt = style.getPadding(Component.TOP), pb = style.getPadding(Component.BOTTOM);
             if (ta.isSingleLineTextArea() && ta.getVerticalAlignment() == Component.CENTER) {
                 pt = Math.max(pt, (ta.getHeight() - font.fontHeight()) / 2);
+            } else if (ta.isSingleLineTextArea() && ta.getVerticalAlignment() == Component.BOTTOM) {
+                pt = Math.max(pt, ta.getHeight() - pb - font.fontHeight());
             }
             String css = "position:absolute;box-sizing:border-box;border:0;margin:0;outline:0;resize:none;"
                     + "background:transparent;overflow:hidden;pointer-events:auto;user-select:text;cursor:text;"
@@ -1316,7 +1352,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     + "px;padding:" + scaleCoord(pt) + "px " + scaleCoord(style.getPadding(ta.isRTL(), Component.RIGHT))
                     + "px " + scaleCoord(pb) + "px " + scaleCoord(style.getPadding(ta.isRTL(), Component.LEFT))
                     + "px;font:" + font.getScaledCSS() + ";line-height:" + scaleCoord(font.fontHeight() + ta.getRowsGap())
-                    + "px;color:" + HTML5Graphics.color(style.getFgColor()) + ";direction:" + (ta.isRTL() ? "rtl" : "ltr")
+                    + "px;color:" + HTML5Graphics.colorWithAlpha((style.getFgAlpha() << 24) | (style.getFgColor() & 0xffffff)) + ";direction:" + (ta.isRTL() ? "rtl" : "ltr")
                     + ";text-align:" + (style.getAlignment() == Component.CENTER ? "center"
                         : style.getAlignment() == Component.RIGHT ? "right" : "left")
                     + ";clip-path:inset(" + scaleCoord(top - y) + "px " + scaleCoord(x + ta.getWidth() - right)
@@ -1336,6 +1372,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 el.setAttribute("maxlength", "" + lastMaxSize);
             }
             updateNativeEditorText(ta.getText());
+            if (!singleLine && lastScrollY != ta.getScrollY()) {
+                lastScrollY = ta.getScrollY();
+                // Apply after CSS in the same paint batch, once the viewport has its size.
+                graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_SCROLL, el, null,
+                        "" + scaleCoord(lastScrollY));
+            }
         }
 
         @Override

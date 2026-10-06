@@ -47,7 +47,105 @@ async function exercise(context, name, host, mobileDevice = null) {
   }
   page.on('console', m => { logs.push(m.type() + ': ' + m.text()); if (/Exception:|CAUGHT_RAW_JS_ERROR/.test(m.text())) errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
+  async function exerciseReview() {
+    async function openReview(kind) {
+      await page.goto(`http://${host}:${port}/?review=${kind}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => !document.getElementById('cn1-splash'), null, { timeout: 60000 });
+      await page.waitForTimeout(500);
+    }
+    async function clickButton(name) {
+      if (mobile) await hideAndroidKeyboard();
+      const box = await page.getByRole('button', { name: new RegExp('^' + name + '$', 'i') }).first().boundingBox();
+      assert.ok(box, name + ' is visible');
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    }
+    await openReview('metadata');
+    const field = page.locator('.cn1-selection-editor[aria-label="reviewField"]');
+    await field.waitFor({ state: 'visible' });
+    assert.equal(await field.getAttribute('type'), 'email');
+    const appearance = await field.evaluate(el => {
+      const css = getComputedStyle(el);
+      return { color: css.color, top: parseFloat(css.paddingTop), bottom: parseFloat(css.paddingBottom),
+        height: el.clientHeight, font: parseFloat(css.fontSize) };
+    });
+    assert.match(appearance.color, /^rgba\(18, 52, 86, 0\.37/);
+    assert.ok(appearance.top > appearance.height / 2, 'bottom-aligned text leaves space above it');
+    await clickButton('Change constraints');
+    await page.waitForFunction(() => document.querySelector('[aria-label="reviewField"].cn1-selection-editor')?.type === 'number');
+    assert.equal(await field.getAttribute('inputmode'), 'numeric');
+    assert.equal(await field.getAttribute('autocomplete'), 'off');
+    assert.equal(await field.getAttribute('spellcheck'), 'false');
+    await clickButton('Reset constraints');
+    await page.waitForFunction(() => document.querySelector('[aria-label="reviewField"].cn1-selection-editor')?.type === 'text');
+    assert.equal(await field.getAttribute('inputmode'), null);
+    assert.equal(await field.getAttribute('autocomplete'), 'nickname');
+    assert.equal(await field.getAttribute('autocapitalize'), 'words');
+    assert.equal(await field.getAttribute('spellcheck'), 'true');
+    if (!mobile) {
+      await field.click();
+      await page.keyboard.press('Escape', { delay: 100 });
+      await page.waitForFunction(() => document.body.innerText.includes('Escape received'));
+      await page.keyboard.press('F2', { delay: 100 });
+      await page.waitForFunction(() => document.body.innerText.includes('F2 received'));
+    }
+    console.log('PASS', name, 'dynamic constraints, translucent foreground and bottom alignment' + (mobile ? '' : ', form shortcuts'));
+
+    await openReview('scroll');
+    const area = page.locator('.cn1-selection-editor[aria-label="reviewScroll"]');
+    await area.waitFor({ state: 'visible' });
+    const box = await area.boundingBox();
+    if (mobile) {
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Input.synthesizeScrollGesture', { x: box.x + box.width / 2, y: box.y + box.height * 0.8,
+        yDistance: -40, speed: 500, gestureSourceType: 'touch' });
+      await cdp.detach();
+    } else {
+      await page.mouse.move(box.x + 30, box.y + 25);
+      await page.mouse.wheel(0, 65);
+    }
+    await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="reviewScroll"]').scrollTop > 0);
+    assert.ok(Math.abs((await area.boundingBox()).y - box.y) < 2, 'the text viewport stays fixed while its content scrolls');
+    assert.ok(await page.evaluate(() => /Scroll Y [1-9]/.test(document.body.innerText)), 'CN1 owns the matching scroll state');
+    await clickButton('Reset scroll');
+    await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="reviewScroll"]').scrollTop === 0);
+    // Browser caret/selection scrolling is reflected back into the component too.
+    await area.evaluate(el => { el.scrollTop = 85; el.dispatchEvent(new Event('scroll')); });
+    await page.waitForFunction(() => /Scroll Y [1-9]/.test(document.body.innerText));
+    console.log('PASS', name, 'fixed-height textarea scroll synchronization in both directions');
+
+    await openReview('labels');
+    for (const text of ['Custom pointer label', 'Draggable label', '50%']) {
+      const span = page.locator('#cn1-text-layer span').filter({ hasText: text }).first();
+      await span.waitFor({ state: 'attached' });
+      assert.equal(await span.evaluate(el => getComputedStyle(el).pointerEvents), 'none', text + ' retains canvas gestures');
+    }
+    const plain = page.locator('#cn1-text-layer span').filter({ hasText: 'Plain selectable label' }).first();
+    assert.equal(await plain.getAttribute('data-cn1-native-selection'), 'true');
+    const item = page.locator('#cn1-text-layer span').filter({ hasText: /^Horizontal item 0$/ }).first();
+    const hb = await item.boundingBox();
+    if (mobile) {
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Input.synthesizeScrollGesture', { x: hb.x + hb.width / 2, y: hb.y + hb.height / 2,
+        xDistance: -70, speed: 500, gestureSourceType: 'touch' });
+      await cdp.detach();
+    } else {
+      await page.mouse.move(hb.x + 30, hb.y + hb.height / 2);
+      await page.mouse.wheel(70, 0);
+    }
+    await page.waitForFunction(x => {
+      const span = [...document.querySelectorAll('#cn1-text-layer span')].find(el => el.textContent === 'Horizontal item 0');
+      return !span || span.getBoundingClientRect().x < x - 10;
+    }, hb.x);
+    const custom = page.locator('#cn1-text-layer span').filter({ hasText: 'Custom pointer label' }).first();
+    const cb = await custom.boundingBox();
+    await page.mouse.click(cb.x + 15, cb.y + cb.height / 2);
+    assert.equal(await page.evaluate(() => window.__cn1PointerEvents.filter(e => e.type === 'mousedown').pop()?.target),
+      'CANVAS', 'custom label pointer input reaches the canvas');
+    console.log('PASS', name, 'interactive labels and horizontal scrolling over selectable text');
+    assert.deepEqual(errors, [], 'no browser/worker exceptions in review regressions');
+  }
   try {
+    if (process.env.CN1_JS_REVIEW_ONLY === 'true') { await exerciseReview(); return; }
     await page.goto(`http://${host}:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.bringToFront();
     await page.waitForFunction(() => !document.getElementById('cn1-splash'), null, { timeout: 60000 });
@@ -193,6 +291,7 @@ async function exercise(context, name, host, mobileDevice = null) {
       });
       console.log('PASS', name, 'hint disabled: legacy editor and unfocused Unicode rendering');
     }
+    await exerciseReview();
     assert.deepEqual(errors, [], 'no browser/worker exceptions');
   } finally {
     if (mobile) await mobileDevice.screenshot({ path: path.join(artifacts, name + '-device.png') }).catch(() => {});

@@ -21,3 +21,8 @@ accesses the test server through `10.0.2.2`. Screenshots and logs go under
 
 The translated compact-string regression is
 `JavascriptRuntimeSemanticsTest#preservesCompactLatin1AndWideStrings` in `vm/tests`.
+
+The selection harness also exercises runtime constraint changes, foreground alpha,
+bottom alignment, form shortcuts, fixed-height textarea scrolling in both directions,
+interactive/custom labels, and horizontal container scrolling. Set
+`CN1_JS_REVIEW_ONLY=true` to run only those review regression cases while iterating.
