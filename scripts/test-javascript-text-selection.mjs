@@ -389,7 +389,8 @@ async function exercise(context, name, host, mobileDevice = null) {
         ['Inherited context label', 'Inherited context received']]) {
         const span = page.locator('#cn1-text-layer span').filter({ hasText: text }).first();
         await span.waitFor({ state: 'attached' });
-        assert.equal(await span.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+        await page.waitForFunction(text => [...document.querySelectorAll('#cn1-text-layer span')]
+          .some(el => el.textContent.includes(text) && getComputedStyle(el).pointerEvents === 'none'), text);
         const bounds = await span.evaluate(el => el.getBoundingClientRect().toJSON());
         await page.mouse.click(bounds.x + 10, bounds.y + bounds.height / 2, { button: 'right' });
         await page.waitForFunction(text => document.body.innerText.includes(text), status);

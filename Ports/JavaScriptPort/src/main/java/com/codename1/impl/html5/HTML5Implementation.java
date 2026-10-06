@@ -7677,25 +7677,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             editingCompleteCallback = new Runnable() {
                 public void run() {
                     try {     
-                        // Fix for https://github.com/shannah/cn1-teavm-port/issues/48
-                        // on iPad the invisible input field may retain focus and we can't
-                        // seem to return focus to the canvas.
-                        if (!usePreemptiveNativeTextFieldApproach() || (!nextEditPending && !prevEditPending)) {
-                            
-                            inputEl.blur();
-                            outputCanvas.focus();
-                        } else {
-                            nextEditPending = false;
-                            prevEditPending = false;
-                        }
-
                         // Remove all of the event listeners that we added to the input field
                         // and text field before blocking.
                         
-                        EventUtil.removeEventListener(inputEl, "input", inputHandle);
-                        //EventUtil.removeEventListener(inputEl, "blur", blurHandle);
-                        //EventUtil.removeEventListener(inputEl, "focus", focusHandle);
-                        //EventUtil.removeEventListener(inputEl, "click", clickHandle);
+                        EventUtil.removeEventListener(finalInputEl, "input", inputHandle);
+                        //EventUtil.removeEventListener(finalInputEl, "blur", blurHandle);
+                        //EventUtil.removeEventListener(finalInputEl, "focus", focusHandle);
+                        //EventUtil.removeEventListener(finalInputEl, "click", clickHandle);
                         EventUtil.removeEventListener(window, "resize", resizeHandle);
                         if (!intervalCleared[0]) {
                             intervalCleared[0] = true;
@@ -7707,8 +7695,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             ((TextField)ta).removeDataChangeListener(dataChangedListener);
                         }
 
+                        // A delayed completion belongs to this session, even if a new
+                        // editor has already replaced the shared inputEl reference.
+                        if (inputEl != finalInputEl) {
+                            String completedText = finalInputEl.getValue();
+                            ta.setText(completedText);
+                            finalInputEl.getStyle().setProperty("display", "none");
+                            Display.getInstance().onEditingComplete(ta, completedText);
+                            ta.repaint();
+                            return;
+                        }
+                        // Fix for https://github.com/shannah/cn1-teavm-port/issues/48
+                        // on iPad the invisible input field may retain focus and we can't
+                        // seem to return focus to the canvas.
+                        if (!usePreemptiveNativeTextFieldApproach() || (!nextEditPending && !prevEditPending)) {
+
+                            finalInputEl.blur();
+                            outputCanvas.focus();
+                        } else {
+                            nextEditPending = false;
+                            prevEditPending = false;
+                        }
+
                         //if (lastHTMLInputTime > lastCN1InputTime) {
-                            text = inputEl.getValue();
+                            text = finalInputEl.getValue();
                         //} else {
                         //    text = ta.getText();
                         //}
@@ -7724,9 +7734,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             pendingTextChanges = null;
                             text = ta.getText();
                         }
+                        // Async edit completion does not copy the value itself. Capture
+                        // the final DOM value even if the last input callback is pending.
+                        if (!text.equals(ta.getText())) ta.setText(text);
 
                     } finally {
-                        cleanup.run();
+                        if (inputEl == finalInputEl) cleanup.run();
                     }
                 }
             };
