@@ -5534,6 +5534,19 @@ public final class Display extends CN1Constants {
         return "true".equals(getImplementationProperty("cn1.nativeRedirects", "false"));
     }
 
+    private static final class ExternalUrlDispatch implements Runnable {
+        private final String url;
+
+        ExternalUrlDispatch(String url) {
+            this.url = url;
+        }
+
+        @Override
+        public void run() {
+            com.codename1.router.Navigation.dispatchExternalUrl(url);
+        }
+    }
+
     /// Sets a local property to the application, this method has no effect on the
     /// implementation code and only allows the user to override the logic of getProperty
     /// for internal application purposes.
@@ -5552,7 +5565,14 @@ public final class Display extends CN1Constants {
             // and route them through the build-time-generated dispatcher; other
             // AppArg payloads (free-form launch data) are untouched.
             if (value != null && value.length() > 0 && looksLikeUrl(value)) {
-                com.codename1.router.Navigation.dispatchExternalUrl(value);
+                if (isEdt()) {
+                    com.codename1.router.Navigation.dispatchExternalUrl(value);
+                } else {
+                    // Native main threads must remain free to service EDT requests during
+                    // startup and rendering. Waiting for navigation here can deadlock them.
+                    // Store AppArg immediately above, but capture each URL for EDT delivery.
+                    callSerially(new ExternalUrlDispatch(value));
+                }
             }
             return;
         }
