@@ -278,6 +278,22 @@ class BuildTimeSettingsTest {
     }
 
     @Test
+    @DisplayName("a key that names a variable nobody set asks for nothing, as it did before anything read it")
+    void anUnresolvedReferenceIsNotARequest() throws Exception {
+        String unset = "CN1_TEST_NOBODY_SETS_THIS_" + System.nanoTime();
+        for (String key : new String[] {"cn1.management.enabled", "cn1.mcp.enabled",
+            "cn1.otel.enabled"}) {
+            Backend.builder(config(key, "${" + unset + "}")).quiet().port(0).handler(NOTHING)
+                    .start().stop();
+        }
+        // And a tracer that was built in stays in.
+        Opened tracer = new Opened();
+        Backend.builder(config("cn1.otel.enabled", "${" + unset + "}")).quiet().port(0)
+                .handler(NOTHING).tracing(tracer).start().stop();
+        assertTrue(tracer.asked);
+    }
+
+    @Test
     @DisplayName("a @BackendTest application is built without those parts and is not refused for them")
     void theTestApplicationIsNotAPackagedServer() throws Exception {
         open();

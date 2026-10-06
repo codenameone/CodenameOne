@@ -1733,7 +1733,7 @@ public final class Backend {
                     mcpRoute != null || testApplication,
                     tracer != null || metricReader != null || testApplication);
             // And the other way: a server built to export that is told not to.
-            boolean telemetryOff = BuildTimeSettings.switchedOff(config,
+            boolean telemetryOff = BuildTimeSettings.leftOut(config,
                     BuildTimeSettings.TELEMETRY);
             // BEFORE the database, so the statements start-up runs -- the ORM's
             // CREATE TABLE -- are traced like any other, and before anything that
@@ -2177,7 +2177,7 @@ public final class Backend {
             try {
                 // Not for a server told at run time to leave the exporters out.
                 if (metricReader != null
-                        && !BuildTimeSettings.switchedOff(config, BuildTimeSettings.TELEMETRY)) {
+                        && !BuildTimeSettings.leftOut(config, BuildTimeSettings.TELEMETRY)) {
                     readerOpen = metricReader.open(config);
                     measuring |= readerOpen;
                 }

@@ -100,7 +100,7 @@ final class BuildTimeSettings {
         };
         for (int i = 0; i < SETTINGS.length; i++) {
             String[] setting = SETTINGS[i];
-            if (builtIn[i] || !config.getBoolean(setting[0], false)) {
+            if (builtIn[i] || !asksFor(config, setting[0])) {
                 continue;
             }
             throw new IllegalStateException(setting[0] + " is true in this server's run-time "
@@ -112,6 +112,31 @@ final class BuildTimeSettings {
                     + "application.properties and build again."
                     + (setting[3] == null ? ""
                             : " A server assembled by hand " + setting[3] + " instead."));
+        }
+    }
+
+    /// Whether the configuration resolves `key` to true. A value that cannot be read --
+    /// `${NAME}` naming a variable nobody set -- asks for nothing: before this check
+    /// existed nothing read these keys in a server built without their part, and a
+    /// server that started then must not be stopped now by a reference it never used.
+    private static boolean asksFor(Config config, String key) {
+        try {
+            return config.getBoolean(key, false);
+        } catch (IOException unreadable) {
+            return false;
+        }
+    }
+
+    /// [#switchedOff(Config, String)], for a key nothing read at run time until now: a
+    /// value that cannot be read leaves the part in, as it was left in before.
+    /// @param config the server's configuration
+    /// @param key one of the keys of this class
+    /// @return true when the key is set, readable and not a truth value
+    static boolean leftOut(Config config, String key) {
+        try {
+            return switchedOff(config, key);
+        } catch (IOException unreadable) {
+            return false;
         }
     }
 
