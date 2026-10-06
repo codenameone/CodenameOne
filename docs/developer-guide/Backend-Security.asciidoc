@@ -1,0 +1,1450 @@
+[[backend-security]]
+== Backend security
+
+The backend's security layer decides who a request is from and whether that
+caller may have what it asked for. It has the shape of Spring Security: you
+declare a filter chain as a bean, describe it with `HttpSecurity`, and the
+names and defaults are the ones you already know. This chapter covers the
+chain, the ways of signing in, the tokens a server verifies and issues, the
+tables it keeps, and how to test it. The differences from Spring
+Security are collected in <<backend-security-differences>>.
+
+The client side is covered in <<authentication-and-identity>>: signing a
+Codename One app in against this server with `OidcClient`, storing its tokens,
+authorizing its requests, the device grant and passkeys.
+
+=== The filter chain
+
+A filter chain is an ordered list of filters that every request it guards
+passes through before it reaches a controller. One filter reads the session,
+another checks a password or a token, another applies the authorization rules.
+You don't write the filters. You declare a `SecurityFilterChain` bean, and the
+`HttpSecurity` its method is handed builds the chain from what you ask for:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecurityConfig.java[tag=backend-security-config,indent=0]
+----
+
+This server has two chains. Requests under `/api` carry a bearer token and
+keep no session. Everything else belongs to a browser that signs in through a
+form.
+
+A request is put to the chains in `@Order`, lowest first. Only the first chain
+whose `securityMatcher` matches the request sees it. A chain without
+a `securityMatcher` guards every request, so it has to come last, and a server
+whose catch-all chain isn't last refuses to start. A bean without `@Order`
+comes after those that have one. A request that no chain matches isn't guarded
+at all.
+
+The server's own endpoints, which are management, MCP and the telemetry relay,
+aren't put to any chain. They keep their own tokens. A WebSocket handshake is a
+request like any other, and its chain can refuse it.
+
+A chain is an ordinary singleton. The server takes its chains when it starts,
+so the build refuses one that's `@Lazy` or scoped.
+
+Out of the box a chain guards every request it matches, writes the security
+headers, keeps the signed-in user in the HTTP session, protects that session
+against CSRF, and gives a request nobody signed in for an anonymous
+authentication. It has no way of signing in and no authorization rules until
+you give it some.
+
+==== A server without a chain has no security layer
+
+Nothing here is switched on by a dependency. The build links the security
+layer only when it finds a `SecurityFilterChain` bean, so a server without one
+has no filters, no login page and no generated password. Its routes are open,
+exactly as they were before. That's the opposite of Spring Boot, where the
+starter on the classpath locks every route. See
+<<backend-security-linking>> for what else follows from this.
+
+==== Who is calling
+
+A handler receives the caller by declaring a parameter:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AccountApi.java[tag=backend-security-handler,indent=0]
+----
+
+An `Authentication` parameter is the authentication of the request. An
+`@AuthenticationPrincipal` parameter is its principal, and it's `null` when the
+principal isn't of the declared type. That includes a request nobody signed in
+for, whose principal is the text `anonymousUser`. A handler can also declare a
+`CsrfToken` parameter. The build refuses all three in a module with no chain,
+where they would always be `null`.
+
+Anywhere else, ask the holder:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-current,indent=0]
+----
+
+The context belongs to the thread that serves the request, for the length of
+that request. It doesn't follow work handed to another thread: an `@Async`
+method or a `@Scheduled` job starts with none.
+
+=== Users and passwords
+
+A chain that takes a password needs to know its users. It finds them in the
+application's `UserDetailsService` bean. For a demonstration or a test, keep
+them in memory:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/DemoUsers.java[tag=backend-security-users-memory,indent=0]
+----
+
+For a real application, keep them in the database. `JdbcUserDetailsManager`
+uses the `cn1_users` and `cn1_authorities` tables described in
+<<backend-security-schema>>:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecurityConfig.java[tag=backend-security-users-jdbc,indent=0]
+----
+
+Both stores compare names without regard to the case of `A` to `Z`, and keep
+the spelling a user was created with. A store keeps a password as it's given,
+so encode it first:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/DemoUsers.java[tag=backend-security-users-create,indent=0]
+----
+
+You can also implement `UserDetailsService` yourself over your own tables, or
+hand a chain its users directly with `http.userDetailsService(...)`. A chain
+uses the application's `AuthenticationProvider` beans or its
+`AuthenticationManager` bean when it has them.
+
+A server with no user store at all can describe one user in its configuration,
+which suits a first run:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-user,indent=0]
+----
+
+==== Password encoders
+
+A stored password starts with the scheme that made it, in braces:
+
+[source]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.txt[tag=backend-security-passwords,indent=0]
+----
+
+`PasswordEncoderFactories.createDelegatingPasswordEncoder()` returns the
+encoder that reads that prefix, and a chain uses it when the application
+declares no `PasswordEncoder` bean. It encodes new passwords with
+`{pbkdf2-sha256}`, which is PBKDF2 over HMAC-SHA256 with a random salt and the
+round count written into the result.
+
+It also verifies what a Spring application wrote: `{bcrypt}`, `{pbkdf2}` and
+`{pbkdf2@SpringSecurity_v5_8}`. A user table brought over from Spring
+therefore signs its users in as it is. A password in an older scheme is
+re-encoded in the current one the next time its owner signs in, as long as the
+user store implements `UserDetailsPasswordService`. Both stores above do.
+
+A password whose prefix names a scheme the encoder doesn't know is refused. A
+password with no prefix is refused too, unless you call
+`setDefaultPasswordEncoderForMatches` for a store that predates the prefixes.
+
+`{noop}` stores a password as clear text. It verifies only on a development
+profile, which is `dev`, `development`, `test` or `local`. Anywhere else a
+`{noop}` password matches nothing, and the server says why once on standard
+error.
+
+Checking a password takes tens of milliseconds of processor time that can't be
+interrupted. Set `cn1.security.password.maxConcurrent` to bound how many are
+checked at once. A sign-in beyond the bound is answered 503 with `Retry-After`
+immediately, instead of taking a thread from the rest of the server. A value
+near the number of processors, less one or two, is reasonable. There's no bound
+unless you set one.
+
+An unknown username still costs one password comparison, so the time an
+answer takes doesn't say whether the account exists.
+
+=== Authorization rules
+
+`authorizeHttpRequests` says which requests need what:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-rules,indent=0]
+----
+
+The rules are asked in the order they're written, and the first that matches
+decides. A request that no rule matches is denied, so most chains end with
+`anyRequest()`.
+
+A pattern is an Ant pattern. `?` is one character, and `*` is any run of
+characters within one path segment. `**` is any number of whole segments,
+including none, so `/api/**` matches `/api`, `/api/` and `/api/users/7`.
+`{name}` binds one segment. Matching is case-sensitive, as routing is, and a
+trailing slash is part of the path. `AntPathRequestMatcher.antMatcher` adds an
+HTTP method, and `RequestMatchers` combines matchers with `allOf`, `anyOf` and
+`not`.
+
+[cols="2,3", options="header"]
+|===
+| Rule | Who passes
+
+| `permitAll()`, `denyAll()`
+| Everyone, and nobody.
+
+| `authenticated()`
+| Anyone who signed in.
+
+| `fullyAuthenticated()`
+| Someone who signed in during this session, and wasn't only recognized by a
+  `remember-me` cookie. Use it for what should ask for the password again.
+
+| `rememberMe()`, `anonymous()`
+| Someone recognized by a `remember-me` cookie, and a caller who didn't sign in.
+
+| `hasRole("ADMIN")`, `hasAnyRole(...)`
+| A caller with the authority `ROLE_ADMIN`, or with any one of the roles.
+
+| `hasAuthority("orders:delete")`, `hasAnyAuthority(...)`
+| A caller with the authority exactly as it's written.
+
+| `access(manager)`
+| Whoever your own `AuthorizationManager` grants.
+|===
+
+A role is an authority with the `ROLE_` prefix, and nothing more. `roles("ADMIN")`
+on a user grants `ROLE_ADMIN`, and `hasRole("ADMIN")` asks for it. A token's
+scopes become authorities with the `SCOPE_` prefix, which is why the first
+chain in this chapter asks for `SCOPE_orders:read`.
+
+==== Paths the layer refuses
+
+Before any rule sees a request, the layer checks that its path can't mean one
+thing to a rule and another to the router. A path with a `;` parameter, a
+backslash, an empty segment, a `.` or `..` segment or a control character is
+answered `400 Bad Request`. The same goes for a path with an encoded slash,
+backslash, percent, dot, semicolon, or NUL. The check applies to every request of a server
+that has a chain.
+
+==== The answers to a refused request
+
+A request that must sign in is answered by the chain's entry point. With form
+login that's a redirect to the login page. With HTTP Basic it's a 401 with a
+challenge, when Basic is the only way in or a script made the request. A bearer
+token or an API key gets a 401 with the reason in `WWW-Authenticate`. A chain
+with no way of signing in answers 403. A signed-in caller that's denied gets a
+403. Change either one with `exceptionHandling`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-handling,indent=0]
+----
+
+=== Form login, HTTP Basic and sign-out
+
+==== Form login
+
+With nothing set, `formLogin` serves a plain login page at `GET /login`. It
+takes the form at `POST /login` with the fields `username` and `password`. It
+sends a signed-in user back to the page that asked for the sign-in, or to `/`,
+and a refused one to `/login?error`.
+
+Name a `loginPage` to serve your own:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-form,indent=0]
+----
+
+The chain then serves no page and takes the form at that same path. Call
+`permitAll()` with a page of your own. Without it, a rule such as
+`anyRequest().authenticated()` redirects the login page to itself.
+
+Only the address of the page that asked for the sign-in is remembered, and
+only for a `GET` that a browser made. A request with a body isn't replayed
+after the user signs in.
+
+==== HTTP Basic
+
+`httpBasic` checks the `Authorization: Basic` header on every request that
+carries one. It keeps nothing and starts no session:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-basic,indent=0]
+----
+
+==== Sign-out
+
+`POST /logout` ends the session, forgets who was signed in and redirects to
+`/login?logout`. `logout` changes the path, the destination and the cookies to
+delete, as the form example above shows. The request must be a `POST` while
+CSRF protection is on, so that a link on another site can't sign a user out.
+
+A chain has sign-out when it has a way of signing in to a session, which is
+`formLogin`, `oauth2Login`, `rememberMe`, `mfa` or `webAuthn`. Any other chain
+has no `POST /logout` until it calls `http.logout(...)`.
+
+=== CSRF, sessions and headers
+
+==== CSRF
+
+A chain that keeps a session requires a CSRF token on every request that isn't
+a `GET`, `HEAD`, `TRACE` or `OPTIONS`, and answers 403 without it. The token
+travels in the `_csrf` form field or the `X-CSRF-TOKEN` header. The generated
+login page carries it already. Your own pages get it from a `CsrfToken` handler
+parameter or from `CsrfFilter.getToken(request)`.
+
+The token a page is given is masked with random bytes, so every response
+carries a different string for the same token. The token is replaced when a
+user signs in.
+
+A single-page application usually wants the token in a cookie that its script
+reads and sends back in the `X-XSRF-TOKEN` header:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-csrf,indent=0]
+----
+
+`ignoringRequestMatchers` leaves out an endpoint that another server calls and
+that authenticates some other way. A request authenticated by a bearer token
+or an API key is never asked for the token, because a browser doesn't attach
+those to a request another site made it send. `csrf.disable()` turns the
+protection off for a chain whose clients aren't browsers.
+
+A `STATELESS` chain has no CSRF filter unless it calls `http.csrf(...)`. It
+keeps nothing a forged request could ride on. A stateless chain that takes
+HTTP Basic credentials from browsers should ask for it.
+
+==== Sessions
+
+`sessionManagement` says whether a chain may use the HTTP session that
+<<backend-sessions>> describes:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-session,indent=0]
+----
+
+[cols="1,3", options="header"]
+|===
+| Policy | What the chain does
+
+| `IF_REQUIRED`
+| Starts a session when it needs one: at sign-in, or to remember where an
+  anonymous request was going. The default.
+
+| `ALWAYS`
+| Gives every request under the chain a session.
+
+| `NEVER`
+| Never starts a session, and uses one that's already there.
+
+| `STATELESS`
+| Neither starts nor reads a session. Each request carries its own credentials.
+|===
+
+At sign-in the chain changes the session id and keeps the attributes, which is
+the `changeSessionId()` call that the sessions chapter asks you to make by
+hand. `sessionFixation` chooses otherwise: `newSession()` starts an empty
+session, and `none()` leaves the session as it is.
+
+==== Security headers
+
+Every chain puts these on its responses:
+
+[source]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.txt[tag=backend-security-headers,indent=0]
+----
+
+The cache headers are left out when the handler set any of the three itself.
+`Strict-Transport-Security` is sent only for a request that arrived over TLS.
+A header the handler set is never replaced. `headers` changes the defaults and
+adds a `Content-Security-Policy`, which isn't sent unless you configure it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-headers,indent=0]
+----
+
+[[backend-security-method]]
+=== Method security
+
+Rules about paths guard the door. Method security guards the service behind
+it, whoever calls it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/Reports.java[tag=backend-security-method,indent=0]
+----
+
+[cols="2,3", options="header"]
+|===
+| Annotation | Who may call
+
+| `@PreAuthorize("...")`
+| A caller for whom the expression holds.
+
+| `@Secured("ROLE_ADMIN")`
+| A caller with one of the authorities, each written in full.
+
+| `@RolesAllowed("ADMIN")`
+| A caller with one of the roles. `ADMIN` asks for `ROLE_ADMIN`.
+
+| `@PermitAll`, `@DenyAll`
+| Anyone, and nobody.
+|===
+
+On a class, an annotation covers every public method. On a method, it replaces
+the one on the class. A caller who hasn't signed in gets an
+`InsufficientAuthenticationException`, which a chain answers with its sign-in
+challenge. A signed-in caller who's refused gets an `AccessDeniedException`,
+which is a 403.
+
+==== The expression subset
+
+The backend has no expression language at run time. The build compiles each
+`@PreAuthorize` expression into plain Java, so an expression costs what an
+`if` costs, and a mistake in one is a build error. An expression may contain:
+
+* `hasRole('X')`, `hasAnyRole('X', 'Y')`, `hasAuthority('X')` and
+  `hasAnyAuthority('X', 'Y')`.
+* `isAuthenticated()`, `isAnonymous()`, `isFullyAuthenticated()`,
+  `isRememberMe()`, `permitAll` and `denyAll`.
+* `and`, `or` and `not`, also written `&&`, `||` and `!`, and parentheses.
+* `authentication.name` and `principal.username`, compared with `==` or `!=`
+  to a string literal or to a `String` parameter written `#name`.
+* A call on a bean, written `@beanName.method(...)`.
+
+A parameter is named as the source names it when the class is compiled with
+debug information or `-parameters`. Otherwise name it with `@P`, as `rename`
+does above.
+
+==== Calling a bean
+
+Anything the subset can't say goes in a bean method:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/DocumentPermissions.java[tag=backend-security-method-bean,indent=0]
+----
+
+The arguments of the call can be `authentication`, `principal`, a parameter
+written `#name`, or a string, whole number or boolean literal. The build
+checks the call against the bean's class: the method has to exist, be public
+in a public class, and return `boolean`. The bean has to be a singleton. Its
+name is the class's simple name with the first letter in lower case, unless
+`@Component` names it.
+
+==== Where the build draws the line
+
+What the build can't compile, it refuses with the reason and the fix:
+
+[source]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.txt[tag=backend-security-build-errors,indent=0]
+----
+
+The build also refuses `returnObject`, `T(...)`, `@PostAuthorize`, `@PreFilter`
+and `@PostFilter`, two security annotations on one element, and an annotation
+on an interface method or an abstract method.
+
+Because the build rewrites the method itself instead of wrapping the object in
+a proxy, the check runs however the method is called: from another bean, from
+`this`, on a private method, or on an object made with `new`. In Spring a call
+through `this` skips the check. For an `@Async` method the check runs on the
+caller's thread, before the work is handed off.
+
+[[backend-security-resource-server]]
+=== A JWT resource server
+
+A resource server takes a bearer token on each request and verifies it as a
+JWT. `oauth2ResourceServer` turns it on, as the `api` chain at the top of this
+chapter does, and two properties tell it whose tokens to accept:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-jwt,indent=0]
+----
+
+With an `issuer-uri`, the server reads the issuer's metadata from its
+`.well-known` address when it starts, and refuses metadata that names another
+issuer. It fetches the keys from the metadata's `jwks_uri` when the first
+token arrives, and requires every token's `iss` to be that issuer.
+
+Set `audiences` too. Without it, a token the issuer made for another
+application is accepted here.
+
+A token with a bad signature, an expired token, or one from another issuer is
+answered 401 with the reason in `WWW-Authenticate`. A good token that doesn't
+grant enough is answered 403 with `insufficient_scope`. No session is started
+for a request that carries a token.
+
+==== Keys
+
+For an issuer that publishes no metadata, set `jwk-set-uri` instead, or
+`public-key-location` for a PEM file holding the one public key. For anything
+the properties can't say, declare a `JwtDecoder` bean:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/ResourceServerConfig.java[tag=backend-security-jwt-decoder,indent=0]
+----
+
+A fetched key set is kept for five minutes. A token that names a key the set
+doesn't have makes the server fetch early, which is how a rotated key is
+picked up, but never more than once in 30 seconds. When a fetch fails, the
+server goes on using the keys it has.
+
+Use an `https` address for the keys. They're what every token is trusted by.
+
+==== What's verified
+
+The token's `alg` header never chooses the algorithm. A decoder is built with
+the algorithms it accepts, `RS256` unless told otherwise, and holds keys of a
+matching kind. A token whose header disagrees with either is refused, so
+`alg: none` fails, and so does a token signed with HMAC using an RSA public
+key as the secret. The supported algorithms are `RS256`, `RS384`, `RS512`,
+`PS256`, `ES256` and `ES384`, and `HS256`, `HS384` and `HS512` for a shared
+secret.
+
+The default validators check `exp` and `nbf` with a minute's allowance for
+clocks that disagree. A decoder checks `iss` and `aud` only when it's told
+what they should be. `JwtClaimValidator` tests any other claim.
+
+==== From scopes to authorities
+
+A token's authorities come from its `scope` claim, or else `scp`, each with
+the `SCOPE_` prefix. A token with `"scope": "orders:read orders:write"` is
+granted `SCOPE_orders:read` and `SCOPE_orders:write`. Its name is the `sub`
+claim. A converter changes either one:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/ResourceServerConfig.java[tag=backend-security-jwt-converter,indent=0]
+----
+
+==== Several issuers
+
+A server that trusts more than one issuer routes each token by its `iss`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-jwt-issuers,indent=0]
+----
+
+A token that names an issuer not on the list is refused without a request
+being made anywhere.
+
+=== API keys
+
+An API key is a long-lived secret that a program presents instead of signing
+in. `apiKey` turns it on:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-apikey,indent=0]
+----
+
+A client sends its key in either of two headers:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.sh[tag=backend-security-bash-apikey,indent=0]
+----
+
+The chain looks keys up in the application's `ApiKeyRepository` bean. That's a
+`JdbcApiKeyRepository` over the `cn1_api_key` table, an
+`InMemoryApiKeyRepository`, or your own. Make a key with `ApiKeyGenerator`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-apikey-generate,indent=0]
+----
+
+A key is a prefix followed by 256 random bits. Only its SHA-256 is stored, so a
+copy of the table isn't a set of working keys, and the key's text exists only
+at the moment it's made. The stored record keeps the prefix and the last four
+characters, which is enough to show someone which key a row is. `revoke`
+withdraws a key.
+
+A request authenticated by a key is named after the key's owner, and each scope
+is the authority `SCOPE_` and its name. Those are the authorities a token with
+the same scopes gets, so one set of rules covers both. On a chain that also has
+`oauth2ResourceServer`, a bearer value that starts with the key prefix is an
+API key and any other is a token. The prefix is `cn1_` unless you change it,
+and the chain's prefix has to be the one the keys were generated with.
+
+=== Rate limiting
+
+`rateLimit` bounds how often the requests a matcher matches may be made under
+one key. A request over the limit is answered 429 with `Retry-After`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-ratelimit,indent=0]
+----
+
+`RateLimitKeys` has the usual keys: the client's address, the name of who is
+signed in, the session id and the API key's id. `firstOf` takes the first one
+a request has. A limit whose key the request has from the start runs before
+anything else in the chain, so a refused request costs no password hash and no
+query. A limit keyed by who signed in runs once that's known. A request with
+no key for a rule isn't limited by it.
+
+Give each rule its own limiter. Two rules that share one share its counts.
+
+`InMemoryRateLimiter` is a token bucket, and its counts are per process. A
+server that runs as several instances has one count in each, so a client is
+allowed up to the limit times the number of instances. The counts are also
+gone when the process restarts. That's usually fine for a limit that keeps
+load down. A limit that's a security bound, such as attempts at a password,
+needs `JdbcRateLimiter`, which counts in the `cn1_rate_limit` table so that
+every process shares one limit. It costs a statement or two per request. When
+the database can't be reached it refuses nobody.
+
+[[backend-security-proxies]]
+==== Client addresses behind a proxy
+
+Behind a load balancer every connection comes from the load balancer, so
+`RateLimitKeys.clientAddress()` would be one key for every client. The real
+address arrives in `X-Forwarded-For`, and anybody can send that header. The
+server therefore believes it only when you say so, and only from a proxy it
+trusts:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-proxy,indent=0]
+----
+
+`cn1.server.forwardHeaders` is `false` unless set. `cn1.server.trustedProxies`
+is a list of addresses and CIDR ranges. Unless it's set, the trusted proxies
+are loopback and the private ranges. `X-Forwarded-For` is read from the right,
+past every trusted proxy, so what a client wrote at the left end is never
+reached.
+
+The same setting decides whether `X-Forwarded-Proto` is believed. That's what
+`request.isSecure()` answers with behind a proxy that terminates TLS, and it
+decides whether `Strict-Transport-Security` is sent. `request.getRemoteAddress()`
+is the client's address under these rules, and `request.getPeerAddress()` is
+always the other end of the connection.
+
+[[backend-security-oauth2-login]]
+=== Signing in through another provider
+
+`oauth2Login` signs users in through Google, GitHub, Microsoft, Apple or any
+OAuth2 or OpenID Connect provider:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-oauth2-login,indent=0]
+----
+
+The providers come from the configuration:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-oauth2,indent=0]
+----
+
+A registration called `google`, `github` or `microsoft` needs only the client
+id and secret the provider issued. Any other provider is described by a
+`cn1.security.oauth2.client.provider.<id>` block. Give it an `issuer-uri` and
+the endpoints are read from the issuer's metadata. Otherwise name them with
+`authorization-uri`, `token-uri`, `user-info-uri`, `jwk-set-uri` and
+`user-name-attribute`. Under a registration, the keys are `client-id`,
+`client-secret`, `client-authentication-method`, `scope`, `redirect-uri`,
+`client-name`, `response-mode` and `provider`.
+
+A sign-in starts at `GET /oauth2/authorization/{registrationId}`, which sends
+the browser to the provider. It ends at `/login/oauth2/code/{registrationId}`,
+which is the redirect address to register with the provider. A chain with no
+login page of its own serves one at `GET /login` with a link for each
+provider. When there's only one provider, a request that must sign in goes
+straight to it.
+
+Every request to a provider carries a `state`, a PKCE challenge and, with
+OpenID Connect, a `nonce`. An ID token is accepted only when its signature
+verifies under the provider's published keys and its `iss`, `aud`, `exp` and
+`nonce` are right. After the sign-in, the user goes back to the page that
+asked for it or to `defaultSuccessUrl`. Nothing the provider or the request
+says chooses the address.
+
+The Microsoft registration uses the multi-tenant `common` endpoints, which
+accept accounts of any organization. An application that admits one tenant
+should also check the `tid` claim.
+
+==== Sign in with Apple
+
+Apple's client secret isn't a text Apple issues. It's a token the server signs
+with the `.p8` key from the developer account, so Sign in with Apple is
+declared in code, beside the registrations the configuration holds:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SocialLoginConfig.java[tag=backend-security-oauth2-apple,indent=0]
+----
+
+A `ClientRegistrationRepository` bean replaces the registrations read from the
+configuration, which is why this one adds them itself.
+
+Apple answers with a form that the browser posts from Apple's page, and a
+browser doesn't send the session cookie with such a request. The pending
+sign-in is therefore kept in a signed cookie of its own. Set
+`cn1.security.oauth2.client.cookie-secret`, at least 32 characters, to the
+same value on every instance. Without it each process makes its own key when
+it starts.
+
+==== Account linking
+
+By default, a user who signs in through a provider is that provider's user and
+nothing more. `LinkingOAuth2UserService` ties them to one of the application's
+own users, so the same person has the same account and the same roles however
+they sign in:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SocialLoginConfig.java[tag=backend-security-oauth2-linking,indent=0]
+----
+
+It decides who the provider's user is in this order:
+
+. An identity that's already tied to a local user signs in as that user. An
+  identity is the provider and the provider's subject, never the email
+  address, which can change hands.
+. Otherwise the provider must say that it has verified the user's email
+  address. An address it doesn't vouch for is refused with
+  `email_not_verified`. GitHub's user carries no such flag, so GitHub is asked
+  for its list of addresses, and the one marked both primary and verified is
+  used.
+. A verified address that's the name of a local user ties the identity to that
+  user.
+. A verified address that nobody here has makes a new local user when
+  `setCreateUsers(true)` allows it and the user store is a
+  `UserDetailsManager`. Otherwise the sign-in is refused with
+  `account_not_found`.
+
+A user made this way has a password nobody knows, and signs in through the
+provider until they set one. The identities are kept in a
+`FederatedIdentityRepository`, in memory or in the `cn1_federated_identity`
+table.
+
+[[backend-security-authorization-server]]
+=== The authorization server
+
+`authorizationServer` makes the server an OAuth2 authorization server and
+OpenID Connect provider: the one that signs users in for clients and issues
+them tokens. A Codename One app signs in against it with a system browser and
+PKCE, and then calls your API with the access token.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver,indent=0]
+----
+
+How a user signs in is whatever else the chain declares: a form, another
+provider, a second factor, a passkey. A browser that arrives signed out is
+sent to sign in and comes back to the request it made. A client that isn't a
+browser is answered 401 with `login_required`.
+
+[cols="2,3", options="header"]
+|===
+| Endpoint | What it does
+
+| `GET /oauth2/authorize`
+| The authorization endpoint, for the signed-in user.
+
+| `POST /oauth2/token`
+| The token endpoint.
+
+| `GET /oauth2/jwks`
+| The public halves of the signing keys.
+
+| `POST /oauth2/revoke`
+| Revokes a token.
+
+| `POST /oauth2/device_authorization`
+| Starts a device grant.
+
+| `/oauth2/device_verification`
+| The page where the signed-in user types the device's code.
+
+| `GET /userinfo`
+| The user's claims, for an access token granted `openid`.
+
+| `GET /.well-known/openid-configuration`, `GET /.well-known/oauth-authorization-server`
+| The metadata a client discovers the endpoints from.
+|===
+
+The server needs to know its issuer, which is the address clients reach it at,
+with no trailing slash:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-authserver,indent=0]
+----
+
+The issuer is the `iss` of every token and the base of every address in the
+metadata. Outside a development profile the server doesn't start without it.
+On a development profile it's taken from the request. `settings` sets the
+issuer in code and moves the endpoints, and `tokenCustomizer` changes the
+claims of a token before it's signed:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver-customize,indent=0]
+----
+
+==== Registered clients
+
+The clients are the application's `RegisteredClientRepository` bean, and the
+server doesn't start without one:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver-clients,indent=0]
+----
+
+The first client is public. A mobile app can't keep a secret, so it
+authenticates with nothing and proves with PKCE that the code it redeems is
+the one it asked for. PKCE is required of a public client, and only `S256` is
+accepted.
+
+The second client is confidential. It has a secret, which is stored as a
+`PasswordEncoder` wrote it and compared through the application's
+`PasswordEncoder` bean. A server with confidential clients and no such bean
+refuses their secrets and says so in its log, so declare the bean or call
+`clientSecretEncoder(...)`.
+
+A redirect address is matched whole, character for character. There are no
+wildcards. The one exception is an `http` address on `127.0.0.1` or `[::1]`,
+which may be asked for with any port, because a desktop application can't know
+which port it will get. A request whose client or redirect address is wrong is
+answered 400 and never a redirect.
+
+A client is never granted a scope it wasn't registered with. There's no
+consent page: registering a client with a scope is the consent.
+
+`JdbcRegisteredClientRepository` keeps the clients in the
+`cn1_oauth2_registered_client` table instead.
+
+==== Grants
+
+* **Authorization code.** A code works once, for five minutes. Presenting it
+  again later revokes what its use issued.
+* **Refresh token.** Opaque, stored as a hash, and issued to public clients
+  too.
+* **Client credentials.** For a client with a secret, acting as itself:
++
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.sh[tag=backend-security-bash-client-credentials,indent=0]
+----
+* **Device code.** For a device with no browser or keyboard, described below.
+
+==== Refresh tokens
+
+A refresh token is replaced every time it's used. Using one that was already
+replaced means two parties hold it, so the server revokes the whole grant.
+That rotation is what protects a public client, which has no secret to
+present with the token. A client that refreshes twice at the same moment is
+allowed ten seconds in which the second request is refused and nothing is
+revoked.
+
+`TokenSettings` sets the lifetimes for each client. Unless set, an
+authorization code, an access token and a device code last 5 minutes, an ID
+token 30 minutes, and a refresh token 60 minutes from its last use.
+`reuseRefreshTokens(true)` turns rotation off.
+
+The grants are kept by the application's `OAuth2AuthorizationService` bean:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver-store,indent=0]
+----
+
+Without one, the grants are kept in the process, and a line at start-up says
+so. Refresh tokens then don't survive a restart and aren't shared between
+instances.
+
+==== Keys and rotation
+
+Tokens are signed with the keys in `cn1.security.authorizationserver.jwk.keys`,
+a list of PEM files that each hold an RSA or a P-256 private key. Make one
+with:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.sh[tag=backend-security-bash-key,indent=0]
+----
+
+The first key signs every new token, with `RS256` for an RSA key and `ES256`
+for a P-256 key. Every key is published at `/oauth2/jwks`. To rotate,
+put the new key first and keep the old one in the list for as long as its
+tokens live. A resource server picks the new key up on its own, as
+<<backend-security-resource-server>> describes.
+
+A key file protected by a passphrase is refused. On a development profile
+with no key set, the server makes a key when it starts and warns you, and
+every restart then invalidates every token. Anywhere else, a missing key stops
+the server from starting.
+
+An application that signs tokens of its own declares the keys and an encoder
+as beans, and the authorization server uses the same ones:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver-keys,indent=0]
+----
+
+==== The device grant
+
+A television or a command-line tool can't show a login page. It asks the server
+for a code, and then polls the token endpoint while the user approves it
+somewhere else:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.sh[tag=backend-security-bash-device,indent=0]
+----
+
+The first answer carries a `device_code`, a `user_code` of eight letters, a
+`verification_uri` and the `interval` to poll at. The user opens the
+verification page on a phone or a computer, signs in, types the code, and is
+asked by name whether to let that client in. Until they answer, the device's
+polling is answered `authorization_pending`, `slow_down`, `access_denied` or
+`expired_token`.
+
+One user may try ten codes in five minutes at the verification page. That
+count is kept in the process unless you give `deviceVerificationRateLimiter`
+a limiter that counts in the database.
+
+==== What a resource server sees
+
+An access token is a JWT of type `at+jwt`. Its payload looks like this:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.txt[tag=backend-security-token-claims,indent=0]
+----
+
+`sub` is the user's name, or the client's id for the client credentials grant.
+`aud` is the client's id, so that's the value a resource server lists in its
+`audiences`. `scope` becomes the `SCOPE_` authorities that
+<<backend-security-resource-server>> describes.
+
+An ID token also carries `nonce`, `auth_time`, `azp` and `at_hash`. Without a
+`userInfoMapper`, the `profile` scope yields `preferred_username` and the
+`email` scope yields nothing, because the server doesn't know that a username
+is an address.
+
+An access token is verified by its signature alone. Revoking a grant stops its
+refresh token and its answers at `/userinfo`, but an access token that's
+already issued stays good until it expires. Keep access tokens short.
+
+=== A second factor
+
+`mfa` asks a user who has enrolled an authenticator app for a one-time code
+after their password:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecondFactorConfig.java[tag=backend-security-mfa,indent=0]
+----
+
+The password of an enrolled user no longer signs them in. It's accepted, the
+request stays anonymous, and the user is sent to `/login/mfa`, which asks for
+the code. Posting a right one there signs them in. A user who hasn't enrolled
+signs in as before. The chain serves a plain page at `GET /login/mfa` unless
+`secondFactorPage` names your own. The user has five minutes to enter the
+code, and five attempts.
+
+The second factor applies to every sign-in that ends in a session, including
+one through another provider.
+
+==== Enrolling
+
+Enrollment takes two steps, so that nobody is locked out by an app that was
+never set up. First make a secret and show it to the user:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-totp-begin,indent=0]
+----
+
+Then take a code from their app. Only then does the user have a second
+factor:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-totp-confirm,indent=0]
+----
+
+Codes are six digits that change every 30 seconds, which is what authenticator
+apps expect. One step either side of the current one is accepted, to allow for
+a clock that's off. A code is good once.
+
+==== Recovery codes
+
+`RecoveryCodeService.generate` makes ten codes that stand in for a lost phone.
+Show them to the user once. The server keeps a hash of each and can't show
+them again. Each code works once, in place of a one-time code at sign-in, and
+generating again replaces whatever was left.
+
+==== The encryption key
+
+`JdbcTotpRepository` seals each authenticator secret with AES-GCM before it
+stores it, under a key the database doesn't hold:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-mfa,indent=0]
+----
+
+The key is 32 bytes in base64:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.sh[tag=backend-security-bash-mfa-key,indent=0]
+----
+
+Outside a development profile the server doesn't start without the key. Losing
+the key loses every enrollment, and so does changing it.
+
+[[backend-security-passkeys]]
+=== Passkeys
+
+`webAuthn` lets a signed-in user register a passkey and, from then on, sign in
+with it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-webauthn,indent=0]
+----
+
+The `rpId` is the domain the passkeys belong to. The allowed origins
+are where a ceremony may run, and each is compared whole with what the client
+reports. A web origin is a scheme, a host and a port when it isn't the default,
+with no path and no trailing slash.
+
+An Android application reports `android:apk-key-hash:` followed by the
+base64url SHA-256 of its signing certificate. List that origin beside the web
+one for the application to use the same passkeys. This command prints the hash
+for a key in a keystore:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.sh[tag=backend-security-bash-apk-hash,indent=0]
+----
+
+==== The two ceremonies
+
+Registration makes a passkey for a user who's already signed in. Sign-in
+proves that the caller holds one. Each ceremony is two requests: the client
+asks for options, which carry a challenge, and then sends back what the
+authenticator answered. The endpoints take and answer the JSON forms the
+WebAuthn specification defines, so a browser's `parseCreationOptionsFromJSON`
+and `toJSON()` and the Codename One client's `WebAuthnClient` work with them
+as they are. The chain serves no page.
+
+[cols="2,1,3", options="header"]
+|===
+| Request | Who | What it does
+
+| `POST /webauthn/register/options`
+| Signed in
+| Answers the options to make a passkey with.
+
+| `POST /webauthn/register`
+| Signed in
+| Takes the authenticator's answer and stores the passkey. A refused answer
+  gets a 400.
+
+| `DELETE /webauthn/register/{credentialId}`
+| The owner
+| Removes a passkey.
+
+| `POST /webauthn/authenticate/options`
+| Anybody
+| Answers the options to sign in with.
+
+| `POST /login/webauthn`
+| Anybody
+| Takes the authenticator's answer and signs the user in. A refused answer
+  gets a 401 that doesn't say why.
+|===
+
+"Signed in" means in this session. Somebody a `remember-me` cookie brought back
+is asked to sign in before they may add or remove a passkey. A ceremony's
+options wait in the session for five minutes, and a challenge is answered
+once.
+
+A passkey whose authenticator verified the user, with a fingerprint, a face or
+a PIN, is two factors in one step. It signs the user in without `mfa` asking
+for a code. One that didn't verify the user is one factor, and the second
+factor is asked for, the way it's asked for after a password. Call
+`userVerification("required")` to make every passkey sign-in the first kind.
+
+A registration whose attestation isn't `none` or self-signed `packed` is
+refused unless you call `allowUnverifiedAttestation(true)`.
+
+==== Apps and the CSRF token
+
+On a chain that keeps a session, the ceremony's requests are checked for the
+CSRF token like any other `POST`. A page sends it as it does for its other
+requests. An app has no page to read it from, so leave the ceremony out of the
+check:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-webauthn-csrf,indent=0]
+----
+
+The four `POST` requests lose little by it, because each one answers a random
+challenge kept in the caller's own session. The `DELETE` has no such
+protection, which is why the example leaves it under the check.
+
+==== Where passkeys are kept
+
+Passkeys are kept in the application's `UserCredentialRepository` and
+`PublicKeyCredentialUserEntityRepository` beans:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecondFactorConfig.java[tag=backend-security-webauthn-store,indent=0]
+----
+
+With neither, they're kept in memory and are gone when the server stops, which
+a server outside a development profile says once when it starts. Neither table
+holds a secret: a public key verifies and can't sign. A user who signs in with
+a passkey is looked up in the application's `UserDetailsService` for their
+authorities.
+
+=== Remembering a user
+
+`rememberMe` gives a user who ticks the box on the login form a cookie that
+signs them in on a later visit:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-remember,indent=0]
+----
+
+The cookie holds a series and a token, and the server keeps only a hash of the
+token. The token is replaced every time the cookie is used. A cookie whose
+series is known but whose token isn't the current one has been copied, so
+every remembered sign-in of that user is deleted. The cookie lasts two weeks
+unless you set `tokenValiditySeconds`.
+
+A remembered user is authenticated, but not fully. `fullyAuthenticated()` in
+the rules and `isFullyAuthenticated()` in a `@PreAuthorize` refuse them until
+they sign in again. Signing out deletes the cookie and forgets the user in
+every browser.
+
+Without a `tokenRepository` or a `PersistentTokenRepository` bean, the tokens
+are kept in memory. They're then forgotten when the server restarts, and
+they're no use to a deployment of several instances.
+
+[[backend-security-schema]]
+=== Keeping it in the database
+
+Each store in this chapter has an implementation that keeps its rows in the
+server's own database. The tables come from a migration set that ships with
+the security layer. Ask for it in `application.properties`:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-schema,indent=0]
+----
+
+The build reads the key and registers the set in the server it generates,
+which is why the key has to be in the module's `application.properties` and
+not only in the environment. A test, or a server you assemble by hand,
+registers it before the server starts:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-schema-register,indent=0]
+----
+
+The tables are migrations, and <<backend-schema-migrations>> describes how
+those run. The set is called `security`. It keeps its history in
+`cn1_security_schema_history`, apart from your own, and runs before the
+application's migrations, so your scripts may refer to its tables. The tables
+are the same on SQLite, PostgreSQL, and MySQL.
+
+[cols="1,3,4", options="header"]
+|===
+| Version | Tables | Used by
+
+| 1
+| `cn1_users`, `cn1_authorities`
+| `JdbcUserDetailsManager`
+
+| 2
+| `cn1_api_key`
+| `JdbcApiKeyRepository`
+
+| 3
+| `cn1_persistent_logins`
+| `JdbcTokenRepository`, for remembered sign-ins
+
+| 4
+| `cn1_mfa_totp`, `cn1_mfa_recovery_code`
+| `JdbcTotpRepository`, `JdbcRecoveryCodeRepository`
+
+| 5
+| `cn1_rate_limit`
+| `JdbcRateLimiter`
+
+| 6
+| `cn1_federated_identity`
+| `JdbcFederatedIdentityRepository`
+
+| 7
+| `cn1_oauth2_registered_client`
+| `JdbcRegisteredClientRepository`
+
+| 8
+| `cn1_oauth2_authorization`, `cn1_oauth2_token`
+| `JdbcOAuth2AuthorizationService`
+
+| 9
+| `cn1_webauthn_user`, `cn1_webauthn_credential`
+| `JdbcUserCredentialRepository`, `JdbcPublicKeyCredentialUserEntityRepository`
+|===
+
+The key creates the tables. It doesn't choose the stores. Each store is still
+a bean you declare, or an object you hand to a chain, as the examples in this
+chapter do. A feature whose store you don't declare keeps its state in memory
+where it has an in-memory default, and the sections above say which do.
+
+Secrets aren't stored as they are. Passwords are stored as their encoder wrote
+them. API keys, remembered sign-in tokens, recovery codes, authorization codes,
+refresh tokens and device codes are stored as SHA-256 hashes. Authenticator
+secrets are sealed under `cn1.security.mfa.encryptionKey`.
+
+Anything that must happen once is one conditional statement and the count of
+rows it changed. Two instances that present the same code at the same moment
+can't both be told yes. That covers a revoked key, a replaced token, a used
+recovery code and a rate limit's last permit.
+
+`JdbcRateLimiter.deleteExpired`, `JdbcTokenRepository.deleteExpired` and
+`OAuth2AuthorizationService.purgeExpired` remove rows nobody will present
+again. The first two are yours to call from a scheduled job.
+
+[[backend-security-testing]]
+=== Testing
+
+The test library that <<backend-testing>> describes has Spring Security's
+test support under the same names:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuredApiTest.java[tag=backend-security-test,indent=0]
+----
+
+`@WithMockUser` runs a test, or every test of a class, as a signed-in user who
+exists nowhere but in the test. No user store is asked and no password is
+checked. Every request the test sends through `MockMvc` comes from that user,
+and `SecurityContextHolder` on the test's thread names them too.
+`@WithAnonymousUser` runs one test of such a class as nobody.
+
+The request post-processors say something about one request:
+
+[cols="2,3", options="header"]
+|===
+| Post-processor | What the request carries
+
+| `user("ada").roles("EDITOR")`
+| A signed-in user, with the role `USER` unless told otherwise.
+
+| `jwt().subject("svc").scopes("orders:read")`
+| A bearer token that was accepted. No token is sent and none is verified.
+
+| `apiKey("billing").scopes("orders:read")`
+| An API key of that owner that was accepted. No repository is asked.
+
+| `httpBasic("svc", "secret")`
+| Real credentials in an `Authorization: Basic` header, for the chain to check.
+
+| `csrf()`
+| A valid CSRF token in the `_csrf` parameter. `asHeader()` sends it in the
+  header, and `useInvalidToken()` sends a wrong one.
+
+| `anonymous()`, `authentication(...)`
+| Nobody, and an authentication you built yourself.
+|===
+
+`TestSecurityContextHolder` changes who a test runs as part-way through.
+
+Requests sent over a socket with `TestRestTemplate` aren't affected by any of
+this. They're served on the server's threads and authenticate as a real client
+does.
+
+A test's `@PreAuthorize` expressions call the beans of the test's application,
+so a bean replaced with `@MockitoBean` is the one an expression reaches.
+
+[[backend-security-linking]]
+=== A server links only the security it declares
+
+A packaged server is one native binary, and the build leaves out every class
+that nothing refers to. The security layer is written so that each feature is
+reached only from the `HttpSecurity` method that turns it on. A server
+therefore carries the code of what its chains ask for and nothing else. A
+server that only verifies tokens has no login page, no password hashing and no
+user store in it. One that only has a login form has no JWT or key-handling
+code.
+
+That keeps the binary small, and it has consequences you can see:
+
+* **No chain, no security.** A server without a `SecurityFilterChain` bean
+  links none of the layer. Method security and the `Authentication` handler
+  parameter are build errors there.
+* **Sign-out comes with a session.** `formLogin`, `oauth2Login`, `rememberMe`,
+  `mfa` and `webAuthn` bring `POST /logout` and the memory of where a request
+  was going. A chain without one of them lacks both until it calls `logout`
+  or `requestCache`.
+* **A stateless chain has no CSRF filter** unless it calls `csrf`.
+* **Database stores are declared.** Setting `cn1.security.schema.enabled`
+  creates the tables, but nothing picks a `Jdbc` store for you. A server that
+  declares none of them carries no SQL for them.
+* **Client secrets need an encoder you declare.** The authorization server
+  compares secrets through the `PasswordEncoder` bean or
+  `clientSecretEncoder`. It doesn't bring the password encoders with it.
+* **Sign in with Apple is declared in code.** A registration read from the
+  configuration never signs a client secret, so a server that doesn't declare
+  `AppleClientSecret` carries nothing that signs one.
+* **The configured user belongs to the password mechanisms.** The
+  `cn1.security.user.*` keys are read by `formLogin`, `httpBasic` and
+  `rememberMe` only.
+
+=== Configuration keys
+
+[cols="2,3", options="header"]
+|===
+| Key | What it sets
+
+| `cn1.security.user.name`, `cn1.security.user.password`, `cn1.security.user.roles`
+| The one user of a server with no user store. The user exists when the
+  password is set. The name is `user` unless set, and the roles are separated
+  by commas. A password without a `{id}` prefix is taken as `{noop}`.
+
+| `cn1.security.password.maxConcurrent`
+| The most passwords checked at one time. No bound unless set.
+
+| `cn1.security.schema.enabled`
+| `true` to create the security tables. Read by the build from
+  `application.properties`. Off unless set.
+
+| `cn1.security.oauth2.resourceserver.jwt.issuer-uri`
+| The issuer whose tokens a resource server accepts.
+
+| `cn1.security.oauth2.resourceserver.jwt.jwk-set-uri`
+| Where the keys are, for an issuer that publishes no metadata.
+
+| `cn1.security.oauth2.resourceserver.jwt.public-key-location`
+| A PEM file holding the one public key.
+
+| `cn1.security.oauth2.resourceserver.jwt.jws-algorithms`
+| The signature algorithms accepted, separated by commas. `RS256` unless set.
+
+| `cn1.security.oauth2.resourceserver.jwt.audiences`
+| What this server is called in a token's `aud`, separated by commas. None
+  unless set, and then `aud` isn't checked.
+
+| `cn1.security.oauth2.client.registration.<id>.*`
+| One provider to sign in through. See <<backend-security-oauth2-login>>.
+
+| `cn1.security.oauth2.client.provider.<id>.*`
+| The endpoints of a provider that isn't built in.
+
+| `cn1.security.oauth2.client.cookie-secret`
+| The key that signs the pending sign-in of a provider that answers with a
+  posted form. A key made at start-up unless set.
+
+| `cn1.security.authorizationserver.issuer`
+| The address clients reach the authorization server at. Required outside a
+  development profile.
+
+| `cn1.security.authorizationserver.jwk.keys`
+| The PEM files of the signing keys, the signing one first. Required outside a
+  development profile.
+
+| `cn1.security.mfa.encryptionKey`
+| The key that seals authenticator secrets in the database, 32 bytes in
+  base64. Required outside a development profile.
+
+| `cn1.server.forwardHeaders`
+| `true` to believe `X-Forwarded-For` and `X-Forwarded-Proto` from a trusted
+  proxy. `false` unless set.
+
+| `cn1.server.trustedProxies`
+| The proxies, as addresses and CIDR ranges separated by commas. Loopback and
+  the private ranges unless set.
+|===
+
+[[backend-security-differences]]
+=== How this differs from Spring Security
+
+* **Packages.** The classes live under `com.codename1.backend.security`, and
+  the annotations in `com.codename1.backend.annotations`.
+* **No security without a chain.** Spring Boot secures every route once the
+  starter is on the classpath, and generates a password. Here a server with no
+  `SecurityFilterChain` bean has no security layer.
+* **Sign-out isn't on every chain.** A chain without a way of signing in to a
+  session has no `POST /logout` until it calls `logout`.
+* **A stateless chain skips CSRF.** It has the filter only when it calls
+  `csrf`.
+* **Method security is compiled.** The build turns each expression into Java
+  and weaves the check into the method. It applies to self-calls, private
+  methods and objects made with `new`. Only the subset in
+  <<backend-security-method>> is accepted.
+* **New passwords use `{pbkdf2-sha256}`,** not `{bcrypt}`. `bcrypt` is written
+  in Java here and costs more of a thread, so it's kept for verifying.
+* **`{noop}` works on a development profile only.**
+* **The authorization server has no consent page.** A client is authorized for
+  the scopes it was registered with, and `requireAuthorizationConsent` accepts
+  `false` only.
+* **`OAuth2AuthorizationService` isn't Spring's interface.** It has no `save`
+  and `findByToken` pair. A store uses a secret up in one atomic call.
+* **The security context stays on the request's thread.** It isn't propagated
+  to an `@Async` method or a `@Scheduled` job.
+* **Passkey endpoints are JSON only.** The chain serves no page for them.
+
+==== What isn't supported
+
+* **In expressions:** `hasPermission` and ACLs, `returnObject`, `T(...)`,
+  property chains such as `#order.owner.id`, and `@PostAuthorize`,
+  `@PreFilter` and `@PostFilter`. Put the decision in a bean method and call
+  it.
+* **Method security on an interface method or an abstract method,** and two
+  security annotations on one element.
+* **Replaying a request after sign-in.** Only the address of a `GET` is
+  remembered.
+* **Concurrent-session control.** `sessionManagement` sets the creation policy
+  and the fixation strategy, and nothing else.
+* **SAML and LDAP.** The ways of signing in are the ones in this chapter.
+  Anything else is a filter or an `AuthenticationProvider` of your own.
+* **Other password schemes.** The delegating encoder knows `{pbkdf2-sha256}`,
+  `{bcrypt}`, the two Spring PBKDF2 schemes and `{noop}`. A password stored
+  under another id, such as `{argon2}` or `{scrypt}`, is refused unless you register
+  an encoder for it.
+* **Opaque access tokens and token introspection.** A resource server verifies
+  JWTs, and the authorization server issues them.
+* **In the authorization server:** dynamic client registration,
+  `private_key_jwt` and mutual TLS client authentication, pushed authorization
+  requests, DPoP, encrypted tokens, the implicit and password grants, and
+  back-channel or RP-initiated logout.
+* **Passkey attestation beyond `none` and self-signed `packed`.** Other
+  formats are refused, or accepted unverified when you allow it.
+* **Shared in-memory state.** `InMemoryRateLimiter`, the in-memory stores, the
+  second factor's attempt counter and the device page's counter are per
+  process. Use the database stores for a server that runs as several
+  instances.

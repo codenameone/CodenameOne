@@ -371,6 +371,10 @@ there is nothing next to the binary.
 | `cn1.server.tls.http2`
 | Whether a TLS server offers HTTP/2 through ALPN. True by default.
 
+| `cn1.server.forwardHeaders`, `cn1.server.trustedProxies`
+| Whether `X-Forwarded-For` and `X-Forwarded-Proto` are believed, and from
+  which proxies. Off by default; see <<backend-security-proxies>>.
+
 | `cn1.static.prefix`, `cn1.static.index`, `cn1.static.cacheControl`
 | Where static files are served (`/static`), the file a directory answers with
   (`index.html`), and their `Cache-Control` header (`public, max-age=3600`).
@@ -388,7 +392,7 @@ class loads: `CN1_HTTP_MAX_UPLOAD_MB`, 64 by default, bounds the request bodies
 being received at once across all HTTP/1.1 connections. A request that would pass
 the limit gets a 503 rather than being buffered.
 
-The chapters that follow add their own keys -- `cn1.session.*`,
+The chapters that follow add their own keys -- `cn1.session.*`, `cn1.security.*`,
 `cn1.task.executor.*`, `cn1.management.*`, `cn1.mcp.*` and `cn1.otel.*` -- and
 list each one where it's described.
 

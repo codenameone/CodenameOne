@@ -143,6 +143,11 @@ covers:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/TunedGreetingTest.java[tag=backend-test-and-return,indent=0]
 ----
 
+A server with a security layer needs its requests to come from somebody.
+`@WithMockUser` and the request post-processors `user()`, `jwt()`, `apiKey()`,
+`httpBasic()` and `csrf()` do that, and <<backend-security-testing>> describes
+them.
+
 === Testing over a real port
 
 `MockMvc` skips the socket, the HTTP parser and the response writer. It also
