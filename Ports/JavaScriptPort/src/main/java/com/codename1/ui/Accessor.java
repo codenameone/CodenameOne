@@ -27,11 +27,18 @@ public class Accessor {
     /** Whether the browser may own text gestures without bypassing an app action. */
     public static boolean allowsNativeTextSelection(Component c) {
         // A Label subclass may override pointer handling without registering listeners
-        // (Slider is one example). Only plain labels are safe to promote by default.
+        // (Slider is one example). The same applies to custom TextArea/TextField
+        // subclasses: only the known built-in editors are safe to promote.
         return c != null && (!(c instanceof Label) || c.getClass() == Label.class)
+                && (!(c instanceof TextArea) || c.getClass() == TextArea.class || c.getClass() == TextField.class)
                 && !c.isDraggable() && !c.isCellRenderer()
                 && c.getLeadComponent() == null && !c.hasPointerInteractionListeners()
                 && (!(c instanceof TextArea) || !((TextArea) c).hasActionListeners());
+    }
+
+    /** Use the same traversal order and wrapping as the desktop key handler. */
+    public static void moveFocusByTab(Form form, boolean backwards) {
+        form.moveFocusByTab(backwards);
     }
 
     /** Reflect browser caret/selection scrolling in the CN1 text component. */

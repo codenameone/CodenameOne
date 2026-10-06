@@ -93,7 +93,72 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=ownership") >= 0) {
+        if (query.indexOf("review=traversal") >= 0) {
+            TextField first = new TextField("First"); first.setName("tabFirst");
+            TextField last = new TextField("Last"); last.setName("tabLast");
+            form.addAll(first, new Button("Middle button"), new CheckBox("Middle check"), last);
+        } else if (query.indexOf("review=occlusion") >= 0) {
+            com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
+            Container layers = new Container(layout);
+            layers.setPreferredH(160);
+            TextArea area = new TextArea("Partly covered text", 3, 24);
+            area.setName("coveredArea");
+            Button cover = new Button("Edge button");
+            cover.addActionListener(e -> status.setText("Edge button clicked"));
+            layers.addAll(area, cover);
+            layout.setInsets(area, "0");
+            layout.setInsets(cover, "0 0 auto auto");
+            form.addAll(layers, status);
+        } else if (query.indexOf("review=interactionstate") >= 0) {
+            Container context = new Container(BoxLayout.y());
+            Container stylus = new Container(BoxLayout.y());
+            Container commands = new Container(BoxLayout.y());
+            Container[] parents = {context, stylus, commands};
+            String[] names = {"dynamicContext", "dynamicStylus", "dynamicCommands"};
+            for (int i = 0; i < parents.length; i++) {
+                TextArea area = new TextArea(names[i]); area.setName(names[i]);
+                parents[i].addAll(new Label(names[i] + " label"), area);
+                form.add(parents[i]);
+            }
+            com.codename1.ui.events.ActionListener handler = e -> { };
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> {
+                context.addContextMenuListener(handler);
+                stylus.addStylusListener(handler);
+                commands.setContextMenuCommands(new Command("Menu"));
+            });
+            com.codename1.ui.util.UITimer.timer(6000, false, form, () -> {
+                context.removeContextMenuListener(handler);
+                stylus.removeStylusListener(handler);
+                commands.setContextMenuCommands((Command[]) null);
+            });
+        } else if (query.indexOf("review=accessiblename") >= 0) {
+            TextField field = new TextField("", "Original hint");
+            field.setName("Original name");
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> field.setName("Updated name"));
+            com.codename1.ui.util.UITimer.timer(5000, false, form, () -> field.setName(""));
+            com.codename1.ui.util.UITimer.timer(7000, false, form, () -> field.setHint("Updated hint"));
+            form.add(field);
+        } else if (query.indexOf("review=maxsize") >= 0) {
+            TextField field = new TextField(""); field.setName("limitedField"); field.setMaxSize(20);
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> field.setMaxSize(3));
+            Button check = new Button("Check maximum");
+            check.addActionListener(e -> status.setText("Maximum " + field.getMaxSize() + " value " + field.getText()));
+            form.addAll(field, check, status);
+        } else if (query.indexOf("review=subclasses") >= 0) {
+            TextArea area = new TextArea("Custom area") {
+                public void pointerPressed(int x, int y) { status.setText("Custom area pressed"); }
+            };
+            TextField field = new TextField("Custom field") {
+                public void pointerPressed(int x, int y) { status.setText("Custom field pressed"); }
+            };
+            area.setName("customArea"); field.setName("customField");
+            form.addAll(area, field, status);
+        } else if (query.indexOf("review=ellipsis") >= 0) {
+            TextArea area = new TextArea("First row\nSecond row\nThird row\nFourth row", 2, 24);
+            area.setName("ellipsisArea"); area.setEditable(false);
+            area.setGrowByContent(true); area.setGrowLimit(2); area.setEndsWith3Points(true);
+            form.add(area);
+        } else if (query.indexOf("review=ownership") >= 0) {
             TextField field = new TextField("Active session");
             field.setName("ownershipField");
             TextField password = new TextField("", "Password", 20, TextArea.PASSWORD);

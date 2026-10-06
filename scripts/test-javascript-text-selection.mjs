@@ -67,6 +67,75 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('traversal');
+    const firstTab = page.locator('.cn1-selection-editor[aria-label="tabFirst"]');
+    const lastTab = page.locator('.cn1-selection-editor[aria-label="tabLast"]');
+    await firstTab.click();
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Middle button');
+    await lastTab.click();
+    await page.keyboard.press('Shift+Tab');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Middle check');
+    await lastTab.click();
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'tabFirst');
+    await firstTab.click();
+    await page.keyboard.press('Shift+Tab');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'tabLast');
+    console.log('PASS', name, 'native Tab includes buttons and checkboxes and wraps at both ends');
+
+    await openReview('occlusion');
+    assert.equal(await page.locator('.cn1-selection-editor[aria-label="coveredArea"]:visible').count(), 0);
+    const cover = page.getByRole('button', {name: 'Edge button', exact: true});
+    const coverBox = await cover.evaluate(el => el.getBoundingClientRect().toJSON());
+    await page.mouse.click(coverBox.x + coverBox.width / 2, coverBox.y + coverBox.height / 2);
+    await page.waitForFunction(() => document.body.innerText.includes('Edge button clicked'));
+    console.log('PASS', name, 'partially overlapping buttons retain pointer input');
+
+    await openReview('interactionstate');
+    for (const active of [true, false, true]) {
+      await page.waitForFunction(active => ['dynamicContext', 'dynamicStylus', 'dynamicCommands'].every(name => {
+        const editor = document.querySelector('.cn1-selection-editor[aria-label="' + name + '"]');
+        const label = [...document.querySelectorAll('#cn1-text-layer span')].find(el => el.textContent === name + ' label');
+        return Boolean(editor && getComputedStyle(editor).display !== 'none') === active
+          && Boolean(label && getComputedStyle(label).pointerEvents === 'auto') === active;
+      }), active);
+    }
+    console.log('PASS', name, 'ancestor context menus, stylus listeners and commands refresh static native text');
+
+    await openReview('accessiblename');
+    for (const label of ['Original name', 'Updated name', 'Original hint', 'Updated hint']) {
+      await page.waitForFunction(label => document.querySelector('.cn1-selection-editor')?.getAttribute('aria-label') === label, label);
+    }
+    console.log('PASS', name, 'accessible names track name and fallback hint changes');
+
+    await openReview('maxsize');
+    const limited = page.locator('.cn1-selection-editor[aria-label="limitedField"]');
+    await limited.click();
+    await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="limitedField"]').maxLength === 3);
+    await limited.pressSequentially('abcdef');
+    assert.equal(await limited.inputValue(), 'abc');
+    await page.waitForFunction(() => document.querySelector('#cn1-accessibility-tree').textContent.includes('abc'));
+    await clickButton('Check maximum');
+    await page.waitForFunction(() => document.body.innerText.includes('Maximum 3 value abc'));
+    console.log('PASS', name, 'reduced max size is enforced while the editor is focused');
+
+    await openReview('subclasses');
+    assert.equal(await page.locator('.cn1-selection-editor').count(), 0);
+    for (const text of ['Custom area', 'Custom field']) {
+      const field = page.locator('#cn1-accessibility-tree [role="textbox"]').filter({hasText: text});
+      const box = await field.evaluate(el => el.getBoundingClientRect().toJSON());
+      await page.mouse.click(box.x + 10, box.y + box.height / 2);
+      await page.waitForFunction(text => document.body.innerText.includes(text + ' pressed'), text);
+    }
+    console.log('PASS', name, 'custom text component pointer overrides retain canvas input');
+
+    await openReview('ellipsis');
+    assert.equal(await page.locator('.cn1-selection-editor').count(), 0);
+    await page.waitForFunction(() => window.__cn1TextDraws.concat([...document.querySelectorAll('#cn1-text-layer span')]
+      .map(el => el.textContent)).some(text => text.includes('...')));
+    console.log('PASS', name, 'truncated multiline text retains configured ellipses');
+
     for (const action of ['Make readonly', 'Disable field']) {
       await openReview('ownership');
       const editor = page.locator('.cn1-selection-editor[aria-label="ownershipField"]');

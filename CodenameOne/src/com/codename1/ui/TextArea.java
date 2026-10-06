@@ -790,7 +790,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `maxSize`: the maximum size of the text area
     public void setMaxSize(int maxSize) {
-        this.maxSize = maxSize;
+        if (this.maxSize != maxSize) {
+            this.maxSize = maxSize;
+            repaintTextSelection();
+        }
     }
 
     /// {@inheritDoc}
@@ -1851,6 +1854,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - `hint`: the hint text to display
     public void setHint(String hint) {
         super.setHint(hint, getHintIcon());
+        repaintTextSelection();
     }
 
     /// Returns the hint icon
@@ -1884,6 +1888,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     @Override
     public void setHint(String hint, Image icon) {
         super.setHint(hint, icon);
+        repaintTextSelection();
     }
 
     /// Returns the hint label component that can be customized directly
@@ -2080,7 +2085,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `endsWith3Points`: true if text should add "..." at the end
     public void setEndsWith3Points(boolean endsWith3Points) {
-        this.endsWith3Points = endsWith3Points;
+        if (this.endsWith3Points != endsWith3Points) {
+            this.endsWith3Points = endsWith3Points;
+            repaintTextSelection();
+        }
     }
 
     /// Registers this TextArea as the current input device for the current form.

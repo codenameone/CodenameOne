@@ -1142,11 +1142,48 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return nativeSelectionRequested() && Accessor.allowsNativeTextSelection(ta)
                 && (!(ta instanceof TextField) || TextField.isUseNativeTextInput())
                 && ta.getDoneListener() == null
+                && !ta.isEndsWith3Points()
                 && !Accessor.isBitmapFont(ta.getStyle().getFont())
                 && ta.getStyle().getTextDecoration() == Style.TEXT_DECORATION_NONE
                 && (ta.getConstraint() & TextArea.PASSWORD) == 0
                 && (ta.isEditable() || ta.isTextSelectionEnabled() && ta.getComponentForm() != null
                     && ta.getComponentForm().getTextSelection().isEnabled());
+    }
+
+    private boolean hasNativeEditorOcclusion(Component target, int left, int top, int right, int bottom) {
+        // A rectangular native control cannot safely punch holes around covering siblings.
+        // Fall back to canvas editing if any later-painted sibling overlaps its viewport.
+        for (Component branch = target; branch.getParent() != null; branch = branch.getParent()) {
+            Container parent = branch.getParent();
+            // Form.getComponentIndex() redirects to its content pane; inspect the
+            // actual child list so the content pane cannot occlude its own fields.
+            List<Component> siblings = parent.getChildrenAsList(false);
+            int index = siblings.indexOf(branch);
+            for (int i = 0; i < siblings.size(); i++) {
+                Component sibling = siblings.get(i);
+                if (i != index && (i > index || sibling.getStyle().getElevation() > branch.getStyle().getElevation())
+                        && overlapsNativeEditor(sibling, left, top, right, bottom)) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean overlapsNativeEditor(Component c, int left, int top, int right, int bottom) {
+        if (!c.isVisible() || c.isHidden()) return false;
+        left = Math.max(left, c.getAbsoluteX() + c.getScrollX());
+        top = Math.max(top, c.getAbsoluteY() + c.getScrollY());
+        right = Math.min(right, c.getAbsoluteX() + c.getScrollX() + c.getWidth());
+        bottom = Math.min(bottom, c.getAbsoluteY() + c.getScrollY() + c.getHeight());
+        if (right <= left || bottom <= top) return false;
+        if (!(c instanceof Container)) return true;
+        Style style = c.getStyle();
+        if (style.getBgTransparency() != 0 || style.getBgImage() != null
+                || style.getBorder() != null && !style.getBorder().isEmptyBorder()) return true;
+        Container container = (Container) c;
+        for (int i = 0; i < container.getComponentCount(); i++) {
+            if (overlapsNativeEditor(container.getComponentAt(i), left, top, right, bottom)) return true;
+        }
+        return false;
     }
 
     private class SelectionTextOverlay extends NativeOverlay {
@@ -1164,6 +1201,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         int lastConstraint = -1;
         String lastAutocomplete;
         String lastName;
+        String lastAccessibleName;
         int lastScrollY = Integer.MIN_VALUE;
 
         SelectionTextOverlay(final TextArea ta) {
@@ -1203,10 +1241,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         public void run() {
                             Form form = ta.getComponentForm();
                             if (form == null) return;
-                            Component next = key.isShiftKey() ? form.getPreviousComponent(ta) : form.getNextComponent(ta);
-                            if (next == null) return;
                             el.blur();
-                            next.requestFocus();
+                            Accessor.moveFocusByTab(form, key.isShiftKey());
+                            Component next = form.getFocused();
+                            if (next == null) return;
                             if (next.getNativeOverlay() instanceof SelectionTextOverlay) {
                                 SelectionTextOverlay overlay = (SelectionTextOverlay) next.getNativeOverlay();
                                 if (overlay.visible) overlay.el.focus();
@@ -1271,6 +1309,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         private void updateConstraints() {
+            String accessibleName = ta.getName();
+            if (accessibleName == null || accessibleName.length() == 0) accessibleName = ta.getHint();
+            if (accessibleName == null) accessibleName = "";
+            if (!accessibleName.equals(lastAccessibleName)) {
+                el.setAttribute("aria-label", accessibleName);
+                lastAccessibleName = accessibleName;
+            }
             Object autocomplete = ta.getClientProperty("cn1$autocomplete");
             String override = autocomplete == null ? null : autocomplete.toString();
             String name = ta.getName() == null ? "" : ta.getName();
@@ -1324,6 +1369,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 bottom = Math.min(bottom, parent.getAbsoluteY() + parent.getScrollY() + parent.getHeight());
             }
             visible &= right > left && bottom > top;
+            if (visible && hasNativeEditorOcclusion(ta, left, top, right, bottom)) visible = false;
             if (visible) {
                 Component hit = form.getComponentAt((left + right) / 2, (top + bottom) / 2);
                 visible = hit == ta;

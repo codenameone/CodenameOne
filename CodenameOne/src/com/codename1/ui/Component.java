@@ -759,6 +759,16 @@ public class Component implements Animation, StyleListener, Editable {
                 || hasApplicationPointerListeners(owner.longPressListeners);
     }
 
+    // Native text controls and promoted labels share eligibility across the form.
+    void repaintTextSelection() {
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().repaint();
+        } else {
+            repaint();
+        }
+    }
+
     // Port accessors use this before giving pointer gestures to a native text control.
     boolean hasPointerInteractionListeners() {
         return pointerPressedListeners != null && pointerPressedListeners.hasListeners()
@@ -7176,6 +7186,9 @@ public class Component implements Animation, StyleListener, Editable {
             pointerPressedListeners = new EventDispatcher();
         }
         pointerPressedListeners.addListener(l);
+        if (!(l instanceof NativeTextSelectionListener)) {
+            repaintTextSelection();
+        }
     }
 
     /// Adds a listener to the pointer event
@@ -7189,6 +7202,9 @@ public class Component implements Animation, StyleListener, Editable {
             longPressListeners = new EventDispatcher();
         }
         longPressListeners.addListener(l);
+        if (!(l instanceof NativeTextSelectionListener)) {
+            repaintTextSelection();
+        }
     }
 
     /// Adds a listener that is notified when the user requests a context menu on this component.
@@ -7205,6 +7221,7 @@ public class Component implements Animation, StyleListener, Editable {
             contextMenuListeners = new EventDispatcher();
         }
         contextMenuListeners.addListener(l);
+        repaintTextSelection();
     }
 
     /// Removes a context menu listener.
@@ -7215,6 +7232,7 @@ public class Component implements Animation, StyleListener, Editable {
     public void removeContextMenuListener(ActionListener l) {
         if (contextMenuListeners != null) {
             contextMenuListeners.removeListener(l);
+            repaintTextSelection();
         }
     }
 
@@ -7258,6 +7276,7 @@ public class Component implements Animation, StyleListener, Editable {
             stylusListeners = new EventDispatcher();
         }
         stylusListeners.addListener(l);
+        repaintTextSelection();
     }
 
     /// Removes a stylus listener.
@@ -7268,6 +7287,7 @@ public class Component implements Animation, StyleListener, Editable {
     public void removeStylusListener(ActionListener l) {
         if (stylusListeners != null) {
             stylusListeners.removeListener(l);
+            repaintTextSelection();
         }
     }
 
@@ -7366,6 +7386,7 @@ public class Component implements Animation, StyleListener, Editable {
     public void setContextMenuCommands(Command... commands) {
         if (commands == null || commands.length == 0) {
             contextMenuCommands = null;
+            repaintTextSelection();
             return;
         }
         // Nulls are dropped HERE rather than at every use, so `length > 0` keeps meaning "has a
@@ -7380,6 +7401,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         if (kept == 0) {
             contextMenuCommands = null;
+            repaintTextSelection();
             return;
         }
         contextMenuCommands = new Command[kept];
@@ -7389,6 +7411,7 @@ public class Component implements Animation, StyleListener, Editable {
                 contextMenuCommands[at++] = cmd;
             }
         }
+        repaintTextSelection();
     }
 
     private Command[] contextMenuCommands;
@@ -7532,6 +7555,9 @@ public class Component implements Animation, StyleListener, Editable {
     public void removePointerPressedListener(ActionListener l) {
         if (pointerPressedListeners != null) {
             pointerPressedListeners.removeListener(l);
+            if (!(l instanceof NativeTextSelectionListener)) {
+                repaintTextSelection();
+            }
         }
     }
 
@@ -7544,6 +7570,9 @@ public class Component implements Animation, StyleListener, Editable {
     public void removeLongPressListener(ActionListener l) {
         if (longPressListeners != null) {
             longPressListeners.removeListener(l);
+            if (!(l instanceof NativeTextSelectionListener)) {
+                repaintTextSelection();
+            }
         }
     }
 
@@ -7568,6 +7597,9 @@ public class Component implements Animation, StyleListener, Editable {
             pointerReleasedListeners = new EventDispatcher();
         }
         pointerReleasedListeners.addListener(l);
+        if (!(l instanceof NativeTextSelectionListener)) {
+            repaintTextSelection();
+        }
     }
 
     /// Removes the listener from the pointer event
@@ -7578,6 +7610,9 @@ public class Component implements Animation, StyleListener, Editable {
     public void removePointerReleasedListener(ActionListener l) {
         if (pointerReleasedListeners != null) {
             pointerReleasedListeners.removeListener(l);
+            if (!(l instanceof NativeTextSelectionListener)) {
+                repaintTextSelection();
+            }
         }
     }
 
@@ -7591,6 +7626,9 @@ public class Component implements Animation, StyleListener, Editable {
             pointerDraggedListeners = new EventDispatcher();
         }
         pointerDraggedListeners.addListener(l);
+        if (!(l instanceof NativeTextSelectionListener)) {
+            repaintTextSelection();
+        }
     }
 
     /// Removes the listener from the pointer event
@@ -7601,6 +7639,9 @@ public class Component implements Animation, StyleListener, Editable {
     public void removePointerDraggedListener(ActionListener l) {
         if (pointerDraggedListeners != null) {
             pointerDraggedListeners.removeListener(l);
+            if (!(l instanceof NativeTextSelectionListener)) {
+                repaintTextSelection();
+            }
         }
     }
 
@@ -9494,6 +9535,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `name`: a name for the component
     public void setName(String name) {
         this.name = name;
+        repaintTextSelection();
     }
 
     /// Allows components to create a style of their own, this method binds the listener
