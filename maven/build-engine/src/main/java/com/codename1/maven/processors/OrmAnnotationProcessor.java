@@ -772,6 +772,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         java.util.List<MigrationGenerator.Item> migrations = MigrationGenerator.scan(ctx, backend);
         MigrationGenerator.addJava(ctx, migrations, javaMigrations);
         if (ctx.hasErrors()) return;
+        if (migrations.isEmpty()) {
+            removeStaleMigrations(ctx, accepted.isEmpty());
+        }
         if (accepted.isEmpty() && migrations.isEmpty()) {
             removeAStaleBootstrap(ctx);
             return;
@@ -2236,6 +2239,80 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             ctx.getLog().info("cn1: removed " + BACKEND_BOOTSTRAP_BINARY
                     + ", which this module no longer has any @Entity for");
         }
+    }
+
+    /// Removes the compiled migrations of a previous run from a module that no
+    /// longer has any script or Java migration.
+    ///
+    /// Nothing else would. A module that drops its last script generates no
+    /// `cn1app.BackendMigrations`, and the one in the output directory stays --
+    /// with `cn1app.BackendMigrationsCli` beside it, which is what the migrate
+    /// goals launch. `cn1:migrate` on such a module then applied scripts that
+    /// were deleted from it, to whatever database it was pointed at, and only
+    /// `mvn clean` explained why.
+    ///
+    /// A server's classes are removed by the marker every generated source of
+    /// a server carries, as the bootstrap is. An application's
+    /// `cn1app.ClientMigrations` carries none, so it is removed by its name:
+    /// `cn1app` is a package this processor generates into and nothing else
+    /// does. An application with no entity left either would keep the bootstrap
+    /// that registers the class just removed, so that goes with it -- a
+    /// bootstrap this method leaves alone in every other case, as
+    /// [#removeAStaleBootstrap] says.
+    ///
+    /// @param noEntities whether the module has no entity either, so that no
+    /// bootstrap is about to be generated over the old one
+    private void removeStaleMigrations(ProcessorContext ctx, boolean noEntities) {
+        String[] names = backend
+                ? new String[] {MigrationGenerator.BACKEND_BINARY,
+                    MigrationGenerator.BACKEND_CLI_BINARY}
+                : new String[] {MigrationGenerator.CLIENT_BINARY};
+        boolean removed = false;
+        for (String name : names) {
+            if (backend) {
+                AnnotatedClass existing = ctx.lookup(name.replace('.', '/'));
+                if (existing == null
+                        || !existing.getClassAnnotations().containsKey(GENERATED_DESC)) {
+                    continue;
+                }
+            }
+            if (deleteGenerated(ctx, name)) {
+                removed = true;
+                ctx.getLog().info("cn1: removed " + name
+                        + ", which this module no longer has any migration for");
+            }
+        }
+        if (!backend && removed && noEntities && deleteGenerated(ctx, BOOTSTRAP_BINARY)) {
+            ctx.getLog().info("cn1: removed " + BOOTSTRAP_BINARY
+                    + ", which registered the migrations this module no longer has");
+        }
+    }
+
+    /// Deletes a generated class and the classes nested in it from the output
+    /// directory; whether the class itself was there and is gone.
+    private static boolean deleteGenerated(ProcessorContext ctx, String binaryName) {
+        File file = new File(ctx.getOutputClassDir(),
+                binaryName.replace('.', File.separatorChar) + ".class");
+        if (!file.isFile()) {
+            return false;
+        }
+        final String nested = file.getName().substring(0, file.getName().length() - 6) + "$";
+        File[] siblings = file.getParentFile().listFiles();
+        if (siblings != null) {
+            for (File sibling : siblings) {
+                if (sibling.isFile() && sibling.getName().startsWith(nested)
+                        && sibling.getName().endsWith(".class") && !sibling.delete()) {
+                    ctx.getLog().warn("cn1: could not remove the stale " + sibling);
+                }
+            }
+        }
+        if (!file.delete()) {
+            ctx.getLog().warn("cn1: could not remove the stale " + file + "; it holds "
+                    + "migrations this module no longer has, and the migrate goals would run "
+                    + "them. Delete it, or run a clean build.");
+            return false;
+        }
+        return true;
     }
 
     /// Refuses to generate over a class the project already has.

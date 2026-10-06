@@ -301,6 +301,67 @@ public class MigrationGeneratorTest {
         assertFalse(new File(classes, "cn1app").exists());
     }
 
+    @Test
+    public void aServerThatDropsItsLastScriptLosesTheCompiledOnes() throws Exception {
+        module(true);
+        script(true, "V1__notes.sql", "CREATE TABLE gone_notes (id INT PRIMARY KEY);");
+        ProcessorContext ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        File set = new File(classes, "cn1app/BackendMigrations.class");
+        File cli = new File(classes, "cn1app/BackendMigrationsCli.class");
+        File bootstrap = new File(classes, "cn1app/BackendDaoBootstrap.class");
+        assertTrue(set.isFile());
+        assertTrue("the entry point of the migrate goals", cli.isFile());
+        assertTrue(bootstrap.isFile());
+
+        // The script is deleted and the module built again WITHOUT a clean:
+        // target/classes is what the last build left.
+        assertTrue(new File(module, MigrationGenerator.BACKEND_LOCATION + "/V1__notes.sql").delete());
+        ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        assertFalse("cn1:migrate would launch this and apply a script the module no longer has",
+                cli.exists());
+        assertFalse(set.exists());
+        assertFalse(bootstrap.exists());
+        String[] left = new File(classes, "cn1app").list();
+        assertEquals("nothing generated is left behind", 0, left == null ? 0 : left.length);
+    }
+
+    @Test
+    public void aClassOfTheProjectsOwnUnderThatNameIsNotRemoved() throws Exception {
+        module(true);
+        // Not generated: no marker. Somebody's own class, however ill-advised
+        // the name, is not this processor's to delete.
+        Map<String, String> own = new java.util.LinkedHashMap<String, String>();
+        own.put("cn1app.BackendMigrationsCli", "package cn1app; public class BackendMigrationsCli {}");
+        JavaSourceCompiler.compile(own, classes, Collections.<File>emptyList());
+        File cli = new File(classes, "cn1app/BackendMigrationsCli.class");
+        assertTrue(cli.isFile());
+        ProcessorContext ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        assertTrue(cli.isFile());
+    }
+
+    @Test
+    public void anApplicationThatDropsItsLastScriptLosesTheCompiledOnes() throws Exception {
+        module(false);
+        script(false, "V1__notes.sql", "CREATE TABLE gone_notes (id INT PRIMARY KEY);");
+        ProcessorContext ctx = run(false);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        File set = new File(classes, "cn1app/ClientMigrations.class");
+        File bootstrap = new File(classes, "cn1app/DaoBootstrap.class");
+        assertTrue(set.isFile());
+        assertTrue(bootstrap.isFile());
+
+        assertTrue(new File(module, MigrationGenerator.CLIENT_LOCATION + "/V1__notes.sql").delete());
+        ctx = run(false);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        assertFalse(set.exists());
+        // And the bootstrap that registered them, which would otherwise name a
+        // class that is gone.
+        assertFalse(bootstrap.exists());
+    }
+
     private String errorsFor(boolean backend, String name, String text) throws Exception {
         module(backend);
         script(backend, "V1__ok.sql", "SELECT 1;");
