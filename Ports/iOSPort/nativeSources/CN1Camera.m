@@ -27,10 +27,41 @@
 #if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #import "java_lang_String.h"
 #import "com_codename1_impl_ios_IOSCameraImpl.h"
+#import <QuartzCore/QuartzCore.h>
 
 // Defined in IOSNative.m; converts an NSData into a Java byte[]. It pulls the
 // thread state via getThreadLocalData() internally, so it takes no thread arg.
 extern JAVA_OBJECT nsDataToByteArr(NSData *data);
+
+// The Java peer resizes its native view after creation and on every layout.
+// CALayer sublayers do not automatically follow that view's bounds on iOS.
+@interface CN1CameraPreviewView : CN1View
+@end
+
+@implementation CN1CameraPreviewView
+- (void)layoutCameraLayer {
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    for (CALayer *layer in self.layer.sublayers) {
+        if ([layer isKindOfClass:[AVCaptureVideoPreviewLayer class]]) {
+            layer.frame = self.bounds;
+        }
+    }
+    [CATransaction commit];
+}
+
+#if TARGET_OS_OSX
+- (void)layout {
+    [super layout];
+    [self layoutCameraLayer];
+}
+#else
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    [self layoutCameraLayer];
+}
+#endif
+@end
 
 @interface CN1Camera ()
 @property (nonatomic, copy) NSString *pendingPhotoFilePath;
@@ -196,7 +227,7 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
 - (CN1View *)createPreviewView {
     if (self.previewView) return self.previewView;
-    CN1View *v = [[CN1View alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
+    CN1View *v = [[CN1CameraPreviewView alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
 #ifndef CN1_USE_ARC
     // Autoreleased so the previewView property below is the only owner. The
     // alloc's +1 was never balanced here either: this method does not begin
