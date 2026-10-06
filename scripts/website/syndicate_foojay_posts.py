@@ -63,9 +63,17 @@ def read_image(url: str, static_dir: Path) -> bytes:
         raise ValueError(f"Unsupported image URL: {url}")
     if parsed.netloc in {"www.codenameone.com", "codenameone.com"}:
         root = static_dir.resolve()
-        local = (root / urllib.parse.unquote(parsed.path).lstrip("/")).resolve()
+        relative = urllib.parse.unquote(parsed.path).lstrip("/")
+        local = (root / relative).resolve()
         if not local.is_relative_to(root):
             raise ValueError("Image path escapes the static directory")
+        if not local.exists() and relative.startswith("developer-guide/img/"):
+            # build.sh copies guide assets here when building the website;
+            # syndication runs without that build, so read their tracked source.
+            guide_root = (root.parent.parent / "developer-guide/img").resolve()
+            local = (guide_root / relative.removeprefix("developer-guide/img/")).resolve()
+            if not local.is_relative_to(guide_root):
+                raise ValueError("Image path escapes the developer guide image directory")
         data = local.read_bytes()
     else:
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
