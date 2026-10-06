@@ -55,7 +55,7 @@ never run the body at once.
 `@Async` on a `@Scheduled` method is a build error: it would end the run as soon
 as the work was queued, so runs could overlap and a lock be released early;
 `@Scheduled` already runs off the request thread, on the thread its `thread`
-attribute picks. `@Async` on a `@RequestScope` or `@SessionScope` bean builds with
+attribute picks. `@Async` on a request- or session-scoped bean builds with
 a warning, as it runs in Spring: the task calls the bean itself, which is destroyed
 when its request or session ends, possibly before the task runs.
 

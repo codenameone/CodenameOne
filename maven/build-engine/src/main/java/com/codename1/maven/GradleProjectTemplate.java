@@ -116,8 +116,8 @@ public final class GradleProjectTemplate {
     }
 
     /// Writes a backend skeleton into `backendDir`: its `application*.properties`
-    /// and, when `packageName` is not null, an `Api` controller and the `Greeter`
-    /// service it is given, in that package.
+    /// and, when `packageName` is not null, an `Api` controller, the `Greeter`
+    /// service it is given and the tests of both, in that package.
     ///
     /// @param taskPrefix how the backend's tasks are addressed from the root:
     ///        `:backend:` for a subproject, empty for a backend-only project
@@ -132,6 +132,11 @@ public final class GradleProjectTemplate {
                             .replace("__BACKEND__", taskPrefix));
             write(new File(backendDir, "src/main/java/" + packageName.replace('.', '/') + "/Greeter.java"),
                     text("backend/Greeter.java.txt").replace("${package}", packageName));
+            for (String test : new String[] {"ApiTest", "ServedApiTest"}) {
+                write(new File(backendDir, "src/test/java/" + packageName.replace('.', '/') + "/" + test + ".java"),
+                        text("backend/" + test + ".java.txt").replace("${package}", packageName)
+                                .replace("__BACKEND__", taskPrefix));
+            }
         }
     }
 

@@ -90,27 +90,60 @@
         <artifactId>codenameone-maven-plugin</artifactId>
         <version>${cn1.plugin.version}</version>
       </plugin>
-      <plugin>
-        <!-- Codename One Uses its own test runner currently.
-                    This snippet configures Maven Surefire to use Codename One's "dummy"
-                    provider so that Surefire doesn't try to run Codename One's tests
-                    using its built-in test providers. -->
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0-M5</version>
-        <dependencies>
-          <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-maven-plugin</artifactId>
-            <version>${cn1.plugin.version}</version>
-          </dependency>
-        </dependencies>
-      </plugin>
     </plugins>
   </build>
   <repositories/>
   <pluginRepositories/>
   <profiles>
+    <!--
+      Codename One's client modules run their tests with cn1:test, so Surefire is
+      given a provider that finds nothing. Everywhere but the backend: the backend
+      module's tests are ordinary JUnit 5, which that provider would swallow:
+      Surefire uses a provider declared this way INSTEAD of detecting JUnit, so
+      "Tests run: 0" was all a backend ever reported.
+    -->
+    <profile>
+      <id>cn1-client-tests</id>
+      <activation>
+        <property>
+          <name>codename1.platform</name>
+          <value>!backend</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <!-- Codename One Uses its own test runner currently.
+                        This snippet configures Maven Surefire to use Codename One's "dummy"
+                        provider so that Surefire doesn't try to run Codename One's tests
+                        using its built-in test providers. -->
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.0.0-M5</version>
+            <dependencies>
+              <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+                <version>${cn1.plugin.version}</version>
+              </dependency>
+            </dependencies>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!-- The CI test server, scripts/lib/cn1ss.sh builds and starts it. -->
+    <profile>
+      <id>backend</id>
+      <activation>
+        <property>
+          <name>codename1.platform</name>
+          <value>backend</value>
+        </property>
+      </activation>
+      <modules>
+        <module>backend</module>
+      </modules>
+    </profile>
     <profile>
       <id>javascript</id>
       <activation>

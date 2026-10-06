@@ -23,11 +23,11 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.annotations.Component;
-import com.codename1.backend.annotations.RequestScope;
+import com.codename1.backend.annotations.Scope;
 
 // tag::backend-bean-request-scope[]
 @Component
-@RequestScope
+@Scope("request")
 public class RequestClock {
     private final long started = System.currentTimeMillis();
 

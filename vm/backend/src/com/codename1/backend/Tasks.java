@@ -22,6 +22,8 @@
  */
 package com.codename1.backend;
 
+import com.codename1.impl.backend.AsyncTask;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -56,14 +58,14 @@ import java.util.Map;
 /// virtual thread, and every other virtual thread on that host with it. See
 /// `com.codename1.backend.annotations.ThreadKind`.
 public final class Tasks {
-    public static final int AUTO = 0;
-    public static final int VIRTUAL = 1;
-    public static final int PLATFORM = 2;
+    static final int AUTO = com.codename1.impl.backend.BackendAccess.AUTO;
+    static final int VIRTUAL = com.codename1.impl.backend.BackendAccess.VIRTUAL;
+    static final int PLATFORM = com.codename1.impl.backend.BackendAccess.PLATFORM;
 
     /// The executor `@Async` methods use when they name none.
-    public static final String DEFAULT = "default";
+    static final String DEFAULT = com.codename1.impl.backend.BackendAccess.DEFAULT_EXECUTOR;
     /// The executor scheduled jobs use when they name none.
-    public static final String SCHEDULING = "scheduling";
+    static final String SCHEDULING = com.codename1.impl.backend.BackendAccess.SCHEDULING_EXECUTOR;
 
     /// The registry of the server the calling thread works for, when it carries one.
     private static final ThreadLocal CURRENT = new ThreadLocal();
@@ -168,9 +170,9 @@ public final class Tasks {
     /// #### Parameters
     ///
     /// - `kind`: @param kind [#AUTO], [#VIRTUAL] or [#PLATFORM]: what the
-    /// code asked for, which `cn1.task.executor..kind`
+    /// code asked for, which `cn1.task.executor.<name>.kind`
     /// overrides
-    public static TaskExecutor executor(String name, int kind) {
+    static TaskExecutor executor(String name, int kind) {
         return executor(current(), name, kind);
     }
 
@@ -311,7 +313,7 @@ public final class Tasks {
     /// turned metrics off, whose queues would then appear in another server's
     /// telemetry, the one built-in metric counting work from a server that opted
     /// out.
-    public static List executorsOf(java.util.Collection servers) {
+    static List executorsOf(java.util.Collection servers) {
         List registries;
         synchronized (Tasks.class) {
             registries = new ArrayList(LIVE);
@@ -330,7 +332,7 @@ public final class Tasks {
 
     /// Stops the executors of the calling thread's server, waiting up to
     /// `waitMillis` in total for what is running.
-    public static void shutdown(long waitMillis) {
+    static void shutdown(long waitMillis) {
         shutdown(current(), waitMillis);
     }
 

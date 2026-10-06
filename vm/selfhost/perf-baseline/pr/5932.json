@@ -1,0 +1,27 @@
+{
+ "pr": 5932,
+ "rebaseline": {
+  "windows-x64@intel64-family-6-model-173-genuineintel": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.467,
+      "time": 4.101,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.32,
+     "reason": "#5940's cheaper allocation path and generational collection; this runner's baseline predates it (the fold that followed #5940 did not cover it)",
+     "runs": 1,
+     "time": 1.621,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
+  }
+ }
+}

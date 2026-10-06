@@ -138,10 +138,15 @@ final class BackendWeaver {
     /// Rewrites one class file in place. Answers false when it was already
     /// rewritten, or has nothing to rewrite.
     static boolean weave(File outputDir, Plan plan) throws IOException {
+        return weaveFile(new File(outputDir, plan.internalName + ".class"), plan);
+    }
+
+    /// As [#weave], for the class file at `file` -- a test class that lives in
+    /// another output directory than the one the pass writes into.
+    static boolean weaveFile(File file, Plan plan) throws IOException {
         if (plan.isEmpty()) {
             return false;
         }
-        File file = new File(outputDir, plan.internalName + ".class");
         if (!file.isFile()) {
             throw new IOException("Cannot weave " + plan.internalName + ": no class file at "
                     + file);

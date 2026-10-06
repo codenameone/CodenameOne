@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.codenameone.examples.hellocodenameone</groupId>
+    <artifactId>hellocodenameone</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>hellocodenameone-backend</artifactId>
+  <packaging>jar</packaging>
+  <name>hellocodenameone-backend</name>
+
+  <!--
+    The server every on-device test leg talks to.
+
+    It receives the screenshots the suite streams over a websocket (Cn1ssEndpoint,
+    which used to be vm/backend/demo/cn1ss), and serves the REST surface the app's
+    networking tests exercise: typed @RestClient calls, Rest, ConnectionRequest,
+    MultipartRequest, cookies, redirects, auth, gzip. scripts/lib/cn1ss.sh builds
+    and starts it: natively where a native backend builds, on the JVM elsewhere.
+
+    Its own tests are the backend testing support in use: MockMvc, TestRestTemplate,
+    @TestConfiguration and @MockitoBean, run by Surefire and, with
+    -Dcn1.backend.compiledTests=true, again as a native binary.
+
+      mvn -pl backend -Dcodename1.platform=backend test
+      mvn -pl backend -Dcodename1.platform=backend cn1:backend
+      mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
+  -->
+  <properties>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.testSource>1.8</maven.compiler.testSource>
+    <maven.compiler.testTarget>1.8</maven.compiler.testTarget>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-backend</artifactId>
+      <version>${cn1.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.xerial</groupId>
+      <artifactId>sqlite-jdbc</artifactId>
+      <version>3.46.1.0</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-backend-test</artifactId>
+      <version>${cn1.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.9.3</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>4.11.0</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-maven-plugin</artifactId>
+        <version>${cn1.plugin.version}</version>
+        <executions>
+          <execution>
+            <id>cn1-process-annotations</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>process-annotations</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>cn1-process-test-annotations</id>
+            <phase>process-test-classes</phase>
+            <goals>
+              <goal>process-test-annotations</goal>
+            </goals>
+          </execution>
+          <execution>
+            <!-- Off unless -Dcn1.backend.compiledTests=true. -->
+            <id>cn1-compiled-tests</id>
+            <phase>test</phase>
+            <goals>
+              <goal>backend-test</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.0.0-M5</version>
+        <configuration>
+          <!-- One backend runs per process, and the runtime keeps process-wide
+               state: a JVM per test class keeps one class's server out of the
+               next's, as maven/backend does for its own tests. -->
+          <reuseForks>false</reuseForks>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

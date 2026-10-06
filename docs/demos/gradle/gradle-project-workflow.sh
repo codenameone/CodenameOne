@@ -65,6 +65,8 @@ mvn com.codenameone:codenameone-maven-plugin:VERSION:generate-app-project \
 ./gradlew addBackend                          # create backend/ once
 CN1_PROFILE=dev ./gradlew :backend:runBackend  # run it on this JVM
 ./gradlew :backend:backendPackage              # build the native binary
+./gradlew :backend:test                        # run its tests on this JVM
+./gradlew :backend:backendTest                 # and as a native binary
 # end::gradle-backend[]
 
 # tag::gradle-backend-only[]

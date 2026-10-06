@@ -22,12 +22,12 @@
  */
 package com.codenameone.developerguide.backend.beans;
 
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.McpParam;
 import com.codename1.backend.annotations.McpTool;
-import com.codename1.backend.annotations.Service;
 
 // tag::backend-mcp-tool[]
-@Service
+@Component
 public class SupportTools {
     private final Signups signups;
 

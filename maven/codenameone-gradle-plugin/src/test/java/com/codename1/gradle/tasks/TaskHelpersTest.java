@@ -105,4 +105,17 @@ class TaskHelpersTest {
         assertEquals(Collections.emptyList(), SplitOutputCheck.collisions(
                 new File(tmp.toFile(), "java"), new File(tmp.toFile(), "missing")));
     }
+
+    /// A mixed backend with annotated classes in both languages: each processing
+    /// pass writes its own entry point record, and the check refuses the pair
+    /// rather than let one half-wired application win the classpath.
+    @Test
+    void twoBackendWiringsAreACollision() throws IOException {
+        touch("java/META-INF/cn1-backend-main");
+        touch("java/META-INF/cn1-backend-wiring");
+        touch("kotlin/META-INF/cn1-backend-main");
+        touch("kotlin/META-INF/cn1-backend-wiring");
+        assertEquals(java.util.Arrays.asList("META-INF/cn1-backend-main", "META-INF/cn1-backend-wiring"),
+                SplitOutputCheck.collisions(new File(tmp.toFile(), "java"), new File(tmp.toFile(), "kotlin")));
+    }
 }

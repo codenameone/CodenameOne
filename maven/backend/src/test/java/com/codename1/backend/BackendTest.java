@@ -79,6 +79,43 @@ class BackendTest {
     }
 
     @Test
+    @DisplayName("a compiled-in ${DATABASE_URL} nobody set does not stop a server that needs no database")
+    void anUnsetDatabaseReferenceIsNotADatabase() throws Exception {
+        // The archetype's committed application.properties says
+        // cn1.datasource.url=${DATABASE_URL}, and the build compiles it into the
+        // binary. A server with no entity and no handler that needs a database
+        // must still start where that variable is unset; one that needs a
+        // database must still refuse, naming it.
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Config config = Config.of(settings, "production").withCompiledDefaults(new String[] {
+            Config.DATASOURCE_URL, "${CN1_TEST_NEVER_SET_DATABASE_URL}"});
+        Backend backend = Backend.builder(config)
+                .quiet()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                        return HttpServer.Response.text(200, "ok");
+                    }
+                })
+                .start();
+        try {
+            assertEquals("ok", get(port, "/anything"));
+            assertNull(backend.getDataSource(), "no database was asked for");
+        } finally {
+            backend.stop();
+        }
+        Properties needy = new Properties();
+        needy.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Config needs = Config.of(needy, "production").withCompiledDefaults(new String[] {
+            Config.DATASOURCE_URL, "${CN1_TEST_NEVER_SET_DATABASE_URL}"});
+        java.io.IOException refused = assertThrows(java.io.IOException.class,
+                () -> Backend.builder(needs).quiet().requiresDataSource().start());
+        assertTrue(refused.getMessage().contains("CN1_TEST_NEVER_SET_DATABASE_URL"),
+                refused.getMessage());
+    }
+
+    @Test
     @DisplayName("handlers are tried in order and static files come last")
     void staticFilesCannotShadowARoute(@TempDir File dir) throws Exception {
         // A file named like a route would otherwise decide which of the two

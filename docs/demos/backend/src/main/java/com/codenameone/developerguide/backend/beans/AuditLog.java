@@ -23,14 +23,14 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Propagation;
-import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.Transactional;
 
 import java.io.IOException;
 
 // tag::backend-tx-requires-new[]
-@Service
+@Component
 public class AuditLog {
     private final DataSource db;
 

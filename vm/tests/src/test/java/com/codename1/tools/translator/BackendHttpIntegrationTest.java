@@ -1239,6 +1239,43 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("binary, gzip and multipart bodies reach the handler as sent")
+    void binaryGzipAndMultipartBodies() throws Exception {
+        // A binary type keeps its bytes; it used to be a 400 for not being UTF-8.
+        byte[] png = new byte[] { (byte) 0x89, 'P', 'N', 'G', 0, (byte) 0xff, (byte) 0xc3, '(' };
+        int sum = 0;
+        for (byte b : png) {
+            sum = sum * 31 + (b & 0xff);
+        }
+        String answer = new String(raw("POST /bodyecho HTTP/1.1\r\nHost: x\r\nContent-Type: "
+                + "image/png\r\nContent-Length: " + png.length
+                + "\r\nConnection: close\r\n\r\n", png), StandardCharsets.UTF_8);
+        assertTrue(answer.contains("length=8 sum=" + sum), answer);
+
+        // A gzip body is inflated by the pure-Java JZlib the client also uses.
+        ByteArrayOutputStream zipped = new ByteArrayOutputStream();
+        java.util.zip.GZIPOutputStream gz = new java.util.zip.GZIPOutputStream(zipped);
+        gz.write("{\"field\":\"zipped\"}".getBytes(StandardCharsets.UTF_8));
+        gz.close();
+        byte[] z = zipped.toByteArray();
+        answer = new String(raw("POST /bodyecho HTTP/1.1\r\nHost: x\r\nContent-Type: "
+                + "application/json\r\nContent-Encoding: gzip\r\nContent-Length: " + z.length
+                + "\r\nConnection: close\r\n\r\n", z), StandardCharsets.UTF_8);
+        assertTrue(answer.contains("length=18"), answer);
+
+        // A multipart form splits into parts; its text field is a parameter.
+        String boundary = "nativeb0undary";
+        byte[] form = ("--" + boundary + "\r\nContent-Disposition: form-data; name=\"field\"\r\n\r\n"
+                + "value\r\n--" + boundary + "\r\nContent-Disposition: form-data; name=\"up\"; "
+                + "filename=\"f.bin\"\r\nContent-Type: application/octet-stream\r\n\r\nABCD\r\n--"
+                + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8);
+        answer = new String(raw("POST /bodyecho HTTP/1.1\r\nHost: x\r\nContent-Type: "
+                + "multipart/form-data; boundary=" + boundary + "\r\nContent-Length: "
+                + form.length + "\r\nConnection: close\r\n\r\n", form), StandardCharsets.UTF_8);
+        assertTrue(answer.contains("part=field/null/5 part=up/f.bin/4 field=value"), answer);
+    }
+
+    @Test
     @DisplayName("a chunked body that is not UTF-8 is refused too")
     void malformedUtf8ChunkedBodiesAreRefused() throws Exception {
         // The chunked path decodes separately, so it needs its own proof: fixing

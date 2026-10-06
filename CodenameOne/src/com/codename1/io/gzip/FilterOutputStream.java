@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /// Dummy implementation of filter output stream
+@com.codename1.impl.SharedWithBackend
 public class FilterOutputStream extends OutputStream {
     protected OutputStream out;
 

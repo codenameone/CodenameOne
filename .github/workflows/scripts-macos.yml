@@ -72,7 +72,7 @@ on:
       # emulator legs as well would buy nothing and cost a great deal: a change to
       # the ORM, the database layer or the HTTP parser cannot reach this
       # transport.
-      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/hellocodenameone/backend/**'
   push:
     branches: [ master ]
     paths:
@@ -113,7 +113,7 @@ on:
       # emulator legs as well would buy nothing and cost a great deal: a change to
       # the ORM, the database layer or the HTTP parser cannot reach this
       # transport.
-      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/hellocodenameone/backend/**'
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.

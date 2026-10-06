@@ -35,7 +35,6 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.Random;
@@ -85,42 +84,27 @@ class BackendWebSocketIntegrationTest {
             BackendTestSupport.skipOrFail(skipReason);
             return;
         }
-        Path backend = Paths.get("..", "backend").normalize().toAbsolutePath();
-        BackendTestSupport.require(Files.isDirectory(backend), "vm/backend is not present");
-        Path jdk8 = BackendTestSupport.findJdk8();
-        BackendTestSupport.require(jdk8 != null, "no JDK 8 available to compile the backend");
-
         work = Files.createTempDirectory("backend-websocket");
         outDir = Files.createDirectories(work.resolve("screenshots"));
-        Path binary = work.resolve("cn1ss");
 
         // The screenshot server rather than a purpose-built fixture: it is what CI
         // actually runs, so a break here is a break in the transport every
         // on-device suite depends on, and the application protocol gets covered
-        // alongside the frame layer.
-        String failure = BackendTestSupport.build("Cn1ssScreenshotServer", "demo/cn1ss",
-                binary, jdk8);
+        // alongside the frame layer. Its own tests, compiled the same way, run in
+        // the backend-compiled-tests job.
+        Path binary = work.resolve("cn1ss");
+        String failure = BackendTestSupport.buildCn1ssServer(binary);
         if (failure != null) {
             BackendTestSupport.skipOrFail(failure);
             return;
         }
 
-        // Proves the binary works before any test blames the protocol for a
-        // toolchain problem.
-        ProcessBuilder check = new ProcessBuilder(binary.toString(), "--port", "0",
-                "--out", outDir.toString(), "--selfcheck");
-        check.redirectErrorStream(true);
-        Process checked = check.start();
-        assertTrue(checked.waitFor(60, java.util.concurrent.TimeUnit.SECONDS),
-                "the self-check did not finish");
-        assertEquals(0, checked.exitValue(), "the translated server failed its own self-check");
-
         port = BackendTestSupport.freePort();
-        // Started directly rather than through BackendTestSupport.start, which
-        // takes no arguments: --port and --out reach the translated main through
-        // cn1MainArgs, and this test is partly about that being true.
-        ProcessBuilder run = new ProcessBuilder(binary.toString(), "--port",
-                String.valueOf(port), "--out", outDir.toString());
+        // The port and the output directory reach the translated server through
+        // the environment, which its compiled-in application.properties defers to.
+        ProcessBuilder run = new ProcessBuilder(binary.toString());
+        run.environment().put("CN1_SERVER_PORT", String.valueOf(port));
+        run.environment().put("CN1SS_OUT", outDir.toString());
         // A short HTTP read deadline, so idleLongerThanTheRequestTimeout can wait
         // past it in seconds rather than in the default fifteen. It also makes the
         // test sharper: the websocket allowance it must NOT inherit is now four

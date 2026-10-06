@@ -231,6 +231,10 @@ Gradle runs one Codename One build at a time, even when a command line names sev
 | `cn1:backend-package`
 | Builds a backend as a single native binary.
 
+| `backendTest`
+| `test -Dcn1.backend.compiledTests=true`
+| Runs a backend's tests as a native binary. The standard `test` task runs them on this JVM.
+
 | `cn1Update`
 | `cn1:update`
 | Updates the plugin version in `settings.gradle.kts` and the build client.
@@ -350,7 +354,7 @@ Java and Kotlin classes in one project can call each other. Both are checked by 
 include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-backend,indent=0]
 ----
 
-A backend-only project has the same bootstrap with the server at the root: `application.properties`, `application-dev.properties` and `src/main/java`. Its tasks are `runBackend`, `backendPackage`, `cn1Update` and the standard `test`. `backendPackage` writes the binary to `build/<project name>`:
+A backend-only project has the same bootstrap with the server at the root: `application.properties`, `application-dev.properties` and `src/main/java`. Its tasks are `runBackend`, `backendPackage`, `backendTest`, `cn1Update` and the standard `test`, which runs the backend's tests on this JVM; <<backend-testing>> covers writing them. `backendPackage` writes the binary to `build/<project name>`:
 
 [source,bash]
 ----

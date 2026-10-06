@@ -16,7 +16,7 @@
     <!--
       The server side of this app, in the same language as the rest of it.
 
-      Two commands matter here:
+      Three commands matter here:
 
         The property is not optional: the backend module lives in a profile, so
         without it Maven reports "Could not find the selected project in the
@@ -26,6 +26,9 @@
             runs it on this JVM, in seconds
         mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
             builds a native binary to deploy
+        mvn -pl backend -Dcodename1.platform=backend test
+            runs its tests; add -Dcn1.backend.compiledTests=true to also run
+            them as a native binary
 
       The first is the development loop. The second produces a single executable
       with no runtime to install, which is what lets the deployed container be the
@@ -56,6 +59,24 @@
             <version>3.46.1.0</version>
             <scope>runtime</scope>
         </dependency>
+        <!--
+             @BackendTest, MockMvc and TestRestTemplate: Spring Boot's test layer,
+             under Codename One's package names. The tests are JUnit 5. Add
+             org.mockito:mockito-core here too to replace a bean with @MockitoBean;
+             tests that use it run on the JVM only.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-backend-test</artifactId>
+            <version>${cn1.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -80,7 +101,37 @@
                             <goal>process-annotations</goal>
                         </goals>
                     </execution>
+                    <execution>
+                        <id>cn1-process-test-annotations</id>
+                        <phase>process-test-classes</phase>
+                        <goals>
+                            <!-- Generates the wiring each @BackendTest class runs
+                                 against: the production beans, with the test's
+                                 @TestConfiguration beans and mocks in place. -->
+                            <goal>process-test-annotations</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>cn1-compiled-tests</id>
+                        <phase>test</phase>
+                        <goals>
+                            <!-- Off unless -Dcn1.backend.compiledTests=true: then the
+                                 same tests are also translated into a native test
+                                 binary and run, which is how this server ships. -->
+                            <goal>backend-test</goal>
+                        </goals>
+                    </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M5</version>
+                <configuration>
+                    <!-- One server runs per process: a JVM per test class keeps one
+                         class's server and settings out of the next's. -->
+                    <reuseForks>false</reuseForks>
+                </configuration>
             </plugin>
         </plugins>
     </build>

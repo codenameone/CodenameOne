@@ -22,6 +22,8 @@
  */
 package com.codename1.backend;
 
+import com.codename1.impl.backend.AsyncTask;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;

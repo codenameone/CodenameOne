@@ -24,14 +24,14 @@ package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.AsyncResult;
 import com.codename1.backend.annotations.Async;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
-import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.ThreadKind;
 
 import java.util.concurrent.Future;
 
 // tag::backend-background[]
-@Service
+@Component
 public class Reports {
     @Async
     public Future<String> monthly(String month) {

@@ -40,6 +40,7 @@ package com.codename1.io.gzip;
 /// #### Deprecated
 ///
 /// Not for public use in the future.
+@com.codename1.impl.SharedWithBackend
 @Deprecated
 public class ZStream {
 

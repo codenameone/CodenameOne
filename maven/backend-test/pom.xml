@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Testing support for backend modules: com.codename1.backend.test.
+
+  vm/backend/test holds the shared API and runtime (src), a JVM half (javase) and
+  a compiled half (parparvm), plus the subset of JUnit 5's API a compiled test is
+  translated against (junit-shim). Published the way codenameone-backend is:
+
+    codenameone-backend-test                    src + javase, COMPILED. A backend
+                                                module's tests depend on it; under
+                                                Surefire it is a JUnit 5 extension.
+
+    codenameone-backend-test:parparvm-sources   src + parparvm + junit-shim as
+                                                SOURCE, for `cn1:backend-test`,
+                                                which translates the tests with
+                                                the application. The shim is in
+                                                this jar only: on a JVM the real
+                                                JUnit is on the classpath.
+
+  Java 8 source and target, for the same reason as the runtime: the shared half
+  compiles against the JavaAPI bootclasspath on the translated side.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-backend-test</artifactId>
+    <packaging>jar</packaging>
+    <name>Codename One Backend Test Support</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <backend.test.dir>${project.basedir}/../../vm/backend/test</backend.test.dir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-backend</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- The API a test is written against; the engine is the project's to add. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.jupiter.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>${backend.test.dir}/src</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-javase-half</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${backend.test.dir}/javase</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>attach-parparvm-sources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/${project.build.finalName}-parparvm-sources.jar</file>
+                                    <type>jar</type>
+                                    <classifier>parparvm-sources</classifier>
+                                </artifact>
+                            </artifacts>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>parparvm-sources-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <jar destfile="${project.build.directory}/${project.build.finalName}-parparvm-sources.jar">
+                                    <fileset dir="${backend.test.dir}/src" includes="**/*.java"/>
+                                    <fileset dir="${backend.test.dir}/parparvm" includes="**/*.java"/>
+                                    <fileset dir="${backend.test.dir}/junit-shim" includes="**/*.java"/>
+                                </jar>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- The gates the runtime has: this is published API and translated too. -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>true</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>3.21.0</version>
+                <configuration>
+                    <failOnViolation>false</failOnViolation>
+                    <printFailingErrors>false</printFailingErrors>
+                    <targetJdk>1.8</targetJdk>
+                    <rulesets>
+                        <ruleset>${project.basedir}/../core-unittests/pmd.xml</ruleset>
+                    </rulesets>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>pmd</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>pmd</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <configLocation>${project.basedir}/../core-unittests/checkstyle.xml</configLocation>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <consoleOutput>false</consoleOutput>
+                    <failsOnError>false</failsOnError>
+                    <linkXRef>false</linkXRef>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                    <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
+                    <outputFileFormat>xml</outputFileFormat>
+                    <sourceDirectories>
+                        <sourceDirectory>${backend.test.dir}/src</sourceDirectory>
+                        <sourceDirectory>${backend.test.dir}/javase</sourceDirectory>
+                        <sourceDirectory>${backend.test.dir}/parparvm</sourceDirectory>
+                        <sourceDirectory>${backend.test.dir}/junit-shim</sourceDirectory>
+                    </sourceDirectories>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>validate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>checkstyle</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

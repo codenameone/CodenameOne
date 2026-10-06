@@ -153,6 +153,7 @@ public final class AnnotatedClass {
 
     public boolean isAbstract() { return (access & Opcodes.ACC_ABSTRACT) != 0; }
     public boolean isInterface() { return (access & Opcodes.ACC_INTERFACE) != 0; }
+    public boolean isAnnotation() { return (access & Opcodes.ACC_ANNOTATION) != 0; }
     public boolean isPublic() { return (access & Opcodes.ACC_PUBLIC) != 0; }
     public boolean isSynthetic() { return (access & Opcodes.ACC_SYNTHETIC) != 0; }
     public boolean isFinal() { return (access & Opcodes.ACC_FINAL) != 0; }

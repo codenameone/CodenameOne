@@ -478,6 +478,12 @@ public class GeneratorModel {
                 entries, ZipEntryType.COMMON);
         copySingleTextEntryToMap(sourceDir + "Greeter.java",
                 mavenBackendTemplate(scaffold, "backend/Greeter.java.txt"), entries, ZipEntryType.COMMON);
+        // The same @BackendTest samples every other backend layout gets.
+        String testDir = "src/test/java/" + packageName.replace('.', '/') + "/";
+        copySingleTextEntryToMap(testDir + "ApiTest.java",
+                mavenBackendTemplate(scaffold, "backend/ApiTest.java.txt"), entries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap(testDir + "ServedApiTest.java",
+                mavenBackendTemplate(scaffold, "backend/ServedApiTest.java.txt"), entries, ZipEntryType.COMMON);
         copySingleTextEntryToMap("README.md", buildMavenBackendReadmeMarkdown(), entries, ZipEntryType.COMMON);
         validateGeneratedPomCoordinates(entries);
         return entries;
@@ -493,6 +499,9 @@ public class GeneratorModel {
         String text = StringUtil.newString(data);
         text = StringUtil.replaceAll(text, "./gradlew __BACKEND__runBackend", "./mvnw cn1:backend");
         text = StringUtil.replaceAll(text, "./gradlew __BACKEND__backendPackage", "./mvnw cn1:backend-package");
+        text = StringUtil.replaceAll(text, "./gradlew __BACKEND__backendTest",
+                "./mvnw test -Dcn1.backend.compiledTests=true");
+        text = StringUtil.replaceAll(text, "./gradlew __BACKEND__test", "./mvnw test");
         text = StringUtil.replaceAll(text, "under `runBackend`", "under `cn1:backend`");
         text = StringUtil.replaceAll(text, "${package}", packageName);
         return text;
@@ -510,6 +519,10 @@ public class GeneratorModel {
                 gradleTemplate(scaffold, "backend/Api.java.txt", taskPrefix));
         putGradleText(entries, dir + "src/main/java/" + packageName.replace('.', '/') + "/Greeter.java",
                 gradleTemplate(scaffold, "backend/Greeter.java.txt", taskPrefix));
+        putGradleText(entries, dir + "src/test/java/" + packageName.replace('.', '/') + "/ApiTest.java",
+                gradleTemplate(scaffold, "backend/ApiTest.java.txt", taskPrefix));
+        putGradleText(entries, dir + "src/test/java/" + packageName.replace('.', '/') + "/ServedApiTest.java",
+                gradleTemplate(scaffold, "backend/ServedApiTest.java.txt", taskPrefix));
     }
 
     private void putGradleText(Map<String, byte[]> entries, String path, String content) throws IOException {

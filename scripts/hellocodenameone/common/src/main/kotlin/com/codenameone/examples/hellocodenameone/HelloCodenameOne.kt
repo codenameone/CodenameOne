@@ -31,6 +31,7 @@ import com.codename1.car.CarListTemplate
 import com.codename1.car.CarRow
 import com.codename1.car.CarScreen
 import com.codename1.car.CarTemplate
+import com.codename1.io.NetworkEvent
 import com.codename1.system.Lifecycle
 import com.codename1.testing.TestReporting
 import com.codename1.ui.CN
@@ -38,12 +39,24 @@ import com.codename1.ui.Display
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter
 import com.codenameone.examples.hellocodenameone.tests.KotlinUiTest
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendClientTest
 import com.codename1.annotations.buildhints.*
 
 @Android(useAndroidX = Toggle.ON)
 @Ios(applicationQueriesSchemes = ["cydia"], newStorageLocation = Toggle.ON)
 @IosPrivacy(cameraUsageDescription = "Used by the CI smoke test to verify the com.codename1.camera native bridge compiles. The app never opens a camera session.", healthShareUsageDescription = "Used by the CI smoke test to verify the com.codename1.health native bridge compiles. The app never reads real health data.", healthUpdateUsageDescription = "Used by the CI smoke test to verify the com.codename1.health write path compiles. The app never writes real health data.")
 open class HelloCodenameOne : Lifecycle() {
+    // Lifecycle's handler consumes every network error and shows a modal dialog,
+    // and NetworkManager then never calls the request's own handleException. A
+    // backend client test that expects a failure (a request past its timeout)
+    // reports it there, so leave its requests alone.
+    override fun handleNetworkError(err: NetworkEvent) {
+        if (err.connectionRequest is BackendClientTest.ReportsOwnErrors) {
+            return
+        }
+        super.handleNetworkError(err)
+    }
+
     override fun init(context: Any?) {
         super.init(context)
         check(!Display.getInstance().isJailbrokenDevice()) {

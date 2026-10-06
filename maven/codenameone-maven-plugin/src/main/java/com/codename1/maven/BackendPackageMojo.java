@@ -235,6 +235,12 @@ public class BackendPackageMojo extends AbstractMojo {
      * about it.
      */
     private String sourceEncoding() {
+        return sourceEncodingOf(project);
+    }
+
+    /// [#sourceEncoding] for any module; the backend-test goal compiles the same
+    /// sources and has to read them the same way.
+    static String sourceEncodingOf(MavenProject project) {
         Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
         if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
             Xpp3Dom encoding = ((Xpp3Dom) compiler.getConfiguration()).getChild("encoding");
@@ -258,6 +264,14 @@ public class BackendPackageMojo extends AbstractMojo {
 
     private File resolve(String groupId, String artifactId, String version, String classifier)
             throws MojoExecutionException {
+        return resolve(repositorySystem, localRepository, project, groupId, artifactId, version,
+                classifier);
+    }
+
+    /// Resolves one artifact of the backend runtime for `project`.
+    static File resolve(RepositorySystem repositorySystem, ArtifactRepository localRepository,
+                        MavenProject project, String groupId, String artifactId, String version,
+                        String classifier) throws MojoExecutionException {
         Artifact artifact = repositorySystem.createArtifactWithClassifier(
                 groupId, artifactId, version, "jar", classifier);
         ArtifactResolutionRequest request = new ArtifactResolutionRequest();

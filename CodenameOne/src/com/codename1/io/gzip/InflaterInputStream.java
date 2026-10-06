@@ -33,6 +33,7 @@ package com.codename1.io.gzip;
 import java.io.IOException;
 import java.io.InputStream;
 
+@com.codename1.impl.SharedWithBackend
 public class InflaterInputStream extends FilterInputStream {
     protected static final int DEFAULT_BUFSIZE = 512;
     protected final Inflater inflater;

@@ -472,6 +472,51 @@ class GradleConversionTest {
     }
 
     @Test
+    void aBackendWhoseSurefireWasCustomizedIsNotTheSkeleton() throws Exception {
+        // The plugin the archetype declares, but with the developer's own settings:
+        // their work, so the backend is kept rather than left behind.
+        File mvn = mavenApp(UNTOUCHED_API);
+        String generated = GENERATED_BACKEND_POM.replace("</plugins>", "<plugin><groupId>org.apache.maven.plugins</groupId>"
+                + "<artifactId>maven-surefire-plugin</artifactId><configuration><reuseForks>false</reuseForks>"
+                + "</configuration></plugin></plugins>");
+        touch(mvn, "backend/pom.xml", generated);
+        assertTrue(GradleConversion.pomAsGenerated(new File(mvn, "backend/pom.xml")),
+                "Surefire as the archetype writes it is the skeleton");
+        touch(mvn, "backend/pom.xml", generated.replace("<reuseForks>false</reuseForks>",
+                "<reuseForks>false</reuseForks><includes><include>**/*Spec.java</include></includes>"));
+        assertFalse(GradleConversion.pomAsGenerated(new File(mvn, "backend/pom.xml")),
+                "a customized Surefire read as generated");
+    }
+
+    @Test
+    void theArchetypesSampleTestsStillCountAsTheSkeleton() throws Exception {
+        // The archetype now writes ApiTest and ServedApiTest beside the generated
+        // code, with the test library, JUnit and Surefire in the pom. None of that
+        // is the developer's work, so the conversion still leaves it behind.
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "backend/pom.xml", GENERATED_BACKEND_POM
+                .replace("</dependencies>", "<dependency><groupId>com.codenameone</groupId>"
+                        + "<artifactId>codenameone-backend-test</artifactId><scope>test</scope></dependency>"
+                        + "<dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId>"
+                        + "<version>5.9.3</version><scope>test</scope></dependency></dependencies>")
+                .replace("</plugins>", "<plugin><groupId>org.apache.maven.plugins</groupId>"
+                        + "<artifactId>maven-surefire-plugin</artifactId></plugin></plugins>"));
+        String apiTest = template("backend/ApiTest.java.txt").replace("${package}", "a.backend")
+                .replace("__BACKEND__", ":backend:");
+        touch(mvn, "backend/src/test/java/a/backend/ApiTest.java", apiTest);
+        touch(mvn, "backend/src/test/java/a/backend/ServedApiTest.java",
+                template("backend/ServedApiTest.java.txt").replace("${package}", "a.backend")
+                        .replace("__BACKEND__", ":backend:"));
+        assertTrue(GradleConversion.isUntouchedSkeleton(new File(mvn, "backend")),
+                "the generated tests are part of the skeleton");
+        // A test the developer changed is their work.
+        touch(mvn, "backend/src/test/java/a/backend/ApiTest.java",
+                apiTest.replace("\"Hello, Ada\"", "\"Hi, Ada\""));
+        assertFalse(GradleConversion.isUntouchedSkeleton(new File(mvn, "backend")),
+                "an edited generated test is someone's work");
+    }
+
+    @Test
     void whatThePomReplacesIsLeftOutAndTargetPathsAreKept() throws Exception {
         File mvn = mavenApp(UNTOUCHED_API);
         touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"

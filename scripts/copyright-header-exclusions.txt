@@ -246,6 +246,26 @@ vm/JavaAPI/src/java/text/Format.java | Codename One contribution whose copyright
 vm/JavaAPI/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 maven/build-engine/src/main/java/com/codename1/builders/util/JSONSanitizer.java | Adapted from the OWASP JSON Sanitizer (Apache-2.0), whose documentation it keeps verbatim
+CodenameOne/src/com/codename1/io/gzip/Adler32.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/CRC32.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Checksum.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Deflate.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Deflater.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/DeflaterOutputStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/GZIPException.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/GZIPHeader.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/GZIPInputStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/GZIPOutputStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/InfBlocks.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/InfCodes.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/InfTree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Inflate.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Inflater.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/InflaterInputStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/JZlib.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/StaticTree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/Tree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
+CodenameOne/src/com/codename1/io/gzip/ZStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license (based on zlib 1.1.3), retaining its original notice
 CodenameOne/src/com/codename1/ui/layouts/mig/InCellGapProvider.java | MiG Layout source (Mikael Grev, BSD) retaining its original notice
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/AnnotationVisitor.java | Rewrite of ASM org.objectweb.asm.AnnotationVisitor for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/ClassReader.java | Rewrite of ASM org.objectweb.asm.ClassReader for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)

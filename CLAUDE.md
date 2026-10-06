@@ -328,8 +328,7 @@ a line of their own above the type declaration, and every backend build compiles
 from there:
 
 - `vm/backend/shared-sources.sh` lists them for the shell builds (`build.sh`,
-  `run-javase.sh`, `ws-conformance.sh`, `scripts/lib/cn1ss.sh`,
-  `scripts/check-native-signatures.sh`).
+  `run-javase.sh`, `ws-conformance.sh`, `scripts/check-native-signatures.sh`).
 - `maven/backend/pom.xml` copies them into `target/generated-sources/backend-shared`
   with the same line match, for the compiled jar and the `parparvm-sources` jar.
 

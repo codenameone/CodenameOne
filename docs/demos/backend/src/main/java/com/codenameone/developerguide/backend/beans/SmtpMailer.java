@@ -22,12 +22,12 @@
  */
 package com.codenameone.developerguide.backend.beans;
 
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Profile;
-import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.Value;
 
 // tag::backend-bean-value[]
-@Service
+@Component
 @Profile("!dev")
 public class SmtpMailer implements Mailer {
     @Value("${mail.host:localhost}")

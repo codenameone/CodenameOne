@@ -50,7 +50,7 @@ name: Test Android build scripts
       # emulator legs as well would buy nothing and cost a great deal: a change to
       # the ORM, the database layer or the HTTP parser cannot reach this
       # transport.
-      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/hellocodenameone/backend/**'
       - 'scripts/lib/cn1ss.sh'
   push:
     branches:
@@ -96,7 +96,7 @@ name: Test Android build scripts
       # emulator legs as well would buy nothing and cost a great deal: a change to
       # the ORM, the database layer or the HTTP parser cannot reach this
       # transport.
-      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/hellocodenameone/backend/**'
       - 'scripts/lib/cn1ss.sh'
 
 # The token in secrets.CN1SS_GH_TOKEN was generated on
