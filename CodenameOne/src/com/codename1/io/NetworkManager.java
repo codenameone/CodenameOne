@@ -910,7 +910,7 @@ public final class NetworkManager {
     /// - `request`: network request for execution
     public void addToQueue(final ConnectionRequest request) {
         if (Display.isInitialized() && !Display.getInstance().isEdt()) {
-            if (request == null || !(authorizerRegistered || request.getAuthorizer() != null)) {
+            if (!authorizerRegistered && request.getAuthorizer() == null) {
                 // No authorizer can have a header for it: queued from here as it always
                 // was, without a look at anything the EDT owns.
                 addToQueue(request, false);
@@ -937,8 +937,7 @@ public final class NetworkManager {
         if (holdForAuthorizer(request)) {
             return;
         }
-        addToQueue(request, false,
-                request == null ? null : request.captureAuthorization(true), true);
+        addToQueue(request, false, request.captureAuthorization(true), true);
     }
 
     /// Asks the network tracer, on the thread that asked for a request, what that thread
