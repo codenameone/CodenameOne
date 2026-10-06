@@ -56,8 +56,9 @@ import java.util.Map;
 /// Everything else is there only when the chain asks for it, and a server
 /// carries the code of only what its chains ask for: [#formLogin] -- which
 /// brings sign-out and the memory of where a request was going with it --
-/// [#httpBasic], [#oauth2Login], [#oauth2ResourceServer], [#apiKey],
-/// [#rateLimit], [#rememberMe], [#mfa], [#logout] and [#requestCache]. A server that only
+/// [#httpBasic], [#oauth2Login], [#oauth2ResourceServer],
+/// [#authorizationServer], [#apiKey], [#rateLimit], [#rememberMe], [#mfa],
+/// [#logout] and [#requestCache]. A server that only
 /// verifies tokens has no login page, no password hashing and no user store in
 /// it. The one departure from Spring Security this makes: a chain without
 /// `formLogin` has no `POST /logout` until it calls [#logout].
@@ -272,6 +273,21 @@ public final class HttpSecurity {
             configurer = new OAuth2LoginConfigurer();
             apply(configurer);
             sessionMechanism();
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
+    /// Makes this server an OAuth2 authorization server and OpenID Connect
+    /// provider: the one that issues tokens; see
+    /// [AuthorizationServerConfigurer]. How a user signs in to it is whatever
+    /// else the chain declares.
+    public HttpSecurity authorizationServer(Customizer<AuthorizationServerConfigurer> customizer) {
+        AuthorizationServerConfigurer configurer = getConfigurer(
+                AuthorizationServerConfigurer.class);
+        if (configurer == null) {
+            configurer = new AuthorizationServerConfigurer();
+            apply(configurer);
         }
         customizer.customize(configurer);
         return this;
