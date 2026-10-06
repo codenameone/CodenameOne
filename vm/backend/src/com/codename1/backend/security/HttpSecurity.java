@@ -710,6 +710,26 @@ public final class HttpSecurity {
         secondFactorPolicy = policy;
     }
 
+    private final List<AuthenticationCodec> authenticationCodecs =
+            new ArrayList<AuthenticationCodec>();
+
+    /// Keeps one more kind of [Authentication] in the session as itself; see
+    /// [AuthenticationCodec]. Called before the chain is built, or from a
+    /// configurer's `init`: a way of signing in that has a kind of its own,
+    /// such as [#oauth2Login], calls it for its own.
+    public HttpSecurity authenticationCodec(AuthenticationCodec codec) {
+        if (codec == null) {
+            throw new IllegalArgumentException("codec cannot be null");
+        }
+        if (sharedObjects.get(SecurityContextRepository.class) != null) {
+            throw new IllegalStateException("The chain's SecurityContextRepository has already "
+                    + "been made; add codecs before the chain is built, or from a "
+                    + "configurer's init()");
+        }
+        authenticationCodecs.add(codec);
+        return this;
+    }
+
     /// Whether the chain called [#csrf], rather than having it by default.
     boolean csrfAsked() {
         return csrfAsked;
@@ -795,7 +815,7 @@ public final class HttpSecurity {
         if (shared == null) {
             SecurityContextConfigurer context = getConfigurer(SecurityContextConfigurer.class);
             shared = context == null ? new NullSecurityContextRepository()
-                    : context.resolve(sessionCreationPolicy());
+                    : context.resolve(sessionCreationPolicy(), authenticationCodecs);
             sharedObjects.put(SecurityContextRepository.class, shared);
         }
         return shared;

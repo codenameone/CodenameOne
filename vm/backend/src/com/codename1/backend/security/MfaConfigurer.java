@@ -172,6 +172,10 @@ public final class MfaConfigurer extends SecurityConfigurer {
     @Override
     public void configure(HttpSecurity http) {
         filter.signIn(http.signIn());
+        SecurityContextRepository repository = http.resolveSecurityContextRepository();
+        if (repository instanceof HttpSessionSecurityContextRepository) {
+            filter.kinds((HttpSessionSecurityContextRepository) repository);
+        }
         http.addFilter(filter, HttpSecurity.ORDER_SECOND_FACTOR);
     }
 

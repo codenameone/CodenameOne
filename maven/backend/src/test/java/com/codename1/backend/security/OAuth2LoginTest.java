@@ -53,6 +53,9 @@ import com.codename1.backend.security.oauth2.client.DefaultOAuth2AuthorizationRe
 import com.codename1.backend.security.oauth2.client.InMemoryClientRegistrationRepository;
 import com.codename1.backend.security.oauth2.client.InMemoryFederatedIdentityRepository;
 import com.codename1.backend.security.oauth2.client.LinkingOAuth2UserService;
+import com.codename1.backend.security.oauth2.client.OAuth2AuthenticationToken;
+import com.codename1.backend.security.oauth2.client.OAuth2User;
+import com.codename1.backend.security.oauth2.client.OidcUser;
 import com.codename1.backend.security.oauth2.core.AuthorizationGrantType;
 import com.codename1.backend.security.oauth2.core.ClientAuthenticationMethod;
 import com.codename1.backend.security.oauth2.core.OAuth2AuthenticationException;
@@ -91,9 +94,8 @@ class OAuth2LoginTest {
         @Override
         public HttpServer.Response handle(HttpServer.Request request) {
             Authentication who = SecuritySupport.authentication();
-            Object details = who == null ? null : who.getDetails();
-            Object registration = details instanceof Map ? ((Map) details).get("registrationId")
-                    : null;
+            Object registration = who instanceof OAuth2AuthenticationToken
+                    ? ((OAuth2AuthenticationToken) who).getAuthorizedClientRegistrationId() : null;
             return HttpServer.Response.text(200, request.pathFrom(0) + " " + (who == null
                     ? "nobody" : who.getName() + " " + who.getAuthorities() + " via "
                             + registration));
@@ -445,6 +447,8 @@ class OAuth2LoginTest {
             // And on to where they were going when they were asked to sign in.
             assertEquals("/private", signedIn.header("Location"));
             assertTrue(app.get("/private").body.startsWith("/private ada "));
+            // Still the provider's user, though the code is what finished it.
+            assertTrue(app.get("/private").body.endsWith(" via own"), app.get("/private").body);
         }
     }
 
@@ -836,6 +840,154 @@ class OAuth2LoginTest {
                 new InMemoryClientRegistrationRepository(ClientRegistration
                         .withRegistrationId("x").clientId("c").authorizationUri("https://a/b")
                         .tokenUri("https://a/c").build())));
+    }
+
+    // ------------------------------------ what a later request sees
+
+    /// What a controller's `@AuthenticationPrincipal OAuth2User` parameter is
+    /// bound from -- the generated router asks [SecuritySupport#principal] and
+    /// checks the type -- and what the authentication is beside it.
+    private static final HttpServer.Handler PRINCIPAL = new HttpServer.Handler() {
+        @Override
+        public HttpServer.Response handle(HttpServer.Request request) {
+            Authentication who = SecuritySupport.authentication();
+            Object principal = SecuritySupport.principal();
+            StringBuilder out = new StringBuilder();
+            out.append(who == null ? "nobody" : who.getClass().getSimpleName());
+            if (who instanceof OAuth2AuthenticationToken) {
+                out.append(" via ").append(
+                        ((OAuth2AuthenticationToken) who).getAuthorizedClientRegistrationId());
+            }
+            if (principal instanceof OAuth2User) {
+                OAuth2User user = (OAuth2User) principal;
+                out.append(" OAuth2User ").append(user.getName()).append(' ')
+                        .append(user.getAuthorities()).append(' ')
+                        .append(new java.util.TreeMap<String, Object>(user.getAttributes()));
+            }
+            if (principal instanceof OidcUser) {
+                OidcUser user = (OidcUser) principal;
+                out.append(" OidcUser sub=").append(user.getSubject()).append(" idToken.aud=")
+                        .append(user.getIdToken().getAudience()).append(" alg=")
+                        .append(user.getIdToken().getHeaders().get("alg")).append(" value=")
+                        .append(user.getIdToken().getTokenValue().length() > 100);
+            }
+            return HttpServer.Response.text(200, out.toString());
+        }
+    };
+
+    private SecuredServer principalApp(Properties settings, ClientRegistration... registrations)
+            throws Exception {
+        return SecuredServer.start(settings, "test", new Object[0], PRINCIPAL, http -> http
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .oauth2Login(o -> o.clientRegistrationRepository(
+                        new InMemoryClientRegistrationRepository(registrations))
+                        .failureHandler(recording)).build());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"memory", "db"})
+    @DisplayName("a later request sees the provider's user, in memory and through the database session store")
+    void theSessionKeepsTheKindOfSignIn(String store,
+            @org.junit.jupiter.api.io.TempDir java.io.File dir) throws Exception {
+        Properties settings = SecuredServer.settings();
+        settings.setProperty("cn1.session.store", store);
+        if ("db".equals(store)) {
+            settings.setProperty(Config.DATASOURCE_URL, new java.io.File(dir, "s.db").getPath());
+        }
+        try (Stub provider = stubServer()) {
+            try (SecuredServer app = principalApp(settings,
+                    stubRegistration("oidc").issuerUri("https://stub.example").scope("openid")
+                            .build(),
+                    stubRegistration("hub").userInfoUri(stubUrl + "/user")
+                            .userNameAttributeName("id").scope("read:user").build())) {
+                // OpenID Connect: the claims, a nested one among them, and the
+                // ID token itself.
+                Map<String, String> sent = begin(app, "oidc");
+                Map<String, Object> address = new LinkedHashMap<String, Object>();
+                address.put("country", "NO");
+                answerWith(sign(idClaims(sent.get("nonce")).claim("email", "ada@example.com")
+                        .claim("email_verified", Boolean.TRUE).claim("address", address)
+                        .claim("groups", Arrays.asList("staff", "ops")).build()));
+                Reply done = app.get("/login/oauth2/code/oidc?code=c&state=" + sent.get("state"));
+                assertEquals("/", done.header("Location"), done.toString() + failures);
+                String seen = app.get("/me").body;
+                assertTrue(seen.startsWith("OAuth2AuthenticationToken via oidc OAuth2User user-1 "
+                        + "[OIDC_USER, SCOPE_openid] {address={country=NO}, aud=stub-client, "
+                        + "email=ada@example.com, email_verified=true, "), seen);
+                assertTrue(seen.contains("groups=[staff, ops]"), seen);
+                assertTrue(seen.endsWith(" OidcUser sub=user-1 idToken.aud=[stub-client] alg=RS256 "
+                        + "value=true"), seen);
+                // And again: the same on every later request, not on the first alone.
+                assertEquals(seen, app.get("/me").body);
+
+                if ("db".equals(store)) {
+                    // The instrument: the session really went through the database,
+                    // as JSON, and what it holds says which kind it is.
+                    com.codename1.backend.DataSource pool = com.codename1.backend.DataSource
+                            .open(new java.io.File(dir, "s.db").getPath(), 1, 5000, 10000);
+                    try {
+                        String rows = String.valueOf(pool.query(
+                                "SELECT * FROM cn1_http_session", null));
+                        assertTrue(rows.contains("\"kind\":\"oauth2\"")
+                                && rows.contains("\"registrationId\":\"oidc\""), rows);
+                    } finally {
+                        pool.close();
+                    }
+                }
+            }
+            // Without OpenID Connect: GitHub's user, whose id is a number.
+            settings.setProperty(Config.DATASOURCE_URL, new java.io.File(dir, "s2.db").getPath());
+            if (!"db".equals(store)) {
+                settings.remove(Config.DATASOURCE_URL);
+            }
+            try (SecuredServer app = principalApp(settings,
+                    stubRegistration("hub").userInfoUri(stubUrl + "/user")
+                            .userNameAttributeName("id").scope("read:user").build())) {
+                Map<String, String> sent = begin(app, "hub");
+                stub.tokenAnswer = "access_token=stub-access&scope=read%3Auser&token_type=bearer";
+                stub.userAnswer = "{\"id\":583231,\"login\":\"octocat\",\"site_admin\":false,"
+                        + "\"plan\":{\"name\":\"pro\",\"seats\":3}}";
+                Reply done = app.get("/login/oauth2/code/hub?code=c&state=" + sent.get("state"));
+                assertEquals("/", done.header("Location"), done.toString() + failures);
+                assertEquals("OAuth2AuthenticationToken via hub OAuth2User 583231 [OAUTH2_USER, "
+                        + "SCOPE_read:user] {id=583231, login=octocat, plan={name=pro, seats=3}, "
+                        + "site_admin=false}", app.get("/me").body);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("a session of a kind the chain has no codec for is still its user, by name")
+    void aKindNobodyReads() {
+        HttpSessionSecurityContextRepository with = new HttpSessionSecurityContextRepository();
+        with.addAuthenticationCodec(new OAuth2AuthenticationCodec());
+        OAuth2AuthenticationToken token = new OAuth2AuthenticationToken(
+                new com.codename1.backend.security.oauth2.client.DefaultOAuth2User("ada",
+                        Arrays.asList(new SimpleGrantedAuthority("ROLE_USER")),
+                        Collections.<String, Object>singletonMap("login", "ada")),
+                Arrays.asList(new SimpleGrantedAuthority("ROLE_USER")), "hub");
+        Map<String, Object> stored = with.toMap(token);
+        assertEquals("oauth2", stored.get("kind"));
+        assertTrue(with.fromMap(stored) instanceof OAuth2AuthenticationToken);
+        // Another chain of the same server, without oauth2Login().
+        Authentication plain = new HttpSessionSecurityContextRepository().fromMap(stored);
+        assertTrue(plain instanceof UsernamePasswordAuthenticationToken, String.valueOf(plain));
+        assertEquals("ada [ROLE_USER]", plain.getName() + " " + plain.getAuthorities());
+        // What a codec cannot read back -- a registration id that is not text,
+        // attributes that are not a map -- is the name and authorities alone.
+        for (Object[] broken : new Object[][] {{"registrationId", Long.valueOf(7)},
+            {"registrationId", ""}, {"attributes", "x"}, {"attributes", null}}) {
+            Map<String, Object> copy = new LinkedHashMap<String, Object>(stored);
+            Map<String, Object> data = new LinkedHashMap<String, Object>(
+                    (Map<String, Object>) stored.get("data"));
+            data.put((String) broken[0], broken[1]);
+            copy.put("data", data);
+            assertTrue(with.fromMap(copy) instanceof UsernamePasswordAuthenticationToken,
+                    String.valueOf(broken[1]));
+        }
+        Map<String, Object> notAMap = new LinkedHashMap<String, Object>(stored);
+        notAMap.put("data", "x");
+        assertTrue(with.fromMap(notAMap) instanceof UsernamePasswordAuthenticationToken);
     }
 
     // ------------------------------------ a provider that lists addresses

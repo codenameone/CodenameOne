@@ -37,7 +37,20 @@ public final class SecurityContextConfigurer extends SecurityConfigurer {
         return this;
     }
 
-    SecurityContextRepository resolve(SessionCreationPolicy policy) {
+    SecurityContextRepository resolve(SessionCreationPolicy policy,
+                                      java.util.List<AuthenticationCodec> codecs) {
+        SecurityContextRepository resolved = resolve(policy);
+        // The application's own repository is given them too, when it is the
+        // session one or a subclass of it.
+        if (resolved instanceof HttpSessionSecurityContextRepository) {
+            for (AuthenticationCodec codec : codecs) {
+                ((HttpSessionSecurityContextRepository) resolved).addAuthenticationCodec(codec);
+            }
+        }
+        return resolved;
+    }
+
+    private SecurityContextRepository resolve(SessionCreationPolicy policy) {
         if (repository != null) {
             return repository;
         }

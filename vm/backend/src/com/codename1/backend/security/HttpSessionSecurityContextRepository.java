@@ -43,13 +43,34 @@ import java.util.Map;
 ///
 /// The consequence: on a later request the principal is a
 /// [User] rebuilt from the name and authorities, with no password, not the
-/// object the user store returned at sign-in. A subclass that needs more
-/// overrides [#toMap] and [#fromMap].
+/// object the user store returned at sign-in.
+///
+/// A way of signing in whose authentication is a kind of its own -- a user of
+/// another identity provider, a passkey -- keeps that kind through an
+/// [AuthenticationCodec], which its configurer registers with
+/// [HttpSecurity#authenticationCodec]; see there. A subclass that needs
+/// something else again overrides [#toMap] and [#fromMap].
 public class HttpSessionSecurityContextRepository implements SecurityContextRepository {
     /// The session attribute the context is stored under.
     public static final String SPRING_SECURITY_CONTEXT_KEY = "SPRING_SECURITY_CONTEXT";
 
     private boolean allowSessionCreation = true;
+    private final List<AuthenticationCodec> codecs = new ArrayList<AuthenticationCodec>();
+
+    /// Adds a codec; see [AuthenticationCodec]. One of a kind that is here
+    /// already replaces it.
+    public void addAuthenticationCodec(AuthenticationCodec codec) {
+        if (codec == null || codec.getKind() == null || codec.getKind().length() == 0) {
+            throw new IllegalArgumentException("A codec needs a kind");
+        }
+        for (int iter = 0 ; iter < codecs.size() ; iter++) {
+            if (codecs.get(iter).getKind().equals(codec.getKind())) {
+                codecs.set(iter, codec);
+                return;
+            }
+        }
+        codecs.add(codec);
+    }
 
     /// Whether saving may start a session; true unless changed. A chain with
     /// [SessionCreationPolicy#NEVER] turns it off.
@@ -113,6 +134,18 @@ public class HttpSessionSecurityContextRepository implements SecurityContextRepo
         if (isPlain(details, 0)) {
             out.put("details", details);
         }
+        for (AuthenticationCodec codec : codecs) {
+            Map<String, Object> kept = codec.encode(authentication);
+            if (kept != null) {
+                // Something a session cannot store would be lost on the way to
+                // another server and not on this one; kept nowhere instead.
+                if (isPlain(kept, 0)) {
+                    out.put("kind", codec.getKind());
+                    out.put("data", kept);
+                }
+                break;
+            }
+        }
         return out;
     }
 
@@ -134,6 +167,24 @@ public class HttpSessionSecurityContextRepository implements SecurityContextRepo
         if (!Boolean.TRUE.equals(stored.get("authenticated"))) {
             return null;
         }
+        Object kind = stored.get("kind");
+        Object data = stored.get("data");
+        if (kind instanceof String && data instanceof Map) {
+            for (AuthenticationCodec codec : codecs) {
+                if (codec.getKind().equals(kind)) {
+                    Authentication made = codec.decode((String) name, authorities, (Map) data);
+                    if (made != null && made.isAuthenticated()) {
+                        if (made instanceof AbstractAuthenticationToken) {
+                            ((AbstractAuthenticationToken) made).setDetails(stored.get("details"));
+                        }
+                        return made;
+                    }
+                    break;
+                }
+            }
+            // A kind this chain has no codec for -- the session was written by
+            // another chain, or by a build that had one -- is still a user.
+        }
         User user = new User((String) name, "", authorities);
         if (Boolean.TRUE.equals(stored.get("rememberMe"))) {
             RememberMeAuthenticationToken remembered = new RememberMeAuthenticationToken(
@@ -149,7 +200,7 @@ public class HttpSessionSecurityContextRepository implements SecurityContextRepo
 
     /// Whether `value` is something JSON can write and read back unchanged.
     private static boolean isPlain(Object value, int depth) {
-        if (value == null || depth > 8) {
+        if (value == null || depth > 12) {
             return false;
         }
         if (value instanceof String || value instanceof Boolean || value instanceof Long

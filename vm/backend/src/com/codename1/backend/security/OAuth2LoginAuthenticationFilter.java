@@ -47,8 +47,6 @@ import com.codename1.backend.security.oauth2.core.OAuth2Parameters;
 import com.codename1.backend.security.oauth2.jwt.Jwt;
 import com.codename1.backend.security.oauth2.jwt.JwtException;
 import com.codename1.backend.security.oauth2.jwt.RemoteJwkSet;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /// Ends a sign-in at an identity provider: takes the provider's answer at
@@ -159,15 +157,10 @@ public final class OAuth2LoginAuthenticationFilter implements SecurityFilter {
         if (user == null) {
             throw refused(OAuth2ErrorCodes.INVALID_USER_INFO_RESPONSE, "No user was made");
         }
-        OAuth2AuthenticationToken authentication = new OAuth2AuthenticationToken(user,
-                user.getAuthorities(), registration.getRegistrationId());
-        // What the session keeps of this sign-in beside the name and the
-        // authorities: it stores text, numbers, lists and maps.
-        Map<String, Object> details = new LinkedHashMap<String, Object>();
-        details.put("registrationId", registration.getRegistrationId());
-        details.put("attributes", plain(user.getAttributes(), 0));
-        authentication.setDetails(details);
-        return authentication;
+        // Kept in the session as what it is by the codec http.oauth2Login()
+        // registers; see OAuth2AuthenticationCodec.
+        return new OAuth2AuthenticationToken(user, user.getAuthorities(),
+                registration.getRegistrationId());
     }
 
     /// The registration with its provider's endpoints known: read from the
@@ -275,38 +268,5 @@ public final class OAuth2LoginAuthenticationFilter implements SecurityFilter {
 
     private static OAuth2AuthenticationException refused(String code, String message) {
         return new OAuth2AuthenticationException(new OAuth2Error(code), message);
-    }
-
-    /// `value` reduced to what a session stores, or null for what it cannot.
-    private static Object plain(Object value, int depth) {
-        if (value instanceof String || value instanceof Boolean || value instanceof Long
-                || value instanceof Integer || value instanceof Double) {
-            return value;
-        }
-        if (depth > 6) {
-            return null;
-        }
-        if (value instanceof Map) {
-            Map<String, Object> out = new LinkedHashMap<String, Object>();
-            for (Object entry : ((Map) value).entrySet()) {
-                Map.Entry e = (Map.Entry) entry;
-                Object kept = plain(e.getValue(), depth + 1);
-                if (e.getKey() instanceof String && kept != null) {
-                    out.put((String) e.getKey(), kept);
-                }
-            }
-            return out;
-        }
-        if (value instanceof List) {
-            List<Object> out = new java.util.ArrayList<Object>();
-            for (Object element : (List) value) {
-                Object kept = plain(element, depth + 1);
-                if (kept != null) {
-                    out.add(kept);
-                }
-            }
-            return out;
-        }
-        return null;
     }
 }

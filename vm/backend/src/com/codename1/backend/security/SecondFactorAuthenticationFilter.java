@@ -65,6 +65,7 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
     private final AuthenticationFailureHandler expiredHandler;
     private final Clock clock;
     private SessionSignIn signIn;
+    private HttpSessionSecurityContextRepository kinds;
 
     SecondFactorAuthenticationFilter(TotpService totp, RecoveryCodeService recoveryCodes,
             String page, boolean servePage, String processingUrl, String codeParameter,
@@ -89,6 +90,13 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         this.signIn = signIn;
     }
 
+    /// The chain's session repository, when it has one: what knows how to keep
+    /// the kind of a sign-in while it waits here, so that a user who came
+    /// through another provider is that provider's user after the code too.
+    void kinds(HttpSessionSecurityContextRepository repository) {
+        this.kinds = repository;
+    }
+
     // ------------------------------------------------------------ the policy
 
     @Override
@@ -106,6 +114,11 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         pending.put("authorities", authorities);
         pending.put("expires", Long.valueOf(clock.currentTimeMillis() + pendingMillis));
         pending.put("remember", Boolean.valueOf(rememberMe));
+        if (kinds != null) {
+            // Kept as the repository would keep it, under a name of the
+            // marker's own: nothing reads this as a security context.
+            pending.put("authentication", kinds.toMap(authentication));
+        }
         HttpSession session = request.getSession(true);
         // Whatever the session held of an earlier user is not this one's, and
         // an id handed out before a password was accepted is not kept either.
@@ -164,8 +177,20 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
                 }
             }
         }
-        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
-                new User(user, "", authorities), null, authorities);
+        Authentication authentication = null;
+        Object kept = pending.get("authentication");
+        if (kinds != null && kept instanceof Map) {
+            Authentication made = kinds.fromMap((Map) kept);
+            // The one that waited, and no other: the name the code was checked
+            // against is the name that signs in.
+            if (made != null && user.equals(made.getName())) {
+                authentication = made;
+            }
+        }
+        if (authentication == null) {
+            authentication = UsernamePasswordAuthenticationToken.authenticated(
+                    new User(user, "", authorities), null, authorities);
+        }
         SessionSignIn complete = signIn;
         if (complete == null) {
             throw new IllegalStateException("The second factor filter was not given the "

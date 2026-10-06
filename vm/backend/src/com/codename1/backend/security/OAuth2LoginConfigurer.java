@@ -262,6 +262,8 @@ public final class OAuth2LoginConfigurer extends SecurityConfigurer {
     @Override
     public void init(HttpSecurity http) {
         http.redirectsToSignIn();
+        // A later request sees the provider's user, not a name alone.
+        http.authenticationCodec(new OAuth2AuthenticationCodec());
         ClientRegistrationRepository repository = registrations(http);
         boolean formPost = false;
         if (repository instanceof InMemoryClientRegistrationRepository) {
