@@ -26,6 +26,7 @@ package com.codename1.io.oidc;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.RequestAuthorizer;
+import com.codename1.ui.CN;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 
@@ -57,12 +58,29 @@ import java.util.ArrayList;
 /// A renewal that fails without an answer from the server -- no network -- keeps the tokens:
 /// nothing has said they are bad.
 ///
-/// #### What it doesn't do
+/// #### Before the token expires
 ///
-/// An access token past its expiry time is still sent, and renewed when the service refuses
-/// it. The header is added on a network thread, which cannot wait for a renewal; the cost is
-/// one refused request per expiry.
-public final class OidcRequestAuthorizer implements RequestAuthorizer {
+/// A refusal is the fallback, not the way a token is normally renewed. When a request is
+/// queued and the access token is within [#setRefreshLeeway(int)] of its expiry -- sixty
+/// seconds unless set -- the refresh token is exchanged first and the request is kept out
+/// of the queue until the exchange is done. It is then sent once, with the new token.
+/// Requests queued in the meantime wait for the same exchange.
+///
+/// Nothing blocks for this: the request has simply not been handed to a network thread
+/// yet. Code that waits for it -- `addToQueueAndWait`, the blocking methods of
+/// `RequestBuilder` -- returns the one final answer.
+///
+/// If that exchange is refused the session ends as described above, and the request goes
+/// out with no token for the service to answer `401`. If it fails without an answer the
+/// request is sent with the token it has, which may still be good, and no exchange is tried
+/// ahead of time for the next few seconds.
+///
+/// A token whose response carried no `expires_in` has no known expiry, and is renewed only
+/// when the service refuses it.
+public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive {
+    /// How long after an exchange failed without an answer before one is tried ahead of
+    /// time again. A request refused in between is still renewed at once.
+    private static final long RETRY_AHEAD_MILLIS = 5000;
 
     /// Told when the user has to sign in again.
     public interface SignInRequiredListener {
@@ -83,8 +101,11 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer {
             new ArrayList<SignInRequiredListener>();
     /// Written on the EDT and read on network threads, under [#lock].
     private OidcTokens tokens;
-    /// The exchange in progress, shared by every request refused while it runs.
+    /// The exchange in progress, shared by every request refused or held while it runs.
     private AsyncResource<Boolean> renewal;
+    private int refreshLeewaySeconds = 60;
+    /// When an exchange started ahead of time last failed without an answer; under [#lock].
+    private long aheadFailedAt;
 
     /// An authorizer for the tokens of `client`.
     ///
@@ -196,9 +217,91 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer {
         listeners.remove(listener);
     }
 
+    /// How close to its expiry an access token is renewed before a request is sent with it.
+    /// Sixty seconds unless set: long enough for the request to reach a service whose clock
+    /// runs a little ahead. Zero renews a token only once it has expired, and a negative
+    /// value turns renewing ahead of time off, leaving the `401` as the only trigger.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the leeway in seconds
+    ///
+    /// #### Returns
+    ///
+    /// this authorizer
+    public OidcRequestAuthorizer setRefreshLeeway(int seconds) {
+        synchronized (lock) {
+            this.refreshLeewaySeconds = seconds;
+        }
+        return this;
+    }
+
+    /// The leeway set with [#setRefreshLeeway(int)].
+    public int getRefreshLeeway() {
+        synchronized (lock) {
+            return refreshLeewaySeconds;
+        }
+    }
+
     @Override
     public String getAuthorization(ConnectionRequest request) {
         return headerOf(getTokens());
+    }
+
+    @Override
+    public AsyncResource<Boolean> prepareAuthorization(ConnectionRequest request) {
+        final OidcTokens current;
+        synchronized (lock) {
+            current = tokens;
+            if (refreshLeewaySeconds < 0 || current == null || current.getAccessToken() == null
+                    || current.getRefreshToken() == null
+                    || !current.isExpiringWithin(refreshLeewaySeconds)
+                    || System.currentTimeMillis() - aheadFailedAt < RETRY_AHEAD_MILLIS) {
+                return null;
+            }
+        }
+        if (CN.isEdt()) {
+            return renewAhead(current);
+        }
+        // The exchange in progress is kept on the event dispatch thread, where a refusal
+        // is handled too; a request queued from another thread joins it from there.
+        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        CN.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                AsyncResource<Boolean> joined = renewAhead(current);
+                if (joined == null) {
+                    out.complete(Boolean.TRUE);
+                    return;
+                }
+                joined.ready(new SuccessCallback<Boolean>() {
+                    @Override
+                    public void onSucess(Boolean renewed) {
+                        out.complete(renewed);
+                    }
+                }).except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable err) {
+                        out.complete(Boolean.FALSE);
+                    }
+                });
+            }
+        });
+        return out;
+    }
+
+    /// Joins the exchange in progress or starts one for `expiring`, on the event dispatch
+    /// thread. Null when the token has been replaced since it was looked at.
+    private AsyncResource<Boolean> renewAhead(OidcTokens expiring) {
+        if (renewal != null) {
+            return renewal;
+        }
+        OidcTokens current = getTokens();
+        if (current != expiring) { //NOPMD CompareObjectsWithEquals - the set that was looked at
+            // Renewed, or dropped, between the look and now.
+            return null;
+        }
+        return exchange(current, true);
     }
 
     @Override
@@ -221,11 +324,18 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer {
             }
             return done(false);
         }
+        return exchange(current, false);
+    }
+
+    /// Exchanges the refresh token of `current` for a new set, as the one exchange every
+    /// request that needs it shares until it is done. `ahead` says that nothing has refused
+    /// the token yet.
+    private AsyncResource<Boolean> exchange(OidcTokens current, final boolean ahead) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         renewal = out;
         AsyncResource<OidcTokens> exchange;
         try {
-            exchange = client.refresh(refreshToken);
+            exchange = client.refresh(current.getRefreshToken());
         } catch (RuntimeException misconfigured) {
             renewal = null;
             out.complete(Boolean.FALSE);
@@ -248,6 +358,12 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer {
                         && !OidcException.TRANSPORT_ERROR.equals(((OidcException) err).getError());
                 if (refused) {
                     endSession(err);
+                } else if (ahead) {
+                    // Nothing said the token is bad; it is sent as it is, and the next
+                    // request does not try again at once.
+                    synchronized (lock) {
+                        aheadFailedAt = System.currentTimeMillis();
+                    }
                 }
                 out.complete(Boolean.FALSE);
             }

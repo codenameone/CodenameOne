@@ -105,6 +105,13 @@ public class BackendSignInSnippets {
         show(profile);
     }
 
+    public void leeway(OidcRequestAuthorizer authorizer) {
+        // tag::backend-signin-leeway[]
+        // Renew a token that has less than two minutes left.
+        authorizer.setRefreshLeeway(120);
+        // end::backend-signin-leeway[]
+    }
+
     public void perRequest(RequestAuthorizer other) {
         // tag::backend-signin-per-request[]
         // Another authorizer for one request.

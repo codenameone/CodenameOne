@@ -57,6 +57,9 @@ import com.codename1.util.AsyncResource;
 /// blocking methods of `RequestBuilder`, [NetworkManager#addToQueueAsync(ConnectionRequest)] --
 /// keeps waiting through all of it and sees only the final answer.
 ///
+/// An authorizer that knows when its credential expires can skip the refused request
+/// altogether: see [Proactive].
+///
 /// #### Threads
 ///
 /// [#getAuthorization(ConnectionRequest)] runs on a network thread and must answer from memory.
@@ -115,4 +118,37 @@ public interface RequestAuthorizer {
     /// `false` or an error when there is none to be had. Null means the same as `false`
     AsyncResource<Boolean> refreshAuthorization(ConnectionRequest request,
             String rejectedAuthorization);
+
+    /// An authorizer that can tell, before a request is sent, that its credential is about
+    /// to stop working, and renew it first.
+    ///
+    /// Without this a credential is renewed only after the service has refused it, which
+    /// costs one refused request for every credential that expires. An authorizer that
+    /// implements this is asked when a request is queued -- on the thread that queued it,
+    /// before the request reaches a network thread -- and may hold the request until a new
+    /// credential is ready. The request is then queued as usual and
+    /// [RequestAuthorizer#getAuthorization(ConnectionRequest)] answers with the new one. A
+    /// `401` is still handled as [RequestAuthorizer] describes; this only makes it rare.
+    ///
+    /// Nothing waits on a thread for it: the request is simply not in the queue yet. Code
+    /// that waits for the request waits a little longer, and sees one answer.
+    interface Proactive extends RequestAuthorizer {
+        /// Called when a request this authorizer covers is queued, on the thread that queued
+        /// it. Answer from memory and do not block: start the renewal and return.
+        ///
+        /// Several requests can be queued while one renewal runs. An implementation should
+        /// renew once and hold them all on the same resource.
+        ///
+        /// #### Parameters
+        ///
+        /// - `request`: the request being queued
+        ///
+        /// #### Returns
+        ///
+        /// null when the request can be sent as it is; otherwise a resource that completes
+        /// when it can -- with any value, or with an error: the request is sent either way,
+        /// with whatever [RequestAuthorizer#getAuthorization(ConnectionRequest)] answers
+        /// then
+        AsyncResource<Boolean> prepareAuthorization(ConnectionRequest request);
+    }
 }

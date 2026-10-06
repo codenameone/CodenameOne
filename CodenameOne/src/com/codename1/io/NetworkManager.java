@@ -32,6 +32,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -848,6 +849,93 @@ public final class NetworkManager {
     ///
     /// - `request`: network request for execution
     public void addToQueue(ConnectionRequest request) {
+        if (holdForAuthorizer(request)) {
+            return;
+        }
+        addToQueue(request, false);
+    }
+
+    /// Asks the request's authorizer, if it is a [RequestAuthorizer.Proactive], whether its
+    /// credential has to be renewed before this request is sent, and keeps the request out
+    /// of the queue until it has been.
+    ///
+    /// Nothing blocks here. The request is not handed to a network thread yet, so the
+    /// renewal -- a request of its own -- has the queue to itself even with one network
+    /// thread, and the held request is queued exactly once, from the renewal's completion.
+    /// Whoever waits for the request waits on its completion, which has not happened.
+    ///
+    /// #### Returns
+    ///
+    /// true when the request was taken and will be queued later
+    private boolean holdForAuthorizer(final ConnectionRequest request) {
+        if (request == null) {
+            return false;
+        }
+        if (request.heldBeforeSending) {
+            // Queued again while it waits: it will be queued, once, when the wait ends.
+            return true;
+        }
+        RequestAuthorizer.Proactive proactive = request.proactiveAuthorizer();
+        if (proactive == null || (userHeaders != null && userHeaders.containsKey("Authorization"))) {
+            return false;
+        }
+        AsyncResource<Boolean> preparing;
+        try {
+            preparing = proactive.prepareAuthorization(request);
+        } catch (RuntimeException err) {
+            // An authorizer that throws must not take the request down with it.
+            Log.e(err);
+            preparing = null;
+        }
+        if (preparing == null || preparing.isDone()) {
+            return false;
+        }
+        request.heldBeforeSending = true;
+        // The context of whoever asked, captured now: by the time the request is queued
+        // this thread has moved on.
+        request.heldTracerParent = null;
+        request.heldTracerOwner = null;
+        request.heldTracerCaptured = false;
+        NetworkTracer tracer = getNetworkTracer();
+        if (tracer != null) {
+            try {
+                request.heldTracerParent = tracer.requestQueued(request);
+                request.heldTracerOwner = tracer;
+                request.heldTracerCaptured = true;
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+        preparing.ready(new SuccessCallback<Boolean>() {
+            @Override
+            public void onSucess(Boolean ready) {
+                releaseHeld(request);
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable err) {
+                releaseHeld(request);
+            }
+        });
+        return true;
+    }
+
+    /// Queues a request [#holdForAuthorizer(ConnectionRequest)] took, once.
+    private void releaseHeld(ConnectionRequest request) {
+        if (!request.heldBeforeSending) {
+            // Answered twice: a resource can complete and then fail in a listener of its own.
+            return;
+        }
+        request.heldBeforeSending = false;
+        if (request.isKilled()) {
+            // Nobody will send it, so whoever waits for it has to be told here.
+            request.heldTracerCaptured = false;
+            request.heldTracerParent = null;
+            request.heldTracerOwner = null;
+            request.complete = true;
+            authorizationAbandoned(request);
+            return;
+        }
         addToQueue(request, false);
     }
 
@@ -1009,13 +1097,22 @@ public final class NetworkManager {
         NetworkTracer queuedBy = null;
         Object queuedParent = null;
         if (!retry) {
-            NetworkTracer tracer = getNetworkTracer();
-            if (tracer != null) {
-                try {
-                    queuedParent = tracer.requestQueued(request);
-                    queuedBy = tracer;
-                } catch (Throwable t) {
-                    Log.e(t);
+            if (request.heldTracerCaptured) {
+                // Asked for when it was held for its authorizer, on the thread that asked.
+                queuedParent = request.heldTracerParent;
+                queuedBy = request.heldTracerOwner;
+                request.heldTracerCaptured = false;
+                request.heldTracerParent = null;
+                request.heldTracerOwner = null;
+            } else {
+                NetworkTracer tracer = getNetworkTracer();
+                if (tracer != null) {
+                    try {
+                        queuedParent = tracer.requestQueued(request);
+                        queuedBy = tracer;
+                    } catch (Throwable t) {
+                        Log.e(t);
+                    }
                 }
             }
         }

@@ -196,6 +196,14 @@ public class ConnectionRequest implements IOProgressListener {
     private String authorizationOrigin;
     /// True from the moment a 401 is held until the request is queued again or given up.
     boolean authorizationPending;
+    /// Whether the request is being kept out of the queue while its authorizer renews a
+    /// credential that is about to expire; see [RequestAuthorizer.Proactive].
+    boolean heldBeforeSending;
+    /// What the network tracer answered when a held request was first asked to be queued,
+    /// kept for when it really is: the thread that queues it then is not the one that asked.
+    Object heldTracerParent;
+    NetworkTracer heldTracerOwner;
+    boolean heldTracerCaptured;
     private static final int AUTHORIZATION_FIRST = 0;
     private static final int AUTHORIZATION_RENEWED = 1;
     private static final int AUTHORIZATION_REFUSED = 2;
@@ -725,6 +733,20 @@ public class ConnectionRequest implements IOProgressListener {
     /// the authorizer, or null when this request uses the default for its URL
     public RequestAuthorizer getAuthorizer() {
         return authorizer;
+    }
+
+    /// The authorizer to ask, as this request is queued, whether its credential needs
+    /// renewing first: the one that would add this request's header, when it is one that can
+    /// tell. Null for a request that carries its own `Authorization` header, or none.
+    RequestAuthorizer.Proactive proactiveAuthorizer() {
+        RequestAuthorizer a = authorizer;
+        if (a == null) {
+            a = NetworkManager.getInstance().getAuthorizer(url);
+        }
+        if (!(a instanceof RequestAuthorizer.Proactive) || getRequestHeader("Authorization") != null) {
+            return null;
+        }
+        return (RequestAuthorizer.Proactive) a;
     }
 
     /// Decides what `Authorization` header, if any, an authorizer adds to the attempt about to
