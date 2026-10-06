@@ -88,6 +88,66 @@ public class LaunchModeTest {
     }
 
     @Test
+    public void singleTopOnTopIsPausedAroundTheIntent() {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                Context app = AndroidTestSupport.context().getApplicationContext();
+                app.startActivity(new Intent(app, AndroidTestSupport.SingleTopActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                final AndroidTestSupport.SingleTopActivity first =
+                        (AndroidTestSupport.SingleTopActivity) ActivityThread.getTopActivity();
+                final StringBuilder events = new StringBuilder();
+                Application.ActivityLifecycleCallbacks cb = new Application.ActivityLifecycleCallbacks() {
+                    @Override
+                    public void onActivityCreated(Activity activity, android.os.Bundle saved) {
+                        events.append("created;");
+                    }
+
+                    @Override
+                    public void onActivityStarted(Activity activity) {
+                        events.append("started;");
+                    }
+
+                    @Override
+                    public void onActivityResumed(Activity activity) {
+                        events.append("resumed").append(first.newIntents).append(';');
+                    }
+
+                    @Override
+                    public void onActivityPaused(Activity activity) {
+                        events.append("paused").append(first.newIntents).append(';');
+                    }
+
+                    @Override
+                    public void onActivityStopped(Activity activity) {
+                        events.append("stopped;");
+                    }
+
+                    @Override
+                    public void onActivitySaveInstanceState(Activity activity, android.os.Bundle out) {
+                    }
+
+                    @Override
+                    public void onActivityDestroyed(Activity activity) {
+                        events.append("destroyed;");
+                    }
+                };
+                first.getApplication().registerActivityLifecycleCallbacks(cb);
+                try {
+                    app.startActivity(new Intent(app, AndroidTestSupport.SingleTopActivity.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                } finally {
+                    first.getApplication().unregisterActivityLifecycleCallbacks(cb);
+                }
+                assertSame(first, ActivityThread.getTopActivity());
+                // Paused before onNewIntent and resumed after it, as Android does.
+                assertEquals("paused0;resumed1;", events.toString());
+            }
+        });
+    }
+
+    @Test
     public void clearTopRecreatesAStandardTarget() {
         onEdt(new Runnable() {
             @Override

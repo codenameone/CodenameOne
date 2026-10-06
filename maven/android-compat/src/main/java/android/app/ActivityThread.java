@@ -227,7 +227,14 @@ public final class ActivityThread {
         if (singleTop) {
             Record t = top();
             if (t != null && t.activity.getClass() == info.type) {
+                // Paused around onNewIntent() and resumed after it, as
+                // Android does and as the reuse branch above does: work an
+                // application keeps in onResume() sees the new intent.
+                if (t.resumed) {
+                    pause(t);
+                }
                 t.activity.onNewIntent(intent);
+                resumeRecord(t, false);
                 return;
             }
         }

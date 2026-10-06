@@ -305,6 +305,12 @@ public class ImageView extends android.view.View {
         invalidate();
     }
 
+    /// The matrix the drawable is drawn with, or a fresh identity matrix when
+    /// there is none. This is Android's own implementation, not the user
+    /// matrix: AOSP returns `mDrawMatrix` (a copy of the identity when null)
+    /// and documents that the result must not be changed in place, only
+    /// passed back through `setImageMatrix()`. Returning `mMatrix` instead
+    /// would report the wrong transform for every scale type but MATRIX.
     public Matrix getImageMatrix() {
         return mDrawMatrix == null ? new Matrix() : mDrawMatrix;
     }

@@ -85,4 +85,52 @@ public class DialogHideTest {
         }
         assertEquals("false;true;false;true;true", states.toString());
     }
+
+    @Test
+    public void cancelIsDeliveredOncePerShow() {
+        final Context app = AndroidTestSupport.context().getApplicationContext();
+        final int[] cancels = new int[3];
+        final Throwable[] failure = new Throwable[1];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Intent intent = new Intent(app, AndroidTestSupport.TestActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    app.startActivity(intent);
+                    Activity activity = ActivityThread.getTopActivity();
+                    Dialog dialog = new Dialog(activity);
+                    final int[] count = new int[1];
+                    dialog.setOnCancelListener(new android.content.DialogInterface.OnCancelListener() {
+                        @Override
+                        public void onCancel(android.content.DialogInterface d) {
+                            count[0]++;
+                        }
+                    });
+                    dialog.show();
+                    dialog.cancel();
+                    cancels[0] = count[0];
+                    dialog.cancel();
+                    cancels[1] = count[0];
+                    // Showing it again re-arms the listener.
+                    dialog.show();
+                    dialog.cancel();
+                    cancels[2] = count[0];
+                } catch (Throwable t) {
+                    failure[0] = t;
+                } finally {
+                    ActivityThread.finishAllActivities();
+                }
+            }
+        });
+        if (failure[0] instanceof Error) {
+            throw (Error) failure[0];
+        }
+        if (failure[0] != null) {
+            throw new RuntimeException(failure[0]);
+        }
+        assertEquals(1, cancels[0]);
+        assertEquals("a second cancel() does not notify again", 1, cancels[1]);
+        assertEquals(2, cancels[2]);
+    }
 }

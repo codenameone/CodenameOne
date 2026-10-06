@@ -80,7 +80,16 @@ public class InsetDrawable extends Drawable implements Drawable.Callback {
         drawable = d;
         if (d != null) {
             d.setCallback(this);
+            // Brought up to this wrapper's visibility, state, level and
+            // (inset) bounds, as Android's DrawableWrapper does: a
+            // replacement set after layout otherwise kept its old or empty
+            // bounds and stayed invisible until an unrelated bounds change.
+            d.setVisible(isVisible(), true);
+            d.setState(getState());
+            d.setLevel(getLevel());
+            onBoundsChange(getBounds());
         }
+        invalidateSelf();
     }
 
     public Drawable getDrawable() {

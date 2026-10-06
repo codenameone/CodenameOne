@@ -49,6 +49,10 @@ public class Dialog implements DialogInterface, Window.Callback {
     private boolean mShowing;
     private boolean mCancelable = true;
     private boolean mCanceledOnTouchOutside = true;
+    /// Set by the first `cancel()` and cleared by the next `show()`, as on
+    /// Android: a second `cancel()` before that dismisses nothing new, so it
+    /// must not run the `OnCancelListener` again.
+    private boolean mCanceled;
     private CharSequence mTitle;
     private OnCancelListener mCancelListener;
     private OnDismissListener mDismissListener;
@@ -216,6 +220,7 @@ public class Dialog implements DialogInterface, Window.Callback {
             }
             return;
         }
+        mCanceled = false;
         create();
         onStart();
         mHost = new Host();
@@ -283,7 +288,8 @@ public class Dialog implements DialogInterface, Window.Callback {
 
     @Override
     public void cancel() {
-        if (mCancelListener != null) {
+        if (!mCanceled && mCancelListener != null) {
+            mCanceled = true;
             mCancelListener.onCancel(this);
         }
         dismiss();

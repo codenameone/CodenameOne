@@ -119,9 +119,14 @@ public class RippleDrawable extends LayerDrawable {
             }
         }
         if (shape != null) {
+            // The shape's own filter -- one a caller set on this ripple,
+            // which LayerDrawable passes to every child -- is put back
+            // afterwards; clearing it left every later unpressed frame
+            // drawing that child unfiltered.
+            android.graphics.ColorFilter own = shape.getColorFilter();
             shape.setColorFilter(new PorterDuffColorFilter(c, PorterDuff.Mode.SRC_IN));
             shape.draw(canvas);
-            shape.setColorFilter(null);
+            shape.setColorFilter(own);
         } else {
             paint.setColor(c);
             Rect b = getBounds();
