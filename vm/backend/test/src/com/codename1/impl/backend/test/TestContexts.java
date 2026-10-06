@@ -86,6 +86,7 @@ public final class TestContexts {
         access.compiledSettings(builder, concat(context.compiledSettings(), profileSettings));
         context.prepare();
         access.application(builder, context.createApplication());
+        context.configure(builder);
         Backend backend = builder.start();
         current = new TestEnvironment(context, backend);
         currentKey = context.key();
