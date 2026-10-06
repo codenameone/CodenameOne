@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codenameone.playground;
 
 import com.codename1.ui.Component;
@@ -162,10 +185,10 @@ final class PlaygroundPreviewColumn extends Container {
         // the previous one is otherwise never explicitly removed -- and a
         // 3D/GameView inside it keeps its requestAnimationFrame loop running,
         // flushing the display ~60-120x/s long after the user switched samples
-        // (degrading the whole playground). Stop any RenderView's animation loop
-        // and detach the old preview.
+        // (degrading the whole playground). Stop animation and camera capture
+        // before detaching the old preview.
         if (currentPreview != null && currentPreview != preview) {
-            stopRenderViews(currentPreview);
+            releasePreviewResources(currentPreview);
             Container previousParent = currentPreview.getParent();
             if (previousParent != null) {
                 previousParent.removeComponent(currentPreview);
@@ -175,23 +198,27 @@ final class PlaygroundPreviewColumn extends Container {
         rebuildStage();
     }
 
-    /// Stops the continuous render loop of every RenderView/GameView in a tree
-    /// (so its rAF stops scheduling). A Form's children live in its content pane,
+    /// Releases resources owned by the outgoing preview. Removing an embedded
+    /// Form does not close CameraSessions or reliably deinitialize its peers.
+    /// A Form's children live in its content pane,
     /// which getComponentAt() does not traverse, so recurse it explicitly.
-    private static void stopRenderViews(Component c) {
+    private static void releasePreviewResources(Component c) {
         if (c == null) {
             return;
+        }
+        if (c instanceof com.codename1.camera.CameraView) {
+            ((com.codename1.camera.CameraView) c).getSession().close();
         }
         if (c instanceof com.codename1.gpu.RenderView) {
             ((com.codename1.gpu.RenderView) c).setContinuous(false);
         }
         if (c instanceof com.codename1.ui.Form) {
-            stopRenderViews(((com.codename1.ui.Form) c).getContentPane());
+            releasePreviewResources(((com.codename1.ui.Form) c).getContentPane());
         }
         if (c instanceof Container) {
             Container cnt = (Container) c;
             for (int i = 0; i < cnt.getComponentCount(); i++) {
-                stopRenderViews(cnt.getComponentAt(i));
+                releasePreviewResources(cnt.getComponentAt(i));
             }
         }
     }

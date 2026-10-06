@@ -63,7 +63,9 @@ window. Both browsers use synthetic cameras and automate permission acceptance.
 The checker verifies that no media request happens before the click and that
 clicking Start opens exactly one real getUserMedia request with audio disabled.
 It requires visible changing video pixels and captured-photo pixels, then closes
-the dialog. No physical camera is used. This does not test the browser's own
+the dialog. A separate navigation case switches through Camera, Hello World and
+3D twice in one page, requires every outgoing camera track to end, and verifies
+that a new camera stream can be opened and released again. No physical camera is used. This does not test the browser's own
 permission-dialog UI or Safari.
 
 Worker errors are observed after initialization and throughout interaction, even
@@ -74,5 +76,9 @@ artifact directory, the standalone checker writes `playground-demo-artifacts/`.
 `PLAYGROUND_DEMO_FILTER=camera` runs only matching cases during iteration; an
 unknown filter fails instead of silently testing nothing. CI always runs all cases.
 `PLAYGROUND_BROWSERS=chromium` or `firefox` narrows a local run; `chrome` uses
-an installed Google Chrome. The CI default runs Chromium and Firefox. A failed behavior assertion fails the command and the existing browser
+an installed Google Chrome. Local runs use normal browser GPU settings.
+`PLAYGROUND_HEADED=1` runs visible browsers; diagnostic JSON records the WebGL
+renderer and whether GPU overrides were requested.
+`PLAYGROUND_SOFTWARE_GL=1` explicitly enables software/forced WebGL for hosted
+Linux CI runners without hardware GPUs. The CI default runs Chromium and Firefox. A failed behavior assertion fails the command and the existing browser
 CI job; the remaining cases still run and retain their evidence.

@@ -72,8 +72,8 @@ async function check(name, fn) {
   try { await fn(); results.push({name, ok: true}); console.log('PASS ' + name); }
   catch (error) { results.push({name, ok: false, error: error.message}); console.error('FAIL ' + name + ': ' + error.message); }
 }
-async function run(slug, title, width, exercise) {
-  const name = browserName + '-' + slug + '-' + width + 'x' + viewport.height;
+async function run(slug, title, width, exercise, caseName = slug) {
+  const name = browserName + '-' + caseName + '-' + width + 'x' + viewport.height;
   if (process.env.PLAYGROUND_DEMO_FILTER && !name.includes(process.env.PLAYGROUND_DEMO_FILTER)) return;
   console.log('RUN ' + name);
   appFrame = null;
@@ -81,11 +81,15 @@ async function run(slug, title, width, exercise) {
   page.setDefaultTimeout(15000);
   await page.addInitScript(() => {
     window.__playgroundMediaRequests = [];
+    window.__playgroundMediaTracks = [];
     if (navigator.mediaDevices) {
       const getUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
       navigator.mediaDevices.getUserMedia = constraints => {
         window.__playgroundMediaRequests.push(constraints);
-        return getUserMedia(constraints);
+        return getUserMedia(constraints).then(stream => {
+          window.__playgroundMediaTracks.push(...stream.getTracks());
+          return stream;
+        });
       };
     }
   });
@@ -123,7 +127,16 @@ async function run(slug, title, width, exercise) {
     const controls = await (appFrame || page.mainFrame()).evaluate(() => [...document.querySelectorAll('[aria-label]')]
       .filter(e => !e.closest('[aria-hidden="true"]')).map(e => ({label: e.getAttribute('aria-label'),
         role: e.getAttribute('role'), bounds: e.getBoundingClientRect().toJSON()}))).catch(() => []);
-    fs.writeFileSync(path.join(artifacts, name + '.json'), JSON.stringify({url, browser: browserName, version: browser.version(), viewport, log, runtimeErrors, controls,
+    const gpu = await page.evaluate(() => {
+      const gl = document.createElement('canvas').getContext('webgl');
+      if (!gl) return {available: false};
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      const result = {available: true, renderer: info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)};
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      return result;
+    }).catch(error => ({error: error.message}));
+    fs.writeFileSync(path.join(artifacts, name + '.json'), JSON.stringify({url, browser: browserName, version: browser.version(), viewport, gpu,
+      headed: process.env.PLAYGROUND_HEADED === '1', softwareGl: process.env.PLAYGROUND_SOFTWARE_GL === '1', log, runtimeErrors, controls,
       checks: results.filter(r => r.name.startsWith(name))}, null, 2));
     await page.close();
   }
@@ -188,19 +201,80 @@ async function cameraDemo(page, region, name) {
   await cameraStatus('^Captured [1-9][0-9]* x [1-9][0-9]*$');
 }
 
+async function selectSample(page, sample, title) {
+  // The icon-only activity bar currently has no accessible names. Locate its
+  // topmost left-edge button by live bounds, then click the real canvas.
+  if (!await appFrame.getByRole('button', {name: 'Hello World', exact: true}).count()) {
+    const buttons = appFrame.getByRole('button');
+    const candidates = [];
+    for (const button of await buttons.all()) {
+      const box = await button.boundingBox();
+      if (box && box.x < 20 && box.width > 20 && box.height > 20) candidates.push(box);
+    }
+    candidates.sort((a, b) => a.y - b.y);
+    assert.ok(candidates.length, 'Samples activity button is missing');
+    const box = candidates[0];
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  }
+  const button = appFrame.getByRole('button', {name: sample, exact: true});
+  await button.waitFor();
+  // Scroll the CN1 sample panel, not its pointer-transparent ARIA overlay.
+  const searchBox = await appFrame.locator('[role="textbox"][aria-readonly="false"]').boundingBox();
+  assert.ok(searchBox, 'Sample search field is missing');
+  const top = searchBox.y + searchBox.height;
+  for (let i = 0; i < 12; i++) {
+    const box = await button.boundingBox();
+    assert.ok(box, 'Sample button has no bounds: ' + sample);
+    if (box.y >= top && box.y + box.height <= viewport.height) break;
+    await page.mouse.move(searchBox.x + searchBox.width / 2, Math.min(viewport.height - 50, top + 150));
+    await page.mouse.wheel(0, box.y < top ? -240 : 240);
+    await page.waitForTimeout(150);
+  }
+  await clickControl(page, sample);
+  await (title === 'Hello World' ? appFrame.getByLabel('Hello, World!', {exact: true})
+    : appFrame.getByRole('group', {name: title, exact: true})).waitFor({timeout: 30000});
+  await page.waitForTimeout(500);
+}
+async function demoNavigation(page, region, name) {
+  await clickControl(page, 'Start Camera');
+  await cameraStatus("^Live preview running - tap 'Take Photo'$");
+  const tracks = () => appFrame.evaluate(() => window.__playgroundMediaTracks.map(t => t.readyState));
+  assert.deepEqual(await tracks(), ['live'], 'Expected one live video track');
+  await selectSample(page, 'Hello World', 'Hello World');
+  await check(name + ' camera released on exit', async () => {
+    await appFrame.waitForFunction(() => window.__playgroundMediaTracks.every(t => t.readyState === 'ended'), null, {timeout: 3000});
+    assert.deepEqual(await tracks(), ['ended']);
+  });
+  await selectSample(page, '3D / GPU', '3D / GPU');
+  await animatedScene(page, await preview(page, '3D / GPU'), name + ' selected cube', 'cube');
+  await selectSample(page, 'Hello World', 'Hello World');
+  await selectSample(page, '3D / GPU', '3D / GPU');
+  await animatedScene(page, await preview(page, '3D / GPU'), name + ' reopened cube', 'cube');
+  await selectSample(page, 'Camera Capture', 'Camera');
+  await clickControl(page, 'Start Camera');
+  await cameraStatus("^Live preview running - tap 'Take Photo'$");
+  assert.deepEqual(await tracks(), ['ended', 'live'], 'Camera must reopen with a new stream');
+  await selectSample(page, 'Hello World', 'Hello World');
+  await appFrame.waitForFunction(() => window.__playgroundMediaTracks.every(t => t.readyState === 'ended'), null, {timeout: 3000});
+  assert.deepEqual(await tracks(), ['ended', 'ended'], 'Reopened camera must also stop on exit');
+}
+
 try {
   for (browserName of (process.env.PLAYGROUND_BROWSERS || 'chromium,firefox').split(',')) {
     assert.ok(['chromium', 'chrome', 'firefox'].includes(browserName), 'Unknown browser: ' + browserName);
     browser = await (browserName === 'firefox' ? firefox : chromium).launch(browserName !== 'firefox'
-      ? {headless: true, ...(browserName === 'chrome' ? {channel: 'chrome'} : {}),
-        args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--enable-unsafe-swiftshader']}
-      : {headless: true, firefoxUserPrefs: {'media.navigator.streams.fake': true,
-        'media.navigator.permission.disabled': true, 'webgl.force-enabled': true}});
+      ? {headless: process.env.PLAYGROUND_HEADED !== '1', ...(browserName === 'chrome' ? {channel: 'chrome'} : {}),
+        args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
+          ...(process.env.PLAYGROUND_SOFTWARE_GL === '1' ? ['--enable-unsafe-swiftshader'] : [])]}
+      : {headless: process.env.PLAYGROUND_HEADED !== '1', firefoxUserPrefs: {'media.navigator.streams.fake': true,
+        'media.navigator.permission.disabled': true,
+        ...(process.env.PLAYGROUND_SOFTWARE_GL === '1' ? {'webgl.force-enabled': true} : {})}});
     for (viewport of [{width: 1440, height: 900}, {width: 1280, height: 720}]) {
       const width = viewport.width;
       await run('bouncing-balls', 'Bouncing Balls', width, (p, r, n) => animatedScene(p, r, n, 'balls'));
       await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'));
       await run('camera-capture', 'Camera', width, cameraDemo);
+      await run('camera-capture', 'Camera', width, demoNavigation, 'demo-navigation');
     }
     await browser.close();
   }

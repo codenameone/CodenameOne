@@ -123,6 +123,8 @@ jobs:
       # samples/editor in Chromium and demo behavior in Chromium and Firefox.
       - name: Run playground browser tests
         env:
+          # Hosted Linux runners have no hardware GPU. Local runs use browser defaults.
+          PLAYGROUND_SOFTWARE_GL: "1"
           PLAYGROUND_BROWSER_ARTIFACT_DIR: ${{ runner.temp }}/playground-browser
         run: |
           set -euo pipefail
