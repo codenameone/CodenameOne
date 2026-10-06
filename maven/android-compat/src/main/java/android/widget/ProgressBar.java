@@ -145,6 +145,7 @@ public class ProgressBar extends View {
             mMax = min;
         }
         setProgress(mProgress);
+        clampToRange();
     }
 
     public int getMax() {
@@ -156,9 +157,16 @@ public class ProgressBar extends View {
             max = mMin;
         }
         mMax = max;
-        if (mProgress > max) {
-            mProgress = max;
-        }
+        clampToRange();
+    }
+
+    /// Pulls both progress values back inside the range after an endpoint
+    /// moved. The secondary value is clamped too, or a shrunk range left it
+    /// past the end and the bar drew it beyond the track; and the primary is
+    /// clamped directly because `setProgress` ignores an indeterminate bar.
+    private void clampToRange() {
+        mProgress = Math.max(mMin, Math.min(mMax, mProgress));
+        mSecondaryProgress = Math.max(mMin, Math.min(mMax, mSecondaryProgress));
         invalidate();
     }
 

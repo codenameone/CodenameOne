@@ -295,17 +295,29 @@ public class Spinner extends AbsSpinner implements DialogInterface.OnClickListen
         return handled;
     }
 
+    /// The dialog lists the adapter's own `getDropDownView` rows, as the
+    /// drop-down does and as Android's dialog mode does, so custom row
+    /// layouts, icons and disabled items survive; the selected row is
+    /// marked through the list's single choice.
     private void showDialog() {
-        CharSequence[] items = new CharSequence[mItemCount];
-        for (int i = 0; i < mItemCount; i++) {
-            Object o = mAdapter.getItem(i);
-            items[i] = o instanceof CharSequence ? (CharSequence) o : String.valueOf(o);
+        ListView list = new ListView(getContext());
+        list.setAdapter(new DropDownAdapter(mAdapter));
+        list.setChoiceMode(AbsListView.CHOICE_MODE_SINGLE);
+        if (mSelectedPosition >= 0) {
+            list.setItemChecked(mSelectedPosition, true);
+            list.setSelection(mSelectedPosition);
         }
+        list.setOnItemClickListener(new OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Spinner.this.onClick(mDialog, position);
+            }
+        });
         AlertDialog.Builder b = new AlertDialog.Builder(getContext());
         if (mPrompt != null) {
             b.setTitle(mPrompt);
         }
-        b.setSingleChoiceItems(items, mSelectedPosition, this);
+        b.setView(list);
         mDialog = b.show();
     }
 

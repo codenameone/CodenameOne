@@ -217,7 +217,12 @@ public class TimePicker extends FrameLayout {
 
     @Deprecated
     public void setCurrentHour(Integer currentHour) {
-        setHour(currentHour == null ? 0 : currentHour.intValue());
+        // A null leaves the hour alone, as the legacy picker did, rather than
+        // resetting the selection to midnight.
+        if (currentHour == null) {
+            return;
+        }
+        setHour(currentHour.intValue());
     }
 
     @Deprecated
@@ -227,7 +232,10 @@ public class TimePicker extends FrameLayout {
 
     @Deprecated
     public void setCurrentMinute(Integer currentMinute) {
-        setMinute(currentMinute == null ? 0 : currentMinute.intValue());
+        if (currentMinute == null) {
+            return;
+        }
+        setMinute(currentMinute.intValue());
     }
 
     @Deprecated

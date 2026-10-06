@@ -113,12 +113,15 @@ public class SimpleAdapter extends BaseAdapter implements Filterable {
             if (mViewBinder != null && mViewBinder.setViewValue(v, data, text)) {
                 continue;
             }
+            // The default bindings go through the overridable hooks, as
+            // Android's do, so a subclass that formats in setViewText or
+            // setViewImage is honoured without a ViewBinder.
             if (v instanceof TextView) {
-                ((TextView) v).setText(text);
+                setViewText((TextView) v, text);
             } else if (v instanceof ImageView) {
                 ImageView iv = (ImageView) v;
                 if (data instanceof Integer) {
-                    iv.setImageResource(((Integer) data).intValue());
+                    setViewImage(iv, ((Integer) data).intValue());
                 } else if (data instanceof Bitmap) {
                     iv.setImageBitmap((Bitmap) data);
                 } else if (data instanceof Drawable) {
