@@ -26,8 +26,10 @@ package com.codename1.io.oidc;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.RequestAuthorizer;
 import com.codename1.io.Util;
 import com.codename1.security.SecureRandom;
+import com.codename1.ui.CN;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.StringUtil;
@@ -78,8 +80,20 @@ import java.util.Map;
 ///   platform without pulling in a heavy dep. The remedy is: trust the
 ///   TLS connection to the well-known issuer (i.e. always discover, never
 ///   pass tokens to a server without re-validating server-side).
-/// - **Implicit / hybrid / device flows.** Use the lower-level
+/// - **Implicit and hybrid flows.** Use the lower-level
 ///   [com.codename1.io.ConnectionRequest] APIs if you need those.
+///
+/// ### A device without a browser or a keyboard
+///
+/// [#requestDeviceAuthorization()] and [#pollDeviceToken(OidcDeviceAuthorization)]
+/// run the device authorization grant (RFC 8628): the device shows a short
+/// code, the user approves it on a phone or a computer, and the device
+/// receives its tokens.
+///
+/// ### Using the tokens
+///
+/// [OidcRequestAuthorizer] attaches the access token to the application's
+/// requests and renews it with the refresh token when the service refuses it.
 ///
 public final class OidcClient {
 
@@ -94,6 +108,9 @@ public final class OidcClient {
     private String storeKey;
     private String responseMode;
     private boolean enforceNonce = true;
+    private OidcRequestAuthorizer tokenListener;
+    /// How long one second of a device grant's polling interval lasts. A test shortens it.
+    int devicePollUnitMillis = 1000;
 
     private OidcClient(OidcConfiguration configuration) {
         this.configuration = configuration;
@@ -152,10 +169,21 @@ public final class OidcClient {
                         "Failed to fetch discovery document at " + url + ": "
                                 + err.getMessage(), err));
             }
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // The answer's body carries the error and readResponse() reports it. The
+                // default handling would put an error dialog in front of the user for what
+                // is an ordinary answer here -- a refused refresh token, a device not yet
+                // approved.
+            }
         };
         req.setUrl(url);
         req.setPost(false);
         req.setReadResponseForErrors(true);
+        // Never the application's own authorizer: these are the requests that fetch its
+        // token, and one of them waiting on a renewal would be waiting on itself.
+        req.setAuthorizer(RequestAuthorizer.NONE);
         NetworkManager.getInstance().addToQueue(req);
         return out;
     }
@@ -280,7 +308,11 @@ public final class OidcClient {
     /// value returned from [OidcTokens#getRefreshToken()] on a previous flow.
     /// The new tokens are persisted via the current [TokenStore].
     public AsyncResource<OidcTokens> refresh(final String refreshToken) {
-        requireConfigured();
+        // Only what the exchange itself uses. A client that signed in with the device grant
+        // has no redirect URI, and asking for one here would leave it unable to refresh.
+        if (clientId == null) {
+            throw new IllegalStateException("clientId is required");
+        }
         if (refreshToken == null) {
             throw new IllegalArgumentException("refreshToken must not be null");
         }
@@ -373,10 +405,21 @@ public final class OidcClient {
                 out.error(new OidcException(OidcException.TRANSPORT_ERROR,
                         "Token revocation failed: " + err.getMessage(), err));
             }
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // The answer's body carries the error and readResponse() reports it. The
+                // default handling would put an error dialog in front of the user for what
+                // is an ordinary answer here -- a refused refresh token, a device not yet
+                // approved.
+            }
         };
         req.setUrl(configuration.getRevocationEndpoint());
         req.setPost(true);
         req.setReadResponseForErrors(true);
+        // Never the application's own authorizer: these are the requests that fetch its
+        // token, and one of them waiting on a renewal would be waiting on itself.
+        req.setAuthorizer(RequestAuthorizer.NONE);
         req.addRequestHeader("Content-Type", "application/x-www-form-urlencoded");
         req.addArgument("token", token);
         req.addArgument("client_id", clientId);
@@ -391,7 +434,201 @@ public final class OidcClient {
     /// revocation endpoint -- combine with [#revoke(String)] if you want a
     /// proper sign-out.
     public AsyncResource<Boolean> clearStoredTokens() {
+        tokensChanged(null);
         return tokenStore.clear(storageKey());
+    }
+
+    /// Starts the device authorization grant (RFC 8628), for a device with no browser or no
+    /// practical way to type: a television, a watch, a kiosk, a command line.
+    ///
+    /// The answer holds a short code. Show it with the verification address; the user opens
+    /// that address on another device, signs in and types the code. Meanwhile pass the answer
+    /// to [#pollDeviceToken(OidcDeviceAuthorization)], which completes once they have.
+    ///
+    /// Needs a client id, the scopes, and a provider whose configuration names a
+    /// `device_authorization_endpoint`. No redirect URI is involved.
+    ///
+    /// #### Returns
+    ///
+    /// a resource that completes with the codes, or fails with an [OidcException] carrying the
+    /// server's error code
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when the client id is missing, or the provider does not
+    ///   offer the grant
+    public AsyncResource<OidcDeviceAuthorization> requestDeviceAuthorization() {
+        requireDeviceGrant();
+        final AsyncResource<OidcDeviceAuthorization> out =
+                new AsyncResource<OidcDeviceAuthorization>();
+        ConnectionRequest req = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                String json = StringUtil.newString(Util.readInputStream(input));
+                Map<String, Object> parsed;
+                try {
+                    parsed = new JSONParser().parseJSON(new StringReader(json));
+                } catch (Exception e) {
+                    parsed = null;
+                }
+                if (parsed == null || parsed.isEmpty()) {
+                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                            "Device authorization endpoint returned no JSON (HTTP "
+                                    + getResponseCode() + ")"));
+                    return;
+                }
+                if (parsed.get("error") != null) {
+                    Object desc = parsed.get("error_description");
+                    out.error(new OidcException(parsed.get("error").toString(),
+                            desc != null ? desc.toString() : null));
+                    return;
+                }
+                try {
+                    out.complete(OidcDeviceAuthorization.fromJson(parsed));
+                } catch (IllegalArgumentException incomplete) {
+                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                            incomplete.getMessage(), incomplete));
+                }
+            }
+
+            @Override
+            protected void handleException(Exception err) {
+                out.error(new OidcException(OidcException.TRANSPORT_ERROR,
+                        "Device authorization request failed: " + err.getMessage(), err));
+            }
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // The body says why, and readResponse() reports it.
+            }
+        };
+        req.setUrl(configuration.getDeviceAuthorizationEndpoint());
+        req.setPost(true);
+        req.setReadResponseForErrors(true);
+        req.setAuthorizer(RequestAuthorizer.NONE);
+        req.addRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        req.addRequestHeader("Accept", "application/json");
+        req.addArgument("client_id", clientId);
+        if (clientSecret != null) {
+            req.addArgument("client_secret", clientSecret);
+        }
+        if (scopes != null && scopes.length > 0) {
+            req.addArgument("scope", join(scopes));
+        }
+        NetworkManager.getInstance().addToQueue(req);
+        return out;
+    }
+
+    /// Waits for the user to approve a device, by asking the token endpoint at the pace the
+    /// server set.
+    ///
+    /// The wait is a timer, not a thread: each request is queued when the previous answer's
+    /// interval has passed. The interval starts at
+    /// [OidcDeviceAuthorization#getInterval()] and grows by five seconds every time the
+    /// server answers `slow_down`, and doubles after a request that failed to reach the server
+    /// at all.
+    ///
+    /// The resource completes with the tokens, which are saved to the [TokenStore] the way
+    /// [#authorize()] saves them. It fails with an [OidcException] whose code is
+    /// [OidcException#ACCESS_DENIED] when the user refused, [OidcException#EXPIRED_TOKEN]
+    /// when the codes ran out -- by the server's word or by the clock -- or whatever other
+    /// code the server sent. Cancelling the resource stops the polling.
+    ///
+    /// #### Parameters
+    ///
+    /// - `authorization`: the answer of [#requestDeviceAuthorization()]
+    ///
+    /// #### Returns
+    ///
+    /// a resource that completes with the tokens
+    public AsyncResource<OidcTokens> pollDeviceToken(final OidcDeviceAuthorization authorization) {
+        if (authorization == null) {
+            throw new IllegalArgumentException("authorization must not be null");
+        }
+        requireDeviceGrant();
+        final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
+        scheduleDevicePoll(authorization, authorization.getInterval(), out);
+        return out;
+    }
+
+    private void scheduleDevicePoll(final OidcDeviceAuthorization authorization,
+            final int intervalSeconds, final AsyncResource<OidcTokens> out) {
+        CN.setTimeout(intervalSeconds * devicePollUnitMillis, new Runnable() {
+            @Override
+            public void run() {
+                devicePoll(authorization, intervalSeconds, out);
+            }
+        });
+    }
+
+    private void devicePoll(final OidcDeviceAuthorization authorization,
+            final int intervalSeconds, final AsyncResource<OidcTokens> out) {
+        if (out.isDone()) {
+            // Cancelled while the timer ran.
+            return;
+        }
+        if (authorization.isExpired()) {
+            out.error(new OidcException(OidcException.EXPIRED_TOKEN,
+                    "The device code expired before the user approved it"));
+            return;
+        }
+        Map<String, String> args = new HashMap<String, String>();
+        args.put("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
+        args.put("device_code", authorization.getDeviceCode());
+        appendBaseTokenArgs(args);
+        AsyncResource<OidcTokens> attempt = new AsyncResource<OidcTokens>();
+        attempt.ready(new SuccessCallback<OidcTokens>() {
+            @Override
+            public void onSucess(OidcTokens tokens) {
+                if (!out.isDone()) {
+                    out.complete(tokens);
+                }
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable err) {
+                if (out.isDone()) {
+                    return;
+                }
+                String code = err instanceof OidcException ? ((OidcException) err).getError() : null;
+                if (OidcException.AUTHORIZATION_PENDING.equals(code)) {
+                    scheduleDevicePoll(authorization, intervalSeconds, out);
+                } else if (OidcException.SLOW_DOWN.equals(code)) {
+                    scheduleDevicePoll(authorization, intervalSeconds + 5, out);
+                } else if (OidcException.TRANSPORT_ERROR.equals(code)) {
+                    // The server was not reached, so it has not said no. Asking less often
+                    // is what the grant requires of a device that cannot get through.
+                    scheduleDevicePoll(authorization, Math.min(intervalSeconds * 2, 60), out);
+                } else {
+                    out.error(err);
+                }
+            }
+        });
+        postToTokenEndpoint(args, null, null, attempt);
+    }
+
+    private void requireDeviceGrant() {
+        if (clientId == null) {
+            throw new IllegalStateException("clientId is required");
+        }
+        if (configuration.getDeviceAuthorizationEndpoint() == null) {
+            throw new IllegalStateException(
+                    "deviceAuthorizationEndpoint missing from configuration");
+        }
+        if (configuration.getTokenEndpoint() == null) {
+            throw new IllegalStateException("OIDC configuration is missing tokenEndpoint");
+        }
+    }
+
+    /// Lets one [OidcRequestAuthorizer] follow the tokens this client obtains and clears.
+    void setTokenListener(OidcRequestAuthorizer listener) {
+        this.tokenListener = listener;
+    }
+
+    private void tokensChanged(OidcTokens tokens) {
+        if (tokenListener != null) {
+            tokenListener.tokensChanged(tokens);
+        }
     }
 
     // -----------------------------------------------------------
@@ -562,6 +799,7 @@ public final class OidcClient {
                             }
                         });
                 completed[0] = true;
+                tokensChanged(tokens);
                 out.complete(tokens);
             }
 
@@ -574,10 +812,21 @@ public final class OidcClient {
                 out.error(new OidcException(OidcException.TRANSPORT_ERROR,
                         "Token endpoint request failed: " + err.getMessage(), err));
             }
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // The answer's body carries the error and readResponse() reports it. The
+                // default handling would put an error dialog in front of the user for what
+                // is an ordinary answer here -- a refused refresh token, a device not yet
+                // approved.
+            }
         };
         req.setUrl(configuration.getTokenEndpoint());
         req.setPost(true);
         req.setReadResponseForErrors(true);
+        // Never the application's own authorizer: these are the requests that fetch its
+        // token, and one of them waiting on a renewal would be waiting on itself.
+        req.setAuthorizer(RequestAuthorizer.NONE);
         req.addRequestHeader("Content-Type", "application/x-www-form-urlencoded");
         req.addRequestHeader("Accept", "application/json");
         for (Map.Entry<String, String> e : args.entrySet()) {

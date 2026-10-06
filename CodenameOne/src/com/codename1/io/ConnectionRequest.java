@@ -181,6 +181,24 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean readResponseForErrors = readResponseForErrorsDefault;
     private String responseContentType;
     private boolean redirecting;
+    /// The authorizer given to this request, or null to use the default one for its URL.
+    private RequestAuthorizer authorizer;
+    /// Whose header the attempt in flight carries, and what it was. Null when the attempt was
+    /// sent without an authorizer's header, which is also what makes a 401 nobody's to renew.
+    private RequestAuthorizer attachedAuthorizer;
+    private String attachedAuthorization;
+    /// Where this request stands with its authorizer: [#AUTHORIZATION_FIRST] until a 401 is
+    /// held, then one of the other two for the single attempt that follows.
+    private int authorizationAttempt;
+    /// The header the service refused, sent again by the attempt that delivers the refusal.
+    private String refusedAuthorization;
+    /// The scheme and authority an authorizer set on this request first sent its header to.
+    private String authorizationOrigin;
+    /// True from the moment a 401 is held until the request is queued again or given up.
+    boolean authorizationPending;
+    private static final int AUTHORIZATION_FIRST = 0;
+    private static final int AUTHORIZATION_RENEWED = 1;
+    private static final int AUTHORIZATION_REFUSED = 2;
     private boolean cookiesEnabled = cookiesEnabledDefault;
     private int chunkedStreamingLen = -1;
     private Exception failureException;
@@ -678,6 +696,177 @@ public class ConnectionRequest implements IOProgressListener {
     /// - `httpMethod`: the http method string
     public void setHttpMethod(String httpMethod) {
         this.httpMethod = httpMethod;
+    }
+
+    /// Gives this request an authorizer of its own, in place of the default
+    /// [NetworkManager#setAuthorizer(String, RequestAuthorizer)] would pick for its URL.
+    ///
+    /// See [RequestAuthorizer] for what an authorizer does to a request. Two things are worth
+    /// knowing about one set here rather than by URL:
+    ///
+    /// - An `Authorization` header set with [#addRequestHeader(String, String)] still wins; the
+    ///   authorizer is then not consulted at all.
+    /// - The header follows the request only as far as the host it was first sent to. If the
+    ///   service redirects somewhere else, the redirected request goes without it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `authorizer`: the authorizer, [RequestAuthorizer#NONE] to send this request without
+    ///   even the default one, or null to go back to the default
+    public void setAuthorizer(RequestAuthorizer authorizer) {
+        this.authorizer = authorizer;
+    }
+
+    /// The authorizer set with [#setAuthorizer(RequestAuthorizer)].
+    ///
+    /// #### Returns
+    ///
+    /// the authorizer, or null when this request uses the default for its URL
+    public RequestAuthorizer getAuthorizer() {
+        return authorizer;
+    }
+
+    /// Decides what `Authorization` header, if any, an authorizer adds to the attempt about to
+    /// be made, and records whose it is so a 401 can be taken back to the same authorizer.
+    private String resolveAuthorization() {
+        attachedAuthorizer = null;
+        attachedAuthorization = null;
+        RequestAuthorizer a = authorizer;
+        boolean own = a != null;
+        if (!own) {
+            a = NetworkManager.getInstance().getAuthorizer(url);
+        }
+        if (a == null || getRequestHeader("Authorization") != null) {
+            // The caller's own header wins, and so does a default header of NetworkManager,
+            // which is on the request by now. Neither is this authorizer's to renew.
+            return null;
+        }
+        if (own) {
+            // A default authorizer is matched against the URL of every attempt, so a redirect
+            // away from its base URL drops it. One set on the request has no base URL to be
+            // matched against, so it is held to the first host instead.
+            String origin = originOf(url);
+            if (authorizationOrigin == null) {
+                authorizationOrigin = origin;
+            } else if (!authorizationOrigin.equals(origin)) {
+                return null;
+            }
+        }
+        String value;
+        if (authorizationAttempt == AUTHORIZATION_REFUSED) {
+            value = refusedAuthorization;
+        } else {
+            try {
+                value = a.getAuthorization(this);
+            } catch (RuntimeException err) {
+                // An authorizer that throws must not take the request down with it: the
+                // request goes without a header and the service answers for itself.
+                Log.e(err);
+                value = null;
+            }
+        }
+        if (value == null) {
+            return null;
+        }
+        attachedAuthorizer = a;
+        attachedAuthorization = value;
+        return value;
+    }
+
+    /// The scheme and authority of a URL in lower case, or the whole URL when it has neither.
+    static String originOf(String url) {
+        if (url == null) {
+            return "";
+        }
+        int scheme = url.indexOf("://");
+        if (scheme < 0) {
+            return url;
+        }
+        int end = url.length();
+        for (int i = scheme + 3; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        StringBuilder b = new StringBuilder(end);
+        for (int i = 0; i < end; i++) {
+            char c = url.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                c = (char) (c + 32);
+            }
+            b.append(c);
+        }
+        return b.toString();
+    }
+
+    /// Forgets what an earlier run of this request went through with its authorizer. Called
+    /// when the request is queued afresh, which is a new request as far as renewing goes.
+    void resetAuthorization() {
+        authorizationAttempt = AUTHORIZATION_FIRST;
+        refusedAuthorization = null;
+        authorizationOrigin = null;
+        authorizationPending = false;
+    }
+
+    /// Asks the authorizer whose header was refused for a new one. Runs on the EDT, queued by
+    /// the network thread behind the completion event of the attempt that was refused.
+    void renewAuthorization() {
+        final RequestAuthorizer a = attachedAuthorizer;
+        final String refused = attachedAuthorization;
+        if (isKilled() || a == null) {
+            resumeAfterAuthorization(false, refused);
+            return;
+        }
+        AsyncResource<Boolean> renewal;
+        try {
+            renewal = a.refreshAuthorization(this, refused);
+        } catch (RuntimeException err) {
+            Log.e(err);
+            renewal = null;
+        }
+        if (renewal == null) {
+            resumeAfterAuthorization(false, refused);
+            return;
+        }
+        renewal.ready(new SuccessCallback<Boolean>() {
+            @Override
+            public void onSucess(Boolean renewed) {
+                resumeAfterAuthorization(renewed != null && renewed.booleanValue(), refused);
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable err) {
+                resumeAfterAuthorization(false, refused);
+            }
+        });
+    }
+
+    private void resumeAfterAuthorization(boolean renewed, String refused) {
+        if (!authorizationPending) {
+            // Answered twice. A resource can complete and then fail in a listener of its
+            // own; the request has gone on by then and must not be queued a second time.
+            return;
+        }
+        authorizationPending = false;
+        if (isKilled()) {
+            // Nobody will send it again, so whoever waits for it has to be told here.
+            complete = true;
+            NetworkManager.getInstance().authorizationAbandoned(this);
+            return;
+        }
+        if (renewed) {
+            authorizationAttempt = AUTHORIZATION_RENEWED;
+        } else {
+            // Sent once more exactly as it was refused, so that the 401 is read, handed to
+            // the error handlers and delivered by the same code as any other response. The
+            // refusal held earlier cannot be replayed instead: its connection is closed, and
+            // the hooks that read headers and the body need one that is open.
+            authorizationAttempt = AUTHORIZATION_REFUSED;
+            refusedAuthorization = refused;
+        }
+        NetworkManager.getInstance().addToQueue(this, true);
     }
 
     /// Adds the given header to the request that will be sent
@@ -1288,6 +1477,12 @@ public class ConnectionRequest implements IOProgressListener {
             }
         }
 
+        // After the guard, whose own Authorization header -- if it adds one -- wins like any
+        // other the request already carries. Resolved before the connection opens and written
+        // after initConnection(), outside it for the same reason as the guard: a subclass
+        // that overrides that method without calling super must not lose the header.
+        String authorization = resolveAuthorization();
+
         CodenameOneImplementation impl = Util.getImplementation();
         Object connection = null;
         input = null;
@@ -1305,6 +1500,9 @@ public class ConnectionRequest implements IOProgressListener {
                 return true;
             }
             initConnection(connection);
+            if (authorization != null) {
+                impl.setHeader(connection, "Authorization", authorization);
+            }
             if (httpMethod != null) {
                 impl.setHttpMethod(connection, httpMethod);
             }
@@ -1474,6 +1672,20 @@ public class ConnectionRequest implements IOProgressListener {
                     return true;
                 }
 
+                if (responseCode == 401 && attachedAuthorizer != null
+                        && authorizationAttempt == AUTHORIZATION_FIRST) {
+                    // The service refused the header an authorizer supplied. Held here,
+                    // before any error handling: handleErrorResponseCode() is where the
+                    // default error dialog and the application's error handlers are, and a
+                    // token that only needed renewing must reach neither. The guard still
+                    // sees the refusal, which is how a token layer of its own learns of one.
+                    captureGuardHeaders(connection);
+                    authorizationPending = true;
+                    // Read by whoever waits for this request, as it is for a redirect: the
+                    // completion event of this attempt is not the end of the request.
+                    retrying = true;
+                    return false;
+                }
                 responseErrorMessge = impl.getResponseMessage(connection);
                 handleErrorResponseCode(responseCode, responseErrorMessge);
                 if (!isReadResponseForErrors()) {

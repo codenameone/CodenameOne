@@ -43,6 +43,7 @@ public final class OidcConfiguration {
     private final String revocationEndpoint;
     private final String endSessionEndpoint;
     private final String jwksUri;
+    private final String deviceAuthorizationEndpoint;
 
     private OidcConfiguration(Builder b) {
         this.issuer = b.issuer;
@@ -52,6 +53,7 @@ public final class OidcConfiguration {
         this.revocationEndpoint = b.revocationEndpoint;
         this.endSessionEndpoint = b.endSessionEndpoint;
         this.jwksUri = b.jwksUri;
+        this.deviceAuthorizationEndpoint = b.deviceAuthorizationEndpoint;
     }
 
     /// Builds an [OidcConfiguration] from a parsed discovery JSON document.
@@ -68,6 +70,7 @@ public final class OidcConfiguration {
         b.revocationEndpoint = stringOrNull(json.get("revocation_endpoint"));
         b.endSessionEndpoint = stringOrNull(json.get("end_session_endpoint"));
         b.jwksUri = stringOrNull(json.get("jwks_uri"));
+        b.deviceAuthorizationEndpoint = stringOrNull(json.get("device_authorization_endpoint"));
         return b.build();
     }
 
@@ -99,6 +102,16 @@ public final class OidcConfiguration {
         return jwksUri;
     }
 
+    /// Where a device starts the device authorization grant (RFC 8628), from the discovery
+    /// document's `device_authorization_endpoint`.
+    ///
+    /// #### Returns
+    ///
+    /// the endpoint, or null when the provider does not offer the grant
+    public String getDeviceAuthorizationEndpoint() {
+        return deviceAuthorizationEndpoint;
+    }
+
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -112,6 +125,7 @@ public final class OidcConfiguration {
         b.revocationEndpoint = source.revocationEndpoint;
         b.endSessionEndpoint = source.endSessionEndpoint;
         b.jwksUri = source.jwksUri;
+        b.deviceAuthorizationEndpoint = source.deviceAuthorizationEndpoint;
         return b;
     }
 
@@ -128,6 +142,7 @@ public final class OidcConfiguration {
         private String revocationEndpoint;
         private String endSessionEndpoint;
         private String jwksUri;
+        private String deviceAuthorizationEndpoint;
 
         public Builder issuer(String v) {
             this.issuer = v;
@@ -161,6 +176,12 @@ public final class OidcConfiguration {
 
         public Builder jwksUri(String v) {
             this.jwksUri = v;
+            return this;
+        }
+
+        /// Sets the endpoint of the device authorization grant.
+        public Builder deviceAuthorizationEndpoint(String v) {
+            this.deviceAuthorizationEndpoint = v;
             return this;
         }
 

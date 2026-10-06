@@ -472,6 +472,126 @@ public final class NetworkManager {
         userHeaders.put(key, value);
     }
 
+    /// What [#setAuthorizer(String, RequestAuthorizer)] registered. Replaced whole on every
+    /// change and never modified, so the network thread can walk the array it read.
+    private AuthorizerEntry[] authorizers = new AuthorizerEntry[0];
+    private final Object authorizerLock = new Object();
+
+    private static final class AuthorizerEntry {
+        final String baseUrl;
+        final RequestAuthorizer authorizer;
+
+        AuthorizerEntry(String baseUrl, RequestAuthorizer authorizer) {
+            this.baseUrl = baseUrl;
+            this.authorizer = authorizer;
+        }
+    }
+
+    /// Makes `authorizer` the default for every request to `baseUrl` and below, so the
+    /// application's own service gets its `Authorization` header -- and a renewed one after a
+    /// `401` -- without each request being told. See [RequestAuthorizer].
+    ///
+    /// ```java
+    /// NetworkManager.getInstance().setAuthorizer("https://api.example.com/v1", authorizer);
+    /// ```
+    ///
+    /// A request is covered when its URL has the same scheme, host and port as `baseUrl` and a
+    /// path that is `baseUrl`'s path or below it. The comparison stops at whole segments, so
+    /// `https://api.example.com` covers `https://api.example.com/pets` and covers neither
+    /// `https://api.example.com.evil.test/` nor `https://api.example.com@evil.test/`, and
+    /// `/v1` does not cover `/v10`. The port is compared as written: `https://host` and
+    /// `https://host:443` are different base URLs. When several registrations cover a request
+    /// the longest one is used.
+    ///
+    /// A request with an authorizer of its own, or with an `Authorization` header already on
+    /// it, is left alone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `baseUrl`: an absolute URL; a trailing slash is ignored
+    ///
+    /// - `authorizer`: the authorizer, or null to remove the one registered for `baseUrl`
+    public void setAuthorizer(String baseUrl, RequestAuthorizer authorizer) {
+        if (baseUrl == null || baseUrl.indexOf("://") < 0) {
+            throw new IllegalArgumentException("baseUrl must be an absolute URL");
+        }
+        String base = baseUrl;
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        synchronized (authorizerLock) {
+            ArrayList<AuthorizerEntry> next = new ArrayList<AuthorizerEntry>();
+            for (AuthorizerEntry e : authorizers) {
+                if (!e.baseUrl.equals(base)) {
+                    next.add(e);
+                }
+            }
+            if (authorizer != null) {
+                next.add(new AuthorizerEntry(base, authorizer));
+            }
+            authorizers = next.toArray(new AuthorizerEntry[next.size()]);
+        }
+    }
+
+    /// The default authorizer of a URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL of a request
+    ///
+    /// #### Returns
+    ///
+    /// the authorizer registered for the longest base URL that covers `url`, or null
+    public RequestAuthorizer getAuthorizer(String url) {
+        AuthorizerEntry[] current;
+        synchronized (authorizerLock) {
+            current = authorizers;
+        }
+        if (url == null || current.length == 0) {
+            return null;
+        }
+        AuthorizerEntry best = null;
+        for (AuthorizerEntry e : current) {
+            if ((best == null || e.baseUrl.length() > best.baseUrl.length())
+                    && covers(e.baseUrl, url)) {
+                best = e;
+            }
+        }
+        return best == null ? null : best.authorizer;
+    }
+
+    /// Whether `url` is `base` or below it. The scheme and authority compare without regard
+    /// to ASCII case, as hosts do; the path compares exactly.
+    static boolean covers(String base, String url) {
+        if (url.length() < base.length()) {
+            return false;
+        }
+        int authorityEnd = base.indexOf('/', base.indexOf("://") + 3);
+        if (authorityEnd < 0) {
+            authorityEnd = base.length();
+        }
+        if (!url.regionMatches(true, 0, base, 0, authorityEnd)
+                || !url.regionMatches(false, authorityEnd, base, authorityEnd,
+                        base.length() - authorityEnd)) {
+            return false;
+        }
+        if (url.length() == base.length()) {
+            return true;
+        }
+        char next = url.charAt(base.length());
+        return next == '/' || next == '?' || next == '#';
+    }
+
+    /// Tells whoever waits for a request that it will not be sent again: it was killed while
+    /// its authorizer was renewing, after the attempt that would have completed it was held.
+    void authorizationAbandoned(ConnectionRequest request) {
+        scheduleTracerClear(request, request.tracerRequeues);
+        EventDispatcher listeners = progressListeners;
+        if (listeners != null) {
+            listeners.fireActionEvent(new NetworkEvent(request, NetworkEvent.PROGRESS_TYPE_COMPLETED));
+        }
+    }
+
     /// Identical to add to queue but returns an AsyncResource object that will resolve to
     /// the ConnectionRequest.
     ///
@@ -582,6 +702,10 @@ public final class NetworkManager {
             addToQueue(request);
             Display.getInstance().invokeAndBlock(w);
         } else {
+            // The flag this thread is about to poll still says "complete" for a request that
+            // has run before, and stays so until a network thread picks the request up
+            // again -- long enough for the loop to return before anything was sent.
+            request.complete = false;
             addToQueue(request);
             w.run();
         }
@@ -804,6 +928,13 @@ public final class NetworkManager {
                 request.tracerParentChained = false;
                 request.tracerLastAttempt = null;
                 request.tracerLastOwner = null;
+                // And nothing of the last run's dealings with its authorizer: a request the
+                // application queues again gets its one renewal again. A retry mark the last
+                // run left unread goes too -- with nobody waiting on that run it was never
+                // consumed, and the first waiter of this one would take a completed request
+                // for one still being retried and wait for good.
+                request.resetAuthorization();
+                request.retrying = false;
             } else {
                 i = ConnectionRequest.PRIORITY_HIGH;
             }
@@ -1332,7 +1463,7 @@ public final class NetworkManager {
                 // Any tracer field, the owners included: a request queued outside an
                 // action holds only tracerParentOwner, and that alone pins the whole
                 // telemetry installation.
-                if (req.tracerRequeues == requeuesBefore
+                if (req.tracerRequeues == requeuesBefore && !req.authorizationPending
                         && (req.tracerParent != null || req.tracerLastAttempt != null
                         || req.tracerParentOwner != null || req.tracerLastOwner != null)) {
                     // Nothing queued this request again YET. Its tracer state has
@@ -1366,7 +1497,28 @@ public final class NetworkManager {
                 if (completionListeners != null) {
                     completionListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_COMPLETED));
                 }
-                if (req.getDisposeOnCompletion() != null && !req.isRedirecting()) {
+                // Read once: a renewal that answers at once clears it again below.
+                boolean heldForAuthorizer = req.authorizationPending;
+                if (heldForAuthorizer) {
+                    // A 401 is being held for the request's authorizer. Queued here, behind
+                    // the completion event just fired, and not from the request itself: the
+                    // renewal may finish at once and queue the request again, and whoever
+                    // waits must have read this attempt's completion as "retrying" before
+                    // the next attempt can end.
+                    final ConnectionRequest held = req;
+                    if (Display.isInitialized()) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                held.renewAuthorization();
+                            }
+                        });
+                    } else {
+                        held.renewAuthorization();
+                    }
+                }
+                if (req.getDisposeOnCompletion() != null && !req.isRedirecting()
+                        && !heldForAuthorizer) {
                     // there may be a race condition where the dialog hasn't yet appeared but the
                     // network request completed
                     final ConnectionRequest finalReq = req;
