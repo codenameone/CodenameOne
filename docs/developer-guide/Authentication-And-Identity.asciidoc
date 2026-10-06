@@ -330,7 +330,9 @@ From then on every request under that base URL carries `Authorization: Bearer ..
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-call,indent=0]
 ----
 
-The base URL is matched by scheme, host, port and whole path segments. A token registered for `https://api.example.com` isn't sent to another host, and `/v1` doesn't cover `/v10`. The port is compared as written, so `https://api.example.com` and `https://api.example.com:443` are different base URLs. When two registrations cover a request, the longer one wins.
+The base URL is matched by origin and by whole path segments. The origin is the scheme, the host and the port. Scheme and host are compared without regard to case, and a port that's left out is the scheme's own, so `https://api.example.com` and `https://API.example.com:443` are the same base URL. The path is compared exactly and ends where a segment ends, so `/v1` covers `/v1/pets` and doesn't cover `/v10`. When two registrations cover a request, the one with the longer path wins.
+
+A token is never sent to another origin. That holds for a redirect too: a request the server redirects to another host, another port or plain `http` is sent there without the header. This is the behavior where Codename One follows the redirect itself. On iOS the system follows redirects before the app sees them, so don't have a token-protected API redirect to a host you don't control.
 
 ==== What happens on a 401
 

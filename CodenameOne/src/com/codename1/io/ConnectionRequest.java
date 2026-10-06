@@ -706,8 +706,9 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - An `Authorization` header set with [#addRequestHeader(String, String)] still wins; the
     ///   authorizer is then not consulted at all.
-    /// - The header follows the request only as far as the host it was first sent to. If the
-    ///   service redirects somewhere else, the redirected request goes without it.
+    /// - The header follows the request only as far as the origin it was first sent to: the
+    ///   scheme, the host and the port. If the service redirects to another one, the
+    ///   redirected request goes without it.
     ///
     /// #### Parameters
     ///
@@ -773,32 +774,10 @@ public class ConnectionRequest implements IOProgressListener {
         return value;
     }
 
-    /// The scheme and authority of a URL in lower case, or the whole URL when it has neither.
+    /// The origin of a URL as [NetworkManager] compares one: scheme and host in lower case,
+    /// the port always written, so `https://host` and `https://host:443` are one origin.
     static String originOf(String url) {
-        if (url == null) {
-            return "";
-        }
-        int scheme = url.indexOf("://");
-        if (scheme < 0) {
-            return url;
-        }
-        int end = url.length();
-        for (int i = scheme + 3; i < url.length(); i++) {
-            char c = url.charAt(i);
-            if (c == '/' || c == '?' || c == '#') {
-                end = i;
-                break;
-            }
-        }
-        StringBuilder b = new StringBuilder(end);
-        for (int i = 0; i < end; i++) {
-            char c = url.charAt(i);
-            if (c >= 'A' && c <= 'Z') {
-                c = (char) (c + 32);
-            }
-            b.append(c);
-        }
-        return b.toString();
+        return NetworkManager.originOf(url);
     }
 
     /// Forgets what an earlier run of this request went through with its authorizer. Called

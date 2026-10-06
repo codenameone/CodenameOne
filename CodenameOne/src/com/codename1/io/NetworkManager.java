@@ -478,11 +478,15 @@ public final class NetworkManager {
     private final Object authorizerLock = new Object();
 
     private static final class AuthorizerEntry {
-        final String baseUrl;
+        /// The base URL's origin, as [#originOf(String)] writes it.
+        final String origin;
+        /// The base URL's path, without a trailing slash; empty for the whole origin.
+        final String path;
         final RequestAuthorizer authorizer;
 
-        AuthorizerEntry(String baseUrl, RequestAuthorizer authorizer) {
-            this.baseUrl = baseUrl;
+        AuthorizerEntry(String origin, String path, RequestAuthorizer authorizer) {
+            this.origin = origin;
+            this.path = path;
             this.authorizer = authorizer;
         }
     }
@@ -495,13 +499,22 @@ public final class NetworkManager {
     /// NetworkManager.getInstance().setAuthorizer("https://api.example.com/v1", authorizer);
     /// ```
     ///
-    /// A request is covered when its URL has the same scheme, host and port as `baseUrl` and a
-    /// path that is `baseUrl`'s path or below it. The comparison stops at whole segments, so
-    /// `https://api.example.com` covers `https://api.example.com/pets` and covers neither
-    /// `https://api.example.com.evil.test/` nor `https://api.example.com@evil.test/`, and
-    /// `/v1` does not cover `/v10`. The port is compared as written: `https://host` and
-    /// `https://host:443` are different base URLs. When several registrations cover a request
-    /// the longest one is used.
+    /// A request is covered when its URL has the same origin as `baseUrl` and a path that is
+    /// `baseUrl`'s path or below it.
+    ///
+    /// The origin is the scheme, the host and the port. Scheme and host compare without
+    /// regard to case, and a port left out is the scheme's own, so `https://host`,
+    /// `HTTPS://Host` and `https://host:443` are one base URL, and so are `http://host` and
+    /// `http://host:80`. Anything else is another origin and never gets the header:
+    /// `https://api.example.com` covers neither `https://api.example.com.evil.test/` nor
+    /// `https://api.example.com@evil.test/`, nor the same host over `http` or on port 8443.
+    ///
+    /// The path compares exactly and stops at whole segments: `/api` covers `/api`,
+    /// `/api/pets` and `/api?x=1`, and does not cover `/apiary` or `/API`. When several
+    /// registrations cover a request the one with the longest path is used.
+    ///
+    /// A request redirected to another origin is matched again against its new address, so
+    /// the header is not sent there.
     ///
     /// A request with an authorizer of its own, or with an `Authorization` header already on
     /// it, is left alone.
@@ -515,19 +528,31 @@ public final class NetworkManager {
         if (baseUrl == null || baseUrl.indexOf("://") < 0) {
             throw new IllegalArgumentException("baseUrl must be an absolute URL");
         }
-        String base = baseUrl;
-        while (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
+        String origin = originOf(baseUrl);
+        String path = pathOf(baseUrl);
+        int end = path.length();
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == '?' || c == '#') {
+                end = i;
+                break;
+            }
         }
+        while (end > 0 && path.charAt(end - 1) == '/') {
+            end--;
+        }
+        path = path.substring(0, end);
         synchronized (authorizerLock) {
             ArrayList<AuthorizerEntry> next = new ArrayList<AuthorizerEntry>();
             for (AuthorizerEntry e : authorizers) {
-                if (!e.baseUrl.equals(base)) {
+                // The same base URL however it was spelled: https://host:443/ replaces, and
+                // removes, what https://HOST registered.
+                if (!(e.origin.equals(origin) && e.path.equals(path))) {
                     next.add(e);
                 }
             }
             if (authorizer != null) {
-                next.add(new AuthorizerEntry(base, authorizer));
+                next.add(new AuthorizerEntry(origin, path, authorizer));
             }
             authorizers = next.toArray(new AuthorizerEntry[next.size()]);
         }
@@ -550,36 +575,142 @@ public final class NetworkManager {
         if (url == null || current.length == 0) {
             return null;
         }
+        String origin = null;
+        String path = null;
         AuthorizerEntry best = null;
         for (AuthorizerEntry e : current) {
-            if ((best == null || e.baseUrl.length() > best.baseUrl.length())
-                    && covers(e.baseUrl, url)) {
+            if (best != null && e.path.length() <= best.path.length()) {
+                continue;
+            }
+            if (origin == null) {
+                origin = originOf(url);
+                path = pathOf(url);
+            }
+            if (e.origin.equals(origin) && pathCovers(e.path, path)) {
                 best = e;
             }
         }
         return best == null ? null : best.authorizer;
     }
 
-    /// Whether `url` is `base` or below it. The scheme and authority compare without regard
-    /// to ASCII case, as hosts do; the path compares exactly.
+    /// Whether `url` is `base` or below it: the same origin, and a path at or under the
+    /// base's on a segment boundary. See [#setAuthorizer(String, RequestAuthorizer)].
     static boolean covers(String base, String url) {
-        if (url.length() < base.length()) {
+        if (base == null || url == null || !originOf(base).equals(originOf(url))) {
             return false;
         }
-        int authorityEnd = base.indexOf('/', base.indexOf("://") + 3);
-        if (authorityEnd < 0) {
-            authorityEnd = base.length();
+        String path = pathOf(base);
+        while (path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
         }
-        if (!url.regionMatches(true, 0, base, 0, authorityEnd)
-                || !url.regionMatches(false, authorityEnd, base, authorityEnd,
-                        base.length() - authorityEnd)) {
+        return pathCovers(path, pathOf(url));
+    }
+
+    /// Whether `rest` -- what follows the authority of a URL -- is the path `base` or below
+    /// it. `base` has no trailing slash. The comparison is exact, and `base` must end where
+    /// a segment of `rest` ends: `/api` is not a prefix of `/apiary`.
+    private static boolean pathCovers(String base, String rest) {
+        if (!rest.startsWith(base)) {
             return false;
         }
-        if (url.length() == base.length()) {
+        if (rest.length() == base.length()) {
             return true;
         }
-        char next = url.charAt(base.length());
+        char next = rest.charAt(base.length());
         return next == '/' || next == '?' || next == '#';
+    }
+
+    /// Where the authority of `url` ends: the first `/`, `?` or `#` after `://`, or the end.
+    private static int authorityEnd(String url, int from) {
+        for (int i = from; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                return i;
+            }
+        }
+        return url.length();
+    }
+
+    /// What follows the authority of `url`: its path, query and fragment. Empty when it has
+    /// none, and when `url` is not absolute.
+    static String pathOf(String url) {
+        int scheme = url == null ? -1 : url.indexOf("://");
+        if (scheme < 0) {
+            return "";
+        }
+        return url.substring(authorityEnd(url, scheme + 3));
+    }
+
+    /// The origin of a URL in one spelling, so that two URLs of one origin compare equal as
+    /// text: the scheme and the host in lower case, and the port always written --
+    /// `https://Api.Example.com` and `https://api.example.com:443` are both
+    /// `https://api.example.com:443`. The port left out of an `http` or `ws` URL is 80, of an
+    /// `https` or `wss` one 443, and of any other scheme stays empty.
+    ///
+    /// User information is kept, as it was written, so that `https://host@evil.test` is not
+    /// the origin `https://evil.test` either: a URL that carries credentials is nobody's
+    /// base URL but its own. A URL with no `://` is returned as it is.
+    ///
+    /// Only `A` to `Z` are folded, by hand: a scheme and a host name are ASCII, and
+    /// `toLowerCase()` follows the device's locale.
+    static String originOf(String url) {
+        if (url == null) {
+            return "";
+        }
+        int scheme = url.indexOf("://");
+        if (scheme < 0) {
+            return url;
+        }
+        int end = authorityEnd(url, scheme + 3);
+        int at = url.lastIndexOf('@', end - 1);
+        int host = at >= scheme + 3 ? at + 1 : scheme + 3;
+        // The port follows the last colon outside an IPv6 literal's brackets.
+        int bracket = url.lastIndexOf(']', end - 1);
+        int colon = -1;
+        for (int i = end - 1; i >= host && i > bracket; i--) {
+            if (url.charAt(i) == ':') {
+                colon = i;
+                break;
+            }
+        }
+        int hostEnd = colon < 0 ? end : colon;
+        String port = colon < 0 ? "" : url.substring(colon + 1, end);
+        StringBuilder b = new StringBuilder(end + 6);
+        appendAsciiLower(b, url, 0, scheme);
+        String schemeName = b.toString();
+        if (port.length() == 0) {
+            if ("https".equals(schemeName) || "wss".equals(schemeName)) {
+                port = "443";
+            } else if ("http".equals(schemeName) || "ws".equals(schemeName)) {
+                port = "80";
+            }
+        } else {
+            // 0443 is 443: leading zeros are the same port.
+            int digits = 0;
+            while (digits < port.length() - 1 && port.charAt(digits) == '0') {
+                digits++;
+            }
+            port = port.substring(digits);
+        }
+        b.append("://");
+        b.append(url.substring(scheme + 3, host));
+        appendAsciiLower(b, url, host, hostEnd);
+        // A trailing dot names the same host.
+        if (b.length() > 0 && b.charAt(b.length() - 1) == '.' && hostEnd - host > 1) {
+            b.setLength(b.length() - 1);
+        }
+        b.append(':').append(port);
+        return b.toString();
+    }
+
+    private static void appendAsciiLower(StringBuilder b, String text, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char c = text.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                c = (char) (c + ('a' - 'A'));
+            }
+            b.append(c);
+        }
     }
 
     /// Tells whoever waits for a request that it will not be sent again: it was killed while

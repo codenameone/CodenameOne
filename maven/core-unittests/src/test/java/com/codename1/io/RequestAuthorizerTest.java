@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -194,6 +195,148 @@ public class RequestAuthorizerTest extends UITestBase {
         assertNull(nm.getAuthorizer("http://api.example.com/v1"));
         assertNull(nm.getAuthorizer("https://api.example.com:8443/v1"));
         assertNull(nm.getAuthorizer(null));
+    }
+
+    @Test
+    void aPortLeftOutIsTheSchemesOwn() {
+        NetworkManager nm = NetworkManager.getInstance();
+        nm.setAuthorizer(API, authorizer);
+        try {
+            assertSame(authorizer, nm.getAuthorizer("https://api.example.com:443/pets"));
+            assertSame(authorizer, nm.getAuthorizer("HTTPS://Api.Example.COM:0443/pets"));
+            assertSame(authorizer, nm.getAuthorizer("https://api.example.com./pets"));
+            assertSame(authorizer, nm.getAuthorizer("https://api.example.com:443"));
+            assertSame(authorizer, nm.getAuthorizer("https://api.example.com?x=1"));
+            // Another port, another scheme, and the other scheme's default port.
+            assertNull(nm.getAuthorizer("https://api.example.com:8443/pets"));
+            assertNull(nm.getAuthorizer("https://api.example.com:80/pets"));
+            assertNull(nm.getAuthorizer("http://api.example.com/pets"));
+            assertNull(nm.getAuthorizer("http://api.example.com:443/pets"));
+            // What only looks like the host.
+            assertNull(nm.getAuthorizer("https://api.example.com:443@evil.test/pets"));
+            assertNull(nm.getAuthorizer("https://api.example.com.evil.test:443/pets"));
+            assertNull(nm.getAuthorizer("https://evil.test/https://api.example.com/pets"));
+            assertNull(nm.getAuthorizer("https://evil.test?https://api.example.com:443/"));
+
+            // Registered with the port written, found without it -- and the
+            // same registration, so naming it either way replaces or removes it.
+            FakeAuthorizer other = new FakeAuthorizer();
+            nm.setAuthorizer("https://API.example.com:443/", other);
+            assertSame(other, nm.getAuthorizer(API + "/pets"));
+            nm.setAuthorizer("https://api.example.com:443", null);
+            assertNull(nm.getAuthorizer(API + "/pets"));
+
+            nm.setAuthorizer("http://plain.example.com:80/api", authorizer);
+            assertSame(authorizer, nm.getAuthorizer("http://plain.example.com/api/x"));
+            assertSame(authorizer, nm.getAuthorizer("http://PLAIN.example.com:80/api"));
+            assertNull(nm.getAuthorizer("https://plain.example.com/api/x"));
+            assertNull(nm.getAuthorizer("http://plain.example.com:8080/api/x"));
+        } finally {
+            nm.setAuthorizer("http://plain.example.com/api", null);
+        }
+        assertNull(nm.getAuthorizer("http://plain.example.com/api/x"));
+    }
+
+    @Test
+    void aPathPrefixEndsWhereASegmentEnds() {
+        NetworkManager nm = NetworkManager.getInstance();
+        nm.setAuthorizer(API + "/api", authorizer);
+        try {
+            assertSame(authorizer, nm.getAuthorizer(API + "/api"));
+            assertSame(authorizer, nm.getAuthorizer(API + "/api/"));
+            assertSame(authorizer, nm.getAuthorizer(API + "/api/pets/7"));
+            assertSame(authorizer, nm.getAuthorizer(API + "/api?x=1"));
+            assertSame(authorizer, nm.getAuthorizer(API + "/api#top"));
+            assertSame(authorizer, nm.getAuthorizer("https://api.example.com:443/api/pets"));
+            assertNull(nm.getAuthorizer(API + "/apiary"));
+            assertNull(nm.getAuthorizer(API + "/api-v2/pets"));
+            assertNull(nm.getAuthorizer(API + "/api.json"));
+            assertNull(nm.getAuthorizer(API + "/API/pets"));
+            assertNull(nm.getAuthorizer(API + "/x/api/pets"));
+            assertNull(nm.getAuthorizer(API + "?/api/pets"));
+            assertNull(nm.getAuthorizer(API));
+        } finally {
+            nm.setAuthorizer(API + "/api/", null);
+        }
+        assertNull(nm.getAuthorizer(API + "/api/pets"));
+    }
+
+    @Test
+    void anOriginIsWrittenOneWay() {
+        assertEquals("https://api.example.com:443", NetworkManager.originOf("HTTPS://API.Example.com/a/B"));
+        assertEquals("https://api.example.com:443", NetworkManager.originOf("https://api.example.com:443"));
+        assertEquals("http://h:80", NetworkManager.originOf("http://H?x"));
+        assertEquals("wss://h:443", NetworkManager.originOf("WSS://h#f"));
+        assertEquals("http://h:8080", NetworkManager.originOf("http://h:8080/"));
+        assertEquals("https://[::1]:443", NetworkManager.originOf("https://[::1]/x"));
+        assertEquals("https://[::1]:8443", NetworkManager.originOf("https://[::1]:8443/x"));
+        assertEquals("custom://host:", NetworkManager.originOf("custom://Host/x"));
+        assertEquals("https://user:pw@evil.test:443",
+                NetworkManager.originOf("https://user:pw@Evil.test/x"));
+        assertEquals("/relative", NetworkManager.originOf("/relative"));
+        assertEquals("", NetworkManager.originOf(null));
+        assertEquals("/a/B?c#d", NetworkManager.pathOf("https://h:1/a/B?c#d"));
+        assertEquals("", NetworkManager.pathOf("https://h"));
+    }
+
+    @Test
+    void aRedirectToAnotherOriginGoesWithoutTheToken() {
+        accepted = "Bearer T1";
+        final List<String> hops = Collections.synchronizedList(new ArrayList<String>());
+        TestCodenameOneImplementation.getInstance().setNetworkMockHandler(
+                new TestCodenameOneImplementation.NetworkMockHandler() {
+                    public void handle(TestCodenameOneImplementation.TestConnection c) {
+                        String sent = c.getHeaders().get("Authorization");
+                        c.clearRequest();
+                        hops.add(c.getUrl() + " " + sent);
+                        if (c.getUrl().equals(API + "/away")) {
+                            c.setHeader("location", ELSEWHERE + "/landing");
+                            c.respond(302, "Found", utf8(""));
+                        } else if (c.getUrl().equals(API + "/same")) {
+                            // The same origin, spelled with its port.
+                            c.setHeader("location", "https://API.example.com:443/pets");
+                            c.respond(302, "Found", utf8(""));
+                        } else if (c.getUrl().equals(API + "/downgrade")) {
+                            c.setHeader("location", "http://api.example.com/pets");
+                            c.respond(302, "Found", utf8(""));
+                        } else {
+                            c.respond(200, "OK", utf8("arrived"));
+                        }
+                    }
+                });
+        NetworkManager.getInstance().setAuthorizer(API, authorizer);
+
+        Probe away = send(new Probe(API + "/away"));
+        assertEquals(Arrays.asList(API + "/away Bearer T1", ELSEWHERE + "/landing null"), hops,
+                "the token followed a redirect to another host");
+        assertEquals(Collections.singletonList(Integer.valueOf(200)), away.delivered);
+
+        hops.clear();
+        send(new Probe(API + "/same"));
+        assertEquals(Arrays.asList(API + "/same Bearer T1",
+                "https://API.example.com:443/pets Bearer T1"), hops);
+
+        hops.clear();
+        send(new Probe(API + "/downgrade"));
+        assertEquals(Arrays.asList(API + "/downgrade Bearer T1",
+                "http://api.example.com/pets null"), hops, "the token left over plain http");
+
+        // An authorizer set on the request itself is held to the first origin too.
+        NetworkManager.getInstance().setAuthorizer(API, null);
+        for (String path : new String[] {"/away", "/downgrade"}) {
+            hops.clear();
+            Probe own = new Probe(API + path);
+            own.setAuthorizer(authorizer);
+            send(own);
+            assertEquals(2, hops.size(), hops.toString());
+            assertEquals(API + path + " Bearer T1", hops.get(0));
+            assertTrue(hops.get(1).endsWith(" null"), hops.get(1));
+        }
+        hops.clear();
+        Probe own = new Probe(API + "/same");
+        own.setAuthorizer(authorizer);
+        send(own);
+        assertEquals("https://API.example.com:443/pets Bearer T1", hops.get(1));
     }
 
     @Test
