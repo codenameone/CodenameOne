@@ -117,7 +117,7 @@
   "all": {
    "memory": 0.539,
    "runs": 1,
-   "time": 0.495,
+   "time": 0.641,
    "tolerance": {
     "time": 0.2
    }
