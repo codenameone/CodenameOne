@@ -91,6 +91,10 @@ public final class HttpSecurity {
 
     private final Config config;
     private final Object[] beans;
+    /// The name of each bean and whether it is `@Primary`, by position; null for a
+    /// chain built without the generated wiring, which knows neither.
+    private final String[] beanNames;
+    private final boolean[] beanPrimary;
     private final Map<Class<?>, Object> sharedObjects = new HashMap<Class<?>, Object>();
     private final Map<Class<?>, SecurityConfigurer> configurers =
             new LinkedHashMap<Class<?>, SecurityConfigurer>();
@@ -145,8 +149,14 @@ public final class HttpSecurity {
     }
 
     HttpSecurity(Config config, Object[] beans) {
+        this(config, beans, null, null);
+    }
+
+    HttpSecurity(Config config, Object[] beans, String[] names, boolean[] primary) {
         this.config = config;
         this.beans = beans == null ? new Object[0] : beans.clone();
+        this.beanNames = names == null ? null : names.clone();
+        this.beanPrimary = primary == null ? null : primary.clone();
         // The order the filters of a chain run in. The gaps are where the
         // filters of the sign-in mechanisms that are not here yet belong:
         // between CSRF and the form login for a redirect to another identity
@@ -610,6 +620,68 @@ public final class HttpSecurity {
             }
         }
         return (C) found;
+    }
+
+    /// The bean a part of the chain counts on when the application was given no other
+    /// choice, chosen the way an injection point chooses: the one set with
+    /// [#setSharedObject]; or the one bean that is an instance of `sharedType`; or, of
+    /// several, the one marked `@Primary`.
+    ///
+    /// Unlike [#getSharedObject] this never answers null because there were too many.
+    /// Several beans and no single `@Primary` among them is refused, naming the
+    /// candidates and the two ways out, because the alternative is a part of the chain
+    /// quietly doing without any of them.
+    /// @param sharedType the type looked for
+    /// @param what the part that needs it, for the message: "The second factor's
+    ///     attempt limit"
+    /// @param pass how to give that part one directly, for the message:
+    ///     "mfa().attemptLimiter(...)"
+    /// @return the bean, or null when the application has none of that type
+    /// @throws IllegalStateException when several beans qualify and none is the choice
+    @SuppressWarnings("unchecked")
+    <C> C uniqueSharedObject(Class<C> sharedType, String what, String pass) {
+        Object set = sharedObjects.get(sharedType);
+        if (set != null) {
+            return (C) set;
+        }
+        Object only = null;
+        Object preferred = null;
+        int found = 0;
+        int primaries = 0;
+        StringBuilder candidates = new StringBuilder();
+        for (int i = 0; i < beans.length; i++) {
+            Object bean = beans[i];
+            if (bean == null || !sharedType.isInstance(bean)) {
+                continue;
+            }
+            found++;
+            only = bean;
+            boolean primary = beanPrimary != null && i < beanPrimary.length && beanPrimary[i];
+            if (primary) {
+                primaries++;
+                preferred = bean;
+            }
+            candidates.append(found == 1 ? "" : ", ");
+            if (beanNames != null && i < beanNames.length && beanNames[i] != null) {
+                candidates.append('"').append(beanNames[i]).append("\" (")
+                        .append(bean.getClass().getName()).append(')');
+            } else {
+                candidates.append(bean.getClass().getName());
+            }
+            candidates.append(primary ? ", @Primary" : "");
+        }
+        if (found <= 1) {
+            return (C) only;
+        }
+        if (primaries == 1) {
+            return (C) preferred;
+        }
+        String type = sharedType.getName();
+        type = type.substring(type.lastIndexOf('.') + 1);
+        throw new IllegalStateException(what + " has " + found + " " + type
+                + " beans to choose from and nothing says which: " + candidates + ". "
+                + (primaries > 1 ? "Keep @Primary on one of them" : "Mark one of them @Primary")
+                + ", or pass the one to use to " + pass + ".");
     }
 
     /// Shares `object` with the parts of this chain under `sharedType`.

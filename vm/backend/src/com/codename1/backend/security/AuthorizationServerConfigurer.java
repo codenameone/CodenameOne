@@ -247,6 +247,10 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
     /// [RateLimiter#derive]. A limiter given here, or a bean that derives
     /// none, counts by its own limit, and setting the two keys as well is
     /// then refused when the chain is built, since they would decide nothing.
+    ///
+    /// Of several [RateLimiter] beans the one marked `@Primary` is used. With
+    /// none marked, or more than one, the chain is refused when it is built
+    /// and the message names the beans; mark one, or pass the one meant here.
     public AuthorizationServerConfigurer deviceVerificationRateLimiter(RateLimiter rateLimiter) {
         this.verificationLimiter = rateLimiter;
         return this;
@@ -386,7 +390,9 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
             }
             String counted = "the limiter given to deviceVerificationRateLimiter(...)";
             if (verificationLimiter == null) {
-                RateLimiter bean = http.getSharedObject(RateLimiter.class);
+                RateLimiter bean = http.uniqueSharedObject(RateLimiter.class,
+                        "The device verification page's limit on codes tried",
+                        "authorizationServer().deviceVerificationRateLimiter(...)");
                 RateLimiter derived = bean == null ? null : bean.derive("device-verification",
                         verificationAttempts, verificationWindow);
                 if (derived != null) {

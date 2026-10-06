@@ -64,6 +64,13 @@ import com.codename1.backend.security.ratelimit.RateLimiter;
 /// derives none, counts by its own limit, and setting the two keys as well is
 /// then refused when the chain is built, since they would decide nothing.
 ///
+/// With several [RateLimiter] beans the one marked `@Primary` is the one, as it
+/// would be for an injection. With none marked, or more than one, the chain is
+/// refused when it is built, with a message that names the beans: counting in
+/// this process instead would look exactly like the shared count the
+/// application asked for, and not be it. Mark one `@Primary`, or inject the
+/// one meant -- `@Qualifier` names it -- and give it to [#attemptLimiter].
+///
 /// What holds a sign-in back is the chain's [SecondFactorPolicy], which every
 /// sign-in that ends in a session consults; see [SessionSignIn].
 ///
@@ -169,7 +176,9 @@ public final class MfaConfigurer extends SecurityConfigurer {
 
     /// What counts attempts for this chain: the limiter given; or one the
     /// application's [RateLimiter] bean derives, sized by the configuration;
-    /// or that bean itself when it derives none; or a count in this process.
+    /// or that bean itself when it derives none; or a count in this process
+    /// when the application has no such bean. Several beans and no one
+    /// `@Primary` among them is refused, never counted around.
     private RateLimiter attempts(HttpSecurity http) {
         try {
             com.codename1.backend.Config config = http.getConfig();
@@ -184,7 +193,8 @@ public final class MfaConfigurer extends SecurityConfigurer {
             RateLimiter limiter = attempts;
             String counted = "the limiter given to attemptLimiter(...)";
             if (!attemptsGiven) {
-                RateLimiter bean = http.getSharedObject(RateLimiter.class);
+                RateLimiter bean = http.uniqueSharedObject(RateLimiter.class,
+                        "The second factor's attempt limit", "mfa().attemptLimiter(...)");
                 if (bean == null) {
                     return new InMemoryRateLimiter(permits, window);
                 }

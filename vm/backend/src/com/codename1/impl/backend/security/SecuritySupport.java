@@ -55,6 +55,13 @@ public final class SecuritySupport {
         return SecurityAccess.get().httpSecurity(config, beans);
     }
 
+    /// [#http(Config, Object[])], with each bean's name and whether it is `@Primary`;
+    /// what the generated wiring calls.
+    public static HttpSecurity http(Config config, Object[] beans, String[] names,
+            boolean[] primary) {
+        return SecurityAccess.get().httpSecurity(config, beans, names, primary);
+    }
+
     /// A controller's `Authentication` parameter: who signed in, or null.
     public static Authentication authentication() {
         return SecurityAccess.get().authentication();

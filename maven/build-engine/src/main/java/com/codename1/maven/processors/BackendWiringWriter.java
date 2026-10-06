@@ -570,6 +570,19 @@ final class BackendWiringWriter {
                     }
                     sb.append(reference(p.candidates.get(i)));
                 }
+                // And what the layer cannot read off an object: each bean's name and
+                // whether it is @Primary, by position. A chain that looks for one bean
+                // of a type and finds two chooses the way an injection point would,
+                // and names them when it cannot.
+                sb.append("}, new String[] {");
+                for (int i = 0; i < p.candidates.size(); i++) {
+                    sb.append(i > 0 ? ", " : "")
+                      .append(BackendSources.quote(p.candidates.get(i).name));
+                }
+                sb.append("}, new boolean[] {");
+                for (int i = 0; i < p.candidates.size(); i++) {
+                    sb.append(i > 0 ? ", " : "").append(p.candidates.get(i).primary);
+                }
                 return sb.append("})").toString();
             }
             return p.builtin;

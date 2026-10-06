@@ -80,6 +80,17 @@ public abstract class SecurityAccess {
     /// providers; a null element is a conditional bean that is off
     public abstract HttpSecurity httpSecurity(Config config, Object[] beans);
 
+    /// [#httpSecurity(Config, Object[])], with what the build knows about each bean and
+    /// the layer cannot read off the object: its name, and whether it is `@Primary`.
+    /// That is what lets a chain choose between two beans of one type the way an
+    /// injection point would, and name them when it cannot.
+    /// @param config the server's configuration
+    /// @param beans the beans; a null element is a conditional bean that is off
+    /// @param names the name of each bean, by position
+    /// @param primary whether each bean is `@Primary`, by position
+    public abstract HttpSecurity httpSecurity(Config config, Object[] beans, String[] names,
+            boolean[] primary);
+
     /// The layer for a server's chains, in the order they are asked.
     public abstract RequestSecurity runtime(Config config, List chains, boolean tls);
 

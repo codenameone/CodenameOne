@@ -39,6 +39,14 @@ final class Access extends SecurityAccess {
     }
 
     @Override
+    public HttpSecurity httpSecurity(Config config, Object[] beans, String[] names,
+            boolean[] primary) {
+        com.codename1.impl.backend.security.SecuritySupport.developmentProfile(
+                config != null && config.isDevelopmentProfile());
+        return new HttpSecurity(config, beans, names, primary);
+    }
+
+    @Override
     public RequestSecurity runtime(Config config, List chains, boolean tls) {
         return new FilterChainEngine(config, chains, tls);
     }

@@ -506,10 +506,17 @@ class MfaTest {
 
     private SecuredServer startLimited(java.util.Properties settings, Object limiterBean,
             Customizer<MfaConfigurer> more) throws Exception {
+        return startLimited(settings, limiterBean, more, null);
+    }
+
+    private SecuredServer startLimited(java.util.Properties settings, Object limiterBean,
+            Customizer<MfaConfigurer> more, Object secondLimiterBean) throws Exception {
         InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
                 User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
         assertTrue(totp.isEnabled("ada") || enrol("ada"));
         Object[] beans = limiterBean == null ? new Object[] {users, totp}
+                : secondLimiterBean != null
+                ? new Object[] {users, totp, limiterBean, secondLimiterBean}
                 : new Object[] {users, totp, limiterBean};
         return SecuredServer.start(settings, "dev", beans, APP,
                 http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
@@ -618,6 +625,85 @@ class MfaTest {
         assertEquals("cn1.security.mfa.attempts and cn1.security.mfa.attemptsWindowSeconds must "
                 + "each be at least 1", assertThrows(IllegalStateException.class,
                         () -> startLimited(zero, null, mfa -> { })).getMessage());
+    }
+
+    /// A server whose chain is built over `beans` as the generated wiring hands
+    /// them over: each with its name and whether it is `@Primary`.
+    private SecuredServer startWired(final Object[] beans, final String[] names,
+            final boolean[] primary, final Customizer<MfaConfigurer> more) throws Exception {
+        assertTrue(totp.isEnabled("ada") || enrol("ada"));
+        return SecuredServer.start(SecuredServer.settings(), "dev", new Object[0], APP,
+                unused -> com.codename1.impl.backend.security.SecuritySupport.http(
+                        unused.getConfig(), beans, names, primary)
+                        .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable())
+                        .formLogin(Customizer.withDefaults())
+                        .mfa(mfa -> {
+                            mfa.clock(clock);
+                            more.customize(mfa);
+                        }).build());
+    }
+
+    @Test
+    @DisplayName("two RateLimiter beans: the @Primary one counts, and without one the chain is refused, never ignored")
+    void twoLimiterBeansAreChosenBetweenOrRefused() throws Exception {
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
+                User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
+        Counting api = new Counting(7);
+        Counting logins = new Counting(2);
+        Object[] beans = {users, totp, api, logins};
+        String[] names = {"users", "totp", "apiLimiter", "loginLimiter"};
+
+        // Nothing says which: refused when the chain is built, naming both and both
+        // ways out. Counting in the process instead would look exactly like working.
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> startWired(beans, names, new boolean[4], mfa -> { }));
+        assertEquals("The second factor's attempt limit has 2 RateLimiter beans to choose from "
+                + "and nothing says which: \"apiLimiter\" (" + Counting.class.getName()
+                + "), \"loginLimiter\" (" + Counting.class.getName() + "). Mark one of them "
+                + "@Primary, or pass the one to use to mfa().attemptLimiter(...).",
+                refused.getMessage());
+        assertTrue(api.keys.isEmpty() && logins.keys.isEmpty());
+
+        // Both @Primary says as little.
+        IllegalStateException both = assertThrows(IllegalStateException.class,
+                () -> startWired(beans, names, new boolean[] {false, false, true, true},
+                        mfa -> { }));
+        assertTrue(both.getMessage().contains("\"apiLimiter\" (" + Counting.class.getName()
+                + "), @Primary, \"loginLimiter\" (" + Counting.class.getName() + "), @Primary. "
+                + "Keep @Primary on one of them, or pass the one to use to "
+                + "mfa().attemptLimiter(...)."), both.getMessage());
+
+        // Without the wiring's names -- a chain assembled by hand -- the classes are named.
+        IllegalStateException unnamed = assertThrows(IllegalStateException.class,
+                () -> startLimited(SecuredServer.settings(), api, mfa -> { },
+                        logins));
+        assertTrue(unnamed.getMessage().contains("nothing says which: " + Counting.class.getName()
+                + ", " + Counting.class.getName() + ". Mark one of them @Primary"),
+                unnamed.getMessage());
+
+        // One @Primary: that bean counts, as it would be the one injected.
+        try (SecuredServer server = startWired(beans, names,
+                new boolean[] {false, false, false, true}, mfa -> { })) {
+            assertEquals(2, guessesAllowed(server));
+            assertEquals("mfa:ada", logins.keys.get(0));
+            assertTrue(api.keys.isEmpty(), "the bean that is not @Primary counted: " + api.keys);
+        }
+
+        // A @Primary that is switched off -- a conditional bean, null in the wiring --
+        // leaves the other as the only one.
+        logins.keys.clear();
+        try (SecuredServer server = startWired(new Object[] {users, totp, null, logins}, names,
+                new boolean[] {false, false, true, false}, mfa -> { })) {
+            assertEquals(2, guessesAllowed(server));
+        }
+
+        // And a limiter passed to the configurer settles it whatever the beans are.
+        Counting passed = new Counting(4);
+        try (SecuredServer server = startWired(beans, names, new boolean[4],
+                mfa -> mfa.attemptLimiter(passed))) {
+            assertEquals(4, guessesAllowed(server));
+        }
     }
 
     @Test

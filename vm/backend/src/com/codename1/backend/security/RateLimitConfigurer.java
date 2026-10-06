@@ -50,7 +50,8 @@ public final class RateLimitConfigurer extends SecurityConfigurer {
         for (Object[] rule : rules) {
             Object limiter = rule[2];
             if (limiter == null) {
-                limiter = http.getSharedObject(RateLimiter.class);
+                limiter = http.uniqueSharedObject(RateLimiter.class,
+                        "A rateLimit() rule that names no limiter", "rateLimit(...)");
             }
             if (limiter == null) {
                 throw new IllegalStateException("rateLimit() was given no RateLimiter, and this "

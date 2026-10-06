@@ -675,6 +675,16 @@ A bean of your own `RateLimiter` class that doesn't implement `derive` does
 the same. Setting the keys as well is then refused when the server starts,
 because they'd decide nothing.
 
+An application with several `RateLimiter` beans has to say which one these two
+use. The bean marked `@Primary` is used, as it would be for an injection. With
+no bean marked, or more than one, the server doesn't start, and the error names
+the beans. It never falls back to counting in the process, because that would
+look the same as the shared count you asked for. There are two ways to choose:
+mark one bean `@Primary`, or inject the one you mean into the chain's method,
+with `@Qualifier` and its name, and pass it to `attemptLimiter` or
+`deviceVerificationRateLimiter`. A `rateLimit` rule that names no limiter
+follows the same rule.
+
 Attempts at a second factor are counted for the user, not for the session.
 Signing in again with the password doesn't buy more guesses.
 

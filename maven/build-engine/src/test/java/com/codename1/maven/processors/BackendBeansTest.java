@@ -2576,7 +2576,8 @@ public class BackendBeansTest {
         // Each chain method gets its own HttpSecurity, handed the beans it picks
         // its user store and encoder from.
         assertEquals(wiring, 2, wiring.split("SecuritySupport\\.http\\(config, new Object\\[\\] \\{"
-                + "b_encoder, b_users\\}\\)", -1).length - 1);
+                + "b_encoder, b_users\\}, new String\\[\\] \\{\"encoder\", \"users\"\\}, "
+                + "new boolean\\[\\] \\{false, false\\}\\)", -1).length - 1);
         assertTrue(wiring, wiring.contains("environment.registerSecurityFilterChain(b_pagesChain, 2);"));
         assertTrue(wiring, wiring.contains("environment.registerSecurityFilterChain(b_apiChain, 1);"));
 
@@ -2685,7 +2686,9 @@ public class BackendBeansTest {
         // The decoder, the key repository and the limiter are handed to the
         // HttpSecurity, which picks each by its type.
         assertTrue(wiring, wiring.contains(
-                "SecuritySupport.http(config, new Object[] {b_decoder, b_keys, b_limiter})"));
+                "SecuritySupport.http(config, new Object[] {b_decoder, b_keys, b_limiter}, "
+                + "new String[] {\"decoder\", \"keys\", \"limiter\"}, "
+                + "new boolean[] {false, false, false})"));
 
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
@@ -2721,6 +2724,49 @@ public class BackendBeansTest {
             assertEquals("ok", bearer(port, "/limited", token));
             assertEquals("429 null 3600", bearer(port, "/limited", token));
             assertEquals("ok", bearer(port, "/limited", apiKey));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void theChainIsToldWhichOfTwoLimiterBeansIsPrimary() throws Exception {
+        // Two RateLimiter beans and a rule that names none: the chain picks the
+        // @Primary one, which it can only do because the wiring says which that is.
+        Map<String, String> sources = tokenSecured();
+        String config = sources.get("com.example.TokenConfig");
+        String one = "    @Bean public RateLimiter limiter() { return new InMemoryRateLimiter(1, 3600); }\n";
+        assertTrue(config.contains(one));
+        sources.put("com.example.TokenConfig", config.replace(one, one
+                + "    @Bean @com.codename1.backend.annotations.Primary public RateLimiter wide() {\n"
+                + "        return new InMemoryRateLimiter(3, 3600);\n    }\n"));
+        File classes = compile(sources);
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(classes, proc));
+        String wiring = proc.generateWiring("com.example");
+        assertTrue(wiring, wiring.contains("new String[] {\"decoder\", \"keys\", \"limiter\", "
+                + "\"wide\"}, new boolean[] {false, false, false, true})"));
+
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        BackendApplication app = (BackendApplication) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        Object generated = loader.loadClass("com.example.TokenConfig").getField("KEY").get(null);
+        String apiKey = (String) generated.getClass().getMethod("getPlaintext").invoke(generated);
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend.Builder builder = withApplication(Backend.builder(Config.of(settings, "test")).quiet(),
+                app);
+        BackendAccess.get().security(builder);
+        Backend backend = builder.start();
+        try {
+            // Three an hour is the @Primary bean's limit; the other bean allows one.
+            assertEquals("ok", bearer(port, "/limited", apiKey));
+            assertEquals("ok", bearer(port, "/limited", apiKey));
+            assertEquals("ok", bearer(port, "/limited", apiKey));
+            assertTrue(bearer(port, "/limited", apiKey).startsWith("429 "));
         } finally {
             backend.stop();
         }

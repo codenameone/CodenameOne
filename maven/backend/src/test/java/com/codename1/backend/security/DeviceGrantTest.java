@@ -516,6 +516,48 @@ class DeviceGrantTest {
         assertNotEquals("", issuer);
     }
 
+    @Test
+    @DisplayName("two RateLimiter beans and none chosen: the authorization server is refused, not left counting alone")
+    void twoLimiterBeansAreRefusedForTheVerificationPage() throws Exception {
+        Object users = new InMemoryUserDetailsManager(
+                User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
+        final Object[] beans = {users, new InMemoryRateLimiter(600, 60), new InMemoryRateLimiter(5, 60)};
+        final String[] names = {"users", "apiLimiter", "loginLimiter"};
+        int port = OAuth2Testing.freePort();
+        issuer = "http://127.0.0.1:" + port;
+        final Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(AuthorizationServerSettings.ISSUER, issuer);
+        final boolean[][] primary = {new boolean[3]};
+        final Customizer<AuthorizationServerConfigurer>[] more = new Customizer[] {as -> { }};
+        SecuredServer.Chain chain = unused -> com.codename1.impl.backend.security.SecuritySupport
+                .http(unused.getConfig(), beans, names, primary[0])
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .formLogin(Customizer.withDefaults())
+                .authorizationServer(as -> {
+                    as.registeredClientRepository(AuthorizationServerTest.clients())
+                            .authorizationService(grants)
+                            .clientSecretEncoder(OAuth2Testing.PLAIN).clock(clock);
+                    more[0].customize(as);
+                }).build();
+
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> SecuredServer.start(settings, "test", new Object[0], APP, chain));
+        assertEquals("The device verification page's limit on codes tried has 2 RateLimiter "
+                + "beans to choose from and nothing says which: \"apiLimiter\" ("
+                + InMemoryRateLimiter.class.getName() + "), \"loginLimiter\" ("
+                + InMemoryRateLimiter.class.getName() + "). Mark one of them @Primary, or pass "
+                + "the one to use to authorizationServer().deviceVerificationRateLimiter(...).",
+                refused.getMessage());
+
+        // Either way out builds the chain.
+        primary[0] = new boolean[] {false, false, true};
+        SecuredServer.start(settings, "test", new Object[0], APP, chain).close();
+        primary[0] = new boolean[3];
+        more[0] = as -> as.deviceVerificationRateLimiter(new InMemoryRateLimiter(2, 60));
+        SecuredServer.start(settings, "test", new Object[0], APP, chain).close();
+    }
+
     private SecuredServer startConfigured(String attempts, String window, Object bean,
             Customizer<AuthorizationServerConfigurer> more) throws Exception {
         int port = OAuth2Testing.freePort();
