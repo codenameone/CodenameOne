@@ -141,7 +141,15 @@ public class JavaScriptSelectionApp extends Lifecycle {
             Container horizontal = new Container(BoxLayout.x());
             horizontal.setScrollableX(true);
             horizontal.setScrollableY(false);
-            for (int i = 0; i < 10; i++) horizontal.add(new Label("Horizontal item " + i));
+            // Keep the scrollbar from overlapping the glyphs: overlapping canvas
+            // decoration correctly demotes those runs out of the native text layer.
+            horizontal.setScrollVisible(false);
+            TextArea horizontalText = new TextArea("Horizontal selectable text", 2, 30);
+            horizontalText.setName("horizontalText");
+            horizontalText.setEditable(false);
+            horizontalText.setPreferredW(Display.getInstance().getDisplayWidth() * 2);
+            horizontalText.setPreferredH(CN.convertToPixels(12));
+            horizontal.add(horizontalText);
             form.addAll(normal, custom, draggable, slider, horizontal);
         }
         form.show();

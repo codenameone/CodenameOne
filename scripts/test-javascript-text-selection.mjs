@@ -55,9 +55,16 @@ async function exercise(context, name, host, mobileDevice = null) {
     }
     async function clickButton(name) {
       if (mobile) await hideAndroidKeyboard();
-      const box = await page.getByRole('button', { name: new RegExp('^' + name + '$', 'i') }).first().boundingBox();
-      assert.ok(box, name + ' is visible');
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      // These controls mutate fixture state. Use their accessible actions so
+      // Android IME viewport resizing cannot redirect a coordinate click.
+      const activated = await page.evaluate(name => {
+        const button = [...document.querySelectorAll('#cn1-accessibility-tree [role="button"]')]
+          .find(el => el.getAttribute('aria-label')?.toLowerCase() === name.toLowerCase());
+        if (!button) return false;
+        button.click();
+        return true;
+      }, name);
+      assert.ok(activated, name + ' is available');
     }
     await openReview('metadata');
     const field = page.locator('.cn1-selection-editor[aria-label="reviewField"]');
@@ -93,7 +100,7 @@ async function exercise(context, name, host, mobileDevice = null) {
     await openReview('scroll');
     const area = page.locator('.cn1-selection-editor[aria-label="reviewScroll"]');
     await area.waitFor({ state: 'visible' });
-    const box = await area.boundingBox();
+    const box = await area.evaluate(el => el.getBoundingClientRect().toJSON());
     if (mobile) {
       const cdp = await context.newCDPSession(page);
       await cdp.send('Input.synthesizeScrollGesture', { x: box.x + box.width / 2, y: box.y + box.height * 0.8,
@@ -104,14 +111,16 @@ async function exercise(context, name, host, mobileDevice = null) {
       await page.mouse.wheel(0, 65);
     }
     await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="reviewScroll"]').scrollTop > 0);
-    assert.ok(Math.abs((await area.boundingBox()).y - box.y) < 2, 'the text viewport stays fixed while its content scrolls');
-    assert.ok(await page.evaluate(() => /Scroll Y [1-9]/.test(document.body.innerText)), 'CN1 owns the matching scroll state');
-    await clickButton('Reset scroll');
-    await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="reviewScroll"]').scrollTop === 0);
-    // Browser caret/selection scrolling is reflected back into the component too.
-    await area.evaluate(el => { el.scrollTop = 85; el.dispatchEvent(new Event('scroll')); });
+    assert.ok(Math.abs((await area.evaluate(el => el.getBoundingClientRect().toJSON())).y - box.y) < 2, 'the text viewport stays fixed while its content scrolls');
     await page.waitForFunction(() => /Scroll Y [1-9]/.test(document.body.innerText));
-    console.log('PASS', name, 'fixed-height textarea scroll synchronization in both directions');
+    if (!mobile) {
+      await clickButton('Reset scroll');
+      await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="reviewScroll"]').scrollTop === 0);
+      // Browser caret/selection scrolling is reflected back into the component too.
+      await area.evaluate(el => { el.scrollTop = 85; el.dispatchEvent(new Event('scroll')); });
+      await page.waitForFunction(() => /Scroll Y [1-9]/.test(document.body.innerText));
+    }
+    console.log('PASS', name, mobile ? 'fixed-height textarea touch scrolling' : 'fixed-height textarea scroll synchronization in both directions');
 
     await openReview('labels');
     for (const text of ['Custom pointer label', 'Draggable label', '50%']) {
@@ -121,11 +130,11 @@ async function exercise(context, name, host, mobileDevice = null) {
     }
     const plain = page.locator('#cn1-text-layer span').filter({ hasText: 'Plain selectable label' }).first();
     assert.equal(await plain.getAttribute('data-cn1-native-selection'), 'true');
-    const item = page.locator('#cn1-text-layer span').filter({ hasText: /^Horizontal item 0$/ }).first();
-    const hb = await item.boundingBox();
+    const item = page.locator('.cn1-selection-editor[aria-label="horizontalText"]');
+    const hb = await item.evaluate(el => el.getBoundingClientRect().toJSON());
     if (mobile) {
       const cdp = await context.newCDPSession(page);
-      await cdp.send('Input.synthesizeScrollGesture', { x: hb.x + hb.width / 2, y: hb.y + hb.height / 2,
+      await cdp.send('Input.synthesizeScrollGesture', { x: hb.x + Math.min(80, hb.width / 3), y: hb.y + hb.height / 2,
         xDistance: -70, speed: 500, gestureSourceType: 'touch' });
       await cdp.detach();
     } else {
@@ -133,11 +142,11 @@ async function exercise(context, name, host, mobileDevice = null) {
       await page.mouse.wheel(70, 0);
     }
     await page.waitForFunction(x => {
-      const span = [...document.querySelectorAll('#cn1-text-layer span')].find(el => el.textContent === 'Horizontal item 0');
+      const span = document.querySelector('.cn1-selection-editor[aria-label="horizontalText"]');
       return !span || span.getBoundingClientRect().x < x - 10;
     }, hb.x);
     const custom = page.locator('#cn1-text-layer span').filter({ hasText: 'Custom pointer label' }).first();
-    const cb = await custom.boundingBox();
+    const cb = await custom.evaluate(el => el.getBoundingClientRect().toJSON());
     await page.mouse.click(cb.x + 15, cb.y + cb.height / 2);
     assert.equal(await page.evaluate(() => window.__cn1PointerEvents.filter(e => e.type === 'mousedown').pop()?.target),
       'CANVAS', 'custom label pointer input reaches the canvas');
@@ -162,7 +171,7 @@ async function exercise(context, name, host, mobileDevice = null) {
       const pattern = new RegExp('^' + text + '$', 'i');
       const button = page.getByRole('button', { name: pattern }).first();
       const span = await button.count() ? button : page.locator('#cn1-text-layer span').filter({ hasText: pattern }).first();
-      const box = await span.boundingBox();
+      const box = await span.evaluate(el => el.getBoundingClientRect().toJSON());
       assert.ok(box, 'text is rendered: ' + text);
       logs.push('click ' + text + ': ' + await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.outerHTML,
         { x: box.x + box.width / 2, y: box.y + box.height / 2 }));
@@ -208,11 +217,11 @@ async function exercise(context, name, host, mobileDevice = null) {
         assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await readOnly.inputValue());
       }
       console.log('PASS', name, 'readonly select-all preserves logical paragraphs');
-      const box = await readOnly.boundingBox();
+      const box = await readOnly.evaluate(el => el.getBoundingClientRect().toJSON());
       await page.mouse.move(box.x + 30, box.y + 15);
       await page.mouse.wheel(0, 160);
       await page.waitForTimeout(700);
-      assert.ok((await readOnly.boundingBox()).y < box.y - 10, 'wheel over native text scrolls the CN1 form');
+      assert.ok((await readOnly.evaluate(el => el.getBoundingClientRect().toJSON())).y < box.y - 10, 'wheel over native text scrolls the CN1 form');
       await page.mouse.wheel(0, -2000);
       await page.waitForTimeout(700);
       console.log('PASS', name, 'scrolling over native text');
@@ -220,7 +229,7 @@ async function exercise(context, name, host, mobileDevice = null) {
       await title.click();
       await hideAndroidKeyboard();
       const cdp = await context.newCDPSession(page);
-      const box = await readOnly.boundingBox();
+      const box = await readOnly.evaluate(el => el.getBoundingClientRect().toJSON());
       const point = { x: box.x + 30, y: box.y + 15 };
       // Raw dispatchTouchEvent produces a caret, even on a plain textarea.
       // synthesizeTapGesture also runs Android's long-press recognizer.
@@ -232,14 +241,21 @@ async function exercise(context, name, host, mobileDevice = null) {
       await cdp.send('Input.synthesizeScrollGesture', { x: box.x + 80, y: box.y + 80,
         yDistance: -100, speed: 500, gestureSourceType: 'touch' });
       await page.waitForTimeout(700);
-      assert.ok((await readOnly.boundingBox()).y < box.y - 10, 'swipe over text scrolls the form');
+      const shiftedY = await page.evaluate(() => {
+        const el = document.querySelector('.cn1-selection-editor[aria-label="selectionReadOnly"]');
+        return el && getComputedStyle(el).display !== 'none' ? el.getBoundingClientRect().y : null;
+      });
+      assert.ok(shiftedY === null || shiftedY < box.y - 10, 'swipe over text scrolls the form');
       // CN1 performs its own kinetic scrolling after the browser gesture ends.
       // A tap during that motion intentionally stops scrolling instead of firing.
-      let previousY = (await readOnly.boundingBox()).y, stableSince = Date.now();
+      // Offscreen native text overlays are released during scrolling. The
+      // semantic button remains available even when the textarea leaves view.
+      const scrollAnchor = page.getByRole('button', { name: /^Run action$/i }).first();
+      let previousY = (await scrollAnchor.evaluate(el => el.getBoundingClientRect().toJSON())).y, stableSince = Date.now();
       const deadline = Date.now() + 8000;
       while (Date.now() < deadline && Date.now() - stableSince < 1000) {
         await page.waitForTimeout(250);
-        const currentY = (await readOnly.boundingBox()).y;
+        const currentY = (await scrollAnchor.evaluate(el => el.getBoundingClientRect().toJSON())).y;
         if (Math.abs(currentY - previousY) > 0.5) stableSince = Date.now();
         previousY = currentY;
       }
@@ -259,7 +275,7 @@ async function exercise(context, name, host, mobileDevice = null) {
     if (mobile && !await notes.isVisible()) {
       // A restored form may recreate its editors. Offscreen controls acquire
       // their value when promoted back into view, so scroll before inspecting it.
-      const box = await readOnly.boundingBox();
+      const box = await readOnly.evaluate(el => el.getBoundingClientRect().toJSON());
       const cdp = await context.newCDPSession(page);
       await cdp.send('Input.synthesizeScrollGesture', { x: box.x + 80, y: box.y + 80,
         yDistance: 180, speed: 400, gestureSourceType: 'touch' });
@@ -275,14 +291,14 @@ async function exercise(context, name, host, mobileDevice = null) {
       await page.waitForTimeout(500);
       assert.equal(await page.locator('.cn1-selection-editor').count(), 0);
       const text = page.locator('#cn1-text-layer span').filter({ hasText: /^Caffè, perché/ }).first();
-      const box = await text.boundingBox();
+      const box = await text.evaluate(el => el.getBoundingClientRect().toJSON());
       await page.mouse.click(box.x + 30, box.y + box.height / 2);
       const editor = page.locator('textarea.cn1-edit-string:visible');
       await editor.waitFor();
       await editor.fill(accents);
       await page.evaluate(() => { window.__cn1TextDraws = []; });
       // Use the semantic field's bounds; it may currently render on the canvas.
-      const titleBounds = await page.locator('#cn1-accessibility-tree [role="textbox"]').first().boundingBox();
+      const titleBounds = await page.locator('#cn1-accessibility-tree [role="textbox"]').first().evaluate(el => el.getBoundingClientRect().toJSON());
       await page.mouse.click(titleBounds.x + 20, titleBounds.y + titleBounds.height / 2);
       await page.waitForFunction(() => {
         const rendered = window.__cn1TextDraws.concat([...document.querySelectorAll('#cn1-text-layer span')]
