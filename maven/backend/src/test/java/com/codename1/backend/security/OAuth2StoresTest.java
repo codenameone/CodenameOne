@@ -91,7 +91,8 @@ class OAuth2StoresTest {
     private static final String[] TABLES = {"cn1_users", "cn1_authorities", "cn1_api_key",
         "cn1_persistent_logins", "cn1_mfa_totp", "cn1_mfa_recovery_code", "cn1_rate_limit",
         "cn1_federated_identity", "cn1_oauth2_registered_client", "cn1_oauth2_authorization",
-        "cn1_oauth2_token", "cn1_security_schema_history"};
+        "cn1_oauth2_token", "cn1_webauthn_user", "cn1_webauthn_credential",
+        "cn1_security_schema_history"};
 
     private final List<DataSource> opened = new ArrayList<DataSource>();
     private final List<DataSource> shared = new ArrayList<DataSource>();

@@ -64,6 +64,7 @@ import java.io.IOException;
 /// | 6 | `cn1_federated_identity` | [com.codename1.backend.security.oauth2.client.JdbcFederatedIdentityRepository] |
 /// | 7 | `cn1_oauth2_registered_client` | [com.codename1.backend.security.oauth2.server.authorization.JdbcRegisteredClientRepository] |
 /// | 8 | `cn1_oauth2_authorization`, `cn1_oauth2_token` | [com.codename1.backend.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService] |
+/// | 9 | `cn1_webauthn_user`, `cn1_webauthn_credential` | [com.codename1.backend.security.webauthn.JdbcPublicKeyCredentialUserEntityRepository], [com.codename1.backend.security.webauthn.JdbcUserCredentialRepository] |
 ///
 /// A user name is kept twice: as it was given, and folded to lower case in the
 /// `username_key` column every table is keyed by, which is what makes a lookup
@@ -80,12 +81,9 @@ public final class SecuritySchema {
 
     // The versions of this set. A version is never edited once released: a new
     // table, or a change to one, is a new version appended in migrations().
-    // Reserved for the part of the layer that keeps a table and is not here yet,
-    // so that it can be written side by side without colliding:
-    //   9  cn1_webauthn_credential         (passkeys)
-    // Anything after that takes 10 and up. Each version is one method below
-    // that returns the statements for an engine, a case in Tables.migrate, and a
-    // line in migrations().
+    // The next takes 10. Each version is one method below that returns the
+    // statements for an engine, a case in Tables.migrate, and a line in
+    // migrations().
 
     private SecuritySchema() {
     }
@@ -101,6 +99,7 @@ public final class SecuritySchema {
                 .java("6", "federated identities", new Tables(6))
                 .java("7", "oauth2 registered clients", new Tables(7))
                 .java("8", "oauth2 authorizations", new Tables(8))
+                .java("9", "passkeys", new Tables(9))
                 .build();
     }
 
@@ -133,6 +132,7 @@ public final class SecuritySchema {
                 case 6: statements = federatedIdentities(d); break;
                 case 7: statements = registeredClients(d); break;
                 case 8: statements = authorizations(d); break;
+                case 9: statements = passkeys(d); break;
                 default: throw new IOException("The security schema has no version " + version);
             }
             for (String statement : statements) {
@@ -263,5 +263,26 @@ public final class SecuritySchema {
                 + flag(d) + ", expires_at " + moment(d) + ", polled_at " + moment(d) + ")",
             "CREATE INDEX cn1_oauth2_token_auth ON cn1_oauth2_token (authorization_id)",
             "CREATE INDEX cn1_oauth2_token_exp ON cn1_oauth2_token (expires_at)"};
+    }
+
+    /// A user's passkey handle, and their credentials. Byte strings -- the
+    /// handle, a credential's id, its public key -- are base64url text, so
+    /// that an id is a key that compares byte for byte on every engine; an id
+    /// is at most 1023 bytes, which is more text than MySQL indexes whole, so
+    /// the table is keyed by its SHA-256 instead and the id is a column.
+    private static String[] passkeys(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_webauthn_user (username_key " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "username " + text(d) + ", user_id " + key(d) + " NOT NULL, display_name "
+                + text(d) + ", created_at " + moment(d) + ")",
+            "CREATE UNIQUE INDEX cn1_webauthn_user_id ON cn1_webauthn_user (user_id)",
+            "CREATE TABLE cn1_webauthn_credential (credential_key " + key(d)
+                + " NOT NULL PRIMARY KEY, credential_id " + text(d) + ", user_id " + key(d)
+                + " NOT NULL, algorithm " + moment(d) + ", public_key " + text(d)
+                + ", sign_count " + moment(d) + ", uv_initialized " + flag(d)
+                + ", backup_eligible " + flag(d) + ", backup_state " + flag(d) + ", transports "
+                + text(d) + ", label " + text(d) + ", created_at " + moment(d) + ", last_used "
+                + moment(d) + ")",
+            "CREATE INDEX cn1_webauthn_credential_user ON cn1_webauthn_credential (user_id)"};
     }
 }
