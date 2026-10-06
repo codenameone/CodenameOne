@@ -312,7 +312,7 @@ class MfaTest {
     }
 
     @Test
-    @DisplayName("a pending sign-in lasts five minutes, and five attempts")
+    @DisplayName("a pending sign-in lasts five minutes, and one network has three wrong codes")
     void expiryAndAttempts() throws Exception {
         Ticking pending = new Ticking();
         try (SecuredServer server = start(pending)) {
@@ -335,11 +335,11 @@ class MfaTest {
             server.post("/login", "username=ada&password=ada-pw");
             String code = totp.currentCode("ada");
             String wrong = "000000".equals(code) ? "000001" : "000000";
-            for (int attempt = 0; attempt < 5; attempt++) {
+            for (int attempt = 0; attempt < 3; attempt++) {
                 assertEquals("/login/mfa?error", server.post("/login/mfa", "code=" + wrong)
                         .header("Location"), "attempt " + attempt);
             }
-            // The sixth is not looked at, right or not.
+            // The fourth from here is not looked at, right or not.
             Reply limited = server.post("/login/mfa", "code=" + code);
             assertEquals(429, limited.status);
             assertNotNull(limited.header("Retry-After"));
@@ -351,6 +351,214 @@ class MfaTest {
             server.post("/login", "username=ADA&password=ada-pw");
             assertEquals(429, server.post("/login/mfa", "code=" + code).status);
             assertEquals("/open nobody", server.get("/open").body);
+        }
+    }
+
+    // ---- what somebody with the password can and cannot do ----
+
+    /// A server that believes `X-Forwarded-For` from the loopback connection
+    /// the tests make, so a request can be sent as coming from any address.
+    private SecuredServer startBehindProxy() throws Exception {
+        java.util.Properties settings = SecuredServer.settings();
+        settings.setProperty("cn1.server.forwardHeaders", "true");
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
+                User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
+        assertTrue(totp.isEnabled("ada") || enrol("ada"));
+        return SecuredServer.start(settings, "dev", new Object[] {users, totp, recovery}, APP,
+                http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable())
+                        .formLogin(Customizer.withDefaults())
+                        .mfa(mfa -> mfa.clock(clock)).build());
+    }
+
+    /// The cookies of the session the requests below are sent in.
+    private final java.util.Map<String, String> wireCookies =
+            new java.util.LinkedHashMap<String, String>();
+
+    /// One request over a real connection, said by the proxy to come from
+    /// `address`: the status, then the `Location`, the `Retry-After` and the
+    /// body. A request dispatched in process arrives on no connection and has
+    /// no address at all, which is no way to test what is counted by one.
+    private String[] wire(SecuredServer server, String address, String target, String form)
+            throws Exception {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(
+                "http://127.0.0.1:" + server.port() + target).openConnection();
+        c.setInstanceFollowRedirects(false);
+        c.setRequestProperty("X-Forwarded-For", address);
+        if (!wireCookies.isEmpty()) {
+            StringBuilder jar = new StringBuilder();
+            for (java.util.Map.Entry<String, String> e : wireCookies.entrySet()) {
+                jar.append(jar.length() == 0 ? "" : "; ").append(e.getKey()).append('=')
+                        .append(e.getValue());
+            }
+            c.setRequestProperty("Cookie", jar.toString());
+        }
+        if (form != null) {
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            c.getOutputStream().write(form.getBytes("UTF-8"));
+        }
+        int status = c.getResponseCode();
+        List<String> set = c.getHeaderFields().get("Set-Cookie");
+        if (set != null) {
+            for (String cookie : set) {
+                int eq = cookie.indexOf('=');
+                int semi = cookie.indexOf(';');
+                wireCookies.put(cookie.substring(0, eq),
+                        cookie.substring(eq + 1, semi < 0 ? cookie.length() : semi));
+            }
+        }
+        java.io.InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
+        java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+        if (in != null) {
+            for (int b = in.read(); b >= 0; b = in.read()) {
+                body.write(b);
+            }
+            in.close();
+        }
+        return new String[] {String.valueOf(status), c.getHeaderField("Location"),
+            c.getHeaderField("Retry-After"), new String(body.toByteArray(), "UTF-8")};
+    }
+
+    /// A new session at `address` whose password was accepted: what whoever
+    /// has the password can get as often as they like.
+    private void password(SecuredServer server, String address) throws Exception {
+        wireCookies.clear();
+        assertEquals("/login/mfa", wire(server, address, "/login",
+                "username=ada&password=ada-pw")[1]);
+    }
+
+    /// One code sent from `address`: "wrong", "signed in" or "429".
+    private String guess(SecuredServer server, String address, String code)
+            throws Exception {
+        String[] reply = wire(server, address, "/login/mfa", "code=" + code);
+        if ("429".equals(reply[0])) {
+            assertNotNull(reply[2], "a 429 says how long to wait");
+            return "429";
+        }
+        return "/login/mfa?error".equals(reply[1]) ? "wrong"
+                : "/".equals(reply[1]) ? "signed in" : java.util.Arrays.toString(reply);
+    }
+
+    private String wrongCode() {
+        return "000000".equals(totp.currentCode("ada")) ? "000001" : "000000";
+    }
+
+    @Test
+    @DisplayName("five wrong one-time codes for a user in all, from however many addresses and sessions, and three from any one")
+    void theGuessesOfAPasswordHolderAreBoundedInTotal() throws Exception {
+        try (SecuredServer server = startBehindProxy()) {
+            String wrong = wrongCode();
+            int looked = 0;
+            // Ten addresses, a new session at each, six tries at each.
+            StringBuilder seen = new StringBuilder();
+            for (int host = 1; host <= 10; host++) {
+                String address = "203.0.113." + host;
+                password(server, address);
+                for (int attempt = 0; attempt < 6; attempt++) {
+                    String answer = guess(server, address, wrong);
+                    looked += "wrong".equals(answer) ? 1 : 0;
+                    seen.append("wrong".equals(answer) ? 'w' : '.');
+                }
+                seen.append(' ');
+            }
+            assertEquals(5, looked, "codes that were looked at: " + seen);
+            // Three at the first address, the two that were left at the second,
+            // and nothing anywhere after that.
+            assertTrue(seen.toString().startsWith("www... ww.... ...... "), seen.toString());
+            // Not even the right code, from an address that has guessed nothing.
+            password(server, "198.51.100.77");
+            assertEquals("429", guess(server, "198.51.100.77", totp.currentCode("ada")));
+        }
+    }
+
+    @Test
+    @DisplayName("one address that knows the password cannot keep the user out, however often it tries")
+    void oneAddressCannotLockTheUserOut() throws Exception {
+        try (SecuredServer server = startBehindProxy()) {
+            String wrong = wrongCode();
+            String attacker = "203.0.113.9";
+            password(server, attacker);
+            assertEquals("wrong", guess(server, attacker, wrong));
+            assertEquals("wrong", guess(server, attacker, wrong));
+            assertEquals("wrong", guess(server, attacker, wrong));
+            // And then it keeps going, with new sessions too. Refused at its own
+            // network, it spends nothing of what the user has left.
+            for (int more = 0; more < 20; more++) {
+                if (more % 5 == 0) {
+                    password(server, attacker);
+                }
+                assertEquals("429", guess(server, attacker, wrong), "try " + more);
+            }
+            // The user, somewhere else, mistypes once and is then let in.
+            String user = "198.51.100.20";
+            password(server, user);
+            assertEquals("wrong", guess(server, user, wrong));
+            assertEquals("signed in", guess(server, user, totp.currentCode("ada")));
+            assertEquals("/me ada [ROLE_USER]", wire(server, user, "/me", null)[3]);
+
+            // Two IPv6 addresses of one subscriber are one network: the second
+            // does not start a count of its own.
+            clock.now += 30000;
+            password(server, "2001:db8:1:2:aaaa::1");
+            assertEquals("wrong", guess(server, "2001:db8:1:2:aaaa::1", wrong));
+            assertEquals("wrong", guess(server, "2001:db8:1:2:bbbb::2", wrong));
+            assertEquals("wrong", guess(server, "2001:db8:1:2:cccc::3", wrong));
+            assertEquals("429", guess(server, "2001:db8:1:2:dddd::4", wrong));
+        }
+    }
+
+    @Test
+    @DisplayName("with every attempt used up from several addresses, a recovery code still signs the user in, and clears the count")
+    void aRecoveryCodeIsTheWayInWhenTheAttemptsAreGone() throws Exception {
+        try (SecuredServer server = startBehindProxy()) {
+            List<String> codes = recovery.generate("ada");
+            String wrong = wrongCode();
+            // Two addresses use all five.
+            password(server, "203.0.113.1");
+            for (int attempt = 0; attempt < 3; attempt++) {
+                assertEquals("wrong", guess(server, "203.0.113.1", wrong));
+            }
+            password(server, "203.0.113.2");
+            assertEquals("wrong", guess(server, "203.0.113.2", wrong));
+            assertEquals("wrong", guess(server, "203.0.113.2", wrong));
+            // The user's one-time code is refused now, wherever they are.
+            String user = "198.51.100.20";
+            password(server, user);
+            assertEquals("429", guess(server, user, totp.currentCode("ada")));
+            // A recovery code is not: it is counted apart, at the user's own network.
+            assertEquals("signed in", guess(server, user, codes.get(0)));
+            assertEquals(9, recovery.remaining("ada"));
+
+            // And the count is cleared: the next sign-in takes the one-time code.
+            clock.now += 30000;
+            password(server, user);
+            assertEquals("signed in", guess(server, user, totp.currentCode("ada")));
+        }
+    }
+
+    @Test
+    @DisplayName("wrong recovery codes are counted at each network, apart from the one-time codes")
+    void recoveryCodeGuessesAreCountedAtTheNetwork() throws Exception {
+        try (SecuredServer server = startBehindProxy()) {
+            List<String> codes = recovery.generate("ada");
+            String attacker = "203.0.113.9";
+            password(server, attacker);
+            assertEquals("wrong", guess(server, attacker, "aaaaa-aaaaa"));
+            assertEquals("wrong", guess(server, attacker, "bbbbb-bbbbb"));
+            assertEquals("wrong", guess(server, attacker, "ccccc-ccccc"));
+            assertEquals("429", guess(server, attacker, "ddddd-ddddd"));
+            assertEquals("429", guess(server, attacker, codes.get(1)));
+            // They took nothing from the one-time codes, there or anywhere.
+            assertEquals("wrong", guess(server, attacker, wrongCode()));
+            // The user elsewhere has their own three, and all five one-time codes
+            // less the one just spent.
+            String user = "198.51.100.20";
+            password(server, user);
+            assertEquals("wrong", guess(server, user, "eeeee-eeeee"));
+            assertEquals("signed in", guess(server, user, codes.get(1)));
+            assertEquals(9, recovery.remaining("ada"));
         }
     }
 
@@ -546,6 +754,7 @@ class MfaTest {
             com.codename1.backend.security.ratelimit.RateLimiter {
         private final int limit;
         final java.util.List<String> keys = new java.util.ArrayList<String>();
+        final java.util.List<String> cleared = new java.util.ArrayList<String>();
 
         Counting(int limit) {
             this.limit = limit;
@@ -554,7 +763,15 @@ class MfaTest {
         @Override
         public synchronized boolean tryAcquire(String key) {
             keys.add(key);
-            return keys.size() <= limit;
+            return java.util.Collections.frequency(keys, key) <= limit;
+        }
+
+        @Override
+        public synchronized void reset(String key) {
+            cleared.add(key);
+            while (keys.remove(key)) {
+                // Every count under the key.
+            }
         }
     }
 
@@ -563,8 +780,15 @@ class MfaTest {
     void theAttemptLimitIsConfigured() throws Exception {
         java.util.Properties two = SecuredServer.settings();
         two.setProperty(MfaConfigurer.ATTEMPTS, "2");
+        two.setProperty(MfaConfigurer.ATTEMPTS_PER_ADDRESS, "2");
         two.setProperty(MfaConfigurer.ATTEMPTS_WINDOW, "60");
         try (SecuredServer server = startLimited(two, null, mfa -> { })) {
+            assertEquals(2, guessesAllowed(server));
+        }
+        // One network's share is half of the user's attempts, rounded up, unless set.
+        java.util.Properties four = SecuredServer.settings();
+        four.setProperty(MfaConfigurer.ATTEMPTS, "4");
+        try (SecuredServer server = startLimited(four, null, mfa -> { })) {
             assertEquals(2, guessesAllowed(server));
         }
         // A limiter bean that throttles something else at 600 a minute: the
@@ -589,19 +813,22 @@ class MfaTest {
                     }
                 };
         try (SecuredServer server = startLimited(two, bean, mfa -> { })) {
-            assertEquals("[mfa 2/60]", derivedAs.toString());
+            assertEquals("[mfa 2/60, mfa-address 2/60]", derivedAs.toString());
             assertEquals(2, guessesAllowed(server));
         }
         derivedAs.clear();
         try (SecuredServer server = startLimited(SecuredServer.settings(), bean, mfa -> { })) {
-            assertEquals("[mfa 5/300]", derivedAs.toString());
-            assertEquals(5, guessesAllowed(server));
+            assertEquals("[mfa 5/300, mfa-address 3/300]", derivedAs.toString());
+            assertEquals(3, guessesAllowed(server));
         }
-        // A bean that derives nothing counts itself, under the user's name.
+        // A bean that derives nothing counts itself: the user at the network,
+        // and then the user.
         Counting own = new Counting(3);
         try (SecuredServer server = startLimited(SecuredServer.settings(), own, mfa -> { })) {
             assertEquals(3, guessesAllowed(server));
-            assertEquals("mfa:ada", own.keys.get(0));
+            // A request these tests dispatch in process arrives on no connection.
+            assertEquals("mfa:ada|net:none", own.keys.get(0));
+            assertEquals("mfa:ada", own.keys.get(1));
         }
     }
 
@@ -620,6 +847,13 @@ class MfaTest {
                 () -> startLimited(two, new Counting(9), mfa -> { }));
         assertTrue(bean.getMessage().contains("the application's RateLimiter bean, which "
                 + "derives no limiter"), bean.getMessage());
+        java.util.Properties more = SecuredServer.settings();
+        more.setProperty(MfaConfigurer.ATTEMPTS_PER_ADDRESS, "6");
+        assertEquals("cn1.security.mfa.attemptsPerAddress is 6; it must be at least 1 and no "
+                + "more than cn1.security.mfa.attempts, which is 5: one client network cannot "
+                + "use more attempts than the user has.", assertThrows(
+                        IllegalStateException.class,
+                        () -> startLimited(more, null, mfa -> { })).getMessage());
         java.util.Properties zero = SecuredServer.settings();
         zero.setProperty(MfaConfigurer.ATTEMPTS, "0");
         assertEquals("cn1.security.mfa.attempts and cn1.security.mfa.attemptsWindowSeconds must "
@@ -686,7 +920,7 @@ class MfaTest {
         try (SecuredServer server = startWired(beans, names,
                 new boolean[] {false, false, false, true}, mfa -> { })) {
             assertEquals(2, guessesAllowed(server));
-            assertEquals("mfa:ada", logins.keys.get(0));
+            assertTrue(logins.keys.contains("mfa:ada"), logins.keys.toString());
             assertTrue(api.keys.isEmpty(), "the bean that is not @Primary counted: " + api.keys);
         }
 

@@ -100,6 +100,14 @@ public final class RecoveryCodeService {
         return hash != null && repository.consume(username, hash);
     }
 
+    /// Whether `code` is written as a recovery code is: ten letters and digits,
+    /// with or without the dash. It says nothing about whether anybody has that
+    /// code -- only that it is not something else, such as the digits of a
+    /// one-time code.
+    public static boolean isCodeShaped(String code) {
+        return hash(code) != null;
+    }
+
     /// How many codes `username` has left.
     public int remaining(String username) {
         return repository.count(username);

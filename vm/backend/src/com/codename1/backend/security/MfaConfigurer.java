@@ -50,19 +50,75 @@ import com.codename1.backend.security.ratelimit.RateLimiter;
 /// of that type, and recovery codes are accepted when there is a
 /// [RecoveryCodeService] the same way.
 ///
-/// Attempts at the code are counted for each user, whichever session they
-/// come from: signing in again with the password does not buy more guesses.
-/// Five are allowed in five minutes unless `cn1.security.mfa.attempts` and
-/// `cn1.security.mfa.attemptsWindowSeconds` say otherwise.
+/// #### How many guesses, and who can be kept out
+///
+/// Wrong codes are counted, and too many are answered 429. Three numbers
+/// decide how many:
+///
+/// - `cn1.security.mfa.attempts`: wrong one-time codes for one user, from
+///   every address and session together. 5 unless set.
+/// - `cn1.security.mfa.attemptsPerAddress`: how many of those one client
+///   network may use up, and how many wrong recovery codes it may try for that
+///   user. Half of `attempts` rounded up unless set: 3.
+/// - `cn1.security.mfa.attemptsWindowSeconds`: the window both are counted
+///   in. 300 unless set.
+///
+/// A client network is the client's address, an IPv6 address counting by its
+/// first 64 bits; see
+/// [com.codename1.backend.security.ratelimit.RateLimitKeys#clientNetwork].
+/// A code is counted before it is looked at and a right one hands its counts
+/// back, so only wrong ones stay counted. A sign-in that completes -- by a
+/// one-time code, a recovery code, or a passkey that verified the user --
+/// clears what was counted against that user.
+///
+/// What that gives somebody who has a user's password and not their second
+/// factor, with the numbers above:
+///
+/// - **At most 5 wrong one-time codes in a window, in total.** Signing in again
+///   with the password, a new session or another address buys none: the count
+///   is the user's. At most 3 of the 5 from one network.
+/// - **Recovery codes: at most 3 wrong ones in a window from each network**,
+///   with no total for the user. A code is ten characters out of 31, and a
+///   user has ten: a guess is right once in 8 x 10^13.
+/// - **They cannot keep the user out from one network.** When they have used
+///   their 3 there, 2 of the user's 5 are left for everybody else, and a
+///   right code needs one.
+/// - **From two networks or more they can use all 5**, and one-time codes are
+///   then refused for that user from everywhere until the window has run. The
+///   user still signs in with a recovery code, which has its own count at
+///   their own network, or with a passkey, which is not counted at all; either
+///   clears the count. The attacker can run it up again, so this lasts until
+///   the password is changed -- and a run of 429s for one user is the sign
+///   that it has to be.
+/// - **At the user's own network they can use up both counts**, the one-time
+///   codes' and the recovery codes'. A passkey is then the way in. A server
+///   behind a proxy it has not been told to believe sees one address for every
+///   client, which makes every client the user's own network: set
+///   `cn1.server.forwardHeaders`.
+///
+/// `attemptsPerAddress` equal to `attempts` gives the old trade back: any one
+/// client that knows the password can keep the user out. Larger is refused.
+///
+/// The window is whatever the limiter means by one. The count kept in the
+/// process hands attempts back evenly -- after 5 at once, one every minute --
+/// and a [com.codename1.backend.security.ratelimit.JdbcRateLimiter] counts 5
+/// from the first of each window.
+///
+/// #### Where the attempts are counted
 ///
 /// Where they are counted depends on what the application declares. With
 /// nothing, in this process. With one [RateLimiter] bean, wherever that bean
 /// counts -- a [com.codename1.backend.security.ratelimit.JdbcRateLimiter]
-/// makes it one count for every process -- in a limiter the bean derives for
-/// the purpose, with the limit above and not the bean's own; see
+/// makes it one count for every process -- in two limiters the bean derives
+/// for the purpose, with the limits above and not the bean's own; see
 /// [RateLimiter#derive]. A limiter given to [#attemptLimiter], or a bean that
-/// derives none, counts by its own limit, and setting the two keys as well is
+/// derives none, counts by its own limit, and setting the keys as well is
 /// then refused when the chain is built, since they would decide nothing.
+/// One limiter has one limit, so it cannot hold a client network to less than
+/// the user's total: give [#attemptLimiter(RateLimiter, RateLimiter)] two to
+/// keep the guarantees above. Clearing a count needs [RateLimiter#reset]; with
+/// a limiter that has none, a right code costs an attempt and nothing is
+/// cleared.
 ///
 /// With several [RateLimiter] beans the one marked `@Primary` is the one, as it
 /// would be for an injection. With none marked, or more than one, the chain is
@@ -100,9 +156,13 @@ import com.codename1.backend.security.ratelimit.RateLimiter;
 /// A filter or provider of the application's own that makes a request a
 /// user's is outside all of this; it can ask [SecondFactorPolicy#requires].
 public final class MfaConfigurer extends SecurityConfigurer {
-    /// The setting that holds how many attempts at a code a user has in one
-    /// window; 5 unless set.
+    /// The setting that holds how many wrong one-time codes a user has in one
+    /// window, from everywhere together; 5 unless set.
     public static final String ATTEMPTS = "cn1.security.mfa.attempts";
+    /// The setting that holds how many of those one client network may use
+    /// up, and how many wrong recovery codes it may try for the user; half of
+    /// [#ATTEMPTS], rounded up, unless set.
+    public static final String ATTEMPTS_PER_ADDRESS = "cn1.security.mfa.attemptsPerAddress";
     /// The setting that holds the length of that window in seconds; 300
     /// unless set.
     public static final String ATTEMPTS_WINDOW = "cn1.security.mfa.attemptsWindowSeconds";
@@ -115,6 +175,7 @@ public final class MfaConfigurer extends SecurityConfigurer {
     private String codeParameter = "code";
     private int pendingSeconds = 300;
     private RateLimiter attempts;
+    private RateLimiter addressAttempts;
     private boolean attemptsGiven;
     private String defaultSuccessUrl = "/";
     private AuthenticationSuccessHandler successHandler;
@@ -165,24 +226,46 @@ public final class MfaConfigurer extends SecurityConfigurer {
         return this;
     }
 
-    /// What counts attempts, each user under a key of their own, in place of
-    /// the application's [RateLimiter] bean and of the count kept in this
-    /// process; null to count none.
+    /// What counts attempts, in place of the application's [RateLimiter] bean
+    /// and of the count kept in this process; null to count none.
+    ///
+    /// The one limiter counts a user's attempts and their attempts at each
+    /// client network, under keys of their own and by its one limit. A client
+    /// network is then allowed all of a user's attempts, and one client that
+    /// knows the password can keep the user out; see
+    /// [#attemptLimiter(RateLimiter, RateLimiter)].
     public MfaConfigurer attemptLimiter(RateLimiter attemptLimiter) {
-        this.attempts = attemptLimiter;
+        return attemptLimiter(attemptLimiter, attemptLimiter);
+    }
+
+    /// What counts attempts, as two limits: `perUser` a user's wrong one-time
+    /// codes from everywhere, and `perAddress` their wrong codes at one client
+    /// network -- one-time codes and recovery codes apart.
+    ///
+    /// Give `perAddress` the smaller limit. What is left of `perUser` when one
+    /// network has used its share up is what everybody else, the user
+    /// included, still has.
+    /// @param perUser the limiter for a user's total, or null to count none
+    /// @param perAddress the limiter for a user at one network, or null to
+    ///     count none
+    public MfaConfigurer attemptLimiter(RateLimiter perUser, RateLimiter perAddress) {
+        this.attempts = perUser;
+        this.addressAttempts = perAddress;
         this.attemptsGiven = true;
         return this;
     }
 
-    /// What counts attempts for this chain: the limiter given; or one the
-    /// application's [RateLimiter] bean derives, sized by the configuration;
-    /// or that bean itself when it derives none; or a count in this process
-    /// when the application has no such bean. Several beans and no one
-    /// `@Primary` among them is refused, never counted around.
-    private RateLimiter attempts(HttpSecurity http) {
+    /// What counts attempts for this chain, as {a user's total, a user at one
+    /// network}: the limiters given; or two the application's [RateLimiter]
+    /// bean derives, sized by the configuration; or that bean itself, twice,
+    /// when it derives none; or two counts in this process when the
+    /// application has no such bean. Several beans and no one `@Primary` among
+    /// them is refused, never counted around.
+    private RateLimiter[] attempts(HttpSecurity http) {
         try {
             com.codename1.backend.Config config = http.getConfig();
             boolean configured = config.get(ATTEMPTS, null) != null
+                    || config.get(ATTEMPTS_PER_ADDRESS, null) != null
                     || config.get(ATTEMPTS_WINDOW, null) != null;
             int permits = config.getInt(ATTEMPTS, 5);
             int window = config.getInt(ATTEMPTS_WINDOW, 300);
@@ -190,19 +273,30 @@ public final class MfaConfigurer extends SecurityConfigurer {
                 throw new IllegalStateException(ATTEMPTS + " and " + ATTEMPTS_WINDOW
                         + " must each be at least 1");
             }
-            RateLimiter limiter = attempts;
+            // Half, rounded up: what one network cannot use is what the others have.
+            int perAddress = config.getInt(ATTEMPTS_PER_ADDRESS, permits - permits / 2);
+            if (perAddress < 1 || perAddress > permits) {
+                throw new IllegalStateException(ATTEMPTS_PER_ADDRESS + " is " + perAddress
+                        + "; it must be at least 1 and no more than " + ATTEMPTS + ", which is "
+                        + permits + ": one client network cannot use more attempts than the "
+                        + "user has.");
+            }
             String counted = "the limiter given to attemptLimiter(...)";
+            RateLimiter[] limiters = {attempts, addressAttempts};
             if (!attemptsGiven) {
                 RateLimiter bean = http.uniqueSharedObject(RateLimiter.class,
                         "The second factor's attempt limit", "mfa().attemptLimiter(...)");
                 if (bean == null) {
-                    return new InMemoryRateLimiter(permits, window);
+                    return new RateLimiter[] {new InMemoryRateLimiter(permits, window),
+                        new InMemoryRateLimiter(perAddress, window)};
                 }
                 RateLimiter derived = bean.derive("mfa", permits, window);
-                if (derived != null) {
-                    return derived;
+                RateLimiter derivedPerAddress = derived == null ? null
+                        : bean.derive("mfa-address", perAddress, window);
+                if (derived != null && derivedPerAddress != null) {
+                    return new RateLimiter[] {derived, derivedPerAddress};
                 }
-                limiter = bean;
+                limiters = new RateLimiter[] {bean, bean};
                 counted = "the application's RateLimiter bean, which derives no limiter";
             }
             if (configured) {
@@ -211,7 +305,7 @@ public final class MfaConfigurer extends SecurityConfigurer {
                         + ", by a limit of its own. Remove the settings, or give that limiter "
                         + "the numbers.");
             }
-            return limiter;
+            return limiters;
         } catch (java.io.IOException err) {
             throw new IllegalStateException("The second factor's attempt limit could not be "
                     + "read from the configuration: " + err.getMessage(), err);
@@ -258,8 +352,10 @@ public final class MfaConfigurer extends SecurityConfigurer {
             saved.setRequestCache(new Deferred(http));
             success = saved;
         }
+        RateLimiter[] counting = attempts(http);
         filter = new SecondFactorAuthenticationFilter(codes, recovery, page, !customPage,
-                processing(), codeParameter, pendingSeconds * 1000L, attempts(http), success,
+                processing(), codeParameter, pendingSeconds * 1000L, counting[0], counting[1],
+                success,
                 new SimpleUrlAuthenticationFailureHandler(http.loginPage() + "?error"), clock);
         http.secondFactorPolicy(filter);
         http.redirectsToSignIn();

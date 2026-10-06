@@ -39,6 +39,17 @@ public interface RateLimiter {
         return 1;
     }
 
+    /// Forgets what was counted under `key`, so the next request under it is
+    /// counted from nothing.
+    ///
+    /// A bound on wrong guesses uses this: the guess is counted before it is
+    /// looked at, so that guesses made together cannot each be let through as
+    /// the last one, and a right one hands the count back. A limiter that
+    /// cannot forget does nothing here, which is what it does unless it says
+    /// more; a right guess then costs what a wrong one does.
+    default void reset(String key) {
+    }
+
     /// A limiter that keeps its counts where this one does, apart from this
     /// one's, with a limit of its own; null when this limiter cannot make one,
     /// which is what it answers unless it says more.

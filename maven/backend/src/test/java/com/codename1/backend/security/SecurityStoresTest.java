@@ -425,6 +425,21 @@ class SecurityStoresTest {
         assertEquals(0L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM cn1_rate_limit", null)
                 .get("n")).longValue());
 
+        // Forgetting a key gives it a full window again, and touches no other
+        // key and no other limiter.
+        for (int hit = 0; hit < 3; hit++) {
+            assertTrue(login.tryAcquire("ip:9"));
+        }
+        assertTrue(api.tryAcquire("ip:9"));
+        assertFalse(login.tryAcquire("ip:9"));
+        login.reset("ip:9");
+        login.reset("ip:never-seen");
+        for (int hit = 0; hit < 3; hit++) {
+            assertTrue(login.tryAcquire("ip:9"), "after reset, hit " + hit);
+        }
+        assertFalse(login.tryAcquire("ip:9"));
+        assertFalse(api.tryAcquire("ip:9"), "another limiter's count went with it");
+
         // Atomic: many callers at one moment, as several processes would be,
         // and exactly the permits are taken -- for a key that has no row yet,
         // where the callers race to insert it.

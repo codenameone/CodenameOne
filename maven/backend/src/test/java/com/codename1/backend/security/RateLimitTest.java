@@ -112,6 +112,21 @@ class RateLimitTest {
         clock.advance(-600000);
         assertFalse(limiter.tryAcquire("a"));
 
+        // Forgetting a key gives it its burst back, and leaves the others.
+        int taken = 0;
+        while (limiter.tryAcquire("b")) {
+            taken++;
+        }
+        assertEquals(3, taken);
+        limiter.reset("a");
+        limiter.reset("never seen");
+        limiter.reset(null);
+        assertTrue(limiter.tryAcquire("a"));
+        assertTrue(limiter.tryAcquire("a"));
+        assertTrue(limiter.tryAcquire("a"));
+        assertFalse(limiter.tryAcquire("a"));
+        assertFalse(limiter.tryAcquire("b"));
+
         assertThrows(IllegalArgumentException.class, () -> limiter.tryAcquire(null));
         assertThrows(IllegalArgumentException.class, () -> new InMemoryRateLimiter(0, 60));
         assertThrows(IllegalArgumentException.class, () -> new InMemoryRateLimiter(1, 0));

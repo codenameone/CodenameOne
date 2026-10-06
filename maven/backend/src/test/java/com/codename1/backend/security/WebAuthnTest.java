@@ -462,6 +462,55 @@ class WebAuthnTest {
         }
     }
 
+    @Test
+    @DisplayName("a passkey signs the user in when the attempts at a code are used up, and clears them")
+    void aPasskeyClearsTheCountOfWrongCodes() throws Exception {
+        final TotpService totp = new TotpService(new InMemoryTotpRepository(), "Acme");
+        totp.setClock(clock);
+        totp.beginEnrollment("ada");
+        assertTrue(totp.confirmEnrollment("ada", totp.currentCode("ada")));
+        clock.now += 30000;
+        Passkeys verifying = new Passkeys(false, RP, ORIGIN);
+        try (SecuredServer server = SecuredServer.start(SecuredServer.settings(), "dev",
+                new Object[] {users, totp}, APP, http -> http
+                        .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable())
+                        .formLogin(Customizer.withDefaults())
+                        .mfa(mfa -> mfa.clock(clock))
+                        .webAuthn(passkeys(w -> { })).build())) {
+            server.post("/login", "username=ada&password=ada-pw");
+            assertEquals(302, server.post("/login/mfa", "code=" + totp.currentCode("ada")).status);
+            clock.now += 30000;
+            assertEquals(Boolean.TRUE, register(server, verifying, null).get("success"));
+            server.post("/logout", "");
+
+            // Somebody with the password uses up what this network has.
+            server.cookies.clear();
+            server.post("/login", "username=ada&password=ada-pw");
+            String right = totp.currentCode("ada");
+            String wrong = "000000".equals(right) ? "000001" : "000000";
+            for (int attempt = 0; attempt < 3; attempt++) {
+                assertEquals("/login/mfa?error", server.post("/login/mfa", "code=" + wrong)
+                        .header("Location"));
+            }
+            assertEquals(429, server.post("/login/mfa", "code=" + right).status);
+
+            // The passkey is not counted with the codes: it signs in.
+            server.cookies.clear();
+            Reply direct = signIn(server, verifying);
+            assertEquals("200 {authenticated=true, redirectUrl=/}", direct.status + " "
+                    + json(direct));
+            server.post("/logout", "");
+
+            // And what was counted is gone: the code is taken again, which it
+            // was not a moment ago.
+            server.cookies.clear();
+            server.post("/login", "username=ada&password=ada-pw");
+            Reply code = server.post("/login/mfa", "code=" + right);
+            assertEquals("302 /", code.status + " " + code.header("Location"));
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"memory", "db"})
     @DisplayName("a later request sees the passkey's sign-in, in memory and through the database session store")

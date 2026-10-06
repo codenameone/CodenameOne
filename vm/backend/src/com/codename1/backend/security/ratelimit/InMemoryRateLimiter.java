@@ -120,6 +120,13 @@ public final class InMemoryRateLimiter implements RateLimiter {
     }
 
     @Override
+    public synchronized void reset(String key) {
+        if (key != null) {
+            buckets.remove(key);
+        }
+    }
+
+    @Override
     public synchronized long retryAfterSeconds(String key) {
         double[] bucket = key == null ? null : buckets.get(key);
         if (bucket == null) {

@@ -49,6 +49,18 @@ public final class RateLimitKeys {
         return new ClientAddress();
     }
 
+    /// The client's network: its address, with an IPv6 address cut to its first
+    /// 64 bits. The key for a bound on guesses.
+    ///
+    /// One IPv6 subscriber is handed 2^64 addresses or more, so a count kept
+    /// for each address is a count the client resets by picking another. The
+    /// first four groups are the part its provider assigned. An IPv4 address
+    /// is the key whole. The address is [HttpServer.Request#getRemoteAddress],
+    /// with everything [#clientAddress] says about a proxy.
+    public static RateLimitKeyResolver clientNetwork() {
+        return new ClientNetwork();
+    }
+
     /// The name of who is signed in; no key for a request nobody signed in for.
     public static RateLimitKeyResolver principal() {
         return new Principal();
@@ -88,6 +100,29 @@ public final class RateLimitKeys {
         public String resolve(HttpServer.Request request) {
             String address = request.getRemoteAddress();
             return address == null ? null : "ip:" + address;
+        }
+    }
+
+    private static final class ClientNetwork implements RateLimitKeyResolver {
+        @Override
+        public String resolve(HttpServer.Request request) {
+            String address = request.getRemoteAddress();
+            if (address == null) {
+                return null;
+            }
+            // getRemoteAddress writes IPv6 as eight groups and never "::", so the
+            // fourth colon is where the first 64 bits end.
+            int groups = 0;
+            for (int iter = 0 ; iter < address.length() ; iter++) {
+                if (address.charAt(iter) != ':') {
+                    continue;
+                }
+                groups++;
+                if (groups == 4) {
+                    return "net:" + address.substring(0, iter) + "::/64";
+                }
+            }
+            return "net:" + address;
         }
     }
 

@@ -58,11 +58,11 @@ Whether the token endpoint hands back a refresh token is up to the request: the 
 
 * **The authorization response.** Its `state` has to be the one the request carried. If the response names an issuer with the `iss` parameter, that issuer has to be the provider you configured. A provider whose discovery document sets `authorization_response_iss_parameter_supported` always names itself, so a response without `iss` is refused for that provider. The error is `issuer_mismatch`. This stops an answer from one provider being taken for another's when an app signs in with several.
 * **The ID token's claims.** `iss` is the provider, `aud` is your client ID, `exp` hasn't passed, and `nonce` is the one the request carried. When the token has an `at_hash`, it has to match the access token that came with it. The device's clock may be five minutes off, and `setIdTokenClockSkew` changes that.
-* **The ID token's signature.** The provider's keys are fetched from its `jwks_uri` once and kept. They're fetched again when a token names a key that isn't among them. `RS256`, `RS384`, `RS512`, `ES256` and `ES384` are accepted. An unsigned token is refused, and so is one signed with `HS256`.
+* **The ID token's signature.** The provider's keys are fetched from its `jwks_uri` once and kept. They're fetched again when a token names a key that isn't among them, but not more than once in 60 seconds. A token that names an unknown key within 60 seconds of the last fetch is refused without another request to the provider. `RS256`, `RS384`, `RS512`, `ES256` and `ES384` are accepted. An unsigned token is refused. A token signed with `HS256` or another shared-secret algorithm is refused too, because an app can't keep the secret that would verify it.
 
 A configuration you build by hand needs a `jwksUri` for the last check. `discover` fills it in.
 
-The signature check has no silent fallback. If the platform the app runs on can't verify a signature of the token's algorithm, the token is refused and the error says so. For a provider whose ID tokens can't be verified on a platform you ship to, turn the check off explicitly:
+The signature check has no silent fallback. If the platform the app runs on can't verify a signature of the token's algorithm, the token is refused and the error says so. For a provider whose ID tokens can't be verified on a platform you ship to, or one that signs them with `HS256`, turn the check off explicitly. There is no other way to have such a token accepted:
 
 [source,java]
 ----

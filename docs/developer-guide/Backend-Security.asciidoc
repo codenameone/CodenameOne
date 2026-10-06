@@ -636,17 +636,22 @@ the database can't be reached it refuses nobody.
 ==== The limits the layer keeps itself
 
 Two parts of the layer count something without being asked. `mfa` counts the
-attempts at a one-time code for each user, and the authorization server counts
-the device codes each user tries at the verification page.
+wrong codes entered for each user, and the authorization server counts the
+device codes each user tries at the verification page.
 
 [cols="2,2,1,1",options="header"]
 |===
 | What's counted | Keys | Limit | Window
 
-| Attempts at a second factor
+| Wrong one-time codes for a user, from everywhere
 | `cn1.security.mfa.attempts`, `cn1.security.mfa.attemptsWindowSeconds`
 | 5
 | 300 seconds
+
+| Wrong codes for a user from one client address
+| `cn1.security.mfa.attemptsPerAddress`
+| Half of `attempts`, rounded up: 3
+| The same window
 
 | Device codes tried
 | `cn1.security.authorizationserver.device.verificationAttempts`,
@@ -685,8 +690,61 @@ with `@Qualifier` and its name, and pass it to `attemptLimiter` or
 `deviceVerificationRateLimiter`. A `rateLimit` rule that names no limiter
 follows the same rule.
 
-Attempts at a second factor are counted for the user, not for the session.
-Signing in again with the password doesn't buy more guesses.
+[[backend-security-mfa-guarantee]]
+===== What the second factor's limits promise
+
+A wrong code is counted twice: once for the user, whatever address and session
+it came from, and once for the user at the client's address. An IPv6 address
+counts by its first 64 bits, because one subscriber has all the addresses
+behind them. A right code isn't counted. A sign-in that completes clears what
+was counted against that user, whether it was completed with a one-time code, a
+recovery code or a passkey that verified the user.
+
+Recovery codes are counted apart from one-time codes, and only at the client's
+address. That keeps a recovery code usable when the one-time codes aren't.
+
+With the default numbers, this is what somebody who has a user's password and
+not their second factor can and can't do:
+
+* They get five wrong one-time codes in five minutes in total. Signing in again
+  with the password, starting another session or using another address doesn't
+  buy more. At most three of the five can come from one address.
+* They get three wrong recovery codes in five minutes from each address, with
+  no total for the user. A recovery code is ten characters from an alphabet of
+  31 and a user has ten of them, so one guess is right about once in 80
+  trillion tries.
+* They can't keep the user out from one address. When that address has used its
+  three, it's refused there and takes nothing more from the user's five. Two
+  are left for everyone else, and a right code needs one.
+* From two addresses or more they can use up all five. One-time codes are then
+  refused for that user from everywhere until the window has passed. The user
+  can still sign in with a recovery code from an address the attacker isn't
+  using, or with a passkey, which isn't counted at all. Either one clears the
+  count. The attacker can run the count up again, so this lasts until the
+  password is changed. A run of `429` answers for one user is the sign that it
+  needs changing.
+* At the user's own address they can use up both counts, the one-time codes'
+  and the recovery codes'. A passkey is then the way in.
+
+The last point matters behind a proxy. A server that isn't told to believe the
+forwarding headers sees the proxy's address for every client, so every client
+is at the user's own address. Set `cn1.server.forwardHeaders`; see
+<<backend-security-proxies>>.
+
+Setting `cn1.security.mfa.attemptsPerAddress` to the same number as
+`cn1.security.mfa.attempts` gives up the third point: one address that knows
+the password can then keep the user out. A larger number is refused when the
+server starts.
+
+The window depends on the limiter. The count kept in the process hands attempts
+back evenly, so after five at once it allows one more each minute. A
+`JdbcRateLimiter` counts five from the first of each window.
+
+A limiter you pass to `attemptLimiter` counts both by its own single limit, so
+one address may use every attempt a user has. Pass two limiters,
+`attemptLimiter(perUser, perAddress)`, to keep the promises in the list.
+Clearing a count uses `RateLimiter.reset`. A limiter of your own that doesn't
+implement it clears nothing, and a right code then costs an attempt.
 
 [[backend-security-proxies]]
 ==== Client addresses behind a proxy
@@ -1023,7 +1081,10 @@ CSRF protection. The second looks the code up and answers with `client_id`,
 ticket with `"decision": "approve"` or `"deny"`, and is answered
 `{"status":"approved"}` or `{"status":"denied"}`.
 
-Nothing is relaxed for the JSON form. The user has to be signed in, and a
+Nothing is relaxed for the JSON form. It needs a session, as the page does: the
+ticket is kept in the session between the lookup and the answer, so a client
+that doesn't send the session cookie back can't approve a device. The user has
+to be signed in, and a
 request that isn't is answered `401` with `login_required` instead of a
 redirect. The chain's CSRF protection covers both posts. An answer counts only
 with the ticket from the lookup in the same session, and a ticket works once.
@@ -1095,9 +1156,10 @@ request stays anonymous, and the user is sent to `/login/mfa`, which asks for
 the code. Posting a right one there signs them in. A user who hasn't enrolled
 signs in as before. The chain serves a plain page at `GET /login/mfa` unless
 `secondFactorPage` names your own. The user has five minutes to enter the
-code, and five attempts in five minutes. See
-<<backend-security-builtin-limits>> to change the limit or to count across
-instances.
+code. Five wrong codes are allowed for the user in five minutes, and three of
+them from one address. See <<backend-security-mfa-guarantee>> for what that
+does and doesn't stop, and <<backend-security-builtin-limits>> to change the
+numbers or to count across instances.
 
 ==== What counts as a sign-in
 
@@ -1125,7 +1187,10 @@ a first one. None of it affects a user who hasn't enrolled.
 | `rememberMe`
 | The cookie signs the user in only if the sign-in that issued it passed the
   second factor. A cookie issued for a password alone, before the user
-  enrolled, is withdrawn.
+  enrolled, is withdrawn. A `RememberMeServices` of your own has to carry that
+  fact itself: record `SECOND_FACTOR_ATTRIBUTE` when it issues a cookie, and
+  answer `isAfterSecondFactor()` on the token `autoLogin` returns. One that
+  doesn't can't sign in a user who has a second factor.
 
 | `oauth2ResourceServer`, `apiKey`
 | Accepted. A token or a key isn't a user signing in. It was issued by a
@@ -1590,8 +1655,13 @@ read by the build, because it decides what's linked into the server.
 | How many device codes one user may try, and in how many seconds. 10 and 300
   unless set.
 
+| `cn1.security.mfa.attemptsPerAddress`
+| How many of a user's wrong one-time codes one client address may use up, and
+  how many wrong recovery codes it may try for that user. Half of
+  `cn1.security.mfa.attempts`, rounded up, unless set.
+
 | `cn1.security.mfa.attempts`, `cn1.security.mfa.attemptsWindowSeconds`
-| How many attempts at a one-time code a user has, and in how many seconds. 5
+| How many wrong one-time codes a user has from everywhere, and in how many seconds. 5
   and 300 unless set.
 
 | `cn1.security.mfa.encryptionKey`

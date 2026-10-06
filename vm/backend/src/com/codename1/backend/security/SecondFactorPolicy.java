@@ -63,4 +63,15 @@ public interface SecondFactorPolicy {
     default boolean requires(Authentication authentication) {
         return true;
     }
+
+    /// Told that `authentication` signed in with two factors presented in one
+    /// step -- a passkey whose authenticator verified the user -- so that
+    /// [#intercept] was not asked.
+    ///
+    /// A policy that counts wrong attempts at its own second factor forgets
+    /// them here: the user has just proved both factors another way, and
+    /// whatever was counted against them was not theirs. Nothing unless the
+    /// policy says more.
+    default void satisfied(HttpServer.Request request, Authentication authentication) {
+    }
 }

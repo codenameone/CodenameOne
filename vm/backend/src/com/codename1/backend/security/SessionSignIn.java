@@ -104,6 +104,9 @@ public final class SessionSignIn {
                 return held;
             }
         }
+        if (secondFactor != null && secondFactorSatisfied) {
+            secondFactor.satisfied(request, authentication);
+        }
         return complete(request, authentication, remember, handler,
                 secondFactor != null && secondFactorSatisfied);
     }

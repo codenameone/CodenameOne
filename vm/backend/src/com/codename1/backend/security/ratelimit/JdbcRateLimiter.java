@@ -130,6 +130,22 @@ public final class JdbcRateLimiter implements RateLimiter {
         }
     }
 
+    /// Deletes the row of `key`. A database that cannot be reached leaves the
+    /// count as it is, which is the safe way round for a bound on guesses.
+    @Override
+    public void reset(String key) {
+        if (key == null) {
+            return;
+        }
+        try {
+            dataSource.execute("DELETE FROM cn1_rate_limit WHERE limit_key = ?",
+                    new Object[] {row(key)});
+        } catch (IOException err) {
+            System.err.println("cn1: the rate limit store could not be reached, so a count "
+                    + "was not cleared: " + err.getMessage());
+        }
+    }
+
     /// One more hit in the row's window, when that window is still open and
     /// has room.
     private boolean count(String row, Long windowFloor) throws IOException {
