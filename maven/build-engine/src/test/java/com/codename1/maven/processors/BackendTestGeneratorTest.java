@@ -749,6 +749,21 @@ public class BackendTestGeneratorTest {
             + "        mvc.perform(post(\"/notes\")).andExpect(status().isForbidden());\n"
             + "    }\n"
             + "    @org.junit.jupiter.api.Test\n"
+            + "    void aTokenOrAKeyThatWasAccepted() throws Exception {\n"
+            + "        mvc.perform(get(\"/me\").with(jwt())).andExpect(content().string(\"user [SCOPE_read]\"));\n"
+            + "        mvc.perform(get(\"/me\").with(jwt().subject(\"svc\").scopes(\"a\", \"b\")\n"
+            + "                .claim(\"tenant\", \"acme\")))\n"
+            + "                .andExpect(content().string(\"svc [SCOPE_a, SCOPE_b]\"));\n"
+            + "        mvc.perform(get(\"/admin/x\").with(jwt().authorities(\"ROLE_ADMIN\")))\n"
+            + "                .andExpect(content().string(\"admin\"));\n"
+            + "        mvc.perform(get(\"/admin/x\").with(jwt())).andExpect(status().isForbidden());\n"
+            + "        mvc.perform(get(\"/me\").with(apiKey(\"billing\").scopes(\"orders:read\")))\n"
+            + "                .andExpect(content().string(\"billing [SCOPE_orders:read]\"));\n"
+            + "        mvc.perform(get(\"/me\").with(apiKey(\"billing\")))\n"
+            + "                .andExpect(content().string(\"billing []\"));\n"
+            + "        runningAs(\"ada\");\n"
+            + "    }\n"
+            + "    @org.junit.jupiter.api.Test\n"
             + "    void expectsTheWrongUser() throws Exception {\n"
             + "        mvc.perform(get(\"/me\")).andExpect(content().string(\"eve [ROLE_EDITOR]\"));\n"
             + "    }\n"
@@ -788,7 +803,7 @@ public class BackendTestGeneratorTest {
             loader.loadClass("com.example.SecuredTestCn1TestRunner").getMethod("run").invoke(null);
             assertEquals("exactly the test that expects another user fails",
                     failed + 1, counter("failed"));
-            assertEquals(passed + 5, counter("passed"));
+            assertEquals(passed + 6, counter("passed"));
             // Nothing of the last test's user is left on this thread.
             assertNull(com.codename1.impl.backend.security.SecurityAccess.get().testContext());
             assertNull(com.codename1.backend.security.SecurityContextHolder.getContext()
@@ -799,7 +814,8 @@ public class BackendTestGeneratorTest {
             Object test = loader.loadClass("com.example.SecuredTest").newInstance();
             context.inject(test, env);
             for (String name : new String[] {"asTheClassSays", "asTheMethodSays", "asNobody",
-                "oneRequestAtATime", "aStateChangingRequestNeedsItsToken"}) {
+                "oneRequestAtATime", "aStateChangingRequestNeedsItsToken",
+                "aTokenOrAKeyThatWasAccepted"}) {
                 com.codename1.impl.backend.test.TestSecurity.apply(context.securityContext(name));
                 try {
                     invoke(test, name);

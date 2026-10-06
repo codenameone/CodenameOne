@@ -31,11 +31,17 @@ import com.codename1.backend.security.SecurityContextHolder;
 import com.codename1.backend.security.SecurityContextImpl;
 import com.codename1.backend.security.SimpleGrantedAuthority;
 import com.codename1.backend.security.UsernamePasswordAuthenticationToken;
+import com.codename1.backend.security.apikey.ApiKey;
+import com.codename1.backend.security.apikey.ApiKeyAuthenticationToken;
 import com.codename1.backend.security.core.userdetails.User;
 import com.codename1.backend.security.core.userdetails.UserDetails;
+import com.codename1.backend.security.oauth2.jwt.Jwt;
+import com.codename1.backend.security.oauth2.server.resource.JwtAuthenticationToken;
 import com.codename1.impl.backend.security.SecurityAccess;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /// What a test says about one request's security, for static import:
 ///
@@ -48,6 +54,14 @@ import java.util.List;
 /// [#user] and [#authentication] say who the request is from, without asking a
 /// user store; [#csrf] gives a state-changing request the token its chain
 /// demands; [#httpBasic] sends real credentials for the chain to check.
+/// [#jwt] and [#apiKey] say the request came with a bearer token or an API
+/// key that was accepted -- with these claims, these scopes -- without a key to
+/// sign one with or a store to look one up in:
+///
+/// ```java
+/// mvc.perform(get("/api/orders").with(jwt().subject("svc").scopes("orders:read")));
+/// mvc.perform(get("/api/orders").with(apiKey("billing").scopes("orders:read")));
+/// ```
 public final class SecurityMockMvcRequestPostProcessors {
     private SecurityMockMvcRequestPostProcessors() {
     }
@@ -97,6 +111,23 @@ public final class SecurityMockMvcRequestPostProcessors {
                 return request;
             }
         };
+    }
+
+    /// The request carries a bearer token that was accepted: a JWT whose
+    /// subject is `user` and whose scope is `read`, until told otherwise. What
+    /// the chain's rules and the handler see is the
+    /// [JwtAuthenticationToken] a resource server would have made; no token is
+    /// sent and none is verified.
+    public static JwtRequestPostProcessor jwt() {
+        return new JwtRequestPostProcessor();
+    }
+
+    /// The request carries an API key of this owner that was accepted, with no
+    /// scopes until told otherwise. What the chain's rules and the handler see
+    /// is the [ApiKeyAuthenticationToken] the key would have made; no key is
+    /// sent and no repository is asked.
+    public static ApiKeyRequestPostProcessor apiKey(String owner) {
+        return new ApiKeyRequestPostProcessor(owner);
     }
 
     /// Makes `request` one from `authentication`, for as long as it is being
@@ -173,6 +204,117 @@ public final class SecurityMockMvcRequestPostProcessors {
             User user = new User(username, password, authorities);
             as(request, UsernamePasswordAuthenticationToken.authenticated(user, password,
                     authorities));
+            return request;
+        }
+    }
+
+    /// [SecurityMockMvcRequestPostProcessors#jwt()], to refine.
+    public static final class JwtRequestPostProcessor implements RequestPostProcessor {
+        private final Map<String, Object> claims = new LinkedHashMap<String, Object>();
+        private List<GrantedAuthority> authorities;
+
+        private JwtRequestPostProcessor() {
+            claims.put("sub", "user");
+            claims.put("scope", "read");
+        }
+
+        /// The token's `sub` claim, which is the request's user name.
+        public JwtRequestPostProcessor subject(String subject) {
+            claims.put("sub", subject);
+            return this;
+        }
+
+        /// One claim of the token; null removes it.
+        public JwtRequestPostProcessor claim(String name, Object value) {
+            if (value == null) {
+                claims.remove(name);
+            } else {
+                claims.put(name, value);
+            }
+            return this;
+        }
+
+        /// The token's `scope` claim. Each scope is granted as `SCOPE_` and
+        /// its name, as a resource server grants it, unless [#authorities]
+        /// says what is granted.
+        public JwtRequestPostProcessor scopes(String... scopes) {
+            StringBuilder joined = new StringBuilder();
+            for (String scope : scopes) {
+                joined.append(joined.length() == 0 ? "" : " ").append(scope);
+            }
+            claims.put("scope", joined.toString());
+            return this;
+        }
+
+        /// What the request is granted, as written, whatever the claims say.
+        public JwtRequestPostProcessor authorities(String... authorities) {
+            List<GrantedAuthority> granted = new ArrayList<GrantedAuthority>();
+            for (String authority : authorities) {
+                granted.add(new SimpleGrantedAuthority(authority));
+            }
+            this.authorities = granted;
+            return this;
+        }
+
+        @Override
+        public MockRequestBuilder postProcessRequest(MockRequestBuilder request) {
+            Map<String, Object> headers = new LinkedHashMap<String, Object>();
+            headers.put("alg", "none");
+            Jwt jwt = new Jwt("token", headers, claims);
+            List<GrantedAuthority> granted = authorities;
+            if (granted == null) {
+                granted = new ArrayList<GrantedAuthority>();
+                Object scope = claims.get("scope");
+                String listed = scope instanceof String ? (String) scope : "";
+                int start = 0;
+                while (start < listed.length()) {
+                    int space = listed.indexOf(' ', start);
+                    int end = space < 0 ? listed.length() : space;
+                    if (end > start) {
+                        granted.add(new SimpleGrantedAuthority("SCOPE_"
+                                + listed.substring(start, end)));
+                    }
+                    start = end + 1;
+                }
+            }
+            as(request, new JwtAuthenticationToken(jwt, granted));
+            return request;
+        }
+    }
+
+    /// [SecurityMockMvcRequestPostProcessors#apiKey(String)], to refine.
+    public static final class ApiKeyRequestPostProcessor implements RequestPostProcessor {
+        private final String owner;
+        private String id = "test-key";
+        private final List<String> scopes = new ArrayList<String>();
+
+        private ApiKeyRequestPostProcessor(String owner) {
+            if (owner == null || owner.length() == 0) {
+                throw new IllegalArgumentException("owner cannot be empty");
+            }
+            this.owner = owner;
+        }
+
+        /// The key's id, which is what a rate limit keyed by API key counts
+        /// under; `test-key` unless set.
+        public ApiKeyRequestPostProcessor id(String id) {
+            this.id = id;
+            return this;
+        }
+
+        /// The key's scopes, each granted as `SCOPE_` and its name.
+        public ApiKeyRequestPostProcessor scopes(String... scopes) {
+            this.scopes.clear();
+            for (String scope : scopes) {
+                this.scopes.add(scope);
+            }
+            return this;
+        }
+
+        @Override
+        public MockRequestBuilder postProcessRequest(MockRequestBuilder request) {
+            as(request, new ApiKeyAuthenticationToken(new ApiKey(id, owner, scopes, "test-hash",
+                    "cn1_", "test", false)));
             return request;
         }
     }
