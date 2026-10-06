@@ -102,11 +102,20 @@ public class TextUtils {
             return new String[0];
         }
         ArrayList<String> out = new ArrayList<String>();
-        if (expression.length() == 0 || !hasRegexMeta(expression)) {
+        if (expression.length() == 0) {
+            // The empty expression matches between every two characters and
+            // at the end, so Java yields each character plus a trailing "".
+            for (int i = 0; i < text.length(); i++) {
+                out.add(text.substring(i, i + 1));
+            }
+            out.add("");
+            return out.toArray(new String[out.size()]);
+        }
+        if (!hasRegexMeta(expression)) {
             int start = 0;
             while (true) {
                 int i = text.indexOf(expression, start);
-                if (i < 0 || expression.length() == 0) {
+                if (i < 0) {
                     out.add(text.substring(start));
                     break;
                 }
@@ -245,8 +254,39 @@ public class TextUtils {
         return "ar".equals(l) || "he".equals(l) || "iw".equals(l) || "fa".equals(l) || "ur".equals(l) ? 1 : 0;
     }
 
+    /// Fits a comma-separated list into `avail` by keeping whole items: the
+    /// longest run of leading items (each with its comma) that fits together
+    /// with the suffix `" " + oneMore` when one item is dropped, or
+    /// `" " + String.format(more, count)` when `count` are. As on Android, the
+    /// result is empty when not even the first item fits with its suffix.
     public static CharSequence commaEllipsize(CharSequence text, TextPaint p, float avail, String oneMore,
                                               String more) {
-        return ellipsize(text, p, avail, TruncateAt.END);
+        String s = text.toString();
+        if (p.measureText(s) <= avail) {
+            return text;
+        }
+        int len = s.length();
+        int remaining = 1;
+        for (int i = 0; i < len; i++) {
+            if (s.charAt(i) == ',') {
+                remaining++;
+            }
+        }
+        int ok = 0;
+        String okFormat = "";
+        for (int i = 0; i < len; i++) {
+            if (s.charAt(i) != ',') {
+                continue;
+            }
+            remaining--;
+            String format = remaining == 1 ? " " + oneMore : " " + String.format(more, remaining);
+            if (p.measureText(s, 0, i + 1) + p.measureText(format) <= avail) {
+                ok = i + 1;
+                okFormat = format;
+            }
+        }
+        SpannableStringBuilder out = new SpannableStringBuilder(okFormat);
+        out.insert(0, text, 0, ok);
+        return out;
     }
 }

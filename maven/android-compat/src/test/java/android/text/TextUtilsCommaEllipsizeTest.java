@@ -22,46 +22,48 @@
  */
 package android.text;
 
+import com.codename1.androidcompat.testing.AndroidTestSupport;
 import com.codename1.androidcompat.testing.MainThreadRule;
-
-import java.util.Arrays;
 
 import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-/// `TextUtils.split` takes a regular expression, as on Android, and keeps
-/// trailing empty strings (`String.split(expression, -1)`).
-public class TextUtilsSplitRegexTest {
+/// `TextUtils.commaEllipsize` keeps whole list items and says how many were
+/// dropped, as Android does for recipient summaries; it used to cut the list
+/// mid-item like a plain ellipsis.
+public class TextUtilsCommaEllipsizeTest {
+
+    private static final String LIST = "alpha,beta,gamma,delta";
 
     @Rule
     public final MainThreadRule mainThread = new MainThreadRule();
 
-    private static String split(String text, String expression) {
-        return Arrays.asList(TextUtils.split(text, expression)).toString();
+    private static TextPaint paint() {
+        AndroidTestSupport.context();
+        return new TextPaint();
     }
 
     @Test
-    public void regularExpressionsSplit() {
-        assertEquals("[a, b, c]", split("a  b\tc", "\\s+"));
-        assertEquals("[a, b, c]", split("a,b;c", "[,;]"));
-        assertEquals("[a, b]", split("a|b", "\\|"));
-        assertEquals("[1, 2, 3]", split("1.2.3", "\\."));
-        assertEquals("[, a, , ]", split(";a;;", "[;]"));
+    public void keepsWholeItemsAndCountsTheRest() {
+        TextPaint p = paint();
+        float avail = p.measureText("alpha,beta,") + p.measureText(" +2");
+        assertEquals("alpha,beta, +2",
+                TextUtils.commaEllipsize(LIST, p, avail, "+1", "+%d").toString());
     }
 
     @Test
-    public void literalSeparatorsAndEmptyText() {
-        assertEquals("[, a, b, ]", split(",a,b,", ","));
-        assertEquals("[a, b, ]", split("a::b::", "::"));
-        assertEquals("[abc]", split("abc", "x"));
-        assertEquals(0, TextUtils.split("", "\\s+").length);
+    public void oneDroppedItemUsesTheSingularSuffix() {
+        TextPaint p = paint();
+        float avail = p.measureText("alpha,beta,gamma,") + p.measureText(" +1");
+        assertEquals("alpha,beta,gamma, +1",
+                TextUtils.commaEllipsize(LIST, p, avail, "+1", "+%d").toString());
     }
 
     @Test
-    public void emptyExpressionSplitsBetweenCharacters() {
-        assertEquals("[a, b, c, ]", split("abc", ""));
-        assertEquals("[x, ]", split("x", ""));
+    public void fittingTextIsUnchanged() {
+        TextPaint p = paint();
+        assertEquals(LIST, TextUtils.commaEllipsize(LIST, p, p.measureText(LIST), "+1", "+%d").toString());
     }
 }

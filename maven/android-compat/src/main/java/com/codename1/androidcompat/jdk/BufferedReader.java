@@ -35,6 +35,7 @@ public class BufferedReader extends Reader {
     private static final int UNMARKED = -1;
     private static final int INVALIDATED = -2;
 
+    /// Null once the reader is closed, which every operation checks.
     private char[] buf;
     private int pos;
     private int count;
@@ -59,6 +60,12 @@ public class BufferedReader extends Reader {
     /// Refills the buffer once it is consumed. A valid mark keeps the
     /// characters from the mark on at the start of the buffer, growing it up
     /// to the read-ahead limit; reading past that limit drops the mark.
+    private void ensureOpen() throws IOException {
+        if (buf == null) {
+            throw new IOException("Stream closed");
+        }
+    }
+
     private boolean fill() throws IOException {
         int dst = 0;
         if (markedChar >= 0) {
@@ -91,6 +98,7 @@ public class BufferedReader extends Reader {
 
     @Override
     public int read() throws IOException {
+        ensureOpen();
         while (true) {
             if (pos >= count && !fill()) {
                 return -1;
@@ -108,6 +116,7 @@ public class BufferedReader extends Reader {
 
     @Override
     public int read(char[] cbuf, int off, int len) throws IOException {
+        ensureOpen();
         if (len == 0) {
             return 0;
         }
@@ -126,6 +135,7 @@ public class BufferedReader extends Reader {
     }
 
     public String readLine() throws IOException {
+        ensureOpen();
         StringBuilder sb = null;
         while (true) {
             if (pos >= count && !fill()) {
@@ -163,11 +173,13 @@ public class BufferedReader extends Reader {
 
     @Override
     public boolean ready() throws IOException {
+        ensureOpen();
         return pos < count || in.ready();
     }
 
     @Override
     public long skip(long n) throws IOException {
+        ensureOpen();
         long skipped = 0;
         while (skipped < n && read() >= 0) {
             skipped++;
@@ -185,6 +197,7 @@ public class BufferedReader extends Reader {
         if (readAheadLimit < 0) {
             throw new IllegalArgumentException("Read-ahead limit < 0");
         }
+        ensureOpen();
         this.readAheadLimit = readAheadLimit;
         markedChar = pos;
         markedSkipLf = skipLf;
@@ -192,6 +205,7 @@ public class BufferedReader extends Reader {
 
     @Override
     public void reset() throws IOException {
+        ensureOpen();
         if (markedChar < 0) {
             throw new IOException(markedChar == INVALIDATED ? "Mark invalid" : "Stream not marked");
         }
@@ -201,6 +215,10 @@ public class BufferedReader extends Reader {
 
     @Override
     public void close() throws IOException {
+        if (buf == null) {
+            return;
+        }
+        buf = null;
         in.close();
     }
 }

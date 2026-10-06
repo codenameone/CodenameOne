@@ -29,6 +29,7 @@ import java.io.InputStream;
 /// reset support.
 public class BufferedInputStream extends FilterInputStream {
 
+    /// Null once the stream is closed, which every read checks.
     protected byte[] buf;
     protected int count;
     protected int pos;
@@ -45,6 +46,12 @@ public class BufferedInputStream extends FilterInputStream {
             throw new IllegalArgumentException("Buffer size <= 0");
         }
         buf = new byte[size];
+    }
+
+    private void ensureOpen() throws IOException {
+        if (buf == null) {
+            throw new IOException("Stream closed");
+        }
     }
 
     private void fill() throws IOException {
@@ -74,6 +81,7 @@ public class BufferedInputStream extends FilterInputStream {
 
     @Override
     public int read() throws IOException {
+        ensureOpen();
         if (pos >= count) {
             fill();
             if (pos >= count) {
@@ -85,6 +93,7 @@ public class BufferedInputStream extends FilterInputStream {
 
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
+        ensureOpen();
         if (len == 0) {
             return 0;
         }
@@ -107,6 +116,7 @@ public class BufferedInputStream extends FilterInputStream {
 
     @Override
     public long skip(long n) throws IOException {
+        ensureOpen();
         if (n <= 0) {
             return 0;
         }
@@ -128,6 +138,7 @@ public class BufferedInputStream extends FilterInputStream {
 
     @Override
     public int available() throws IOException {
+        ensureOpen();
         return (count - pos) + in.available();
     }
 
@@ -139,10 +150,20 @@ public class BufferedInputStream extends FilterInputStream {
 
     @Override
     public void reset() throws IOException {
+        ensureOpen();
         if (markpos < 0) {
             throw new IOException("Resetting to invalid mark");
         }
         pos = markpos;
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (buf == null) {
+            return;
+        }
+        buf = null;
+        in.close();
     }
 
     @Override
