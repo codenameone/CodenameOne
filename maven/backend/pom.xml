@@ -144,6 +144,27 @@
                             </sources>
                         </configuration>
                     </execution>
+                    <!--
+                         One declaration per plugin: Maven 3.10 refuses a POM that
+                         declares the same plugin twice, where 3.9 only warned and
+                         merged them, so every execution of it belongs here.
+                    -->
+                    <execution>
+                        <id>attach-parparvm-sources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/${project.build.finalName}-parparvm-sources.jar</file>
+                                    <type>jar</type>
+                                    <classifier>parparvm-sources</classifier>
+                                </artifact>
+                            </artifacts>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
@@ -329,28 +350,6 @@
                         <goals>
                             <goal>checkstyle</goal>
                         </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>attach-parparvm-sources</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>attach-artifact</goal>
-                        </goals>
-                        <configuration>
-                            <artifacts>
-                                <artifact>
-                                    <file>${project.build.directory}/${project.build.finalName}-parparvm-sources.jar</file>
-                                    <type>jar</type>
-                                    <classifier>parparvm-sources</classifier>
-                                </artifact>
-                            </artifacts>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>

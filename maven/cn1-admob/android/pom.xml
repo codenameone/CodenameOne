@@ -208,13 +208,11 @@
                             </target>
                         </configuration>
                     </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
+                    <!--
+                         One declaration per plugin: Maven 3.10 refuses a POM that
+                         declares the same plugin twice, where 3.9 only warned and
+                         merged them, so every execution of it belongs here.
+                    -->
                     <execution>
                         <phase>package</phase>
                         <configuration>
