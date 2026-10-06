@@ -375,7 +375,13 @@ The backend is held to the client's gates:
   `package-info.java` per package; no since markers.
 - SpotBugs (zero findings, `maven/backend/spotbugs-exclude.xml`), PMD (the core's
   forbidden list) and Checkstyle (zero errors) run in `maven/backend`'s `verify`,
-  using the core's own `pmd.xml` and `checkstyle.xml`.
+  using the core's own `pmd.xml` and `checkstyle.xml`. Only two of the three
+  fail a local build: SpotBugs, and Checkstyle through its `check` execution
+  (`checkstyle-zero-errors`). **PMD writes `maven/backend/target/pmd.xml` and
+  judges nothing** -- its forbidden list lives in
+  `.github/scripts/generate-quality-report.py`, which PR CI runs afterwards. A
+  green `mvn verify` therefore says nothing about PMD: read the report. Both
+  reports once sat at seven and thirteen findings behind green local builds.
 - Error Prone's `BanClassForName`, because ParparVM translates the backend too.
 - `maven/backend` compiles only the `impl/javase` twins, so the production
   `impl/parparvm` tree gets its own analysis-only module, `maven/backend-parparvm`
