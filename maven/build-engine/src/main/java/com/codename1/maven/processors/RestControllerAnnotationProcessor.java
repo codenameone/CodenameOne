@@ -79,6 +79,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String REQUEST_PARAM = PKG + "RequestParam;";
     private static final String REQUEST_HEADER = PKG + "RequestHeader;";
     private static final String REQUEST_PART = PKG + "RequestPart;";
+    private static final String AUTHENTICATION_PRINCIPAL = PKG + "AuthenticationPrincipal;";
+    private static final String AUTHENTICATION_TYPE = "com.codename1.backend.security.Authentication";
+    private static final String CSRF_TOKEN_TYPE = "com.codename1.backend.security.CsrfToken";
+    private static final String SECURITY_SUPPORT = "com.codename1.impl.backend.security.SecuritySupport";
     private static final String REQUEST_BODY = PKG + "RequestBody;";
     private static final String RESPONSE_STATUS = PKG + "ResponseStatus;";
     private static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
@@ -266,7 +270,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     }
 
     private static final class Param {
-        String kind;      // PATH, QUERY, HEADER, BODY, REQUEST
+        String kind;      // PATH, QUERY, HEADER, BODY, PART, REQUEST, AUTHENTICATION, PRINCIPAL, CSRF
         String name;
         String javaType;
         /** The same type with its arguments, when the method carried a signature. */
@@ -284,6 +288,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
          */
         String codecRead;
     }
+
+    /// {AnnotatedClass, description} of every handler parameter the security
+    /// layer fills in, for the check that the module has a chain at all.
+    private final List<Object[]> securityParameters = new ArrayList<Object[]>();
 
     /// The JSON codecs for the application's own classes, created with the first
     /// route that needs one.
@@ -795,6 +803,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             AnnotationValues requestHeader = annotations.get(REQUEST_HEADER);
             AnnotationValues requestBody = annotations.get(REQUEST_BODY);
             AnnotationValues requestPart = annotations.get(REQUEST_PART);
+            AnnotationValues principal = annotations.get(AUTHENTICATION_PRINCIPAL);
             // EXACTLY one. The chain below is priority-ordered, so a parameter
             // carrying both @RequestHeader("Authorization") and @RequestParam("token")
             // silently bound whichever came first and read from a source the
@@ -803,13 +812,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // caller writes. The contract client processor already refuses this.
             int bindings = (pathVariable != null ? 1 : 0) + (requestParam != null ? 1 : 0)
                     + (requestHeader != null ? 1 : 0) + (requestBody != null ? 1 : 0)
-                    + (requestPart != null ? 1 : 0);
+                    + (requestPart != null ? 1 : 0) + (principal != null ? 1 : 0);
             if (bindings > 1) {
                 ctx.error(cls, "Parameter " + (i + 1) + " of " + cls.getBinaryName() + "."
                         + m.getName() + " carries more than one binding annotation. One "
                         + "parameter reads from one place: keep @PathVariable, "
-                        + "@RequestParam, @RequestHeader, @RequestPart or @RequestBody, and "
-                        + "drop the others.");
+                        + "@RequestParam, @RequestHeader, @RequestPart, @RequestBody or "
+                        + "@AuthenticationPrincipal, and drop the others.");
                 return null;
             }
             if (pathVariable != null) {
@@ -870,15 +879,38 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                             + "parameter is a HttpServer.Part, a byte[] or a String.");
                     return null;
                 }
+            } else if (principal != null) {
+                if (paramTypes[i].getSort() != Type.OBJECT) {
+                    // A principal is an object, and the binding hands over null
+                    // when it is not of the declared type -- which an int or an
+                    // array cannot hold or be tested for.
+                    ctx.error(cls, "@AuthenticationPrincipal parameter " + (i + 1) + " of "
+                            + cls.getBinaryName() + "." + m.getName() + " is a " + p.javaType
+                            + ". Declare the type of the principal -- UserDetails, usually -- "
+                            + "which is null when nobody of that type is signed in.");
+                    return null;
+                }
+                p.kind = "PRINCIPAL";
+                securityParameters.add(new Object[] {cls, "@AuthenticationPrincipal parameter "
+                        + (i + 1) + " of " + cls.getBinaryName() + "." + m.getName()});
             } else if (isRequestType(p.javaType)) {
                 // The escape hatch: a handler that needs something this binding does not
                 // model takes the Request itself, exactly as it would have before.
                 p.kind = "REQUEST";
+            } else if (AUTHENTICATION_TYPE.equals(p.javaType)) {
+                p.kind = "AUTHENTICATION";
+                securityParameters.add(new Object[] {cls, "The Authentication parameter "
+                        + (i + 1) + " of " + cls.getBinaryName() + "." + m.getName()});
+            } else if (CSRF_TOKEN_TYPE.equals(p.javaType)) {
+                p.kind = "CSRF";
+                securityParameters.add(new Object[] {cls, "The CsrfToken parameter "
+                        + (i + 1) + " of " + cls.getBinaryName() + "." + m.getName()});
             } else {
                 ctx.error(cls, "Parameter " + (i + 1) + " of " + cls.getBinaryName() + "."
                         + m.getName() + " has no binding annotation. Annotate it with "
-                        + "@PathVariable, @RequestParam, @RequestHeader, @RequestPart or "
-                        + "@RequestBody, or declare it as HttpServer.Request");
+                        + "@PathVariable, @RequestParam, @RequestHeader, @RequestPart, "
+                        + "@RequestBody or @AuthenticationPrincipal, or declare it as "
+                        + "HttpServer.Request, Authentication or CsrfToken");
                 return null;
             }
             p.genericJavaType = genericType;
@@ -943,7 +975,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "generates the codecs.");
                 return null;
             }
-            if (!"REQUEST".equals(p.kind) && !"PART".equals(p.kind)
+            if (!"REQUEST".equals(p.kind) && !"PART".equals(p.kind) && !isSecurityKind(p.kind)
                     && !isBindable(p.javaType, p.kind)) {
                 ctx.error(cls, "Cannot bind " + p.javaType + " from the request on "
                         + cls.getBinaryName() + "." + m.getName() + ". Path, query and "
@@ -1341,6 +1373,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (ctx.hasErrors()) {
             return;
         }
+        if (!securityParameters.isEmpty() && !beans.hasSecurityChains()) {
+            // Not a harmless null: the handler was written to act on who is
+            // signed in, and with no chain nobody ever is -- so it would run for
+            // everyone as though for nobody, which is the mistake a security
+            // check is there to prevent.
+            for (Object[] use : securityParameters) {
+                ctx.error((AnnotatedClass) use[0], use[1] + " is filled in by the security "
+                        + "layer, and this module declares no SecurityFilterChain bean, so "
+                        + "nobody ever signs in and it would always be null. Declare a "
+                        + "@Bean method returning a SecurityFilterChain built from the "
+                        + "HttpSecurity it is handed.");
+            }
+            return;
+        }
         // And one that only serves files: a static root in a properties file is
         // a server the runtime builds a router for.
         boolean staticFiles = settings.values.containsKey("cn1.static.root")
@@ -1610,10 +1656,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         emitBodyLocals(sb, route, pad);
 
         StringBuilder args = new StringBuilder();
+        boolean principalRead = false;
         for (int i = 0; i < route.params.size(); i++) {
             Param p = route.params.get(i);
             if (i > 0) {
                 args.append(", ");
+            }
+            if ("PRINCIPAL".equals(p.kind) && !principalRead) {
+                // Read once, into a local the instanceof test and the cast share.
+                principalRead = true;
+                sb.append(pad).append("final Object cn1Principal = ").append(SECURITY_SUPPORT)
+                  .append(".principal();\n");
             }
             args.append(argumentExpression(p));
         }
@@ -1683,7 +1736,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return false;
         }
         if ("PATH".equals(p.kind) || "REQUEST".equals(p.kind) || "BODY".equals(p.kind)
-                || "PART".equals(p.kind)) {
+                || "PART".equals(p.kind) || isSecurityKind(p.kind)) {
             return false;
         }
         return p.javaType != null && p.javaType.indexOf('.') < 0
@@ -2304,9 +2357,29 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 ? arg : null;
     }
 
+    /// Whether a parameter is filled from the security layer rather than read
+    /// out of the request: who is signed in, their principal, or the CSRF token.
+    private static boolean isSecurityKind(String kind) {
+        return "AUTHENTICATION".equals(kind) || "PRINCIPAL".equals(kind) || "CSRF".equals(kind);
+    }
+
     private static String argumentExpression(Param p) {
         if ("REQUEST".equals(p.kind)) {
             return "request";
+        }
+        if ("AUTHENTICATION".equals(p.kind)) {
+            return SECURITY_SUPPORT + ".authentication()";
+        }
+        if ("CSRF".equals(p.kind)) {
+            return SECURITY_SUPPORT + ".csrfToken(request)";
+        }
+        if ("PRINCIPAL".equals(p.kind)) {
+            // Tested, never merely cast: a principal of another type -- the
+            // anonymous one is a String -- is null to this handler. A failed cast
+            // does not throw on the translated runtime; it hands over the wrong
+            // object, whose fields are then read as the declared type's.
+            String type = p.javaType.replace('$', '.');
+            return "(cn1Principal instanceof " + type + " ? (" + type + ") cn1Principal : null)";
         }
         String raw;
         if ("PATH".equals(p.kind)) {
@@ -2857,6 +2930,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append(i == 0 ? "" : ", ").append(quote(flat.get(i)));
             }
             sb.append("});\n");
+        }
+        if (beans != null && beans.hasSecurityChains()) {
+            // The ONLY call that names the security layer, made for a build with
+            // a SecurityFilterChain bean. A server without one has none of the
+            // layer's code -- the translator drops the builder method nothing
+            // calls -- and pays one null check per request for its absence.
+            sb.append("        cn1Access.security(cn1Builder);\n");
         }
         if (devTools || (settings != null && settings.management)) {
             // The ONLY call that names the management endpoints, so a packaged

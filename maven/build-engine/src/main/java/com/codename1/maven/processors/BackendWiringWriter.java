@@ -250,6 +250,14 @@ final class BackendWiringWriter {
             initialize(sb, b, b.var, "        ", true);
         }
         for (BackendBeans.Bean b : model.beans) {
+            if (BackendBeans.isSecurityChain(b)) {
+                // The server asks them in @Order; a chain whose condition is off
+                // is null and is not registered.
+                sb.append("        environment.registerSecurityFilterChain(").append(b.var)
+                  .append(", ").append(b.order).append(");\n");
+            }
+        }
+        for (BackendBeans.Bean b : model.beans) {
             if (b.managed == null && b.tools.isEmpty()) {
                 continue;
             }
@@ -542,6 +550,17 @@ final class BackendWiringWriter {
             }
             if ("httpSession".equals(p.builtin)) {
                 return "request.getSession(true)";
+            }
+            if ("httpSecurity".equals(p.builtin)) {
+                StringBuilder sb = new StringBuilder("com.codename1.impl.backend.security."
+                        + "SecuritySupport.http(config, new Object[] {");
+                for (int i = 0; i < p.candidates.size(); i++) {
+                    if (i > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(reference(p.candidates.get(i)));
+                }
+                return sb.append("})").toString();
             }
             return p.builtin;
         }

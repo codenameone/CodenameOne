@@ -2495,6 +2495,206 @@ public class BackendBeansTest {
         }
     }
 
+    private static final String SECURED = PKG
+            + "import com.codename1.backend.security.*;\n"
+            + "import com.codename1.backend.security.core.userdetails.*;\n"
+            + "import com.codename1.backend.security.crypto.*;\n";
+
+    private static Map<String, String> secured() {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.SecurityConfig", SECURED
+                + "@Configuration public class SecurityConfig {\n"
+                // Declared against their order: the catch-all first.
+                + "    @Bean @Order(2) public SecurityFilterChain pagesChain(HttpSecurity http) {\n"
+                + "        http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll())\n"
+                + "            .csrf(csrf -> csrf.ignoringRequestMatchers(\"/open/**\"));\n"
+                + "        return http.build();\n"
+                + "    }\n"
+                + "    @Bean @Order(1) public SecurityFilterChain apiChain(HttpSecurity http) {\n"
+                + "        http.securityMatcher(\"/api/**\")\n"
+                + "            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())\n"
+                + "            .httpBasic(Customizer.withDefaults())\n"
+                + "            .csrf(csrf -> csrf.disable());\n"
+                + "        return http.build();\n"
+                + "    }\n"
+                + "    @Bean public PasswordEncoder encoder() { return new BCryptPasswordEncoder(4); }\n"
+                + "    @Bean public UserDetailsService users(PasswordEncoder encoder) {\n"
+                + "        return new InMemoryUserDetailsManager(User.withUsername(\"ada\")\n"
+                + "                .password(encoder.encode(\"ada-pw\")).roles(\"USER\").build());\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", SECURED
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/api/me\") public String me(Authentication who) {\n"
+                + "        return who == null ? \"nobody\" : who.getName();\n"
+                + "    }\n"
+                + "    @GetMapping(\"/api/user\") public String user(\n"
+                + "            @AuthenticationPrincipal UserDetails user,\n"
+                + "            @RequestParam(value = \"x\", defaultValue = \"-\") String x) {\n"
+                + "        return (user == null ? \"none\" : user.getUsername() + user.getAuthorities()) + x;\n"
+                + "    }\n"
+                // The principal is a User: declared as another type it is null,
+                // not a failed cast.
+                + "    @GetMapping(\"/api/odd\") public String odd(@AuthenticationPrincipal Integer n,\n"
+                + "            @AuthenticationPrincipal User user) {\n"
+                + "        return n + \" \" + (user == null ? \"none\" : user.getUsername());\n"
+                + "    }\n"
+                + "    @GetMapping(\"/open/who\") public String who(Authentication who,\n"
+                + "            @AuthenticationPrincipal UserDetails user,\n"
+                + "            @AuthenticationPrincipal String name) {\n"
+                + "        return who + \" \" + user + \" \" + name;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/open/csrf\") public String csrf(CsrfToken token) {\n"
+                + "        return token.getHeaderName() + \" \" + token.getParameterName() + \" \"\n"
+                + "                + (token.getToken().length() > 40);\n"
+                + "    }\n"
+                + "}\n");
+        return s;
+    }
+
+    private static String call(int port, String path, String user, String password)
+            throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + path)
+                .openConnection();
+        if (user != null) {
+            c.setRequestProperty("Authorization", "Basic " + com.codename1.backend.Base64.encode(
+                    (user + ":" + password).getBytes("UTF-8")));
+        }
+        return read(c);
+    }
+
+    @Test
+    public void aSecurityFilterChainBeanLinksTheLayerAndGuardsTheRoutes() throws Exception {
+        File classes = compile(secured());
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(classes, proc));
+        String bootstrap = proc.generateBootstrap("com.example");
+        assertTrue("a chain bean did not link the security layer:\n" + bootstrap,
+                bootstrap.contains("        cn1Access.security(cn1Builder);\n"));
+        String wiring = proc.generateWiring("com.example");
+        // Each chain method gets its own HttpSecurity, handed the beans it picks
+        // its user store and encoder from.
+        assertEquals(wiring, 2, wiring.split("SecuritySupport\\.http\\(config, new Object\\[\\] \\{"
+                + "b_encoder, b_users\\}\\)", -1).length - 1);
+        assertTrue(wiring, wiring.contains("environment.registerSecurityFilterChain(b_pagesChain, 2);"));
+        assertTrue(wiring, wiring.contains("environment.registerSecurityFilterChain(b_apiChain, 1);"));
+
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        BackendApplication app = (BackendApplication) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend.Builder builder = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), app);
+        // What the generated main does.
+        BackendAccess.get().security(builder);
+        Backend backend = builder.start();
+        try {
+            // @Order(1) is asked first although it was declared second: /api is
+            // its, and needs credentials.
+            assertEquals("HTTP 401: Unauthorized", call(port, "/api/me", null, null));
+            assertEquals("HTTP 401: Unauthorized", call(port, "/api/me", "ada", "wrong"));
+            assertEquals("ada", call(port, "/api/me", "ada", "ada-pw"));
+            assertEquals("ada[ROLE_USER]-", call(port, "/api/user", "ada", "ada-pw"));
+            assertEquals("ada[ROLE_USER]7", call(port, "/api/user?x=7", "ada", "ada-pw"));
+            assertEquals("null ada", call(port, "/api/odd", "ada", "ada-pw"));
+            // Nobody signed in: no Authentication, no UserDetails, and the
+            // anonymous principal for a parameter of its type.
+            assertEquals("null null anonymousUser", call(port, "/open/who", null, null));
+            assertEquals("X-CSRF-TOKEN _csrf true", call(port, "/open/csrf", null, null));
+        } finally {
+            backend.stop();
+        }
+        // Without the layer linked, a wiring that has chains refuses to start
+        // rather than serve its routes to anybody.
+        app = (BackendApplication) loader.loadClass("com.example.BackendWiring").newInstance();
+        try {
+            withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), app).start();
+            fail("a server with chains and no security layer started");
+        } catch (IllegalStateException refused) {
+            assertTrue(refused.getMessage(), refused.getMessage().contains(
+                    "the security layer was not linked into this server"));
+        }
+    }
+
+    @Test
+    public void aServerWithoutAChainLinksNoSecurity() throws Exception {
+        Map<String, String> plain = new LinkedHashMap<String, String>();
+        plain.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/x\") public String x() { return \"x\"; }\n"
+                + "}\n");
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(compile(plain), proc));
+        String bootstrap = proc.generateBootstrap("com.example");
+        assertFalse("nothing declares a chain, yet the entry point names the layer:\n" + bootstrap,
+                bootstrap.contains("security"));
+        String wiring = proc.generateWiring("com.example");
+        assertFalse(wiring, wiring.contains("security"));
+        assertFalse(wiring, wiring.contains("Security"));
+    }
+
+    @Test
+    public void securityParametersAndChainsAreCheckedAtBuildTime() throws Exception {
+        // A handler that reads who is signed in, in a module where nobody can be.
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Api", SECURED
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/me\") public String me(Authentication who) { return \"x\"; }\n"
+                + "    @GetMapping(\"/t\") public String t(CsrfToken token) { return \"x\"; }\n"
+                + "    @GetMapping(\"/u\") public String u(@AuthenticationPrincipal UserDetails u) {\n"
+                + "        return \"x\";\n    }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("The Authentication parameter 1 of com.example.Api.me "
+                + "is filled in by the security layer, and this module declares no "
+                + "SecurityFilterChain bean"));
+        assertTrue(errors, errors.contains("The CsrfToken parameter 1 of com.example.Api.t"));
+        assertTrue(errors, errors.contains("@AuthenticationPrincipal parameter 1 of "
+                + "com.example.Api.u"));
+
+        s = secured();
+        s.put("com.example.Api", SECURED
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/n\") public String n(@AuthenticationPrincipal int n) { return \"x\"; }\n"
+                + "}\n");
+        errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("@AuthenticationPrincipal parameter 1 of "
+                + "com.example.Api.n is a int. Declare the type of the principal"));
+
+        s = secured();
+        s.put("com.example.Api", SECURED
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/n\") public String n(\n"
+                + "            @AuthenticationPrincipal @RequestParam(\"n\") String n) { return n; }\n"
+                + "}\n");
+        errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("carries more than one binding annotation"));
+        assertTrue(errors, errors.contains("@RequestBody or @AuthenticationPrincipal, and drop "
+                + "the others"));
+
+        // A chain built later than start-up, or per request, would guard nothing.
+        s = secured();
+        s.put("com.example.Late", SECURED
+                + "@Configuration public class Late {\n"
+                + "    @Bean @Lazy public SecurityFilterChain lateChain(HttpSecurity http) {\n"
+                + "        return http.securityMatcher(\"/late/**\").build();\n"
+                + "    }\n"
+                + "    @Bean @Scope(\"request\") public DefaultSecurityFilterChain eachChain(HttpSecurity http) {\n"
+                + "        return http.securityMatcher(\"/each/**\").build();\n"
+                + "    }\n"
+                + "}\n");
+        errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("SecurityFilterChain lateChain (com.codename1.backend."
+                + "security.SecurityFilterChain) is @Lazy; the server takes its chains when it "
+                + "starts"));
+        assertTrue(errors, errors.contains("is request-scoped; the server takes its chains "
+                + "when it starts"));
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private Backend start(File classes, int port, Properties settings) throws Exception {

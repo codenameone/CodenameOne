@@ -118,6 +118,19 @@ final class BackendBeans {
     static final String SESSION_TYPE = "com/codename1/orm/session/Session";
     static final String REQUEST_TYPE = "com/codename1/backend/HttpServer$Request";
     static final String HTTP_SESSION_TYPE = "com/codename1/backend/HttpSession";
+    static final String SECURITY_PKG = "com/codename1/backend/security/";
+    static final String SECURITY_CHAIN_TYPE = SECURITY_PKG + "SecurityFilterChain";
+    static final String HTTP_SECURITY_TYPE = SECURITY_PKG + "HttpSecurity";
+    /// The bean types an HttpSecurity picks its collaborators from: every bean
+    /// of one of these is handed to it, and it chooses by type. A sign-in
+    /// mechanism that needs another kind of bean adds its type here.
+    static final String[] SECURITY_SHARED_TYPES = {
+        SECURITY_PKG + "core/userdetails/UserDetailsService",
+        SECURITY_PKG + "core/userdetails/UserDetailsPasswordService",
+        SECURITY_PKG + "crypto/PasswordEncoder",
+        SECURITY_PKG + "AuthenticationProvider",
+        SECURITY_PKG + "AuthenticationManager",
+    };
 
     static final String SINGLETON = "singleton";
     static final String PROTOTYPE = "prototype";
@@ -631,6 +644,21 @@ final class BackendBeans {
             }
         }
         return false;
+    }
+
+    /// Whether any bean is a SecurityFilterChain: what links the security layer
+    /// into the server.
+    boolean hasSecurityChains() {
+        for (Bean b : beans) {
+            if (isSecurityChain(b)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean isSecurityChain(Bean b) {
+        return b.types.contains(SECURITY_CHAIN_TYPE);
     }
 
     boolean hasTools() {
@@ -2007,6 +2035,13 @@ final class BackendBeans {
             if (b.isProxied()) {
                 checkProxyable(b);
             }
+            if (isSecurityChain(b) && !b.isEager()) {
+                // The chains are handed to the server once, when it starts: one
+                // built later, or once per request, would guard nothing.
+                ctx.error(where, "SecurityFilterChain " + b.describe() + " is "
+                        + (b.lazy ? "@Lazy" : b.scope + "-scoped") + "; the server takes its "
+                        + "chains when it starts, so a chain must be an ordinary singleton.");
+            }
             if (b.webSocket && !SINGLETON.equals(b.scope)) {
                 ctx.error(b.cls, "Websocket endpoint " + b.describe() + " is "
                         + b.scope + "-scoped; an endpoint serves many connections for the "
@@ -2157,6 +2192,25 @@ final class BackendBeans {
             needsDatabase = true;
             needsEntities = true;
             needsSession = true;
+            return;
+        }
+        if (HTTP_SECURITY_TYPE.equals(type)) {
+            // A new one at every injection point, like a prototype: each chain
+            // method configures and builds its own. It is given the beans it may
+            // pick a user store, a password encoder and providers from, which
+            // also puts them before the chain in construction order.
+            p.builtin = "httpSecurity";
+            for (Bean b : beans) {
+                if (b == owner || b == owner.owner || p.candidates.contains(b)) {
+                    continue;
+                }
+                for (String shared : SECURITY_SHARED_TYPES) {
+                    if (b.types.contains(shared)) {
+                        p.candidates.add(b);
+                        break;
+                    }
+                }
+            }
             return;
         }
         if (REQUEST_TYPE.equals(type) || HTTP_SESSION_TYPE.equals(type)) {
