@@ -49,10 +49,10 @@ import static org.junit.jupiter.api.Assertions.fail;
  * reference puts bcrypt, the login page and the JWT stack into every server with a chain, and
  * every test stays green.
  *
- * So this builds five whole servers, vm/backend/demo/linknone, linkjwt, linkform,
- * linkoauthlogin and linkauthserver -- no security, a JWT resource server only, a form login
- * only, a sign-in through another provider only, an authorization server only -- runs each to
- * prove it works, and reads the symbols of each binary. A class that is linked has a static
+ * So this builds six whole servers, vm/backend/demo/linknone, linkjwt, linkform,
+ * linkoauthlogin, linkauthserver and linkwebauthn -- no security, a JWT resource server only,
+ * a form login only, a sign-in through another provider only, an authorization server only,
+ * passkeys only -- runs each to prove it works, and reads the symbols of each binary. A class that is linked has a static
  * initializer symbol; the classes of what a server did not declare must have none.
  *
  * The same goes for the natives. They are compiled whole, and what leaves an uncalled one out
@@ -127,6 +127,17 @@ class BackendLinkingTest {
     private static final String[] FORM_ONLY = {"FormLoginConfigurer",
         "UsernamePasswordAuthenticationFilter", "DefaultLoginPageGeneratingFilter",
         "LoginUrlAuthenticationEntryPoint"};
+    /** Passkeys: the configurer, its filters, and what reads and verifies a ceremony. */
+    private static final String[] WEBAUTHN = {"WebAuthnConfigurer", "WebAuthnAuthenticationFilter",
+        "WebAuthnRegistrationFilter", "WebAuthnAuthenticationCodec", "webauthn_Cbor",
+        "webauthn_CoseKey", "webauthn_AuthenticatorData",
+        "webauthn_WebAuthnRelyingPartyOperations", "webauthn_WebAuthnAuthentication",
+        "webauthn_CredentialRecord", "webauthn_InMemoryUserCredentialRepository",
+        "webauthn_InMemoryPublicKeyCredentialUserEntityRepository"};
+    /** Every class of passkeys, by prefix: what a server without them must not hold. */
+    private static final String[] NO_WEBAUTHN = {"WebAuthnConfigurer",
+        "WebAuthnAuthenticationFilter", "WebAuthnRegistrationFilter",
+        "WebAuthnAuthenticationCodec", "webauthn_"};
     /** The natives only a server that signs, verifies or encrypts calls. */
     private static final String[] SIGNING_NATIVES = {"Crypto_signImpl", "Crypto_verifyImpl",
         "Crypto_aesGcmImpl", "Crypto_generateRsaKeyImpl"};
@@ -157,6 +168,9 @@ class BackendLinkingTest {
         Set<String> issuer = build(work, "LinkAuthServer", "demo/linkauthserver", jdk8,
                 "LINKCHECK authserver open=200 metadata=200 jwks=200 token=200 signed=true "
                         + "wrong=401 device=200 authorize=401 elsewhere=403");
+        Set<String> passkeys = build(work, "LinkWebAuthn", "demo/linkwebauthn", jdk8,
+                "LINKCHECK webauthn open=200 options=200 rp=true refused=401 register=403 "
+                        + "home=403 registered=true verified=ada forged=signature_invalid");
 
         // No chain, no layer: not one class of it, the internals included.
         List<String> stray = new ArrayList<String>();
@@ -221,6 +235,36 @@ class BackendLinkingTest {
         absent("LinkAuthServer", issuer, NEVER);
         absent("LinkAuthServer", issuer, OAUTH_OPTIONAL);
 
+        // Passkeys: the ceremonies, the session they end in, and the CBOR and
+        // DER that read a credential's key -- and no form, no passwords, no
+        // tokens, no second factor, nothing that keeps a table. The fixture
+        // verifies a registration and a sign-in made elsewhere, so what is
+        // present here ran, translated.
+        present("LinkWebAuthn", passkeys, WEBAUTHN);
+        present("LinkWebAuthn", passkeys, "SessionSignIn", "LogoutFilter",
+                "HttpSessionRequestCache", "crypto_Der", "HttpSecurity", "AuthorizationFilter");
+        absent("LinkWebAuthn", passkeys, FORM_ONLY);
+        absent("LinkWebAuthn", passkeys, PASSWORDS);
+        absent("LinkWebAuthn", passkeys, NEVER);
+        absent("LinkWebAuthn", passkeys, OAUTH_LOGIN);
+        absent("LinkWebAuthn", passkeys, AUTH_SERVER);
+        absent("LinkWebAuthn", passkeys, OAUTH_OPTIONAL);
+        absent("LinkWebAuthn", passkeys, "oauth2_", "OAuth2ResourceServerConfigurer",
+                "BearerTokenAuthenticationFilter", "OAuth2AuthenticationCodec", "crypto_Jwk",
+                "crypto_JwkSet", "crypto_KeyFiles", "crypto_SignedTokens",
+                "webauthn_JdbcUserCredentialRepository",
+                "webauthn_JdbcPublicKeyCredentialUserEntityRepository");
+        // And nobody else holds a class of it, nor the codec of a sign-in
+        // through another provider where there is none.
+        absent("LinkJwt", jwt, NO_WEBAUTHN);
+        absent("LinkForm", form, NO_WEBAUTHN);
+        absent("LinkOAuthLogin", login, NO_WEBAUTHN);
+        absent("LinkAuthServer", issuer, NO_WEBAUTHN);
+        present("LinkOAuthLogin", login, "OAuth2AuthenticationCodec");
+        absent("LinkJwt", jwt, "OAuth2AuthenticationCodec");
+        absent("LinkForm", form, "OAuth2AuthenticationCodec");
+        absent("LinkAuthServer", issuer, "OAuth2AuthenticationCodec");
+
         // The natives, which only the linker can leave out. The server that
         // signs holds the signature native -- so its absence elsewhere is the
         // linker's doing and not a symbol that was renamed.
@@ -242,6 +286,14 @@ class BackendLinkingTest {
         }
         assertTrue(NATIVES.get("LinkOAuthLogin").contains("com_codename1_backend_Crypto_verifyImpl"),
                 "LinkOAuthLogin verifies ID tokens, and its binary holds no native for it");
+        assertTrue(NATIVES.get("LinkWebAuthn").contains("com_codename1_backend_Crypto_verifyImpl"),
+                "LinkWebAuthn verifies assertions, and its binary holds no native for it");
+        for (String symbol : new String[] {"Crypto_signImpl", "Crypto_generateRsaKeyImpl",
+            "Crypto_aesGcmImpl"}) {
+            assertTrue(!NATIVES.get("LinkWebAuthn").contains("com_codename1_backend_" + symbol),
+                    "LinkWebAuthn signs nothing, makes no keys and encrypts nothing, and its "
+                            + "binary holds the native " + symbol);
+        }
         for (String symbol : new String[] {"Crypto_signImpl", "Crypto_generateRsaKeyImpl",
             "Crypto_aesGcmImpl"}) {
             assertTrue(!NATIVES.get("LinkOAuthLogin").contains("com_codename1_backend_" + symbol),
@@ -289,6 +341,9 @@ class BackendLinkingTest {
         assertTrue(classes.size() > 300 && classes.contains("com_codename1_backend_Backend"),
                 "could not read the classes of " + main + " from its symbols: " + classes.size());
         NATIVES.put(main, natives.toString());
+        // For the log: what each kind of security costs a binary.
+        System.out.println("LINKSIZE " + main + " " + Files.size(binary) + " bytes, "
+                + classes.size() + " classes");
         return classes;
     }
 

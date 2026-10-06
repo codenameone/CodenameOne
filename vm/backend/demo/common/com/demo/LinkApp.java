@@ -33,12 +33,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/// What the three link-check servers share: an application with one handler,
+/// What the link-check servers share: an application with one handler,
 /// standing in for the wiring a build generates, and a way to send it a request
 /// in process.
 ///
-/// Each of LinkNone, LinkJwt and LinkForm is a whole server that declares one
-/// kind of security, or none. They exist to be translated: the driver test
+/// Each of them -- LinkNone, LinkJwt, LinkForm and the rest -- is a whole server
+/// that declares one kind of security, or none. They exist to be translated: the driver test
 /// reads the symbols of each binary and requires the code of what a server did
 /// NOT declare to be absent from it. This class names nothing of the security
 /// layer, so the server with no chain carries none of it.
