@@ -143,21 +143,50 @@ final class FilterChainEngine implements RequestSecurity {
     /// Starts serving `request`: the chain that guards it, or null -- with the
     /// exchange left in place when the request is refused outright, and removed
     /// when no chain claims it.
+    ///
+    /// A request no chain claims is not this layer's to judge, however its
+    /// path is written: it goes to the routers exactly as it would in a server
+    /// with no chain. A path that is not [#wellFormed] is refused when a chain
+    /// claims it -- as it was sent, or as anything further on might read it;
+    /// see [#readings]. That second half is what stops a request leaving a
+    /// chain by being misspelled.
     private SecurityFilterChain begin(HttpServer.Request request) {
         // Over TLS this server terminated, or TLS a trusted proxy did: see
         // HttpServer.Request.isSecure.
         SecurityExchange exchange = new SecurityExchange(request, tls || request.isSecure());
         SecurityExchange.enter(exchange);
-        if (!wellFormed(SecurityExchange.path(request))) {
+        String path = SecurityExchange.path(request);
+        SecurityFilterChain chain = match(request);
+        if (!wellFormed(path)) {
+            if (chain == null && !claimedAsRead(request, exchange, path)) {
+                SecurityExchange.leave();
+            }
             return null;
         }
-        SecurityFilterChain chain = match(request);
         if (chain == null) {
             SecurityExchange.leave();
             return null;
         }
         exchange.setFilterChain(chain);
         return chain;
+    }
+
+    /// Whether a chain matches any of the [#readings] of a path that is not
+    /// well formed. The chains are asked about each as if it were the
+    /// request's path, which is what a path matcher compares.
+    private boolean claimedAsRead(HttpServer.Request request, SecurityExchange exchange,
+                                  String path) {
+        try {
+            for (String reading : readings(path)) {
+                exchange.path(reading);
+                if (match(request) != null) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            exchange.path(path);
+        }
     }
 
     private HttpServer.Response run(SecurityFilterChain chain, HttpServer.Request request,
@@ -248,11 +277,11 @@ final class FilterChainEngine implements RequestSecurity {
         SecurityExchange.enter((SecurityExchange) previous[1]);
     }
 
-    /// Whether `path` is one this layer will judge. A path written to look like
-    /// one thing to a rule and another to whatever serves it is refused before
-    /// either sees it: a `;` parameter, a backslash, an empty or dot segment, an
-    /// encoded slash, backslash, percent, dot, semicolon or NUL, or a control
-    /// character.
+    /// Whether `path` is one a chain will judge. A path written to look like
+    /// one thing to a rule and another to whatever serves it is refused by the
+    /// chain that claims it, before any rule sees it: a `;` parameter, a
+    /// backslash, an empty or dot segment, an encoded slash, backslash,
+    /// percent, dot, semicolon or NUL, or a control character.
     static boolean wellFormed(String path) {
         if (path.length() == 0 || path.charAt(0) != '/') {
             // OPTIONS * and a CONNECT authority match no path rule; let the
@@ -295,6 +324,130 @@ final class FilterChainEngine implements RequestSecurity {
             }
         }
         return true;
+    }
+
+    /// What a path that is not [#wellFormed] could be taken for by something
+    /// that reads it more generously than the routers do -- a proxy in front, a
+    /// handler that resolves the path itself, a file system. Each is a path a
+    /// chain is asked about, so that `/public/..%2Fapi/secure` cannot leave the
+    /// chain of `/api/**` by not looking like it.
+    ///
+    /// Escapes are resolved until none is left, so one hidden inside another
+    /// is found; a backslash is a slash; a `;` parameter is dropped from its
+    /// segment; control characters are dropped. That is the first reading. The
+    /// second resolves its empty and dot segments as RFC 3986 5.2.4 does, and
+    /// the third is the second without the slash a trailing dot segment
+    /// leaves. A path with a NUL is also read as ending there.
+    static List<String> readings(String path) {
+        List<String> out = new java.util.ArrayList<String>(6);
+        String decoded = decodeAll(path);
+        addReadings(out, decoded);
+        int nul = decoded.indexOf((char) 0);
+        if (nul > 0) {
+            addReadings(out, decoded.substring(0, nul));
+        }
+        return out;
+    }
+
+    private static void addReadings(List<String> out, String decoded) {
+        StringBuilder plain = new StringBuilder(decoded.length());
+        boolean parameter = false;
+        for (int iter = 0 ; iter < decoded.length() ; iter++) {
+            char c = decoded.charAt(iter);
+            if (c == '\\') {
+                c = '/';
+            }
+            if (c == '/') {
+                parameter = false;
+            } else if (c == ';') {
+                parameter = true;
+            }
+            if (!parameter && c >= 0x20 && c != 0x7f) {
+                plain.append(c);
+            }
+        }
+        add(out, plain.toString());
+        List<String> kept = new java.util.ArrayList<String>();
+        boolean trailing = false;
+        for (String segment : AntPathRequestMatcher.split(plain.toString())) {
+            trailing = false;
+            if ("..".equals(segment)) {
+                if (!kept.isEmpty()) {
+                    kept.remove(kept.size() - 1);
+                }
+                trailing = true;
+            } else if (".".equals(segment)) {
+                trailing = true;
+            } else if (segment.length() > 0) {
+                kept.add(segment);
+            } else {
+                trailing = true;
+            }
+        }
+        StringBuilder resolved = new StringBuilder(plain.length());
+        for (String segment : kept) {
+            resolved.append('/').append(segment);
+        }
+        if (resolved.length() == 0) {
+            add(out, "/");
+            return;
+        }
+        add(out, resolved.toString());
+        if (trailing) {
+            add(out, resolved.append('/').toString());
+        }
+    }
+
+    private static void add(List<String> out, String reading) {
+        if (reading.length() > 0 && reading.charAt(0) == '/' && !out.contains(reading)) {
+            out.add(reading);
+        }
+    }
+
+    /// `path` with its percent-escapes of ASCII characters resolved, again and
+    /// again until that changes nothing: every round is shorter than the last.
+    private static String decodeAll(String path) {
+        String current = path;
+        while (true) {
+            StringBuilder sb = null;
+            int length = current.length();
+            for (int iter = 0 ; iter < length ; iter++) {
+                char c = current.charAt(iter);
+                if (c == '%' && iter + 2 < length && hex(current.charAt(iter + 1)) >= 0
+                        && hex(current.charAt(iter + 2)) >= 0) {
+                    int value = (hex(current.charAt(iter + 1)) << 4)
+                            | hex(current.charAt(iter + 2));
+                    if (value < 0x80) {
+                        if (sb == null) {
+                            sb = new StringBuilder(length).append(current.substring(0, iter));
+                        }
+                        sb.append((char) value);
+                        iter += 2;
+                        continue;
+                    }
+                }
+                if (sb != null) {
+                    sb.append(c);
+                }
+            }
+            if (sb == null) {
+                return current;
+            }
+            current = sb.toString();
+        }
+    }
+
+    private static int hex(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
     }
 
     /// The filters of a chain, then the application: what a filter sees as the

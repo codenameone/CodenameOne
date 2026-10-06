@@ -109,6 +109,15 @@ final class SecuredServer implements AutoCloseable {
         return settings;
     }
 
+    /// The profile of a server started with no security layer at all.
+    private static final String UNSECURED = "unsecured";
+
+    /// The same application with no chain and no security layer linked: what
+    /// the server answered before it had any.
+    static SecuredServer startUnsecured(HttpServer.Handler handler) throws Exception {
+        return start(settings(), UNSECURED, new Object[0], handler);
+    }
+
     static SecuredServer start(HttpServer.Handler handler, Chain... chains) throws Exception {
         return start(settings(), "test", new Object[0], handler, chains);
     }
@@ -163,7 +172,9 @@ final class SecuredServer implements AutoCloseable {
         Backend.Builder builder = Backend.builder(Config.of(settings, profile)).quiet()
                 .host("127.0.0.1");
         BackendAccess.get().application(builder, application);
-        BackendAccess.get().security(builder);
+        if (chains.length > 0 || !UNSECURED.equals(profile)) {
+            BackendAccess.get().security(builder);
+        }
         self[0] = new SecuredServer(builder.start());
         self[0].reachedSource = reached;
         return self[0];

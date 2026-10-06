@@ -223,12 +223,24 @@ chain in this chapter asks for `SCOPE_orders:read`.
 
 ==== Paths the layer refuses
 
-Before any rule sees a request, the layer checks that its path can't mean one
-thing to a rule and another to the router. A path with a `;` parameter, a
-backslash, an empty segment, a `.` or `..` segment or a control character is
-answered `400 Bad Request`. The same goes for a path with an encoded slash,
-backslash, percent, dot, semicolon, or NUL. The check applies to every request of a server
-that has a chain.
+Before any rule of a chain sees a request, the chain checks that its path can't
+mean one thing to a rule and another to the router. A path with a `;`
+parameter, a backslash, an empty segment, a `.` or `..` segment or a control
+character is answered `400 Bad Request`. The same goes for a path with an
+encoded slash, backslash, percent, dot, semicolon, or NUL.
+
+The check belongs to the chain that claims the request. A request no chain
+matches is answered exactly as a server with no chain answers it, however its
+path is written.
+
+A request can't leave its chain by being misspelled. A path of that kind is
+also compared as a proxy or a handler might read it, with its escapes resolved,
+its `;` parameters dropped and its empty and dot segments removed. If a chain
+matches any of those readings, the request is refused. With a chain on
+`/api/**`, both `//api/orders` and `/public/..%2Fapi/orders` get a 400.
+
+Matching is case sensitive, as routing is. `/API/orders` is a different route
+from `/api/orders`, so it reaches nothing the chain guards.
 
 ==== The answers to a refused request
 

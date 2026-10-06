@@ -93,6 +93,12 @@ public final class SecurityExchange {
         return exchange.path;
     }
 
+    /// Has the rules compare `path` as this request's: for asking the chains
+    /// about another reading of a path, and for putting the real one back.
+    void path(String path) {
+        this.path = path;
+    }
+
     private static String canonicalPath(HttpServer.Request request) {
         return request.getTarget() == null ? "" : request.pathFrom(0);
     }
