@@ -30,7 +30,7 @@ import java.io.IOException;
 /// for authorization-server responses (e.g. `"access_denied"`, `"invalid_grant"`)
 /// and uses Codename One-specific values for transport or client-side problems
 /// (`"transport_error"`, `"state_mismatch"`, `"nonce_mismatch"`, `"user_cancelled"`,
-/// `"discovery_failed"`, `"invalid_id_token"`).
+/// `"discovery_failed"`, `"invalid_id_token"`, `"storage_unavailable"`).
 ///
 public class OidcException extends IOException {
 
@@ -59,6 +59,19 @@ public class OidcException extends IOException {
 
     /// Generic transport / network failure.
     public static final String TRANSPORT_ERROR = "transport_error";
+
+    /// A [TokenStore] could not read, write or remove the tokens -- the platform has no
+    /// secure storage, or the store failed.
+    public static final String STORAGE_UNAVAILABLE = "storage_unavailable";
+
+    /// Device grant: the user has not finished approving the device yet. Polling continues.
+    public static final String AUTHORIZATION_PENDING = "authorization_pending";
+
+    /// Device grant: the device asked too often; it must wait longer between requests.
+    public static final String SLOW_DOWN = "slow_down";
+
+    /// Device grant: the device code ran out before the user approved it.
+    public static final String EXPIRED_TOKEN = "expired_token";
 
     private final String error;
     private final String errorDescription;

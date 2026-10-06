@@ -90,7 +90,12 @@ public final class OidcTokens {
         String scope = stringOrNull(json.get("scope"));
         Date expiresAt = null;
         Object expiresIn = json.get("expires_in");
-        if (expiresIn != null) {
+        if (expiresIn instanceof Number) {
+            // Not through the text form: a Double of ten million seconds or more prints as
+            // "1.0E7", which read up to its dot is one second.
+            expiresAt = new Date(System.currentTimeMillis()
+                    + ((Number) expiresIn).longValue() * 1000L);
+        } else if (expiresIn != null) {
             try {
                 String raw = expiresIn.toString().trim();
                 int dot = raw.indexOf('.');
