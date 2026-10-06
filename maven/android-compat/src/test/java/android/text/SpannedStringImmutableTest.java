@@ -22,24 +22,34 @@
  */
 package android.text;
 
-/// Immutable text with immutable spans. Deliberately not a [Spannable], as on
-/// Android, so a holder may retain one knowing nothing can change it.
-public final class SpannedString extends SpannableStringInternal {
+import android.text.style.ForegroundColorSpan;
 
-    public SpannedString(CharSequence source) {
-        super(source);
-    }
+import org.junit.Test;
 
-    private SpannedString(String text, SpanSet spans) {
-        super(text, spans);
-    }
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-    public static SpannedString valueOf(CharSequence source) {
-        return source instanceof SpannedString ? (SpannedString) source : new SpannedString(source);
-    }
+/// `SpannedString` is not a `Spannable`, so nothing can change a retained
+/// one. It used to extend `SpannableString` and inherit `setSpan`.
+public class SpannedStringImmutableTest {
 
-    @Override
-    public CharSequence subSequence(int start, int end) {
-        return new SpannedString(toString().substring(start, end), spans().slice(start, end));
+    @Test
+    public void spannedStringIsNotSpannable() {
+        SpannableString source = new SpannableString("hello");
+        ForegroundColorSpan red = new ForegroundColorSpan(0xffff0000);
+        source.setSpan(red, 1, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        Object s = new SpannedString(source);
+        assertFalse(s instanceof Spannable);
+        assertTrue(s instanceof Spanned);
+        Spanned sp = (Spanned) s;
+        assertEquals(1, sp.getSpanStart(red));
+        assertEquals(3, sp.getSpanEnd(red));
+
+        source.removeSpan(red);
+        assertEquals(1, sp.getSpans(0, 5, Object.class).length);
+        Object sub = sp.subSequence(0, 2);
+        assertTrue(sub instanceof Spanned);
+        assertFalse(sub instanceof Spannable);
     }
 }

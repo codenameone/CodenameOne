@@ -23,110 +23,32 @@
 package android.text;
 
 /// Immutable text with mutable spans.
-public class SpannableString implements CharSequence, GetChars, Spannable {
-
-    private final String text;
-    private final SpanSet spans;
+public class SpannableString extends SpannableStringInternal implements Spannable {
 
     public SpannableString(CharSequence source) {
-        text = source == null ? "" : source.toString();
-        if (source instanceof SpannableString) {
-            spans = ((SpannableString) source).spans.copy();
-        } else if (source instanceof SpannableStringBuilder) {
-            spans = new SpanSet();
-            Object[] all = ((SpannableStringBuilder) source).getSpans(0, source.length(), Object.class);
-            for (Object o : all) {
-                SpannableStringBuilder b = (SpannableStringBuilder) source;
-                spans.set(o, b.getSpanStart(o), b.getSpanEnd(o), b.getSpanFlags(o));
-            }
-        } else {
-            spans = new SpanSet();
-        }
+        super(source);
     }
 
     private SpannableString(String text, SpanSet spans) {
-        this.text = text;
-        this.spans = spans;
+        super(text, spans);
     }
 
     public static SpannableString valueOf(CharSequence source) {
         return source instanceof SpannableString ? (SpannableString) source : new SpannableString(source);
     }
 
-    SpanSet spans() {
-        return spans;
-    }
-
-    @Override
-    public int length() {
-        return text.length();
-    }
-
-    @Override
-    public char charAt(int index) {
-        return text.charAt(index);
-    }
-
     @Override
     public CharSequence subSequence(int start, int end) {
-        return new SpannableString(text.substring(start, end), spans.slice(start, end));
-    }
-
-    @Override
-    public void getChars(int start, int end, char[] dest, int destoff) {
-        text.getChars(start, end, dest, destoff);
-    }
-
-    @Override
-    public String toString() {
-        return text;
+        return new SpannableString(toString().substring(start, end), spans().slice(start, end));
     }
 
     @Override
     public void setSpan(Object what, int start, int end, int flags) {
-        spans.set(what, start, end, flags);
+        setSpanInternal(what, start, end, flags);
     }
 
     @Override
     public void removeSpan(Object what) {
-        spans.remove(what);
-    }
-
-    @Override
-    public <T> T[] getSpans(int start, int end, Class<T> type) {
-        return spans.get(start, end, type);
-    }
-
-    @Override
-    public int getSpanStart(Object tag) {
-        SpanSet.Entry e = spans.find(tag);
-        return e == null ? -1 : e.start;
-    }
-
-    @Override
-    public int getSpanEnd(Object tag) {
-        SpanSet.Entry e = spans.find(tag);
-        return e == null ? -1 : e.end;
-    }
-
-    @Override
-    public int getSpanFlags(Object tag) {
-        SpanSet.Entry e = spans.find(tag);
-        return e == null ? 0 : e.flags;
-    }
-
-    @Override
-    public int nextSpanTransition(int start, int limit, Class type) {
-        return spans.nextTransition(start, limit, type);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        return o instanceof CharSequence && o.toString().equals(text);
-    }
-
-    @Override
-    public int hashCode() {
-        return text.hashCode();
+        removeSpanInternal(what);
     }
 }

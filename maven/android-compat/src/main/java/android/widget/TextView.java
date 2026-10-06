@@ -421,6 +421,11 @@ public class TextView extends View {
             // Android hands back a Spannable for this mode, and callers add
             // spans by casting getText() to one.
             text = new SpannableString(text);
+        } else {
+            // A snapshot, as on Android: keeping a caller's mutable builder
+            // would let later edits change getText() behind the filters,
+            // watchers and layout.
+            text = TextUtils.stringOrSpannedString(text);
         }
         sendBeforeTextChanged(old, 0, old == null ? 0 : old.length(), text.length());
         mText = text;

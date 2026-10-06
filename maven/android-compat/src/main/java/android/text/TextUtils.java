@@ -221,8 +221,20 @@ public class TextUtils {
         return source.subSequence(start, end).toString();
     }
 
+    /// An immutable snapshot of `source`: a String, or a [SpannedString]
+    /// when it carries spans, so a later edit of a mutable source cannot
+    /// reach the copy.
     public static CharSequence stringOrSpannedString(CharSequence source) {
-        return source;
+        if (source == null) {
+            return null;
+        }
+        if (source instanceof SpannedString) {
+            return source;
+        }
+        if (source instanceof Spanned) {
+            return new SpannedString(source);
+        }
+        return source.toString();
     }
 
     public static int getLayoutDirectionFromLocale(java.util.Locale locale) {

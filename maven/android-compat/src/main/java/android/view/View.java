@@ -262,6 +262,7 @@ public class View implements Drawable.Callback {
     private Drawable mBackground;
     private Drawable mForeground;
     private ColorStateList mBackgroundTint;
+    private PorterDuff.Mode mBackgroundTintMode;
     private int mVisibility = VISIBLE;
     private boolean mEnabled = true;
     private boolean mClickable;
@@ -1838,6 +1839,9 @@ public class View implements Drawable.Callback {
             if (mBackgroundTint != null) {
                 background.setTintList(mBackgroundTint);
             }
+            if (mBackgroundTintMode != null) {
+                background.setTintMode(mBackgroundTintMode);
+            }
         }
         requestLayout();
         invalidate();
@@ -1872,10 +1876,17 @@ public class View implements Drawable.Callback {
         return mBackgroundTint;
     }
 
+    /// Kept on the view, like the tint list, so a replacement background
+    /// is tinted the same way.
     public void setBackgroundTintMode(PorterDuff.Mode mode) {
+        mBackgroundTintMode = mode;
         if (mBackground != null) {
             mBackground.setTintMode(mode);
         }
+    }
+
+    public PorterDuff.Mode getBackgroundTintMode() {
+        return mBackgroundTintMode;
     }
 
     public Drawable getForeground() {

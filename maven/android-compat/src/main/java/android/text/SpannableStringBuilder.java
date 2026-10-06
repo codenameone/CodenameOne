@@ -55,8 +55,8 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
         text = new StringBuilder(source == null ? "" : source.toString().substring(start, end));
         if (source instanceof SpannableStringBuilder) {
             spans = ((SpannableStringBuilder) source).spans.slice(start, end);
-        } else if (source instanceof SpannableString) {
-            spans = ((SpannableString) source).spans().slice(start, end);
+        } else if (source instanceof SpannableStringInternal) {
+            spans = ((SpannableStringInternal) source).spans().slice(start, end);
         } else {
             spans = new SpanSet();
         }
@@ -234,11 +234,11 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof CharSequence && o.toString().equals(toString());
+        return SpannableStringInternal.spannedEquals(this, o);
     }
 
     @Override
     public int hashCode() {
-        return text.toString().hashCode();
+        return SpannableStringInternal.spannedHashCode(this);
     }
 }

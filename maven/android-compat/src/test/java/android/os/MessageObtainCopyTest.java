@@ -20,26 +20,38 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package android.text;
+package android.os;
 
-/// Immutable text with immutable spans. Deliberately not a [Spannable], as on
-/// Android, so a holder may retain one knowing nothing can change it.
-public final class SpannedString extends SpannableStringInternal {
+import org.junit.Test;
 
-    public SpannedString(CharSequence source) {
-        super(source);
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+
+/// `Message.obtain(Message)` copies `replyTo` and gives the copy its own
+/// bundle. It used to drop the reply channel and share the bundle, so an
+/// edit through either message showed up in the other.
+public class MessageObtainCopyTest {
+
+    @Test
+    public void copyKeepsReplyToAndOwnsItsBundle() {
+        Message orig = new Message();
+        orig.what = 7;
+        orig.replyTo = new Messenger(null);
+        orig.getData().putString("k", "v");
+
+        Message copy = Message.obtain(orig);
+        assertSame(orig.replyTo, copy.replyTo);
+        assertEquals("v", copy.getData().getString("k"));
+        assertNotSame(orig.getData(), copy.getData());
+
+        copy.getData().putString("k", "changed");
+        assertEquals("v", orig.getData().getString("k"));
     }
 
-    private SpannedString(String text, SpanSet spans) {
-        super(text, spans);
-    }
-
-    public static SpannedString valueOf(CharSequence source) {
-        return source instanceof SpannedString ? (SpannedString) source : new SpannedString(source);
-    }
-
-    @Override
-    public CharSequence subSequence(int start, int end) {
-        return new SpannedString(toString().substring(start, end), spans().slice(start, end));
+    @Test
+    public void copyOfMessageWithoutDataHasNone() {
+        assertNull(Message.obtain(new Message()).peekData());
     }
 }

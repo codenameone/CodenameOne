@@ -86,9 +86,12 @@ public final class Message {
         m.arg1 = orig.arg1;
         m.arg2 = orig.arg2;
         m.obj = orig.obj;
+        m.replyTo = orig.replyTo;
         m.target = orig.target;
         m.callback = orig.callback;
-        m.data = orig.data;
+        // Its own bundle, as on Android, so neither message's later edits
+        // reach the other.
+        m.data = orig.data == null ? null : new Bundle(orig.data);
         return m;
     }
 
