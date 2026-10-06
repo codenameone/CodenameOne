@@ -44,6 +44,36 @@ class JavascriptTargetIntegrationTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void keepsHostOnlyAnimationFrameCallbacks(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+        Path sources = Files.createTempDirectory("js-animation-callback-src");
+        Path classes = Files.createTempDirectory("js-animation-callback-classes");
+        Path api = Files.createTempDirectory("js-animation-callback-api");
+        Path callbackDir = sources.resolve("com/codename1/html5/js/browser");
+        Files.createDirectories(callbackDir);
+        // Like the real JSFunctor, this interface does NOT extend JSObject.
+        Files.write(callbackDir.resolve("AnimationFrameCallback.java"),
+                ("package com.codename1.html5.js.browser; public interface AnimationFrameCallback {"
+                        + " void onAnimationFrame(double time); }").getBytes(StandardCharsets.UTF_8));
+        Files.write(sources.resolve("JsAnimationFrameApp.java"),
+                ("import com.codename1.html5.js.browser.AnimationFrameCallback;"
+                        + "public class JsAnimationFrameApp { public static AnimationFrameCallback callback;"
+                        + " public static int frames; public static void main(String[] args) {"
+                        + " callback = new AnimationFrameCallback() { public void onAnimationFrame(double time) {"
+                        + " frames += (int) time; } }; } }").getBytes(StandardCharsets.UTF_8));
+        compileAgainstJavaApi(config, sources, classes, api);
+        Path output = Files.createTempDirectory("js-animation-callback-output");
+        runJavascriptTranslator(classes, output, "JsAnimationFrameApp");
+        String bundle = new String(Files.readAllBytes(output.resolve("dist/JsAnimationFrameApp-js/translated_app.js")),
+                StandardCharsets.UTF_8);
+        // No Java invocation references this SAM. Both its body and dispatch slot
+        // must survive a CLOSED-world build for the browser's rAF bridge to call it.
+        assertTrue(bundle.contains("cn1_s_onAnimationFrame_double:cn1_JsAnimationFrameApp_1_onAnimationFrame_double"),
+                "Host-only animation callback must retain its concrete virtual dispatch entry");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void generatesBrowserBundleForJavascriptTarget(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

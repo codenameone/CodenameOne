@@ -567,6 +567,9 @@ final class JavascriptReachability {
         // callback edge is invisible to bytecode-only RTA. Keep concrete
         // onTimer implementations on instantiated handlers reachable.
         seedRuntimeDispatched("com_codename1_html5_js_browser_TimerHandler", "onTimer", "()V");
+        // AnimationFrameCallback is also a JSFunctor, not a JSObject. Its Java
+        // implementations are called only by the host requestAnimationFrame bridge.
+        seedRuntimeDispatched("com_codename1_html5_js_browser_AnimationFrameCallback", "onAnimationFrame", "(D)V");
         // JSO bridge methods are reachable via hand-written port.js
         // dispatch sites that the bytecode-only RTA can't see (e.g.
         // ``__nativeEventListener`` in port.js calls

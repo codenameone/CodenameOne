@@ -34,6 +34,7 @@ if (!url) {
 }
 const artifactDir = process.env.PLAYGROUND_BROWSER_ARTIFACT_DIR || '';
 const here = path.dirname(fileURLToPath(import.meta.url));
+if (artifactDir) fs.mkdirSync(artifactDir, {recursive: true});
 
 // The sample list is read from the sources so a new sample is covered without editing this
 // file; the slug rule mirrors PlaygroundExamples.slugify.
@@ -74,6 +75,7 @@ try {
     const errors = [];
     page.on('console', m => {
       const t = m.text();
+      if (/PARPAR:ERROR|Missing virtual method|\[playground\].*failed/.test(t)) errors.push(t);
       if (t.startsWith('[playground]') && outcome === null) {
         outcome = t;
       }
@@ -83,6 +85,8 @@ try {
     for (let i = 0; i < 600 && outcome === null; i++) {
       await page.waitForTimeout(150);
     }
+    // Initialization can succeed before a worker animation/listener callback fails.
+    await page.waitForTimeout(1000);
     check('sample ' + slug, outcome && outcome.includes('preview updated') && errors.length === 0,
         (outcome || 'no outcome') + (errors.length ? ' pageerrors=' + errors.slice(0, 2).join(' | ') : ''));
     await shot(page, 'sample-' + slug);
@@ -120,10 +124,14 @@ try {
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
     await page.keyboard.insertText(code);
   }
-  // The preview's first button in the phone frame.
-  async function clickPreviewButton() {
-    await page.waitForTimeout(1000);
-    await page.mouse.click(830, 198);
+  // The preview scales with the window. Use the current semantic bounds and
+  // send a real canvas click rather than assuming a particular phone position.
+  async function clickPreviewButton(name) {
+    const control = page.getByRole('button', {name, exact: true});
+    await control.waitFor({timeout: 15000});
+    const box = await control.boundingBox();
+    if (!box || box.height < 2) throw new Error(name + ' is not visible');
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   }
 
   await page.goto(url + '?code=' + encodeCode('Label l = new Label("x");\nint n = "not a number";\nl\n'),
@@ -159,7 +167,7 @@ try {
   await setCode('Button b = new Button("Boom");\nb.addActionListener(e -> { String s = null; s.length(); });\n'
       + 'Container root = BoxLayout.encloseY(b);\nroot\n');
   r = await waitFor(l => l.startsWith('[playground] preview updated'), 30000);
-  await clickPreviewButton();
+  await clickPreviewButton('Boom');
   r = await waitFor(l => l.includes('NullPointerException'), 10000);
   await page.waitForTimeout(500);
   await shot(page, 'flow-listener-exception');
@@ -170,7 +178,7 @@ try {
       + 'f.add(new Label("second screen")); f.show(); System.out.println("PG-SHOWN"); });\n'
       + 'Container root = BoxLayout.encloseY(b);\nroot\n');
   r = await waitFor(l => l.startsWith('[playground] preview updated'), 30000);
-  await clickPreviewButton();
+  await clickPreviewButton('Next');
   r = await waitFor(l => l.startsWith('PG-SHOWN'), 10000);
   await page.waitForTimeout(1500);
   await shot(page, 'flow-second-form');
