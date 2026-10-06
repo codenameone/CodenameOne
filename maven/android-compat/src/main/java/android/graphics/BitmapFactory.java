@@ -73,6 +73,9 @@ public class BitmapFactory {
     }
 
     public static Bitmap decodeByteArray(byte[] data, int offset, int length, Options opts) {
+        if (boundsFromHeader(data, offset, length, opts)) {
+            return null;
+        }
         Image img;
         try {
             img = Image.createImage(data, offset, length);
@@ -102,6 +105,9 @@ public class BitmapFactory {
         int bucket = com.codename1.androidcompat.runtime.DrawableInflater.densityOf(res, id);
         try {
             byte[] data = readAll(in);
+            if (boundsFromHeader(data, 0, data.length, opts)) {
+                return null;
+            }
             Image img = Image.createImage(data, 0, data.length);
             return finish(img, opts, bucket, mimeType(data, 0, data.length));
         } catch (IOException e) {
@@ -157,9 +163,85 @@ public class BitmapFactory {
         return null;
     }
 
-    private static Bitmap finish(Image img, Options opts, int bucketDensity, String mimeType) {
-        int w = img.getWidth();
-        int h = img.getHeight();
+    /// Answers a bounds-only request from the encoded header, so a two-pass
+    /// sizing flow over a large camera image does not decode every pixel just
+    /// to learn the dimensions. PNG, JPEG and GIF are read here; any other
+    /// format, or a header this cannot parse, falls through to a full decode,
+    /// which reports the same numbers. Like Android's decoder this ignores
+    /// EXIF orientation.
+    private static boolean boundsFromHeader(byte[] d, int off, int len, Options opts) {
+        if (opts == null || !opts.inJustDecodeBounds) {
+            return false;
+        }
+        String mime = mimeType(d, off, len);
+        int[] size = null;
+        if ("image/png".equals(mime)) {
+            // The IHDR chunk is first: width and height at bytes 16 and 20.
+            if (len >= 24 && d[off + 12] == 'I' && d[off + 13] == 'H' && d[off + 14] == 'D' && d[off + 15] == 'R') {
+                size = new int[] {be32(d, off + 16), be32(d, off + 20)};
+            }
+        } else if ("image/gif".equals(mime)) {
+            if (len >= 10) {
+                size = new int[] {(d[off + 6] & 0xff) | (d[off + 7] & 0xff) << 8,
+                    (d[off + 8] & 0xff) | (d[off + 9] & 0xff) << 8};
+            }
+        } else if ("image/jpeg".equals(mime)) {
+            size = jpegSize(d, off, len);
+        }
+        if (size == null || size[0] <= 0 || size[1] <= 0) {
+            return false;
+        }
+        reportBounds(opts, size[0], size[1], mime);
+        return true;
+    }
+
+    private static int be32(byte[] d, int i) {
+        return (d[i] & 0xff) << 24 | (d[i + 1] & 0xff) << 16 | (d[i + 2] & 0xff) << 8 | (d[i + 3] & 0xff);
+    }
+
+    /// The frame size from the first start-of-frame marker, walking the
+    /// marker segments by their lengths; null when none is found before the
+    /// scan data.
+    private static int[] jpegSize(byte[] d, int off, int len) {
+        int end = off + len;
+        int i = off + 2;
+        while (i + 3 < end) {
+            if ((d[i] & 0xff) != 0xff) {
+                return null;
+            }
+            int marker = d[i + 1] & 0xff;
+            if (marker == 0xff) {
+                i++;
+                continue;
+            }
+            if (marker == 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+                i += 2;
+                continue;
+            }
+            if (marker == 0xd9 || marker == 0xda) {
+                return null;
+            }
+            int segment = (d[i + 2] & 0xff) << 8 | (d[i + 3] & 0xff);
+            if (segment < 2) {
+                return null;
+            }
+            boolean frame = marker >= 0xc0 && marker <= 0xcf && marker != 0xc4 && marker != 0xc8 && marker != 0xcc;
+            if (frame) {
+                if (i + 8 >= end) {
+                    return null;
+                }
+                int h = (d[i + 5] & 0xff) << 8 | (d[i + 6] & 0xff);
+                int w = (d[i + 7] & 0xff) << 8 | (d[i + 8] & 0xff);
+                return new int[] {w, h};
+            }
+            i += 2 + segment;
+        }
+        return null;
+    }
+
+    /// Writes the bounds fields where AOSP's decoder writes them: after
+    /// `inSampleSize`, before any density scaling. Answers the sampled size.
+    private static int[] reportBounds(Options opts, int w, int h, String mimeType) {
         // Any inSampleSize divides the dimensions as given, not rounded down to
         // a power of two: the Options javadoc still says it rounds, but AOSP's
         // decoder (libs/hwui/jni/BitmapFactory.cpp, needsFineScale) has
@@ -178,9 +260,16 @@ public class BitmapFactory {
             opts.outHeight = th;
             opts.outConfig = Bitmap.Config.ARGB_8888;
             opts.outMimeType = mimeType;
-            if (opts.inJustDecodeBounds) {
-                return null;
-            }
+        }
+        return new int[] {tw, th};
+    }
+
+    private static Bitmap finish(Image img, Options opts, int bucketDensity, String mimeType) {
+        int[] sampled = reportBounds(opts, img.getWidth(), img.getHeight(), mimeType);
+        int tw = sampled[0];
+        int th = sampled[1];
+        if (opts != null && opts.inJustDecodeBounds) {
+            return null;
         }
         boolean scale = opts == null || opts.inScaled;
         int target = opts != null && opts.inTargetDensity > 0 ? opts.inTargetDensity
@@ -200,7 +289,7 @@ public class BitmapFactory {
                 density = source;
             }
         }
-        if (tw != w || th != h) {
+        if (tw != img.getWidth() || th != img.getHeight()) {
             img = img.scaled(tw, th);
         }
         if (opts != null && opts.inMutable) {

@@ -48,6 +48,9 @@ public class AlertDialog extends Dialog implements DialogInterface {
     /// a later `setMessage` updates this view, as Android's does.
     private TextView mMessageView;
     private View mView;
+    /// Replaces the title row (icon and title text) when set, as Android's
+    /// `setCustomTitle` does.
+    private View mCustomTitle;
     private Drawable mIcon;
     private final Button[] mButtons = new Button[3];
     private final CharSequence[] mButtonText = new CharSequence[3];
@@ -78,6 +81,10 @@ public class AlertDialog extends Dialog implements DialogInterface {
 
     public void setView(View view) {
         mView = view;
+    }
+
+    public void setCustomTitle(View customTitleView) {
+        mCustomTitle = customTitleView;
     }
 
     public void setIcon(Drawable icon) {
@@ -129,7 +136,13 @@ public class AlertDialog extends Dialog implements DialogInterface {
         int textSecondary = themeColor(android.R.attr.textColorSecondary, 0x8a000000);
         int accent = themeColor(android.R.attr.colorAccent, 0xff009688);
         CharSequence title = getTitle();
-        if (title != null && title.length() > 0) {
+        if (mCustomTitle != null) {
+            if (mCustomTitle.getParent() instanceof ViewGroup) {
+                ((ViewGroup) mCustomTitle.getParent()).removeView(mCustomTitle);
+            }
+            root.addView(mCustomTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+        } else if (title != null && title.length() > 0) {
             LinearLayout titleRow = new LinearLayout(c);
             titleRow.setGravity(Gravity.CENTER_VERTICAL);
             titleRow.setPadding(dp(24), 0, dp(24), dp(mMessage != null || mItems != null ? 16 : 8));
@@ -272,6 +285,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
         private CharSequence title;
         private CharSequence message;
         private View view;
+        private View customTitle;
         private int viewLayout;
         private Drawable icon;
         private final CharSequence[] buttonText = new CharSequence[3];
@@ -309,6 +323,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
         }
 
         public Builder setCustomTitle(View customTitleView) {
+            customTitle = customTitleView;
             return this;
         }
 
@@ -432,6 +447,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
             d.setTitle(title);
             d.mMessage = message;
             d.mIcon = icon;
+            d.mCustomTitle = customTitle;
             d.mView = view != null ? view : viewLayout != 0
                     ? d.getLayoutInflater().inflate(viewLayout, null, false) : null;
             for (int i = 0; i < 3; i++) {

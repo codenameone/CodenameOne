@@ -383,8 +383,7 @@ public class DatePicker extends FrameLayout {
         mMinYear = f[0];
         mMinMonth = f[1];
         mMinDay = f[2];
-        clampDate();
-        updateSpinners();
+        clampAfterRangeChange();
     }
 
     public long getMinDate() {
@@ -396,8 +395,21 @@ public class DatePicker extends FrameLayout {
         mMaxYear = f[0];
         mMaxMonth = f[1];
         mMaxDay = f[2];
+        clampAfterRangeChange();
+    }
+
+    /// A new bound that moves the selection tells the listeners, as
+    /// Android's calendar-mode picker does, so a model observing the picker
+    /// does not keep a date the picker no longer shows.
+    private void clampAfterRangeChange() {
+        int year = mYear;
+        int month = mMonth;
+        int day = mDay;
         clampDate();
         updateSpinners();
+        if (year != mYear || month != mMonth || day != mDay) {
+            notifyDateChanged();
+        }
     }
 
     public long getMaxDate() {

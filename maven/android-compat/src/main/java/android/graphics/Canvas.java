@@ -103,6 +103,11 @@ public class Canvas {
 
     public void setBitmap(Bitmap bitmap) {
         if (bitmap != null) {
+            // As on Android: drawing would change pixels the bitmap promises
+            // are fixed, and that a decoded or copied bitmap may share.
+            if (!bitmap.isMutable()) {
+                throw new IllegalStateException("Immutable bitmap passed to Canvas");
+            }
             Image img = bitmap.getImage();
             bind(img.getGraphics(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
             bitmapTarget = true;

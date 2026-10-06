@@ -201,8 +201,13 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return new Object();
     }
 
+    /// Counts encoded images handed to [#createImage(byte[], int, int)], so a
+    /// test can tell a header-only bounds probe from a full decode.
+    public static int encodedDecodes;
+
     @Override
     public java.lang.Object createImage(byte[] a0, int a1, int a2) {
+        encodedDecodes++;
         if (pixelImages) {
             try {
                 return createImage(new java.io.ByteArrayInputStream(a0, a1, a2));

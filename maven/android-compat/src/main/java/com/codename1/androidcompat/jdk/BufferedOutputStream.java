@@ -30,6 +30,10 @@ public class BufferedOutputStream extends FilterOutputStream {
 
     protected byte[] buf;
     protected int count;
+    /// Set by [#close()]. The buffer and the underlying stream are kept, so
+    /// without it a later write would land in the buffer and a second close
+    /// could hand those bytes to a stream whose own close is a no-op.
+    private boolean closed;
 
     public BufferedOutputStream(OutputStream out) {
         this(out, 8192);
@@ -43,6 +47,12 @@ public class BufferedOutputStream extends FilterOutputStream {
         buf = new byte[size];
     }
 
+    private void ensureOpen() throws IOException {
+        if (closed) {
+            throw new IOException("Stream closed");
+        }
+    }
+
     private void flushBuffer() throws IOException {
         if (count > 0) {
             out.write(buf, 0, count);
@@ -52,6 +62,7 @@ public class BufferedOutputStream extends FilterOutputStream {
 
     @Override
     public void write(int b) throws IOException {
+        ensureOpen();
         if (count >= buf.length) {
             flushBuffer();
         }
@@ -60,6 +71,7 @@ public class BufferedOutputStream extends FilterOutputStream {
 
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
+        ensureOpen();
         if (len >= buf.length) {
             flushBuffer();
             out.write(b, off, len);
@@ -74,7 +86,22 @@ public class BufferedOutputStream extends FilterOutputStream {
 
     @Override
     public void flush() throws IOException {
+        ensureOpen();
         flushBuffer();
         out.flush();
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (closed) {
+            return;
+        }
+        try {
+            flush();
+        } finally {
+            closed = true;
+            count = 0;
+            out.close();
+        }
     }
 }
