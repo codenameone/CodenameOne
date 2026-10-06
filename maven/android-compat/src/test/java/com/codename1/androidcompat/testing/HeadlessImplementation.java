@@ -190,6 +190,13 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.lang.Object createImage(byte[] a0, int a1, int a2) {
+        if (pixelImages) {
+            try {
+                return createImage(new java.io.ByteArrayInputStream(a0, a1, a2));
+            } catch (java.io.IOException e) {
+                return new Object();
+            }
+        }
         return new Object();
     }
 

@@ -798,6 +798,7 @@ public class Canvas {
     }
 
     public void drawBitmap(Bitmap bitmap, Rect src, RectF dst, Paint paint) {
+        throwIfCannotDraw(bitmap);
         Image img = bitmap.getImage();
         if (src != null && !(src.left == 0 && src.top == 0 && src.right == bitmap.getWidth()
                 && src.bottom == bitmap.getHeight())) {
@@ -807,10 +808,22 @@ public class Canvas {
     }
 
     public void drawBitmap(Bitmap bitmap, Matrix m, Paint paint) {
+        throwIfCannotDraw(bitmap);
         Matrix save = new Matrix(matrix);
         matrix.preConcat(m);
         drawBitmap(bitmap, 0, 0, paint);
         matrix.set(save);
+    }
+
+    /// Refuses a recycled bitmap the way AOSP's `BaseCanvas.throwIfCannotDraw`
+    /// does. `Bitmap.recycle()` keeps the image (a canvas may share it), so
+    /// without this every `drawBitmap` overload kept painting stale pixels.
+    /// Every overload funnels into the `Rect`/`RectF` one; the `Matrix` one
+    /// checks first too, so it cannot leave its concatenated matrix behind.
+    private static void throwIfCannotDraw(Bitmap bitmap) {
+        if (bitmap.isRecycled()) {
+            throw new RuntimeException("Canvas: trying to use a recycled bitmap " + bitmap);
+        }
     }
 
     /// Draws a Codename One image into `dst` (local coordinates).

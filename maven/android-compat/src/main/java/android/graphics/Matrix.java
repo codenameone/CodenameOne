@@ -38,14 +38,34 @@ public class Matrix {
 
     public enum ScaleToFit { FILL, START, CENTER, END }
 
-    public static final Matrix IDENTITY_MATRIX = new Matrix();
+    /// The shared identity. Immutable as on Android: every mutator throws
+    /// `IllegalStateException`, so no caller can turn the process-wide
+    /// constant into a non-identity transform for everyone after it.
+    public static final Matrix IDENTITY_MATRIX = new Matrix(true);
 
     private final float[] m = {1, 0, 0, 0, 1, 0, 0, 0, 1};
 
+    private final boolean immutable;
+
     public Matrix() {
+        immutable = false;
+    }
+
+    private Matrix(boolean immutable) {
+        this.immutable = immutable;
+    }
+
+    /// Every write to `m` goes through `reset`, `set`, `setValues`,
+    /// `setSinCos`, `setConcat`, `pre`, `post`, `postTranslate` or the
+    /// `inverse` side of `invert`, and each of those calls this first.
+    private void checkMutable() {
+        if (immutable) {
+            throw new IllegalStateException("Matrix can not be modified");
+        }
     }
 
     public Matrix(Matrix src) {
+        immutable = false;
         set(src);
     }
 
@@ -62,6 +82,7 @@ public class Matrix {
     }
 
     public void set(Matrix src) {
+        checkMutable();
         if (src == null) {
             reset();
         } else {
@@ -70,6 +91,7 @@ public class Matrix {
     }
 
     public void reset() {
+        checkMutable();
         m[0] = 1;
         m[1] = 0;
         m[2] = 0;
@@ -86,6 +108,7 @@ public class Matrix {
     }
 
     public void setValues(float[] values) {
+        checkMutable();
         System.arraycopy(values, 0, m, 0, 9);
     }
 
@@ -121,6 +144,7 @@ public class Matrix {
     }
 
     public void setSinCos(float sinValue, float cosValue, float px, float py) {
+        checkMutable();
         m[0] = cosValue;
         m[1] = -sinValue;
         m[3] = sinValue;
@@ -140,6 +164,7 @@ public class Matrix {
 
     /// this = a * b
     public boolean setConcat(Matrix a, Matrix b) {
+        checkMutable();
         float[] r = multiply(a.m, b.m);
         System.arraycopy(r, 0, m, 0, 9);
         return true;
@@ -158,11 +183,13 @@ public class Matrix {
     }
 
     private void pre(Matrix other) {
+        checkMutable();
         float[] r = multiply(m, other.m);
         System.arraycopy(r, 0, m, 0, 9);
     }
 
     private void post(Matrix other) {
+        checkMutable();
         float[] r = multiply(other.m, m);
         System.arraycopy(r, 0, m, 0, 9);
     }
@@ -175,6 +202,7 @@ public class Matrix {
     }
 
     public boolean postTranslate(float dx, float dy) {
+        checkMutable();
         m[2] += dx;
         m[5] += dy;
         return true;
@@ -258,6 +286,7 @@ public class Matrix {
         float c = -(a * m[2] + b * m[5]);
         float f = -(d * m[2] + e * m[5]);
         if (inverse != null) {
+            inverse.checkMutable();
             inverse.m[0] = a;
             inverse.m[1] = b;
             inverse.m[2] = c;

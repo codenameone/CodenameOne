@@ -160,18 +160,20 @@ public class BitmapFactory {
     private static Bitmap finish(Image img, Options opts, int bucketDensity, String mimeType) {
         int w = img.getWidth();
         int h = img.getHeight();
+        // Any inSampleSize divides the dimensions as given, not rounded down to
+        // a power of two: the Options javadoc still says it rounds, but AOSP's
+        // decoder (libs/hwui/jni/BitmapFactory.cpp, needsFineScale) has
+        // fine-scaled to exactly width / inSampleSize since SkAndroidCodec
+        // replaced the old decoders, so 3 really yields a third.
         int sample = opts == null || opts.inSampleSize < 1 ? 1 : opts.inSampleSize;
         int tw = Math.max(1, w / sample);
         int th = Math.max(1, h / sample);
-        boolean scale = opts == null || opts.inScaled;
-        int target = opts != null && opts.inTargetDensity > 0 ? opts.inTargetDensity
-                : Resources.getSystem().getDisplayMetrics().densityDpi;
-        int source = opts != null && opts.inDensity > 0 ? opts.inDensity : bucketDensity;
-        if (scale && source > 0 && source != 0xffff && target > 0 && source != target) {
-            tw = Math.max(1, Math.round(tw * (float) target / source));
-            th = Math.max(1, Math.round(th * (float) target / source));
-        }
         if (opts != null) {
+            // Reported before the density scaling, exactly where AOSP's
+            // decoder writes them: outWidth/outHeight include inSampleSize
+            // but never the density ratio, in a bounds-only probe and in a
+            // full decode alike. A two-pass sizing flow over a resource
+            // therefore sees the image's own size, not the scaled one.
             opts.outWidth = tw;
             opts.outHeight = th;
             opts.outConfig = Bitmap.Config.ARGB_8888;
@@ -179,6 +181,14 @@ public class BitmapFactory {
             if (opts.inJustDecodeBounds) {
                 return null;
             }
+        }
+        boolean scale = opts == null || opts.inScaled;
+        int target = opts != null && opts.inTargetDensity > 0 ? opts.inTargetDensity
+                : Resources.getSystem().getDisplayMetrics().densityDpi;
+        int source = opts != null && opts.inDensity > 0 ? opts.inDensity : bucketDensity;
+        if (scale && source > 0 && source != 0xffff && target > 0 && source != target) {
+            tw = Math.max(1, Math.round(tw * (float) target / source));
+            th = Math.max(1, Math.round(th * (float) target / source));
         }
         if (tw != w || th != h) {
             img = img.scaled(tw, th);
