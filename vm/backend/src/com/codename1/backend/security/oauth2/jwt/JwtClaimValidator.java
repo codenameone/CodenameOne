@@ -32,16 +32,19 @@ import java.util.function.Predicate;
 ///
 /// ```java
 /// // An ID token must carry the nonce this server sent with the request.
-/// OAuth2TokenValidator<Jwt> nonce = new JwtClaimValidator<Object>("nonce", expected::equals);
+/// OAuth2TokenValidator<Jwt> nonce = new JwtClaimValidator("nonce", expected::equals);
 /// ```
 ///
-/// The test is handed the claim as the JSON had it, and null when the token has
-/// none of that name.
-public final class JwtClaimValidator<T> implements OAuth2TokenValidator<Jwt> {
+/// The test is handed the claim as the JSON had it -- a String, a Long or
+/// Double, a Boolean, a List or a Map -- and null when the token has none of
+/// that name. It is handed an Object and not something narrower on purpose:
+/// what type a claim has is the issuer's choice, and a test that assumed one
+/// would be casting a value it has not looked at. Ask with `instanceof`.
+public final class JwtClaimValidator implements OAuth2TokenValidator<Jwt> {
     private final String claim;
-    private final Predicate<T> test;
+    private final Predicate<Object> test;
 
-    public JwtClaimValidator(String claim, Predicate<T> test) {
+    public JwtClaimValidator(String claim, Predicate<Object> test) {
         if (claim == null || test == null) {
             throw new IllegalArgumentException("A claim and a test are required");
         }
@@ -50,9 +53,8 @@ public final class JwtClaimValidator<T> implements OAuth2TokenValidator<Jwt> {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public OAuth2TokenValidatorResult validate(Jwt jwt) {
-        if (test.test((T) jwt.getClaim(claim))) {
+        if (test.test(jwt.getClaim(claim))) {
             return OAuth2TokenValidatorResult.success();
         }
         return OAuth2TokenValidatorResult.failure(new OAuth2Error(OAuth2ErrorCodes.INVALID_TOKEN,

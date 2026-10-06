@@ -104,6 +104,25 @@ final class AuthCheckServer {
                     .append(' ');
         }
         AuthCheck.value("rate limit trace", trace.toString().trim());
+
+        // Bounded memory: which keys are forgotten depends on the order a map keeps them
+        // in, and that map is each runtime's own.
+        InMemoryRateLimiter small = new InMemoryRateLimiter(1, 10, 3);
+        small.setClock(new Clock() {
+            public long currentTimeMillis() {
+                return now[0];
+            }
+        });
+        StringBuilder forgotten = new StringBuilder();
+        String[] keys = {"a", "b", "c", "a", "d", "b", "a", "c", "e", "f", "g", "d", "a"};
+        for(int iter = 0 ; iter < keys.length ; iter++) {
+            if(iter == 8) {
+                now[0] += 11000;
+            }
+            forgotten.append(keys[iter]).append(small.tryAcquire(keys[iter]) ? '+' : '-')
+                    .append(small.size()).append(' ');
+        }
+        AuthCheck.value("rate limit eviction", forgotten.toString().trim());
         AuthCheck.value("api key hash", ApiKeyGenerator.hash("cn1_not-a-real-key"));
         String made = new ApiKeyGenerator().generate("ci-bot", new String[] {"deploy"}).getPlaintext();
         AuthCheck.check("a generated key has its prefix and length", "cn1_ 47",

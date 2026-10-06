@@ -407,13 +407,17 @@ class JwtCodecTest {
 
         // An ID token's nonce.
         DefaultJwtDecoder withNonce = at(DefaultJwtDecoder.withPublicKey(publicKey).build(), clock,
-                new JwtClaimValidator<Object>("nonce", "n-0S6_WzA2Mj"::equals));
+                new JwtClaimValidator("nonce", "n-0S6_WzA2Mj"::equals));
         assertEquals("ada", withNonce.decode(encoder.encode(JwtEncoderParameters.from(claims()
                 .claim("nonce", "n-0S6_WzA2Mj").build())).getTokenValue()).getSubject());
         assertEquals("The nonce claim is not valid", refusal(withNonce, encoder.encode(
                 JwtEncoderParameters.from(claims().claim("nonce", "another").build()))
                 .getTokenValue()));
         assertEquals("The nonce claim is not valid", refusal(withNonce, good));
+        // A claim of a type the test did not expect is a claim that fails, not a cast.
+        assertEquals("The nonce claim is not valid", refusal(withNonce, encoder.encode(
+                JwtEncoderParameters.from(claims().claim("nonce", Long.valueOf(7)).build()))
+                .getTokenValue()));
 
         // JwtValidators' own compositions.
         OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(
