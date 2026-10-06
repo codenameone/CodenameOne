@@ -46,7 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * Parsed class file
@@ -365,6 +365,11 @@ public class ByteCodeClass {
                 continue;
             }
             if(bc.clsName.equals("java_lang_Boolean")) {
+                bc.markDependent(lst);
+                continue;
+            }
+            // Open-world output: classes code translated later may call are roots.
+            if(JavascriptOpenWorld.keepsClass(bc.clsName)) {
                 bc.markDependent(lst);
                 continue;
             }
@@ -2094,6 +2099,10 @@ public class ByteCodeClass {
             b.append(".vtable);\n");
 
         }
+        // Register the class in both class registries BEFORE `initialized` is published:
+        // CN1_FAST_NEW tests only that flag, so this is what lets the inline allocation
+        // and the init-before-publish class stamp skip their per-object registry tests.
+        b.append("    cn1ClassReady(&class__").append(clsName).append(");\n");
         b.append("    __atomic_store_n(&class__");
         b.append(clsName);
         // This flag means STARTED, not completed: the JLS requires a class whose
@@ -2763,6 +2772,12 @@ public class ByteCodeClass {
         
         b.append("\n\n");
 
+        // 1 when a dead instance must reach the sweep's per-slot reclaim (a finalizer or
+        // native-block storage). CN1_FAST_NEW tests it to flag the object's page, and it
+        // is a constant so every other class's allocation path compiles exactly as before.
+        b.append("#define CN1_FINALIZABLE_").append(clsName)
+                .append(hasRealFinalizerInHierarchy() ? " 1\n" : " 0\n");
+
         // object struct contains instace field variables
         b.append("struct obj__");
         b.append(clsName);
@@ -2849,7 +2864,10 @@ public class ByteCodeClass {
             return;
         }
         for(BytecodeMethod m : baseInterface.methods) {
-            if(m.isStatic() || m.isPrivate()) {
+            // An eliminated method has no virtual_ dispatcher (the vtable list leaves it
+            // out), so a forwarding wrapper for it would call an undeclared function.
+            // Nothing calls it either: the cull removed it for having no caller.
+            if(m.isStatic() || m.isPrivate() || m.isEliminated()) {
                 continue;
             }
             if(!bm.contains(m)) {
@@ -2878,7 +2896,7 @@ public class ByteCodeClass {
             return;
         }
         for(BytecodeMethod m : baseInterface.methods) {
-            if(m.isStatic() || m.isPrivate()) {
+            if(m.isStatic() || m.isPrivate() || m.isEliminated()) {
                 continue;
             }
             if(!bm.contains(m)) {

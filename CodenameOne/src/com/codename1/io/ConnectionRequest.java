@@ -3529,18 +3529,18 @@ public class ConnectionRequest implements IOProgressListener {
     /// Example:
     ///
     /// ```java
-    /// `ConnectionRequest req = new ConnectionRequest() {
+    /// ConnectionRequest req = new ConnectionRequest() {
     /// @Override
     ///     protected void checkSSLCertificates(ConnectionRequest.SSLCertificate[] certificates) {
     ///         if (!trust(certificates)) {
     ///             // Assume that you've implemented method trust(SSLCertificate[] certs)
     ///             // to tell you whether you trust some certificates.
-    ///             this.kill();`
+    ///             this.kill();
+    ///         }
     ///     }
     /// };
     /// req.setCheckSSLCertificates(true);
-    /// ....
-    /// }
+    /// // ...
     /// ```
     ///
     /// #### See also

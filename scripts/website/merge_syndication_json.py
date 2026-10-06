@@ -85,10 +85,29 @@ def merge_value(
         assert isinstance(local_dict, dict)
         assert isinstance(remote_dict, dict)
 
+        # A stale run may recover the same publication from the platform API.
+        # Its publication time can differ from the original local receipt time.
+        # Only reconcile that metadata when both durable identity fields match.
+        same_publication = (
+            len(path) == 3 and path[0] == "posts"
+            and local_dict.get("id") is not None
+            and local_dict.get("id") == remote_dict.get("id")
+            and isinstance(local_dict.get("url"), str)
+            and bool(local_dict["url"])
+            and local_dict["url"] == remote_dict.get("url")
+        )
+
         keys = list(remote_dict)
         keys.extend(key for key in local_dict if key not in remote_dict)
         merged = {}
         for key in keys:
+            if (same_publication and key == "syndicated_at"
+                    and isinstance(local_dict.get(key), str)
+                    and isinstance(remote_dict.get(key), str)
+                    and local_dict[key] != base_dict.get(key, MISSING)
+                    and remote_dict[key] != base_dict.get(key, MISSING)):
+                merged[key] = remote_dict[key]
+                continue
             value = merge_value(
                 base_dict.get(key, MISSING),
                 local_dict.get(key, MISSING),

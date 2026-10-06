@@ -261,6 +261,8 @@ include::TVPlatforms.asciidoc[]
 
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
+include::Java-In-The-Browser.asciidoc[]
+
 include::Working-With-CodenameOne-Sources.asciidoc[]
 
 include::Skin-Designer.asciidoc[]

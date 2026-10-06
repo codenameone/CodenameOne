@@ -27,7 +27,7 @@ package com.codename1.home;
 /// ```java
 /// TraitWrite w = new TraitWrite(lamp, lamp.getPrimaryService(),
 ///         Trait.BRIGHTNESS, TraitValue.of(40, TraitUnit.PERCENT));
-/// SmartHome.getInstance().write(w).onResult((results, err) -> { ... });
+/// SmartHome.getInstance().write(w).onResult((results, err) -> { /* ... */ });
 /// ```
 ///
 /// Writes name a **service**, not just an accessory, because an accessory can

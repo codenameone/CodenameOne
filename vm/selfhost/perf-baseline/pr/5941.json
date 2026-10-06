@@ -65,26 +65,6 @@
       "time": 0.5
      }
     }
-   },
-   "objectAllocation": {
-    "all": {
-     "from": {
-      "memory": 0.388,
-      "time": 4.756,
-      "tolerance": {
-       "memory": 0.3,
-       "time": 0.5
-      }
-     },
-     "memory": 0.388,
-     "reason": "#5940's hybrid GC made objectAllocation about 4x faster; #5940 rebaselined it on other runner models but not on the AMD EPYC 9V74, so every pull request landing on that runner failed as IMPROVED",
-     "runs": 1,
-     "time": 1.18,
-     "tolerance": {
-      "memory": 0.3,
-      "time": 0.5
-     }
-    }
    }
   },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {

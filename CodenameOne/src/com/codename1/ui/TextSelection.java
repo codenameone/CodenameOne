@@ -47,7 +47,7 @@ import static com.codename1.ui.ComponentSelector.$;
 /// Text selection needs to be enabled on a per-form basis.
 ///
 /// ```java
-/// `myForm.getTextSelection().setEnabled(true);`
+/// myForm.getTextSelection().setEnabled(true);
 /// ```
 ///
 /// If text selection is enabled on a form, then non-editable text fields and text areas will allow text

@@ -77,6 +77,16 @@ We aimed the VM at Java 5 support, and it works for some Java 8 syntax out of th
 
 The API is relatively limited in scope to keep the size low, we occasionally add additional API's ideally with very concise implementations to avoid bringing over the full JDK. Check out [this post](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html) explaining why we don't think supporting the entire JDK makes sense.
 
+## Self-Hosting
+
+The translator is itself translatable: it compiles against ParparVM's own class
+library (`JavaAPI`), reads class files with its own `classfile` package (a rewrite
+of the parts of ASM it uses, under ASM's BSD license) and runs natively and as
+JavaScript. The Codename One Playground uses that to translate user code inside the
+browser, compiled by the in-tree Java compiler in `JavaCompiler/`. See
+`selfhost/README.md` and the developer guide's "Java in the browser" chapter
+(`../docs/developer-guide/Java-In-The-Browser.asciidoc`).
+
 ## Relation To Codename One
 
 ParparVM is used by Codename One internally, it's open source and we have no intention to change that. It is used in Codename One's Mac build servers (so Codename One proper doesn't require a Mac) and also used by the offline builder tool.

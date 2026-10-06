@@ -56,6 +56,64 @@ public class GeneratorModel {
     public static boolean isGradleOffered() {
         return GRADLE_PLUGIN_PUBLISHED;
     }
+
+    /// The first codenameone-maven-plugin that builds an app without its platform
+    /// modules (common/pom.xml binds its compile-javase-natives and hosted-platform
+    /// goals) and runs a backend that is the whole project. A Maven download made
+    /// against an older plugin is the full multi-module layout it always was, so
+    /// the new layouts light up when update-cn1-version.sh moves
+    /// [CN1_PLUGIN_VERSION] to this release, with no other change.
+    static final String MAVEN_LAYOUTS_SINCE = "7.0.275";
+
+    /// Whether a Maven project gets the layout choices -- the minimal app, the
+    /// optional backend module, a backend-only project -- at [CN1_PLUGIN_VERSION].
+    public static boolean isMavenLayoutChoiceOffered() {
+        return isVersionAtLeast(CN1_PLUGIN_VERSION, MAVEN_LAYOUTS_SINCE);
+    }
+
+    /// The plugin version a download is generated against.
+    static String cn1PluginVersion() {
+        return CN1_PLUGIN_VERSION;
+    }
+
+    /// Whether `version` is `min` or newer, comparing up to four numeric parts and
+    /// stopping at the first character that is neither a digit nor a dot, so
+    /// `8.0-SNAPSHOT` reads as 8.0. Written by hand: the Codename One runtime this
+    /// runs on has no version parser, and split() would mean a regex.
+    static boolean isVersionAtLeast(String version, String min) {
+        int[] a = parseVersion(version);
+        int[] b = parseVersion(min);
+        for (int i = 0; i < a.length; i++) {
+            if (a[i] != b[i]) {
+                return a[i] > b[i];
+            }
+        }
+        return true;
+    }
+
+    private static int[] parseVersion(String version) {
+        int[] out = new int[4];
+        if (version == null) {
+            return out;
+        }
+        int part = 0;
+        int current = 0;
+        for (int i = 0; i < version.length() && part < out.length; i++) {
+            char c = version.charAt(i);
+            if (c >= '0' && c <= '9') {
+                current = current * 10 + (c - '0');
+            } else if (c == '.') {
+                out[part++] = current;
+                current = 0;
+            } else {
+                break;
+            }
+        }
+        if (part < out.length) {
+            out[part] = current;
+        }
+        return out;
+    }
     /// The Kotlin version a Gradle Kotlin project builds with, for both the Kotlin
     /// Gradle plugin and kotlin-stdlib (the plugin adds its own stdlib anyway, so
     /// the two cannot usefully differ).
@@ -123,19 +181,73 @@ public class GeneratorModel {
     // maven/cn1app-archetype stages agent-skill-agents-md.md verbatim, so a token
     // there would reach every archetype-generated Maven project unrendered.
     private static final String AGENTS_MD_GRADLE_RESOURCE = "/agent-skill-agents-md-gradle.md";
+    // Both shared with maven/cn1app-archetype, which stages them from this directory.
+    private static final String HOSTED_PROFILES_RESOURCE = "/common-hosted-platform-profiles.xml";
+    private static final String BACKEND_ONLY_POM_RESOURCE = "/backend-only-pom.xml";
 
     private final IDE ide;
     private final Template template;
     private final String appName;
     private final String packageName;
     private final ProjectOptions options;
+    private final String pluginVersion;
 
     GeneratorModel(IDE ide, Template template, String appName, String packageName, ProjectOptions options) {
+        this(ide, template, appName, packageName, options, CN1_PLUGIN_VERSION);
+    }
+
+    private GeneratorModel(IDE ide, Template template, String appName, String packageName, ProjectOptions options,
+                           String pluginVersion) {
         this.ide = ide;
         this.template = template;
         this.appName = appName;
         this.packageName = packageName;
         this.options = options == null ? ProjectOptions.defaults() : options;
+        this.pluginVersion = pluginVersion;
+    }
+
+    /// A model that generates against `pluginVersion` rather than [CN1_PLUGIN_VERSION]:
+    /// how the tests and fixtures see both sides of [MAVEN_LAYOUTS_SINCE] whatever
+    /// release the initializr is on.
+    static GeneratorModel createForPluginVersion(IDE ide, Template template, String appName, String packageName,
+                                                 ProjectOptions options, String pluginVersion) {
+        return new GeneratorModel(ide, template, appName, packageName, options, pluginVersion);
+    }
+
+    /// Whether this Maven download gets the layouts of [MAVEN_LAYOUTS_SINCE].
+    /// `content` without the lines that contain `marker`.
+    static String removeLinesContaining(String content, String marker) {
+        StringBuilder out = new StringBuilder(content.length());
+        int start = 0;
+        while (start < content.length()) {
+            int end = content.indexOf('\n', start);
+            int next = end < 0 ? content.length() : end + 1;
+            String line = content.substring(start, next);
+            if (line.indexOf(marker) < 0) {
+                out.append(line);
+            }
+            start = next;
+        }
+        return out.toString();
+    }
+
+    private boolean mavenLayoutsEnabled() {
+        return !options.isGradle() && isVersionAtLeast(pluginVersion, MAVEN_LAYOUTS_SINCE);
+    }
+
+    /// A Maven backend-only project: the server alone, at the root.
+    private boolean isMavenBackendOnly() {
+        return mavenLayoutsEnabled() && options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY;
+    }
+
+    /// Whether the Maven app carries its platform modules (javase/, android/, ...).
+    private boolean includesPlatformModules() {
+        return !mavenLayoutsEnabled() || options.allPlatformModules;
+    }
+
+    /// Whether the Maven app carries the backend/ module.
+    private boolean includesBackendModule() {
+        return !mavenLayoutsEnabled() || options.projectType == ProjectOptions.ProjectType.APP_WITH_BACKEND;
     }
 
     public static GeneratorModel create(IDE ide, Template template, String appName, String packageName) {
@@ -271,6 +383,9 @@ public class GeneratorModel {
         if (options.isGradle()) {
             return collectGradleProjectEntries();
         }
+        if (isMavenBackendOnly()) {
+            return collectMavenBackendOnlyEntries();
+        }
         Map<String, byte[]> mergedEntries = new LinkedHashMap<String, byte[]>();
 
         copyZipEntriesToMap(ide.ZIP, mergedEntries, ZipEntryType.IDE);
@@ -341,6 +456,48 @@ public class GeneratorModel {
         return entries;
     }
 
+    /// A Maven backend-only project: one module, the server, at the root. The pom is
+    /// backend-only-pom.xml; the server's files are the same templates the Gradle
+    /// generators use (gradle.zip), with Maven's commands; the wrapper comes from
+    /// common.zip. No launchers and no agent skill -- both are about the app.
+    private Map<String, byte[]> collectMavenBackendOnlyEntries() throws IOException {
+        Map<String, byte[]> entries = new LinkedHashMap<String, byte[]>();
+        Map<String, byte[]> scaffold = readZipResource(GRADLE_TEMPLATE_ZIP);
+        addMavenBackendIdeEntries(entries);
+        copyZipEntriesToMap("/common.zip", entries, ZipEntryType.COMMON_ARCHIVE);
+        copySingleTextEntryToMap(".gitignore", GENERATED_GITIGNORE, entries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap("pom.xml", readResourceToString(BACKEND_ONLY_POM_RESOURCE), entries,
+                ZipEntryType.COMMON);
+        copySingleTextEntryToMap("application.properties",
+                mavenBackendTemplate(scaffold, "backend/application.properties.txt"), entries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap("application-dev.properties",
+                mavenBackendTemplate(scaffold, "backend/application-dev.properties.txt"), entries,
+                ZipEntryType.COMMON);
+        String sourceDir = "src/main/java/" + packageName.replace('.', '/') + "/";
+        copySingleTextEntryToMap(sourceDir + "Api.java", mavenBackendTemplate(scaffold, "backend/Api.java.txt"),
+                entries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap(sourceDir + "Greeter.java",
+                mavenBackendTemplate(scaffold, "backend/Greeter.java.txt"), entries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap("README.md", buildMavenBackendReadmeMarkdown(), entries, ZipEntryType.COMMON);
+        validateGeneratedPomCoordinates(entries);
+        return entries;
+    }
+
+    /// A backend template from gradle.zip with the Gradle commands it names put the
+    /// way Maven spells them, and its package filled in.
+    private String mavenBackendTemplate(Map<String, byte[]> scaffold, String name) throws IOException {
+        byte[] data = scaffold.get(name);
+        if (data == null) {
+            throw new IOException("Missing backend template " + name);
+        }
+        String text = StringUtil.newString(data);
+        text = StringUtil.replaceAll(text, "./gradlew __BACKEND__runBackend", "./mvnw cn1:backend");
+        text = StringUtil.replaceAll(text, "./gradlew __BACKEND__backendPackage", "./mvnw cn1:backend-package");
+        text = StringUtil.replaceAll(text, "under `runBackend`", "under `cn1:backend`");
+        text = StringUtil.replaceAll(text, "${package}", packageName);
+        return text;
+    }
+
     private void addGradleBackendEntries(Map<String, byte[]> entries, Map<String, byte[]> scaffold, String dir,
                                          String taskPrefix) throws IOException {
         putGradleText(entries, dir + "build.gradle.kts",
@@ -370,7 +527,7 @@ public class GeneratorModel {
             throw new IOException("Missing Gradle project template " + name);
         }
         String text = StringUtil.newString(data);
-        text = StringUtil.replaceAll(text, "__CN1_VERSION__", CN1_PLUGIN_VERSION);
+        text = StringUtil.replaceAll(text, "__CN1_VERSION__", pluginVersion);
         // The same name the Maven reactor gets as its artifactId (cn1app.name).
         text = StringUtil.replaceAll(text, "__PROJECT_NAME__", toLowerCaseInvariant(appName));
         text = StringUtil.replaceAll(text, "__BACKEND__", taskPrefix);
@@ -419,10 +576,10 @@ public class GeneratorModel {
     void validateGradleProject(Map<String, byte[]> entries) throws IOException {
         String settings = entries.get("settings.gradle.kts") == null ? null
                 : StringUtil.newString(entries.get("settings.gradle.kts"));
-        if (settings == null || settings.indexOf("id(\"com.codenameone\") version \"" + CN1_PLUGIN_VERSION + "\"") < 0
+        if (settings == null || settings.indexOf("id(\"com.codenameone\") version \"" + pluginVersion + "\"") < 0
                 || settings.indexOf("rootProject.name = \"" + toLowerCaseInvariant(appName) + "\"") < 0) {
             throw new IOException("Refusing to generate project: settings.gradle.kts does not apply the "
-                    + "Codename One plugin " + CN1_PLUGIN_VERSION + " to " + toLowerCaseInvariant(appName));
+                    + "Codename One plugin " + pluginVersion + " to " + toLowerCaseInvariant(appName));
         }
         if (entries.get("build.gradle.kts") == null || entries.get("gradlew") == null) {
             throw new IOException("Refusing to generate project: the Gradle build script or wrapper is missing");
@@ -482,8 +639,15 @@ public class GeneratorModel {
             return;
         }
         if (options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY) {
-            throw new IOException("A backend-only project is generated for Gradle. Every Maven project already "
-                    + "carries the backend module; build it with -Dcodename1.platform=backend.");
+            if (!mavenLayoutsEnabled()) {
+                throw new IOException("A backend-only Maven project needs Codename One " + MAVEN_LAYOUTS_SINCE
+                        + " or newer; generate it for Gradle. Every Maven project already carries the backend "
+                        + "module; build it with -Dcodename1.platform=backend.");
+            }
+            if (options.allPlatformModules) {
+                throw new IOException("A backend-only project has no platform modules; leave "
+                        + "\"Include all platform modules\" off.");
+            }
         }
     }
 
@@ -512,18 +676,78 @@ public class GeneratorModel {
                 "cn1app.name " + rootArtifactId
         );
 
+        if (isMavenBackendOnly()) {
+            validateBackendOnlyPom(entries, rootPom);
+            return;
+        }
+
         validateModulePomCoordinates(entries, "common", rootArtifactId + "-common", false, version);
 
-        String[] platforms = new String[] {"android", "ios", "javase", "javascript", "linux", "win"};
-        for (int i = 0; i < platforms.length; i++) {
-            String platform = platforms[i];
-            validateModulePomCoordinates(entries, platform, rootArtifactId + "-" + platform, true, version);
+        for (int i = 0; i < PLATFORM_MODULES.length; i++) {
+            String platform = PLATFORM_MODULES[i];
+            if (includesPlatformModules()) {
+                validateModulePomCoordinates(entries, platform, rootArtifactId + "-" + platform, true, version);
+            } else {
+                requireAbsentModule(entries, rootPom, platform);
+            }
         }
         // The backend module is checked for coordinates like the rest, but NOT for a
         // dependency on the generated common module. It must not have one: common is
         // compiled against codenameone-core, and a server has no display. Requiring it
         // here would enforce exactly the mistake the module's own comment warns against.
-        validateModulePomCoordinates(entries, "backend", rootArtifactId + "-backend", false, version);
+        if (includesBackendModule()) {
+            validateModulePomCoordinates(entries, "backend", rootArtifactId + "-backend", false, version);
+        } else {
+            requireAbsentModule(entries, rootPom, "backend");
+        }
+
+        if (mavenLayoutsEnabled()) {
+            String commonPom = normalizedPom(entries, "common/pom.xml");
+            requirePomFragment("common/pom.xml", commonPom, "<goal>compile-javase-natives</goal>",
+                    "hosted platform profiles");
+            if (commonPom.indexOf("<id>simulator</id>") != commonPom.lastIndexOf("<id>simulator</id>")) {
+                throw new IOException("Refusing to generate project: common/pom.xml declares the simulator "
+                        + "profile twice");
+            }
+            if (!includesPlatformModules() && rootPom.indexOf("<activeByDefault>") >= 0) {
+                throw new IOException("Refusing to generate project: pom.xml activates a javase module "
+                        + "the project does not have");
+            }
+        }
+    }
+
+    /// An optional module that was left out: no files of it in the download, and
+    /// the root pom adds it only once its pom exists.
+    private void requireAbsentModule(Map<String, byte[]> entries, String rootPom, String module) throws IOException {
+        for (String path : entries.keySet()) {
+            if (path.startsWith(module + "/")) {
+                throw new IOException("Refusing to generate project: " + path + " belongs to the " + module
+                        + " module this project does not have");
+            }
+        }
+        if (rootPom.indexOf("<module>" + module + "</module>") >= 0) {
+            requirePomFragment("pom.xml", rootPom, "<exists>${basedir}/" + module + "/pom.xml</exists>",
+                    "guard that adds the " + module + " module only when it exists");
+        }
+    }
+
+    /// A backend-only project is one module: no parent, the backend runtime, the
+    /// annotation processing that generates its entry point, and nothing of an app.
+    private void validateBackendOnlyPom(Map<String, byte[]> entries, String rootPom) throws IOException {
+        if (rootPom.indexOf("<parent>") >= 0) {
+            throw new IOException("Refusing to generate project: a backend-only pom.xml has a parent");
+        }
+        requirePomFragment("pom.xml", rootPom, "<artifactId>codenameone-backend</artifactId>",
+                "dependency on codenameone-backend");
+        requirePomFragment("pom.xml", rootPom, "<goal>process-annotations</goal>", "process-annotations goal");
+        if (rootPom.indexOf("-common</artifactId>") >= 0 || rootPom.indexOf("<artifactId>codenameone-core</artifactId>") >= 0) {
+            throw new IOException("Refusing to generate project: a backend-only pom.xml depends on the app");
+        }
+        for (String path : entries.keySet()) {
+            if (path.startsWith("common/") || (path.endsWith("/pom.xml") && !"pom.xml".equals(path))) {
+                throw new IOException("Refusing to generate project: " + path + " in a backend-only project");
+            }
+        }
     }
 
     private void validateModulePomCoordinates(
@@ -728,6 +952,12 @@ public class GeneratorModel {
                 return null;
             }
             targetPath = sourcePath.substring("common/".length());
+        } else if (zipType == ZipEntryType.COMMON_ARCHIVE && mavenLayoutsEnabled()) {
+            String mapped = mapMavenLayoutPath(sourcePath);
+            if (mapped == null) {
+                return null;
+            }
+            targetPath = mapped;
         } else if (zipType == ZipEntryType.TEMPLATE_CSS) {
             targetPath = appDir() + "src/main/css/" + sourcePath;
         } else if (zipType == ZipEntryType.TEMPLATE_SOURCE) {
@@ -744,6 +974,103 @@ public class GeneratorModel {
             }
         }
         return applyPathReplacements(targetPath);
+    }
+
+    /// The platform modules common.zip carries, each optional from [MAVEN_LAYOUTS_SINCE].
+    private static final String[] PLATFORM_MODULES = {"android", "ios", "javase", "javascript", "linux", "win"};
+
+    /// Where a common.zip entry goes in a Maven download with the layout choices, or
+    /// null to leave it out: a backend-only project keeps the Maven wrapper alone; an
+    /// app drops the platform modules unless every one was asked for, and the backend
+    /// module unless it was asked for. The packaged desktop app's native theme moves
+    /// from the javase module to common, where the desktop goals read it when there
+    /// is no javase module.
+    private String mapMavenLayoutPath(String sourcePath) {
+        if (isMavenBackendOnly()) {
+            return "mvnw".equals(sourcePath) || "mvnw.cmd".equals(sourcePath) || sourcePath.startsWith(".mvn/")
+                    ? sourcePath : null;
+        }
+        if (!includesPlatformModules()) {
+            if ("javase/src/desktop/resources/NativeTheme.res".equals(sourcePath)) {
+                return "common/src/desktop/resources/NativeTheme.res";
+            }
+            for (int i = 0; i < PLATFORM_MODULES.length; i++) {
+                if (sourcePath.startsWith(PLATFORM_MODULES[i] + "/")) {
+                    return null;
+                }
+            }
+        }
+        if (!includesBackendModule() && sourcePath.startsWith("backend/")) {
+            return null;
+        }
+        return sourcePath;
+    }
+
+    /// The modules the root pom adds through a profile of the same id.
+    private static final String[] PROFILE_MODULES = {"javascript", "ios", "win", "linux", "backend", "android", "javase"};
+
+    /// The root pom with every module profile also requiring the module's pom, so a
+    /// module that is not there is simply not in the reactor and `common` builds
+    /// that platform instead. Maven needs both the property and the file. Without a
+    /// javase module the javase profile also loses activeByDefault, which Maven
+    /// honours even when the profile's own conditions fail.
+    static String guardModuleProfiles(String pom, boolean withoutJavase) {
+        int profiles = pom.indexOf("<profiles>");
+        if (profiles < 0) {
+            return pom;
+        }
+        for (int i = 0; i < PROFILE_MODULES.length; i++) {
+            String module = PROFILE_MODULES[i];
+            int id = pom.indexOf("<id>" + module + "</id>", profiles);
+            if (id < 0) {
+                continue;
+            }
+            int activationEnd = pom.indexOf("</activation>", id);
+            int property = pom.indexOf("</property>", id);
+            if (activationEnd < 0 || property < 0 || property > activationEnd) {
+                continue;
+            }
+            String guard = "<exists>${basedir}/" + module + "/pom.xml</exists>";
+            if (pom.substring(id, activationEnd).indexOf(guard) >= 0) {
+                continue;
+            }
+            int lineStart = pom.lastIndexOf('\n', property) + 1;
+            String indent = pom.substring(lineStart, property);
+            // common.zip's root pom indents by two.
+            String step = "  ";
+            int at = property + "</property>".length();
+            pom = pom.substring(0, at)
+                    + "\n" + indent + "<file>\n" + indent + step + guard + "\n" + indent + "</file>"
+                    + pom.substring(at);
+        }
+        if (withoutJavase) {
+            String tag = "<activeByDefault>true</activeByDefault>";
+            int pos = pom.indexOf(tag);
+            if (pos >= 0) {
+                int lineStart = pom.lastIndexOf('\n', pos);
+                pom = pom.substring(0, lineStart < 0 ? pos : lineStart) + pom.substring(pos + tag.length());
+            }
+        }
+        return pom;
+    }
+
+    /// common/pom.xml with the profiles that let common build any platform the
+    /// project has no module for (common-hosted-platform-profiles.xml, the file the
+    /// archetype injects too). They replace the template's own `simulator` profile,
+    /// which the shared file carries in full.
+    private static String injectHostedPlatformProfiles(String pom) throws IOException {
+        String fragment = readResourceToString(HOSTED_PROFILES_RESOURCE);
+        int id = pom.indexOf("<id>simulator</id>");
+        int start = id < 0 ? -1 : pom.lastIndexOf("<profile>", id);
+        int end = id < 0 ? -1 : pom.indexOf("</profile>", id);
+        if (start < 0 || end < 0) {
+            throw new IOException("Refusing to generate project: common/pom.xml has no simulator profile "
+                    + "to replace with the hosted platform profiles");
+        }
+        int lineStart = pom.lastIndexOf('\n', start) + 1;
+        int lineEnd = pom.indexOf('\n', end);
+        lineEnd = lineEnd < 0 ? pom.length() : lineEnd + 1;
+        return pom.substring(0, lineStart) + fragment + pom.substring(lineEnd);
     }
 
     /// The directory the application's own files live in: the `common/` module of
@@ -793,12 +1120,24 @@ public class GeneratorModel {
         if (".idea/misc.xml".equals(targetPath)) {
             content = normalizeIntellijMiscXml(content);
         }
+        if (!includesPlatformModules()
+                && (".idea/compiler.xml".equals(targetPath) || ".idea/encodings.xml".equals(targetPath))) {
+            // The IntelliJ files name the javase module, which this download does not have.
+            content = removeLinesContaining(content, "-javase\"");
+            content = removeLinesContaining(content, "$PROJECT_DIR$/javase/");
+        }
         if (".idea/workspace.xml".equals(targetPath)) {
             content = applySimulatorJvmExportToIdeaWorkspace(content);
         }
         if ("pom.xml".equals(targetPath)) {
-            content = replaceTagValue(content, "cn1.plugin.version", CN1_PLUGIN_VERSION);
-            content = replaceTagValue(content, "cn1.version", CN1_PLUGIN_VERSION);
+            content = replaceTagValue(content, "cn1.plugin.version", pluginVersion);
+            content = replaceTagValue(content, "cn1.version", pluginVersion);
+            if (mavenLayoutsEnabled() && !isMavenBackendOnly()) {
+                content = guardModuleProfiles(content, !includesPlatformModules());
+            }
+        }
+        if ("common/pom.xml".equals(targetPath) && mavenLayoutsEnabled()) {
+            content = injectHostedPlatformProfiles(content);
         }
         if ("android/pom.xml".equals(targetPath) || "ios/pom.xml".equals(targetPath) || "javascript/pom.xml".equals(targetPath)) {
             content = hardenPlatformModulePomAgainstDoubleJarAttach(content);
@@ -1050,9 +1389,14 @@ public class GeneratorModel {
 
     private String buildReadmeMarkdown() {
         StringBuilder out = new StringBuilder();
-        out.append("# Codename One Project\n\n")
-                .append("This is a multi-module Maven project for a Codename One app.\n")
-                .append("You can write the app in Java and/or Kotlin, and build for Android, iOS, desktop, and web.\n\n")
+        out.append("# Codename One Project\n\n");
+        if (includesPlatformModules()) {
+            out.append("This is a multi-module Maven project for a Codename One app.\n");
+        } else {
+            out.append("This is a Maven project for a Codename One app. The app lives in `common/`, and every ")
+                    .append("platform is built from it: there is no per-platform module until you add one.\n");
+        }
+        out.append("You can write the app in Java and/or Kotlin, and build for Android, iOS, desktop, and web.\n\n")
                 .append("## Getting Started\n\n");
 
         out.append("Use JDK ").append(options.javaVersion == ProjectOptions.JavaVersion.JAVA_17 ? "17" : "8")
@@ -1071,6 +1415,19 @@ public class GeneratorModel {
                 .append("These local operations do not create a cloud build.\n\n");
 
         appendIdeSection(out);
+
+        if (!includesPlatformModules()) {
+            out.append("## Native Code\n\n")
+                    .append("Native interface implementations go in a directory per platform beside `common/`, ")
+                    .append("for example `android/src/main/java` or `ios/src/main/objectivec`. ")
+                    .append("`mvn cn1:generate-native-interfaces` creates them, and the build picks them up from there.\n\n");
+        }
+        if (mavenLayoutsEnabled() && includesBackendModule()) {
+            out.append("## Backend\n\n")
+                    .append("`backend/` is the app's server. Run it with ")
+                    .append("`./mvnw -pl backend -Dcodename1.platform=backend cn1:backend` and package it as a native ")
+                    .append("binary with `./mvnw -pl backend -Dcodename1.platform=backend cn1:backend-package`.\n\n");
+        }
 
         if (template.USES_CODERAD) {
             out.append("### Additional Eclipse Steps for CodeRAD Projects\n\n")
@@ -1108,11 +1465,133 @@ public class GeneratorModel {
         }
         if (ide == IDE.NETBEANS) {
             out.append("## NetBeans Users\n\n")
-                    .append("This is a standard multi-module Maven project generated from an archetype.\n\n");
+                    .append(includesPlatformModules()
+                            ? "This is a standard multi-module Maven project generated from an archetype.\n\n"
+                            : "This is a standard Maven project; open the root pom.xml.\n\n");
             return;
         }
         out.append("## VS Code Users\n\n")
                 .append("Open the project folder in VS Code and make sure Java + Maven extensions are installed.\n\n");
+    }
+
+    /// The goals a Maven backend-only project's IDE files offer, as {label, goal}.
+    private static final String[][] MAVEN_BACKEND_GOALS = {
+            {"Run Backend", "cn1:backend"},
+            {"Package Backend", "cn1:backend-package"},
+            {"Update Codename One", "cn1:update"}
+    };
+
+    /// IDE files for a Maven backend-only project: every IDE imports the pom on its
+    /// own, so what is left is a button per goal worth one. The IDE zips are not
+    /// used -- their run configurations are the app's simulator and builds.
+    private void addMavenBackendIdeEntries(Map<String, byte[]> entries) throws IOException {
+        if (ide == IDE.INTELLIJ) {
+            for (int i = 0; i < MAVEN_BACKEND_GOALS.length; i++) {
+                copySingleTextEntryToMap(".idea/runConfigurations/" + fileNameFor(MAVEN_BACKEND_GOALS[i][0]) + ".xml",
+                        intellijMavenRunConfiguration(MAVEN_BACKEND_GOALS[i][0], MAVEN_BACKEND_GOALS[i][1]),
+                        entries, ZipEntryType.COMMON);
+            }
+            return;
+        }
+        if (ide == IDE.VS_CODE) {
+            copySingleTextEntryToMap(".vscode/tasks.json", vscodeTasks(MAVEN_BACKEND_GOALS, "./mvnw", ".\\\\mvnw.cmd"),
+                    entries, ZipEntryType.COMMON);
+            copySingleTextEntryToMap(".vscode/extensions.json",
+                    "{\n  \"recommendations\": [\n"
+                            + "    \"vscjava.vscode-java-pack\",\n"
+                            + "    \"vscjava.vscode-maven\"\n"
+                            + "  ]\n}\n", entries, ZipEntryType.COMMON);
+        }
+    }
+
+    private static String intellijMavenRunConfiguration(String name, String goal) {
+        return "<component name=\"ProjectRunConfigurationManager\">\n"
+                + "  <configuration default=\"false\" name=\"" + name + "\" type=\"MavenRunConfiguration\" "
+                + "factoryName=\"Maven\">\n"
+                + "    <MavenSettings>\n"
+                + "      <option name=\"myGeneralSettings\" />\n"
+                + "      <option name=\"myRunnerSettings\" />\n"
+                + "      <option name=\"myRunnerParameters\">\n"
+                + "        <MavenRunnerParameters>\n"
+                + "          <option name=\"profiles\">\n"
+                + "            <set />\n"
+                + "          </option>\n"
+                + "          <option name=\"goals\">\n"
+                + "            <list>\n"
+                + "              <option value=\"" + goal + "\" />\n"
+                + "              <option value=\"-e\" />\n"
+                + "            </list>\n"
+                + "          </option>\n"
+                + "          <option name=\"pomFileName\" value=\"pom.xml\" />\n"
+                + "          <option name=\"profilesMap\">\n"
+                + "            <map />\n"
+                + "          </option>\n"
+                + "          <option name=\"resolveToWorkspace\" value=\"false\" />\n"
+                + "          <option name=\"workingDirPath\" value=\"$PROJECT_DIR$\" />\n"
+                + "        </MavenRunnerParameters>\n"
+                + "      </option>\n"
+                + "    </MavenSettings>\n"
+                + "    <method v=\"2\" />\n"
+                + "  </configuration>\n"
+                + "</component>\n";
+    }
+
+    /// A VS Code tasks.json running each {label, argument} through `command`.
+    private static String vscodeTasks(String[][] tasks, String command, String windowsCommand) {
+        StringBuilder json = new StringBuilder();
+        json.append("{\n  \"version\": \"2.0.0\",\n  \"tasks\": [\n");
+        for (int i = 0; i < tasks.length; i++) {
+            json.append("    {\n")
+                    .append("      \"label\": \"").append(tasks[i][0]).append("\",\n")
+                    .append("      \"type\": \"shell\",\n")
+                    .append("      \"command\": \"").append(command).append("\",\n")
+                    .append("      \"windows\": { \"command\": \"").append(windowsCommand).append("\" },\n")
+                    .append("      \"args\": [\"").append(tasks[i][1]).append("\"],\n")
+                    .append("      \"problemMatcher\": []\n")
+                    .append("    }").append(i + 1 < tasks.length ? "," : "").append('\n');
+        }
+        json.append("  ]\n}\n");
+        return json.toString();
+    }
+
+    private String buildMavenBackendReadmeMarkdown() {
+        StringBuilder out = new StringBuilder();
+        out.append("# Codename One Backend\n\n")
+                .append("This is a Maven project for a Codename One backend: a server written in Java, ")
+                .append("run on the JVM while you develop and packaged as a single native binary.\n\n")
+                .append("## Getting Started\n\n")
+                .append("Use JDK 17 or newer, and set JAVA_HOME for terminal builds. ")
+                .append("Extract the entire ZIP, then open the root pom.xml as a Maven project.\n\n")
+                .append("macOS/Linux:\n\n```\nCN1_PROFILE=dev ./mvnw cn1:backend\n```\n\n")
+                .append("Windows PowerShell:\n\n```\n$env:CN1_PROFILE=\"dev\"; .\\mvnw.cmd cn1:backend\n```\n\n")
+                .append("The first build downloads the dependencies and can take several minutes. ")
+                .append("If a download fails, check your connection or Maven proxy settings and retry.\n\n")
+                .append("## Goals\n\n")
+                .append("- `./mvnw cn1:backend` runs the server on this JVM; it starts in seconds.\n")
+                .append("- `CN1_PROFILE=dev ./mvnw cn1:backend` also reads `application-dev.properties` ")
+                .append("(an in-memory database).\n")
+                .append("- `./mvnw cn1:backend-package` builds a single native binary.\n\n")
+                .append("Routes are the annotated methods in `src/main/java/")
+                .append(packageName.replace('.', '/')).append("/Api.java`. Settings live in ")
+                .append("`application.properties` beside the pom.\n\n");
+        if (ide == IDE.ECLIPSE) {
+            out.append("## Eclipse Users\n\n")
+                    .append("Choose File > Import > Maven > Existing Maven Projects and select this folder. ")
+                    .append("Run the goals above from Run As > Maven build.\n\n");
+        } else if (ide == IDE.NETBEANS) {
+            out.append("## NetBeans Users\n\n")
+                    .append("Open this folder as a Maven project and run the goals above from Run Maven > Goals.\n\n");
+        } else if (ide == IDE.INTELLIJ) {
+            out.append("## IntelliJ Users\n\n")
+                    .append("Open this folder; the Run Backend and Package Backend configurations run the goals above.\n\n");
+        } else {
+            out.append("## VS Code Users\n\n")
+                    .append("Open this folder; Terminal > Run Task offers the goals above.\n\n");
+        }
+        out.append("## Help and Support\n\n")
+                .append("- Codename One website: https://www.codenameone.com\n")
+                .append("- Codename One GitHub: https://github.com/codenameone/CodenameOne\n");
+        return out.toString();
     }
 
     /// The tasks a Gradle project's IDE files offer, as {label, task path}.

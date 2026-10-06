@@ -68,7 +68,7 @@ import com.codename1.impl.async.EdtResult;
 ///         scan.stop();
 ///         sensors.connect(sensor, HealthSensorProfile.HEART_RATE,
 ///                 new SensorSessionOptions())
-///               .onResult((session, err) -> { ... });
+///               .onResult((session, err) -> { /* ... */ });
 ///     }
 ///     public void scanFailed(HealthException e) { Log.e(e); }
 /// });

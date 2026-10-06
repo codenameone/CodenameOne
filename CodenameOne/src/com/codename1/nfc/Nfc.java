@@ -66,7 +66,7 @@ import com.codename1.util.SuccessCallback;
 ///         IsoDep iso = tag.getIsoDep();
 ///         if (iso == null) return;
 ///         iso.transceive(myCommandApdu).onResult((resp, e) -> {
-///             if (ApduResponse.isSuccess(resp)) { ... }
+///             if (ApduResponse.isSuccess(resp)) { /* ... */ }
 ///         });
 ///    });
 /// ```

@@ -37,11 +37,13 @@ the first can download codenameone-core and still fail to find a newer
 codenameone-maven-plugin, which reads as a corrupt install rather than a missing
 repository.
 
-The three scaffolds must agree; they are the only ways a user gets a new project:
+The scaffolds must agree; they are the only ways a user gets a new project:
 
-  1. cn1app-archetype  -- mvn archetype:generate / cn1:generate-app-project
-  2. cn1lib-archetype  -- library projects
-  3. common.zip        -- the Initializr root pom (start.codenameone.com)
+  1. cn1app-archetype     -- mvn archetype:generate / cn1:generate-app-project
+  2. cn1lib-archetype     -- library projects
+  3. common.zip           -- the Initializr root pom (start.codenameone.com)
+  4. backend-only-pom.xml -- the root pom of a backend-only project, from both the
+                             Initializr and the app archetype
 """
 
 from pathlib import Path
@@ -64,6 +66,7 @@ APP_ARCHETYPE_POM = "maven/cn1app-archetype/src/main/resources/archetype-resourc
 LIB_ARCHETYPE_POM = "maven/cn1lib-archetype/src/main/resources/archetype-resources/pom.xml"
 INITIALIZR_ZIP = "scripts/initializr/common/src/main/resources/common.zip"
 INITIALIZR_ZIP_POM = "pom.xml"
+BACKEND_ONLY_POM = "scripts/initializr/common/src/main/resources/backend-only-pom.xml"
 
 
 def fail(message):
@@ -105,10 +108,10 @@ def validate_pom(label, data):
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
-    for relative_path in (APP_ARCHETYPE_POM, LIB_ARCHETYPE_POM):
+    for relative_path in (APP_ARCHETYPE_POM, LIB_ARCHETYPE_POM, BACKEND_ONLY_POM):
         pom_path = repo_root / relative_path
         if not pom_path.is_file():
-            fail("archetype POM not found: " + str(pom_path))
+            fail("scaffold POM not found: " + str(pom_path))
         validate_pom(relative_path, pom_path.read_bytes())
 
     archive_path = repo_root / INITIALIZR_ZIP

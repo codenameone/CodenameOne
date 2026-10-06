@@ -147,6 +147,18 @@ public final class ProjectLayouts {
                 return new ProjectLayout(BuildSystem.MAVEN, settings.isFile() ? ProjectKind.APP : ProjectKind.LIB,
                         dir, dir, null);
             }
+            if (isMavenBackend(dir)) {
+                File parent = dir.getParentFile();
+                if (parent != null && new File(parent, "pom.xml").isFile()
+                        && (new File(parent, "common/" + ProjectLayout.SETTINGS_FILE).isFile()
+                        || new File(parent, "common/" + ProjectLayout.LIBRARY_SETTINGS_FILE).isFile())) {
+                    // The backend module of an application: the walk continues to
+                    // the application root, where mavenLayout() answers BACKEND.
+                    return null;
+                }
+                // A backend-only project: one module, the backend itself, at the root.
+                return new ProjectLayout(BuildSystem.MAVEN, ProjectKind.BACKEND, dir, dir, null);
+            }
             return null;
         }
 
@@ -171,6 +183,15 @@ public final class ProjectLayouts {
         }
         ProjectKind kind = new File(common, ProjectLayout.SETTINGS_FILE).isFile() ? ProjectKind.APP : ProjectKind.LIB;
         return new ProjectLayout(BuildSystem.MAVEN, kind, root, common, null);
+    }
+
+    /// Whether `dir` is a Codename One backend built by Maven: its configuration
+    /// file beside a pom that depends on the backend runtime. The dependency is
+    /// what tells it apart from any other server that keeps an
+    /// `application.properties`, a Spring Boot project for one.
+    private static boolean isMavenBackend(File dir) {
+        return new File(dir, ProjectLayout.BACKEND_SETTINGS_FILE).isFile()
+                && readQuietly(new File(dir, "pom.xml")).contains("<artifactId>codenameone-backend</artifactId>");
     }
 
     private static ProjectLayout gradleLayout(File root, File origin) {

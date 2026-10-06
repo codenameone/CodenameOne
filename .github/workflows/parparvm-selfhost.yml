@@ -15,6 +15,11 @@ name: ParparVM Self-Hosting
 #   D  native vs native, two fresh processes, same input. If the native side is
 #      not self-consistent nothing else means anything, so it runs first.
 #   A  JVM vs native over the same corpus. The headline.
+#   J  the same comparison for the JavaScript target: the native translator
+#      carries the JavaScript backend too, and must emit the same bundle.
+#   C, S  JVM vs the translator TRANSLATED TO JAVASCRIPT and run under Node, for
+#      the C and the JavaScript targets (verify-selfhost-js.sh): self-hosting on
+#      the JavaScript target.
 #   Negative control: after a green comparison one emitted byte is flipped and
 #      the comparator MUST report exactly that file. A comparator nobody has
 #      watched fail is not a comparator.
@@ -87,13 +92,6 @@ jobs:
           -pl ByteCodeTranslator -am package -DskipTests
         working-directory: vm
 
-      - name: Resolve the ASM classpath
-        run: >-
-          "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -q -B -pl ByteCodeTranslator
-          dependency:build-classpath
-          -Dmdep.outputFile=target/selfhost-asm-classpath.txt
-        working-directory: vm
-
       # -O1: the diff gates care about the EMITTED C, not about how well clang
       # optimised the binary that emitted it, and -O1 links several times faster.
       #
@@ -107,7 +105,8 @@ jobs:
       - name: Build the self-hosted translator
         run: vm/selfhost/build-selfhost.sh
 
-      # The corpus is the translator's OWN classes plus ASM. verify-selfhost.sh
+      # The corpus is the translator's OWN classes plus ASM, which build-selfhost.sh
+      # fetches and extracts as corpus only -- the translator does not use it. verify-selfhost.sh
       # prepends vm/selfhost/target/javaapi-classes itself, so it is not repeated
       # here. Absolute paths: the script runs both sides under `env -i` into one
       # fixed output directory, so a relative path would not survive.
@@ -136,6 +135,20 @@ jobs:
       # The baselines and tolerance live in vm/selfhost/perf-baseline/, the
       # measurement in vm/selfhost/perf-gate.py.
 
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      # The translator as a JavaScript program, against the JVM translator, over the
+      # same corpus. build-selfhost.sh has already compiled it against JavaAPI.
+      - name: Gate C and Gate S, self-hosted on JavaScript
+        run: |
+          vm/selfhost/verify-selfhost-js.sh \
+            "$PWD/vm/selfhost/target/asm-classes;$PWD/vm/selfhost/target/classes" \
+            com_codename1_tools_translator_ByteCodeTranslator \
+            com.codename1.tools.translator
+
       # Both trees, so a divergence can be inspected rather than guessed at from
       # a one-line summary.
       - name: Upload the compared trees on failure
@@ -149,5 +162,8 @@ jobs:
             vm/selfhost/target/verify/parpar2-tree
             vm/selfhost/target/verify/*.txt
             vm/selfhost/target/verify/*.log
+            vm/selfhost/target/verify-js/*-tree
+            vm/selfhost/target/verify-js/*.txt
+            vm/selfhost/target/verify-js/*.log
           retention-days: 7
           if-no-files-found: ignore

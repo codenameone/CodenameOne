@@ -25,7 +25,7 @@ package com.codename1.tools.translator;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class ByteCodeField {
     private final String clsName;

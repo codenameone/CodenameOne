@@ -47,6 +47,10 @@ CodeRAD includes an annotation processor that needs to be activated. There are a
 
 See https://github.com/codenameone/CodenameOne/issues/3724[this issue] for more details.
 
+== Project Layout
+
+The app lives in the `common` module. Platform modules (`javase`, `android`, `ios`, `javascript`, `win`, `linux`) are optional: when a platform has no module, `common` builds it, so `./build.sh` and `./run.sh` work either way. Native interface implementations go under `<platform>/src/main/...` (for example `android/src/main/java`), which `mvn cn1:generate-native-interfaces` creates when needed. Add a `<platform>/pom.xml` only if that platform needs its own build plugins or dependencies.
+
 == NetBeans Users
 
 This project is a multi-module Maven project that was generated from a Maven archetype.

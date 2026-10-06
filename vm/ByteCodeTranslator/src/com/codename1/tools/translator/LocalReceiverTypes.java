@@ -29,10 +29,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.*;
-import org.objectweb.asm.tree.analysis.*;
+import com.codename1.tools.translator.classfile.Opcodes;
+import com.codename1.tools.translator.classfile.Type;
+import com.codename1.tools.translator.classfile.tree.*;
+import com.codename1.tools.translator.classfile.analysis.*;
 
 /**
  * Allocation proofs for collection calls and native traversal. Reference
@@ -183,7 +183,7 @@ final class LocalReceiverTypes {
 
     /** Primitive provenance cannot prove a receiver; share its category values. */
     private static final class ReceiverInterpreter extends SourceInterpreter {
-        ReceiverInterpreter() { super(Opcodes.ASM9); }
+        ReceiverInterpreter() { super(); }
         @Override public SourceValue newValue(Type type) {
             if (type == Type.VOID_TYPE) return null;
             if (type == null) return ONE;
@@ -207,8 +207,8 @@ final class LocalReceiverTypes {
                     Object constant = ((LdcInsnNode) node).cst;
                     if (constant instanceof Long || constant instanceof Double) return TWO;
                     if (constant instanceof Integer || constant instanceof Float) return ONE;
-                    if (constant instanceof org.objectweb.asm.ConstantDynamic) {
-                        char kind = ((org.objectweb.asm.ConstantDynamic) constant).getDescriptor().charAt(0);
+                    if (constant instanceof com.codename1.tools.translator.classfile.ConstantDynamic) {
+                        char kind = ((com.codename1.tools.translator.classfile.ConstantDynamic) constant).getDescriptor().charAt(0);
                         return kind == 'J' || kind == 'D' ? TWO : kind == 'L' || kind == '[' ? UNKNOWN : ONE;
                     }
                     return UNKNOWN;

@@ -28,7 +28,7 @@ import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.Invoke;
 import com.codename1.tools.translator.bytecodes.Ldc;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
-import org.objectweb.asm.Type;
+import com.codename1.tools.translator.classfile.Type;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,7 +39,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * JavaScript-target-only Rapid Type Analysis culler. The default
@@ -539,6 +539,14 @@ final class JavascriptReachability {
             }
             if (cls.getUsedByNative() == ByteCodeClass.UsedByNativeResult.Used) {
                 markAllocated(cls.getClsName());
+            }
+            // Open-world output: code translated later may instantiate any kept class
+            // and call any of its methods, so all of them are roots.
+            if (JavascriptOpenWorld.keepsClass(cls.getClsName())) {
+                markAllocated(cls.getClsName());
+                for (BytecodeMethod m : cls.getMethods()) {
+                    enqueue(m);
+                }
             }
         }
         // Runtime roots that the translator always keeps alive.

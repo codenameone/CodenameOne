@@ -32,7 +32,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * LEVER B (perf-tier1): inline a SMALL, leaf-ish constructor body as direct field
@@ -107,6 +107,17 @@ public final class InlinableConstructor {
      * object; {@code argExprs[p-1]} is the C expression for constructor parameter p.
      */
     public void appendStores(StringBuilder b, String objExpr, String[] argExprs) {
+        appendStores(b, objExpr, argExprs, false);
+    }
+
+    /**
+     * As {@link #appendStores(StringBuilder, String, String[])}; {@code freshTarget} says
+     * {@code objExpr} is the object this very sequence just allocated (init-before-publish),
+     * which lets each object store use CN1_INIT_WRITE_BARRIER: the SATB insertion half
+     * only. The generational half records an OLD target, and an object allocated a few
+     * stores earlier with no safepoint in between cannot be one.
+     */
+    public void appendStores(StringBuilder b, String objExpr, String[] argExprs, boolean freshTarget) {
         for (Store s : stores) {
             String value = s.paramIndex > 0 ? argExprs[s.paramIndex - 1] : s.constLiteral;
             // Direct struct-member store -- byte-for-byte the body of the generated
@@ -121,7 +132,8 @@ public final class InlinableConstructor {
             String lhs = "((struct obj__" + s.cOwner + "*)(" + objExpr + "))->" + s.cOwner + "_" + s.fieldName;
             b.append("    ");
             if (s.fieldCat == 'o') {
-                b.append("CN1_WRITE_BARRIER(").append(objExpr).append(", ").append(value).append("); ");
+                b.append(freshTarget ? "CN1_INIT_WRITE_BARRIER(" : "CN1_WRITE_BARRIER(")
+                 .append(objExpr).append(", ").append(value).append("); ");
             }
             b.append(lhs).append(" = ").append(value).append(";\n");
         }
@@ -206,7 +218,7 @@ public final class InlinableConstructor {
         }
         b.append("    JAVA_OBJECT __ibp = CN1_FAST_NEW_NOZERO(").append(cType).append(");\n");
         // ctor-written fields (params / constants)
-        appendStores(b, "__ibp", argExprs);
+        appendStores(b, "__ibp", argExprs, true);
         // explicit zeros for the fields the ctor does NOT write (empty when the
         // ctor writes every field). clang -O3 coalesces adjacent zero
         // stores; padding is neither written nor GC-scanned so it is left alone.
@@ -237,7 +249,9 @@ public final class InlinableConstructor {
         // guards on parentCls==0). Set it only now, with every field written: from
         // this store on the object is safely traceable. (The __NEW_X slow-path
         // fallback already set it -- rewriting the same value is harmless.)
-        b.append("    CN1_OBJ_SET_CLASS(__ibp, &class__").append(cType).append(");\n");
+        // A constant store: the class registered itself in its static initializer, which
+        // CN1_FAST_NEW_NOZERO's guard has already run (see CN1_OBJ_PUBLISH_CLASS).
+        b.append("    CN1_OBJ_PUBLISH_CLASS(__ibp, ").append(cType).append(");\n");
         // publish: the object becomes a GC root only now, fully constructed.
         b.append("    SP[-").append(survivorSlot).append("].data.o = __ibp;\n");
         if(deadGuardId >= 0) {

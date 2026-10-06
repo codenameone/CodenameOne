@@ -2555,6 +2555,20 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
     allThreads[threadOffset] = i;
     unlockCriticalSection();
     //printf("Thread slot %d assigned to thread %d\n",threadOffset,(int)i->threadId);
+    // The registering half of the handshake with the collector's stop-the-world recheck
+    // (cn1GcUnheldThreadPresent in cn1_globals.m). This state is not lightweight, so no
+    // cycle will hold it; a stop-the-world cycle whose scan of allThreads came before the
+    // store above would therefore run with it unheld and could free what it allocates. The
+    // collector raised cn1GcStwInProgress before taking the lock this thread took after it,
+    // so it is visible here: wait for that cycle to end. Nothing waits on this thread -- the
+    // collector never waits for a non-lightweight one -- so the wait cannot deadlock.
+    {
+        extern volatile int cn1GcStwInProgress;
+        int spins = 0;
+        while(__atomic_load_n(&cn1GcStwInProgress, __ATOMIC_SEQ_CST)) {
+            cn1GcHandshakeBackoff(&spins);
+        }
+    }
 
     return i;
 }
@@ -2800,12 +2814,18 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     if(firstTimeGcThread) {
         firstTimeGcThread = JAVA_FALSE;
         
-        // reduce thread priority
-        int policy;
-        struct sched_param param;
-        pthread_getschedparam(pthread_self(), &policy, &param);
-        param.sched_priority--;
-        pthread_setschedparam(pthread_self(), policy, &param);
+        // Reduce thread priority -- but NOT where the collector runs stop-the-world cycles.
+        // There the mutator is held until the cycle ends, so the collector thread is the
+        // critical path, and a deprioritized one is preempted by everything else on the
+        // host while the application waits on it.
+        extern int cn1GcStwCapablePublic(void);
+        if(!cn1GcStwCapablePublic()) {
+            int policy;
+            struct sched_param param;
+            pthread_getschedparam(pthread_self(), &policy, &param);
+            param.sched_priority--;
+            pthread_setschedparam(pthread_self(), policy, &param);
+        }
     }
     flushReleaseQueue();
     // Defense in depth: a collection cycle must NEVER let an exception escape to the GC
@@ -2871,6 +2891,10 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
 #ifdef CN1_GC_CONFORM
         cn1GcProbeThrew = 1;
 #endif
+    }
+    {
+        extern void cn1GcReleaseAllBlockedThreadsPublic(void);
+        cn1GcReleaseAllBlockedThreadsPublic();
     }
     flushReleaseQueue();
 #ifdef CN1_GC_CONFORM

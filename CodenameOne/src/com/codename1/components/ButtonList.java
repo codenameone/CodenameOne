@@ -187,16 +187,16 @@ import java.util.Arrays;
 /// **Switch List in a FlowLayout:**
 ///
 /// ```java
-/// `SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
-/// switchList.setLayout(new FlowLayout());`
+/// SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
+/// switchList.setLayout(new FlowLayout());
 /// ```
 ///
 /// **Switch List in a BoxLayout.Y:**
 ///
 /// *
 /// ```java
-/// `SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
-/// switchList.setLayout(BoxLayout.y());`
+/// SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
+/// switchList.setLayout(BoxLayout.y());
 /// ```
 ///
 /// **Switch List in a Grid Layout:**
@@ -206,15 +206,15 @@ import java.util.Arrays;
 /// **2 Columns:**
 ///
 /// ```java
-/// `SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
-/// switchList.setLayout(new TableLayout(switchList.getComponentCount()/2+1, 2));`
+/// SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
+/// switchList.setLayout(new TableLayout(switchList.getComponentCount()/2+1, 2));
 /// ```
 ///
 /// **3 Columns:**
 ///
 /// ```java
-/// `SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
-/// switchList.setLayout(new TableLayout(switchList.getComponentCount()/3+1, 3));`
+/// SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
+/// switchList.setLayout(new TableLayout(switchList.getComponentCount()/3+1, 3));
 /// ```
 public abstract class ButtonList extends Container implements DataChangedListener, SelectionListener, ActionListener, ActionSource {
     private final EventDispatcher actionListeners = new EventDispatcher();

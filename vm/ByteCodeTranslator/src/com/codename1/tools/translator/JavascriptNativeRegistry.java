@@ -35,6 +35,40 @@ final class JavascriptNativeRegistry {
     }
 
     private static final Set<String> RUNTIME_IMPLEMENTED = new HashSet<String>(Arrays.asList(
+            // java.io on a host-supplied file system (jvm.fileSystem in
+            // parparvm_runtime.js); without one they throw the message below.
+            "cn1_java_io_FileInputStream_availableImpl_long_R_int",
+            "cn1_java_io_FileInputStream_closeImpl_long_R_int",
+            "cn1_java_io_FileInputStream_openImpl_java_lang_String_R_long",
+            "cn1_java_io_FileInputStream_readImpl_long_byte_1ARRAY_int_int_R_int",
+            "cn1_java_io_FileInputStream_skipImpl_long_long_R_long",
+            "cn1_java_io_FileOutputStream_closeImpl_long_R_int",
+            "cn1_java_io_FileOutputStream_flushImpl_long_R_int",
+            "cn1_java_io_FileOutputStream_openImpl_java_lang_String_boolean_R_long",
+            "cn1_java_io_FileOutputStream_writeImpl_long_byte_1ARRAY_int_int_R_int",
+            "cn1_java_io_File_canExecuteImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_canReadImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_canWriteImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_createNewFileImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_deleteImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_existsImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_getAbsolutePathImpl_java_lang_String_R_java_lang_String",
+            "cn1_java_io_File_getCanonicalPathImpl_java_lang_String_R_java_lang_String",
+            "cn1_java_io_File_getFreeSpaceImpl_java_lang_String_R_long",
+            "cn1_java_io_File_getTotalSpaceImpl_java_lang_String_R_long",
+            "cn1_java_io_File_getUsableSpaceImpl_java_lang_String_R_long",
+            "cn1_java_io_File_isDirectoryImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_isFileImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_isHiddenImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_lastModifiedImpl_java_lang_String_R_long",
+            "cn1_java_io_File_lengthImpl_java_lang_String_R_long",
+            "cn1_java_io_File_listImpl_java_lang_String_R_java_lang_String_1ARRAY",
+            "cn1_java_io_File_mkdirImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_renameToImpl_java_lang_String_java_lang_String_R_boolean",
+            "cn1_java_io_File_setExecutableImpl_java_lang_String_boolean_R_boolean",
+            "cn1_java_io_File_setReadOnlyImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_setReadableImpl_java_lang_String_boolean_R_boolean",
+            "cn1_java_io_File_setWritableImpl_java_lang_String_boolean_R_boolean",
             "cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY",
             "cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int",
             "cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class",
@@ -292,11 +326,9 @@ final class JavascriptNativeRegistry {
     }
 
     static String unsupportedReason(String symbol) {
-        if (symbol.startsWith("cn1_java_io_File_")
-                || symbol.startsWith("cn1_java_io_FileInputStream_")
-                || symbol.startsWith("cn1_java_io_FileOutputStream_")) {
-            return "java.io.File native filesystem access is not supported in javascript backend";
-        }
+        // java.io.File and its streams are bound by the runtime (RUNTIME_IMPLEMENTED
+        // above), which throws "java.io.File native filesystem access is not supported
+        // in javascript backend" itself unless the host installed a jvm.fileSystem.
         // The process-shaped parts of java.lang.System, added for the server-side
         // (clean) target. A browser has no stdin to read and no environment to
         // query, so these are unsupported here in the same sense java.io.File is

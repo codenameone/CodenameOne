@@ -83,7 +83,10 @@ vs-master)
     done
     APP="${CN1_NEUTRAL_APP:-/tmp/cmpcls}"
     [ -d "$APP" ] || { echo "no corpus app at $APP (set CN1_NEUTRAL_APP)"; exit 1; }
-    ASM="$(cat "$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt")"
+    # Master's translator may predate the in-tree class-file reader and need ASM;
+    # build-selfhost.sh leaves it extracted here. Harmless for one that does not.
+    ASM="$REPO/vm/selfhost/target/asm-classes"
+    [ -d "$ASM" ] || { echo "missing $ASM -- run build-selfhost.sh first"; exit 1; }
     rm -rf "$W/m-tree" "$W/b-tree" "$OUT"
     for side in m b; do
         [ "$side" = m ] && TR="$MTR" || TR="$REPO/vm/ByteCodeTranslator/target/classes"
@@ -133,7 +136,6 @@ vs-master)
 capture)
     TAG="${2:?}"
     TR="$REPO/vm/ByteCodeTranslator/target/classes"
-    ASM="$(cat "$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt")"
     JAPI="$REPO/vm/selfhost/target/javaapi-classes"
     # Same staleness guard verify-selfhost.sh carries: a source newer than its class
     # would capture the OLD translator under the NEW tag and report a real change as
@@ -144,7 +146,7 @@ capture)
     ( cd "$W" && env -i PATH=/usr/bin:/bin HOME="$HOME" TMPDIR=/tmp LC_ALL=C \
         CN1_NATIVE_VERIFY="${CN1_NATIVE_VERIFY:-}" \
         CN1_RESOURCE_PATH="$REPO/vm/ByteCodeTranslator/src" \
-        "$J8/bin/java" -cp "$TR:$ASM" com.codename1.tools.translator.ByteCodeTranslator \
+        "$J8/bin/java" -cp "$TR" com.codename1.tools.translator.ByteCodeTranslator \
         clean "$JAPI;$REPO/vm/selfhost/target/asm-classes;$REPO/vm/selfhost/target/classes" \
         "$OUT" com_codename1_tools_translator_ByteCodeTranslator \
         com.codename1.tools.translator com_codename1_tools_translator_ByteCodeTranslator \

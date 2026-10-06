@@ -110,16 +110,17 @@ import static com.codename1.ui.ComponentSelector.$;
 /// Example XML Notation
 ///
 /// ```java
-/// `Form f = new Form("Test", new BorderLayout());
-/// String tpl = ""
-///     + ""
-///     + ""
-///     + "";
+/// Form f = new Form("Test", new BorderLayout());
+/// String tpl = "<border>"
+///     + "<border constraint='center'><$search constraint='south'/></border>"
+///     + "<$button constraint='south'/>"
+///     + "</border>";
 ///
 /// f.setFormBottomPaddingEditingMode(true);
 /// TextField searchField = new TextField();
 /// searchField.addActionListener(e->{
-///    Log.p("Search field action performed");`);
+///    Log.p("Search field action performed");
+/// });
 /// Button submit = new Button("Submit");
 /// submit.addActionListener(e->{
 ///     Log.p("Button action performed");
@@ -130,7 +131,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///     .set("search", searchField);
 /// f.add(BorderLayout.CENTER, template.getView());
 /// f.show();
-/// }
 /// ```
 ///
 /// JSON Notation
@@ -146,8 +146,8 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// E.g.:
 ///
-/// ```java
-/// `{center:'Center Label', south:'South Content'`}
+/// ```text
+/// {center:'Center Label', south:'South Content'}
 /// ```
 ///
 /// Will create a Container with labels in its `BorderLayout#CENTER` and `BorderLayout#SOUTH` positions.
@@ -155,34 +155,35 @@ import static com.codename1.ui.ComponentSelector.$;
 /// To make things even more succinct, it supports single-character property keys for the BorderLayout constraint values.  E.g. The following
 /// is equivalent to the previous example:
 ///
-/// ```java
-/// `{c:'Center Label', s:'South Content'`}
+/// ```text
+/// {c:'Center Label', s:'South Content'}
+/// ```
 ///
 /// **Other Layouts**:
 ///
-/// - **Flow Layout** - `{flow:[...]`}
+/// - **Flow Layout** - `{flow:[...]}`
 ///
-/// - **Grid Layout** - `{grid:[...], cols:3, rows:2`}
+/// - **Grid Layout** - `{grid:[...], cols:3, rows:2}`
 ///
-/// - **Box Layout X** - `{x:[...]`}
+/// - **Box Layout X** - `{x:[...]}`
 ///
-/// - **Box Layout Y** - `{y:[...]`}
+/// - **Box Layout Y** - `{y:[...]}`
 ///
-/// - **Layered Layout** - `{layered:[...]`}
+/// - **Layered Layout** - `{layered:[...]}`
 ///
-/// - **Table Layout** - `{table:[['A1', 'B1', 'C1'], ['A2', 'B2', 'C2'], ...]`}
+/// - **Table Layout** - `{table:[['A1', 'B1', 'C1'], ['A2', 'B2', 'C2'], ...]}`
 ///
 /// **Layout Variants**
 ///
 /// BoxLayout and BorderLayout include variant shorthands to customize their behaviour.
 ///
-/// - **xNoGrow, xng** - Same as `{x:[...], noGrow:true`}
+/// - **xNoGrow, xng** - Same as `{x:[...], noGrow:true}`
 ///
-/// - **yBottomLast, ybl** - Same as `{y:[...], bottomLast:true`}
+/// - **yBottomLast, ybl** - Same as `{y:[...], bottomLast:true}`
 ///
-/// - **centerAbsolute, centerAbs, ca** - Same as `{center:[...], behavior:absolute`}
+/// - **centerAbsolute, centerAbs, ca** - Same as `{center:[...], behavior:absolute}`
 ///
-/// - **centerTotalBelow, ctb** - Same as `{center:[...], behavior:totalBelow`}
+/// - **centerTotalBelow, ctb** - Same as `{center:[...], behavior:totalBelow}`
 ///
 /// **Embedding Placeholders/Parameters**
 ///
@@ -190,18 +191,16 @@ import static com.codename1.ui.ComponentSelector.$;
 /// is similar to the XML equivalent.  Just place the parmeter name, prefixed with '$'.  E.g.
 ///
 /// `$submitButton`
-/// ```
 ///
 /// Example JSON Notation
 ///
 /// ```java
-/// `Component view = UIFragment.parseJSON("{n:['Hello', 'World', $checkbox], c:[y, {class:'MyTable', table:[['Username', $username], ['Password', $password]]`, {flow:['Some text'], align:center}], s:$submit}")
+/// Component view = UIFragment.parseJSON("{n:['Hello', 'World', $checkbox], c:[y, {class:'MyTable', table:[['Username', $username], ['Password', $password]]}, {flow:['Some text'], align:center}], s:$submit}")
 ///     .set("username", new TextField())
 ///     .set("password", new TextField())
 ///     .set("submit", new Button("Submit"))
 ///     .set("checkbox", new CheckBox("Check Me"))
 ///     .getView();
-/// }
 /// ```
 public final class UIFragment {
 

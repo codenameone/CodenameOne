@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!--
+      The Codename One Java compiler (vm/JavaCompiler): Java 17+ source to class
+      files, written against ParparVM's JavaAPI subset so it can itself be
+      translated and run in the browser (the Playground compiles user code with
+      it). Reads library class files through the translator's class-file reader,
+      hence the dependency on codenameone-parparvm.
+
+      tools-src holds JVM-only build tools (BuildStubLibrary reads jars), kept
+      apart from the translatable sources.
+    -->
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-javac</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Codename One Java Compiler</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-parparvm</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+
+    <build>
+        <sourceDirectory>../../vm/JavaCompiler/src</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>add-tools-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>../../vm/JavaCompiler/tools-src</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- The compiler runs inside ParparVM (the Playground translates it to JavaScript), so it
+                 may only use what ParparVM's class library has. The main compile above is against the
+                 JDK and cannot tell: a JDK-only call compiles, links nothing on the device, and fails
+                 only when the browser reaches it ("..._impl is not defined"). This compiles the same
+                 sources again with vm/JavaAPI as the boot class path, so such a call fails the build. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>compile-against-javaapi</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <property name="javaapi.check.dir" value="${project.build.directory}/javaapi-check"/>
+                                <mkdir dir="${javaapi.check.dir}/api"/>
+                                <mkdir dir="${javaapi.check.dir}/classes"/>
+                                <javac srcdir="../../vm/JavaAPI/src" destdir="${javaapi.check.dir}/api"
+                                       source="1.8" target="1.8" encoding="${project.build.sourceEncoding}"
+                                       includeantruntime="false" nowarn="true" failonerror="true"/>
+                                <javac destdir="${javaapi.check.dir}/classes" source="1.8" target="1.8"
+                                       encoding="${project.build.sourceEncoding}" bootclasspath="${javaapi.check.dir}/api"
+                                       includeantruntime="false" includejavaruntime="false" nowarn="true"
+                                       failonerror="true">
+                                    <src path="../../vm/JavaCompiler/src"/>
+                                    <src path="../../vm/ByteCodeTranslator/src"/>
+                                    <include name="com/codename1/tools/javac/**"/>
+                                    <include name="com/codename1/tools/translator/classfile/**"/>
+                                    <compilerarg value="-Xlint:-options"/>
+                                </javac>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Held to the same zero-findings SpotBugs gate as the other build
+                 modules (.github/scripts/generate-quality-report.py). -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>false</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                    <maxHeap>1536</maxHeap>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

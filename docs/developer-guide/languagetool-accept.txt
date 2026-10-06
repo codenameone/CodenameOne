@@ -792,3 +792,8 @@ libimobiledevice
 # The GNOME desktop's design language, which names the Linux desktop native
 # theme (Native-Themes.asciidoc).
 Adwaita
+# -----------------------------------------------------------------------------
+# Compiler terms used by the profile-guided optimization section
+# (performance.asciidoc).
+inlining
+inlined

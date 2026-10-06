@@ -30,6 +30,9 @@ Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js | SQLite3 Multiple Ciphers 
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js | SQLite3 Multiple Ciphers OPFS proxy worker, MIT over public-domain SQLite
 vm/JavaAPI/src/java/util/LinkedHashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Collections.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Calendar.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Collection.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Comparator.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/HashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Hashtable.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/IdentityHashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
@@ -234,8 +237,6 @@ maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarEntry.java | jtar 
 maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarInputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
 maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarOutputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
 maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarUtils.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
-scripts/cn1playground/common/src/main/java/bsh/BSHEnhancedForStatement.java | BeanShell source, Apache-2.0, retaining its original notice
-scripts/cn1playground/common/src/main/java/bsh/Primitive.java | BeanShell source, Apache-2.0, retaining its original notice
 vm/JavaAPI/src/java/net/URI.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/net/URIHelper.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/DateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
@@ -303,3 +304,45 @@ maven/android-compat/src/main/java/androidx/constraintlayout/widget/Placeholder.
 maven/android-compat/src/main/java/androidx/constraintlayout/widget/SharedValues.java | Vendored AOSP androidx.constraintlayout (constraintlayout 2.1.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/widget/StateSet.java | Vendored AOSP androidx.constraintlayout (constraintlayout 2.1.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/widget/VirtualLayout.java | Vendored AOSP androidx.constraintlayout (constraintlayout 2.1.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
+CodenameOne/src/com/codename1/ui/layouts/mig/InCellGapProvider.java | MiG Layout source (Mikael Grev, BSD) retaining its original notice
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/AnnotationVisitor.java | Rewrite of ASM org.objectweb.asm.AnnotationVisitor for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/ClassReader.java | Rewrite of ASM org.objectweb.asm.ClassReader for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/ClassVisitor.java | Rewrite of ASM org.objectweb.asm.ClassVisitor for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/ConstantDynamic.java | Rewrite of ASM org.objectweb.asm.ConstantDynamic for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/FieldVisitor.java | Rewrite of ASM org.objectweb.asm.FieldVisitor for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/Handle.java | Rewrite of ASM org.objectweb.asm.Handle for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/Label.java | Rewrite of ASM org.objectweb.asm.Label for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/MethodVisitor.java | Rewrite of ASM org.objectweb.asm.MethodVisitor for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/Opcodes.java | Rewrite of ASM org.objectweb.asm.Opcodes for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/Type.java | Rewrite of ASM org.objectweb.asm.Type for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/Analyzer.java | Rewrite of ASM org.objectweb.asm.tree.analysis.Analyzer for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/AnalyzerException.java | Rewrite of ASM org.objectweb.asm.tree.analysis.AnalyzerException for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/BasicInterpreter.java | Rewrite of ASM org.objectweb.asm.tree.analysis.BasicInterpreter for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/BasicValue.java | Rewrite of ASM org.objectweb.asm.tree.analysis.BasicValue for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/Frame.java | Rewrite of ASM org.objectweb.asm.tree.analysis.Frame for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/Interpreter.java | Rewrite of ASM org.objectweb.asm.tree.analysis.Interpreter for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/SourceInterpreter.java | Rewrite of ASM org.objectweb.asm.tree.analysis.SourceInterpreter for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/SourceValue.java | Rewrite of ASM org.objectweb.asm.tree.analysis.SourceValue for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/analysis/Value.java | Rewrite of ASM org.objectweb.asm.tree.analysis.Value for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/AbstractInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.AbstractInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/ClassNode.java | Rewrite of ASM org.objectweb.asm.tree.ClassNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/FieldInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.FieldInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/IincInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.IincInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/InsnList.java | Rewrite of ASM org.objectweb.asm.tree.InsnList for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/InsnNode.java | Rewrite of ASM org.objectweb.asm.tree.InsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/IntInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.IntInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/InvokeDynamicInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.InvokeDynamicInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/JsrInliner.java | Rewrite of ASM org.objectweb.asm.commons.JSRInlinerAdapter for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/JumpInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.JumpInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/LabelNode.java | Rewrite of ASM org.objectweb.asm.tree.LabelNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/LdcInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.LdcInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/LineNumberNode.java | Rewrite of ASM org.objectweb.asm.tree.LineNumberNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/LocalVariableNode.java | Rewrite of ASM org.objectweb.asm.tree.LocalVariableNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/LookupSwitchInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.LookupSwitchInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/MethodInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.MethodInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/MethodNode.java | Rewrite of ASM org.objectweb.asm.tree.MethodNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/MultiANewArrayInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.MultiANewArrayInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TableSwitchInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.TableSwitchInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TryCatchBlockNode.java | Rewrite of ASM org.objectweb.asm.tree.TryCatchBlockNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TypeInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.TypeInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/VarInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.VarInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)

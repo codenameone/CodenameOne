@@ -66,10 +66,10 @@ Every path in this skill and its references is written relative to the **app dir
 | Run the `AbstractTest` runner | `mvn -pl common cn1:test` | `./gradlew cn1Test` |
 | Run JUnit tests | `mvn test` | `./gradlew test` |
 | Compile the CSS theme | `mvn -pl common cn1:css` (runs with every build) | `./gradlew cn1Css` |
-| Android cloud build | `mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` | `./gradlew buildAndroid` |
-| iOS cloud build (debug / App Store) | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (`ios-device-release`) | `./gradlew buildIos` / `./gradlew buildIosRelease` |
+| Android cloud build | `mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` | `./gradlew buildAndroid` |
+| iOS cloud build (debug / App Store) | `mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (`ios-device-release`) | `./gradlew buildIos` / `./gradlew buildIosRelease` |
 | Xcode / Android Studio project, locally | `-Dcodename1.buildTarget=ios-source` / `android-source` | `./gradlew buildIosXcodeProject` / `./gradlew buildAndroidGradleProject` |
-| Web app, locally / in the cloud | `mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` (`javascript`) | `./gradlew buildJavascriptLocal` / `./gradlew buildJavascript` |
+| Web app, locally / in the cloud | `mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` (`javascript`) | `./gradlew buildJavascriptLocal` / `./gradlew buildJavascript` |
 | Desktop app (JVM) | `-Dcodename1.buildTarget=mac-os-x-desktop` / `windows-desktop` | `./gradlew buildMacDesktop` / `./gradlew buildWindowsDesktop` |
 | Native desktop | `windows-device` / `linux-device` / `mac-os-x-native` | `./gradlew buildWindowsDevice` / `buildLinuxDevice` / `buildMacNative` |
 | Any other build target | `-Dcodename1.platform=<p> -Dcodename1.buildTarget=<t>` | `./gradlew cn1Build -Pcodename1.platform=<p> -Pcodename1.buildTarget=<t>` |
@@ -107,7 +107,7 @@ my-app/
 
 Gradle projects always target Java 17; the plugin sets the compiler release itself.
 
-### Maven (multi-module)
+### Maven
 
 ```
 my-app/
@@ -120,16 +120,16 @@ my-app/
 │       ├── css/theme.css         # CN1 CSS (NOT regular web CSS - see references/css.md)
 │       ├── l10n/                 # i18n bundles (NOT src/main/resources!)
 │       └── guibuilder/           # Optional GUI builder XML
-├── javase/                       # Desktop simulator port
-├── android/                      # Android wrapper (built via build server or local Gradle)
-├── ios/                          # iOS wrapper (ParparVM)
-├── javascript/                   # TeaVM-based web port
+├── javase/                       # Optional: desktop simulator port
+├── android/                      # Optional: Android wrapper (built via build server or local Gradle)
+├── ios/                          # Optional: iOS wrapper (ParparVM)
+├── javascript/                   # Optional: web port
 └── backend/                      # Optional server side (see references/backend.md)
     ├── application.properties    # Server settings: in the MODULE ROOT, not src/main/resources
     └── src/main/java/<pkg>/      # @RestController / @Service classes (Java 8 level, no UI classes)
 ```
 
-**Only edit `common/`** for the app, and `backend/` for the server. The platform modules are thin wrappers — touching them is almost always wrong unless you are intentionally writing a native interface.
+**Only edit `common/`** for the app, and `backend/` for the server. The platform modules are optional thin wrappers: a project without them builds every platform from `common/`, and native interface implementations still go in `android/src/main/java`, `ios/src/main/objectivec` and so on, with or without a `pom.xml` beside them. Touching a platform module is almost always wrong unless you are intentionally writing a native interface.
 
 ## Java version and language features
 
@@ -329,16 +329,17 @@ mvn -pl common cn1:debug
 mvn -pl common cn1:test
 
 # Cloud build for Android/iOS (requires CN1 build server creds)
-mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
-mvn -pl ios     package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios-device
+mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
+mvn package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios-device
 
 # JavaScript / web bundle, built locally via the ParparVM to JavaScript translator.
 # Use -Dcodename1.buildTarget=javascript instead for the cloud builder; set
 # javascript.port=teavm only when the legacy compatibility fallback is needed.
-mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
+mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
 
 # The backend: run it on this JVM (dev profile = in-memory database + MCP dev tools at /mcp),
 # or package it as a native server binary. -Dcodename1.platform=backend is required.
+# (Only in a project with a backend/ module.)
 CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend
 mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
 ```

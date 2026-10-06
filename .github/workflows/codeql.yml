@@ -41,9 +41,8 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-        # Excludes the auto-generated bsh reflective accessors from
-        # analysis. See .github/codeql/codeql-config.yml for the full
-        # rationale.
+        # Excludes vendored third-party trees from analysis. See
+        # .github/codeql/codeql-config.yml for the rationale.
         config-file: ./.github/codeql/codeql-config.yml
 
     - name: Perform CodeQL Analysis

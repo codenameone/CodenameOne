@@ -20,7 +20,6 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 BASELINE="$SCRIPT_DIR/cast-semantics-baseline.txt"
 TRANSLATOR="$REPO_ROOT/vm/ByteCodeTranslator/target/classes"
-ASM_CP_FILE="$REPO_ROOT/vm/ByteCodeTranslator/target/cast-semantics-asm-classpath.txt"
 
 # The modules whose bytecode ParparVM translates and that we own. A translation
 # sees maven/core, maven/ios and vm/JavaAPI, and -- in an application with
@@ -55,10 +54,6 @@ if [[ ! -f "$TRANSLATOR/com/codename1/tools/translator/CastSemanticsVerifier.cla
   echo "check-cast-semantics: building the translator" >&2
   (cd "$REPO_ROOT/vm" && mvn -q -B -pl ByteCodeTranslator -am package -DskipTests)
 fi
-if [[ ! -f "$ASM_CP_FILE" ]]; then
-  (cd "$REPO_ROOT/vm" && mvn -q -B -pl ByteCodeTranslator \
-     dependency:build-classpath "-Dmdep.outputFile=target/cast-semantics-asm-classpath.txt")
-fi
 
 if [[ ${#roots[@]} -eq 0 ]]; then
   missing=0
@@ -88,5 +83,5 @@ if [[ "$write_baseline" -eq 1 ]]; then
 fi
 args+=(--baseline "$BASELINE")
 
-exec java -cp "$TRANSLATOR:$(cat "$ASM_CP_FILE")" \
+exec java -cp "$TRANSLATOR" \
   com.codename1.tools.translator.CastSemanticsVerifier "${args[@]}" "${roots[@]}"

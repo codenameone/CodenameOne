@@ -311,7 +311,7 @@ final class PlaygroundExamples {
             SpanLabel output = new SpanLabel("Tap load to fetch XML as text via RequestBuilder.");
             Button load = new Button("Load codenameone.com");
             FontImage.setMaterialIcon(load, FontImage.MATERIAL_CLOUD_DOWNLOAD);
-            load.addActionListener(() -> {
+            load.addActionListener(e -> {
                 RequestBuilder builder = Rest.get("https://www.codenameone.com/feed.xml");
                 builder.fetchAsString(response -> {
                     String text = response.getResponseData();
@@ -417,9 +417,8 @@ final class PlaygroundExamples {
             // A tiny game loop: balls fall under gravity and bounce off the
             // walls and floor. Position / velocity live in parallel float[]
             // arrays; the loop runs from a UITimer and the scene is drawn through
-            // GameScripting.canvas, which bridges a (Graphics, Component) lambda
-            // to a paintable Component (bsh can't subclass Component to override
-            // paint() on the ahead-of-time-compiled JavaScript port).
+            // GameScripting.canvas, which turns a drawing lambda into a paintable
+            // Component (a Component subclass overriding paint() works too).
             float[] x = { 40f, 78f, 116f, 154f, 192f, 230f, 268f };
             float[] y = { 40f, 70f, 100f, 40f, 70f, 100f, 40f };
             float[] vx = { 2.4f, -2.0f, 2.8f, -2.6f, 2.2f, -2.4f, 2.0f };

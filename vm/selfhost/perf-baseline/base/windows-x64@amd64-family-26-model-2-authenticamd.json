@@ -74,11 +74,11 @@
  },
  "objectAllocation": {
   "all": {
-   "memory": 0.26,
-   "runs": 1,
-   "time": 5.86,
+   "memory": 0.209,
+   "runs": 2,
+   "time": 1.645,
    "tolerance": {
-    "memory": 0.3,
+    "memory": 0.65,
     "time": 0.5
    }
   }

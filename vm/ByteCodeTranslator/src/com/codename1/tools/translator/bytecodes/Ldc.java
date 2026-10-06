@@ -28,9 +28,9 @@ import com.codename1.tools.translator.Util;
 import com.codename1.tools.translator.ByteCodeClass;
 import com.codename1.tools.translator.Parser;
 import java.util.List;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import com.codename1.tools.translator.classfile.Handle;
+import com.codename1.tools.translator.classfile.Opcodes;
+import com.codename1.tools.translator.classfile.Type;
 
 public class Ldc extends Instruction implements AssignableExpression {
     private Object cst;

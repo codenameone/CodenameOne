@@ -22,10 +22,10 @@
  */
 package com.codename1.tools.translator;
 
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.ClassReader;
+import com.codename1.tools.translator.classfile.ClassVisitor;
+import com.codename1.tools.translator.classfile.MethodVisitor;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -1205,7 +1205,7 @@ public class NativeSignatureVerifier {
 
     static void collectFromClassBytes(byte[] bytes, final List<Signature> into) {
         final String[] owner = new String[1];
-        new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
+        new ClassReader(bytes).accept(new ClassVisitor() {
             @Override
             public void visit(int version, int access, String name, String signature,
                               String superName, String[] interfaces) {

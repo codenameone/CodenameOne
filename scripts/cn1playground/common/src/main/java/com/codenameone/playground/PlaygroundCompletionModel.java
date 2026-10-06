@@ -23,8 +23,6 @@
 
 package com.codenameone.playground;
 
-import bsh.cn1.GeneratedCN1Access;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -33,9 +31,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * "Faux reflection" completion model for the playground Java editor. Mirrors the type inference the
- * previous browser-based editor performed in JavaScript, but here it runs in Java against the same
- * {@link GeneratedCN1Access} index (the CN1-safe reflection surface). Given a receiver expression
+ * Completion model for the playground Java editor. Mirrors the type inference the previous
+ * browser-based editor performed in JavaScript, but here it runs in Java against
+ * {@link PlaygroundApi}, the API stubs the compiler itself compiles against. Given a receiver expression
  * like {@code button.} it resolves the receiver's declared type and lists that type's methods and
  * fields; with no receiver it offers the in-scope globals, visible type names and keywords.
  */
@@ -48,9 +46,6 @@ final class PlaygroundCompletionModel {
 
     private static final String[][] GLOBALS = {
             {"ctx", "com.codenameone.playground.PlaygroundContext"},
-            {"theme", "com.codename1.ui.util.Resources"},
-            {"hostForm", "com.codename1.ui.Form"},
-            {"previewRoot", "com.codename1.ui.Container"},
             {"Display", "com.codename1.ui.Display"},
             {"UIManager", "com.codename1.ui.plaf.UIManager"},
             {"FontImage", "com.codename1.ui.FontImage"},
@@ -85,7 +80,7 @@ final class PlaygroundCompletionModel {
         for (String[] g : GLOBALS) {
             globals.put(g[0], g[1]);
         }
-        String[] classes = GeneratedCN1Access.INSTANCE.getIndexedClassNames();
+        String[] classes = PlaygroundApi.classNames();
         for (String fqcn : classes) {
             int lastDot = fqcn.lastIndexOf('.');
             String pkg = lastDot < 0 ? "" : fqcn.substring(0, lastDot);
@@ -276,8 +271,8 @@ final class PlaygroundCompletionModel {
             return out;
         }
         Set<String> seen = new LinkedHashSet<String>();
-        addAll(seen, GeneratedCN1Access.INSTANCE.getFieldNames(typeName));
-        addAll(seen, GeneratedCN1Access.INSTANCE.getMethodSignatures(typeName));
+        addAll(seen, PlaygroundApi.fieldNames(typeName));
+        addAll(seen, PlaygroundApi.methodSignatures(typeName));
         out.addAll(seen);
         return out;
     }

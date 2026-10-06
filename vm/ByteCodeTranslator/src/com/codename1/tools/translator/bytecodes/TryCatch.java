@@ -25,8 +25,8 @@ package com.codename1.tools.translator.bytecodes;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Label;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class TryCatch extends Instruction {
     private Label start;

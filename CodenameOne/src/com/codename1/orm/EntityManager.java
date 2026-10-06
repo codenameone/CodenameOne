@@ -48,7 +48,7 @@ import java.util.Map;
 /// Dao<User> users = em.dao(User.class);
 /// users.createTable();
 /// users.insert(new User("alice"));
-/// for (User u : users.findAll()) { ... }
+/// for (User u : users.findAll()) { /* ... */ }
 /// em.close();
 /// ```
 ///

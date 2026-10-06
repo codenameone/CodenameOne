@@ -50,6 +50,7 @@ public final class PlaygroundLayoutHarness {
 
     public static void main(String[] args) throws Exception {
         Display.init(null);
+        HarnessSupport.install();
         int failures = 0;
         failures += runScenario("desktop", false);
         failures += runScenario("mobile", true);

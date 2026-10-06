@@ -29,13 +29,13 @@ package com.codename1.ui;
 /// There is a default static image factory that can be assigned by calling:
 ///
 /// ```java
-/// `ImageFactory.setImageFactory(null, new ImageFactory() {
+/// ImageFactory.setImageFactory(null, new ImageFactory() {
 ///      public Image createImage(int w, int h, int bgColor) {
 ///          // create an image
 ///          // The Default would be just to call
-///          return Image.createImage(w, h, bgColor);`
+///          return Image.createImage(w, h, bgColor);
+///      }
 /// });
-/// }
 /// ```
 ///
 /// You can also assign a factory whose scope is limited to a particular Form, Container,

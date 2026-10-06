@@ -25,6 +25,22 @@
       <defaultValue>auto</defaultValue>
     </requiredProperty>
 
+    <requiredProperty key="platformModules">
+      <!-- The platform modules to generate. "none" (the default) is the minimal
+           layout: a root pom and common/, which builds every platform itself and
+           gains a module only if one is added later. "all" is the full multi-module
+           layout; a comma-separated list (javase,android,ios,javascript,win,linux)
+           keeps just those. -->
+      <defaultValue>none</defaultValue>
+    </requiredProperty>
+    <requiredProperty key="projectType">
+      <!-- app (the default), app-with-backend (adds the backend/ module), or
+           backend-only (a single-module server at the root, no app).
+           -DplatformModules=all -DprojectType=app-with-backend is the layout every
+           project used to get. -->
+      <defaultValue>app</defaultValue>
+    </requiredProperty>
+
     <requiredProperty key="mainName">
       <validationRegex>^[A-Z][a-zA-Z0-9]+$</validationRegex>
     </requiredProperty>
@@ -70,6 +86,18 @@
       filtered="false" — skill markdown has $foo placeholders that Velocity
       would otherwise misinterpret.
     -->
+    <!--
+      The files of a backend-only project, staged at build time from the
+      initializr and build-engine templates (see maven/cn1app-archetype/pom.xml).
+      archetype-post-generate.groovy assembles them for -DprojectType=backend-only
+      and always deletes this directory.
+    -->
+    <fileSet encoding="UTF-8">
+      <directory>.cn1-backend-only</directory>
+      <includes>
+        <include>**</include>
+      </includes>
+    </fileSet>
     <fileSet encoding="UTF-8">
       <directory>.agent-skills</directory>
       <includes>

@@ -13004,15 +13004,15 @@ public abstract class CodenameOneImplementation {
     /// Example
     ///
     /// ```java
-    /// `onCanInstallOnHomescreen(()->{
+    /// onCanInstallOnHomescreen(()->{
     ///      if (canInstallOnHomescreen()) {
     ///           if (promptInstallOnHomescreen()) {
-    ///               // User accepted installation` else {
+    ///               // User accepted installation
+    ///           } else {
     ///               // user rejected installation
     ///           }
     ///      }
     /// });
-    /// }
     /// ```
     ///
     /// https://developers.google.com/web/fundamentals/app-install-banners/
