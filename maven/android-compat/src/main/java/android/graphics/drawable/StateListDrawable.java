@@ -25,6 +25,7 @@ package android.graphics.drawable;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.PixelFormat;
+import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.util.StateSet;
 
@@ -40,7 +41,16 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
     private boolean variablePadding;
     private boolean constantSize;
     private int alpha = 255;
+    private boolean hasAlpha;
     private ColorFilter colorFilter;
+    private boolean hasColorFilter;
+    // The container never paints itself, so whatever is set on it is kept here
+    // and handed to every child, including states added afterwards -- as
+    // Android's DrawableContainer does when it selects a child.
+    private android.content.res.ColorStateList childTintList;
+    private boolean hasTintList;
+    private PorterDuff.Mode childTintMode;
+    private boolean hasTintMode;
 
     public StateListDrawable() {
     }
@@ -52,6 +62,18 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
         specs.add(stateSet);
         drawables.add(drawable);
         drawable.setCallback(this);
+        if (hasAlpha) {
+            drawable.setAlpha(alpha);
+        }
+        if (hasColorFilter) {
+            drawable.setColorFilter(colorFilter);
+        }
+        if (hasTintList) {
+            drawable.setTintList(childTintList);
+        }
+        if (hasTintMode) {
+            drawable.setTintMode(childTintMode);
+        }
         drawable.setBounds(getBounds());
         drawable.setVisible(isVisible(), true);
         onStateChange(getState());
@@ -185,6 +207,7 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
     @Override
     public void setAlpha(int alpha) {
         this.alpha = alpha;
+        hasAlpha = true;
         for (Drawable d : drawables) {
             d.setAlpha(alpha);
         }
@@ -198,6 +221,7 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
     @Override
     public void setColorFilter(ColorFilter cf) {
         colorFilter = cf;
+        hasColorFilter = true;
         for (Drawable d : drawables) {
             d.setColorFilter(cf);
         }
@@ -210,8 +234,19 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
 
     @Override
     public void setTintList(android.content.res.ColorStateList tint) {
+        childTintList = tint;
+        hasTintList = true;
         for (Drawable d : drawables) {
             d.setTintList(tint);
+        }
+    }
+
+    @Override
+    public void setTintMode(PorterDuff.Mode mode) {
+        childTintMode = mode;
+        hasTintMode = true;
+        for (Drawable d : drawables) {
+            d.setTintMode(mode);
         }
     }
 

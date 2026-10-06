@@ -63,8 +63,34 @@ public interface InputFilter {
         @Override
         public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
             String s = source.subSequence(start, end).toString();
+            // Android's own uppercasing (String.toUpperCase in the default
+            // locale), deliberately not an ASCII fold: this is user text.
             String u = s.toUpperCase();
-            return u.equals(s) ? null : u;
+            if (u.equals(s)) {
+                return null;
+            }
+            if (!(source instanceof Spanned)) {
+                return u;
+            }
+            // Keep the inserted text's styling, as Android does. A case
+            // mapping that changes the length (German sharp s) only clamps the
+            // offsets rather than mapping them character by character.
+            Spanned sp = (Spanned) source;
+            SpannableString out = new SpannableString(u);
+            int len = u.length();
+            Object[] spans = sp.getSpans(start, end, Object.class);
+            for (Object span : spans) {
+                int spanStart = sp.getSpanStart(span);
+                int spanEnd = sp.getSpanEnd(span);
+                int st = Math.min(Math.max(spanStart, start) - start, len);
+                int en = Math.min(Math.min(spanEnd, end) - start, len);
+                if (en < st || (en == st && spanEnd > spanStart)) {
+                    // Only touches the range from outside.
+                    continue;
+                }
+                out.setSpan(span, st, en, sp.getSpanFlags(span));
+            }
+            return out;
         }
     }
 }

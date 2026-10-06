@@ -114,6 +114,12 @@ public abstract class AbsSpinner extends AdapterView<SpinnerAdapter> {
     }
 
     public void setSelection(int position, boolean animate) {
+        // INVALID_POSITION does not clear a populated spinner, and that is
+        // Android's behaviour too: AbsSpinner only records it as the "next"
+        // position, and Spinner/Gallery.layout() adopt the next position only
+        // when it is >= 0, so the old selection stays and no
+        // onNothingSelected() is delivered. A spinner is cleared by emptying
+        // its adapter.
         if (position < 0 || position >= mItemCount || position == mSelectedPosition) {
             return;
         }
