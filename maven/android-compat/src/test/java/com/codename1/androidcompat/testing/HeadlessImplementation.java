@@ -319,11 +319,29 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return recordDraws ? alphaOf(a0) : 0;
     }
 
+    /// With [#recordDraws], the arguments of every gradient fill:
+    /// {"fillLinearGradient", start, end, horizontal} or
+    /// {"fillGradient", the gradient}. A test that records clears it too.
+    public static final java.util.List<Object[]> gradients = new java.util.ArrayList<Object[]>();
+
+    @Override
+    public void fillGradient(Object graphics, com.codename1.ui.Gradient gradient, int x, int y, int width,
+                             int height) {
+        if (recordDraws) {
+            recordDraw("fillGradient", graphics);
+            gradients.add(new Object[]{"fillGradient", gradient});
+        } else {
+            super.fillGradient(graphics, gradient, x, y, width, height);
+        }
+    }
+
     @Override
     public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width,
                                    int height, boolean horizontal) {
         if (recordDraws) {
             recordDraw("fillLinearGradient", graphics);
+            gradients.add(new Object[]{"fillLinearGradient", Integer.valueOf(startColor),
+                Integer.valueOf(endColor), Boolean.valueOf(horizontal)});
         } else {
             super.fillLinearGradient(graphics, startColor, endColor, x, y, width, height, horizontal);
         }

@@ -654,9 +654,7 @@ public class Canvas {
         int old = apply(paint);
         if (fills(paint)) {
             if (sh instanceof LinearGradient && ((LinearGradient) sh).getColors().length >= 2) {
-                LinearGradient lg = (LinearGradient) sh;
-                g.fillLinearGradient(lg.getColors()[0] & 0xffffff, lg.getColors()[lg.getColors().length - 1] & 0xffffff,
-                        x, y, w, h, lg.isHorizontal());
+                fillLinearGradient((LinearGradient) sh, x, y, w, h);
             } else {
                 g.fillRect(x, y, w, h);
             }
@@ -676,6 +674,34 @@ public class Canvas {
             }
         }
         unapply(old);
+    }
+
+    /// Fills a device rectangle with a linear gradient running the way its
+    /// endpoints say: an axis-aligned one through the port's two-color fill
+    /// (its colors swapped when the endpoints run right to left or bottom to
+    /// top), a diagonal one through the port's angled gradient. The paint's
+    /// alpha is already on the context, so the stops are drawn opaque.
+    private void fillLinearGradient(LinearGradient lg, int x, int y, int w, int h) {
+        int[] colors = lg.getColors();
+        float dx = ax(lg.x1, lg.y1) - ax(lg.x0, lg.y0);
+        float dy = ay(lg.x1, lg.y1) - ay(lg.x0, lg.y0);
+        int first = colors[0] & 0xffffff;
+        int last = colors[colors.length - 1] & 0xffffff;
+        if (dx == 0 || dy == 0) {
+            boolean horizontal = dy == 0 && dx != 0;
+            boolean reversed = horizontal ? dx < 0 : dy < 0;
+            g.fillLinearGradient(reversed ? last : first, reversed ? first : last, x, y, w, h, horizontal);
+            return;
+        }
+        int[] stops = new int[colors.length];
+        float[] positions = new float[colors.length];
+        for (int i = 0; i < colors.length; i++) {
+            stops[i] = colors[i] | 0xff000000;
+            positions[i] = i / (float) (colors.length - 1);
+        }
+        // CSS angles: 0 points up and 90 right, in screen coordinates.
+        float angle = (float) Math.toDegrees(com.codename1.util.MathUtil.atan2(dx, -dy));
+        g.fillGradient(new com.codename1.ui.LinearGradient(angle, stops, positions), x, y, w, h);
     }
 
     public void drawRect(RectF rect, Paint paint) {

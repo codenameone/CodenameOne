@@ -120,17 +120,22 @@ public final class ObjectAnimator extends ValueAnimator {
         mInitialized = false;
     }
 
+    /// Animates through `property`, which also names the animation from now
+    /// on. AOSP keeps the old name when the animator was made with one, so
+    /// `getPropertyName`, `getAnimatedValue(String)` and auto-cancel would
+    /// keep matching a property that is no longer animated; here the name
+    /// always follows the property.
     public void setProperty(Property property) {
+        String name = property.getName();
         if (mValues != null) {
             PropertyValuesHolder valuesHolder = mValues[0];
             String oldName = valuesHolder.getPropertyName();
             valuesHolder.setProperty(property);
+            valuesHolder.setPropertyName(name);
             mValuesMap.remove(oldName);
-            mValuesMap.put(mPropertyName, valuesHolder);
+            mValuesMap.put(name, valuesHolder);
         }
-        if (mProperty != null) {
-            mPropertyName = property.getName();
-        }
+        mPropertyName = name;
         mProperty = property;
         mInitialized = false;
     }

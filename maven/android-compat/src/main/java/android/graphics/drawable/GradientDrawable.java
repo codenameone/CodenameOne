@@ -349,13 +349,7 @@ public class GradientDrawable extends Drawable {
             int c1 = filtered(modulate(gradientColors[gradientColors.length - 1]));
             paint.setColor(c0);
             if (gradientType == LINEAR_GRADIENT && shape == RECTANGLE && radius <= 0 && radii == null) {
-                boolean horizontal = orientation == Orientation.LEFT_RIGHT || orientation == Orientation.RIGHT_LEFT;
-                boolean reversed = orientation == Orientation.RIGHT_LEFT || orientation == Orientation.BOTTOM_TOP;
-                int from = reversed ? c1 : c0;
-                int to = reversed ? c0 : c1;
-                paint.setColor(from);
-                paint.setShader(horizontal ? new LinearGradient(r.left, 0, r.right, 0, from, to, Shader.TileMode.CLAMP)
-                        : new LinearGradient(0, r.top, 0, r.bottom, from, to, Shader.TileMode.CLAMP));
+                paint.setShader(linear(r, c0, c1));
                 canvas.drawRect(r, paint);
                 paint.setShader(null);
             } else {
@@ -386,6 +380,21 @@ public class GradientDrawable extends Drawable {
                 paint.setStyle(Paint.Style.FILL);
             }
         }
+    }
+
+    /// Per orientation, in declaration order: the start and end points as
+    /// fractions of the bounds {x0, y0, x1, y1}, the edges or corners
+    /// Android's `GradientDrawable` runs the gradient between.
+    private static final float[][] ENDPOINTS = {
+        {0, 0, 0, 1}, {1, 0, 0, 1}, {1, 0, 0, 0}, {1, 1, 0, 0},
+        {0, 1, 0, 0}, {0, 1, 1, 0}, {0, 0, 1, 0}, {0, 0, 1, 1}
+    };
+
+    /// The gradient from `c0` to `c1` along the orientation.
+    private LinearGradient linear(RectF r, int c0, int c1) {
+        float[] e = ENDPOINTS[orientation.ordinal()];
+        return new LinearGradient(r.left + e[0] * r.width(), r.top + e[1] * r.height(),
+                r.left + e[2] * r.width(), r.top + e[3] * r.height(), c0, c1, Shader.TileMode.CLAMP);
     }
 
     private static int blend(int a, int b) {

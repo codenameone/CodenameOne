@@ -83,7 +83,13 @@ public final class Bitmap {
     }
 
     public static Bitmap createBitmap(android.util.DisplayMetrics display, int width, int height, Config config) {
-        return createBitmap(width, height, config);
+        Bitmap b = createBitmap(width, height, config);
+        // As on Android, the bitmap takes the density of the metrics it was
+        // made for, so scaled sizes and density-aware drawables honour it.
+        if (display != null) {
+            b.density = display.densityDpi;
+        }
+        return b;
     }
 
     public static Bitmap createBitmap(Bitmap src) {

@@ -417,6 +417,12 @@ public class DatePicker extends FrameLayout {
         return mSpinnersShown;
     }
 
+    /// Recorded and reported, but the wheels stay visible. On Android the
+    /// flag hides the spinners only in spinner mode, where it is paired with
+    /// `setCalendarViewShown(true)` to swap in the calendar; calendar mode
+    /// ignores it. This picker has no calendar view and draws every mode as
+    /// wheels, so hiding them would leave an empty widget where Android shows
+    /// a calendar.
     @Deprecated
     public void setSpinnersShown(boolean shown) {
         mSpinnersShown = shown;

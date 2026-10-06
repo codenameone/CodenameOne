@@ -35,6 +35,8 @@ import android.graphics.Shader;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 
+import com.codename1.ui.Image;
+
 /// Draws a bitmap, stretched to its bounds or placed by gravity.
 public class BitmapDrawable extends Drawable {
 
@@ -133,17 +135,8 @@ public class BitmapDrawable extends Drawable {
         Rect b = getBounds();
         ColorFilter cf = effectiveColorFilter(colorFilter);
         paint.setColorFilter(cf instanceof PorterDuffColorFilter ? cf : null);
-        if (tileX == Shader.TileMode.REPEAT || tileY == Shader.TileMode.REPEAT) {
-            int w = Math.max(1, getIntrinsicWidth());
-            int h = Math.max(1, getIntrinsicHeight());
-            canvas.save();
-            canvas.clipRect(b);
-            for (int y = b.top; y < b.bottom; y += h) {
-                for (int x = b.left; x < b.right; x += w) {
-                    canvas.drawBitmap(bitmap, null, new RectF(x, y, x + w, y + h), paint);
-                }
-            }
-            canvas.restore();
+        if (tileX != null || tileY != null) {
+            drawTiled(canvas, b);
             return;
         }
         if (gravity == Gravity.FILL) {
@@ -153,6 +146,76 @@ public class BitmapDrawable extends Drawable {
                     getIntrinsicHeight(), b, dst);
             canvas.drawBitmap(bitmap, null, new RectF(dst), paint);
         }
+    }
+
+    /// Fills the bounds the way Android's bitmap shader does, each axis by its
+    /// own mode (an unset one clamps): `REPEAT` tiles, `MIRROR` tiles with
+    /// every other tile flipped, and `CLAMP` draws the bitmap once and
+    /// stretches its last pixel column or row over the rest.
+    private void drawTiled(Canvas canvas, Rect b) {
+        int w = Math.max(1, getIntrinsicWidth());
+        int h = Math.max(1, getIntrinsicHeight());
+        Image img = bitmap.getImage();
+        int bw = bitmap.getWidth();
+        int bh = bitmap.getHeight();
+        // Flipped copies, made only when a mirrored tile needs one.
+        Image[] flips = new Image[4];
+        flips[0] = img;
+        canvas.save();
+        canvas.clipRect(b);
+        int ty = 0;
+        for (int y = b.top; y < b.bottom; y += h, ty++) {
+            boolean edgeY = y > b.top && !tiles(tileY);
+            boolean flipY = tileY == Shader.TileMode.MIRROR && (ty & 1) == 1;
+            int bottom = edgeY ? b.bottom : y + h;
+            int tx = 0;
+            for (int x = b.left; x < b.right; x += w, tx++) {
+                boolean edgeX = x > b.left && !tiles(tileX);
+                boolean flipX = tileX == Shader.TileMode.MIRROR && (tx & 1) == 1;
+                int right = edgeX ? b.right : x + w;
+                Image tile;
+                if (edgeX || edgeY) {
+                    // A clamped axis past the bitmap: its edge pixels, stretched.
+                    int sx = edgeX ? bw - 1 : 0;
+                    int sy = edgeY ? bh - 1 : 0;
+                    tile = img.subImage(sx, sy, edgeX ? 1 : bw, edgeY ? 1 : bh, true);
+                } else {
+                    int f = (flipX ? 1 : 0) | (flipY ? 2 : 0);
+                    if (flips[f] == null) {
+                        flips[f] = flip(img, flipX, flipY);
+                    }
+                    tile = flips[f];
+                }
+                canvas.drawImage(tile, new RectF(x, y, right, bottom), paint);
+                if (edgeX) {
+                    break;
+                }
+            }
+            if (edgeY) {
+                break;
+            }
+        }
+        canvas.restore();
+    }
+
+    /// A mirrored copy made from the pixels, so it does not depend on the
+    /// port's image encoder the way `Image.flipHorizontally` does.
+    private static Image flip(Image img, boolean flipX, boolean flipY) {
+        int w = img.getWidth();
+        int h = img.getHeight();
+        int[] src = img.getRGB();
+        int[] out = new int[src.length];
+        for (int y = 0; y < h; y++) {
+            int sy = flipY ? h - 1 - y : y;
+            for (int x = 0; x < w; x++) {
+                out[y * w + x] = src[sy * w + (flipX ? w - 1 - x : x)];
+            }
+        }
+        return Image.createImage(out, w, h);
+    }
+
+    private static boolean tiles(Shader.TileMode mode) {
+        return mode == Shader.TileMode.REPEAT || mode == Shader.TileMode.MIRROR;
     }
 
     @Override
