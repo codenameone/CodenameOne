@@ -1244,10 +1244,16 @@ the security layer. Ask for it in `application.properties`:
 include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-schema,indent=0]
 ----
 
-The build reads the key and registers the set in the server it generates,
-which is why the key has to be in the module's `application.properties` and
-not only in the environment. A test, or a server you assemble by hand,
-registers it before the server starts:
+The build reads the key and registers the set in the server it generates, so
+this is a build-time setting. It has to be in the module's
+`application.properties`. A server that finds it `true` only at run time, in
+the environment, a system property or a properties file beside it, doesn't
+start, and the error says where the key belongs. Set to `false` at run time in
+a server built with it, the set isn't applied, and the tables are whatever the
+database already has.
+
+A test, or a server you assemble by hand, registers the set before the server
+starts:
 
 [source,java]
 ----
@@ -1409,6 +1415,10 @@ That keeps the binary small, and it has consequences you can see:
 
 === Configuration keys
 
+Every key here is read when the server starts, from wherever the server's
+configuration comes from, except `cn1.security.schema.enabled`. That one is
+read by the build, because it decides what's linked into the server.
+
 [cols="2,3", options="header"]
 |===
 | Key | What it sets
@@ -1422,8 +1432,9 @@ That keeps the binary small, and it has consequences you can see:
 | The most passwords checked at one time. No bound unless set.
 
 | `cn1.security.schema.enabled`
-| `true` to create the security tables. Read by the build from
-  `application.properties`. Off unless set.
+| `true` to create the security tables. Build-time: read by the build from the
+  module's `application.properties`. Off unless set. `true` at run time alone
+  stops the start. `false` at run time leaves the tables out.
 
 | `cn1.security.oauth2.resourceserver.jwt.issuer-uri`
 | The issuer whose tokens a resource server accepts.

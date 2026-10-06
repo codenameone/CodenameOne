@@ -1717,6 +1717,9 @@ public final class Backend {
                 config = Config.load();
             }
             config = config.withCompiledDefaults(compiledSettings);
+            // Before anything is opened: a setting only the build could have
+            // acted on is refused here rather than silently doing nothing.
+            Migrations.requireBuildTimeSettings(config);
             // BEFORE the database, so the statements start-up runs -- the ORM's
             // CREATE TABLE -- are traced like any other, and before anything that
             // could fail, so a refused configuration is refused up front.

@@ -47,7 +47,15 @@ import java.io.IOException;
 /// Migrations.register(SecuritySchema.migrations());
 /// ```
 ///
-/// before the server starts. The set is named `security`, keeps its history in
+/// before the server starts.
+///
+/// The setting is the build's to read. A server that finds it true anywhere
+/// at run time -- the environment, a system property, a properties file beside
+/// it -- without the set having been registered does not start, and says where
+/// the setting belongs. Found false at run time, in a server built with it,
+/// the set is not applied: the tables are then whatever the database has.
+///
+/// The set is named `security`, keeps its history in
 /// `cn1_security_schema_history`, and runs before the application's own
 /// migrations, so those may refer to its tables.
 ///
