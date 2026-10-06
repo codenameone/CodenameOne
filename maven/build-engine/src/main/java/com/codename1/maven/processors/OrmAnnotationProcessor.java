@@ -780,6 +780,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         Map<String, String> sources = new LinkedHashMap<String, String>();
         if (!migrations.isEmpty()) {
             sources.put(MigrationGenerator.binaryName(backend), MigrationGenerator.source(migrations, backend));
+            if (backend) {
+                sources.put(MigrationGenerator.BACKEND_CLI_BINARY, MigrationGenerator.cliSource());
+            }
         }
         for (EntityClass ec : accepted.values()) {
             if (backend && wouldReplaceAnExistingClass(ec.daoBinaryName,

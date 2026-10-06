@@ -189,8 +189,10 @@ public class MigrationGeneratorTest {
         assertTrue(com.codename1.backend.Migrations.isRegistered());
     }
 
-    /// What `cn1:migrate` and its siblings launch: the generated class is its own entry point,
-    /// so the goals apply exactly the scripts the server carries.
+    /// What `cn1:migrate` and its siblings launch: an entry point generated beside the scripts,
+    /// so the goals apply exactly the scripts the server carries. It is a class of its own, and
+    /// the class that holds the scripts has no `main`: that one is translated into the packaged
+    /// server, whose translation takes exactly one entry point and stops at a second.
     @Test
     public void theGeneratedEntryPointRunsMigrationCommands() throws Exception {
         module(true);
@@ -204,7 +206,10 @@ public class MigrationGeneratorTest {
         System.setProperty(keys[0], database.getPath());
         System.setProperty(keys[1], tmp.newFolder().getPath());
         try {
-            java.lang.reflect.Method main = load("cn1app.BackendMigrations").getMethod("main", String[].class);
+            for (java.lang.reflect.Method declared : load("cn1app.BackendMigrations").getDeclaredMethods()) {
+                assertFalse("the scripts' class must not be an entry point", "main".equals(declared.getName()));
+            }
+            java.lang.reflect.Method main = load("cn1app.BackendMigrationsCli").getMethod("main", String[].class);
             main.invoke(null, (Object) new String[] {"info"});
             main.invoke(null, (Object) new String[] {"migrate"});
             main.invoke(null, (Object) new String[] {"validate"});

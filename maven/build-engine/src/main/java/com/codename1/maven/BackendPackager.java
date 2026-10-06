@@ -769,6 +769,16 @@ public class BackendPackager {
         mkdirs(sourceDir);
         copyDirectory(nativeSources, sourceDir);
 
+        // One main per translation, and it is the server's (or the test runner's).
+        // The migrate goals' entry point is a main too, generated beside the
+        // scripts for the JVM to launch (MigrationGenerator.BACKEND_CLI_BINARY);
+        // left in, the translator stops with "Multiple main classes".
+        File migrateCli = new File(classes, "cn1app/BackendMigrationsCli.class");
+        if (migrateCli.isFile() && !migrateCli.delete()) {
+            throw new BuildExecutionException("Could not remove " + migrateCli
+                    + " from the translation");
+        }
+
         List<String> command = new ArrayList<String>();
         command.add(new File(jdk, "bin/java").getAbsolutePath());
         if (sqlite) {

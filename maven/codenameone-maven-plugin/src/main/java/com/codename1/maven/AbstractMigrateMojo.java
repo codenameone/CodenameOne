@@ -40,13 +40,15 @@ import java.util.Map;
 // JVM, against the database the module is configured with.
 //
 // The command runs inside the project's own classes rather than inside Maven. The scripts were
-// compiled into cn1app.BackendMigrations by process-annotations, and that class's generated
-// main is the entry point -- so the goal applies exactly the scripts the server would, through
+// compiled into cn1app.BackendMigrations by process-annotations, and the main generated beside
+// it (cn1app.BackendMigrationsCli -- a class of its own, because a packaged server is translated
+// from these classes and a translation takes one main) is the entry point -- so the goal applies
+// exactly the scripts the server would, through
 // exactly the engine it would, and there is no second reader of the script files to disagree
 // with the first.
 abstract class AbstractMigrateMojo extends AbstractMojo {
     /** The class process-annotations generates when the module has migrations. */
-    static final String ENTRY_POINT = "cn1app.BackendMigrations";
+    static final String ENTRY_POINT = "cn1app.BackendMigrationsCli";
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
