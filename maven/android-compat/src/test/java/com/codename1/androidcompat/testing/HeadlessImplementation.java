@@ -288,13 +288,45 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public void setColor(java.lang.Object a0, int a1) {
     }
 
+    /// When set, each graphics context keeps the alpha it was given, and
+    /// every `fillRect`, `drawImage` and `fillLinearGradient` is added to
+    /// [#draws] as {operation, native graphics, alpha}. A test that sets it
+    /// must reset it and clear [#draws].
+    public static boolean recordDraws;
+    public static final java.util.List<Object[]> draws = new java.util.ArrayList<Object[]>();
+    private static final java.util.Map<Object, Integer> ALPHAS = new java.util.IdentityHashMap<Object, Integer>();
+
+    private static void recordDraw(String op, Object graphics) {
+        if (recordDraws) {
+            draws.add(new Object[]{op, graphics, Integer.valueOf(alphaOf(graphics))});
+        }
+    }
+
+    private static int alphaOf(Object graphics) {
+        Integer a = ALPHAS.get(graphics);
+        return a == null ? 255 : a.intValue();
+    }
+
     @Override
     public void setAlpha(java.lang.Object a0, int a1) {
+        if (recordDraws) {
+            ALPHAS.put(a0, Integer.valueOf(a1));
+        }
     }
 
     @Override
     public int getAlpha(java.lang.Object a0) {
-        return 0;
+        return recordDraws ? alphaOf(a0) : 0;
+    }
+
+    @Override
+    public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width,
+                                   int height, boolean horizontal) {
+        if (recordDraws) {
+            recordDraw("fillLinearGradient", graphics);
+        } else {
+            super.fillLinearGradient(graphics, startColor, endColor, x, y, width, height, horizontal);
+        }
     }
 
     @Override
@@ -374,6 +406,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void fillRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        recordDraw("fillRect", a0);
     }
 
     /// The rectangles `clearRect` was asked to erase, as `{x, y, w, h}`.
@@ -428,6 +461,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawImage(java.lang.Object a0, java.lang.Object a1, int a2, int a3) {
+        recordDraw("drawImage", a0);
     }
 
     @Override

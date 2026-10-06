@@ -89,6 +89,7 @@ public class Canvas {
         matrix.reset();
         stack.clear();
         clipShapes.clear();
+        layers.clear();
         clipShape = null;
         alphaLayer = 255;
         bitmapTarget = false;
@@ -163,31 +164,110 @@ public class Canvas {
         return save();
     }
 
+    /// As [#saveLayerAlpha(RectF, int)] with the paint's alpha; the paint's
+    /// other properties (transfer mode, color filter) are not applied.
     public int saveLayer(RectF bounds, Paint paint) {
-        int c = save();
-        if (paint != null) {
-            alphaLayer = alphaLayer * paint.getAlpha() / 255;
-        }
-        return c;
+        return saveLayerAlpha(bounds, paint == null ? 255 : paint.getAlpha());
     }
 
     public int saveLayer(float left, float top, float right, float bottom, Paint paint) {
         return saveLayer(new RectF(left, top, right, bottom), paint);
     }
 
+    /// Saves the state and, when `alpha` is translucent, redirects drawing
+    /// into an offscreen layer the size of the clip; the matching restore
+    /// draws that layer back once at `alpha`, so overlapping draws inside it
+    /// do not darken each other, as on Android. The layer is clipped to
+    /// `bounds`. Where the context already carries a transform (a rotated or
+    /// scaled parent view group) the layer is not allocated and `alpha` is
+    /// applied to every draw instead, which differs only where draws overlap.
     public int saveLayerAlpha(RectF bounds, int alpha) {
         int c = save();
-        alphaLayer = alphaLayer * alpha / 255;
+        if (bounds != null) {
+            clipRect(bounds);
+        }
+        int a = Math.max(0, Math.min(255, alpha));
+        if (a < 255 && !beginLayer(a, c)) {
+            alphaLayer = alphaLayer * a / 255;
+        }
         return c;
     }
 
     public int saveLayerAlpha(float left, float top, float right, float bottom, int alpha) {
-        return saveLayerAlpha(null, alpha);
+        return saveLayerAlpha(new RectF(left, top, right, bottom), alpha);
+    }
+
+    /// An offscreen layer: what drawing into it replaced, restored with the
+    /// save record at [#depth].
+    private static final class Layer {
+        int depth;
+        int alpha;
+        int x;
+        int y;
+        Image image;
+        Graphics outer;
+        float outerOriginX;
+        float outerOriginY;
+        Bitmap outerTarget;
+        Image outerTargetImage;
+    }
+
+    private final ArrayList<Layer> layers = new ArrayList<Layer>();
+
+    /// Points `g` at a transparent image covering the current clip; false
+    /// (nothing changed) where the context has a transform the layer could
+    /// not reproduce, or the clip is empty.
+    private boolean beginLayer(int alpha, int depth) {
+        if (g.isTransformSupported()) {
+            Transform t = Transform.makeIdentity();
+            g.getTransform(t);
+            if (!t.isIdentity()) {
+                return false;
+            }
+        }
+        int cx = g.getClipX();
+        int cy = g.getClipY();
+        int cw = g.getClipWidth();
+        int ch = g.getClipHeight();
+        if (cw <= 0 || ch <= 0) {
+            return false;
+        }
+        Layer l = new Layer();
+        l.depth = depth;
+        l.alpha = alpha;
+        l.x = cx;
+        l.y = cy;
+        l.image = Image.createImage(cw, ch, 0);
+        l.outer = g;
+        l.outerOriginX = originX;
+        l.outerOriginY = originY;
+        l.outerTarget = target;
+        l.outerTargetImage = targetImage;
+        layers.add(l);
+        g = l.image.getGraphics();
+        originX -= cx;
+        originY -= cy;
+        // The layer's own alpha and the outer clip shape both apply when it
+        // is drawn back; inside it, draws are opaque and clipped to it.
+        alphaLayer = 255;
+        clipShape = null;
+        target = null;
+        targetImage = null;
+        return true;
     }
 
     public void restore() {
         if (stack.isEmpty()) {
             throw new IllegalStateException("Underflow in restore - more restores than saves");
+        }
+        Layer layer = null;
+        if (!layers.isEmpty() && layers.get(layers.size() - 1).depth == stack.size()) {
+            layer = layers.remove(layers.size() - 1);
+            g = layer.outer;
+            originX = layer.outerOriginX;
+            originY = layer.outerOriginY;
+            target = layer.outerTarget;
+            targetImage = layer.outerTargetImage;
         }
         float[] state = stack.remove(stack.size() - 1);
         float[] m = new float[9];
@@ -201,6 +281,13 @@ public class Canvas {
         } else {
             g.setClip((int) state[10], (int) state[11], (int) state[12], (int) state[13]);
             clipShape = null;
+        }
+        if (layer != null) {
+            drawing();
+            int old = g.getAlpha();
+            g.setAlpha(layer.alpha * alphaLayer / 255 * old / 255);
+            g.drawImage(layer.image, layer.x, layer.y);
+            g.setAlpha(old);
         }
     }
 
@@ -278,7 +365,17 @@ public class Canvas {
 
     // ------------------------------------------------------------ clip
 
+    /// Narrows the clip to the rectangle. Under a rotation or skew the
+    /// rectangle maps to a quadrilateral, which is clipped as a shape so
+    /// nothing paints in the corners of its bounding box; a port without
+    /// shape clipping clips to that bounding box instead.
     public boolean clipRect(float left, float top, float right, float bottom) {
+        if (rotated() && g.isShapeClipSupported()) {
+            Path p = new Path();
+            p.addRect(Math.min(left, right), Math.min(top, bottom), Math.max(left, right),
+                    Math.max(top, bottom), Path.Direction.CW);
+            return clipPath(p);
+        }
         RectF r = new RectF(left, top, right, bottom);
         matrix.mapRect(r);
         int x = (int) Math.floor(originX + r.left);
@@ -521,8 +618,21 @@ public class Canvas {
         drawColor(0xff000000 | (r << 16) | (gr << 8) | b);
     }
 
+    /// Fills the clip with `paint`. A shader-backed paint fills through
+    /// `drawRect` over the clip bounds, so it gets the same gradient support
+    /// a rectangle does; Android fills regardless of the paint's style.
     public void drawPaint(Paint paint) {
-        drawColor(paint.getColor());
+        if (paint.getShader() == null) {
+            drawColor(paint.getColor());
+            return;
+        }
+        Rect clip = new Rect();
+        if (!getClipBounds(clip)) {
+            return;
+        }
+        Paint fill = new Paint(paint);
+        fill.setStyle(Paint.Style.FILL);
+        drawRect(clip, fill);
     }
 
     public void drawRect(float left, float top, float right, float bottom, Paint paint) {
