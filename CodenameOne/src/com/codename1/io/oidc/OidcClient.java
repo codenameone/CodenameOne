@@ -28,6 +28,7 @@ import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.RequestAuthorizer;
 import com.codename1.io.Util;
+import com.codename1.security.Jwt;
 import com.codename1.security.SecureRandom;
 import com.codename1.ui.CN;
 import com.codename1.util.AsyncResource;
@@ -38,6 +39,7 @@ import com.codename1.util.regex.StringReader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,13 +75,28 @@ import java.util.Map;
 /// - Pluggable [TokenStore] persistence
 /// - Nonce + state verification on every authorization round-trip
 ///
+/// ### What is checked before tokens are handed over
+///
+/// - The authorization response: its `state`, and the issuer it names. A response that
+///   names another issuer than this client's is refused, and so is one that names none
+///   when the provider's discovery document says it always does (RFC 9207). That is what
+///   stops a response from one provider being taken for another's.
+/// - The ID token's claims: `iss` is the provider, `aud` is this client, `exp` has not
+///   passed, `nonce` is the one the request carried, and `at_hash`, when the token has
+///   one, is the hash of the access token it came with.
+/// - The ID token's signature, against the provider's keys. The keys are fetched from the
+///   configuration's `jwks_uri` once and kept, and fetched again when a token names a key
+///   that is not among them. `RS256`, `RS384`, `RS512`, `ES256` and `ES384` are accepted;
+///   an unsigned token, or one signed with the client secret, is not.
+///
+/// A token that fails any of this is not stored and not returned: the resource fails
+/// with [OidcException#INVALID_ID_TOKEN], [OidcException#NONCE_MISMATCH] or
+/// [OidcException#ISSUER_MISMATCH]. That includes a signature this platform has no way
+/// to check. Nothing is skipped quietly -- see [#setVerifyIdTokenSignature(boolean)] for
+/// the one switch there is, and what turning it off gives up.
+///
 /// ### Things this class deliberately does NOT do
 ///
-/// - **Verify the ID token signature.** This requires the provider's JWKS
-///   and ECDSA/RSA verification, which is not feasible on every supported
-///   platform without pulling in a heavy dep. The remedy is: trust the
-///   TLS connection to the well-known issuer (i.e. always discover, never
-///   pass tokens to a server without re-validating server-side).
 /// - **Implicit and hybrid flows.** Use the lower-level
 ///   [com.codename1.io.ConnectionRequest] APIs if you need those.
 ///
@@ -108,6 +125,13 @@ public final class OidcClient {
     private String storeKey;
     private String responseMode;
     private boolean enforceNonce = true;
+    private boolean verifyIdTokenSignature = true;
+    private int idTokenClockSkewSeconds = 300;
+    /// The provider's JWK Set as it was last fetched, and when. Read and written where
+    /// token responses are read. Two responses read at the same moment can both fetch the
+    /// set; each keeps a whole one, and nothing is guarded for the sake of that.
+    private List<Map<String, Object>> jwks;
+    private long jwksFetchedAt;
     private OidcRequestAuthorizer tokenListener;
     /// How long one second of a device grant's polling interval lasts. A test shortens it.
     int devicePollUnitMillis = 1000;
@@ -267,6 +291,33 @@ public final class OidcClient {
     /// echo the nonce); the default is to enforce.
     public OidcClient setEnforceNonce(boolean enforce) {
         this.enforceNonce = enforce;
+        return this;
+    }
+
+    /// Whether an ID token's signature is verified against the provider's keys before the
+    /// token is accepted. True unless set.
+    ///
+    /// With it on, a token whose signature cannot be checked is refused -- because it does
+    /// not verify, because the configuration names no `jwks_uri`, or because the platform
+    /// the app is running on cannot verify a signature of that algorithm. The last one is
+    /// the reason this switch exists: turn it off for a provider whose ID tokens cannot be
+    /// verified on a platform you ship to, and for no other reason.
+    ///
+    /// With it off, the claims are still checked, but they are only as good as the TLS
+    /// connection to the token endpoint. Do not make a decision on your server from an ID
+    /// token the app forwards: verify it there.
+    public OidcClient setVerifyIdTokenSignature(boolean verify) {
+        this.verifyIdTokenSignature = verify;
+        return this;
+    }
+
+    /// How far the device's clock may be from the provider's when an ID token's `exp` is
+    /// checked. Five minutes unless set: phones are set by hand more often than servers.
+    public OidcClient setIdTokenClockSkew(int seconds) {
+        if (seconds < 0) {
+            throw new IllegalArgumentException("seconds must not be negative");
+        }
+        this.idTokenClockSkewSeconds = seconds;
         return this;
     }
 
@@ -689,12 +740,29 @@ public final class OidcClient {
         b.append(Util.encodeUrl(k)).append('=').append(Util.encodeUrl(v));
     }
 
-    private void handleRedirect(String redirectUrl,
+    void handleRedirect(String redirectUrl,
                                 String expectedState,
                                 String expectedNonce,
                                 PkceChallenge pkce,
                                 final AsyncResource<OidcTokens> out) {
         Map<String, String> params = parseRedirectParams(redirectUrl);
+        // Before anything the response says is believed, who it says it is from (RFC 9207).
+        // A response another provider produced -- one this app also signs in with, and an
+        // attacker steered the browser to -- names that provider here, and its code must
+        // not be taken to this provider's token endpoint.
+        String issuer = configuration.getIssuer();
+        String named = params.get("iss");
+        if (named != null && issuer != null && !named.equals(issuer)) {
+            out.error(new OidcException(OidcException.ISSUER_MISMATCH,
+                    "The authorization response is from " + named + ", not from " + issuer));
+            return;
+        }
+        if (named == null && configuration.isAuthorizationResponseIssParameterSupported()) {
+            out.error(new OidcException(OidcException.ISSUER_MISMATCH,
+                    "The authorization response names no issuer, and " + issuer
+                            + " says it always names itself"));
+            return;
+        }
         String error = params.get("error");
         if (error != null) {
             String description = params.get("error_description");
@@ -782,25 +850,23 @@ public final class OidcClient {
                     return;
                 }
                 final OidcTokens tokens = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);
-                if (enforceNonce && expectedNonce != null && tokens.getIdToken() != null) {
-                    Object nonceClaim = tokens.getClaim("nonce");
-                    if (nonceClaim != null && !expectedNonce.equals(nonceClaim.toString())) {
-                        completed[0] = true;
-                        out.error(new OidcException(OidcException.NONCE_MISMATCH,
-                                "ID token nonce did not match"));
-                        return;
-                    }
-                }
-                tokenStore.save(storageKey(), tokens)
-                        .except(new SuccessCallback<Throwable>() {
-                            @Override
-                            public void onSucess(Throwable t) {
-                                // Token persistence failure is non-fatal; tokens are still valid in-memory.
-                            }
-                        });
                 completed[0] = true;
-                tokensChanged(tokens);
-                out.complete(tokens);
+                // Nothing is stored, told or returned until the ID token has been held to
+                // its issuer, its audience and its signature.
+                checkIdToken(tokens, enforceNonce ? expectedNonce : null, new Runnable() {
+                    @Override
+                    public void run() {
+                        tokenStore.save(storageKey(), tokens)
+                                .except(new SuccessCallback<Throwable>() {
+                                    @Override
+                                    public void onSucess(Throwable t) {
+                                        // Token persistence failure is non-fatal; tokens are still valid in-memory.
+                                    }
+                                });
+                        tokensChanged(tokens);
+                        out.complete(tokens);
+                    }
+                }, out);
             }
 
             @Override
@@ -832,6 +898,143 @@ public final class OidcClient {
         for (Map.Entry<String, String> e : args.entrySet()) {
             req.addArgument(e.getKey(), e.getValue());
         }
+        NetworkManager.getInstance().addToQueue(req);
+    }
+
+    /// How long a fetched JWK Set is trusted to be complete: a token that names a key it
+    /// does not hold has the set fetched again, but not more often than this. A test
+    /// shortens it.
+    long jwksRefetchMillis = 60000;
+
+    /// Holds the ID token of a token response to what [IdTokenVerifier] asks of one, then
+    /// runs `accepted`; fails `out` otherwise. A response with no ID token has nothing to
+    /// check. Called on a network thread.
+    private void checkIdToken(final OidcTokens tokens, String expectedNonce,
+            final Runnable accepted, final AsyncResource<OidcTokens> out) {
+        String idToken = tokens.getIdToken();
+        if (idToken == null) {
+            accepted.run();
+            return;
+        }
+        final Jwt jwt;
+        try {
+            jwt = Jwt.parse(idToken);
+        } catch (RuntimeException malformed) {
+            out.error(new OidcException(OidcException.INVALID_ID_TOKEN,
+                    "The ID token is not a JWT: " + malformed.getMessage(), malformed));
+            return;
+        }
+        OidcException refused = IdTokenVerifier.checkClaims(jwt, configuration.getIssuer(),
+                clientId, expectedNonce, tokens.getAccessToken(), idTokenClockSkewSeconds,
+                System.currentTimeMillis());
+        if (refused != null) {
+            out.error(refused);
+            return;
+        }
+        if (!verifyIdTokenSignature) {
+            accepted.run();
+            return;
+        }
+        if (IdTokenVerifier.keyType(jwt.getAlgorithm()) == null) {
+            out.error(IdTokenVerifier.verifySignature(jwt, null));
+            return;
+        }
+        if (configuration.getJwksUri() == null) {
+            out.error(new OidcException(OidcException.INVALID_ID_TOKEN, "The configuration "
+                    + "names no jwksUri, so the ID token's signature cannot be verified and "
+                    + "the token was not accepted. Discover the provider, or give the "
+                    + "configuration its jwksUri; setVerifyIdTokenSignature(false) accepts "
+                    + "the token unverified."));
+            return;
+        }
+        List<Map<String, Object>> known = jwks;
+        long fetchedAt = jwksFetchedAt;
+        List<Map<String, Object>> candidates = IdTokenVerifier.candidates(jwt, known);
+        if (!candidates.isEmpty() || (known != null
+                && System.currentTimeMillis() - fetchedAt < jwksRefetchMillis)) {
+            finishIdToken(jwt, candidates, accepted, out);
+            return;
+        }
+        // No key for this token yet: the first sign-in, or the provider has rotated.
+        fetchJwks(new SuccessCallback<List<Map<String, Object>>>() {
+            @Override
+            public void onSucess(List<Map<String, Object>> fetched) {
+                finishIdToken(jwt, IdTokenVerifier.candidates(jwt, fetched), accepted, out);
+            }
+        }, out);
+    }
+
+    private static void finishIdToken(Jwt jwt, List<Map<String, Object>> candidates,
+            Runnable accepted, AsyncResource<OidcTokens> out) {
+        OidcException refused = IdTokenVerifier.verifySignature(jwt, candidates);
+        if (refused != null) {
+            out.error(refused);
+        } else {
+            accepted.run();
+        }
+    }
+
+    /// Fetches the provider's JWK Set and keeps it. A set that cannot be fetched or read
+    /// fails `out`: a signature nothing could check is not a signature that was checked.
+    private void fetchJwks(final SuccessCallback<List<Map<String, Object>>> then,
+            final AsyncResource<OidcTokens> out) {
+        final String url = configuration.getJwksUri();
+        final boolean[] answered = new boolean[1];
+        ConnectionRequest req = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                if (answered[0]) {
+                    return;
+                }
+                answered[0] = true;
+                List<Map<String, Object>> keys = new ArrayList<Map<String, Object>>();
+                Map<String, Object> parsed = null;
+                if (getResponseCode() == 200) {
+                    try {
+                        parsed = new JSONParser().parseJSON(new StringReader(
+                                StringUtil.newString(Util.readInputStream(input))));
+                    } catch (Exception unreadable) {
+                        parsed = null;
+                    }
+                }
+                Object listed = parsed == null ? null : parsed.get("keys");
+                if (!(listed instanceof List)) {
+                    out.error(new OidcException(OidcException.INVALID_ID_TOKEN, "The provider's "
+                            + "keys at " + url + " could not be read, so the ID token's "
+                            + "signature was not verified and the token was not accepted"));
+                    return;
+                }
+                for (Object key : (List) listed) {
+                    if (key instanceof Map) {
+                        keys.add((Map<String, Object>) key);
+                    }
+                }
+                jwksFetchedAt = System.currentTimeMillis();
+                jwks = keys;
+                then.onSucess(keys);
+            }
+
+            @Override
+            protected void handleException(Exception err) {
+                if (answered[0]) {
+                    return;
+                }
+                answered[0] = true;
+                out.error(new OidcException(OidcException.TRANSPORT_ERROR, "The provider's keys "
+                        + "at " + url + " could not be fetched, so the ID token was not "
+                        + "accepted: " + err.getMessage(), err));
+            }
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // readResponse reports it: an answer that is not a key set.
+            }
+        };
+        req.setUrl(url);
+        req.setPost(false);
+        req.setReadResponseForErrors(true);
+        req.setAuthorizer(RequestAuthorizer.NONE);
+        req.addRequestHeader("Accept", "application/json");
         NetworkManager.getInstance().addToQueue(req);
     }
 

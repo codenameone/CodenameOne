@@ -112,6 +112,13 @@ public class BackendSignInSnippets {
         // end::backend-signin-leeway[]
     }
 
+    public void unverified(OidcClient client) {
+        // tag::backend-signin-unverified[]
+        // Only for a provider whose ID tokens this platform can't verify.
+        client.setVerifyIdTokenSignature(false);
+        // end::backend-signin-unverified[]
+    }
+
     public void perRequest(RequestAuthorizer other) {
         // tag::backend-signin-per-request[]
         // Another authorizer for one request.

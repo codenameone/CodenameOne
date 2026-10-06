@@ -42,7 +42,7 @@ That call:
 . Generates a PKCE pair (S256), a `state`, and a `nonce`.
 . Opens the OS system-browser sheet at the discovered authorization endpoint.
 . Exchanges the code for tokens on the discovered token endpoint.
-. Verifies `state` and `nonce`, decodes the ID token, and persists the tokens via the default `TokenStore`.
+. Verifies `state`, the issuer the response names, and the ID token, and persists the tokens via the default `TokenStore`.
 
 image::img/oidc-sign-in-flow.svg[The sign-in flow across the app the platform browser and the provider,scaledwidth=95%]
 
@@ -51,6 +51,25 @@ The token exchange is the leg worth noticing: it goes straight from your app to 
 Only the redirect URL crosses back from the browser, which is why Apple's non-iOS path needs a server in front of it: `AppleSignIn` asks for `response_mode=form_post`, so Apple POSTs `code` and `state` to your redirect URI rather than putting them in the query string, and `OidcClient` parses the URL alone. The page at that URI has to turn the POST into a redirect carrying the same parameters, or the sign-in fails with `STATE_MISMATCH`.
 
 Whether the token endpoint hands back a refresh token is up to the request: the quick start above asks for `openid`, `email` and `profile` and nothing more, so Google returns none and there is nothing for `refreshIfExpired` to renew. `GoogleConnect.signIn` adds `access_type=offline` and `prompt=consent` for exactly that reason.
+
+==== What's verified before you get the tokens
+
+`OidcClient` doesn't hand over tokens it hasn't checked. A sign-in that fails one of these checks fails with an `OidcException`, and nothing is stored.
+
+* **The authorization response.** Its `state` has to be the one the request carried. If the response names an issuer with the `iss` parameter, that issuer has to be the provider you configured. A provider whose discovery document sets `authorization_response_iss_parameter_supported` always names itself, so a response without `iss` is refused for that provider. The error is `issuer_mismatch`. This stops an answer from one provider being taken for another's when an app signs in with several.
+* **The ID token's claims.** `iss` is the provider, `aud` is your client ID, `exp` hasn't passed, and `nonce` is the one the request carried. When the token has an `at_hash`, it has to match the access token that came with it. The device's clock may be five minutes off, and `setIdTokenClockSkew` changes that.
+* **The ID token's signature.** The provider's keys are fetched from its `jwks_uri` once and kept. They're fetched again when a token names a key that isn't among them. `RS256`, `RS384`, `RS512`, `ES256` and `ES384` are accepted. An unsigned token is refused, and so is one signed with `HS256`.
+
+A configuration you build by hand needs a `jwksUri` for the last check. `discover` fills it in.
+
+The signature check has no silent fallback. If the platform the app runs on can't verify a signature of the token's algorithm, the token is refused and the error says so. For a provider whose ID tokens can't be verified on a platform you ship to, turn the check off explicitly:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-unverified,indent=0]
+----
+
+The claims are still checked then, but they're only as trustworthy as the TLS connection to the token endpoint. Don't make a decision on your server from an ID token the app forwards. Verify it there.
 
 ==== Picking a redirect URI
 

@@ -30,7 +30,8 @@ import java.io.IOException;
 /// for authorization-server responses (e.g. `"access_denied"`, `"invalid_grant"`)
 /// and uses Codename One-specific values for transport or client-side problems
 /// (`"transport_error"`, `"state_mismatch"`, `"nonce_mismatch"`, `"user_cancelled"`,
-/// `"discovery_failed"`, `"invalid_id_token"`, `"storage_unavailable"`).
+/// `"discovery_failed"`, `"invalid_id_token"`, `"issuer_mismatch"`,
+/// `"storage_unavailable"`).
 ///
 public class OidcException extends IOException {
 
@@ -52,10 +53,16 @@ public class OidcException extends IOException {
     /// Token-endpoint response was missing or malformed.
     public static final String INVALID_GRANT = "invalid_grant";
 
-    /// ID token failed structural validation (we do not currently verify the
-    /// signature -- treat the issuer as a trust anchor and use TLS to the
-    /// discovery URL).
+    /// The ID token was not accepted: it is malformed, it is for another client or from
+    /// another issuer, it has expired, it does not belong to the access token it came
+    /// with, or its signature does not verify against the provider's keys -- which
+    /// includes a platform that cannot check a signature of that kind. See
+    /// [OidcClient#setVerifyIdTokenSignature(boolean)].
     public static final String INVALID_ID_TOKEN = "invalid_id_token";
+
+    /// The authorization response names another issuer than the provider the request was
+    /// sent to, or none where the provider says it always names one (RFC 9207).
+    public static final String ISSUER_MISMATCH = "issuer_mismatch";
 
     /// Generic transport / network failure.
     public static final String TRANSPORT_ERROR = "transport_error";
