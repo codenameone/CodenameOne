@@ -828,7 +828,13 @@ public class BackendPackager {
                 // Mandatory for generated C: Java arithmetic wraps, and clang -O3
                 // provably miscompiles the output without these.
                 "-fwrapv", "-fno-strict-aliasing",
-                "-fno-builtin-fmod", "-fno-builtin-fmodf"));
+                "-fno-builtin-fmod", "-fno-builtin-fmodf",
+                // One section per function and per object, so that the link
+                // below can leave out what nothing reaches. The natives are
+                // compiled whole; without this a server that signs nothing
+                // carried every signature and cipher native. The same flags as
+                // vm/backend/build.sh and docker/link.sh.
+                "-ffunction-sections", "-fdata-sections"));
         if (!sqlite) {
             // Turning the engine OFF is two changes, not one. Without
             // -Dcn1.sqlite=true the translator leaves cn1_sqlite3.h out, but
@@ -866,9 +872,21 @@ public class BackendPackager {
         }
         command.addAll(Arrays.asList("-lm", "-lpthread",
                 "-lcurl", "-lssl", "-lcrypto", "-lnghttp2"));
+        command.add(deadStripFlag(System.getProperty("os.name", "")));
         command.add("-o");
         command.add(binary.getAbsolutePath());
         run(command, host.baseDir(), "compile the generated C");
+    }
+
+    /**
+     * The linker flag that leaves unreferenced sections out: Apple's linker and
+     * the ELF ones spell it differently.
+     *
+     * @param osName the os.name of the machine that links
+     */
+    static String deadStripFlag(String osName) {
+        return osName.regionMatches(true, 0, "mac", 0, 3) ? "-Wl,-dead_strip"
+                : "-Wl,--gc-sections";
     }
 
     /**
