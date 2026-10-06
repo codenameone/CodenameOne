@@ -143,6 +143,10 @@ public class MatrixCursor extends AbstractCursor {
             return this;
         }
 
+        /// A column the cursor does not define is silently ignored, as
+        /// Android documents: callers offer every value they have to cursors
+        /// built over a caller-chosen projection, so throwing would break
+        /// ordinary content providers.
         public RowBuilder add(String columnName, Object value) {
             for (int i = 0; i < columnNames.length; i++) {
                 if (columnName.equals(columnNames[i])) {

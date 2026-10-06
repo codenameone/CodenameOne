@@ -92,6 +92,10 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
         layers.get(index).id = id;
     }
 
+    /// Returns the highest-index layer with `id`, while `findIndexByLayerId`
+    /// (and so `setDrawableByLayerId`) uses the lowest. That asymmetry is
+    /// Android's documented behaviour and is kept deliberately; it only shows
+    /// when two layers share an id.
     public Drawable findDrawableByLayerId(int id) {
         for (int i = layers.size() - 1; i >= 0; i--) {
             if (layers.get(i).id == id) {

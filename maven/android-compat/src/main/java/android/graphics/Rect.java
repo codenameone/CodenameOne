@@ -187,6 +187,9 @@ public final class Rect {
         union(r.left, r.top, r.right, r.bottom);
     }
 
+    /// Extends the edges to the coordinate itself, not one past it, so a point
+    /// on the right or bottom side stays outside the exclusive edge. This is
+    /// exactly what Android does and is kept for identical layout results.
     public void union(int x, int y) {
         if (x < left) {
             left = x;

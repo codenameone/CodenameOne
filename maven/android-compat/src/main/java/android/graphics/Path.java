@@ -363,6 +363,11 @@ public class Path {
     }
 
     public void addPath(Path src, float dx, float dy) {
+        if (src == this) {
+            // Appending reads src while it grows; without a snapshot
+            // path.addPath(path) never reaches the end of its own ops.
+            src = new Path(this);
+        }
         int p = 0;
         for (int i = 0; i < src.nOps; i++) {
             int n = coordsFor(src.ops[i]);
