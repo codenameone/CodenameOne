@@ -297,7 +297,9 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         if (v == null) {
             return defaultValue;
         }
-        return !"false".equals(v) && !"0".equals(v);
+        // Android folds the value to lower case first; equalsIgnoreCase does
+        // that without the locale-sensitive toLowerCase().
+        return !"false".equalsIgnoreCase(v) && !"0".equals(v);
     }
 
     public Builder buildUpon() {

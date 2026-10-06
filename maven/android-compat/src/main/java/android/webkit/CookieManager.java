@@ -24,6 +24,7 @@ package android.webkit;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -34,7 +35,20 @@ public class CookieManager {
 
     private static CookieManager sInstance;
 
-    private final Map<String, List<String>> mCookies = new HashMap<String, List<String>>();
+    /// One stored cookie: its `name=value` pair, and whether the header gave
+    /// it a lifetime (`Expires` or `Max-Age`), which is what keeps it out of
+    /// [#removeSessionCookies(ValueCallback)].
+    private static final class Cookie {
+        final String pair;
+        final boolean persistent;
+
+        Cookie(String pair, boolean persistent) {
+            this.pair = pair;
+            this.persistent = persistent;
+        }
+    }
+
+    private final Map<String, List<Cookie>> mCookies = new HashMap<String, List<Cookie>>();
     private boolean mAccept = true;
 
     protected CookieManager() {
@@ -94,19 +108,41 @@ public class CookieManager {
         int semi = value.indexOf(';');
         String pair = (semi < 0 ? value : value.substring(0, semi)).trim();
         String h = host(url);
-        List<String> list = mCookies.get(h);
+        List<Cookie> list = mCookies.get(h);
         if (list == null) {
-            list = new ArrayList<String>();
+            list = new ArrayList<Cookie>();
             mCookies.put(h, list);
         }
         String n = name(pair);
         for (int i = 0; i < list.size(); i++) {
-            if (name(list.get(i)).equals(n)) {
+            if (name(list.get(i).pair).equals(n)) {
                 list.remove(i);
                 break;
             }
         }
-        list.add(pair);
+        list.add(new Cookie(pair, semi >= 0 && hasLifetime(value.substring(semi + 1))));
+    }
+
+    /// Whether the attributes after the `name=value` pair name `Expires` or
+    /// `Max-Age`. Attribute names are matched without case folding, so the
+    /// result does not depend on the device locale.
+    private static boolean hasLifetime(String attributes) {
+        int start = 0;
+        while (start <= attributes.length()) {
+            int semi = attributes.indexOf(';', start);
+            int end = semi < 0 ? attributes.length() : semi;
+            String attr = attributes.substring(start, end).trim();
+            int eq = attr.indexOf('=');
+            String attrName = (eq < 0 ? attr : attr.substring(0, eq)).trim();
+            if (attrName.equalsIgnoreCase("expires") || attrName.equalsIgnoreCase("max-age")) {
+                return true;
+            }
+            if (semi < 0) {
+                break;
+            }
+            start = semi + 1;
+        }
+        return false;
     }
 
     public void setCookie(String url, String value, ValueCallback<Boolean> callback) {
@@ -117,7 +153,7 @@ public class CookieManager {
     }
 
     public String getCookie(String url) {
-        List<String> list = mCookies.get(host(url));
+        List<Cookie> list = mCookies.get(host(url));
         if (list == null || list.isEmpty()) {
             return null;
         }
@@ -126,13 +162,36 @@ public class CookieManager {
             if (i > 0) {
                 sb.append("; ");
             }
-            sb.append(list.get(i));
+            sb.append(list.get(i).pair);
         }
         return sb.toString();
     }
 
     public void removeSessionCookies(ValueCallback<Boolean> callback) {
-        removeAllCookies(callback);
+        boolean had = removeSessionOnly();
+        if (callback != null) {
+            callback.onReceiveValue(Boolean.valueOf(had));
+        }
+    }
+
+    /// Drops every cookie without a lifetime and any host left empty;
+    /// answers whether anything was removed.
+    private boolean removeSessionOnly() {
+        boolean removed = false;
+        Iterator<Map.Entry<String, List<Cookie>>> hosts = mCookies.entrySet().iterator();
+        while (hosts.hasNext()) {
+            List<Cookie> list = hosts.next().getValue();
+            for (int i = list.size() - 1; i >= 0; i--) {
+                if (!list.get(i).persistent) {
+                    list.remove(i);
+                    removed = true;
+                }
+            }
+            if (list.isEmpty()) {
+                hosts.remove();
+            }
+        }
+        return removed;
     }
 
     public void removeAllCookies(ValueCallback<Boolean> callback) {
@@ -150,7 +209,7 @@ public class CookieManager {
 
     @Deprecated
     public void removeSessionCookie() {
-        mCookies.clear();
+        removeSessionOnly();
     }
 
     public boolean hasCookies() {

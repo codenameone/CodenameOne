@@ -24,6 +24,13 @@ package android.os;
 
 /// Lets a caller cancel an operation in progress. Database work here runs
 /// synchronously, so a signal is only checked before the work starts.
+///
+/// The state is deliberately unsynchronized. Codename One runs application
+/// code on one thread, the event dispatch thread, and keeps locks and
+/// volatile fields out of the runtime; a caller that cancels from a worker
+/// thread marshals onto that thread first. Used from one thread, a listener
+/// installed after cancel() is called at once and a removed one is never
+/// called, which is the whole of Android's contract here.
 public final class CancellationSignal {
 
     /// Told when the signal is cancelled.

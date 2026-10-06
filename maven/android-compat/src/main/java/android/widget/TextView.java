@@ -32,6 +32,7 @@ import android.graphics.drawable.Drawable;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.SpannedString;
@@ -416,6 +417,10 @@ public class TextView extends View {
             SpannableStringBuilder sb = new SpannableStringBuilder(text);
             sb.setFilters(mFilters);
             text = sb;
+        } else if (type == BufferType.SPANNABLE) {
+            // Android hands back a Spannable for this mode, and callers add
+            // spans by casting getText() to one.
+            text = new SpannableString(text);
         }
         sendBeforeTextChanged(old, 0, old == null ? 0 : old.length(), text.length());
         mText = text;

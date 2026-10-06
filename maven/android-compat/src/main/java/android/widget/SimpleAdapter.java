@@ -30,6 +30,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -42,7 +43,11 @@ public class SimpleAdapter extends BaseAdapter implements Filterable {
     }
 
     private final LayoutInflater mInflater;
-    private final List<? extends Map<String, ?>> mData;
+    private List<? extends Map<String, ?>> mData;
+    /// The rows as constructed, kept once a filter first runs; [#mData]
+    /// then holds the subset the latest constraint matched.
+    private ArrayList<Map<String, ?>> mUnfilteredData;
+    private SimpleFilter mFilter;
     private final int mResource;
     private int mDropDownResource;
     private final String[] mFrom;
@@ -154,19 +159,63 @@ public class SimpleAdapter extends BaseAdapter implements Filterable {
 
     @Override
     public Filter getFilter() {
-        return new Filter() {
-            @Override
-            protected FilterResults performFiltering(CharSequence constraint) {
-                FilterResults r = new FilterResults();
-                r.count = mData.size();
-                r.values = mData;
-                return r;
-            }
+        if (mFilter == null) {
+            mFilter = new SimpleFilter();
+        }
+        return mFilter;
+    }
 
-            @Override
-            protected void publishResults(CharSequence constraint, FilterResults results) {
-                notifyDataSetChanged();
+    /// Keeps the rows where the text of any bound value, or any word of it,
+    /// starts with the constraint, ignoring case -- the match `ArrayAdapter`
+    /// uses. An empty constraint restores every row.
+    private final class SimpleFilter extends Filter {
+
+        @Override
+        protected FilterResults performFiltering(CharSequence prefix) {
+            FilterResults results = new FilterResults();
+            if (mUnfilteredData == null) {
+                mUnfilteredData = new ArrayList<Map<String, ?>>(mData);
             }
-        };
+            if (prefix == null || prefix.length() == 0) {
+                ArrayList<Map<String, ?>> all = new ArrayList<Map<String, ?>>(mUnfilteredData);
+                results.values = all;
+                results.count = all.size();
+                return results;
+            }
+            String p = prefix.toString();
+            ArrayList<Map<String, ?>> kept = new ArrayList<Map<String, ?>>();
+            for (int i = 0; i < mUnfilteredData.size(); i++) {
+                Map<String, ?> row = mUnfilteredData.get(i);
+                if (row != null && rowMatches(row, p)) {
+                    kept.add(row);
+                }
+            }
+            results.values = kept;
+            results.count = kept.size();
+            return results;
+        }
+
+        private boolean rowMatches(Map<String, ?> row, String prefix) {
+            for (int j = 0; j < mTo.length && j < mFrom.length; j++) {
+                Object value = row.get(mFrom[j]);
+                if (value != null && ArrayAdapter.matches(value.toString(), prefix)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        protected void publishResults(CharSequence constraint, FilterResults results) {
+            if (results.values instanceof List) {
+                mData = (List<Map<String, ?>>) results.values;
+            }
+            if (results.count > 0) {
+                notifyDataSetChanged();
+            } else {
+                notifyDataSetInvalidated();
+            }
+        }
     }
 }
