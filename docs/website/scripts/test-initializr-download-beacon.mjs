@@ -104,7 +104,7 @@ const STEPS_ENDPOINT = "https://cloud.codenameone.com/api/v2/funnel/initializr-s
   const { url, init } = calls[0];
   assert.equal(url, STEPS_ENDPOINT);
   assert.equal(init.method, "POST");
-  assert.equal(init.mode, "no-cors");
+  assert.equal(init.mode, "cors", "the steps request must read the server's answer");
   assert.equal(init.credentials, "omit", "the steps request must not carry cookies");
   assert.equal(init.keepalive, true);
   assert.equal(init.referrerPolicy, "no-referrer");
@@ -136,6 +136,21 @@ for (const [label, options, email, pkg] of [
   const rejecting = loadBeacon({ fetchImpl: () => Promise.reject(new TypeError("network")) });
   assert.equal(await rejecting.beacon.sendSteps("dev@example.org", "com.example.app", "", ""), false,
     "an email request that never left must not be reported as sent");
+}
+
+// The panel says "Check your inbox" only on a server-confirmed success: a
+// refused (400), rate-limited (429) or failed (503) request resolves false,
+// while the fire-and-forget download beacon is unaffected by the status.
+for (const status of [400, 429, 503]) {
+  const refused = loadBeacon({ fetchImpl: () => Promise.resolve({ ok: false, status }) });
+  assert.equal(await refused.beacon.sendSteps("dev@example.org", "com.example.app", "", "", "maven"), false,
+    "HTTP " + status + " is not success");
+  assert.equal(await refused.beacon.send("com.example.app", ""), true, "the download beacon ignores status");
+  assert.equal(refused.calls[1].init.mode, "no-cors", "the download beacon stays opaque");
+}
+{
+  const accepted = loadBeacon({ fetchImpl: () => Promise.resolve({ ok: true, status: 202 }) });
+  assert.equal(await accepted.beacon.sendSteps("dev@example.org", "com.example.app", "", "", "maven"), true);
 }
 
 // Page wiring: one download message -> exactly one beacon + one Crisp event,

@@ -48,10 +48,11 @@
 
   /*
    * Posts `fields` plus pkg (the hashed package name) to `endpoint`. Returns a
-   * promise that always resolves (true when a request was issued), so callers
-   * never see a rejection.
+   * promise that always resolves, so callers never see a rejection: for the
+   * fire-and-forget download beacon, true when a request was issued; with
+   * `confirm`, true only when the server ANSWERED with a success status.
    */
-  function post(endpoint, packageName, fields) {
+  function post(endpoint, packageName, fields, confirm) {
     try {
       var host = window.location && window.location.hostname;
       if (!REPORTING_HOSTS[host] || !packageName || typeof window.fetch !== "function") {
@@ -71,16 +72,21 @@
         // this beacon must not carry. credentials:"omit" and no-referrer keep
         // the request anonymous; keepalive lets it outlive a page navigation.
         // A form-encoded body is a CORS "simple" request, so no preflight.
+        // `confirm` uses mode "cors" so the status is readable (BuildCloud
+        // answers the website origin with Access-Control-Allow-Origin):
+        // "no-cors" gives an opaque response that looks the same for a 202 as
+        // for a 400, 429 or 503, and the steps panel would claim an email that
+        // was refused.
         return window.fetch(endpoint, {
           method: "POST",
-          mode: "no-cors",
+          mode: confirm ? "cors" : "no-cors",
           credentials: "omit",
           keepalive: true,
           referrerPolicy: "no-referrer",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: body
-        }).then(function () {
-          return true;
+        }).then(function (response) {
+          return confirm ? !!(response && response.ok) : true;
         }, function () {
           // The request never left (offline, blocked): say so, so the steps
           // panel does not claim an email is on its way. Still never rejects.
@@ -109,7 +115,7 @@
       return Promise.resolve(false);
     }
     return post(STEPS_ENDPOINT, packageName,
-      [["email", address], ["template", template], ["ide", ide], ["build", build]]);
+      [["email", address], ["template", template], ["ide", ide], ["build", build]], true);
   }
 
   window.cn1InitializrBeacon = { send: send, sendSteps: sendSteps };
