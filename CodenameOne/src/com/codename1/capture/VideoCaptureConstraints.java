@@ -38,7 +38,7 @@ package com.codename1.capture;
 /// Example Using size and duration constraints:
 ///
 /// ```java
-/// `// Create capture constraint 320x240, with max length 20 seconds
+/// // Create capture constraint 320x240, with max length 20 seconds
 /// VideoCaptureConstraints vcc = new VideoCaptureConstraints(320, 240, 20);
 /// if (vcc.isSupported()) {
 ///     // These constraints are fully supported by this platform
@@ -47,24 +47,24 @@ package com.codename1.capture;
 ///     // At this point, the following conditions are guaranteed to be true:
 ///     // 1. vcc.getPreferredWidth() == vcc.getWidth() == 320
 ///     // 2. vcc.getPreferredHeight() == vcc.getHeight() == 320
-///     // 3. vcc.getPreferredMaxLength() == vcc.getMaxLength() == 20` else {
+///     // 3. vcc.getPreferredMaxLength() == vcc.getMaxLength() == 20
+/// } else {
 ///     // At least one of the constraints is not supported.
 ///     // You can find out the "granted" constraints using getWidth(), getHeight(),
 ///     // and getMaxLength().
-/// }
 /// }
 /// ```
 ///
 /// Example Using Quality:
 ///
 /// ```java
-/// `//
+/// //
 /// VideoCaptureConstraints vcc = new VideoCaptureConstraints(VideoCaptureConstraints.QUALITY_LOW);
 /// if (vcc.isSupported()) {
 ///     // This platform supports a 'low quality' setting.
-///     //  Low quality generally means a smaller file size.` else {
+///     //  Low quality generally means a smaller file size.
+/// } else {
 ///     // Low quality constraint is not supported.
-/// }
 /// }
 /// ```
 ///

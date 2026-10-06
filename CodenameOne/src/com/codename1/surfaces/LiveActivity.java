@@ -35,7 +35,7 @@ import java.util.Map;
 ///
 /// ```java
 /// LiveActivity delivery = LiveActivity.start(descriptor, initialState);
-/// ...
+/// // ...
 /// delivery.update(stateMap("Arriving now", eta, 1.0f));
 /// delivery.end(null);
 /// ```

@@ -24,7 +24,7 @@ package com.codename1.tools.translator.bytecodes;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 
 public class ArithmeticExpression extends Instruction implements AssignableExpression{
@@ -264,22 +264,22 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
             case Opcodes.DLOAD:
             case Opcodes.ILOAD:
             case Opcodes.LLOAD:
-            case org.objectweb.asm.Opcodes.ICONST_0:
-            case org.objectweb.asm.Opcodes.ICONST_1: 
-            case org.objectweb.asm.Opcodes.ICONST_2:
-            case org.objectweb.asm.Opcodes.ICONST_3: 
-            case org.objectweb.asm.Opcodes.ICONST_4: 
-            case org.objectweb.asm.Opcodes.ICONST_5:
-            case org.objectweb.asm.Opcodes.ICONST_M1:
-            case org.objectweb.asm.Opcodes.LCONST_0:
-            case org.objectweb.asm.Opcodes.LCONST_1: 
+            case com.codename1.tools.translator.classfile.Opcodes.ICONST_0:
+            case com.codename1.tools.translator.classfile.Opcodes.ICONST_1: 
+            case com.codename1.tools.translator.classfile.Opcodes.ICONST_2:
+            case com.codename1.tools.translator.classfile.Opcodes.ICONST_3: 
+            case com.codename1.tools.translator.classfile.Opcodes.ICONST_4: 
+            case com.codename1.tools.translator.classfile.Opcodes.ICONST_5:
+            case com.codename1.tools.translator.classfile.Opcodes.ICONST_M1:
+            case com.codename1.tools.translator.classfile.Opcodes.LCONST_0:
+            case com.codename1.tools.translator.classfile.Opcodes.LCONST_1: 
             case Opcodes.DCONST_0:
             case Opcodes.DCONST_1:
             case Opcodes.FCONST_0:
             case Opcodes.FCONST_1:
             case Opcodes.FCONST_2:
-            case org.objectweb.asm.Opcodes.BIPUSH:
-            case org.objectweb.asm.Opcodes.SIPUSH:
+            case com.codename1.tools.translator.classfile.Opcodes.BIPUSH:
+            case com.codename1.tools.translator.classfile.Opcodes.SIPUSH:
             case Opcodes.LDC:
                 return true;
         }
@@ -442,35 +442,35 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                         return "llocals_"+var.getIndex()+"_";
                     }
                  
-                    case org.objectweb.asm.Opcodes.ICONST_0: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_0: {
                         return "0";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_1: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_1: {
                         return "1";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_2: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_2: {
                         return "2";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_3: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_3: {
                         return "3";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_4: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_4: {
                         return "4";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_5: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_5: {
                         return "5";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_M1: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_M1: {
                         return "(-1)";
                         
                     }
-                    case org.objectweb.asm.Opcodes.LCONST_0: {
+                    case com.codename1.tools.translator.classfile.Opcodes.LCONST_0: {
                         return "((JAVA_LONG)0)";
                         
                     }
@@ -490,12 +490,12 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                         return "((JAVA_FLOAT)2";
                     }
                     
-                    case org.objectweb.asm.Opcodes.LCONST_1: {
+                    case com.codename1.tools.translator.classfile.Opcodes.LCONST_1: {
                         return "((JAVA_LONG)1)";
                         
                     }
-                    case org.objectweb.asm.Opcodes.BIPUSH:
-                    case org.objectweb.asm.Opcodes.SIPUSH: {
+                    case com.codename1.tools.translator.classfile.Opcodes.BIPUSH:
+                    case com.codename1.tools.translator.classfile.Opcodes.SIPUSH: {
                         return String.valueOf(var.getIndex());
                     }
                     default: {
@@ -507,49 +507,49 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
 
                    
 
-                    case org.objectweb.asm.Opcodes.ICONST_0: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_0: {
                         return "0";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_1: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_1: {
                         return "1";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_2: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_2: {
                         return "2";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_3: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_3: {
                         return "3";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_4: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_4: {
                         return "4";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_5: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_5: {
                         return "5";
                         
                     }
-                    case org.objectweb.asm.Opcodes.ICONST_M1: {
+                    case com.codename1.tools.translator.classfile.Opcodes.ICONST_M1: {
                         return "(-1)";
                         
                     }
-                    case org.objectweb.asm.Opcodes.LCONST_0: {
+                    case com.codename1.tools.translator.classfile.Opcodes.LCONST_0: {
                         return "((JAVA_LONG)0)";
                         
                     }
-                    case org.objectweb.asm.Opcodes.LCONST_1: {
+                    case com.codename1.tools.translator.classfile.Opcodes.LCONST_1: {
                         return "(JAVA_LONG)1";
                         
                     }
-                    case org.objectweb.asm.Opcodes.BIPUSH: {
+                    case com.codename1.tools.translator.classfile.Opcodes.BIPUSH: {
                         if (instr instanceof BasicInstruction) {
                             return String.valueOf(((BasicInstruction) instr).getValue());
                         }
                         break;
                     }
-                    case org.objectweb.asm.Opcodes.LDC: {
+                    case com.codename1.tools.translator.classfile.Opcodes.LDC: {
                         if (instr instanceof Ldc) {
                             Ldc ldc = (Ldc) instr;
                             return ldc.getValueAsString();

@@ -2212,9 +2212,14 @@ const jvm = {
     if (value.__class === "java_lang_String") {
       const data = value[CN1_STRING_VALUE];
       const count = value[CN1_STRING_COUNT] | 0;
+      // JavaAPI's String keeps Latin-1 text as a byte[] (see String.value), and
+      // a Java byte is signed: 0xE7 is stored as -25. Without the mask
+      // fromCharCode(-25) answers U+FFE7, so every String holding a Latin-1
+      // character above 0x7F -- "\u00e7", "\u00e9" -- read back corrupted.
+      const latin1 = data && data.__class === jvm.arrayClassName("JAVA_BYTE", 1);
       let out = "";
       for (let i = 0; i < count; i++) {
-        out += String.fromCharCode(data[i] | 0);
+        out += String.fromCharCode(latin1 ? data[i] & 0xff : data[i] | 0);
       }
       value.__nativeString = out;
       return out;
@@ -4575,7 +4580,14 @@ function* cn1_ivN(target, mid, args) {
 // three earlier sync-dispatcher attempts).
 function cn1_ivsDrive(r, mid) {
   if (r && typeof r.next === "function") {
-    const step = r.next();
+    let step = r.next();
+    // A budget yield ({op:"byield"}) only offers the scheduler a turn; in a
+    // synchronous context there is nobody to hand it to, so keep stepping. Code
+    // translated later against an open-world bundle (the Playground) emits every
+    // method as a generator, so its overrides reach here and may hit one.
+    while (!step.done && step.value === _Yv) {
+      step = r.next();
+    }
     if (!step.done) {
       throw new Error("cn1_ivs: sync virtual dispatch reached a yielding method (CHA unsound): " + mid);
     }
@@ -4707,6 +4719,56 @@ global._dw3 = _dw3; global._dw4 = _dw4; global._dwN = _dwN;
 // at every INVOKEVIRTUAL / INVOKEINTERFACE call site (~42k in a real app),
 // so cn1_iv0 -> _v0 / cn1_ivs0 -> _w0 saves ~5 bytes per site (~200KB raw).
 // The long names stay exported for port.js / diagnostics.
+// Adapter for code translated incrementally against this (open-world) bundle:
+// it cannot know whether a host function is a generator, so every direct call into
+// the host goes through ``yield* _G_<fn>(...)``, declared ``var _G_<fn> = _GW("<fn>")``
+// in the chunk's preamble. The function is looked up by name at call time, so a
+// native installed or replaced later is still the one called.
+function _GW(name) {
+  return function* () {
+    const fn = global[name];
+    if (typeof fn !== "function") {
+      throw new Error("Missing host function " + name + " (not in the open-world bundle?)");
+    }
+    const r = fn.apply(null, arguments);
+    if (r && typeof r.next === "function") { return yield* r; }
+    return r;
+  };
+}
+global._GW = _GW;
+// Evaluates incrementally translated classes in the VM's global scope.
+// ``names`` (comma separated) are the classes the chunk defines. A user class may
+// replace one an earlier chunk defined -- a Playground re-run -- but never one of the
+// running application's: its function declarations would be hoisted over the host's
+// before any check inside defineClass could run, so the check is made here, first.
+global.__cn1LoadClasses = function(source, names) {
+  if (names) {
+    const list = String(names).split(",");
+    const mine = jvm.__cn1LoadedClasses || (jvm.__cn1LoadedClasses = new Set());
+    for (let i = 0; i < list.length; i++) {
+      const n = list[i];
+      if (n && jvm.classes[n] && !mine.has(n)) {
+        throw new Error("Class " + n + " clashes with a class of the running application; rename it");
+      }
+    }
+    for (let i = 0; i < list.length; i++) {
+      if (list[i]) {
+        mine.add(list[i]);
+      }
+    }
+  }
+  if (typeof importScripts === "function" && typeof Blob === "function" && typeof URL !== "undefined"
+      && typeof URL.createObjectURL === "function") {
+    const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+    try {
+      importScripts(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } else {
+    (0, eval)(source);
+  }
+};
 global._v0 = cn1_iv0; global._v1 = cn1_iv1; global._v2 = cn1_iv2;
 global._v3 = cn1_iv3; global._v4 = cn1_iv4; global._vN = cn1_ivN;
 global._w0 = cn1_ivs0; global._w1 = cn1_ivs1; global._w2 = cn1_ivs2;
@@ -5429,7 +5491,13 @@ bindNative(["cn1_java_io_PrintStream_println_java_lang_String"], function(__cn1T
       "cn1_java_io_PrintStream_println_java_lang_String", [value]);
 });
 bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function(__cn1ThisObject, value) {
-  if (__cn1ThisObject && __cn1ThisObject.__cn1ConsolePrintStream) {
+  // Only a String (or null) can be printed here directly. Any other object
+  // prints its toString(), which is Java code a native cannot run, so it takes
+  // the translated println(Object) -- String.valueOf, then println(String) back
+  // through this console. Printing printStreamValue's class name instead made
+  // System.out.println(aStringBuilder) print "java_lang_StringBuilder".
+  if (__cn1ThisObject && __cn1ThisObject.__cn1ConsolePrintStream
+      && (value == null || typeof value === "string" || value.__class === "java_lang_String")) {
     printToConsole(printStreamValue(value));
     return null;
   }
@@ -5855,10 +5923,10 @@ bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1A
   }
   const out = jvm.newArray(encoded.length, "JAVA_BYTE", 1);
   for (let i = 0; i < encoded.length; i++) {
-    // Sign-extended: a Java byte[] holds -128..127, and BALOAD reads the slot as
-    // it is. The encoder's 0..255 left every non-ASCII byte of getBytes() a value
-    // no Java byte can have, so comparisons, checksums and "< 0" tests disagreed
-    // with every other platform.
+    // A Java byte is SIGNED: 0xC3 is -61. Storing the encoder's 0..255 made
+    // "\u00e9".getBytes()[0] read 195, so a `b < 0` test or a comparison with a
+    // (byte) constant disagreed with every other target. Readers mask with
+    // & 0xff and are unaffected.
     out[i] = (encoded[i] << 24) >> 24;
   }
   return out;
@@ -5968,7 +6036,320 @@ bindNative(["cn1_java_lang_Class_getComponentType_R_java_lang_Class"], function(
 // null. Returning null is both the safe answer and the correct one: the variable
 // genuinely is not set.
 bindNative(["cn1_java_lang_System_getenvImpl_java_lang_String_R_java_lang_String"], function(name) {
-  return null;
+  // A host that runs a translated PROGRAM rather than an application (the
+  // self-hosted translator under Node, for one) can hand it an environment.
+  const env = jvm.env;
+  if (!env) {
+    return null;
+  }
+  const value = env[jvm.toNativeString(name)];
+  return value == null ? null : createJavaString(String(value));
+});
+
+// ---- java.io on a host-supplied file system --------------------------------
+// A browser has no file system, so java.io.File and its streams stay
+// unsupported -- they throw exactly as the translator's generated stub did --
+// unless the HOST installs one as jvm.fileSystem before the program starts.
+// That is how a translated program that genuinely works on files (the
+// translator itself) runs here: under Node the host passes a file system
+// backed by fs, and in a page jvm.createMemoryFileSystem() gives one the host
+// fills and reads back.
+//
+// The interface is synchronous, which is what lets these natives be plain
+// functions the translator calls directly:
+//   resolve(path) -> absolute, normalised path
+//   stat(abs)     -> { dir: boolean, size: number, mtime: number } or null
+//   list(abs)     -> array of names, or null when abs is not a directory
+//   read(abs)     -> Uint8Array, or null when abs is not a readable file
+//   write(abs, bytes, append) -> boolean
+//   mkdir(abs) / remove(abs) / rename(abs, toAbs) -> boolean
+jvm.fileSystem = null;
+jvm.env = null;
+const CN1_FS_UNSUPPORTED = "java.io.File native filesystem access is not supported in javascript backend";
+function cn1Fs() {
+  const fs = jvm.fileSystem;
+  if (!fs) {
+    throw new Error(CN1_FS_UNSUPPORTED);
+  }
+  return fs;
+}
+function cn1FsPath(path) {
+  return cn1Fs().resolve(jvm.toNativeString(path));
+}
+function cn1FsNormalize(path) {
+  const parts = [];
+  for (const part of path.split("/")) {
+    if (part === "" || part === ".") {
+      continue;
+    }
+    if (part === "..") {
+      parts.pop();
+    } else {
+      parts.push(part);
+    }
+  }
+  return "/" + parts.join("/");
+}
+jvm.createMemoryFileSystem = function(cwd) {
+  const nodes = new Map();
+  nodes.set("/", { dir: true, mtime: Date.now() });
+  const base = cn1FsNormalize(cwd || "/");
+  function parentOf(abs) {
+    const i = abs.lastIndexOf("/");
+    return i <= 0 ? "/" : abs.substring(0, i);
+  }
+  const fs = {
+    resolve(path) {
+      return cn1FsNormalize(path.charAt(0) === "/" ? path : base + "/" + path);
+    },
+    stat(abs) {
+      const node = nodes.get(abs);
+      if (!node) {
+        return null;
+      }
+      return { dir: node.dir, size: node.dir ? 0 : node.data.length, mtime: node.mtime };
+    },
+    list(abs) {
+      const node = nodes.get(abs);
+      if (!node || !node.dir) {
+        return null;
+      }
+      const prefix = abs === "/" ? "/" : abs + "/";
+      const names = [];
+      for (const key of nodes.keys()) {
+        if (key !== abs && key.startsWith(prefix) && key.indexOf("/", prefix.length) < 0) {
+          names.push(key.substring(prefix.length));
+        }
+      }
+      return names;
+    },
+    read(abs) {
+      const node = nodes.get(abs);
+      return node && !node.dir ? node.data : null;
+    },
+    write(abs, bytes, append) {
+      const parent = nodes.get(parentOf(abs));
+      const existing = nodes.get(abs);
+      if (!parent || !parent.dir || (existing && existing.dir)) {
+        return false;
+      }
+      let data = bytes;
+      if (append && existing) {
+        data = new Uint8Array(existing.data.length + bytes.length);
+        data.set(existing.data, 0);
+        data.set(bytes, existing.data.length);
+      }
+      nodes.set(abs, { dir: false, data: data, mtime: Date.now() });
+      return true;
+    },
+    mkdir(abs) {
+      const parent = nodes.get(parentOf(abs));
+      if (nodes.has(abs) || !parent || !parent.dir) {
+        return false;
+      }
+      nodes.set(abs, { dir: true, mtime: Date.now() });
+      return true;
+    },
+    remove(abs) {
+      const node = nodes.get(abs);
+      if (!node || abs === "/" || (node.dir && fs.list(abs).length > 0)) {
+        return false;
+      }
+      nodes.delete(abs);
+      return true;
+    },
+    rename(abs, toAbs) {
+      const node = nodes.get(abs);
+      const parent = nodes.get(parentOf(toAbs));
+      if (!node || node.dir || !parent || !parent.dir || nodes.has(toAbs)) {
+        return false;
+      }
+      nodes.delete(abs);
+      nodes.set(toAbs, node);
+      return true;
+    }
+  };
+  return fs;
+};
+// Open streams, keyed by a positive handle; 0 is the "could not open" answer.
+const cn1FsStreams = new Map();
+let cn1FsNextHandle = 1;
+function cn1FsStream(handle) {
+  return cn1FsStreams.get(_LtoNum(handle));
+}
+bindNative(["cn1_java_io_File_getAbsolutePathImpl_java_lang_String_R_java_lang_String"], function(__cn1ThisObject, path) {
+  return createJavaString(cn1FsPath(path));
+});
+bindNative(["cn1_java_io_File_getCanonicalPathImpl_java_lang_String_R_java_lang_String"], function(__cn1ThisObject, path) {
+  return createJavaString(cn1FsPath(path));
+});
+bindNative(["cn1_java_io_File_existsImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  return cn1Fs().stat(cn1FsPath(path)) ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_isDirectoryImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  const st = cn1Fs().stat(cn1FsPath(path));
+  return st && st.dir ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_isFileImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  const st = cn1Fs().stat(cn1FsPath(path));
+  return st && !st.dir ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_isHiddenImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  const abs = cn1FsPath(path);
+  return abs.substring(abs.lastIndexOf("/") + 1).charAt(0) === "." ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_lastModifiedImpl_java_lang_String_R_long"], function(__cn1ThisObject, path) {
+  const st = cn1Fs().stat(cn1FsPath(path));
+  return _LfromNumber(st ? Math.floor(st.mtime) : 0);
+});
+bindNative(["cn1_java_io_File_lengthImpl_java_lang_String_R_long"], function(__cn1ThisObject, path) {
+  const st = cn1Fs().stat(cn1FsPath(path));
+  return _LfromNumber(st && !st.dir ? st.size : 0);
+});
+bindNative(["cn1_java_io_File_createNewFileImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  const fs = cn1Fs();
+  const abs = cn1FsPath(path);
+  if (fs.stat(abs)) {
+    return 0;
+  }
+  return fs.write(abs, new Uint8Array(0), false) ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_deleteImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  return cn1Fs().remove(cn1FsPath(path)) ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_listImpl_java_lang_String_R_java_lang_String_1ARRAY"], function(__cn1ThisObject, path) {
+  const names = cn1Fs().list(cn1FsPath(path));
+  if (!names) {
+    return null;
+  }
+  const out = jvm.newArray(names.length, "java_lang_String", 1);
+  for (let i = 0; i < names.length; i++) {
+    out[i] = createJavaString(names[i]);
+  }
+  return out;
+});
+bindNative(["cn1_java_io_File_mkdirImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  return cn1Fs().mkdir(cn1FsPath(path)) ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_renameToImpl_java_lang_String_java_lang_String_R_boolean"], function(__cn1ThisObject, path, dest) {
+  return cn1Fs().rename(cn1FsPath(path), cn1FsPath(dest)) ? 1 : 0;
+});
+// Permissions are not modelled: everything that exists is readable and
+// writable, and nothing is executable.
+bindNative(["cn1_java_io_File_setReadOnlyImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_setWritableImpl_java_lang_String_boolean_R_boolean",
+            "cn1_java_io_File_setReadableImpl_java_lang_String_boolean_R_boolean",
+            "cn1_java_io_File_setExecutableImpl_java_lang_String_boolean_R_boolean"], function(__cn1ThisObject, path) {
+  return cn1Fs().stat(cn1FsPath(path)) ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_canReadImpl_java_lang_String_R_boolean",
+            "cn1_java_io_File_canWriteImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  return cn1Fs().stat(cn1FsPath(path)) ? 1 : 0;
+});
+bindNative(["cn1_java_io_File_canExecuteImpl_java_lang_String_R_boolean"], function(__cn1ThisObject, path) {
+  cn1Fs();
+  return 0;
+});
+bindNative(["cn1_java_io_File_getTotalSpaceImpl_java_lang_String_R_long",
+            "cn1_java_io_File_getFreeSpaceImpl_java_lang_String_R_long",
+            "cn1_java_io_File_getUsableSpaceImpl_java_lang_String_R_long"], function(__cn1ThisObject, path) {
+  cn1Fs();
+  return _LfromNumber(0);
+});
+bindNative(["cn1_java_io_FileInputStream_openImpl_java_lang_String_R_long"], function(name) {
+  const data = cn1Fs().read(cn1FsPath(name));
+  if (!data) {
+    return _LfromNumber(0);
+  }
+  const handle = cn1FsNextHandle++;
+  cn1FsStreams.set(handle, { data: data, pos: 0 });
+  return _LfromNumber(handle);
+});
+bindNative(["cn1_java_io_FileInputStream_readImpl_long_byte_1ARRAY_int_int_R_int"], function(handle, buffer, offset, length) {
+  const stream = cn1FsStream(handle);
+  if (!stream) {
+    return -2;
+  }
+  const available = stream.data.length - stream.pos;
+  if (available <= 0) {
+    return -1;
+  }
+  const n = Math.min(available, length | 0);
+  for (let i = 0; i < n; i++) {
+    // Signed, as a Java byte is.
+    buffer[(offset | 0) + i] = (stream.data[stream.pos + i] << 24) >> 24;
+  }
+  stream.pos += n;
+  return n;
+});
+bindNative(["cn1_java_io_FileInputStream_skipImpl_long_long_R_long"], function(handle, count) {
+  const stream = cn1FsStream(handle);
+  if (!stream) {
+    return _LfromNumber(-1);
+  }
+  const n = Math.max(0, Math.min(stream.data.length - stream.pos, _LtoNum(count)));
+  stream.pos += n;
+  return _LfromNumber(n);
+});
+bindNative(["cn1_java_io_FileInputStream_availableImpl_long_R_int"], function(handle) {
+  const stream = cn1FsStream(handle);
+  return stream ? Math.min(2147483647, stream.data.length - stream.pos) : -1;
+});
+bindNative(["cn1_java_io_FileInputStream_closeImpl_long_R_int"], function(handle) {
+  return cn1FsStreams.delete(_LtoNum(handle)) ? 0 : -1;
+});
+// Output is buffered per stream and reaches the file system on flush and close.
+bindNative(["cn1_java_io_FileOutputStream_openImpl_java_lang_String_boolean_R_long"], function(name, append) {
+  const fs = cn1Fs();
+  const abs = cn1FsPath(name);
+  // Create or truncate now, so a missing directory fails at open as it would natively.
+  if (!fs.write(abs, new Uint8Array(0), !!append)) {
+    return _LfromNumber(0);
+  }
+  const handle = cn1FsNextHandle++;
+  cn1FsStreams.set(handle, { path: abs, chunks: [], size: 0 });
+  return _LfromNumber(handle);
+});
+bindNative(["cn1_java_io_FileOutputStream_writeImpl_long_byte_1ARRAY_int_int_R_int"], function(handle, buffer, offset, length) {
+  const stream = cn1FsStream(handle);
+  if (!stream || !stream.chunks) {
+    return -1;
+  }
+  const n = length | 0;
+  const chunk = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    chunk[i] = buffer[(offset | 0) + i] & 0xff;
+  }
+  stream.chunks.push(chunk);
+  stream.size += n;
+  return n;
+});
+function cn1FsFlush(stream) {
+  if (stream.size === 0) {
+    return true;
+  }
+  const data = new Uint8Array(stream.size);
+  let at = 0;
+  for (const chunk of stream.chunks) {
+    data.set(chunk, at);
+    at += chunk.length;
+  }
+  stream.chunks = [];
+  stream.size = 0;
+  return cn1Fs().write(stream.path, data, true);
+}
+bindNative(["cn1_java_io_FileOutputStream_flushImpl_long_R_int"], function(handle) {
+  const stream = cn1FsStream(handle);
+  return stream && stream.chunks && cn1FsFlush(stream) ? 0 : -1;
+});
+bindNative(["cn1_java_io_FileOutputStream_closeImpl_long_R_int"], function(handle) {
+  const key = _LtoNum(handle);
+  const stream = cn1FsStreams.get(key);
+  if (!stream || !stream.chunks) {
+    return -1;
+  }
+  cn1FsStreams.delete(key);
+  return cn1FsFlush(stream) ? 0 : -1;
 });
 bindNative(["cn1_java_lang_Class_isPrimitive_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isPrimitive ? 1 : 0; });
 bindNative(["cn1_java_lang_reflect_Array_newInstanceImpl_java_lang_Class_int_R_java_lang_Object"], function(componentClass, length) {

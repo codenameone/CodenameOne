@@ -49,7 +49,7 @@ import com.codename1.util.SuccessCallback;
 ///         "com.example.app:/oauth2redirect",
 ///         "openid", "email", "profile", "User.Read")
 ///     .ready(new SuccessCallback<OidcTokens>() {
-///         public void onSucess(OidcTokens t) { ... }
+///         public void onSucess(OidcTokens t) { /* ... */ }
 ///     });
 /// ```
 ///

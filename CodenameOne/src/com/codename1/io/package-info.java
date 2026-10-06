@@ -574,7 +574,7 @@
 /// throws ServletException, IOException {
 /// Collection parts = req.getParts();
 /// Part data = parts.iterator().next();
-/// try(InputStream is = data.getInputStream()) {}
+/// try(InputStream is = data.getInputStream()) {
 /// // store or do something with the input stream
 /// }
 /// }
@@ -610,7 +610,16 @@
 /// try(Reader r = new com.codename1.io.CharArrayReader("1997,Ford,E350,\"Super, \"\"luxurious\"\" truck\"".toCharArray())) {
 /// String[][] data = parser.parse(r);
 /// String[] columnNames = new String[data[0].length];
-/// for(int iter=  0 ; iter
+/// for(int iter=  0 ; iter < columnNames.length ; iter++) {
+/// columnNames[iter] = "Col " + (iter + 1);
+/// }
+/// TableModel tm = new DefaultTableModel(columnNames, data);
+/// hi.add(BorderLayout.CENTER, new Table(tm));
+/// } catch(IOException err) {
+/// Log.e(err);
+/// }
+/// hi.show();
+/// ```
 ///
 /// The data contains a two dimensional array of the CSV content. You can change the delimiter character
 /// by using the `CSVParser` constructor that accepts a character.
@@ -727,7 +736,7 @@
 /// JSONParser json = new JSONParser();
 /// try(Reader r = new InputStreamReader(Display.getInstance().getResourceAsStream(getClass(), "/anapioficeandfire.json"), "UTF-8")) {
 ///     Map data = json.parseJSON(r);
-///     java.util.List> content = (java.util.List>)data.get("root"); //
+///     java.util.List<Map<String, Object>> content = (java.util.List<Map<String, Object>>)data.get("root"); //
 ///     for(Map obj : content) { //
 ///         String url = (String)obj.get("url");
 ///         String name = (String)obj.get("name");
@@ -854,10 +863,12 @@
 /// **default public constructor** and must implement the following 4 methods:
 ///
 /// ```java
-/// public int getVersion();
-/// public void externalize(DataOutputStream out) throws IOException;
-/// public void internalize(int version, DataInputStream in) throws IOException;
-/// public String getObjectId();
+/// public interface Externalizable {
+///     public int getVersion();
+///     public void externalize(DataOutputStream out) throws IOException;
+///     public void internalize(int version, DataInputStream in) throws IOException;
+///     public String getObjectId();
+/// }
 /// ```
 ///
 /// The `getVersion()` method returns the current version of the object allowing the

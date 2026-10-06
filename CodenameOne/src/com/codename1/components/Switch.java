@@ -81,8 +81,8 @@ import java.util.Collection;
 ///
 /// **CSS used in the Android native theme:**
 ///
-/// ```java
-/// `#Constants {
+/// ```css
+/// #Constants {
 /// ...
 /// switchThumbPaddingInt: 2;
 /// switchThumbScaleY: "1.5";
@@ -91,7 +91,8 @@ import java.util.Collection;
 /// switchTrackOffOutlineWidthMM: "0";
 /// switchTrackOnOutlineWidthMM: "0";
 /// switchTrackOffOutlineColor: "cccccc";
-/// switchThumbInsetMM: "0";`
+/// switchThumbInsetMM: "0";
+/// }
 /// Switch {
 /// color: rgb(237, 237, 237);
 /// background-color: rgb(159, 158, 158);
@@ -101,13 +102,12 @@ import java.util.Collection;
 /// color: rgb(34,44,50);
 /// background-color: rgb(117, 126, 132);
 /// }
-/// }
 /// ```
 ///
 /// **CSS used in the iOS native theme:**
 ///
-/// ```java
-/// `#Constants {
+/// ```css
+/// #Constants {
 /// ...
 /// switchThumbPaddingInt: 2;
 /// switchThumbScaleY: "1.4";
@@ -116,7 +116,8 @@ import java.util.Collection;
 /// switchTrackOffOutlineWidthMM: "0.25";
 /// switchTrackOnOutlineWidthMM: "0";
 /// switchTrackOffOutlineColor: "cccccc";
-/// switchThumbInsetMM: "0.25";`
+/// switchThumbInsetMM: "0.25";
+/// }
 /// Switch {
 /// color: white;
 /// background-color: white;
@@ -126,7 +127,6 @@ import java.util.Collection;
 /// color: white;
 /// background-color: rgb(61, 216, 76);
 ///
-/// }
 /// }
 /// ```
 ///

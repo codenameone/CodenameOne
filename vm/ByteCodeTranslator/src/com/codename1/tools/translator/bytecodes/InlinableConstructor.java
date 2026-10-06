@@ -32,7 +32,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * LEVER B (perf-tier1): inline a SMALL, leaf-ish constructor body as direct field

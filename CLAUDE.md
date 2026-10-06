@@ -111,8 +111,9 @@ To use locally-built version, edit the generated `pom.xml`:
 PR CI (`.github/workflows/pr.yml`, Java 8 leg) runs SpotBugs over
 `core-unittests`, `android`, `ios`, `ByteCodeTranslator`,
 `codenameone-maven-plugin`, `build-engine` (the Maven-free build logic both
-build plugins share), `project-model` (the project-layout API) and
-`codenameone-gradle-plugin`, then enforces the result in
+build plugins share), `project-model` (the project-layout API),
+`codenameone-gradle-plugin` and `javac` (the in-tree Java compiler,
+`vm/JavaCompiler`), then enforces the result in
 `.github/scripts/generate-quality-report.py`.
 
 - **SpotBugs is a zero-findings gate.** *Any* finding of *any* pattern in *any*
@@ -123,7 +124,7 @@ build plugins share), `project-model` (the project-layout API) and
   (`maven/core-unittests/`, `Ports/Android/`, `Ports/iOSPort/`,
   `vm/ByteCodeTranslator/`, `maven/codenameone-maven-plugin/`,
   `maven/build-engine/`, `maven/project-model/`,
-  `maven/codenameone-gradle-plugin/`), scoped to the
+  `maven/codenameone-gradle-plugin/`, `maven/javac/`), scoped to the
   class or method it applies to and with a comment explaining why. Keep the
   generated report at zero rather than tolerating known noise.
 - PMD and Checkstyle still gate on their own lists in the same script.
@@ -133,7 +134,7 @@ To reproduce the SpotBugs gate locally:
 ```bash
 source tools/env.sh   # JDK 8
 cd maven && mvn -B -DskipTests=true -Pcompile-android \
-  -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin -am verify
+  -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,javac -am verify
 mvn -B -DunitTests -DskipTests=true -pl core-unittests verify
 mvn -B -DskipTests=true -f ../vm/ByteCodeTranslator/pom.xml verify
 ```

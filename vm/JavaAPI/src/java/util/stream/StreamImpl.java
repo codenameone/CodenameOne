@@ -24,25 +24,36 @@ package java.util.stream;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /** Lazy fallback for pipelines whose source or callbacks cannot be specialized. */
 final class StreamImpl<T> implements Stream<T> {
     private static final int SOURCE = 0, FILTER = 1, MAP = 2, SORTED = 3,
-            DISTINCT = 4, LIMIT = 5, SKIP = 6;
+            DISTINCT = 4, LIMIT = 5, SKIP = 6, FLATMAP = 7, PEEK = 8;
 
     private static final class Source {
         final List<?> values;
         boolean closed;
+        /** onClose handlers, shared by every stage of the pipeline, run once by the first close(). */
+        List<Runnable> closeHandlers;
+        /**
+         * The pipeline's flatMap cursors. A cursor holds the mapped stream it is reading until
+         * that stream runs out, so one left mid-way by an iterator the caller stopped using
+         * would never close it; close() releases them all.
+         */
+        List<Cursor> flatMapCursors;
         Source(List<?> values) { this.values = values; }
     }
 
@@ -90,6 +101,22 @@ final class StreamImpl<T> implements Stream<T> {
     }
 
     public Stream<T> sorted() { return new StreamImpl<T>(this, SORTED, null, 0); }
+
+    public Stream<T> sorted(Comparator<? super T> comparator) {
+        // A null comparator is an error, not natural order: SORTED with a null callback means sorted().
+        require(comparator);
+        return new StreamImpl<T>(this, SORTED, comparator, 0);
+    }
+
+    public <R> Stream<R> flatMap(Function<? super T, ? extends Stream<? extends R>> mapper) {
+        require(mapper);
+        return new StreamImpl<R>(this, FLATMAP, mapper, 0);
+    }
+
+    public Stream<T> peek(Consumer<? super T> action) {
+        require(action);
+        return new StreamImpl<T>(this, PEEK, action, 0);
+    }
     public Stream<T> distinct() { return new StreamImpl<T>(this, DISTINCT, null, 0); }
 
     public Stream<T> limit(long maxSize) {
@@ -113,6 +140,9 @@ final class StreamImpl<T> implements Stream<T> {
         private boolean ready;
         private boolean exhausted;
         private Object next;
+        private Iterator<?> inner;
+        /** The stream flatMap's mapper returned, closed once its elements are used (as the JDK does). */
+        private Stream<?> innerStream;
 
         Cursor(Iterator<?> input, int operation, Object callback, long amount) {
             this.input = input;
@@ -132,7 +162,11 @@ final class StreamImpl<T> implements Stream<T> {
             if (operation == SORTED && !sorted) {
                 List<Object> values = new ArrayList<Object>();
                 while (input.hasNext()) values.add(input.next());
-                Collections.sort((List) values);
+                if (callback == null) {
+                    Collections.sort((List) values);
+                } else {
+                    Collections.sort(values, (Comparator<Object>) callback);
+                }
                 input = values.iterator();
                 sorted = true;
             }
@@ -142,8 +176,26 @@ final class StreamImpl<T> implements Stream<T> {
                     remaining--;
                 }
             }
+            if (operation == FLATMAP) {
+                while (true) {
+                    if (inner != null && inner.hasNext()) {
+                        next = inner.next();
+                        ready = true;
+                        return true;
+                    }
+                    closeInner();
+                    if (!input.hasNext()) {
+                        exhausted = true;
+                        return false;
+                    }
+                    Stream<?> s = (Stream<?>) ((Function<Object, Object>) callback).apply(input.next());
+                    innerStream = s;
+                    inner = s == null ? null : s.iterator();
+                }
+            }
             while (input.hasNext()) {
                 Object value = input.next();
+                if (operation == PEEK) ((Consumer<Object>) callback).accept(value);
                 if (operation == FILTER && !((Predicate<Object>) callback).test(value)) continue;
                 if (operation == DISTINCT) {
                     if (seen == null) seen = new HashSet<Object>();
@@ -168,11 +220,64 @@ final class StreamImpl<T> implements Stream<T> {
         }
 
         public void remove() { throw new UnsupportedOperationException(); }
+
+        private void closeInner() {
+            if (innerStream != null) {
+                Stream<?> s = innerStream;
+                innerStream = null;
+                inner = null;
+                s.close();
+            }
+        }
+
+        /**
+         * A terminal operation ended -- early, or by an exception from a callback: close the
+         * mapped streams still open upstream. Every terminal operation calls it in a finally.
+         */
+        void release(Throwable primary) {
+            // Every open mapped stream up the pipeline is closed even when one close throws.
+            // A close failure never replaces the exception that ended the traversal: it is
+            // added to it as suppressed, as the JDK's try-with-resources does; with no such
+            // exception the first close failure is thrown, the rest suppressed into it.
+            Throwable first = null;
+            Cursor c = this;
+            while (c != null) {
+                try {
+                    c.closeInner();
+                } catch (Throwable t) {
+                    if (first == null) {
+                        first = t;
+                    } else if (first != t) {
+                        first.addSuppressed(t);
+                    }
+                }
+                c = c.input instanceof Cursor ? (Cursor) c.input : null;
+            }
+            if (first == null) {
+                return;
+            }
+            if (primary == null) {
+                StreamImpl.<RuntimeException>rethrow(first);
+            } else if (primary != first) {
+                primary.addSuppressed(first);
+            }
+        }
+    }
+
+    private static void release(Iterator<?> values, Throwable failure) {
+        if (values instanceof Cursor) {
+            ((Cursor) values).release(failure);
+        }
     }
 
     private Iterator<?> open() {
         if (operation == SOURCE) return new Cursor(source.values.iterator(), SOURCE, null, 0);
-        return new Cursor(upstream.open(), operation, callback, amount);
+        Cursor cursor = new Cursor(upstream.open(), operation, callback, amount);
+        if (operation == FLATMAP) {
+            if (source.flatMapCursors == null) source.flatMapCursors = new ArrayList<Cursor>();
+            source.flatMapCursors.add(cursor);
+        }
+        return cursor;
     }
 
     @SuppressWarnings("unchecked")
@@ -184,56 +289,279 @@ final class StreamImpl<T> implements Stream<T> {
     public void forEach(Consumer<? super T> action) {
         require(action);
         Iterator<T> values = iterator();
-        while (values.hasNext()) action.accept(values.next());
+        Throwable failure = null;
+        try {
+            while (values.hasNext()) action.accept(values.next());
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
     }
 
     public Object[] toArray() {
         List<T> result = new ArrayList<T>();
         Iterator<T> values = iterator();
-        while (values.hasNext()) result.add(values.next());
-        return result.toArray();
+        Throwable failure = null;
+        try {
+            while (values.hasNext()) result.add(values.next());
+            return result.toArray();
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
     }
 
     public T reduce(T identity, BinaryOperator<T> accumulator) {
         require(accumulator);
         Iterator<T> values = iterator();
-        T result = identity;
-        while (values.hasNext()) result = accumulator.apply(result, values.next());
-        return result;
+        Throwable failure = null;
+        try {
+            T result = identity;
+            while (values.hasNext()) result = accumulator.apply(result, values.next());
+            return result;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
     }
 
     public <A, R> R collect(Collector<? super T, A, R> collector) {
         require(collector);
         Iterator<T> values = iterator();
-        A container = collector.supplier().get();
-        BiConsumer<A, ? super T> accumulator = collector.accumulator();
-        while (values.hasNext()) accumulator.accept(container, values.next());
-        return collector.finisher().apply(container);
+        Throwable failure = null;
+        try {
+            A container = collector.supplier().get();
+            BiConsumer<A, ? super T> accumulator = collector.accumulator();
+            while (values.hasNext()) accumulator.accept(container, values.next());
+            return collector.finisher().apply(container);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
     }
 
     public long count() {
         Iterator<T> values = iterator();
-        long count = 0;
-        while (values.hasNext()) { values.next(); count++; }
-        return count;
+        Throwable failure = null;
+        try {
+            long count = 0;
+            while (values.hasNext()) { values.next(); count++; }
+            return count;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
     }
 
     public boolean anyMatch(Predicate<? super T> predicate) {
         require(predicate);
         Iterator<T> values = iterator();
-        while (values.hasNext()) if (predicate.test(values.next())) return true;
-        return false;
+        Throwable failure = null;
+        try {
+            boolean found = false;
+            while (!found && values.hasNext()) found = predicate.test(values.next());
+            return found;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
     }
 
     public boolean allMatch(Predicate<? super T> predicate) {
         require(predicate);
         Iterator<T> values = iterator();
-        while (values.hasNext()) if (!predicate.test(values.next())) return false;
-        return true;
+        Throwable failure = null;
+        try {
+            boolean all = true;
+            while (all && values.hasNext()) all = predicate.test(values.next());
+            return all;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
     }
 
     public boolean noneMatch(Predicate<? super T> predicate) { return !anyMatch(predicate); }
+
+    public Optional<T> findFirst() {
+        Iterator<T> values = iterator();
+        Throwable failure = null;
+        try {
+            Optional<T> first = values.hasNext() ? Optional.of(values.next()) : Optional.<T>empty();
+            return first;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
+    }
+
+    public Optional<T> findAny() { return findFirst(); }
+
+    public Optional<T> min(Comparator<? super T> comparator) {
+        require(comparator);
+        Iterator<T> values = iterator();
+        Throwable failure = null;
+        try {
+            if (!values.hasNext()) return Optional.<T>empty();
+            T best = values.next();
+            while (values.hasNext()) {
+                T v = values.next();
+                if (comparator.compare(v, best) < 0) best = v;
+            }
+            return Optional.of(best);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
+    }
+
+    public Optional<T> max(Comparator<? super T> comparator) {
+        require(comparator);
+        Iterator<T> values = iterator();
+        Throwable failure = null;
+        try {
+            if (!values.hasNext()) return Optional.<T>empty();
+            T best = values.next();
+            while (values.hasNext()) {
+                T v = values.next();
+                if (comparator.compare(v, best) > 0) best = v;
+            }
+            return Optional.of(best);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
+    }
+
+    public Optional<T> reduce(BinaryOperator<T> accumulator) {
+        require(accumulator);
+        Iterator<T> values = iterator();
+        Throwable failure = null;
+        try {
+            if (!values.hasNext()) return Optional.<T>empty();
+            T result = values.next();
+            while (values.hasNext()) result = accumulator.apply(result, values.next());
+            return Optional.of(result);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
+    }
+
+    public <R> R collect(Supplier<R> supplier, BiConsumer<R, ? super T> accumulator, BiConsumer<R, R> combiner) {
+        require(supplier);
+        require(accumulator);
+        // Never called on a sequential stream, but required all the same, as on the JDK.
+        require(combiner);
+        R container = supplier.get();
+        Iterator<T> values = iterator();
+        Throwable failure = null;
+        try {
+            while (values.hasNext()) accumulator.accept(container, values.next());
+            return container;
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
+    }
+
+    public List<T> toList() {
+        List<T> result = new ArrayList<T>();
+        Iterator<T> values = iterator();
+        Throwable failure = null;
+        try {
+            while (values.hasNext()) result.add(values.next());
+            return Collections.unmodifiableList(result);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
+        } finally {
+            release(values, failure);
+        }
+    }
     public Stream<T> sequential() { return this; }
     public Stream<T> parallel() { return this; }
-    public void close() { source.closed = true; linkedOrConsumed = true; }
+    public Stream<T> onClose(Runnable closeHandler) {
+        require(closeHandler);
+        if (linkedOrConsumed || source.closed) throw new IllegalStateException();
+        if (source.closeHandlers == null) source.closeHandlers = new ArrayList<Runnable>();
+        source.closeHandlers.add(closeHandler);
+        return this;
+    }
+
+    /** Runs every handler even when one throws; the first failure is rethrown with the rest suppressed. */
+    public void close() {
+        linkedOrConsumed = true;
+        if (source.closed) return;
+        source.closed = true;
+        Throwable failure = null;
+        // Mapped streams a stopped iterator still holds come first (the JDK has closed them
+        // by now: it reads each one to the end as soon as it opens it), then the handlers.
+        List<Cursor> cursors = source.flatMapCursors;
+        source.flatMapCursors = null;
+        if (cursors != null) {
+            for (int i = 0; i < cursors.size(); i++) {
+                Cursor cursor = cursors.get(i);
+                try {
+                    cursor.release(null);
+                } catch (Throwable t) {
+                    if (failure == null) {
+                        failure = t;
+                    } else if (failure != t) {
+                        failure.addSuppressed(t);
+                    }
+                }
+            }
+        }
+        List<Runnable> handlers = source.closeHandlers;
+        source.closeHandlers = null;
+        for (int i = 0; handlers != null && i < handlers.size(); i++) {
+            // Fetched outside the try: the generic get() is a checkcast, which ParparVM does not
+            // check, so it must never sit under a handler that would catch its failure.
+            Runnable handler = handlers.get(i);
+            try {
+                handler.run();
+            } catch (Throwable t) {
+                if (failure == null) {
+                    failure = t;
+                } else if (failure != t) {
+                    failure.addSuppressed(t);
+                }
+            }
+        }
+        if (failure != null) {
+            // A handler can throw a checked exception (a generic "sneaky throw"); it is rethrown
+            // as it is, never dropped, as the JDK's close() does.
+            StreamImpl.<RuntimeException>rethrow(failure);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> void rethrow(Throwable t) throws E {
+        throw (E) t;
+    }
 }

@@ -36,12 +36,14 @@ import java.lang.annotation.Target;
 ///
 /// ```java
 /// public final class PhoneConstraint implements Constraint {
-///     public boolean isValid(Object value) { ... }
+///     public boolean isValid(Object value) { /* ... */ }
 ///     public String getDefaultFailMessage() { return "Bad phone number"; }
 /// }
 ///
-/// @Bind(name="phoneField") @Validate(PhoneConstraint.class)
-/// private String phone;
+/// public class ContactForm {
+///     @Bind(name="phoneField") @Validate(PhoneConstraint.class)
+///     private String phone;
+/// }
 /// ```
 ///
 /// Stacks with the canned annotations -- `@Required @Validate(MyExtra.class)`

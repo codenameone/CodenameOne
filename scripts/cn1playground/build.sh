@@ -27,13 +27,13 @@ function linux_device {
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=linux" "-Dcodename1.buildTarget=linux-device" "-U" "-e"
 }
 function javascript {
-  # The Playground's bean-shell registry keeps nearly the whole Codename One
-  # API reachable, so the ParparVM JS Rapid Type Analysis (RTA) tree-shaking
-  # pass cannot prune much yet runs for well over an hour. Disable RTA
-  # (parparvm.js.rta.off); the resulting un-pruned bundle is large, so give
-  # the translator a bigger heap than the 512m default to avoid an
-  # OutOfMemoryError mid-emit. See README.md "JavaScript Port".
-  CN1_TRANSLATOR_OPTS="${CN1_TRANSLATOR_OPTS:--Dparparvm.js.rta.off -Xmx6g}" \
+  # The Playground compiles user code in the browser and loads it into its own
+  # running VM, so the bundle is OPEN-WORLD for the API user code may call: every
+  # class under these prefixes keeps all its methods, fields and dispatch entries
+  # under its canonical function names (see JavascriptOpenWorld in the
+  # translator). Everything else -- the compiler and translator themselves, the
+  # port implementation -- is culled as usual. See README.md "JavaScript Port".
+  CN1_TRANSLATOR_OPTS="${CN1_TRANSLATOR_OPTS:-$(cat "$(dirname "$0")/javascript/translator-opts.txt")}" \
     "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=local-javascript" "-U" "-e"
 }
 function javascript_compare {

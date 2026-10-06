@@ -126,6 +126,43 @@ class BundleTest(unittest.TestCase):
                                            platform_filters={'foojay': accepts}))
 
 
+class DeveloperGuideImageTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.docs = Path(self.temp.name) / "docs"
+        self.static = self.docs / "website/static"
+        self.source = self.docs / "developer-guide/img"
+        (self.static / "blog").mkdir(parents=True)
+        self.source.mkdir(parents=True)
+        (self.static / "blog/cover.jpg").write_bytes(JPEG)
+        (self.source / "settings.png").write_bytes(b"guide-image")
+
+    def test_bundle_reads_guide_source_without_website_build(self):
+        p = post()
+        p.body = '![Cover](/blog/cover.jpg)\n![Settings](/developer-guide/img/settings.png)'
+        with patch('syndicate_foojay_posts.urllib.request.urlopen') as network:
+            files = build_bundle(p, [], TODAY, self.static)
+        self.assertIn(b"guide-image", files.values())
+        self.assertIn('![Settings](settings-', files['draft/friday/index.md'].decode())
+        network.assert_not_called()
+
+    def test_generated_static_image_takes_precedence(self):
+        generated = self.static / "developer-guide/img/settings.png"
+        generated.parent.mkdir(parents=True)
+        generated.write_bytes(b"generated-image")
+        self.assertEqual(b"generated-image", read_image(
+            'https://www.codenameone.com/developer-guide/img/settings.png', self.static))
+
+    def test_source_lookup_rejects_traversal_and_symlinks(self):
+        (self.docs / "developer-guide/private.png").write_bytes(b"private")
+        (self.source / "outside.png").symlink_to(self.docs / "developer-guide/private.png")
+        for path in ['%2e%2e/private.png', 'outside.png']:
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, 'escapes'):
+                read_image('https://www.codenameone.com/developer-guide/img/' + path,
+                           self.static)
+
+
 class SubmissionTest(unittest.TestCase):
     def fake(self, *, existing=None, duplicate=False, ref=None, branch_tree=None):
         github = Mock()

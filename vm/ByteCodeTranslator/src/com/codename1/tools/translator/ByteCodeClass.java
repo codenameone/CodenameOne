@@ -46,7 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * Parsed class file
@@ -365,6 +365,11 @@ public class ByteCodeClass {
                 continue;
             }
             if(bc.clsName.equals("java_lang_Boolean")) {
+                bc.markDependent(lst);
+                continue;
+            }
+            // Open-world output: classes code translated later may call are roots.
+            if(JavascriptOpenWorld.keepsClass(bc.clsName)) {
                 bc.markDependent(lst);
                 continue;
             }
@@ -2859,7 +2864,10 @@ public class ByteCodeClass {
             return;
         }
         for(BytecodeMethod m : baseInterface.methods) {
-            if(m.isStatic() || m.isPrivate()) {
+            // An eliminated method has no virtual_ dispatcher (the vtable list leaves it
+            // out), so a forwarding wrapper for it would call an undeclared function.
+            // Nothing calls it either: the cull removed it for having no caller.
+            if(m.isStatic() || m.isPrivate() || m.isEliminated()) {
                 continue;
             }
             if(!bm.contains(m)) {
@@ -2888,7 +2896,7 @@ public class ByteCodeClass {
             return;
         }
         for(BytecodeMethod m : baseInterface.methods) {
-            if(m.isStatic() || m.isPrivate()) {
+            if(m.isStatic() || m.isPrivate() || m.isEliminated()) {
                 continue;
             }
             if(!bm.contains(m)) {

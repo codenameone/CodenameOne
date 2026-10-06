@@ -28,13 +28,11 @@ J8="${JDK_8_HOME:?set JDK_8_HOME to a working JDK 8}"
 OUT="$REPO/vm/selfhost/target"
 TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
 JAVAAPI="$OUT/javaapi-classes"
-ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt"
-if [ ! -f "$JAVAAPI/java/lang/Object.class" ] || [ ! -f "$ASM_CP_FILE" ] || \
+if [ ! -f "$JAVAAPI/java/lang/Object.class" ] || \
    [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" ]; then
-    echo "build-bench.sh: run build-selfhost.sh first (JavaAPI, translator or ASM classpath missing)"
+    echo "build-bench.sh: run build-selfhost.sh first (JavaAPI or translator missing)"
     exit 1
 fi
-ASM_CP="$(cat "$ASM_CP_FILE")"
 
 # 1. The benchmark classes, against JavaAPI alone -- the same bootclasspath the
 #    translator's own sources are held to, so nothing outside the VM's library slips in.
@@ -47,7 +45,7 @@ rm -rf "$OUT/bench-classes"; mkdir -p "$OUT/bench-classes"
 # 2. translate with the JVM translator, as build-selfhost.sh does.
 APP=Bench
 rm -rf "$OUT/bench-out"; mkdir -p "$OUT/bench-out"
-"$J8/bin/java" -Xmx2g -cp "$(native_path "$TRANSLATOR")$CPSEP$ASM_CP" \
+"$J8/bin/java" -Xmx2g -cp "$(native_path "$TRANSLATOR")" \
     com.codename1.tools.translator.ByteCodeTranslator \
     clean "$(native_path "$JAVAAPI");$(native_path "$OUT/bench-classes")" \
     "$(native_path "$OUT/bench-out")" "$APP" com.bench "$APP" 1.0 clean none \

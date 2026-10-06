@@ -115,6 +115,7 @@ import com.codename1.ui.Component;
 /// as alternative and more customizable approach than using the Capture API:
 ///
 /// ```java
+/// public class AudioRecordingDemo {
 ///     private static final EasyThread countTime = EasyThread.start("countTime");
 ///
 ///     public void start() {
@@ -314,6 +315,7 @@ import com.codename1.ui.Component;
 ///     private static void stopWatch(Label label) {
 ///         label.putClientProperty("stopTime", Boolean.TRUE);
 ///     }
+/// }
 /// ```
 ///
 /// #### See also

@@ -20,97 +20,72 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-
-/// An exception unwinding through a finally must reach the caller. The
-/// translator's dead-case pass stripped the case label of every catch-all
-/// handler -- a finally, a synchronized block's release -- so the throw was
-/// dispatched to a pc with no case, fell to "default: return" and vanished, and
-/// the method returned normally. Shaped like ConnectionRequest's
-/// performOperationComplete, where it dropped every network failure on the
-/// browser: a typed catch that rethrows, inside a try/finally, around a call
-/// that suspends.
 public class JsFinallyRethrowApp {
     public static int result;
-    static int cleanups;
-    static Object pending;
-    static final Object LOCK = new Object();
+    static boolean enabled = true;
+    static Object field = new Object();
+    static int finallyRuns;
+    static int sum;
 
-    static void fail(int n) throws java.io.IOException {
-        Thread.yield();
-        if (n >= 0) {
-            throw new java.io.IOException("boom " + n);
-        }
+    static void boom() {
+        throw new RuntimeException("boom");
     }
 
-    static boolean rethrowsThroughFinally(int n) throws java.io.IOException {
-        String state = "start";
+    static boolean check() {
+        return sum >= 0;
+    }
+
+    static void use(Object a, int x, int y) {
+        sum += x + y;
+    }
+
+    // The shape of Form.pointerReleased: several returns inside the try and a
+    // conditional finally. The exception passing through the finally is caught by
+    // a catch-any entry, which is the one that must be rethrown to the caller.
+    static void f(int x, int y) {
+        final boolean h = check();
         try {
-            for (int iter = 0 ; iter < 3 ; iter++) {
-                state = state + iter;
-                Thread.yield();
+            if (x == 1) {
+                boom();
+                return;
             }
-            fail(n);
-            return true;
-        } catch (java.io.IOException err) {
-            if (pending != null) {
-                java.io.IOException other = (java.io.IOException) pending;
-                pending = null;
-                throw other;
+            if (x == 2) {
+                sum++;
+                return;
             }
-            throw err;
+            boom();
         } finally {
-            cleanups++;
-            state = null;
-        }
-    }
-
-    static boolean plainFinally(int n) throws java.io.IOException {
-        try {
-            Thread.yield();
-            fail(n);
-            return true;
-        } finally {
-            cleanups++;
-        }
-    }
-
-    static boolean throughSynchronized(int n) throws java.io.IOException {
-        synchronized (LOCK) {
-            Thread.yield();
-            fail(n);
-            return true;
+            finallyRuns++;
+            field = null;
+            if (h && enabled && check()) {
+                use(field, x, y);
+            }
         }
     }
 
     public static void main(String[] args) {
-        int score = 0;
-        try {
-            rethrowsThroughFinally(1);
-        } catch (java.io.IOException expected) {
-            if ("boom 1".equals(expected.getMessage())) {
-                score |= 1;
+        int mask = 0;
+        for (int x = 1; x <= 3; x++) {
+            try {
+                f(x, 7);
+                if (x == 2) {
+                    mask |= 2;
+                }
+            } catch (RuntimeException e) {
+                if (x == 1 && "boom".equals(e.getMessage())) {
+                    mask |= 1;
+                }
+                if (x == 3 && "boom".equals(e.getMessage())) {
+                    mask |= 4;
+                }
             }
         }
-        try {
-            plainFinally(2);
-        } catch (java.io.IOException expected) {
-            score |= 2;
+        if (finallyRuns == 3) {
+            mask |= 8;
         }
-        try {
-            throughSynchronized(3);
-        } catch (java.io.IOException expected) {
-            score |= 4;
+        if (sum == 1 + (1 + 7) + (2 + 7) + (3 + 7)) {
+            mask |= 16;
         }
-        try {
-            if (rethrowsThroughFinally(-1)) {
-                score |= 8;
-            }
-        } catch (java.io.IOException unexpected) {
-            score = -100;
-        }
-        if (cleanups == 3) {
-            score |= 16;
-        }
-        result = score;
+        result = mask;
     }
 }

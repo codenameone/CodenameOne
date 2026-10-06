@@ -25,9 +25,6 @@ package com.codename1.tools.translator;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -96,10 +93,10 @@ final class JavascriptSecurityHeaders {
     static void write(File outputDirectory) throws IOException {
         File index = new File(outputDirectory, "index.html");
         String html = index.isFile()
-                ? new String(Files.readAllBytes(index.toPath()), StandardCharsets.UTF_8) : "";
+                ? Util.readUtf8(index) : "";
         File bridge = new File(outputDirectory, "browser_bridge.js");
         String bridgeSource = bridge.isFile()
-                ? new String(Files.readAllBytes(bridge.toPath()), StandardCharsets.UTF_8) : "";
+                ? Util.readUtf8(bridge) : "";
         String csp = contentSecurityPolicy(html, bridgeSource);
 
         // Everything goes in a directory of its own, including `_headers`, and that directory
@@ -133,8 +130,7 @@ final class JavascriptSecurityHeaders {
             netlifyHeaders(csp), nginxHeaders(csp), apacheHeaders(csp), readme(csp),
         };
         for (int iter = 0; iter < names.length; iter++) {
-            Files.write(new File(guidance, names[iter]).toPath(),
-                    contents[iter].getBytes(StandardCharsets.UTF_8));
+            Util.writeUtf8(new File(guidance, names[iter]), contents[iter]);
         }
     }
 
@@ -146,6 +142,12 @@ final class JavascriptSecurityHeaders {
      */
     static String contentSecurityPolicy(String html, String bridgeSource) {
         StringBuilder scriptSources = new StringBuilder("'self' 'wasm-unsafe-eval'");
+        if (JavascriptOpenWorld.isEnabled()) {
+            // An open-world bundle loads code translated while it runs (the Playground
+            // compiles user code in the browser) by importScripts() of a blob: URL in the
+            // VM worker. Only such bundles get this; everything else keeps 'self'.
+            scriptSources.append(" blob:");
+        }
         for (String hash : hashesOf(html, "script")) {
             scriptSources.append(" '").append(hash).append('\'');
         }
@@ -287,13 +289,7 @@ final class JavascriptSecurityHeaders {
      * template it came from.</p>
      */
     static String sha256(String body) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(body.getBytes(StandardCharsets.UTF_8));
-            return "sha256-" + base64(hash);
-        } catch (java.security.NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException("SHA-256 is unavailable", impossible);
-        }
+        return "sha256-" + base64(Sha256.digest(Util.utf8(body)));
     }
 
     private static String base64(byte[] data) {
@@ -342,7 +338,7 @@ final class JavascriptSecurityHeaders {
         b.append("# Netlify and Cloudflare Pages read this file verbatim; see the README.md "
                 + "beside it in the build output.\n");
         b.append("/*\n");
-        String[] lines = commonHeaders().split("\n");
+        String[] lines = com.codename1.tools.translator.regex.Pattern.compile("\n").split(commonHeaders());
         for (int iter = 0; iter < lines.length; iter++) {
             b.append("  ").append(lines[iter]).append('\n');
         }

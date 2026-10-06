@@ -51,7 +51,7 @@ class JavascriptRuntimeSemanticsTest {
     void anExceptionUnwindingThroughAFinallyReachesTheCaller(CompilerHelper.CompilerConfig config) throws Exception {
         // The catch-all handler's case label used to be stripped as dead, so the
         // throw vanished at the finally and the method returned normally.
-        WorkerRunResult result = translateAndRunFixture(config, "JsFinallyRethrowApp.java", "JsFinallyRethrowApp");
+        WorkerRunResult result = translateAndRunFixture(config, "JsSuspendedRethrowApp.java", "JsSuspendedRethrowApp");
         assertEquals(31, result.result, "an exception through a finally or synchronized block was lost: "
                 + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty());
@@ -80,6 +80,86 @@ class JavascriptRuntimeSemanticsTest {
 
         assertEquals(511, result.result,
                 "parseDouble must apply the exponent split out by StringToReal (1.4 must not resolve to 14). raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void stringLiteralsShapedLikeEmittedCodeSurviveThePeepholePasses(CompilerHelper.CompilerConfig config) throws Exception {
+        // The per-method peephole passes are regex rewrites over the emitted text,
+        // and literals were inside it: "stack.p(x); stack.p(y); {...}" came out as
+        // "stack.p((x|0)+(y|0));". Found when the translator translated itself and
+        // its own pattern strings were rewritten. 15 is every literal intact.
+        WorkerRunResult result = translateAndRunFixture(config, "JsStringLiteralIntegrityApp.java", "JsStringLiteralIntegrityApp");
+
+        assertEquals(15, result.result,
+                "string literals must reach the program unmodified. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void intMultiplicationKeepsTheLow32BitsOfLargeProducts(CompilerHelper.CompilerConfig config) throws Exception {
+        // IMUL was emitted as (a|0) * (b|0): a product past 2^53 is rounded as a
+        // double before the truncation, so hashes and PRNGs that multiply by large
+        // constants diverged from the JVM. Found by the self-hosted translator, whose
+        // local-variable minifier ranked identifiers differently under JavaScript.
+        WorkerRunResult result = translateAndRunFixture(config, "JsIntMultiplyApp.java", "JsIntMultiplyApp");
+
+        assertEquals(31, result.result,
+                "int multiplication must keep Java's 32-bit wraparound. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void exceptionsPassThroughAFinallyOnBothEmitters(CompilerHelper.CompilerConfig config) throws Exception {
+        // The pc-switch emitter's dead-case-label pass read the try table with a
+        // pattern that required a comma after the handler pc. A finally's catch-any
+        // entry has no type and ends "h:N}", so its handler label was kept only by
+        // coincidence; where the handler began with a line number the label was
+        // stripped, the rethrow dispatched to "default: return" and the exception
+        // vanished. Every exception an action listener threw was lost that way in
+        // Form.pointerReleased. 31 is every property; run once structured and once
+        // with f forced onto the pc-switch emitter, which is where the bug lived.
+        WorkerRunResult structured = translateAndRunFixture(config, "JsFinallyRethrowApp.java", "JsFinallyRethrowApp");
+        assertEquals(31, structured.result,
+                "structured emitter: exceptions must propagate through a finally. raw="
+                        + structured.rawMessage + " err=" + structured.errorMessage);
+
+        String prevSkip = System.getProperty("parparvm.js.structured.skip");
+        System.setProperty("parparvm.js.structured.skip", "JsFinallyRethrowApp.f");
+        WorkerRunResult interpreted;
+        try {
+            interpreted = translateAndRunFixture(config, "JsFinallyRethrowApp.java", "JsFinallyRethrowApp");
+        } finally {
+            if (prevSkip == null) {
+                System.clearProperty("parparvm.js.structured.skip");
+            } else {
+                System.setProperty("parparvm.js.structured.skip", prevSkip);
+            }
+        }
+        assertEquals(31, interpreted.result,
+                "pc-switch emitter: exceptions must propagate through a finally. raw="
+                        + interpreted.rawMessage + " err=" + interpreted.errorMessage);
+        assertTrue(interpreted.errorMessage == null || interpreted.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void latin1StringsAndUtf8BytesKeepJavaSemantics(CompilerHelper.CompilerConfig config) throws Exception {
+        // Two runtime defects the self-hosted translator found by translating the CN1
+        // core in JavaScript and diffing the result against the JVM: a String built at
+        // runtime from Latin-1 characters (stored as a signed byte[]) read back with
+        // U+FFxx characters, and String.getBytes answered unsigned bytes. Each bit of
+        // the fixture's result is one property; 127 is all of them.
+        WorkerRunResult result = translateAndRunFixture(config, "JsLatin1StringApp.java", "JsLatin1StringApp");
+
+        assertEquals(127, result.result,
+                "Latin-1 strings and UTF-8 bytes must keep Java semantics. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }

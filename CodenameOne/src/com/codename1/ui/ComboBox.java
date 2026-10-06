@@ -82,7 +82,7 @@ import java.util.Vector;
 /// ```java
 /// public void showForm() {
 ///   Form hi = new Form("ComboBox", new BoxLayout(BoxLayout.Y_AXIS));
-///   ComboBox> combo = new ComboBox<> (
+///   ComboBox<Map<String, Object>> combo = new ComboBox<> (
 ///           createListEntry("A Game of Thrones", "1996"),
 ///           createListEntry("A Clash Of Kings", "1998"),
 ///           createListEntry("A Storm Of Swords", "2000"),

@@ -71,34 +71,6 @@ if [ ! -f "$TRANSLATOR_STAMP" ] \
               -newer "$TRANSLATOR_STAMP" -print -quit)" ]; then
     (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am package -DskipTests)
 fi
-ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/bench-asm-classpath.txt"
-# The cached file holds ABSOLUTE paths into whichever maven repo generated it, so a
-# copy from another machine -- or one written before the repo moved -- points at
-# jars that are not there. Reusing it blindly fails much later as
-# "NoClassDefFoundError: org/objectweb/asm/ClassVisitor", which names neither the
-# cache nor the missing jar. Check every entry and regenerate when one is gone.
-asm_cp_valid() {
-    [ -f "$ASM_CP_FILE" ] || return 1
-    cp_value="$(cat "$ASM_CP_FILE")"
-    [ -n "$cp_value" ] || return 1
-    old_ifs="$IFS"; IFS=:
-    for entry in $cp_value; do
-        if [ ! -e "$entry" ]; then IFS="$old_ifs"; return 1; fi
-    done
-    IFS="$old_ifs"
-    return 0
-}
-if ! asm_cp_valid; then
-    command -v mvn >/dev/null 2>&1 || {
-        echo "the ASM classpath cache is missing or stale and maven is not on PATH;"
-        echo "install maven, or regenerate $ASM_CP_FILE on this machine"
-        exit 1
-    }
-    rm -f "$ASM_CP_FILE"
-    (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator dependency:build-classpath \
-        -Dmdep.outputFile=target/bench-asm-classpath.txt)
-fi
-ASM_CP="$(cat "$ASM_CP_FILE")"
 
 # the C runtime resources the translator emits from its classpath
 # cn1_sqlite3.c is synced too: it carries our build options for the bundled
@@ -255,7 +227,7 @@ fi
 # CN1_BACKEND_CHECKED_CASTS=0 turns it off to measure what it costs.
 CAST_OPT="-Dcn1.checkedCasts=true"
 if [ "${CN1_BACKEND_CHECKED_CASTS:-1}" = "0" ]; then CAST_OPT=""; fi
-"$J8/bin/java" $SQLITE_OPT $CAST_OPT $CN1_BACKEND_TRANSLATOR_OPTS -cp "$TRANSLATOR:$ASM_CP" \
+"$J8/bin/java" $SQLITE_OPT $CAST_OPT $CN1_BACKEND_TRANSLATOR_OPTS -cp "$TRANSLATOR" \
     com.codename1.tools.translator.ByteCodeTranslator \
     clean "$JAVAAPI;$WORK/classes" "$WORK/out" "$MAIN" "$PKG" "$MAIN" 1.0 clean none \
     > "$WORK/translate.log" 2>&1 || { echo "TRANSLATE FAILED"; tail -30 "$WORK/translate.log"; exit 1; }

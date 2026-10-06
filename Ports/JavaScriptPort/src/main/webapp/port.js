@@ -3222,16 +3222,11 @@ bindCiFallback("BrowserDomRenderingBackend.createCrossOriginImageElement", [
 // "Only HTTP urls are supported!". The translated Display methods already
 // handle both the local-property map and the impl delegation.
 
-bindCiFallback("Display.addEdtErrorHandler", [
-  "cn1_com_codename1_ui_Display_addEdtErrorHandler_com_codename1_ui_events_ActionListener"
-], function*(__cn1ThisObject, listener) {
-  if (!__cn1ThisObject) {
-    return null;
-  }
-  const handlers = __cn1ThisObject.__cn1EdtErrorHandlers || (__cn1ThisObject.__cn1EdtErrorHandlers = []);
-  handlers.push(listener || null);
-  return null;
-});
+// Display.addEdtErrorHandler is deliberately NOT overridden here either. A
+// fallback once stored the listener in a JS-side array that nothing read, so
+// every handler a web application installed was silently dropped and the
+// default "internal application error" dialog showed instead. The translated
+// method registers the listener where Display's EDT error path reads it.
 
 bindCiFallback("Log.print", [
   "cn1_com_codename1_io_Log_print_java_lang_String_int"
