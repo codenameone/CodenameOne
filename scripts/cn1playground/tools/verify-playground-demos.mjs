@@ -15,12 +15,13 @@ const results = [];
 let browser;
 let browserName;
 let viewport;
+let deviceScaleFactor;
 let appFrame;
 
 async function measure(page, region, kind, screenshotPath) {
   const clip = {x: Math.floor(region.x), y: Math.floor(region.y),
     width: Math.floor(region.width), height: Math.floor(region.height)};
-  const png = await page.screenshot({clip, ...(screenshotPath ? {path: screenshotPath} : {})});
+  const png = await page.screenshot({scale: 'css', clip, ...(screenshotPath ? {path: screenshotPath} : {})});
   // Decode the screenshot in an unattached canvas. Reading the app's WebGL drawing
   // buffer alone would miss overlays, clipping, placement and compositing failures.
   const decoded = await page.evaluate(async base64 => {
@@ -73,11 +74,11 @@ async function check(name, fn) {
   catch (error) { results.push({name, ok: false, error: error.message}); console.error('FAIL ' + name + ': ' + error.message); }
 }
 async function run(slug, title, width, exercise, caseName = slug) {
-  const name = browserName + '-' + caseName + '-' + width + 'x' + viewport.height;
+  const name = browserName + '-' + caseName + '-' + width + 'x' + viewport.height + '-dpr' + deviceScaleFactor;
   if (process.env.PLAYGROUND_DEMO_FILTER && !name.includes(process.env.PLAYGROUND_DEMO_FILTER)) return;
   console.log('RUN ' + name);
   appFrame = null;
-  const page = await browser.newPage({viewport, deviceScaleFactor: 1});
+  const page = await browser.newPage({viewport, deviceScaleFactor});
   page.setDefaultTimeout(15000);
   await page.addInitScript(() => {
     window.__playgroundMediaRequests = [];
@@ -109,6 +110,8 @@ async function run(slug, title, width, exercise, caseName = slug) {
       const embedded = await page.locator('iframe[title="Codename One Playground"]').elementHandles();
       appFrame = embedded.length ? await embedded[0].contentFrame() : page.mainFrame();
       assert.ok(appFrame, 'Playground frame did not load');
+      assert.equal(await appFrame.evaluate(() => window.devicePixelRatio), deviceScaleFactor,
+        'Browser must use the requested pixel ratio');
       const deadline = Date.now() + 90000;
       while (!log.some(m => m.text.startsWith('[playground]')) && Date.now() < deadline) {
         await page.waitForTimeout(100);
@@ -135,7 +138,7 @@ async function run(slug, title, width, exercise, caseName = slug) {
       gl.getExtension('WEBGL_lose_context')?.loseContext();
       return result;
     }).catch(error => ({error: error.message}));
-    fs.writeFileSync(path.join(artifacts, name + '.json'), JSON.stringify({url, browser: browserName, version: browser.version(), viewport, gpu,
+    fs.writeFileSync(path.join(artifacts, name + '.json'), JSON.stringify({url, browser: browserName, version: browser.version(), viewport, deviceScaleFactor, gpu,
       headed: process.env.PLAYGROUND_HEADED === '1', softwareGl: process.env.PLAYGROUND_SOFTWARE_GL === '1', log, runtimeErrors, controls,
       checks: results.filter(r => r.name.startsWith(name))}, null, 2));
     await page.close();
@@ -269,12 +272,15 @@ try {
       : {headless: process.env.PLAYGROUND_HEADED !== '1', firefoxUserPrefs: {'media.navigator.streams.fake': true,
         'media.navigator.permission.disabled': true,
         ...(process.env.PLAYGROUND_SOFTWARE_GL === '1' ? {'webgl.force-enabled': true} : {})}});
-    for (viewport of [{width: 1440, height: 900}, {width: 1280, height: 720}]) {
-      const width = viewport.width;
-      await run('bouncing-balls', 'Bouncing Balls', width, (p, r, n) => animatedScene(p, r, n, 'balls'));
-      await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'));
-      await run('camera-capture', 'Camera', width, cameraDemo);
-      await run('camera-capture', 'Camera', width, demoNavigation, 'demo-navigation');
+    for (deviceScaleFactor of (process.env.PLAYGROUND_DEVICE_SCALE_FACTORS || '1,2').split(',').map(Number)) {
+      assert.ok(deviceScaleFactor > 0 && Number.isFinite(deviceScaleFactor), 'Invalid device scale factor');
+      for (viewport of [{width: 1440, height: 900}, {width: 1280, height: 720}]) {
+        const width = viewport.width;
+        await run('bouncing-balls', 'Bouncing Balls', width, (p, r, n) => animatedScene(p, r, n, 'balls'));
+        await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'));
+        await run('camera-capture', 'Camera', width, cameraDemo);
+        await run('camera-capture', 'Camera', width, demoNavigation, 'demo-navigation');
+      }
     }
     await browser.close();
   }

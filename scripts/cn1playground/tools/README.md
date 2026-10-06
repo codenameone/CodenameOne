@@ -48,8 +48,11 @@ serves them inside a test page with the website's 76px header. This reproduces
 its reduced iframe height. A deployed URL can reproduce production failures,
 but does not validate local changes.
 
-The checks run in Chromium and Firefox at 1440x900 and 1280x720, derive the preview bounds from its
-accessibility tree, and examine screenshot pixels for visible scene content,
+The checks run in Chromium and Firefox at 1440x900 and 1280x720 with both 1x and
+2x (Retina) device pixel ratios. Screenshots are measured in CSS pixels so the
+assertions use the same coordinate space as the accessibility bounds. The tests
+derive the preview bounds from the accessibility tree and examine screenshot
+pixels for visible scene content,
 preview coverage, and animation. They reject blank scenes, a fixed-size scene
 painted into a corner of a larger preview, and frozen foregrounds. The cube must
 also be centered and retain its proportions. Pixel thresholds tolerate antialiasing; these are behavioral
@@ -74,11 +77,17 @@ failure. Each case writes screenshots and JSON console/error evidence; the
 aggregate `demo-results.json` records failed assertions. Without an explicit
 artifact directory, the standalone checker writes `playground-demo-artifacts/`.
 `PLAYGROUND_DEMO_FILTER=camera` runs only matching cases during iteration; an
-unknown filter fails instead of silently testing nothing. CI always runs all cases.
+unknown filter fails instead of silently testing nothing. The playground browser
+CI job runs the full matrix; the website publication gate selects the 3D cases.
 `PLAYGROUND_BROWSERS=chromium` or `firefox` narrows a local run; `chrome` uses
-an installed Google Chrome. Local runs use normal browser GPU settings.
+an installed Google Chrome. `PLAYGROUND_DEVICE_SCALE_FACTORS=1,1.5,2` can extend
+the default `1,2` matrix for fractional browser scaling. Local runs use normal browser GPU settings.
 `PLAYGROUND_HEADED=1` runs visible browsers; diagnostic JSON records the WebGL
 renderer and whether GPU overrides were requested.
 `PLAYGROUND_SOFTWARE_GL=1` explicitly enables software/forced WebGL for hosted
 Linux CI runners without hardware GPUs. The CI default runs Chromium and Firefox. A failed behavior assertion fails the command and the existing browser
 CI job; the remaining cases still run and retain their evidence.
+
+The website workflow also runs the 3D rendering checks against the actual Hugo
+output at both pixel ratios before publishing previews or production. Its
+screenshots and diagnostics are uploaded as `website-playground-rendering`.
