@@ -4,12 +4,15 @@ Only the downloaded Maven executable is replaced with a recorder; launcher and
 wrapper files, including the PowerShell download/cache discovery, stay untouched.
 """
 import hashlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+from urllib.parse import parse_qs
 
 source = Path(sys.argv[1]).resolve()
 windows = os.name == 'nt'
@@ -45,11 +48,27 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         executable.chmod(0o755)
     record = parent / 'record.txt'
     # Initializr launchers report build progress (see launcher-telemetry-sh.txt in
-    # scripts/initializr). Point them at a closed local port: the reporting code
-    # still runs -- and must stay silent and harmless when its request fails --
-    # but no test run lands in the production funnel.
+    # scripts/initializr). Point them at a local recorder that answers 204 at
+    # once, so no test run lands in the production funnel and the reports can
+    # be checked. Not a closed port: on Windows a refused localhost connection
+    # is retried for about two seconds, which with two reports per build pushed
+    # the windows-latest fixture step past its ten-minute limit.
+    events = []
+
+    class Recorder(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get('Content-Length') or 0)).decode()
+            events.append({k: v[0] for k, v in parse_qs(body, keep_blank_values=True).items()})
+            self.send_response(204)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    recorder = ThreadingHTTPServer(('127.0.0.1', 0), Recorder)
+    threading.Thread(target=recorder.serve_forever, daemon=True).start()
     env = dict(os.environ, MAVEN_USER_HOME=str(cache), CN1_TEST_RECORD=str(record), CN1_TEST_EXIT='0',
-               CN1_EVENTS_URL='http://127.0.0.1:9/cn1-launcher-test')
+               CN1_EVENTS_URL='http://127.0.0.1:%d/cn1-launcher-test' % recorder.server_address[1])
     if windows:
         env.update(MVNW_USERNAME='wrapper-test-user', MVNW_PASSWORD='wrapper-test-password')
     env.pop('MVNW_REPOURL', None)
@@ -84,4 +103,17 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     run('run', '', '-Psimulator')
     run('build', 'javascript_cloud', '-Dcodename1.buildTarget=javascript', 37)
     run('run', 'simulator', '-Psimulator', 37)
-    print('PASS: targets, local defaults, parent cwd, spaces/apostrophes, failure exit codes' + (', Windows credential isolation' if windows else ''))
+    recorder.shutdown()
+    reporting = 'CN1_PROJECT_ID' in (project / ('build.bat' if windows else 'build.sh')).read_text()
+    if reporting:
+        # An Initializr launcher: every build reports launch then exit, keyed by
+        # the 64-hex package hash and nothing that names the package.
+        steps = [e.get('step') for e in events]
+        assert 'launch' in steps and 'exit' in steps, events
+        assert all(len(e.get('pkg', '')) == 64 for e in events), events
+        assert any(e.get('step') == 'exit' and e.get('exit') == '37' for e in events), events
+    else:
+        assert not events, ('the archetype launchers report nothing', events)
+    print('PASS: targets, local defaults, parent cwd, spaces/apostrophes, failure exit codes'
+          + (', Windows credential isolation' if windows else '')
+          + (', build progress reports' if reporting else ''))
