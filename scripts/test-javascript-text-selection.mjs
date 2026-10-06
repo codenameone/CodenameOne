@@ -1,0 +1,233 @@
+// Run against scripts/build-javascript-selection-fixture.sh's output.
+// NODE_PATH may point to an existing Playwright installation.
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const { chromium, firefox, _android } = createRequire(import.meta.url)('playwright');
+const root = path.resolve(process.argv[2]);
+const artifacts = path.resolve(process.argv[3] || 'artifacts/javascript-text-selection');
+fs.mkdirSync(artifacts, { recursive: true });
+const types = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css' };
+const server = http.createServer((req, res) => {
+  const file = path.resolve(root, '.' + (req.url.split('?')[0] === '/' ? '/index.html' : req.url.split('?')[0]));
+  if (!file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
+  fs.readFile(file, (error, data) => {
+    res.writeHead(error ? 404 : 200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
+    res.end(error ? 'Not found' : data);
+  });
+});
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+const port = server.address().port;
+const accents = 'Caffè, perché, città, più, però.\nà è é ì ò ù — À È É Ì Ò Ù\nこんにちは | שלום | مرحبًا | 😀 | é';
+
+async function exercise(context, name, host, mobileDevice = null) {
+  const mobile = mobileDevice != null;
+  const page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  await page.addInitScript(() => {
+    window.__cn1TextDraws = [];
+    window.__cn1PointerEvents = [];
+    for (const type of ['touchstart', 'touchend', 'touchcancel', 'mousedown', 'mouseup', 'click']) {
+      document.addEventListener(type, e => window.__cn1PointerEvents.push({ type, target: e.target.tagName,
+        x: e.clientX, y: e.clientY, touches: e.touches && e.touches.length }), true);
+    }
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function(text, ...args) {
+      window.__cn1TextDraws.push(String(text));
+      if (window.__cn1TextDraws.length > 2000) window.__cn1TextDraws.shift();
+      return fillText.call(this, text, ...args);
+    };
+  });
+  const errors = [], logs = [];
+  async function hideAndroidKeyboard() {
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.waitForTimeout(750);
+  }
+  page.on('console', m => { logs.push(m.type() + ': ' + m.text()); if (/Exception:|CAUGHT_RAW_JS_ERROR/.test(m.text())) errors.push(m.text()); });
+  page.on('pageerror', e => errors.push(String(e)));
+  try {
+    await page.goto(`http://${host}:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.bringToFront();
+    await page.waitForFunction(() => !document.getElementById('cn1-splash'), null, { timeout: 60000 });
+    const notes = page.locator('.cn1-selection-editor[aria-label="selectionNotes"]');
+    const title = page.locator('.cn1-selection-editor[aria-label="selectionTitle"]');
+    const readOnly = page.locator('.cn1-selection-editor[aria-label="selectionReadOnly"]');
+    await notes.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.cn1-selection-editor').count(), 3);
+    console.log('PASS', name, 'fresh-session startup and default-font metrics');
+    async function clickText(text) {
+      if (mobile) await hideAndroidKeyboard();
+      // Scrolling can correctly demote painted text back to the canvas. Semantic
+      // button bounds remain available even when there is no visible DOM span.
+      const pattern = new RegExp('^' + text + '$', 'i');
+      const button = page.getByRole('button', { name: pattern }).first();
+      const span = await button.count() ? button : page.locator('#cn1-text-layer span').filter({ hasText: pattern }).first();
+      const box = await span.boundingBox();
+      assert.ok(box, 'text is rendered: ' + text);
+      logs.push('click ' + text + ': ' + await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.outerHTML,
+        { x: box.x + box.width / 2, y: box.y + box.height / 2 }));
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    }
+    await notes.fill(accents);
+    await title.click();
+    await page.waitForTimeout(300);
+    assert.equal(await notes.inputValue(), accents);
+    await notes.click();
+    await page.waitForTimeout(300);
+    assert.equal(await notes.evaluate(el => document.activeElement === el), true, 'semantic focus must not steal the native editor');
+    assert.equal(await notes.inputValue(), accents);
+    console.log('PASS', name, 'Unicode and editing survive focus changes');
+    if (!mobile) {
+      await title.click();
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(500);
+      assert.equal(await notes.evaluate(el => document.activeElement === el), true, 'Tab moves to the next CN1 field');
+      await page.keyboard.press('Shift+Tab');
+      await page.waitForTimeout(300);
+      assert.equal(await title.evaluate(el => document.activeElement === el), true, 'Shift+Tab moves to the previous CN1 field');
+      console.log('PASS', name, 'keyboard field traversal');
+      await notes.click();
+      await notes.dblclick({ position: { x: 25, y: 12 } });
+      assert.ok(await notes.evaluate(el => el.selectionEnd > el.selectionStart), 'double-click selects text');
+      const before = await notes.evaluate(el => [el.selectionStart, el.selectionEnd]);
+      await page.waitForTimeout(600);
+      assert.deepEqual(await notes.evaluate(el => [el.selectionStart, el.selectionEnd]), before, 'repaints preserve selection');
+      await notes.click({ button: 'right', position: { x: 25, y: 12 } });
+      assert.equal(await page.locator('#cn1-text-layer span').filter({ hasText: /^Select All$/ }).count(), 0, 'no competing CN1 context menu');
+      await page.keyboard.press('Escape');
+      console.log('PASS', name, 'word selection, repaint stability and one context menu');
+      await readOnly.click({ clickCount: 3, position: { x: 30, y: 12 } });
+      assert.equal(await readOnly.evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd).trim()),
+        (await readOnly.inputValue()).split('\n')[0], 'triple-click selects the logical paragraph');
+      await readOnly.click();
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
+      assert.equal(await readOnly.evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd)), await readOnly.inputValue());
+      if (name === 'chromium') {
+        await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+c' : 'Control+c');
+        assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await readOnly.inputValue());
+      }
+      console.log('PASS', name, 'readonly select-all preserves logical paragraphs');
+      const box = await readOnly.boundingBox();
+      await page.mouse.move(box.x + 30, box.y + 15);
+      await page.mouse.wheel(0, 160);
+      await page.waitForTimeout(700);
+      assert.ok((await readOnly.boundingBox()).y < box.y - 10, 'wheel over native text scrolls the CN1 form');
+      await page.mouse.wheel(0, -2000);
+      await page.waitForTimeout(700);
+      console.log('PASS', name, 'scrolling over native text');
+    } else {
+      await title.click();
+      await hideAndroidKeyboard();
+      const cdp = await context.newCDPSession(page);
+      const box = await readOnly.boundingBox();
+      const point = { x: box.x + 30, y: box.y + 15 };
+      // Raw dispatchTouchEvent produces a caret, even on a plain textarea.
+      // synthesizeTapGesture also runs Android's long-press recognizer.
+      await cdp.send('Input.synthesizeTapGesture', { ...point, duration: 1000, gestureSourceType: 'touch' });
+      assert.ok(await readOnly.evaluate(el => el.selectionEnd > el.selectionStart), 'long press selects a word');
+      console.log('PASS', name, 'native long-press selection');
+      await readOnly.evaluate(el => { el.setSelectionRange(0, 0); el.blur(); });
+      await page.waitForTimeout(300);
+      await cdp.send('Input.synthesizeScrollGesture', { x: box.x + 80, y: box.y + 80,
+        yDistance: -100, speed: 500, gestureSourceType: 'touch' });
+      await page.waitForTimeout(700);
+      assert.ok((await readOnly.boundingBox()).y < box.y - 10, 'swipe over text scrolls the form');
+      // CN1 performs its own kinetic scrolling after the browser gesture ends.
+      // A tap during that motion intentionally stops scrolling instead of firing.
+      let previousY = (await readOnly.boundingBox()).y, stableSince = Date.now();
+      const deadline = Date.now() + 8000;
+      while (Date.now() < deadline && Date.now() - stableSince < 1000) {
+        await page.waitForTimeout(250);
+        const currentY = (await readOnly.boundingBox()).y;
+        if (Math.abs(currentY - previousY) > 0.5) stableSince = Date.now();
+        previousY = currentY;
+      }
+      assert.ok(Date.now() - stableSince >= 1000, 'kinetic scrolling settles');
+      await cdp.detach();
+      console.log('PASS', name, 'touch scrolling over native text');
+    }
+    await clickText('Run action');
+    await page.waitForFunction(() => document.body.innerText.includes('Action fired'));
+    assert.equal(await readOnly.isVisible(), true, 'readonly text is visible before the dialog');
+    await clickText('Open dialog');
+    await page.waitForFunction(() => document.body.innerText.includes('Selection dialog'));
+    await page.waitForTimeout(500);
+    assert.equal(await readOnly.isVisible(), false, 'modal dialog hides background editor');
+    await clickText('OK');
+    await readOnly.waitFor({ state: 'visible' });
+    if (mobile && !await notes.isVisible()) {
+      // A restored form may recreate its editors. Offscreen controls acquire
+      // their value when promoted back into view, so scroll before inspecting it.
+      const box = await readOnly.boundingBox();
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Input.synthesizeScrollGesture', { x: box.x + 80, y: box.y + 80,
+        yDistance: 180, speed: 400, gestureSourceType: 'touch' });
+      await cdp.detach();
+    }
+    await notes.waitFor({ state: 'visible' });
+    assert.equal(await notes.inputValue(), accents);
+    console.log('PASS', name, 'button actions, dialog occlusion and form restoration');
+    await page.screenshot({ path: path.join(artifacts, name + '.png') });
+    if (!mobile) {
+      await page.goto(`http://${host}:${port}/?selection=off`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => !document.getElementById('cn1-splash'), null, { timeout: 60000 });
+      await page.waitForTimeout(500);
+      assert.equal(await page.locator('.cn1-selection-editor').count(), 0);
+      const text = page.locator('#cn1-text-layer span').filter({ hasText: /^Caffè, perché/ }).first();
+      const box = await text.boundingBox();
+      await page.mouse.click(box.x + 30, box.y + box.height / 2);
+      const editor = page.locator('textarea.cn1-edit-string:visible');
+      await editor.waitFor();
+      await editor.fill(accents);
+      await page.evaluate(() => { window.__cn1TextDraws = []; });
+      // Use the semantic field's bounds; it may currently render on the canvas.
+      const titleBounds = await page.locator('#cn1-accessibility-tree [role="textbox"]').first().boundingBox();
+      await page.mouse.click(titleBounds.x + 20, titleBounds.y + titleBounds.height / 2);
+      await page.waitForFunction(() => {
+        const rendered = window.__cn1TextDraws.concat([...document.querySelectorAll('#cn1-text-layer span')]
+          .map(el => el.textContent)).join(' ');
+        return rendered.includes('Caffè') && rendered.includes('più') && rendered.includes('À È É');
+      });
+      console.log('PASS', name, 'hint disabled: legacy editor and unfocused Unicode rendering');
+    }
+    assert.deepEqual(errors, [], 'no browser/worker exceptions');
+  } finally {
+    if (mobile) await mobileDevice.screenshot({ path: path.join(artifacts, name + '-device.png') }).catch(() => {});
+    await page.screenshot({ path: path.join(artifacts, name + '-last.png') }).catch(() => {});
+    logs.push(JSON.stringify(await page.evaluate(() => ({ active: document.activeElement && document.activeElement.outerHTML,
+      editors: [...document.querySelectorAll('.cn1-selection-editor')].map(el => ({ label: el.getAttribute('aria-label'),
+        start: el.selectionStart, end: el.selectionEnd, rect: el.getBoundingClientRect().toJSON() })),
+      events: window.__cn1PointerEvents,
+      workerLog: (window.__parparMessages || []).filter(m => m.type === 'log').map(m => m.message),
+      text: document.body.innerText.slice(0, 1000) })).catch(() => null)));
+    fs.writeFileSync(path.join(artifacts, name + '.log'), logs.join('\n') + '\n' + errors.join('\n'));
+    await page.close();
+  }
+}
+
+try {
+  if (process.argv.includes('--android')) {
+    const devices = await _android.devices();
+    const device = devices.find(d => d.serial() === (process.env.CN1_ANDROID_SERIAL || 'emulator-5584'));
+    assert.ok(device, 'Android test device is connected');
+    try {
+      // The server uses a fresh origin each run, without prior app storage or caches.
+      const context = await device.launchBrowser({ args: ['--disable-notifications'] });
+      try { await exercise(context, 'android-chrome', '10.0.2.2', device); }
+      finally { await context.close(); }
+    } finally { await device.close(); }
+  } else {
+    for (const name of (process.env.CN1_JS_BROWSERS || 'chromium,firefox').split(',')) {
+      const browser = name === 'firefox'
+        ? await firefox.launch(process.env.CN1_JS_FIREFOX_EXECUTABLE ? { executablePath: process.env.CN1_JS_FIREFOX_EXECUTABLE } : {})
+        : await chromium.launch(process.env.CN1_JS_CHROME_CHANNEL ? { channel: process.env.CN1_JS_CHROME_CHANNEL } : {});
+      try {
+        const context = await browser.newContext({ viewport: { width: 900, height: 800 } });
+        try { await exercise(context, name, '127.0.0.1'); } finally { await context.close(); }
+      } finally { await browser.close(); }
+    }
+  }
+} finally { server.close(); }

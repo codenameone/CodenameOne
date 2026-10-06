@@ -732,6 +732,14 @@ public class Component implements Animation, StyleListener, Editable {
         return nativeOverlay;
     }
 
+    // Port accessors use this before giving pointer gestures to a native text control.
+    boolean hasPointerInteractionListeners() {
+        return pointerPressedListeners != null && pointerPressedListeners.hasListeners()
+                || pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()
+                || pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()
+                || longPressListeners != null && longPressListeners.hasListeners();
+    }
+
     /// Returns a "meta style" that allows setting styles once to all the different Style objects, the getters for this
     /// style will be meaningless and will return 0 values. Usage:
     ///

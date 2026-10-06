@@ -38,11 +38,10 @@ from it. Two DOM layers sit above the canvas, which is itself marked
   rebuild-per-invalidation discarded DOM focus and text selection on every
   `CHANGE_BOUNDS`, which is raised by every `setX/setY/setWidth/setHeight`.
 
-The layer takes no pointer events: the canvas owns hit testing, so a drag across
-a label does not start a native selection. Find-in-page, the browser's own text
-handling and assistive technology all reach the text; pointer selection would
-mean teaching the port's input path to tell a selection drag from an application
-drag, which is a change to input rather than to this layer.
+With `javascript.textSelection=true`, eligible label spans receive native selection
+gestures and text areas use persistent native controls. Buttons, lead components,
+passwords and application interaction handlers retain the canvas input path. The
+host distinguishes a prompt vertical swipe from a stationary selection long press.
 
 Text that stays on the canvas, by design:
 
@@ -85,11 +84,10 @@ directly instead of through pixels.
 Known gaps in this area:
 
 - An editable field is reached through a SET_TEXT control in the actions region rather
-  than by typing into the semantic node itself, which is a div over a canvas. A native
-  input is still what appears once editing starts.
-- Drag-selection is not enabled. The layer takes no pointer events so the canvas
-  keeps hit testing; find-in-page and assistive technology do not need hit
-  testing, but selection does. Enabling it requires the pointer-routing rework.
+  than by typing into the semantic node itself, which is a div over a canvas. Without
+  `javascript.textSelection`, the visible native input appears once editing starts.
+- Native selection is opt-in with `javascript.textSelection`; without it, the canvas
+  continues to own pointer gestures. Canvas-only content retains CN1 TextSelection.
 - Vertical placement uses `fontHeight()` as the line box, which matches Codename
   One's own layout metric but is approximate against the browser's font metrics
   to about a pixel. A text-parity harness comparing `getBoundingClientRect()`

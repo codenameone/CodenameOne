@@ -24,6 +24,17 @@
 package com.codename1.ui;
 
 public class Accessor {
+    /** Whether the browser may own text gestures without bypassing an app action. */
+    public static boolean allowsNativeTextSelection(Component c) {
+        return c != null && !(c instanceof Button) && !c.isCellRenderer()
+                && c.getLeadComponent() == null && !c.hasPointerInteractionListeners()
+                && (!(c instanceof TextArea) || !((TextArea) c).hasActionListeners());
+    }
+
+    /** Re-evaluate overlays after the current form's selection hint has been applied. */
+    public static void showNativeTextOverlay(Component c) {
+        c.showNativeOverlay();
+    }
     public static int getActivePeerCount() {
         return Form.activePeerCount;
     }

@@ -1905,11 +1905,110 @@
   // and a deferred preventDefault would miss the browser's dispatch
   // window. Apps that depend on conditional preventDefault need to set
   // it from the native host-bridge path instead.
+  function nativeSelectionElement(node) {
+    for (; node; node = node.parentNode) {
+      if (node.getAttribute && node.getAttribute('data-cn1-native-selection') === 'true') return node;
+    }
+    return null;
+  }
+
+  // Selection happens synchronously in the browser; only a scrolling gesture is
+  // handed back to the canvas. A stationary long press remains native selection.
+  function installNativeTextInteractions() {
+    var doc = global.document;
+    if (!doc || doc.__cn1NativeTextInteractions) return;
+    doc.__cn1NativeTextInteractions = true;
+    var touch = null;
+    function canvas() { return doc.getElementById('codenameone-canvas'); }
+    function relayTouch(type, event) {
+      var target = canvas();
+      if (!target) return;
+      function copy(list) {
+        return Array.prototype.map.call(list || [], function(t) {
+          return new global.Touch({ identifier: t.identifier, target: target,
+            clientX: t.clientX, clientY: t.clientY, screenX: t.screenX, screenY: t.screenY,
+            pageX: t.pageX, pageY: t.pageY });
+        });
+      }
+      target.dispatchEvent(new global.TouchEvent(type, { bubbles: true, cancelable: true,
+        touches: copy(event.touches), targetTouches: copy(event.touches), changedTouches: copy(event.changedTouches) }));
+    }
+    doc.addEventListener('wheel', function(event) {
+      if (!nativeSelectionElement(event.target) || !canvas()) return;
+      event.preventDefault();
+      canvas().dispatchEvent(new global.WheelEvent('wheel', { bubbles: true, cancelable: true,
+        clientX: event.clientX, clientY: event.clientY, deltaX: event.deltaX,
+        deltaY: event.deltaY, deltaMode: event.deltaMode, ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey }));
+    }, { passive: false });
+    doc.addEventListener('touchstart', function(event) {
+      var el = nativeSelectionElement(event.target);
+      if (!el) return;
+      touch = null;
+      if (event.touches.length !== 1) return;
+      var selected = global.getSelection && global.getSelection();
+      if (/^(INPUT|TEXTAREA)$/.test(el.tagName)) {
+        if (doc.activeElement === el && el.selectionStart !== el.selectionEnd) return;
+      } else if (selected && !selected.isCollapsed && nativeSelectionElement(selected.anchorNode) === el) return;
+      var t = event.touches[0];
+      touch = { x: t.clientX, y: t.clientY, at: Date.now(), start: event, scrolling: false };
+    }, { passive: true });
+    doc.addEventListener('touchmove', function(event) {
+      if (!touch || !nativeSelectionElement(event.target) || event.touches.length !== 1) return;
+      var t = event.touches[0];
+      if (!touch.scrolling) {
+        if (Date.now() - touch.at > 350) { touch = null; return; }
+        if (Math.abs(t.clientY - touch.y) < 8 || Math.abs(t.clientY - touch.y) < Math.abs(t.clientX - touch.x)) return;
+        touch.scrolling = true;
+        relayTouch('touchstart', touch.start);
+      }
+      event.preventDefault();
+      relayTouch('touchmove', event);
+    }, { passive: false });
+    function finishTouch(event) {
+      if (!touch || !nativeSelectionElement(event.target)) return;
+      if (touch.scrolling) {
+        event.preventDefault();
+        relayTouch(event.type, event);
+      }
+      touch = null;
+    }
+    doc.addEventListener('touchend', finishTouch, { passive: false });
+    doc.addEventListener('touchcancel', finishTouch, { passive: false });
+    doc.addEventListener('keydown', function(event) {
+      var el = nativeSelectionElement(event.target);
+      if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && event.key === 'Tab') {
+        // The worker chooses the next CN1 component; suppress the browser's
+        // unrelated tab order before the asynchronous callback reaches it.
+        event.preventDefault();
+      }
+      if (el && el.getAttribute('data-cn1-single-line') === 'true' && event.key === 'Enter' && !event.isComposing) {
+        event.preventDefault();
+        el.blur();
+      }
+    }, true);
+  }
+
   function makeWorkerCallback(callbackId) {
     if (workerCallbackProxies[callbackId]) {
       return workerCallbackProxies[callbackId];
     }
     var fn = function(event) {
+      // Native text owns its gesture on the host. Forwarding the document/window
+      // listeners too starts CN1's selection or moves focus after the browser has
+      // already selected text. Copy must likewise stay inside this dispatch.
+      var nativeText = nativeSelectionElement(event && event.target);
+      if (!nativeText && event && event.type === 'copy' && global.getSelection) {
+        var selection = global.getSelection();
+        nativeText = selection && !selection.isCollapsed && nativeSelectionElement(selection.anchorNode);
+      }
+      if (nativeText && event && /^(mouse|pointer|touch|key|contextmenu|copy|cut|paste)/.test(event.type)
+          && event.currentTarget !== nativeText) return;
+      if (event && event.type === 'contextmenu' && event.target
+          && event.target.id === 'codenameone-canvas'
+          && event.target.getAttribute('data-cn1-text-selection') === 'true') {
+        event.preventDefault();
+      }
       var target = global.__parparWorker;
       if (!target || typeof target.postMessage !== 'function') {
         return;
@@ -2236,6 +2335,12 @@
     var kind = payload.kind;
     var member = payload.member;
     var args = mapHostArgs(payload.args || []);
+    // A semantic snapshot may have been queued before the user's native focus
+    // gesture. Do not let its late focus request steal the editor's first input
+    // or selection. An intentional CN1 focus change blurs the editor first via
+    // its FocusListener, so it still reaches the semantic target normally.
+    if (member === 'focus' && receiver.closest && receiver.closest('#cn1-accessibility-tree')
+        && global.document && nativeSelectionElement(global.document.activeElement)) return null;
     var value;
     if (kind === 'getter') {
       value = receiver[member];
@@ -6917,6 +7022,7 @@
   }
 
   function installWorkerMode() {
+    installNativeTextInteractions();
     log('worker-mode');
     diag('BOOT', 'bridgeMode', 'worker');
     var workerUrl = 'worker.js';

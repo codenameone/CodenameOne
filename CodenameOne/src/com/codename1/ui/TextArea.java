@@ -197,6 +197,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private int rowsGap = 2;
     private boolean triggerClose;
     private EventDispatcher actionListeners = null;
+
+    boolean hasActionListeners() {
+        return actionListeners != null && actionListeners.hasListeners();
+    }
     private EventDispatcher bindListeners = null;
     private EventDispatcher closeListeners = null;
     private String lastTextValue = "";

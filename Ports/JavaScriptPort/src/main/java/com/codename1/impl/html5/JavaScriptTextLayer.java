@@ -448,9 +448,8 @@ public final class JavaScriptTextLayer {
         run.clipY = useClipY;
         run.clipW = useClipW;
         run.clipH = useClipH;
-        // pointer-events stays off so the layer cannot intercept input destined for the canvas,
-        // which still owns all hit testing. Find-in-page and assistive technology do not depend
-        // on hit testing; drag-selection does, and is deliberately not enabled here.
+        // The clipping box must not capture the component's whole paint region.
+        // Only eligible glyph spans below opt into browser pointer selection.
         StringBuilder clipCss = new StringBuilder(
                 "position:absolute;overflow:hidden;pointer-events:none;");
         clipCss.append("left:").append(useClipX / scale).append("px;");
@@ -491,7 +490,13 @@ public final class JavaScriptTextLayer {
 
         // The run is positioned relative to its clip element, so the two move together and a
         // scroll only has to rewrite coordinates rather than restructure anything.
+        boolean selectable = frame.component instanceof com.codename1.ui.Label
+                && com.codename1.ui.Accessor.allowsNativeTextSelection(frame.component)
+                && ((com.codename1.ui.Label) frame.component).isTextSelectionEnabled()
+                && frame.component.getComponentForm().getTextSelection().isEnabled();
         StringBuilder textCss = new StringBuilder("position:absolute;white-space:pre;");
+        textCss.append(selectable ? "pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:text;"
+                : "pointer-events:none;user-select:none;-webkit-user-select:none;");
         textCss.append("left:").append((x - useClipX) / scale).append("px;");
         textCss.append("top:").append((y - useClipY) / scale).append("px;");
         // The font shorthand carries its own line-height ("18.9px/1.0"), so it has to be
@@ -800,6 +805,8 @@ public final class JavaScriptTextLayer {
         while (runs.runs.size() <= index) {
             HTMLElement clip = document.createElement("div");
             HTMLElement text = document.createElement("span");
+            text.setAttribute("class", "cn1-native-selection");
+            text.setAttribute("data-cn1-native-selection", "true");
             // Building the pair is not a frame mutation: neither element is in the document
             // yet, so nothing can be seen half-built and there is nothing to keep in step with
             // the canvas. It stays an immediate write, which is also what guarantees the pair

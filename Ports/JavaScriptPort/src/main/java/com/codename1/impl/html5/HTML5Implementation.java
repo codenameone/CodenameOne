@@ -81,6 +81,7 @@ import com.codename1.ui.AccessibilityColorVisionDeficiency;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.Button;
+import com.codename1.ui.Container;
 import com.codename1.ui.CN;
 import static com.codename1.ui.CN.invokeAndBlock;
 import com.codename1.ui.Component;
@@ -1126,6 +1127,226 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
+    // Persistent native controls are required for selection to begin in the browser's
+    // original event dispatch. Creating an editor after a worker round trip loses
+    // the first drag, right click and mobile long press.
+    private final Set<SelectionTextOverlay> selectionTextOverlays = new HashSet<SelectionTextOverlay>();
+
+    private boolean nativeSelectionRequested() {
+        return "true".equals(asciiLower(Display.getInstance().getProperty("javascript.textSelection", null)));
+    }
+
+    private boolean allowsSelectionOverlay(TextArea ta) {
+        return nativeSelectionRequested() && Accessor.allowsNativeTextSelection(ta)
+                && ta.getDoneListener() == null
+                && (ta.getConstraint() & TextArea.PASSWORD) == 0
+                && (ta.isEditable() || ta.isTextSelectionEnabled() && ta.getComponentForm() != null
+                    && ta.getComponentForm().getTextSelection().isEnabled());
+    }
+
+    private class SelectionTextOverlay extends NativeOverlay {
+        final TextArea ta;
+        final DataChangedListener changes;
+        final FocusListener focus;
+        boolean browserEdit;
+        boolean focused;
+        boolean visible;
+        final boolean singleLine;
+        String lastValue;
+        String lastCss;
+        Boolean lastReadOnly;
+        int lastMaxSize = -1;
+
+        SelectionTextOverlay(final TextArea ta) {
+            super(ta);
+            this.ta = ta;
+            singleLine = ta.isSingleLineTextArea();
+            el = (HTMLInputElement) doc().createElement(ta.isSingleLineTextArea() ? "input" : "textarea");
+            el.setAttribute("class", "cn1-native-selection cn1-selection-editor");
+            el.setAttribute("data-cn1-native-selection", "true");
+            el.setAttribute("data-cn1-single-line", ta.isSingleLineTextArea() ? "true" : "false");
+            el.setAttribute("aria-label", ta.getName() == null ? ta.getHint() : ta.getName());
+            el.setTabIndex(-1); // the semantic overlay owns keyboard traversal
+            applyInputConstraints(el, ta);
+            el.getStyle().setProperty("display", "none");
+            textLayerContainer.appendChild(el);
+            selectionTextOverlays.add(this);
+            changes = new DataChangedListener() {
+                public void dataChanged(int type, int index) {
+                    if (!browserEdit) {
+                        updateNativeEditorText(ta.getText());
+                    }
+                }
+            };
+            ta.addDataChangedListener(changes);
+            focus = new FocusListener() {
+                public void focusGained(Component c) { }
+                public void focusLost(Component c) {
+                    if (focused) el.blur();
+                }
+            };
+            ta.addFocusListener(focus);
+            el.addEventListener("keydown", new EventListener() {
+                public void handleEvent(Event event) {
+                    final KeyEvent key = (KeyEvent) event;
+                    if (key.getKeyCode() != 9) return;
+                    callSerially(new Runnable() {
+                        public void run() {
+                            Form form = ta.getComponentForm();
+                            if (form == null) return;
+                            Component next = key.isShiftKey() ? form.getPreviousComponent(ta) : form.getNextComponent(ta);
+                            if (next == null) return;
+                            el.blur();
+                            next.requestFocus();
+                            if (next.getNativeOverlay() instanceof SelectionTextOverlay) {
+                                SelectionTextOverlay overlay = (SelectionTextOverlay) next.getNativeOverlay();
+                                if (overlay.visible) overlay.el.focus();
+                            }
+                        }
+                    });
+                }
+            });
+            el.addEventListener("input", new EventListener() {
+                public void handleEvent(Event event) {
+                    final String value = el.getValue();
+                    callSerially(new Runnable() {
+                        public void run() { commit(value); }
+                    });
+                }
+            });
+            el.addEventListener("focus", new EventListener() {
+                public void handleEvent(Event event) {
+                    callSerially(new Runnable() {
+                        public void run() {
+                            focused = true;
+                            if (ta.isEditable() && ta.isEnabled()) {
+                                currentEditingField = ta;
+                                currentInputField = el;
+                                isEditing = true;
+                                ta.requestFocus();
+                            }
+                            ta.repaint();
+                        }
+                    });
+                }
+            });
+            el.addEventListener("blur", new EventListener() {
+                public void handleEvent(Event event) {
+                    final String value = el.getValue();
+                    callSerially(new Runnable() {
+                        public void run() {
+                            focused = false;
+                            if (ta.isEditable() && ta.isEnabled()) {
+                                commit(value);
+                                if (currentEditingField == ta) {
+                                    currentEditingField = null;
+                                    currentInputField = null;
+                                    isEditing = false;
+                                }
+                                Display.getInstance().onEditingComplete(ta, value);
+                            }
+                            ta.repaint();
+                        }
+                    });
+                }
+            });
+        }
+
+        private void commit(String value) {
+            if (!ta.isEditable() || !ta.isEnabled()) return;
+            browserEdit = true;
+            try {
+                lastValue = value;
+                if (!value.equals(ta.getText())) ta.setText(value);
+            } finally {
+                browserEdit = false;
+            }
+        }
+
+        @Override
+        void updateNativeEditorText(String value) {
+            if (value == null) value = "";
+            if (!value.equals(lastValue)) {
+                el.setValue(value);
+                lastValue = value;
+            }
+        }
+
+        @Override
+        void updateIfMovedAndFocused() { update(); }
+
+        @Override
+        void update() {
+            Form form = ta.getComponentForm();
+            visible = singleLine == ta.isSingleLineTextArea() && allowsSelectionOverlay(ta)
+                    && form != null && form == getCurrentForm()
+                    && Accessor.isDisplayable(ta) && !Display.getInstance().isInTransition()
+                    && !Accessor.paintsOverChildren(form) && Accessor.getActivePeerCount() == 0;
+            int x = ta.getAbsoluteX(), y = ta.getAbsoluteY();
+            int left = x, top = y, right = x + ta.getWidth(), bottom = y + ta.getHeight();
+            for (Container parent = ta.getParent(); parent != null; parent = parent.getParent()) {
+                left = Math.max(left, parent.getAbsoluteX());
+                top = Math.max(top, parent.getAbsoluteY());
+                right = Math.min(right, parent.getAbsoluteX() + parent.getWidth());
+                bottom = Math.min(bottom, parent.getAbsoluteY() + parent.getHeight());
+            }
+            visible &= right > left && bottom > top;
+            if (visible) {
+                Component hit = form.getComponentAt((left + right) / 2, (top + bottom) / 2);
+                visible = hit == ta;
+            }
+            if (!visible) {
+                if (lastCss != null) {
+                    graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_RUN_CSS, el, null, "display:none");
+                    lastCss = null;
+                }
+                return;
+            }
+            if (el.getParentNode() == null) textLayerContainer.appendChild(el);
+            Style style = ta.getStyle();
+            NativeFont font = resolveNativeFont(style.getFont().getNativeFont());
+            int pt = style.getPadding(Component.TOP), pb = style.getPadding(Component.BOTTOM);
+            if (ta.isSingleLineTextArea() && ta.getVerticalAlignment() == Component.CENTER) {
+                pt = Math.max(pt, (ta.getHeight() - font.fontHeight()) / 2);
+            }
+            String css = "position:absolute;box-sizing:border-box;border:0;margin:0;outline:0;resize:none;"
+                    + "background:transparent;overflow:hidden;pointer-events:auto;user-select:text;cursor:text;"
+                    + "z-index:2147483644;display:block;left:" + scaleCoord(x) + "px;top:" + scaleCoord(y)
+                    + "px;width:" + scaleCoord(ta.getWidth()) + "px;height:" + scaleCoord(ta.getHeight())
+                    + "px;padding:" + scaleCoord(pt) + "px " + scaleCoord(style.getPadding(ta.isRTL(), Component.RIGHT))
+                    + "px " + scaleCoord(pb) + "px " + scaleCoord(style.getPadding(ta.isRTL(), Component.LEFT))
+                    + "px;font:" + font.getScaledCSS() + ";line-height:" + scaleCoord(font.fontHeight() + ta.getRowsGap())
+                    + "px;color:" + HTML5Graphics.color(style.getFgColor()) + ";direction:" + (ta.isRTL() ? "rtl" : "ltr")
+                    + ";text-align:" + (style.getAlignment() == Component.CENTER ? "center"
+                        : style.getAlignment() == Component.RIGHT ? "right" : "left")
+                    + ";clip-path:inset(" + scaleCoord(top - y) + "px " + scaleCoord(x + ta.getWidth() - right)
+                    + "px " + scaleCoord(y + ta.getHeight() - bottom) + "px " + scaleCoord(left - x) + "px);";
+            if (!css.equals(lastCss)) {
+                graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_RUN_CSS, el, null, css);
+                lastCss = css;
+            }
+            boolean readOnly = !ta.isEditable() || !ta.isEnabled();
+            if (lastReadOnly == null || lastReadOnly.booleanValue() != readOnly) {
+                if (readOnly) el.setAttribute("readonly", "readonly");
+                else el.removeAttribute("readonly");
+                lastReadOnly = Boolean.valueOf(readOnly);
+            }
+            if (lastMaxSize != ta.getMaxSize()) {
+                lastMaxSize = ta.getMaxSize();
+                el.setAttribute("maxlength", "" + lastMaxSize);
+            }
+            updateNativeEditorText(ta.getText());
+        }
+
+        @Override
+        void uninstall() {
+            ta.removeDataChangedListener(changes);
+            ta.removeFocusListener(focus);
+            selectionTextOverlays.remove(this);
+            if (el.getParentNode() != null) el.getParentNode().removeChild(el);
+        }
+    }
+
     private class TextAreaNativeOverlay extends NativeOverlay {
         TextArea ta;
         FocusListener focusListener;
@@ -1465,6 +1686,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 && c.getWidth() >= displayWidth && c.getHeight() >= displayHeight) {
             paintCoversScreen = true;
         }
+        if (c instanceof TextArea && c.getNativeOverlay() == null && textLayerContainer != null
+                && isDisplayGraphics(g) && allowsSelectionOverlay((TextArea) c)) {
+            Accessor.showNativeTextOverlay(c);
+        }
         Object overlay = c.getNativeOverlay();
         if (overlay != null) {
             NativeOverlay no = (NativeOverlay)overlay;
@@ -1580,6 +1805,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public Object createNativeOverlay(Component cmp) {
+        if (textLayerContainer != null && textLayerEnabled && cmp instanceof TextArea
+                && allowsSelectionOverlay((TextArea) cmp)) {
+            return new SelectionTextOverlay((TextArea) cmp);
+        }
         if (!useNativeOverlaysForTextFields()) {
             // we only do this for phones and tablets
             return null;
@@ -1837,23 +2066,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // visible text, so it is hidden from assistive technology -- the semantic tree is what
         // announces content, and without aria-hidden every label would be read twice.
         //
-        // It takes no pointer events, which means a drag across a label does not begin a native
-        // text selection. Review asked for that to change; it does not, and the reason is that
-        // the canvas owns hit testing here. Pointer routing decides between the canvas and the
-        // native peers behind it by probing canvas alpha, and every gesture the application
-        // reacts to -- a tap on a button, a drag that scrolls a list, a swipe that opens a side
-        // menu -- arrives as a pointer event on the canvas. A span that answered pointer events
-        // would swallow the gestures that land on text, which is most of the interactive surface
-        // of a Codename One form, and forwarding a synthesized copy to the canvas afterwards
-        // gives the application either a doubled gesture or none, depending on which event is
-        // cancelled to let the selection through.
-        //
-        // What the layer does deliver is real text in the document: find-in-page matches it,
-        // the browser reads it, assistive technology can select and copy through the semantic
-        // tree, and it rasterizes as text rather than as pixels. Pointer selection would need
-        // the port's input path to accept synthesized events and to tell a selection drag from
-        // an application drag before either has finished -- a change to input, not to this
-        // layer, and not one to make quietly at the end of a rendering change.
+        // The layer root does not capture input. Eligible text children opt into
+        // native selection; buttons and app-owned gestures continue to hit the canvas.
         textLayerContainer = (HTMLElement)document.createElement("div");
         textLayerContainer.setAttribute("id", "cn1-text-layer");
         textLayerContainer.setAttribute("aria-hidden", "true");
@@ -4982,11 +5196,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
     //   way the Windows and Linux ports do.
     // ---------------------------------------------------------------------------------------
 
-    /// The `javascript.textSelection` build hint: read-only text becomes selectable and copyable
-    /// in every form, through the framework's own TextSelection -- the canvas owns pointer input,
-    /// so the browser's native selection cannot reach the text (see the text layer's comment in
-    /// __init). The trigger is TextSelection's platform default: a press-drag with a mouse, a
-    /// long press on a touch screen, so a swipe over text still scrolls.
+    /// Enables the native text controls and label selection, with the framework's
+    /// TextSelection retained for text that cannot be promoted out of the canvas.
     private void applyTextSelectionHint(Form f) {
         if (f == null || !"true".equals(asciiLower(Display.getInstance().getProperty("javascript.textSelection", null)))) {
             return;
@@ -6166,6 +6377,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void focusInputElement() {
+        // Persistent native editors already receive focus in the browser's own
+        // gesture. Refocusing the old editor after a canvas press races its blur.
+        if (currentEditingField != null && currentEditingField.getNativeOverlay() instanceof SelectionTextOverlay) return;
         if (isEditing && currentInputField != null && !jQuery_is_(currentInputField, ":focus")) {
             currentInputField.focus();
         }
@@ -6193,6 +6407,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public boolean isNativeEditorVisible(Component c) {
         NativeOverlay overlay = (NativeOverlay)c.getNativeOverlay();
+        if (overlay instanceof SelectionTextOverlay) return ((SelectionTextOverlay) overlay).visible;
         if (overlay != null && jQuery_is_(overlay.el, ":focus")) {
             return true;
         }
@@ -6779,7 +6994,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, final String origText, int initiatingKeycode) {
-        if (cmp.getNativeOverlay() != null) {
+        if (cmp.getNativeOverlay() != null && (!(cmp.getNativeOverlay() instanceof SelectionTextOverlay)
+                || ((SelectionTextOverlay) cmp.getNativeOverlay()).visible)) {
             // If a native overlay exists then just use that native overlay
             NativeOverlay overlayEl = (NativeOverlay)cmp.getNativeOverlay();
             overlayEl.el.focus();
@@ -7463,6 +7679,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void finishTextEditing(){
+        if (currentEditingField != null && currentEditingField.getNativeOverlay() instanceof SelectionTextOverlay) {
+            ((SelectionTextOverlay) currentEditingField.getNativeOverlay()).el.blur();
+            return;
+        }
         if (!useNativeOverlaysForTextFields()) {
             if (editingCompleteCallback != null) {
                 Display.getInstance().callSerially(editingCompleteCallback);
@@ -7512,6 +7732,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
         displayFlushes++;
+        for (SelectionTextOverlay overlay : selectionTextOverlays) overlay.update();
+        if (outputCanvas != null) {
+            Form current = getCurrentForm();
+            outputCanvas.setAttribute("data-cn1-text-selection",
+                    current != null && current.getTextSelection().isEnabled() ? "true" : "false");
+        }
         if (textLayer != null) {
             // Releases runs whose component has been removed, hidden, or whose form is no longer
             // displayed; none of those ever paints again, so nothing else would clean them up.
@@ -10247,18 +10473,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
-        return ((NativeFont)nativeFont).stringWidth(new String(ch, offset, length));
+        return resolveNativeFont(nativeFont).stringWidth(new String(ch, offset, length));
     }
 
     @Override
     public int stringWidth(Object nativeFont, String str) {
         //return graphics.stringWidth(nativeFont, str);
-        return ((NativeFont)nativeFont).stringWidth(str);
+        return resolveNativeFont(nativeFont).stringWidth(str);
     }
 
     @Override
     public int charWidth(Object nativeFont, char ch) {
-        return ((NativeFont)nativeFont).charWidth(ch);
+        return resolveNativeFont(nativeFont).charWidth(ch);
         //return stringWidth(nativeFont, ch+"");
     }
     
@@ -10266,7 +10492,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int getHeight(Object nativeFont) {
-        return ((NativeFont)nativeFont).fontHeight();
+        return resolveNativeFont(nativeFont).fontHeight();
 
     }
 
@@ -10274,7 +10500,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public int getFontAscent(Object nativeFont) {
-        return g(graphics).getFontAscent(nativeFont);
+        return g(graphics).getFontAscent(resolveNativeFont(nativeFont));
     }
 
     @Override
@@ -10286,7 +10512,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int getFontDescent(Object nativeFont) {
-        return g(graphics).getFontDescent(nativeFont);
+        return g(graphics).getFontDescent(resolveNativeFont(nativeFont));
+    }
+
+    // Font.getDefaultFont() initially wraps null. Null is the platform's default
+    // font, including during native-theme initialization before a theme sets one.
+    // Android's ComboBox material icon measures it during startup (#5943).
+    private NativeFont resolveNativeFont(Object nativeFont) {
+        return nativeFont == null ? defaultFont : (NativeFont) nativeFont;
     }
 
     @Override

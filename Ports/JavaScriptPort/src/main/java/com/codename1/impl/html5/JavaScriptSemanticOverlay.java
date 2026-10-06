@@ -230,8 +230,14 @@ public final class JavaScriptSemanticOverlay {
             // drop every key the user typed.
             HTMLElement control = editingControl(pendingFocus);
             HTMLElement target = control == null ? pendingFocus.element : control;
+            AccessibilityNodeSnapshot focusedNode = nodes.get(pendingFocus.id);
+            Component focusedOwner = focusedNode == null ? null : focusedNode.getComponent();
+            // A pointer-focused native editor already owns the caret/selection. Moving
+            // focus to the hidden accessibility input would discard the first gesture.
+            boolean nativeEditing = focusedOwner instanceof TextArea
+                    && focusedOwner.getNativeOverlay() != null && ((TextArea) focusedOwner).isEditing();
             pendingFocus = null;
-            target.focus();
+            if (!nativeEditing) target.focus();
         }
     }
 
