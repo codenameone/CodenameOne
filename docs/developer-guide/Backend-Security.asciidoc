@@ -1640,7 +1640,7 @@ read by the build, because it decides what's linked into the server.
   back-channel or RP-initiated logout.
 * **Passkey attestation beyond `none` and self-signed `packed`.** Other
   formats are refused, or accepted unverified when you allow it.
-* **Shared in-memory state.** `InMemoryRateLimiter`, the in-memory stores, the
-  second factor's attempt counter and the device page's counter are per
-  process. Use the database stores for a server that runs as several
-  instances.
+* **Shared in-memory state.** `InMemoryRateLimiter` and the in-memory stores
+  are per process. Use the database stores for a server that runs as several
+  instances, and declare a `JdbcRateLimiter` bean so the second factor's
+  attempts and the device page's tries are counted once for every instance.
