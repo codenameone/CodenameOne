@@ -85,8 +85,8 @@
  },
  "translator": {
   "all": {
-   "memory": 0.539,
-   "runs": 7,
+   "memory": 0.451,
+   "runs": 1,
    "time": 0.751
   }
  },

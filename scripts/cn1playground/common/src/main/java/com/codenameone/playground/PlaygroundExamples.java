@@ -339,7 +339,7 @@ final class PlaygroundExamples {
             // for camera permission; a secure context (HTTPS or localhost) is
             // required. Camera.open() must originate from a tap.
             Form form = new Form("Camera", new BorderLayout());
-            Label status = new Label("Tap 'Start Camera'");
+            SpanLabel status = new SpanLabel("Tap 'Start Camera'");
             Button start = new Button("Start Camera");
             FontImage.setMaterialIcon(start, FontImage.MATERIAL_VIDEOCAM);
             Button snap = new Button("Take Photo");
@@ -364,7 +364,7 @@ final class PlaygroundExamples {
                     return;
                 }
                 try {
-                    CameraSession session = Camera.open(info, new CameraSessionOptions());
+                    CameraSession session = Camera.open(info, new CameraSessionOptions().captureAudio(false));
                     sessionHolder[0] = session;
                     CameraView view = session.createView();
                     form.add(BorderLayout.CENTER, view);
@@ -393,7 +393,8 @@ final class PlaygroundExamples {
                         Dialog dlg = new Dialog("Captured Photo");
                         dlg.setLayout(new BorderLayout());
                         dlg.add(BorderLayout.CENTER,
-                                new Label(img.scaledWidth(Display.getInstance().getDisplayWidth() - 80)));
+                                new Label(img.scaledSmallerRatio(Display.getInstance().getDisplayWidth() - 80,
+                                        Display.getInstance().getDisplayHeight() - 160)));
                         Button done = new Button("Close");
                         done.addActionListener(e2 -> dlg.dispose());
                         dlg.add(BorderLayout.SOUTH, done);
@@ -425,15 +426,17 @@ final class PlaygroundExamples {
             float[] vy = { 0f, 0f, 0f, 0f, 0f, 0f, 0f };
             int[] col = { 0x5fd0d6, 0xf2b134, 0xe8615f, 0x9b8cf2, 0x6fcf6b, 0xf28cc8, 0x7aa7ff };
 
+            Component[] canvas = new Component[1];
             Component view = GameScripting.canvas(320, 480, g -> {
                 g.setColor(0x10182a);
-                g.fillRect(0, 0, 320, 480);
+                g.fillRect(0, 0, canvas[0].getWidth(), canvas[0].getHeight());
                 for (int i = 0; i < x.length; i++) {
                     g.setColor(col[i]);
                     g.fillArc((int) x[i] - 16, (int) y[i] - 16, 32, 32, 0, 360);
                 }
             });
 
+            canvas[0] = view;
             Form form = new Form("Bouncing Balls", new BorderLayout());
             form.add(BorderLayout.CENTER, view);
             UITimer.timer(16, true, form, () -> {
@@ -442,8 +445,10 @@ final class PlaygroundExamples {
                     x[i] += vx[i];
                     y[i] += vy[i];
                     if (x[i] < 16f) { x[i] = 16f; vx[i] = -vx[i]; }
-                    if (x[i] > 304f) { x[i] = 304f; vx[i] = -vx[i]; }
-                    if (y[i] > 464f) { y[i] = 464f; vy[i] = -vy[i] * 0.78f; }
+                    float right = Math.max(16f, view.getWidth() - 16f);
+                    float floor = Math.max(16f, view.getHeight() - 16f);
+                    if (x[i] > right) { x[i] = right; vx[i] = -Math.abs(vx[i]); }
+                    if (y[i] > floor) { y[i] = floor; vy[i] = -Math.abs(vy[i]) * 0.78f; }
                 }
                 view.repaint();
             });
@@ -469,7 +474,7 @@ final class PlaygroundExamples {
             Material[] material = new Material[1];
             float[] angle = { 0f };
 
-            RenderView view = new RenderView(GpuScripting.renderer(
+            RenderView view = new RenderView(GpuScripting.renderer(camera,
                 device -> {
                     cube[0] = Primitives.cube(device, 1f);
                     material[0] = new Material(Material.Type.PHONG).setColor(0xff3399ff);
