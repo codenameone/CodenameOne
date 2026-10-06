@@ -784,7 +784,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if (!migrations.isEmpty()) {
             sources.put(MigrationGenerator.binaryName(backend), MigrationGenerator.source(migrations, backend));
             if (backend) {
-                sources.put(MigrationGenerator.BACKEND_CLI_BINARY, MigrationGenerator.cliSource());
+                sources.put(MigrationGenerator.BACKEND_CLI_BINARY, MigrationGenerator.cliSource(
+                        RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
+                                "cn1.security.schema.enabled")));
             }
         }
         for (EntityClass ec : accepted.values()) {

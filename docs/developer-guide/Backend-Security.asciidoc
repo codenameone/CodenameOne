@@ -1336,6 +1336,10 @@ start, and the error says where the key belongs. Set to `false` at run time in
 a server built with it, the set isn't applied, and the tables are whatever the
 database already has.
 
+The `cn1:migrate` goals of a module that asks for the tables apply them too,
+before the module's own scripts, and `cn1:migrate-info` lists both histories.
+The goals run for a module that has scripts of its own.
+
 A test, or a server you assemble by hand, registers the set before the server
 starts:
 

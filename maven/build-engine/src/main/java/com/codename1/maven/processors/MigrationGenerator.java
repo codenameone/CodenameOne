@@ -501,6 +501,21 @@ final class MigrationGenerator {
     /// second `main` anywhere in its input stops the translator ("Multiple main classes").
     /// The packager removes this class from what it translates; see [#BACKEND_CLI_BINARY].
     static String cliSource() {
+        return cliSource(false);
+    }
+
+    /// [#cliSource()], for a module that may also have asked for the security layer's
+    /// tables with `cn1.security.schema.enabled=true`.
+    ///
+    /// The server's own entry point registers that set when the module asks, so a start
+    /// creates the tables before the module's scripts run. The goals start from this
+    /// class instead, and without the same registration `cn1:migrate` applied a module's
+    /// scripts to a database the security tables were not in yet -- scripts that may
+    /// refer to them -- and `cn1:migrate-info` reported a schema with half its history
+    /// missing. This class is never translated, so naming the set here links it into
+    /// nothing.
+    /// @param securitySchema whether the module asked for the security tables
+    static String cliSource(boolean securitySchema) {
         String simple = BACKEND_CLI_BINARY.substring(BACKEND_CLI_BINARY.lastIndexOf('.') + 1);
         String scripts = BACKEND_BINARY.substring(BACKEND_BINARY.lastIndexOf('.') + 1);
         StringBuilder sb = new StringBuilder(512);
@@ -510,6 +525,10 @@ final class MigrationGenerator {
         sb.append("@com.codename1.backend.annotations.Generated\n");
         sb.append("public final class ").append(simple).append(" {\n");
         sb.append("    public static void main(String[] args) throws Exception {\n");
+        if (securitySchema) {
+            sb.append("        com.codename1.backend.Migrations.register(")
+                    .append("com.codename1.backend.security.SecuritySchema.migrations());\n");
+        }
         sb.append("        com.codename1.backend.Migrations.register(").append(scripts)
                 .append(".create());\n");
         sb.append("        com.codename1.impl.backend.MigrationCli.run(args);\n");

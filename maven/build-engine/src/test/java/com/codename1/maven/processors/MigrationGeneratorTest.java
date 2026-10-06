@@ -302,6 +302,84 @@ public class MigrationGeneratorTest {
     }
 
     @Test
+    public void theGoalsApplyTheSecurityTablesAModuleAskedFor() throws Exception {
+        module(true);
+        Files.write(new File(module, "application.properties").toPath(),
+                "cn1.security.schema.enabled=true\n".getBytes("UTF-8"));
+        // A script of the module's own that leans on a security table: it can
+        // only run after the security set has.
+        script(true, "V1__profiles.sql", "CREATE TABLE profiles (id INT PRIMARY KEY, "
+                + "username_key VARCHAR(190) REFERENCES cn1_users(username_key));\n"
+                + "INSERT INTO profiles (id) SELECT 1 WHERE (SELECT COUNT(*) FROM cn1_users) = 0;");
+        ProcessorContext ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        File database = new File(tmp.newFolder(), "cli-security.db");
+        String[] keys = {"cn1.datasource.url", "cn1.config.location"};
+        String[] before = {System.getProperty(keys[0]), System.getProperty(keys[1])};
+        System.setProperty(keys[0], database.getPath());
+        System.setProperty(keys[1], tmp.newFolder().getPath());
+        try {
+            load("cn1app.BackendMigrationsCli").getMethod("main", String[].class)
+                    .invoke(null, (Object) new String[] {"migrate"});
+        } finally {
+            MigrationRegistry.unregister("security");
+            for (int i = 0; i < keys.length; i++) {
+                if (before[i] == null) {
+                    System.clearProperty(keys[i]);
+                } else {
+                    System.setProperty(keys[i], before[i]);
+                }
+            }
+        }
+        DataSource pool = DataSource.open(database.getPath());
+        try {
+            assertEquals(Long.valueOf(0), pool.queryOne("SELECT COUNT(*) AS n FROM cn1_users", null)
+                    .get("n"));
+            assertEquals(Long.valueOf(9), pool.queryOne(
+                    "SELECT COUNT(*) AS n FROM cn1_security_schema_history", null).get("n"));
+            assertEquals(Long.valueOf(1), pool.queryOne("SELECT COUNT(*) AS n FROM profiles", null)
+                    .get("n"));
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    public void theGoalsLeaveTheSecurityTablesOutOfAModuleThatDidNotAsk() throws Exception {
+        module(true);
+        script(true, "V1__notes.sql", "CREATE TABLE plain_notes (id INT PRIMARY KEY);");
+        ProcessorContext ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        assertFalse(MigrationGenerator.cliSource(false).contains("SecuritySchema"));
+        assertTrue(MigrationGenerator.cliSource(true).contains(
+                "com.codename1.backend.security.SecuritySchema.migrations()"));
+        File database = new File(tmp.newFolder(), "cli-plain.db");
+        String[] keys = {"cn1.datasource.url", "cn1.config.location"};
+        String[] before = {System.getProperty(keys[0]), System.getProperty(keys[1])};
+        System.setProperty(keys[0], database.getPath());
+        System.setProperty(keys[1], tmp.newFolder().getPath());
+        try {
+            load("cn1app.BackendMigrationsCli").getMethod("main", String[].class)
+                    .invoke(null, (Object) new String[] {"migrate"});
+        } finally {
+            for (int i = 0; i < keys.length; i++) {
+                if (before[i] == null) {
+                    System.clearProperty(keys[i]);
+                } else {
+                    System.setProperty(keys[i], before[i]);
+                }
+            }
+        }
+        DataSource pool = DataSource.open(database.getPath());
+        try {
+            assertEquals(Long.valueOf(0), pool.queryOne("SELECT COUNT(*) AS n FROM sqlite_master "
+                    + "WHERE name LIKE 'cn1\\_%' ESCAPE '\\'", null).get("n"));
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
     public void aServerThatDropsItsLastScriptLosesTheCompiledOnes() throws Exception {
         module(true);
         script(true, "V1__notes.sql", "CREATE TABLE gone_notes (id INT PRIMARY KEY);");
