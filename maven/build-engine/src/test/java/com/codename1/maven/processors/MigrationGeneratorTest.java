@@ -344,6 +344,90 @@ public class MigrationGeneratorTest {
         }
     }
 
+    /** Runs the goals' entry point against `database` and returns what it printed. */
+    private String goal(File database, String command) throws Exception {
+        String[] keys = {"cn1.datasource.url", "cn1.config.location"};
+        String[] before = {System.getProperty(keys[0]), System.getProperty(keys[1])};
+        System.setProperty(keys[0], database.getPath());
+        System.setProperty(keys[1], tmp.newFolder().getPath());
+        java.io.PrintStream out = System.out;
+        java.io.ByteArrayOutputStream printed = new java.io.ByteArrayOutputStream();
+        System.setOut(new java.io.PrintStream(printed, true, "UTF-8"));
+        try {
+            load("cn1app.BackendMigrationsCli").getMethod("main", String[].class)
+                    .invoke(null, (Object) new String[] {command});
+        } finally {
+            System.setOut(out);
+            MigrationRegistry.unregister("security");
+            MigrationRegistry.unregister("default");
+            for (int i = 0; i < keys.length; i++) {
+                if (before[i] == null) {
+                    System.clearProperty(keys[i]);
+                } else {
+                    System.setProperty(keys[i], before[i]);
+                }
+            }
+        }
+        return printed.toString("UTF-8");
+    }
+
+    @Test
+    public void aModuleWhoseOnlyMigrationsAreTheSecurityTablesGetsTheGoals() throws Exception {
+        module(true);
+        Files.write(new File(module, "application.properties").toPath(),
+                "cn1.security.schema.enabled=true\n".getBytes("UTF-8"));
+        // No script and no entity: everything this module's server migrates is a
+        // set it did not write.
+        ProcessorContext ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        File cli = new File(classes, "cn1app/BackendMigrationsCli.class");
+        assertTrue("cn1:migrate would answer \"This module has no migrations\" for a module "
+                + "whose server applies nine at start", cli.isFile());
+        assertFalse("there are no scripts of the module's own to compile",
+                new File(classes, "cn1app/BackendMigrations.class").exists());
+        assertFalse(new File(classes, "cn1app/BackendDaoBootstrap.class").exists());
+        assertFalse(MigrationGenerator.cliSource(true, false).contains("BackendMigrations.create"));
+
+        File database = new File(tmp.newFolder(), "cli-library-only.db");
+        String migrated = goal(database, "migrate");
+        // Each of the nine under a name of its own.
+        java.util.Set<String> names = new java.util.TreeSet<String>();
+        for (String line : migrated.split("\n")) {
+            if (line.startsWith("cn1: security: applied ")) {
+                names.add(line.substring("cn1: security: applied ".length()).trim());
+            }
+        }
+        assertEquals(migrated, 9, names.size());
+        assertTrue(migrated, names.contains(
+                "com.codename1.backend.security.SecuritySchema.V5__rate_limits"));
+        assertTrue(migrated, migrated.contains("cn1: security: 9 applied, schema at version 9"));
+
+        String info = goal(database, "info");
+        assertTrue(info, info.contains("cn1: security: 9 migration(s) in cn1_security_schema_history"));
+        assertTrue(goal(database, "validate"), goal(database, "validate").contains(
+                "cn1: security: the schema history matches this build's migrations"));
+        assertTrue(goal(database, "migrate").contains("cn1: security: nothing to apply"));
+
+        // A first script of the module's own joins it, and taking it away again leaves the
+        // entry point, because there is still a set to run.
+        script(true, "V1__notes.sql", "CREATE TABLE library_notes (id INT PRIMARY KEY);");
+        ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        assertTrue(new File(classes, "cn1app/BackendMigrations.class").isFile());
+        assertTrue(goal(database, "migrate").contains("applied V1__notes.sql"));
+        assertTrue(new File(module, MigrationGenerator.BACKEND_LOCATION + "/V1__notes.sql").delete());
+        ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        assertTrue(cli.isFile());
+        assertFalse(new File(classes, "cn1app/BackendMigrations.class").exists());
+
+        // And without the key there is nothing to run, so nothing to launch.
+        assertTrue(new File(module, "application.properties").delete());
+        ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
+        assertFalse(cli.exists());
+    }
+
     @Test
     public void theGoalsLeaveTheSecurityTablesOutOfAModuleThatDidNotAsk() throws Exception {
         module(true);

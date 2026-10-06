@@ -96,19 +96,33 @@ public final class SecuritySchema {
     private SecuritySchema() {
     }
 
+    /// What each version adds, in version order: the description its history row carries.
+    private static final String[] DESCRIPTIONS = {
+        "users and authorities", "api keys", "persistent logins", "second factors",
+        "rate limits", "federated identities", "oauth2 registered clients",
+        "oauth2 authorizations", "passkeys"
+    };
+
     /// The set, for `Migrations.register`.
     public static MigrationSet migrations() {
-        return MigrationSet.builder(NAME)
-                .java("1", "users and authorities", new Tables(1))
-                .java("2", "api keys", new Tables(2))
-                .java("3", "persistent logins", new Tables(3))
-                .java("4", "second factors", new Tables(4))
-                .java("5", "rate limits", new Tables(5))
-                .java("6", "federated identities", new Tables(6))
-                .java("7", "oauth2 registered clients", new Tables(7))
-                .java("8", "oauth2 authorizations", new Tables(8))
-                .java("9", "passkeys", new Tables(9))
-                .build();
+        MigrationSet.Builder set = MigrationSet.builder(NAME);
+        for (int i = 0; i < DESCRIPTIONS.length; i++) {
+            set.java(String.valueOf(i + 1), DESCRIPTIONS[i], scriptName(i + 1), new Tables(i + 1));
+        }
+        return set.build();
+    }
+
+    /// The name a version is recorded under in the history, and printed as when a run
+    /// applies it: `com.codename1.backend.security.SecuritySchema.V4__second_factors`.
+    ///
+    /// One class provides every version, and its name alone -- what a history written
+    /// before the versions were named holds, `...SecuritySchema.Tables` in all nine rows
+    /// -- says nothing about which was applied. Such a history still validates and
+    /// migrates: the script name is for people, and nothing compares it.
+    /// @param version a version of the set, from 1
+    static String scriptName(int version) {
+        return "com.codename1.backend.security.SecuritySchema.V" + version + "__"
+                + DESCRIPTIONS[version - 1].replace(' ', '_');
     }
 
     /// One version of the set. Written in Java rather than as a script because

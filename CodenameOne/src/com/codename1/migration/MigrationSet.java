@@ -162,14 +162,38 @@ public final class MigrationSet {
         /// @param migration the code to run
         /// @return this builder
         public Builder java(String version, String description, JavaMigration migration) {
-            requireVersion(version);
             if (migration == null) {
                 throw new IllegalArgumentException("A Java migration is required");
             }
             // A nested class is spelled Outer$Inner by one runtime and Outer.Inner by the
             // translated one. The history is compared across them, so it gets one spelling.
-            return add(new MigrationEntry(version, description, migration.getClass().getName().replace('$', '.'),
-                    null, null, null, 0, null, migration));
+            return java(version, description, migration.getClass().getName().replace('$', '.'), migration);
+        }
+
+        /// Adds a migration written in Java and recorded under a name of its own.
+        ///
+        /// The history records the class name of a Java migration as its script. A class
+        /// that provides several versions would be recorded under one name for all of
+        /// them, and a run that reports what it applied would print that name once per
+        /// version. Give each version a name that says which it is.
+        ///
+        /// The name is what a person reads in the history and in the output of a run.
+        /// Nothing is compared against it: a history written under another name -- the
+        /// class name, before a set started naming its versions -- still validates.
+        /// @param version the version
+        /// @param description what it does
+        /// @param name the name the history records as this migration's script
+        /// @param migration the code to run
+        /// @return this builder
+        public Builder java(String version, String description, String name, JavaMigration migration) {
+            requireVersion(version);
+            if (migration == null) {
+                throw new IllegalArgumentException("A Java migration is required");
+            }
+            if (name == null || name.length() == 0) {
+                throw new IllegalArgumentException("A Java migration needs a name");
+            }
+            return add(new MigrationEntry(version, description, name, null, null, null, 0, null, migration));
         }
 
         /// Marks the migration added last as running outside a transaction. A script that must

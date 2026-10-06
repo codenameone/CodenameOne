@@ -1339,6 +1339,16 @@ database already has. The other build-time keys follow the same two rules; see
 
 The `cn1:migrate` goals of a module that asks for the tables apply them too,
 before the module's own scripts, and `cn1:migrate-info` lists both histories.
+A module with no scripts of its own gets the goals as well, for the security
+tables alone.
+
+Each of the nine versions is recorded in `cn1_security_schema_history` under a
+script name of its own, such as
+`com.codename1.backend.security.SecuritySchema.V4__second_factors`, and
+`cn1:migrate` prints that name when it applies the version. A history written
+before the versions had names holds one class name in every row. That history
+still validates and migrates, because the script name isn't compared with
+anything, and its rows are left as they were written.
 The goals run for a module that has scripts of its own.
 
 A test, or a server you assemble by hand, registers the set before the server

@@ -332,6 +332,60 @@ class MigrationEngineTest {
         assertEquals(MigrationState.SUCCESS, after[2].getState());
     }
 
+    /** One class for every version of a set, as a library's set is written. */
+    private static final class Step implements JavaMigration {
+        private final String statement;
+
+        Step(String statement) {
+            this.statement = statement;
+        }
+
+        @Override
+        public void migrate(MigrationContext context) throws IOException {
+            context.execute(statement, null);
+        }
+    }
+
+    @Test
+    void aNamedJavaMigrationIsRecordedUnderItsNameAndAnOlderHistoryStillValidates() throws IOException {
+        FakeMigrationTarget target = new FakeMigrationTarget();
+        // As it was written before the versions had names: the class name, three times.
+        MigrationSet unnamed = MigrationSet.builder("default")
+                .java("1", "a", new Step("J1"))
+                .java("2", "b", new Step("J2"))
+                .build();
+        assertEquals("[" + Step.class.getName().replace('$', '.') + ", "
+                + Step.class.getName().replace('$', '.') + "]",
+                migrator(target, unnamed).migrate().getApplied().toString());
+
+        // The same versions, named now, and one more.
+        MigrationSet named = MigrationSet.builder("default")
+                .java("1", "a", "lib.V1__a", new Step("J1"))
+                .java("2", "b", "lib.V2__b", new Step("J2"))
+                .java("3", "c", "lib.V3__c", new Step("J3"))
+                .build();
+        // Pending version 3 is all validate may object to; the renamed rows are not drift.
+        MigrationException pending = assertThrows(MigrationException.class,
+                () -> migrator(target, named).validate());
+        assertEquals(MigrationException.VALIDATE_FAILED, pending.getCode());
+        assertTrue(pending.getMessage().contains("version 3 (lib.V3__c) has not been applied"),
+                pending.getMessage());
+        assertFalse(pending.getMessage().contains("version 1"), pending.getMessage());
+        assertFalse(pending.getMessage().contains("version 2"), pending.getMessage());
+
+        target.statements.clear();
+        MigrateResult result = migrator(target, named).migrate();
+        assertEquals("[lib.V3__c]", result.getApplied().toString());
+        assertEquals("[J3]", target.statements.toString());
+        migrator(target, named).validate();
+        // What was written stays as it was written; only the new row has the new name.
+        assertEquals(Step.class.getName().replace('$', '.'), target.history.get(0).script);
+        assertEquals("lib.V3__c", target.history.get(2).script);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> MigrationSet.builder("default").java("1", "a", "", new Step("J1")));
+    }
+
     @Test
     void aJavaMigrationRunsInOrderAndIsRecordedWithoutAChecksum() throws IOException {
         FakeMigrationTarget target = new FakeMigrationTarget();

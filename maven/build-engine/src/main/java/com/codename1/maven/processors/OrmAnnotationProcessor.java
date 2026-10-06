@@ -772,21 +772,30 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         java.util.List<MigrationGenerator.Item> migrations = MigrationGenerator.scan(ctx, backend);
         MigrationGenerator.addJava(ctx, migrations, javaMigrations);
         if (ctx.hasErrors()) return;
+        // A set the module did not write but its server applies: the security tables,
+        // asked for with cn1.security.schema.enabled=true. It is a migration set to run
+        // like the module's own, so the goals get their entry point for it alone too.
+        boolean librarySets = backend && BackendSettings.securitySchema(ctx);
         if (migrations.isEmpty()) {
-            removeStaleMigrations(ctx, accepted.isEmpty());
+            removeStaleMigrations(ctx, accepted.isEmpty(), librarySets);
+        }
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        if (backend && (!migrations.isEmpty() || librarySets)) {
+            sources.put(MigrationGenerator.BACKEND_CLI_BINARY,
+                    MigrationGenerator.cliSource(librarySets, !migrations.isEmpty()));
         }
         if (accepted.isEmpty() && migrations.isEmpty()) {
             removeAStaleBootstrap(ctx);
+            if (!sources.isEmpty()) {
+                compileGenerated(ctx, sources);
+                ctx.getLog().info("cn1: generated " + MigrationGenerator.BACKEND_CLI_BINARY
+                        + " for the migration sets this module's server applies");
+            }
             return;
         }
 
-        Map<String, String> sources = new LinkedHashMap<String, String>();
         if (!migrations.isEmpty()) {
             sources.put(MigrationGenerator.binaryName(backend), MigrationGenerator.source(migrations, backend));
-            if (backend) {
-                sources.put(MigrationGenerator.BACKEND_CLI_BINARY, MigrationGenerator.cliSource(
-                        BackendSettings.securitySchema(ctx)));
-            }
         }
         for (EntityClass ec : accepted.values()) {
             if (backend && wouldReplaceAnExistingClass(ec.daoBinaryName,
@@ -813,6 +822,23 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // regardless, which is what makes its provenance readable.
         sources.put(backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY,
                 generateBootstrapSource(accepted.values(), backend, !migrations.isEmpty()));
+        compileGenerated(ctx, sources);
+        try {
+            OrmEnhancer.enhance(accepted, ctx);
+        } catch (IOException ioe) {
+            throw new ProcessingException("Could not compile generated dao sources: "
+                    + ioe.getMessage(), ioe);
+        }
+        ctx.getLog().info("cn1: generated " + accepted.size() + " @Entity "
+                + (backend ? "server-side " : "") + "dao(s) + "
+                + (backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY)
+                + (migrations.isEmpty() ? "" : " + " + migrations.size() + " migration(s) in "
+                        + MigrationGenerator.binaryName(backend)));
+    }
+
+    /// Compiles generated sources into the module's output directory.
+    private static void compileGenerated(ProcessorContext ctx, Map<String, String> sources)
+            throws ProcessingException {
         try {
             java.util.List<java.io.File> cp = new java.util.ArrayList<java.io.File>();
             cp.add(ctx.getOutputClassDir());
@@ -825,16 +851,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 cp.add(new java.io.File(element));
             }
             JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
-            OrmEnhancer.enhance(accepted, ctx);
         } catch (IOException ioe) {
             throw new ProcessingException("Could not compile generated dao sources: "
                     + ioe.getMessage(), ioe);
         }
-        ctx.getLog().info("cn1: generated " + accepted.size() + " @Entity "
-                + (backend ? "server-side " : "") + "dao(s) + "
-                + (backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY)
-                + (migrations.isEmpty() ? "" : " + " + migrations.size() + " migration(s) in "
-                        + MigrationGenerator.binaryName(backend)));
     }
 
     // ---------------------------------------------------------------
@@ -2263,11 +2283,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     ///
     /// @param noEntities whether the module has no entity either, so that no
     /// bootstrap is about to be generated over the old one
-    private void removeStaleMigrations(ProcessorContext ctx, boolean noEntities) {
-        String[] names = backend
-                ? new String[] {MigrationGenerator.BACKEND_BINARY,
-                    MigrationGenerator.BACKEND_CLI_BINARY}
-                : new String[] {MigrationGenerator.CLIENT_BINARY};
+    /// @param keepEntryPoint whether the goals' entry point is about to be
+    /// generated again, for a set the module did not write -- it then stays,
+    /// and only the module's own compiled scripts go
+    private void removeStaleMigrations(ProcessorContext ctx, boolean noEntities,
+            boolean keepEntryPoint) {
+        String[] names = !backend ? new String[] {MigrationGenerator.CLIENT_BINARY}
+                : keepEntryPoint ? new String[] {MigrationGenerator.BACKEND_BINARY}
+                : new String[] {MigrationGenerator.BACKEND_BINARY,
+                    MigrationGenerator.BACKEND_CLI_BINARY};
         boolean removed = false;
         for (String name : names) {
             if (backend) {

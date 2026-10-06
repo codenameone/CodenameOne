@@ -47,7 +47,11 @@ import java.util.Map;
 // exactly the engine it would, and there is no second reader of the script files to disagree
 // with the first.
 abstract class AbstractMigrateMojo extends AbstractMojo {
-    /** The class process-annotations generates when the module has migrations. */
+    /**
+     * The class process-annotations generates when the module has any migration set to run:
+     * scripts of its own, or a set its server applies without the module having written
+     * it -- the security tables.
+     */
     static final String ENTRY_POINT = "cn1app.BackendMigrationsCli";
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
@@ -67,8 +71,10 @@ abstract class AbstractMigrateMojo extends AbstractMojo {
         File classes = new File(project.getBuild().getOutputDirectory());
         File entry = new File(classes, ENTRY_POINT.replace('.', File.separatorChar) + ".class");
         if (!entry.isFile()) {
-            throw new MojoFailureException("This module has no migrations: add V<version>__<description>.sql "
-                    + "files to src/main/resources/db/migration (" + entry + " was not generated)");
+            throw new MojoFailureException("This module has no migrations to run: add "
+                    + "V<version>__<description>.sql files to src/main/resources/db/migration, or ask "
+                    + "for the security tables with cn1.security.schema.enabled=true in "
+                    + "application.properties (" + entry + " was not generated)");
         }
         List<String> command = new ArrayList<String>();
         command.add(javaExecutable());
