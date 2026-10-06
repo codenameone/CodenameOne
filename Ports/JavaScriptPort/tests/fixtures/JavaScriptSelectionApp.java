@@ -112,6 +112,36 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 field.repaint();
             });
             form.addAll(field, change, reset, status);
+        } else if (query.indexOf("review=rendering") >= 0) {
+            TextField hint = new TextField("", "Styled empty hint");
+            hint.setName("reviewHint");
+            hint.getHintLabel().getAllStyles().setFgColor(0x654321);
+            TextArea multiline = new TextArea("", 3, 24);
+            multiline.setName("reviewMultilineHint");
+            multiline.setHint("Multiline empty hint");
+            Button clear = new Button("Clear hint field");
+            clear.addActionListener(e -> hint.setText(""));
+            form.addAll(hint, multiline, clear);
+            for (int align : new int[] {Component.LEFT, Component.RIGHT, Component.CENTER}) {
+                TextField rtl = new TextField("שלום");
+                rtl.setName("rtl" + align);
+                rtl.setRTL(true);
+                rtl.getAllStyles().setAlignment(align);
+                form.add(rtl);
+            }
+        } else if (query.indexOf("review=exclusions") >= 0) {
+            TextField.setUseNativeTextInput(false);
+            TextField lightweight = new TextField("Lightweight value");
+            lightweight.setName("reviewLightweight");
+            Label menu = new Label("Context listener label");
+            menu.addContextMenuListener(e -> { status.setText("Context received"); e.consume(); });
+            TextArea commands = new TextArea("Context command area");
+            commands.setName("reviewContextCommands");
+            commands.setContextMenuCommands(new Command("Application command"));
+            Container inherited = new Container(BoxLayout.y());
+            inherited.addContextMenuListener(e -> { status.setText("Inherited context received"); e.consume(); });
+            inherited.add(new Label("Inherited context label"));
+            form.addAll(lightweight, menu, commands, inherited, status);
         } else if (query.indexOf("review=scroll") >= 0) {
             StringBuilder lines = new StringBuilder();
             for (int i = 0; i < 30; i++) lines.append("Text row ").append(i).append("\n");

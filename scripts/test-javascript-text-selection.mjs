@@ -66,6 +66,47 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('rendering');
+    const hint = page.locator('.cn1-selection-editor[aria-label="reviewHint"]');
+    await hint.waitFor({ state: 'visible' });
+    async function waitForHint(text) {
+      await page.waitForFunction(text => window.__cn1TextDraws.concat(
+        [...document.querySelectorAll('#cn1-text-layer span')].map(el => el.textContent)).includes(text), text);
+    }
+    await waitForHint('Styled empty hint');
+    await waitForHint('Multiline empty hint');
+    await hint.fill('Entered value');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { window.__cn1TextDraws = []; });
+    await clickButton('Clear hint field');
+    await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="reviewHint"]').value === '');
+    await waitForHint('Styled empty hint');
+    for (const [align, expected] of [[1, 'right'], [3, 'left'], [4, 'center']]) {
+      const rtl = page.locator(`.cn1-selection-editor[aria-label="rtl${align}"]`);
+      assert.equal(await rtl.evaluate(el => getComputedStyle(el).textAlign), expected);
+      assert.equal(await rtl.evaluate(el => getComputedStyle(el).direction), 'rtl');
+    }
+    console.log('PASS', name, 'empty field hints, hint restoration and RTL alignments');
+
+    await openReview('exclusions');
+    assert.equal(await page.locator('.cn1-selection-editor[aria-label="reviewLightweight"]').count(), 0);
+    assert.equal(await page.locator('.cn1-selection-editor[aria-label="reviewContextCommands"]').count(), 0);
+    for (const text of ['Lightweight value', 'Context listener label', 'Inherited context label']) {
+      await waitForHint(text);
+    }
+    if (!mobile) {
+      for (const [text, status] of [['Context listener label', 'Context received'],
+        ['Inherited context label', 'Inherited context received']]) {
+        const span = page.locator('#cn1-text-layer span').filter({ hasText: text }).first();
+        await span.waitFor({ state: 'attached' });
+        assert.equal(await span.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+        const bounds = await span.evaluate(el => el.getBoundingClientRect().toJSON());
+        await page.mouse.click(bounds.x + 10, bounds.y + bounds.height / 2, { button: 'right' });
+        await page.waitForFunction(text => document.body.innerText.includes(text), status);
+      }
+    }
+    console.log('PASS', name, 'lightweight input and component context menus retain canvas interaction');
+
     await openReview('metadata');
     const field = page.locator('.cn1-selection-editor[aria-label="reviewField"]');
     await field.waitFor({ state: 'visible' });

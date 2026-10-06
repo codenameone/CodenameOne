@@ -119,6 +119,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.util.Resources;
@@ -1138,6 +1139,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private boolean allowsSelectionOverlay(TextArea ta) {
         return nativeSelectionRequested() && Accessor.allowsNativeTextSelection(ta)
+                && (!(ta instanceof TextField) || TextField.isUseNativeTextInput())
                 && ta.getDoneListener() == null
                 && (ta.getConstraint() & TextArea.PASSWORD) == 0
                 && (ta.isEditable() || ta.isTextSelectionEnabled() && ta.getComponentForm() != null
@@ -1345,6 +1347,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             } else if (ta.isSingleLineTextArea() && ta.getVerticalAlignment() == Component.BOTTOM) {
                 pt = Math.max(pt, ta.getHeight() - pb - font.fontHeight());
             }
+            int alignment = DefaultLookAndFeel.reverseAlignForBidi(ta, style.getAlignment());
             String css = "position:absolute;box-sizing:border-box;border:0;margin:0;outline:0;resize:none;"
                     + "background:transparent;overflow:hidden;pointer-events:auto;user-select:text;cursor:text;"
                     + "z-index:2147483644;display:block;left:" + scaleCoord(x) + "px;top:" + scaleCoord(y)
@@ -1353,8 +1356,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     + "px " + scaleCoord(pb) + "px " + scaleCoord(style.getPadding(ta.isRTL(), Component.LEFT))
                     + "px;font:" + font.getScaledCSS() + ";line-height:" + scaleCoord(font.fontHeight() + ta.getRowsGap())
                     + "px;color:" + HTML5Graphics.colorWithAlpha((style.getFgAlpha() << 24) | (style.getFgColor() & 0xffffff)) + ";direction:" + (ta.isRTL() ? "rtl" : "ltr")
-                    + ";text-align:" + (style.getAlignment() == Component.CENTER ? "center"
-                        : style.getAlignment() == Component.RIGHT ? "right" : "left")
+                    + ";text-align:" + (alignment == Component.CENTER ? "center"
+                        : alignment == Component.RIGHT ? "right" : "left")
                     + ";clip-path:inset(" + scaleCoord(top - y) + "px " + scaleCoord(x + ta.getWidth() - right)
                     + "px " + scaleCoord(y + ta.getHeight() - bottom) + "px " + scaleCoord(left - x) + "px);";
             if (!css.equals(lastCss)) {
@@ -6446,6 +6449,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     
     
+    @Override
+    public boolean nativeEditorPaintsHint() {
+        // Keep themed hint text and icons on the canvas beneath the transparent editor.
+        return false;
+    }
+
     @Override
     public boolean isNativeEditorVisible(Component c) {
         NativeOverlay overlay = (NativeOverlay)c.getNativeOverlay();

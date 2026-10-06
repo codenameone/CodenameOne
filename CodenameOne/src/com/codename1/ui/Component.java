@@ -737,7 +737,17 @@ public class Component implements Animation, StyleListener, Editable {
         return pointerPressedListeners != null && pointerPressedListeners.hasListeners()
                 || pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()
                 || pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()
-                || longPressListeners != null && longPressListeners.hasListeners();
+                || longPressListeners != null && longPressListeners.hasListeners()
+                || hasContextMenuHandling();
+    }
+
+    private boolean hasContextMenuHandling() {
+        // Context menus bubble to ancestors, so their text must retain canvas hit testing too.
+        for (Component c = this; c != null; c = c.getParent()) {
+            if (c.contextMenuListeners != null && c.contextMenuListeners.hasListeners()
+                    || c.contextMenuCommands != null && c.contextMenuCommands.length > 0) return true;
+        }
+        return false;
     }
 
     /// Returns a "meta style" that allows setting styles once to all the different Style objects, the getters for this
