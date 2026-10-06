@@ -108,6 +108,58 @@ public class BackKeyAndNoHistoryTest {
         assertEquals("down;up;", events.toString());
     }
 
+    /// The default down only tracks the key and back happens on the up, as
+    /// on Android, so an activity that overrides only `onKeyUp` sees a
+    /// tracked up. The default down used to finish the activity at once and
+    /// the up was never sent.
+    @Test
+    public void anOnKeyUpOverrideSeesTheTrackedUpOfTheDefaultDown() {
+        final StringBuilder events = new StringBuilder();
+        onEdt(new StackWork() {
+            @Override
+            public void run(Context app) {
+                AndroidTestSupport.TestActivity.keys = new AndroidTestSupport.KeyHandler() {
+                    @Override
+                    public boolean onKey(Activity activity, KeyEvent event) {
+                        AndroidTestSupport.TestActivity t = (AndroidTestSupport.TestActivity) activity;
+                        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                            return t.defaultKeyDown(event);
+                        }
+                        events.append("up tracking=" + event.isTracking() + " finishing=" + t.isFinishing());
+                        return true;
+                    }
+                };
+                Activity root = start(app, Intent.FLAG_ACTIVITY_NEW_TASK);
+                Activity a = start(root, 0);
+                ActivityThread.onBack(a.mRecord);
+                assertFalse("the up handler consumed back", a.isFinishing());
+            }
+        });
+        assertEquals("up tracking=true finishing=false", events.toString());
+    }
+
+    /// Claiming the down without tracking it still blocks back: the default
+    /// up acts only on a tracked key.
+    @Test
+    public void aDownClaimedWithoutTrackingBlocksTheDefaultUp() {
+        onEdt(new StackWork() {
+            @Override
+            public void run(Context app) {
+                AndroidTestSupport.TestActivity.keys = new AndroidTestSupport.KeyHandler() {
+                    @Override
+                    public boolean onKey(Activity activity, KeyEvent event) {
+                        AndroidTestSupport.TestActivity t = (AndroidTestSupport.TestActivity) activity;
+                        return event.getAction() == KeyEvent.ACTION_DOWN || t.defaultKeyUp(event);
+                    }
+                };
+                Activity root = start(app, Intent.FLAG_ACTIVITY_NEW_TASK);
+                Activity a = start(root, 0);
+                ActivityThread.onBack(a.mRecord);
+                assertFalse("a claimed down did not block back", a.isFinishing());
+            }
+        });
+    }
+
     @Test
     public void anUnhandledBackKeyStillFinishes() {
         onEdt(new StackWork() {

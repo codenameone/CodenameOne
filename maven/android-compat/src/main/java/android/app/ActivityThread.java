@@ -162,6 +162,11 @@ public final class ActivityThread {
         if (intent == null) {
             throw new NullPointerException("intent");
         }
+        // A launch crosses a process boundary on Android, so the activity
+        // never shares the caller's object: a caller that reuses or mutates
+        // its Intent after startActivity() must not change getIntent() or
+        // what onNewIntent() was given.
+        intent = new Intent(intent);
         // Activities start on the EDT, which is the main looper's thread.
         android.os.Looper.prepareMainLooper();
         // A component's package, and an implicit intent's setPackage(), are
@@ -821,14 +826,20 @@ public final class ActivityThread {
         Activity a = r.activity;
         // Both halves of the key, as on Android: a handler that claims the
         // down and acts in onKeyUp() (an activity's or a focused view's) is
-        // otherwise a no-op. The up is not sent to an activity the down
-        // already finished -- on Android it would reach the next window,
-        // which never saw the down and ignores it.
-        boolean handled = a.dispatchKeyEvent(new android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,
-                android.view.KeyEvent.KEYCODE_BACK));
+        // otherwise a no-op. A down that called startTracking() gets a
+        // tracked up, which is what Activity's default onKeyUp() navigates
+        // on. The up is not sent to an activity the down already finished --
+        // on Android it would reach the next window, which never saw the
+        // down and ignores it.
+        long now = android.os.SystemClock.uptimeMillis();
+        android.view.KeyEvent down = new android.view.KeyEvent(now, now, android.view.KeyEvent.ACTION_DOWN,
+                android.view.KeyEvent.KEYCODE_BACK, 0);
+        boolean handled = a.dispatchKeyEvent(down);
         if (!a.isFinishing()) {
-            handled |= a.dispatchKeyEvent(new android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,
-                    android.view.KeyEvent.KEYCODE_BACK));
+            boolean tracked = handled && (down.getFlags() & android.view.KeyEvent.FLAG_START_TRACKING) != 0;
+            handled |= a.dispatchKeyEvent(new android.view.KeyEvent(now, android.os.SystemClock.uptimeMillis(),
+                    android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK, 0, 0, 0, 0,
+                    tracked ? android.view.KeyEvent.FLAG_TRACKING : 0));
         }
         if (handled) {
             return;

@@ -791,15 +791,23 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
     // ------------------------------------------------------------ input
 
+    /// The back key is claimed on the down and acted on at the up, as on
+    /// Android: the down only starts tracking, so an `onKeyUp` override sees
+    /// the up, and an `onKeyDown` override that returns true without calling
+    /// through still blocks back (its up is not tracked).
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            onBackPressed();
+            event.startTracking();
             return true;
         }
         return false;
     }
 
     public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && event.isTracking() && !event.isCanceled()) {
+            onBackPressed();
+            return true;
+        }
         return false;
     }
 

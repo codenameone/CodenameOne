@@ -41,6 +41,15 @@ public class EditText extends TextView {
 
     private EditTextPeer mEditPeer;
     private boolean mSyncing;
+    /// The selection last requested through `setSelection`, kept until the
+    /// text changes or the cursor moves away from its end. The native field
+    /// has a cursor and no selection range, so a range is reported back as
+    /// requested while the cursor sits at its end; typing then inserts at
+    /// that end rather than replacing the range, which no Codename One
+    /// field can do.
+    private boolean mSelSet;
+    private int mSelStart;
+    private int mSelEnd;
 
     public EditText(Context context) {
         this(context, null);
@@ -69,6 +78,10 @@ public class EditText extends TextView {
     @Override
     protected Component createPeer() {
         mEditPeer = new EditTextPeer(this);
+        if (mSelSet) {
+            // Requested before the peer existed (onCreate() usually).
+            mEditPeer.setCursor(mSelEnd);
+        }
         return mEditPeer;
     }
 
@@ -165,6 +178,9 @@ public class EditText extends TextView {
     }
 
     public void setSelection(int start, int stop) {
+        mSelSet = true;
+        mSelStart = start;
+        mSelEnd = stop;
         if (mEditPeer != null) {
             mEditPeer.setCursor(stop);
         }
@@ -184,12 +200,31 @@ public class EditText extends TextView {
 
     @Override
     public int getSelectionStart() {
-        return mEditPeer == null ? length() : mEditPeer.cursor();
+        return requestedSelectionHolds() ? Math.min(mSelStart, length()) : cursor();
     }
 
     @Override
     public int getSelectionEnd() {
-        return getSelectionStart();
+        return requestedSelectionHolds() ? Math.min(mSelEnd, length()) : cursor();
+    }
+
+    private int cursor() {
+        return mEditPeer == null || !mEditPeer.tracksCursor() ? length() : mEditPeer.cursor();
+    }
+
+    private boolean requestedSelectionHolds() {
+        if (!mSelSet) {
+            return false;
+        }
+        if (mEditPeer == null || !mEditPeer.tracksCursor()) {
+            return true;
+        }
+        if (mEditPeer.cursor() != Math.min(mSelEnd, length())) {
+            // The user moved the cursor.
+            mSelSet = false;
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -248,6 +283,7 @@ public class EditText extends TextView {
     @Override
     protected void textChanged() {
         super.textChanged();
+        mSelSet = false;
         if (mEditPeer != null) {
             mEditPeer.syncFromView();
         }

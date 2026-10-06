@@ -264,6 +264,12 @@ public final class EditTextPeer extends Container {
         return field == null ? 0 : Math.max(0, field.getCursorPosition());
     }
 
+    /// Whether the field has a cursor `setCursor`/`cursor` reach: a
+    /// multi-line text area reports none.
+    public boolean tracksCursor() {
+        return field instanceof TextField;
+    }
+
     static int constraint(int inputType) {
         int cls = inputType & InputType.TYPE_MASK_CLASS;
         int variation = inputType & InputType.TYPE_MASK_VARIATION;

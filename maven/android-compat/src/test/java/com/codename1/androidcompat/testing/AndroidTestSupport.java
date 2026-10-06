@@ -119,6 +119,16 @@ public final class AndroidTestSupport {
             KeyHandler k = keys;
             return k != null ? k.onKey(this, event) : super.onKeyUp(keyCode, event);
         }
+
+        /// The platform's own `onKeyDown`, for a [KeyHandler] that defers to it.
+        public boolean defaultKeyDown(android.view.KeyEvent event) {
+            return super.onKeyDown(event.getKeyCode(), event);
+        }
+
+        /// The platform's own `onKeyUp`, for a [KeyHandler] that defers to it.
+        public boolean defaultKeyUp(android.view.KeyEvent event) {
+            return super.onKeyUp(event.getKeyCode(), event);
+        }
     }
 
     /// Handles a test activity's key events.

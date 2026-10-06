@@ -73,16 +73,16 @@ public class LaunchModeTest {
             public void run() {
                 Context app = AndroidTestSupport.context().getApplicationContext();
                 Intent i = new Intent(app, AndroidTestSupport.SingleTopActivity.class)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("n", 1);
                 app.startActivity(i);
                 Activity first = ActivityThread.getTopActivity();
                 int count = ActivityThread.getActivityCount();
                 app.startActivity(new Intent(app, AndroidTestSupport.SingleTopActivity.class)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("n", 2));
                 assertSame(first, ActivityThread.getTopActivity());
                 assertEquals(count, ActivityThread.getActivityCount());
                 assertEquals(1, ((AndroidTestSupport.SingleTopActivity) first).newIntents);
-                assertSame("onNewIntent does not replace getIntent()", i, first.getIntent());
+                assertEquals("onNewIntent does not replace getIntent()", 1, first.getIntent().getIntExtra("n", 0));
             }
         });
     }
@@ -167,7 +167,7 @@ public class LaunchModeTest {
                 assertTrue("a standard target is recreated", now != target);
                 assertTrue(target.isDestroyed());
                 assertTrue(above.isDestroyed());
-                assertSame(again, now.getIntent());
+                assertEquals(again.getFlags(), now.getIntent().getFlags());
                 assertEquals(count, ActivityThread.getActivityCount());
                 assertSame(now, ActivityThread.getTopActivity());
             }
@@ -195,7 +195,7 @@ public class LaunchModeTest {
                 assertTrue(above.isDestroyed());
                 // As on Android, a reused instance keeps its launch intent;
                 // the new one reaches onNewIntent only.
-                assertSame(original, target.getIntent());
+                assertEquals(original.getFlags(), target.getIntent().getFlags());
                 assertEquals(count, ActivityThread.getActivityCount());
             }
         });
