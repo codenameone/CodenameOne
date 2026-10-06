@@ -157,25 +157,55 @@ var o = {};
     // "Email me these steps" from the post-download panel. The embedding page
     // (layouts/_default/initializr.html) forwards it to BuildCloud through
     // cn1-initializr-beacon.js, which hashes the package name before it leaves
-    // the browser. Answers false only when there is no embedding page to ask,
-    // so the panel does not claim an email is on its way.
+    // the browser, and ANSWERS with cn1-initializr-steps-result carrying the
+    // same id and whether it actually issued the request. postMessage alone
+    // proves nothing: on localhost, a PR preview, a page without the beacon,
+    // or a browser without fetch/WebCrypto the host drops it, and the panel
+    // must not say "Check your inbox" for an email nobody asked for. No answer
+    // within STEPS_ACK_TIMEOUT_MS counts as not sent.
+    var STEPS_ACK_TIMEOUT_MS = 6000;
+    var stepsSeq = 0;
+
     o.requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String = function(email, packageName, template, ide, callback) {
+        var done = false;
+        var id = "steps-" + (++stepsSeq) + "-" + new Date().getTime();
+        var onAnswer = function(evt) {
+            if (!evt || evt.source !== window.parent || !evt.data
+                    || evt.data.type !== "cn1-initializr-steps-result" || evt.data.id !== id) {
+                return;
+            }
+            finish(evt.data.ok === true);
+        };
+        var finish = function(ok) {
+            if (done) {
+                return;
+            }
+            done = true;
+            try {
+                window.removeEventListener("message", onAnswer);
+            } catch (ignored) {
+                // Nothing to clean up.
+            }
+            callback.complete(ok);
+        };
         try {
             if (email && window.parent && window.parent !== window && window.parent.postMessage) {
+                window.addEventListener("message", onAnswer);
+                window.setTimeout(function() { finish(false); }, STEPS_ACK_TIMEOUT_MS);
                 window.parent.postMessage({
                     type: "cn1-initializr-steps-request",
+                    id: id,
                     email: String(email),
                     packageName: packageName ? String(packageName) : "",
                     template: template ? String(template) : "",
                     ide: ide ? String(ide) : ""
                 }, "*");
-                callback.complete(true);
                 return;
             }
         } catch (ignored) {
             // Cross-origin or sandbox restrictions: report that nothing was sent.
         }
-        callback.complete(false);
+        finish(false);
     };
 
     // Horizontal clearance (CSS px) the host page's Crisp widget needs so the

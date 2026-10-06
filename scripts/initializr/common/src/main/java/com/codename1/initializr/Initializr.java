@@ -692,33 +692,51 @@ public class Initializr extends Lifecycle {
             }
         });
         send.addActionListener(e -> {
-            String address = email.getText() == null ? "" : email.getText().trim();
-            if (!isPlausibleEmail(address)) {
+            final String address = email.getText() == null ? "" : email.getText().trim();
+            if (!isPlausibleEmail(address) || requested[0]) {
                 return;
             }
-            boolean sent;
-            try {
-                sent = bridge.requestSteps(address, model.getPackageName(), model.templateId(), model.ideId());
-            } catch (Throwable t) {
-                sent = false;
-            }
-            if (!sent) {
-                note.setText("Couldn't send the email from here. The README in your project has the same steps.");
-            } else {
-                requested[0] = true;
-                note.setText("Check your inbox.");
-                send.setEnabled(false);
-                email.setEnabled(false);
-            }
-            Form f = note.getComponentForm();
-            if (f != null) {
-                f.revalidate();
-            }
+            // The bridge waits for the host page to confirm it really sent the
+            // request (up to a few seconds), so ask off the EDT and keep the
+            // form responsive; the outcome comes back through callSerially.
+            requested[0] = true;
+            send.setEnabled(false);
+            email.setEnabled(false);
+            note.setText("Sending...");
+            revalidateForm(note);
+            new Thread(() -> {
+                boolean sent;
+                try {
+                    sent = bridge.requestSteps(address, model.getPackageName(), model.templateId(), model.ideId());
+                } catch (Throwable t) {
+                    sent = false;
+                }
+                final boolean ok = sent;
+                callSerially(() -> {
+                    if (ok) {
+                        note.setText("Check your inbox.");
+                    } else {
+                        // Let them try again, and say where the same steps are.
+                        requested[0] = false;
+                        send.setEnabled(isPlausibleEmail(email.getText()));
+                        email.setEnabled(true);
+                        note.setText("Couldn't send the email from here. The README in your project has the same steps.");
+                    }
+                    revalidateForm(note);
+                });
+            }, "initializr-steps").start();
         });
         Container row = new Container(new BorderLayout());
         row.add(BorderLayout.CENTER, email);
         row.add(BorderLayout.EAST, send);
         return BoxLayout.encloseY(row, note);
+    }
+
+    private static void revalidateForm(Component c) {
+        Form f = c.getComponentForm();
+        if (f != null) {
+            f.revalidate();
+        }
     }
 
     private SpanLabel stepText(String text, String uiid) {

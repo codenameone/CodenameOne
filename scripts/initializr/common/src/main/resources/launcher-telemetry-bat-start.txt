@@ -24,9 +24,12 @@ for /f "tokens=3" %%v in ('call "%CN1_JAVA_EXE%" -version 2^>^&1 ^| findstr /i "
 for /f "tokens=1,2 delims=." %%a in ("%CN1_JAVA%") do (
   if "%%a"=="1" (set "CN1_JAVA=%%b") else (set "CN1_JAVA=%%a")
 )
-REM Start time in epoch seconds, for the duration reported at exit. cmd has no
-REM clock arithmetic, so ask PowerShell (present on every supported Windows).
+REM Start time as seconds since midnight, for the duration reported at exit.
+REM Plain cmd arithmetic on %TIME%, deliberately not PowerShell: when the
+REM launcher runs with redirected input (an IDE run configuration, CI) a
+REM PowerShell child can wait on stdin forever and hang the whole build.
 set "CN1_START="
-if not "%CN1_TELEMETRY%"=="0" for /f %%s in ('powershell -NoProfile -NonInteractive -Command "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()" 2^>nul') do set "CN1_START=%%s"
+if not "%CN1_TELEMETRY%"=="0" call :cn1_now
+if not "%CN1_TELEMETRY%"=="0" set "CN1_START=%CN1_NOW%"
 if /i not "%CMD%"=="help" call :cn1_event "step=launch" "exit=" "reason=" "secs="
 

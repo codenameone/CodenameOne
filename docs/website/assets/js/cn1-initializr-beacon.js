@@ -82,7 +82,9 @@
         }).then(function () {
           return true;
         }, function () {
-          return true;
+          // The request never left (offline, blocked): say so, so the steps
+          // panel does not claim an email is on its way. Still never rejects.
+          return false;
         });
       }).catch(function () {
         return false;

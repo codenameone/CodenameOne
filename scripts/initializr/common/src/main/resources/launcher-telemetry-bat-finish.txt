@@ -13,10 +13,20 @@ set /a CN1_JMAJ=%CN1_JAVA% >nul 2>&1
 if not "%CN1_JAVA%"=="none" if %CN1_JMAJ% GTR 0 if %CN1_JMAJ% LSS %CN1_MIN_JAVA% set "CN1_REASON=java_too_old"
 if "%CN1_EXIT_CODE%"=="0" set "CN1_REASON=ok"
 set "CN1_SECS="
-if defined CN1_START for /f %%s in ('powershell -NoProfile -NonInteractive -Command "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - %CN1_START%" 2^>nul') do set "CN1_SECS=%%s"
+if defined CN1_START call :cn1_now
+if defined CN1_START if defined CN1_NOW set /a "CN1_SECS=CN1_NOW-CN1_START"
+if defined CN1_SECS if %CN1_SECS% LSS 0 set /a "CN1_SECS+=86400"
 if /i not "%CN1_TARGET%"=="help" call :cn1_event "step=exit" "exit=%CN1_EXIT_CODE%" "reason=%CN1_REASON%" "secs=%CN1_SECS%"
 popd
 exit /b %CN1_EXIT_CODE%
+
+REM Seconds since midnight from %TIME% (H:MM:SS.cc, or with a comma before the
+REM hundredths in some locales). "1%%a-100" strips the leading zero that set /a
+REM would otherwise read as octal; a leading space in the hour becomes a zero.
+:cn1_now
+set "CN1_NOW="
+for /f "tokens=1-3 delims=:.," %%a in ("%TIME: =0%") do set /a "CN1_NOW=(1%%a-100)*3600+(1%%b-100)*60+(1%%c-100)" 2>nul
+goto :eof
 
 REM Fire-and-forget: three seconds at most, and a failure is never an error.
 :cn1_event

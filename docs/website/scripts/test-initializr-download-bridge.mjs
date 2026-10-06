@@ -41,8 +41,20 @@ function loadBridge(click) {
     },
     matchMedia() {
       return { matches: false };
+    },
+    // Message listeners and timers the steps round trip uses, driven by hand.
+    addEventListener(type, fn) {
+      if (type === "message") listeners.add(fn);
+    },
+    removeEventListener(type, fn) {
+      if (type === "message") listeners.delete(fn);
+    },
+    setTimeout(fn) {
+      timers.push(fn);
     }
   };
+  const listeners = new Set();
+  const timers = [];
 
   vm.runInNewContext(source, {
     window,
@@ -52,7 +64,15 @@ function loadBridge(click) {
   return {
     bridge: nativeInterfaces.com_codename1_initializr_WebsiteThemeNative,
     posts,
-    actions
+    actions,
+    // The host page answering a request (evt.source is the parent window).
+    answer(data, source = parent) {
+      for (const fn of [...listeners]) fn({ source, data });
+    },
+    expire() {
+      for (const fn of timers.splice(0)) fn();
+    },
+    listenerCount: () => listeners.size
   };
 }
 
@@ -90,36 +110,66 @@ function invokeDownload(state) {
 }
 
 function invokeSteps(state, email) {
-  let result;
+  const result = { value: undefined };
   state.bridge.requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String(
     email,
     "com.Example.MyApp",
     "kotlin",
-    "vs_code",
-    { complete(value) { result = value; } }
+    "vscode",
+    { complete(value) { result.value = value; } }
   );
   return result;
 }
 
 {
+  // The request carries an id; only the host's matching answer completes it.
   const state = loadBridge(() => {});
-  assert.equal(invokeSteps(state, "dev@example.org"), true);
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(state.posts)),
-    [{
-      type: "cn1-initializr-steps-request",
-      email: "dev@example.org",
-      packageName: "com.Example.MyApp",
-      template: "kotlin",
-      ide: "vs_code"
-    }]
-  );
+  const result = invokeSteps(state, "dev@example.org");
+  assert.equal(result.value, undefined, "no answer yet: the panel must wait, not claim success");
+  assert.equal(state.posts.length, 1);
+  const sent = JSON.parse(JSON.stringify(state.posts[0]));
+  assert.ok(/^steps-\d+-\d+$/.test(sent.id), "request id: " + sent.id);
+  delete sent.id;
+  assert.deepEqual(sent, {
+    type: "cn1-initializr-steps-request",
+    email: "dev@example.org",
+    packageName: "com.Example.MyApp",
+    template: "kotlin",
+    ide: "vscode"
+  });
   assert.deepEqual(state.actions, ["post"], "a steps request downloads nothing");
+
+  state.answer({ type: "cn1-initializr-steps-result", id: "someone-else", ok: true });
+  state.answer({ type: "cn1-initializr-steps-result", id: state.posts[0].id, ok: true }, {});
+  assert.equal(result.value, undefined, "answers with another id, or from another window, are ignored");
+
+  state.answer({ type: "cn1-initializr-steps-result", id: state.posts[0].id, ok: true });
+  assert.equal(result.value, true);
+  assert.equal(state.listenerCount(), 0, "the listener is removed once answered");
+  state.expire();
+  assert.equal(result.value, true, "a late timeout does not overturn the answer");
+}
+
+{
+  // The host could not send (localhost, a PR preview, no beacon, no WebCrypto).
+  const state = loadBridge(() => {});
+  const result = invokeSteps(state, "dev@example.org");
+  state.answer({ type: "cn1-initializr-steps-result", id: state.posts[0].id, ok: false });
+  assert.equal(result.value, false);
+}
+
+{
+  // No answer at all: the timeout reports not sent.
+  const state = loadBridge(() => {});
+  const result = invokeSteps(state, "dev@example.org");
+  state.expire();
+  assert.equal(result.value, false);
+  assert.equal(state.listenerCount(), 0);
 }
 
 {
   const state = loadBridge(() => {});
-  assert.equal(invokeSteps(state, ""), false, "no request without an email");
+  assert.equal(invokeSteps(state, "").value, false, "no request without an email");
   assert.deepEqual(state.posts, []);
 }
 

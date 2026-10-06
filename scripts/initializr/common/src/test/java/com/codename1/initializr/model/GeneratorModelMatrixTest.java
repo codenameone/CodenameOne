@@ -39,6 +39,22 @@ import java.util.Map;
 
 public class GeneratorModelMatrixTest extends AbstractTest {
 
+    /// Whether any non-comment line of a .bat runs PowerShell. Comments may
+    /// mention it (they explain why it is not used).
+    private static boolean spawnsPowerShell(String bat) {
+        String[] lines = bat.split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            if (line.toUpperCase().startsWith("REM") || line.startsWith("::")) {
+                continue;
+            }
+            if (line.toLowerCase().indexOf("powershell") >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // BuildCloud's /api/v2/funnel/initializr-steps accepts exactly these IDE
     // names (InitializrStepsService.IDES) and treats anything else as "no IDE",
     // which drops the IDE-specific step from the email. VS_CODE.name() lower-
@@ -1031,6 +1047,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(bat, "set \"CN1_MIN_JAVA=" + min + "\"", label + "build.bat should know the Java level");
             assertContains(bat, GeneratorModel.LAUNCHER_EVENTS_URL, label + "build.bat should report to the events URL");
             assertContains(bat, "if \"%CN1_TELEMETRY%\"==\"0\" goto :eof", label + "build.bat should honour the opt-out");
+            // A PowerShell child can wait on stdin forever when the launcher's input
+            // is redirected (IDE run configurations, CI) and hang the build -- it
+            // hung the windows-latest launcher job. The duration uses %TIME% instead.
+            assertFalse(spawnsPowerShell(bat), label + "build.bat must not spawn PowerShell");
+            assertContains(bat, ":cn1_now", label + "build.bat times the build with cmd arithmetic");
             assertContains(bat, "set CN1_TELEMETRY=0", label + "build.bat should explain the opt-out");
             int launch = bat.indexOf("call :cn1_event \"step=launch\"");
             int jump = bat.indexOf("\ngoto %CMD%\n");

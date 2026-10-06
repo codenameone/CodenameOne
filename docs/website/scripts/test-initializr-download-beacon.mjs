@@ -66,7 +66,8 @@ function loadBeacon({ hostname = "www.codenameone.com", fetchImpl, subtle = cryp
 // Failures are swallowed: a rejecting or throwing fetch never rejects send().
 {
   const rejecting = loadBeacon({ fetchImpl: () => Promise.reject(new TypeError("network")) });
-  assert.equal(await rejecting.beacon.send("com.example.app", "kotlin"), true);
+  assert.equal(await rejecting.beacon.send("com.example.app", "kotlin"), false,
+    "a request that never left reports false, and still does not reject");
   assert.equal(rejecting.calls.length, 1);
 
   const throwing = loadBeacon({ fetchImpl: () => { throw new Error("sync failure"); } });
@@ -132,12 +133,13 @@ for (const [label, options, email, pkg] of [
 }
 {
   const rejecting = loadBeacon({ fetchImpl: () => Promise.reject(new TypeError("network")) });
-  assert.equal(await rejecting.beacon.sendSteps("dev@example.org", "com.example.app", "", ""), true);
+  assert.equal(await rejecting.beacon.sendSteps("dev@example.org", "com.example.app", "", ""), false,
+    "an email request that never left must not be reported as sent");
 }
 
 // Page wiring: one download message -> exactly one beacon + one Crisp event,
 // and a throwing beacon does not stop the Crisp event.
-function runPage({ beaconThrows = false } = {}) {
+function runPage({ beaconThrows = false, stepsResult = true, noBeacon = false } = {}) {
   const scripts = [...pageTemplate.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   assert.ok(scripts.length > 0, "inline page script found");
   const pageScript = scripts[scripts.length - 1][1];
@@ -145,7 +147,8 @@ function runPage({ beaconThrows = false } = {}) {
   const steps = [];
   const crisp = [];
   const listeners = {};
-  const frameWindow = {};
+  const answers = [];
+  const frameWindow = { postMessage(message, origin) { answers.push([message, origin]); } };
   const element = () => ({
     addEventListener() {},
     classList: { add() {}, toggle() {}, contains: () => false },
@@ -167,7 +170,7 @@ function runPage({ beaconThrows = false } = {}) {
       sendSteps(email, pkg, template, ide) {
         steps.push([email, pkg, template, ide]);
         if (beaconThrows) throw new Error("beacon failure");
-        return Promise.resolve(true);
+        return Promise.resolve(stepsResult);
       },
     },
     cn1CrispEvents: { initializrProjectDownloaded: (data) => crisp.push(data) },
@@ -179,11 +182,13 @@ function runPage({ beaconThrows = false } = {}) {
     querySelector: () => element(),
     addEventListener() {},
   };
+  if (noBeacon) delete window.cn1InitializrBeacon;
   vm.runInNewContext(pageScript, {
     window, document, localStorage: { getItem: () => null },
   });
-  const post = (data, source = frameWindow) => listeners.message({ source, data });
-  return { post, sends, steps, crisp };
+  const post = (data, source = frameWindow) =>
+    listeners.message({ source, data, origin: "https://www.codenameone.com" });
+  return { post, sends, steps, crisp, answers };
 }
 
 {
@@ -216,8 +221,26 @@ function runPage({ beaconThrows = false } = {}) {
 }
 {
   const page = runPage({ beaconThrows: true });
-  page.post({ type: "cn1-initializr-steps-request", email: "dev@example.org", packageName: "a.b" });
+  page.post({ type: "cn1-initializr-steps-request", id: "s1", email: "dev@example.org", packageName: "a.b" });
   assert.equal(page.steps.length, 1, "a throwing beacon is swallowed");
+  assert.deepEqual(JSON.parse(JSON.stringify(page.answers)),
+    [[{ type: "cn1-initializr-steps-result", id: "s1", ok: false }, "https://www.codenameone.com"]],
+    "a throwing beacon is answered as not sent");
+}
+
+// The page answers every steps request with the same id and whether the beacon
+// really issued it, so the panel never says "Check your inbox" for nothing.
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+for (const [label, options, ok] of [
+  ["sent", {}, true],
+  ["beacon could not send (preview host, no fetch/WebCrypto, offline)", { stepsResult: false }, false],
+  ["no beacon on the page", { noBeacon: true }, false],
+]) {
+  const page = runPage(options);
+  page.post({ type: "cn1-initializr-steps-request", id: "steps-7", email: "dev@example.org", packageName: "a.b" });
+  await tick();
+  assert.deepEqual(JSON.parse(JSON.stringify(page.answers)),
+    [[{ type: "cn1-initializr-steps-result", id: "steps-7", ok }, "https://www.codenameone.com"]], label);
 }
 
 console.log("Initializr download beacon tests passed");
