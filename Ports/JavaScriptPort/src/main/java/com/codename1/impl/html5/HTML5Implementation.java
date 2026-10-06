@@ -6456,6 +6456,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isNativeEditorVisible(Component c, Graphics g) {
+        return isDisplayGraphics(g) && isNativeEditorVisible(c);
+    }
+
+    @Override
     public boolean isNativeEditorVisible(Component c) {
         NativeOverlay overlay = (NativeOverlay)c.getNativeOverlay();
         if (overlay instanceof SelectionTextOverlay) return ((SelectionTextOverlay) overlay).visible;

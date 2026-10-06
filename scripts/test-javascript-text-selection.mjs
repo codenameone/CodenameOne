@@ -24,6 +24,7 @@ const accents = 'Caffè, perché, città, più, però.\nà è é ì ò ù — À
 
 async function exercise(context, name, host, mobileDevice = null) {
   const mobile = mobileDevice != null;
+  if (name === 'chromium') await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const page = await context.newPage();
   page.setDefaultTimeout(15000);
   await page.addInitScript(() => {
@@ -66,6 +67,48 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('selectionstate');
+    async function selectionState(text, enabled) {
+      await page.waitForFunction(({ text, enabled }) => {
+        const span = [...document.querySelectorAll('#cn1-text-layer span')].find(el => el.textContent === text);
+        return Boolean(span && getComputedStyle(span).pointerEvents === 'auto'
+          && getComputedStyle(span).userSelect === 'text') === enabled;
+      }, { text, enabled });
+    }
+    await selectionState('Toggle selection label', true);
+    for (const enabled of [false, true]) {
+      await selectionState('Toggle selection label', enabled);
+    }
+    for (const enabled of [false, true]) {
+      await page.waitForFunction(enabled => {
+        const editor = document.querySelector('.cn1-selection-editor[aria-label="toggleReadOnly"]');
+        return Boolean(editor && getComputedStyle(editor).display !== 'none') === enabled;
+      }, enabled);
+    }
+    for (const enabled of [false, true]) {
+      await selectionState('Toggle selection label', enabled);
+    }
+    console.log('PASS', name, 'selection flags refresh static text without unrelated repaints');
+
+    await openReview('snapshot');
+    await page.locator('.cn1-selection-editor[aria-label="snapshotField"]').waitFor({ state: 'visible' });
+    await page.locator('.cn1-selection-editor[aria-label="snapshotArea"]').waitFor({ state: 'visible' });
+    await clickButton('Capture text images');
+    await page.waitForFunction(() => document.body.innerText.includes('Snapshots contain text'));
+    console.log('PASS', name, 'offscreen field and textarea snapshots contain text');
+
+    await openReview('stylus');
+    for (const text of ['Stylus listener label', 'Inherited stylus label']) {
+      const span = page.locator('#cn1-text-layer span').filter({ hasText: text }).first();
+      await span.waitFor({ state: 'attached' });
+      assert.equal(await span.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+      const bounds = await span.evaluate(el => el.getBoundingClientRect().toJSON());
+      assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName,
+        { x: bounds.x + 5, y: bounds.y + bounds.height / 2 }), 'CANVAS');
+    }
+    assert.equal(await page.locator('.cn1-selection-editor[aria-label="stylusArea"]').count(), 0);
+    console.log('PASS', name, 'component and inherited stylus listeners retain canvas hit testing');
+
     await openReview('rendering');
     const hint = page.locator('.cn1-selection-editor[aria-label="reviewHint"]');
     await hint.waitFor({ state: 'visible' });
@@ -253,7 +296,6 @@ async function exercise(context, name, host, mobileDevice = null) {
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
       assert.equal(await readOnly.evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd)), await readOnly.inputValue());
       if (name === 'chromium') {
-        await context.grantPermissions(['clipboard-read', 'clipboard-write']);
         await page.keyboard.press(process.platform === 'darwin' ? 'Meta+c' : 'Control+c');
         assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await readOnly.inputValue());
       }
@@ -356,6 +398,7 @@ async function exercise(context, name, host, mobileDevice = null) {
     logs.push(JSON.stringify(await page.evaluate(() => ({ active: document.activeElement && document.activeElement.outerHTML,
       editors: [...document.querySelectorAll('.cn1-selection-editor')].map(el => ({ label: el.getAttribute('aria-label'),
         start: el.selectionStart, end: el.selectionEnd, rect: el.getBoundingClientRect().toJSON() })),
+      textRuns: [...document.querySelectorAll('#cn1-text-layer span')].map(el => ({ text: el.textContent, css: el.style.cssText })),
       events: window.__cn1PointerEvents,
       workerLog: (window.__parparMessages || []).filter(m => m.type === 'log').map(m => m.message),
       text: document.body.innerText.slice(0, 1000) })).catch(() => null)));

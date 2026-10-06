@@ -1710,7 +1710,7 @@ public class TextField extends TextArea {
     public void paint(Graphics g) {
 
         //the native input will show the string.
-        if (useNativeTextInput && Display.getInstance().isNativeEditorVisible(this)) {
+        if (useNativeTextInput && Display.impl.isNativeEditorVisible(this, g)) {
             if (!Display.impl.nativeEditorPaintsHint()) {
                 paintHint(g);
             }

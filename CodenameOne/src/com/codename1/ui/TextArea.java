@@ -1396,7 +1396,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     @Override
     public void paint(Graphics g) {
 
-        if (Display.getInstance().isNativeEditorVisible(this)) {
+        if (Display.impl.isNativeEditorVisible(this, g)) {
             if (!Display.impl.nativeEditorPaintsHint()) {
                 paintHint(g);
             }
@@ -1409,7 +1409,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     @Override
     void paintHint(Graphics g) {
-        if (Display.getInstance().isNativeEditorVisible(this) && Display.impl.nativeEditorPaintsHint()) {
+        if (Display.impl.isNativeEditorVisible(this, g) && Display.impl.nativeEditorPaintsHint()) {
             return;
         }
         // For multi-row text areas, keep the hint vertically aligned with where
@@ -2381,6 +2381,13 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         this.textSelectionEnabled = enabled;
         this.textSelectionExplicit = true;
         updateCursor();
+        // Native text layers need the containing paint tree to refresh hit testing.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().repaint();
+        } else {
+            repaint();
+        }
     }
 
     /// {@inheritDoc}

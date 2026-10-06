@@ -112,6 +112,41 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 field.repaint();
             });
             form.addAll(field, change, reset, status);
+        } else if (query.indexOf("review=selectionstate") >= 0) {
+            Label selectable = new Label("Toggle selection label");
+            TextArea readOnly = new TextArea("Toggle readonly selection");
+            readOnly.setName("toggleReadOnly");
+            readOnly.setEditable(false);
+            // Only the flag setters repaint: no buttons, focus changes or status updates.
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> selectable.setTextSelectionEnabled(false));
+            com.codename1.ui.util.UITimer.timer(5000, false, form, () -> selectable.setTextSelectionEnabled(true));
+            com.codename1.ui.util.UITimer.timer(7000, false, form, () -> readOnly.setTextSelectionEnabled(false));
+            com.codename1.ui.util.UITimer.timer(9000, false, form, () -> readOnly.setTextSelectionEnabled(true));
+            com.codename1.ui.util.UITimer.timer(11000, false, form, () -> form.getTextSelection().setEnabled(false));
+            com.codename1.ui.util.UITimer.timer(13000, false, form, () -> form.getTextSelection().setEnabled(true));
+            form.addAll(selectable, readOnly);
+        } else if (query.indexOf("review=snapshot") >= 0) {
+            TextField field = new TextField("Snapshot field value");
+            field.setName("snapshotField");
+            TextArea area = new TextArea("Snapshot area value", 2, 24);
+            area.setName("snapshotArea");
+            Button capture = new Button("Capture text images");
+            capture.addActionListener(e -> {
+                boolean fieldText = snapshotContainsText(field);
+                boolean areaText = snapshotContainsText(area);
+                status.setText(fieldText && areaText ? "Snapshots contain text" : "Snapshot text missing");
+            });
+            form.addAll(field, area, capture, status);
+        } else if (query.indexOf("review=stylus") >= 0) {
+            Label direct = new Label("Stylus listener label");
+            direct.addStylusListener(e -> status.setText("Stylus received"));
+            Container parent = new Container(BoxLayout.y());
+            parent.addStylusListener(e -> status.setText("Inherited stylus received"));
+            parent.add(new Label("Inherited stylus label"));
+            TextArea area = new TextArea("Stylus listener area");
+            area.setName("stylusArea");
+            area.addStylusListener(e -> status.setText("Area stylus received"));
+            form.addAll(direct, parent, area, status);
         } else if (query.indexOf("review=rendering") >= 0) {
             TextField hint = new TextField("", "Styled empty hint");
             hint.setName("reviewHint");
@@ -184,4 +219,17 @@ public class JavaScriptSelectionApp extends Lifecycle {
         }
         form.show();
     }
+    private boolean snapshotContainsText(TextArea area) {
+        String value = area.getText();
+        int[] withText = area.toImage().getRGB();
+        area.setText("");
+        int[] withoutText = area.toImage().getRGB();
+        area.setText(value);
+        int changed = 0;
+        for (int i = 0; i < withText.length; i++) {
+            if (withText[i] != withoutText[i]) changed++;
+        }
+        return changed > 20;
+    }
+
 }

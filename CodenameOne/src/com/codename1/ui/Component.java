@@ -738,13 +738,14 @@ public class Component implements Animation, StyleListener, Editable {
                 || pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()
                 || pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()
                 || longPressListeners != null && longPressListeners.hasListeners()
-                || hasContextMenuHandling();
+                || hasContextMenuOrStylusHandling();
     }
 
-    private boolean hasContextMenuHandling() {
-        // Context menus bubble to ancestors, so their text must retain canvas hit testing too.
+    private boolean hasContextMenuOrStylusHandling() {
+        // Context menus and stylus events bubble to ancestors and need canvas hit testing.
         for (Component c = this; c != null; c = c.getParent()) {
-            if (c.contextMenuListeners != null && c.contextMenuListeners.hasListeners()
+            if (c.stylusListeners != null && c.stylusListeners.hasListeners()
+                    || c.contextMenuListeners != null && c.contextMenuListeners.hasListeners()
                     || c.contextMenuCommands != null && c.contextMenuCommands.length > 0) {
                 return true;
             }

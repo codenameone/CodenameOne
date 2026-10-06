@@ -580,6 +580,7 @@ public class TextSelection {
                 f.removeLongPressListener(pressListener);
                 Display.impl.deinitializeTextSelection(this);
             }
+            f.repaint();
         }
     }
 
