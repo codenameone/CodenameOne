@@ -882,6 +882,21 @@ public final class ResourceCompiler {
             }
         }
         a.noHistory = "true".equals(n.attr(RawNode.NS_KEY_ANDROID, "noHistory"));
+        // NavUtils reads the attribute first and the support meta-data only
+        // when it is absent.
+        String parent = n.attr(RawNode.NS_KEY_ANDROID, "parentActivityName");
+        if (parent == null || parent.trim().isEmpty()) {
+            parent = null;
+            for (RawNode md : n.children) {
+                if (md.tag.equals("meta-data")
+                        && "android.support.PARENT_ACTIVITY".equals(md.attr(RawNode.NS_KEY_ANDROID, "name"))) {
+                    parent = md.attr(RawNode.NS_KEY_ANDROID, "value");
+                }
+            }
+        }
+        if (parent != null && !parent.trim().isEmpty()) {
+            a.parentActivityName = ManifestInfo.resolveClass(pkg, parent.trim());
+        }
         String changes = n.attr(RawNode.NS_KEY_ANDROID, "configChanges");
         if (changes != null) {
             for (String flag : changes.split("\\|")) {

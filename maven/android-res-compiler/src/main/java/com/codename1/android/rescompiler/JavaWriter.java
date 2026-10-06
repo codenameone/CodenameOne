@@ -159,6 +159,10 @@ final class JavaWriter {
                 if (a.noHistory) {
                     sb.append("        noHistory(").append(a.className).append(".class);\n");
                 }
+                if (a.parentActivityName != null) {
+                    sb.append("        parentActivity(").append(a.className).append(".class, ")
+                            .append(quote(a.parentActivityName)).append(");\n");
+                }
                 for (ManifestInfo.IntentFilter f : a.filters) {
                     writeIntentFilter(sb, a.className, f);
                 }

@@ -555,7 +555,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
         startActivityForResult(intent, requestCode);
     }
 
+    /// Starts `intent` unless it would only reach this activity again (it is
+    /// on top, the intent names its class, and the launch is single-top or
+    /// reuses the instance). Then nothing is delivered -- no `onNewIntent` --
+    /// and the answer is false, so the caller handles the intent itself.
     public boolean startActivityIfNeeded(Intent intent, int requestCode) {
+        if (ActivityThread.deliversToCaller(this, intent)) {
+            return false;
+        }
         startActivityForResult(intent, requestCode);
         return true;
     }
@@ -595,25 +602,52 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
         return true;
     }
 
+    /// Finishes everything above the activity `upIntent` names and returns
+    /// to it. When it is not beneath this one, only this activity finishes
+    /// and the answer is false, as on Android.
     public boolean navigateUpTo(Intent upIntent) {
-        finish();
+        return ActivityThread.navigateUpTo(this, upIntent);
+    }
+
+    /// Navigates to [#getParentActivityIntent()]; false, doing nothing, when
+    /// the activity declares no parent.
+    public boolean onNavigateUp() {
+        Intent upIntent = getParentActivityIntent();
+        if (upIntent == null) {
+            return false;
+        }
+        if (shouldUpRecreateTask(upIntent)) {
+            startUpTask(upIntent);
+        } else {
+            navigateUpTo(upIntent);
+        }
         return true;
     }
 
-    public boolean onNavigateUp() {
-        if (getParentActivityIntent() != null || mRecord != null) {
-            finish();
-            return true;
-        }
-        return false;
+    /// Up when the parent is not on the stack (a deep link or notification
+    /// entered the activity directly). Android builds the parent's task
+    /// afresh and finishes this one; there is one task here, so the parent
+    /// replaces the whole stack. Only the parent is created, not its own
+    /// ancestors: Up from it repeats this step.
+    private void startUpTask(Intent upIntent) {
+        Intent up = new Intent(upIntent);
+        up.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(up);
     }
 
+    /// An intent for the manifest's `android:parentActivityName` (or the
+    /// `android.support.PARENT_ACTIVITY` meta-data), or null when there is
+    /// none.
     public Intent getParentActivityIntent() {
-        return null;
+        String parent = mRecord == null || mRecord.info == null ? null : mRecord.info.parentActivityName;
+        return parent == null ? null : new Intent().setClassName(this, parent);
     }
 
+    /// Whether Up must recreate the parent rather than return to it. Android
+    /// answers by task affinity; with one task here, it is whether the
+    /// parent is absent from the stack beneath this activity.
     public boolean shouldUpRecreateTask(Intent targetIntent) {
-        return false;
+        return !ActivityThread.isBelow(this, targetIntent);
     }
 
     /// Pops the fragment back stack, or finishes the activity when it is

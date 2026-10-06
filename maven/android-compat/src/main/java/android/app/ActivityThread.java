@@ -154,6 +154,77 @@ public final class ActivityThread {
         return !STACK.isEmpty() && STACK.get(0).activity == a;
     }
 
+    /// The manifest entry `intent` resolves to, or null; nothing is started
+    /// and nothing throws.
+    private static AndroidApp.ActivityInfo resolve(Intent intent) {
+        AndroidApp app = AndroidRuntime.getInstance().getApp();
+        Class<?> cls = intent.getComponentClass();
+        if (cls != null) {
+            return app.activityInfo(cls);
+        }
+        if (intent.getComponent() != null) {
+            return app.activityInfo(intent.getComponent().getClassName());
+        }
+        return intent.getAction() != null ? app.activityForIntent(intent) : null;
+    }
+
+    /// Whether starting `intent` from `caller` would hand it to `caller`
+    /// itself through `onNewIntent` rather than create an activity: the
+    /// caller is on top, the intent resolves to its own class, and the
+    /// launch is single-top (by flag or launch mode) or reuses the instance.
+    /// That is the case `startActivityIfNeeded` returns false for.
+    static boolean deliversToCaller(Activity caller, Intent intent) {
+        Record t = top();
+        if (intent == null || t == null || t.activity != caller) {
+            return false;
+        }
+        AndroidApp.ActivityInfo info = resolve(intent);
+        if (info == null || info.type != caller.getClass()) {
+            return false;
+        }
+        int flags = intent.getFlags();
+        return info.launchMode != android.content.pm.ActivityInfo.LAUNCH_MULTIPLE
+                || (flags & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0
+                || (flags & (Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_CLEAR_TOP))
+                == Intent.FLAG_ACTIVITY_REORDER_TO_FRONT;
+    }
+
+    /// Whether an instance of the activity `intent` resolves to is beneath
+    /// `a` on the stack.
+    static boolean isBelow(Activity a, Intent intent) {
+        AndroidApp.ActivityInfo info = resolve(intent);
+        Record r = recordOf(a);
+        if (info == null || r == null) {
+            return false;
+        }
+        for (int i = STACK.indexOf(r) - 1; i >= 0; i--) {
+            if (STACK.get(i).activity.getClass() == info.type) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// `Activity.navigateUpTo`, as Android's activity manager does it: when
+    /// the parent is beneath `a`, everything above the parent is finished and
+    /// the parent sees `upIntent` -- through `onNewIntent` when it is
+    /// single-top, single-task or the intent carries `CLEAR_TOP`, otherwise
+    /// as a new instance in its place. When it is not, `a` alone is finished
+    /// and the answer is false.
+    static boolean navigateUpTo(Activity a, Intent upIntent) {
+        if (!isBelow(a, upIntent)) {
+            a.finish();
+            return false;
+        }
+        Intent up = new Intent(upIntent);
+        if ((upIntent.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0) {
+            up.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        }
+        up.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(a, up, -1);
+        return true;
+    }
+
     // ------------------------------------------------------------ starting
 
     /// Starts the activity `intent` names, from `caller` (null at launch).

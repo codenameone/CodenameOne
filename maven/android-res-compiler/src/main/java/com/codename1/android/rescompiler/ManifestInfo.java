@@ -46,6 +46,11 @@ public final class ManifestInfo {
         /// `android:noHistory="true"`: finished as soon as another activity
         /// covers it, so it is never returned to.
         public boolean noHistory;
+        /// The fully qualified class of the activity Up navigates to:
+        /// `android:parentActivityName`, or else the
+        /// `android.support.PARENT_ACTIVITY` meta-data older apps declare.
+        /// Null when the activity declares neither.
+        public String parentActivityName;
         public boolean launcher;
         /// Every `<intent-filter>`, kept whole: an implicit intent must match
         /// a filter's data, MIME types and categories as well as its action.

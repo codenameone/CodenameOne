@@ -174,6 +174,26 @@ public class ResourceCompilerTest {
         assertFalse(impl, impl.contains("noHistory(com.other.Second.class"));
     }
 
+    /// The Up target reaches the runtime, from `android:parentActivityName`
+    /// or from the `android.support.PARENT_ACTIVITY` meta-data, resolved
+    /// against the package like `android:name`.
+    @Test
+    public void compilesParentActivity() throws IOException {
+        File res = project();
+        File manifest = new File(res.getParentFile(), "AndroidManifest.xml");
+        String m = new String(Files.readAllBytes(manifest.toPath()), "UTF-8");
+        write(manifest, m.replace("<activity android:name=\"com.other.Second\"/>",
+                "<activity android:name=\"com.other.Second\" android:parentActivityName=\".Main\"/>"
+                + "<activity android:name=\".Third\"><meta-data android:name=\"android.support.PARENT_ACTIVITY\""
+                + " android:value=\"com.other.Second\"/></activity>"));
+        ResourceCompiler.Result r = compile(res);
+        assertFalse(r.diagnostics.toString(), r.hasErrors());
+        String impl = new String(Files.readAllBytes(r.javaFiles.get(1).toPath()), "UTF-8");
+        assertTrue(impl, impl.contains("parentActivity(com.other.Second.class, \"com.x.Main\");"));
+        assertTrue(impl, impl.contains("parentActivity(com.x.Third.class, \"com.other.Second\");"));
+        assertFalse(impl, impl.contains("parentActivity(com.x.Main.class"));
+    }
+
     @Test
     public void unknownLaunchModeWarnsAndStaysStandard() throws IOException {
         File res = project();

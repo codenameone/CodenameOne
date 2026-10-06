@@ -62,6 +62,10 @@ public abstract class AndroidApp {
         /// covers it, exactly as if every launch carried
         /// `Intent.FLAG_ACTIVITY_NO_HISTORY`.
         public boolean noHistory;
+        /// The fully qualified class `android:parentActivityName` (or the
+        /// `android.support.PARENT_ACTIVITY` meta-data) names, or null: where
+        /// Up navigates.
+        public String parentActivityName;
         /// The manifest's `<intent-filter>`s, data and categories included.
         public final List<android.content.IntentFilter> filters = new ArrayList<android.content.IntentFilter>();
     }
@@ -126,6 +130,13 @@ public abstract class AndroidApp {
         ActivityInfo a = activityInfo(type);
         if (a != null) {
             a.noHistory = true;
+        }
+    }
+
+    protected final void parentActivity(Class<?> type, String parentClassName) {
+        ActivityInfo a = activityInfo(type);
+        if (a != null) {
+            a.parentActivityName = parentClassName;
         }
     }
 

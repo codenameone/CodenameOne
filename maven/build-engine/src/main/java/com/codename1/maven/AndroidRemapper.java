@@ -790,6 +790,10 @@ public final class AndroidRemapper {
             collectClassFiles(dir, classFiles);
         }
         final List<String[]> methods = new ArrayList<String[]>();
+        // Every scanned class's superclass, and the public instance methods
+        // it declares WITHOUT the annotation ("name" + mapped descriptor).
+        final Map<String, String> supers = new HashMap<String, String>();
+        final Map<String, List<String>> unannotated = new HashMap<String, List<String>>();
         for (File f : classFiles) {
             if (!f.isFile()) {
                 continue;
@@ -799,6 +803,11 @@ public final class AndroidRemapper {
                 continue;
             }
             final String cls = map(cr.getClassName());
+            if (cr.getSuperName() != null) {
+                supers.put(cls, map(cr.getSuperName()));
+            }
+            final List<String> plain = new ArrayList<String>();
+            unannotated.put(cls, plain);
             cr.accept(new ClassVisitor(Opcodes.ASM9) {
                 @Override
                 public MethodVisitor visitMethod(final int access, final String name, final String desc, String sig,
@@ -808,10 +817,20 @@ public final class AndroidRemapper {
                         return null;
                     }
                     return new MethodVisitor(Opcodes.ASM9) {
+                        private boolean annotated;
+
+                        @Override
+                        public void visitEnd() {
+                            if (!annotated) {
+                                plain.add(name + REMAPPER.mapMethodDesc(desc));
+                            }
+                        }
+
                         @Override
                         public org.objectweb.asm.AnnotationVisitor visitAnnotation(String annotation, boolean visible) {
                             for (String a : JS_INTERFACE_ANNOTATIONS) {
                                 if (a.equals(annotation)) {
+                                    annotated = true;
                                     String mapped = REMAPPER.mapMethodDesc(desc);
                                     if (jsCallable(mapped)) {
                                         methods.add(new String[] {cls, name, mapped});
@@ -828,6 +847,22 @@ public final class AndroidRemapper {
                 }
             }, ClassReader.SKIP_CODE);
         }
+        // Android exposes a method only when the RUNTIME class's
+        // implementation carries the annotation: a subclass that overrides an
+        // annotated method without repeating it hides that method from
+        // JavaScript. Each entry therefore lists the subclasses that did so,
+        // and an object that is one of them skips the entry. A subclass that
+        // re-annotates its override has an entry of its own.
+        final List<List<String>> hiddenIn = new ArrayList<List<String>>();
+        for (String[] m : methods) {
+            List<String> hidden = new ArrayList<String>();
+            for (Map.Entry<String, List<String>> e : unannotated.entrySet()) {
+                if (e.getValue().contains(m[1] + m[2]) && extendsBase(e.getKey(), supers, m[0])) {
+                    hidden.add(e.getKey());
+                }
+            }
+            hiddenIn.add(hidden);
+        }
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cw.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER, JS_INTERFACE_DISPATCH,
                 null, "java/lang/Object", null);
@@ -839,16 +874,7 @@ public final class AndroidRemapper {
         ctor.visitMaxs(0, 0);
         ctor.visitEnd();
 
-        // methods(Object): a StringBuilder of "name," per class the object is.
-        Map<String, StringBuilder> namesByClass = new java.util.LinkedHashMap<String, StringBuilder>();
-        for (String[] m : methods) {
-            StringBuilder sb = namesByClass.get(m[0]);
-            if (sb == null) {
-                sb = new StringBuilder();
-                namesByClass.put(m[0], sb);
-            }
-            sb.append(m[1]).append(',');
-        }
+        // methods(Object): "name," per entry whose class the object is.
         MethodVisitor names = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "methods",
                 "(Ljava/lang/Object;)Ljava/lang/String;", null, null);
         names.visitCode();
@@ -856,13 +882,15 @@ public final class AndroidRemapper {
         names.visitInsn(Opcodes.DUP);
         names.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
         names.visitVarInsn(Opcodes.ASTORE, 1);
-        for (Map.Entry<String, StringBuilder> e : namesByClass.entrySet()) {
+        for (int i = 0; i < methods.size(); i++) {
+            String[] m = methods.get(i);
             Label next = new Label();
             names.visitVarInsn(Opcodes.ALOAD, 0);
-            names.visitTypeInsn(Opcodes.INSTANCEOF, e.getKey());
+            names.visitTypeInsn(Opcodes.INSTANCEOF, m[0]);
             names.visitJumpInsn(Opcodes.IFEQ, next);
+            skipHidden(names, hiddenIn.get(i), next);
             names.visitVarInsn(Opcodes.ALOAD, 1);
-            names.visitLdcInsn(e.getValue().toString());
+            names.visitLdcInsn(m[1] + ",");
             names.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
                     "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
             names.visitInsn(Opcodes.POP);
@@ -879,7 +907,8 @@ public final class AndroidRemapper {
         MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "invoke",
                 "(Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/String;", null, null);
         mv.visitCode();
-        for (String[] m : methods) {
+        for (int mi = 0; mi < methods.size(); mi++) {
+            String[] m = methods.get(mi);
             org.objectweb.asm.Type[] params = org.objectweb.asm.Type.getArgumentTypes(m[2]);
             org.objectweb.asm.Type ret = org.objectweb.asm.Type.getReturnType(m[2]);
             Label next = new Label();
@@ -894,6 +923,7 @@ public final class AndroidRemapper {
             mv.visitVarInsn(Opcodes.ALOAD, 0);
             mv.visitTypeInsn(Opcodes.INSTANCEOF, m[0]);
             mv.visitJumpInsn(Opcodes.IFEQ, next);
+            skipHidden(mv, hiddenIn.get(mi), next);
             mv.visitVarInsn(Opcodes.ALOAD, 0);
             mv.visitTypeInsn(Opcodes.CHECKCAST, m[0]);
             for (int i = 0; i < params.length; i++) {
@@ -951,6 +981,15 @@ public final class AndroidRemapper {
         out.getParentFile().mkdirs();
         write(out, cw.toByteArray());
         return methods.size();
+    }
+
+    /// Jumps to `next` when local 0 is an instance of any of `hidden`.
+    private static void skipHidden(MethodVisitor mv, List<String> hidden, Label next) {
+        for (String h : hidden) {
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitTypeInsn(Opcodes.INSTANCEOF, h);
+            mv.visitJumpInsn(Opcodes.IFNE, next);
+        }
     }
 
     /// Whether every parameter of `desc` is one JavaScript can pass.

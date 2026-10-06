@@ -182,6 +182,15 @@ public final class AndroidTestSupport {
     public static final class NoHistoryActivity extends Activity {
     }
 
+    /// An activity whose manifest parent (`android:parentActivityName`) is
+    /// [TestActivity].
+    public static final class ChildActivity extends Activity {
+    }
+
+    /// An AppCompat activity whose manifest parent is [TestActivity].
+    public static final class CompatChildActivity extends androidx.appcompat.app.AppCompatActivity {
+    }
+
     /// A `ComponentActivity` that registers a `GetContent` launcher in
     /// `onCreate`, as an application does, and keeps what it receives.
     public static final class GalleryActivity extends androidx.activity.ComponentActivity {
@@ -231,6 +240,12 @@ public final class AndroidTestSupport {
             activity(NoHistoryActivity.class, NoHistoryActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "NoHistory", null, null, false);
             noHistory(NoHistoryActivity.class);
+            activity(ChildActivity.class, ChildActivity.class.getName(),
+                    android.R.style.Theme_Material_Light_DarkActionBar, 0, "Child", null, null, false);
+            parentActivity(ChildActivity.class, TestActivity.class.getName());
+            activity(CompatChildActivity.class, CompatChildActivity.class.getName(), 0, 0, "CompatChild", null,
+                    null, false);
+            parentActivity(CompatChildActivity.class, TestActivity.class.getName());
             activity(GalleryActivity.class, GalleryActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "Gallery", null, null, false);
         }
@@ -261,6 +276,12 @@ public final class AndroidTestSupport {
             }
             if (type == GalleryActivity.class) {
                 return new GalleryActivity();
+            }
+            if (type == ChildActivity.class) {
+                return new ChildActivity();
+            }
+            if (type == CompatChildActivity.class) {
+                return new CompatChildActivity();
             }
             return type == UiModeHandlingActivity.class ? new UiModeHandlingActivity() : null;
         }

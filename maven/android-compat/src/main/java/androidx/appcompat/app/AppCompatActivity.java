@@ -170,11 +170,37 @@ public class AppCompatActivity extends FragmentActivity {
         onSupportNavigateUp();
     }
 
-    /// Navigates up. The activity stack already holds the parent an Android
-    /// task would navigate up to, so this finishes the activity.
+    /// Navigates to [#getSupportParentActivityIntent()], as
+    /// `Activity.onNavigateUp` does; false, doing nothing, when the activity
+    /// declares no parent.
     public boolean onSupportNavigateUp() {
-        finish();
+        android.content.Intent upIntent = getSupportParentActivityIntent();
+        if (upIntent == null) {
+            return false;
+        }
+        if (supportShouldUpRecreateTask(upIntent)) {
+            // The parent is not on the stack: it replaces the stack, as
+            // Activity.onNavigateUp does.
+            android.content.Intent up = new android.content.Intent(upIntent);
+            up.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(up);
+        } else {
+            supportNavigateUpTo(upIntent);
+        }
         return true;
+    }
+
+    public android.content.Intent getSupportParentActivityIntent() {
+        return getParentActivityIntent();
+    }
+
+    public boolean supportShouldUpRecreateTask(android.content.Intent targetIntent) {
+        return shouldUpRecreateTask(targetIntent);
+    }
+
+    public void supportNavigateUpTo(android.content.Intent upIntent) {
+        navigateUpTo(upIntent);
     }
 
     public boolean supportRequestWindowFeature(int featureId) {

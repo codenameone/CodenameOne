@@ -324,6 +324,23 @@ public class AndroidRemapperTest {
         mv.visitEnd();
     }
 
+    /// `cls extends sup` with a no-arg constructor and its own `greet`
+    /// override, annotated or not.
+    private static void jsSubclass(File classes, String cls, String sup, boolean annotated) throws IOException {
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER, cls, null, sup, null);
+        MethodVisitor ctor = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        ctor.visitCode();
+        ctor.visitVarInsn(Opcodes.ALOAD, 0);
+        ctor.visitMethodInsn(Opcodes.INVOKESPECIAL, sup, "<init>", "()V", false);
+        ctor.visitInsn(Opcodes.RETURN);
+        ctor.visitMaxs(0, 0);
+        ctor.visitEnd();
+        jsMethod(cw, "greet", "(Ljava/lang/String;)Ljava/lang/String;", annotated);
+        cw.visitEnd();
+        Files.write(new File(classes, cls + ".class").toPath(), cw.toByteArray());
+    }
+
     /// The runtime's JsBridge reduced to what the test's methods use.
     private static byte[] jsBridgeStub() {
         String name = "com/codename1/androidcompat/runtime/JsBridge";
@@ -382,6 +399,10 @@ public class AndroidRemapperTest {
         jsMethod(cw, "unpassable", "(Ljava/util/List;)Ljava/util/List;", true);
         cw.visitEnd();
         Files.write(new File(classes, "com/x/Bridge.class").toPath(), cw.toByteArray());
+        // Quiet overrides greet WITHOUT the annotation, which hides it on
+        // Android; Loud re-annotates its own override, which exposes it again.
+        jsSubclass(classes, "com/x/Quiet", "com/x/Bridge", false);
+        jsSubclass(classes, "com/x/Loud", "com/x/Quiet", true);
         File jar = tmp.newFile("codenameone-android-compat-8.jar");
         ZipOutputStream z = new ZipOutputStream(new FileOutputStream(jar));
         z.putNextEntry(new ZipEntry("com/codename1/androidcompat/runtime/JsBridge.class"));
@@ -409,6 +430,17 @@ public class AndroidRemapperTest {
             assertEquals(null, invoke.invoke(null, bridge, "greet", new String[] {"a", "b"}));
             assertEquals(null, invoke.invoke(null, bridge, "hidden", new String[] {"a"}));
             assertEquals(null, invoke.invoke(null, "not a bridge", "greet", new String[] {"a"}));
+
+            Object quiet = loader.loadClass("com.x.Quiet").newInstance();
+            String quietNames = (String) dispatch.getMethod("methods", Object.class).invoke(null, quiet);
+            assertTrue(quietNames, quietNames.contains("twice,"));
+            assertFalse(quietNames, quietNames.contains("greet"));
+            assertEquals(null, invoke.invoke(null, quiet, "greet", new String[] {"hi"}));
+            assertEquals("42", invoke.invoke(null, quiet, "twice", new String[] {"21"}));
+            Object loud = loader.loadClass("com.x.Loud").newInstance();
+            String loudNames = (String) dispatch.getMethod("methods", Object.class).invoke(null, loud);
+            assertTrue(loudNames, loudNames.contains("greet,") && loudNames.contains("twice,"));
+            assertEquals("hi", invoke.invoke(null, loud, "greet", new String[] {"hi"}));
         } finally {
             loader.close();
         }
