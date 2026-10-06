@@ -23,6 +23,28 @@
     }
    }
   },
+  "linux-x64@amd-epyc-9v45-96-core-processor": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.363,
+      "time": 1.611,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.239,
+     "reason": "#5940's hybrid GC changed objectAllocation's RAM profile; #5940 rebaselined this row's time on the AMD EPYC 9V45 but carried its pre-hybrid RAM ratio forward, and objectAllocation's RAM now runs below the old ratios on every AMD x64 model measured since (EPYC 7763 -21%/-25%, 9V74 -7% to -22%, 9V45 -34%), so pull requests landing on the 9V45 failed as IMPROVED",
+     "runs": 1,
+     "time": 1.611,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "linux-x64@amd-epyc-9v74-80-core-processor": {
    "hello": {
     "all": {
