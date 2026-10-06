@@ -357,15 +357,26 @@ public class File implements Comparable<File>, java.io.Serializable {
         if (isDirectory()) {
             return false;
         }
+        boolean replacing = dest.exists();
         try {
             InputStream in = fs().openInputStream(storagePath());
             OutputStream out = fs().openOutputStream(dest.storagePath());
             Util.copy(in, out);
-            fs().delete(storagePath());
-            return true;
         } catch (IOException e) {
             return false;
         }
+        // The move only happened if the source is gone. When it cannot be
+        // removed the rename fails, and a copy that created the destination
+        // is taken back so the file is left where it was; one that replaced
+        // an existing destination stays, as deleting it would lose both.
+        fs().delete(storagePath());
+        if (fs().exists(storagePath())) {
+            if (!replacing) {
+                fs().delete(dest.storagePath());
+            }
+            return false;
+        }
+        return true;
     }
 
     public String[] list() {

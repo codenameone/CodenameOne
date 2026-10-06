@@ -396,7 +396,15 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawString(java.lang.Object a0, java.lang.String a1, int a2, int a3) {
+        if (recordText) {
+            drawnText.add(new Object[]{a1, Integer.valueOf(a2), Integer.valueOf(a3)});
+        }
     }
+
+    /// When set, every `drawString` (a `drawChar` arrives as one) is added
+    /// to [#drawnText] as {text, x, y}. A test that sets it must reset both.
+    public static boolean recordText;
+    public static final java.util.List<Object[]> drawnText = new java.util.ArrayList<Object[]>();
 
     @Override
     public void drawImage(java.lang.Object a0, java.lang.Object a1, int a2, int a3) {
@@ -583,7 +591,16 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void deleteFile(java.lang.String a0) {
+        if (fileSystem && !UNDELETABLE.contains(a0)) {
+            FILES.remove(a0);
+        }
     }
+
+    /// When set, [#FILES] answers `exists` and `deleteFile` removes from it,
+    /// except a path in [#UNDELETABLE], which a refused unlink leaves in
+    /// place. A test that sets it must reset it and clear both.
+    public static boolean fileSystem;
+    public static final java.util.Set<String> UNDELETABLE = new java.util.HashSet<String>();
 
     @Override
     public boolean isHidden(java.lang.String a0) {
@@ -606,7 +623,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean exists(java.lang.String a0) {
-        return false;
+        return fileSystem && FILES.containsKey(a0);
     }
 
     @Override

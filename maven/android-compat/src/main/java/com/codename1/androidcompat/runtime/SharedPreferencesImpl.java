@@ -62,6 +62,21 @@ final class SharedPreferencesImpl implements SharedPreferences {
         }
     }
 
+    /// Set while an `apply()` write is waiting on the main thread. Every
+    /// apply in between lands in that one write, and a `commit()` writes
+    /// everything itself, which leaves the queued write nothing to do.
+    private boolean writeQueued;
+
+    private final Runnable queuedWrite = new Runnable() {
+        @Override
+        public void run() {
+            if (writeQueued) {
+                writeQueued = false;
+                persist();
+            }
+        }
+    };
+
     private boolean persist() {
         Hashtable<String, Object> out = new Hashtable<String, Object>();
         for (Map.Entry<String, Object> e : values.entrySet()) {
@@ -88,14 +103,28 @@ final class SharedPreferencesImpl implements SharedPreferences {
     @Override
     public String getString(String key, String defValue) {
         Object o = values.get(key);
-        return o instanceof String ? (String) o : defValue;
+        if (o instanceof String) {
+            return (String) o;
+        }
+        // As on Android and as the other getters here: a value of another
+        // type is a schema mistake, not a missing key.
+        if (o != null) {
+            throw new ClassCastException("Key " + key + " is not a String");
+        }
+        return defValue;
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public Set<String> getStringSet(String key, Set<String> defValues) {
         Object o = values.get(key);
-        return o instanceof Set ? new HashSet<String>((Set<String>) o) : defValues;
+        if (o instanceof Set) {
+            return new HashSet<String>((Set<String>) o);
+        }
+        if (o != null) {
+            throw new ClassCastException("Key " + key + " is not a string set");
+        }
+        return defValues;
     }
 
     @Override
@@ -239,6 +268,34 @@ final class SharedPreferencesImpl implements SharedPreferences {
         // that needs them must marshal its edits to the main thread.
         @Override
         public boolean commit() {
+            ArrayList<String> changed = merge();
+            // As on Android, the in-memory values and the listeners reflect
+            // the edit even when writing it out fails; only the result says
+            // whether it will survive a restart.
+            writeQueued = false;
+            boolean persisted = persist();
+            notifyChanged(changed);
+            return persisted;
+        }
+
+        /// As on Android, the edit is visible in memory and to listeners at
+        /// once and written out later. The write goes through the main
+        /// thread's queue rather than a worker thread, so it never races
+        /// another write of the same file, and a burst of applies (a loop,
+        /// several views saving state) costs one storage write.
+        @Override
+        public void apply() {
+            ArrayList<String> changed = merge();
+            if (!writeQueued) {
+                writeQueued = true;
+                MainThread.post(queuedWrite);
+            }
+            notifyChanged(changed);
+        }
+
+        /// Moves this editor's batch into the values and answers the keys
+        /// whose value changed.
+        private ArrayList<String> merge() {
             // As on Android, a commit consumes the editor's batch: an editor
             // reused afterwards starts empty, so a later commit neither
             // re-applies these values nor repeats this clear() over what
@@ -280,10 +337,10 @@ final class SharedPreferencesImpl implements SharedPreferences {
                     }
                 }
             }
-            // As on Android, the in-memory values and the listeners reflect
-            // the edit even when writing it out fails; only the result says
-            // whether it will survive a restart.
-            boolean persisted = persist();
+            return changed;
+        }
+
+        private void notifyChanged(ArrayList<String> changed) {
             if (!listeners.isEmpty()) {
                 for (String k : changed) {
                     for (OnSharedPreferenceChangeListener l
@@ -292,12 +349,6 @@ final class SharedPreferencesImpl implements SharedPreferences {
                     }
                 }
             }
-            return persisted;
-        }
-
-        @Override
-        public void apply() {
-            commit();
         }
     }
 }

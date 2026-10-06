@@ -47,7 +47,10 @@ public final class Bitmap {
     private int[] pixels;
     private boolean pixelsDirty;
     private boolean recycled;
-    private int density = android.util.DisplayMetrics.DENSITY_DEFAULT;
+    /// The density [#setDensity] gave, or -1 for the device's, which is
+    /// what a bitmap starts with on Android (decoded, created or wrapped).
+    /// Read lazily, so a bitmap made before the resources exist still works.
+    private int density = -1;
 
     Bitmap(Image image, boolean mutable, Config config) {
         this.image = image;
@@ -206,15 +209,23 @@ public final class Bitmap {
     }
 
     public int getScaledWidth(int targetDensity) {
-        return density == DENSITY_NONE || targetDensity == DENSITY_NONE ? width : (width * targetDensity + density / 2) / density;
+        return scale(width, getDensity(), targetDensity);
     }
 
     public int getScaledHeight(int targetDensity) {
-        return density == DENSITY_NONE || targetDensity == DENSITY_NONE ? height : (height * targetDensity + density / 2) / density;
+        return scale(height, getDensity(), targetDensity);
+    }
+
+    private static int scale(int size, int density, int targetDensity) {
+        return density == DENSITY_NONE || targetDensity == DENSITY_NONE || density == targetDensity
+                ? size : (size * targetDensity + density / 2) / density;
     }
 
     public int getDensity() {
-        return density;
+        if (density >= 0) {
+            return density;
+        }
+        return android.content.res.Resources.getSystem().getDisplayMetrics().densityDpi;
     }
 
     public void setDensity(int density) {

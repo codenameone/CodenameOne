@@ -738,16 +738,40 @@ public class Canvas {
             int top = Math.round(py) - f.getAscent();
             int old = apply(paint);
             g.setFont(f);
-            if (paint.getLetterSpacing() != 0) {
-                float cx = px;
-                float extra = paint.getLetterSpacing() * p.getTextSize();
-                for (int i = 0; i < s.length(); i++) {
-                    char c = s.charAt(i);
-                    g.drawChar(c, Math.round(cx), top);
-                    cx += f.charWidth(c) + extra;
+            // textScaleX is part of measureText, so the drawn run must cover
+            // the same width or aligned text lands off its measured box. The
+            // glyphs are stretched about the run's start where the graphics
+            // can transform; elsewhere they keep their shape and only their
+            // advances are scaled, which still matches the measured width.
+            float sx = paint.getTextScaleX();
+            boolean scaledX = sx != 1 && sx > 0;
+            Transform beforeStretch = null;
+            if (scaledX && g.isTransformSupported()) {
+                beforeStretch = Transform.makeIdentity();
+                g.getTransform(beforeStretch);
+                Transform t = beforeStretch.copy();
+                t.translate(px, 0);
+                t.scale(sx, 1);
+                t.translate(-px, 0);
+                g.setTransform(t);
+            }
+            float advance = scaledX && beforeStretch == null ? sx : 1;
+            try {
+                if (paint.getLetterSpacing() != 0 || advance != 1) {
+                    float cx = px;
+                    float extra = paint.getLetterSpacing() * p.getTextSize();
+                    for (int i = 0; i < s.length(); i++) {
+                        char c = s.charAt(i);
+                        g.drawChar(c, Math.round(cx), top);
+                        cx += (f.charWidth(c) + extra) * advance;
+                    }
+                } else {
+                    g.drawString(s, tx, top);
                 }
-            } else {
-                g.drawString(s, tx, top);
+            } finally {
+                if (beforeStretch != null) {
+                    g.setTransform(beforeStretch);
+                }
             }
             if (paint.isUnderlineText()) {
                 int uy = Math.round(py) + Math.max(1, f.getDescent() / 3);
