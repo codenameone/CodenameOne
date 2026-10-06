@@ -102,7 +102,7 @@ public class Color {
         if (n.equals("black")) {
             return BLACK;
         }
-        if (n.equals("darkgray")) {
+        if (n.equals("darkgray") || n.equals("darkgrey")) {
             return DKGRAY;
         }
         if (n.equals("gray") || n.equals("grey")) {
@@ -153,6 +153,10 @@ public class Color {
         if (n.equals("teal")) {
             return 0xFF008080;
         }
+        // Exactly AOSP's sColorNameMap. "transparent" is deliberately not
+        // here: Android's parseColor rejects it too (it is a CSS keyword,
+        // not one of Android's names), so accepting it would make code that
+        // works here throw on a device.
         throw new IllegalArgumentException("Unknown color");
     }
 

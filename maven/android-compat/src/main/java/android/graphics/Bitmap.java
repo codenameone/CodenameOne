@@ -60,6 +60,17 @@ public final class Bitmap {
         this.config = config == null ? Config.ARGB_8888 : config;
     }
 
+    /// A bitmap derived from `source` (a copy, crop, scale or transform),
+    /// keeping its density as AOSP does (`bitmap.mDensity = source.mDensity`).
+    /// The density is a property of the pixels, not of the operation, so
+    /// without this a non-default density reverted to the device's and the
+    /// scaled size of a derived bitmap changed under a density-neutral copy.
+    private static Bitmap derived(Bitmap source, Image image, boolean mutable, Config config) {
+        Bitmap b = new Bitmap(image, mutable, config);
+        b.density = source.density;
+        return b;
+    }
+
     /// Wraps an existing Codename One image.
     public static Bitmap wrap(Image image) {
         return new Bitmap(image, false, Config.ARGB_8888);
@@ -93,16 +104,16 @@ public final class Bitmap {
     }
 
     public static Bitmap createBitmap(Bitmap src) {
-        return new Bitmap(src.snapshot(), false, src.config);
+        return derived(src, src.snapshot(), false, src.config);
     }
 
     public static Bitmap createBitmap(Bitmap source, int x, int y, int width, int height) {
         if (x == 0 && y == 0 && width == source.width && height == source.height) {
             // As on Android, only an immutable source is handed back as is;
             // a mutable one is copied so later drawing does not reach it.
-            return source.mutable ? new Bitmap(source.snapshot(), false, source.config) : source;
+            return source.mutable ? derived(source, source.snapshot(), false, source.config) : source;
         }
-        return new Bitmap(source.getImage().subImage(x, y, width, height, true), false, source.config);
+        return derived(source, source.getImage().subImage(x, y, width, height, true), false, source.config);
     }
 
     public static Bitmap createBitmap(Bitmap source, int x, int y, int width, int height, Matrix m, boolean filter) {
@@ -118,7 +129,7 @@ public final class Bitmap {
         m.getValues(v);
         if (m.isScaleTranslate() && v[0] > 0 && v[4] > 0) {
             // A plain enlargement or reduction: the port's own scaling.
-            return new Bitmap(sub.getImage().scaled(w, h), false, source.config);
+            return derived(source, sub.getImage().scaled(w, h), false, source.config);
         }
         // Rotations, mirrors and skews move pixels, which scaling cannot do:
         // each output pixel is sampled from the source through the inverse
@@ -142,7 +153,7 @@ public final class Bitmap {
                 }
             }
         }
-        return new Bitmap(Image.createImage(out, w, h), false, source.config);
+        return derived(source, Image.createImage(out, w, h), false, source.config);
     }
 
     private static int sampleNearest(int[] src, int sw, int sh, float sx, float sy) {
@@ -203,7 +214,7 @@ public final class Bitmap {
         if (dstWidth == src.width && dstHeight == src.height) {
             return src;
         }
-        return new Bitmap(src.getImage().scaled(dstWidth, dstHeight), false, src.config);
+        return derived(src, src.getImage().scaled(dstWidth, dstHeight), false, src.config);
     }
 
     public int getWidth() {
@@ -405,9 +416,9 @@ public final class Bitmap {
         if (isMutable) {
             Image copy = Image.createImage(width, height, 0);
             copy.getGraphics().drawImage(src, 0, 0);
-            return new Bitmap(copy, true, config);
+            return derived(this, copy, true, config);
         }
-        return new Bitmap(snapshot(), false, config);
+        return derived(this, snapshot(), false, config);
     }
 
     /// The current image, copied when this bitmap is mutable: drawing into a
@@ -424,7 +435,7 @@ public final class Bitmap {
         for (int i = 0; i < p.length; i++) {
             p[i] = p[i] & 0xff000000;
         }
-        return new Bitmap(Image.createImage(p, width, height), false, Config.ALPHA_8);
+        return derived(this, Image.createImage(p, width, height), false, Config.ALPHA_8);
     }
 
     public boolean compress(CompressFormat format, int quality, OutputStream stream) {

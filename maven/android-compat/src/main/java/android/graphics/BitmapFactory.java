@@ -186,9 +186,19 @@ public class BitmapFactory {
         int target = opts != null && opts.inTargetDensity > 0 ? opts.inTargetDensity
                 : Resources.getSystem().getDisplayMetrics().densityDpi;
         int source = opts != null && opts.inDensity > 0 ? opts.inDensity : bucketDensity;
-        if (scale && source > 0 && source != 0xffff && target > 0 && source != target) {
-            tw = Math.max(1, Math.round(tw * (float) target / source));
-            th = Math.max(1, Math.round(th * (float) target / source));
+        // The bitmap reports the density its pixels are at: the target's
+        // when they were scaled to it, otherwise the source's (AOSP's
+        // setDensityFromOptions), so an unscaled mdpi decode on an xxhdpi
+        // device still says mdpi and density-aware drawing scales it.
+        // Without a known source the target stands, as on Android.
+        int density = target;
+        if (source > 0 && source != 0xffff && target > 0 && source != target) {
+            if (scale) {
+                tw = Math.max(1, Math.round(tw * (float) target / source));
+                th = Math.max(1, Math.round(th * (float) target / source));
+            } else {
+                density = source;
+            }
         }
         if (tw != w || th != h) {
             img = img.scaled(tw, th);
@@ -197,11 +207,11 @@ public class BitmapFactory {
             Image m = Image.createImage(tw, th, 0);
             m.getGraphics().drawImage(img, 0, 0);
             Bitmap b = new Bitmap(m, true, opts.inPreferredConfig);
-            b.setDensity(target);
+            b.setDensity(density);
             return b;
         }
         Bitmap b = new Bitmap(img, false, opts == null ? Bitmap.Config.ARGB_8888 : opts.inPreferredConfig);
-        b.setDensity(target);
+        b.setDensity(density);
         return b;
     }
 

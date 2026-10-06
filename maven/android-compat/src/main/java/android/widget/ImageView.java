@@ -315,10 +315,18 @@ public class ImageView extends android.view.View {
         return mDrawMatrix == null ? new Matrix() : mDrawMatrix;
     }
 
+    /// AOSP does not request a layout here (nor for the maximum sizes), so
+    /// on Android a toggle is only measured at the next unrelated layout.
+    /// All three change what `onMeasure` answers, so a changed value asks
+    /// for a layout and takes effect at once on a view already laid out.
     public void setAdjustViewBounds(boolean adjustViewBounds) {
+        boolean changed = mAdjustViewBounds != adjustViewBounds;
         mAdjustViewBounds = adjustViewBounds;
         if (adjustViewBounds) {
             setScaleType(ScaleType.FIT_CENTER);
+        }
+        if (changed) {
+            requestLayout();
         }
     }
 
@@ -327,7 +335,10 @@ public class ImageView extends android.view.View {
     }
 
     public void setMaxWidth(int maxWidth) {
-        mMaxWidth = maxWidth;
+        if (mMaxWidth != maxWidth) {
+            mMaxWidth = maxWidth;
+            requestLayout();
+        }
     }
 
     public int getMaxWidth() {
@@ -335,7 +346,10 @@ public class ImageView extends android.view.View {
     }
 
     public void setMaxHeight(int maxHeight) {
-        mMaxHeight = maxHeight;
+        if (mMaxHeight != maxHeight) {
+            mMaxHeight = maxHeight;
+            requestLayout();
+        }
     }
 
     public int getMaxHeight() {
