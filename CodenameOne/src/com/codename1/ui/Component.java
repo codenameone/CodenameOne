@@ -745,7 +745,9 @@ public class Component implements Animation, StyleListener, Editable {
         // Context menus bubble to ancestors, so their text must retain canvas hit testing too.
         for (Component c = this; c != null; c = c.getParent()) {
             if (c.contextMenuListeners != null && c.contextMenuListeners.hasListeners()
-                    || c.contextMenuCommands != null && c.contextMenuCommands.length > 0) return true;
+                    || c.contextMenuCommands != null && c.contextMenuCommands.length > 0) {
+                return true;
+            }
         }
         return false;
     }
