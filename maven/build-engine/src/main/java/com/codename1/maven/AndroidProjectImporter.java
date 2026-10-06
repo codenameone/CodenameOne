@@ -40,8 +40,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /// Imports an Android Studio module into a Codename One application: copies
-/// its `src/main` into `src/main/android`, carries the namespace into the
-/// manifest when the Gradle build declares it there instead, points the
+/// its `src/main` into `src/main/android`, carries the Gradle namespace into the
+/// manifest as the package R is generated in, points the
 /// Codename One entry point at the generated Android application, and reports
 /// which Gradle dependencies the compatibility runtime covers.
 public final class AndroidProjectImporter {
@@ -133,11 +133,13 @@ public final class AndroidProjectImporter {
             for (String name : new String[] {"AndroidManifest.xml", "res", "assets", "java", "kotlin"}) {
                 File src = new File(main, name);
                 if (src.exists()) {
-                    r.copiedFiles += copy(src, new File(target, name), name, imported);
+                    r.copiedFiles += copy(src, new File(target, name), name, previous, imported);
                 }
             }
+            // A manifest the developer edited since the earlier import was kept
+            // by copy() with its earlier record; it already carries the merge.
+            boolean manifestKept = imported.containsKey(MANIFEST);
             removeStaleImports(target, previous, imported);
-            writeImportRecord(target, imported);
             File moduleDir = main.getParentFile().getParentFile();
             File gradle = new File(moduleDir, "build.gradle.kts");
             if (!gradle.isFile()) {
@@ -150,10 +152,14 @@ public final class AndroidProjectImporter {
             String m = new String(Files.readAllBytes(manifest.toPath()), Charset.forName("UTF-8"));
             // The Android Gradle plugin merges these from the build script into
             // the manifest it packages; the copy gets the same, unless the
-            // manifest already says otherwise.
+            // manifest already says otherwise. The namespace is the exception:
+            // where the build script declares one, the plugin generates R in it
+            // and resolves relative class names against it whatever the
+            // manifest's package says, and the copied tree has no build script
+            // left to say so -- so it replaces the package.
             String merged = m;
             if (r.namespace != null) {
-                merged = addManifestAttribute(merged, "package", r.namespace);
+                merged = setManifestAttribute(merged, "package", r.namespace);
             }
             if (r.versionCode != null) {
                 merged = addManifestAttribute(merged, "android:versionCode", r.versionCode);
@@ -161,10 +167,15 @@ public final class AndroidProjectImporter {
             if (r.versionName != null) {
                 merged = addManifestAttribute(merged, "android:versionName", r.versionName);
             }
-            if (!merged.equals(m)) {
-                Files.write(manifest.toPath(), merged.getBytes(Charset.forName("UTF-8")));
-                log.info("Added the Gradle namespace and version to the copied manifest");
+            if (!manifestKept) {
+                if (!merged.equals(m)) {
+                    Files.write(manifest.toPath(), merged.getBytes(Charset.forName("UTF-8")));
+                    log.info("Added the Gradle namespace and version to the copied manifest");
+                }
+                // Recorded as written, so a later import can tell a local edit.
+                imported.put(MANIFEST, sha256(manifest));
             }
+            writeImportRecord(target, imported);
             if (mainPackage != null && mainClass != null) {
                 writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass);
             }
@@ -215,6 +226,23 @@ public final class AndroidProjectImporter {
         }
         return manifest.substring(0, open.start()) + "<manifest " + name + "=\"" + escapeXmlAttribute(value) + "\""
                 + tag.substring("<manifest".length()) + manifest.substring(open.end());
+    }
+
+    /// Sets `name="value"` on the `<manifest>` element, replacing the value
+    /// it has, or adding the attribute when it has none.
+    static String setManifestAttribute(String manifest, String name, String value) {
+        Matcher open = Pattern.compile("<manifest\\b[^>]*>").matcher(manifest);
+        if (!open.find()) {
+            return manifest;
+        }
+        Matcher attr = Pattern.compile("(\\s" + Pattern.quote(name) + "\\s*=\\s*)(\"[^\"]*\"|'[^']*')")
+                .matcher(open.group());
+        if (!attr.find()) {
+            return addManifestAttribute(manifest, name, value);
+        }
+        int at = open.start() + attr.start(2);
+        return manifest.substring(0, at) + "\"" + escapeXmlAttribute(value) + "\""
+                + manifest.substring(open.start() + attr.end(2));
     }
 
     /// `value` escaped for a double-quoted XML attribute. A Gradle
@@ -325,23 +353,42 @@ public final class AndroidProjectImporter {
         }
     }
 
+    /// The manifest's path in the import record.
+    static final String MANIFEST = "AndroidManifest.xml";
+
     /// Copies `src` to `dest`, recording each copied file's path (relative to
     /// `src/main/android`, `/` separated) and content hash in `imported`. The
-    /// manifest is not recorded: the import rewrites it, and it is never stale.
-    private static int copy(File src, File dest, String path, Map<String, String> imported) throws IOException {
+    /// manifest's hash is left for the caller to record once it has merged the
+    /// build script into it.
+    ///
+    /// A file an earlier import wrote and the developer changed since (its
+    /// bytes no longer match `previous`) is kept, as [#removeStaleImports]
+    /// keeps one, and as an import keeps a customized entry point: it is
+    /// recorded with its earlier hash, so the next import still recognizes
+    /// the edit, and deleting it lets an import copy it afresh.
+    private int copy(File src, File dest, String path, Map<String, String> previous, Map<String, String> imported)
+            throws IOException {
         if (src.isDirectory()) {
             int n = 0;
             File[] files = src.listFiles();
             if (files != null) {
                 for (File f : files) {
-                    n += copy(f, new File(dest, f.getName()), path + "/" + f.getName(), imported);
+                    n += copy(f, new File(dest, f.getName()), path + "/" + f.getName(), previous, imported);
                 }
             }
             return n;
         }
+        String recorded = previous.get(path);
+        if (recorded != null && dest.isFile() && !recorded.equals(sha256(dest))
+                && !java.util.Arrays.equals(Files.readAllBytes(src.toPath()), Files.readAllBytes(dest.toPath()))) {
+            log.warn("Kept " + dest + ": it was changed after the earlier import, so the Android project's copy "
+                    + "was not imported; delete it and import again to take that copy");
+            imported.put(path, recorded);
+            return 0;
+        }
         dest.getParentFile().mkdirs();
         Files.copy(src.toPath(), dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        if (!"AndroidManifest.xml".equals(path)) {
+        if (!MANIFEST.equals(path)) {
             imported.put(path, sha256(dest));
         }
         return 1;
@@ -357,7 +404,9 @@ public final class AndroidProjectImporter {
             throws IOException {
         for (Map.Entry<String, String> e : previous.entrySet()) {
             String path = e.getKey();
-            if (imported.containsKey(path) || path.contains("..")) {
+            // The manifest is always imported (a module without one is refused);
+            // its record is written only after the merge, so it is not here yet.
+            if (imported.containsKey(path) || MANIFEST.equals(path) || path.contains("..")) {
                 continue;
             }
             File f = new File(target, path.replace('/', File.separatorChar));

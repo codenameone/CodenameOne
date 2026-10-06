@@ -188,6 +188,73 @@ public class AndroidProjectImporterTest {
         assertTrue("a file the developer edited was removed", new java.io.File(android, "droid/Edited.java").isFile());
     }
 
+    /// The Gradle namespace decides where R is generated even when the
+    /// manifest still declares an older package; the copied tree has no build
+    /// script, so the copied manifest must carry the namespace.
+    @Test
+    public void gradleNamespaceReplacesTheManifestPackage() throws Exception {
+        java.io.File root = java.nio.file.Files.createTempDirectory("namespace").toFile();
+        java.io.File main = new java.io.File(root, "droid/app/src/main");
+        assertTrue(main.mkdirs());
+        write(new java.io.File(root, "droid/app/build.gradle"), "android {\n    namespace 'com.example.ns'\n}\n");
+        write(new java.io.File(main, "AndroidManifest.xml"),
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"com.example.old\">"
+                        + "<application/></manifest>");
+        java.io.File common = new java.io.File(root, "common");
+        AndroidProjectImporter.Result r = new AndroidProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(new java.io.File(root, "droid"), null, common, null, null);
+        assertEquals("com.example.ns", r.namespace);
+        String m = new String(java.nio.file.Files.readAllBytes(
+                new java.io.File(common, "src/main/android/AndroidManifest.xml").toPath()), "UTF-8");
+        assertTrue(m, m.contains("package=\"com.example.ns\""));
+        assertFalse(m, m.contains("com.example.old"));
+        assertEquals("<manifest a='1' package=\"x.y\">", AndroidProjectImporter.setManifestAttribute(
+                "<manifest a='1' package = 'p.q'>", "package", "x.y").replace("package = ", "package="));
+    }
+
+    /// A re-import takes upstream changes to files the developer left alone,
+    /// but never overwrites one -- the manifest included -- they edited after
+    /// the earlier import.
+    @Test
+    public void reimportKeepsLocallyEditedFiles() throws Exception {
+        java.io.File root = java.nio.file.Files.createTempDirectory("reimport-edit").toFile();
+        java.io.File main = new java.io.File(root, "droid/src/main");
+        java.io.File pkg = new java.io.File(main, "java/com/example/droid");
+        assertTrue(pkg.mkdirs());
+        write(new java.io.File(main, "AndroidManifest.xml"), "<manifest package=\"com.example.droid\"><application/></manifest>");
+        write(new java.io.File(pkg, "Edited.java"), "class Edited {}");
+        write(new java.io.File(pkg, "Untouched.java"), "class Untouched {}");
+        java.io.File common = new java.io.File(root, "common");
+        AndroidProjectImporter importer = new AndroidProjectImporter(new com.codename1.build.SystemStreamLog());
+        importer.importProject(new java.io.File(root, "droid"), null, common, null, null);
+
+        java.io.File android = new java.io.File(common, "src/main/android");
+        java.io.File edited = new java.io.File(android, "java/com/example/droid/Edited.java");
+        java.io.File manifest = new java.io.File(android, "AndroidManifest.xml");
+        String localManifest = "<manifest package=\"com.example.droid\"><uses-permission/><application/></manifest>";
+        write(edited, "class Edited { int local; }");
+        write(manifest, localManifest);
+        write(new java.io.File(pkg, "Edited.java"), "class Edited { int upstream; }");
+        write(new java.io.File(pkg, "Untouched.java"), "class Untouched { int upstream; }");
+        write(new java.io.File(main, "AndroidManifest.xml"), "<manifest package=\"com.example.droid\"><application x=\"1\"/></manifest>");
+        importer.importProject(new java.io.File(root, "droid"), null, common, null, null);
+        assertEquals("a locally edited file was overwritten", "class Edited { int local; }", read(edited));
+        assertEquals("a locally edited manifest was overwritten", localManifest, read(manifest));
+        assertEquals("class Untouched { int upstream; }",
+                read(new java.io.File(android, "java/com/example/droid/Untouched.java")));
+
+        // Still recognized as edited on the next import; deleting it takes upstream.
+        importer.importProject(new java.io.File(root, "droid"), null, common, null, null);
+        assertEquals("class Edited { int local; }", read(edited));
+        assertTrue(edited.delete());
+        importer.importProject(new java.io.File(root, "droid"), null, common, null, null);
+        assertEquals("class Edited { int upstream; }", read(edited));
+    }
+
+    private static String read(java.io.File f) throws java.io.IOException {
+        return new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8");
+    }
+
     private static void write(java.io.File f, String s) throws java.io.IOException {
         java.nio.file.Files.write(f.toPath(), s.getBytes("UTF-8"));
     }

@@ -421,6 +421,8 @@ public class AndroidRemapperTest {
                 classWithCtors("com/x/WithHandle", vm, "(" + handle + ")V"));
         Files.write(new File(classes, "com/x/Both.class").toPath(),
                 classWithCtors("com/x/Both", vm, "()V", "(" + app + handle + ")V"));
+        Files.write(new File(classes, "com/x/NoArgAndHandle.class").toPath(),
+                classWithCtors("com/x/NoArgAndHandle", vm, "(" + handle + ")V", "()V"));
         Files.write(new File(classes, "com/x/Deeper.class").toPath(),
                 classWithCtors("com/x/Deeper", "com/x/Plain", "()V"));
         Files.write(new File(classes, "com/x/Hidden.class").toPath(),
@@ -457,8 +459,16 @@ public class AndroidRemapperTest {
             assertTrue(m.invoke(null, "com.x.Plain", null, null) != null);
             assertEquals(null, m.invoke(null, "com.x.WithApp", null, savedState));
             assertEquals(null, m.invoke(null, "com.x.WithHandle", application, null));
-            // Both prefers (Application, SavedStateHandle), as AndroidX's default factory does.
-            assertEquals(null, m.invoke(null, "com.x.Both", application, null));
+            // A class that also declares a no-argument constructor is still
+            // creatable by a factory that supplies less than its preferred
+            // (Application, SavedStateHandle): NewInstanceFactory and
+            // AndroidViewModelFactory use the constructor they can call.
+            for (Object[] args : new Object[][] {{null, null}, {application, null}, {null, savedState}}) {
+                Object o = m.invoke(null, "com.x.Both", args[0], args[1]);
+                assertTrue(o != null && o.getClass().getName().equals("com.x.Both"));
+                o = m.invoke(null, "com.x.NoArgAndHandle", args[0], args[1]);
+                assertTrue(o != null && o.getClass().getName().equals("com.x.NoArgAndHandle"));
+            }
             for (String name : new String[] {"com.x.Hidden", "com.x.NotAModel", "nope"}) {
                 assertEquals(name, null, m.invoke(null, name, application, savedState));
             }

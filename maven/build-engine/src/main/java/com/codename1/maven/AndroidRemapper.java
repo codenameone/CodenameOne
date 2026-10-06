@@ -92,7 +92,10 @@ public final class AndroidRemapper {
     static final String APPLICATION = TARGET + "android/app/Application";
     static final String SAVED_STATE_HANDLE = TARGET + "androidx/lifecycle/SavedStateHandle";
     /// Constructors in the order AndroidX's `SavedStateViewModelFactory`
-    /// prefers them.
+    /// prefers them. The generated factory tries every one a class declares,
+    /// in this order, and takes the first whose arguments the calling factory
+    /// supplied, so `NewInstanceFactory` still reaches the no-argument
+    /// constructor of a class that also declares an injected one.
     static final String[] VIEW_MODEL_CTORS = {
         "(L" + APPLICATION + ";L" + SAVED_STATE_HANDLE + ";)V", "(L" + SAVED_STATE_HANDLE + ";)V",
         "(L" + APPLICATION + ";)V", "()V"};
@@ -570,11 +573,13 @@ public final class AndroidRemapper {
 
     /// Writes `ViewModelFactory.create(String, Object, Object)`: for every
     /// public, concrete application class extending `ViewModel`, a name
-    /// comparison and `new` through the constructor AndroidX's default
-    /// factory would choose -- what `ViewModelProvider.get(Class)` does by
-    /// reflection on Android. A constructor whose `Application` or
-    /// `SavedStateHandle` the calling factory did not supply answers null,
-    /// and the runtime reports it as AndroidX does.
+    /// comparison and `new` through the first of its constructors, in
+    /// [#VIEW_MODEL_CTORS] order, whose `Application` and `SavedStateHandle`
+    /// the calling factory supplied -- what `ViewModelProvider.get(Class)`
+    /// does by reflection on Android, where each factory looks only for the
+    /// constructor it can call. A class none of whose constructors can be
+    /// called with what was supplied answers null, and the runtime reports it
+    /// as AndroidX does.
     private int writeViewModelFactory() throws IOException {
         final Map<String, String> supers = new HashMap<String, String>();
         List<File> all = new ArrayList<File>();
@@ -582,7 +587,7 @@ public final class AndroidRemapper {
         for (File dir : handlerDirs) {
             collectClassFiles(dir, all);
         }
-        final Map<String, String> ctorOf = new HashMap<String, String>();
+        final Map<String, List<String>> ctorOf = new HashMap<String, List<String>>();
         for (File f : all) {
             ClassReader cr = new ClassReader(Files.readAllBytes(f.toPath()));
             final String cls = map(cr.getClassName());
@@ -604,11 +609,14 @@ public final class AndroidRemapper {
                     return null;
                 }
             }, ClassReader.SKIP_CODE);
+            List<String> usable = new ArrayList<String>();
             for (String preferred : VIEW_MODEL_CTORS) {
                 if (ctors.contains(preferred)) {
-                    ctorOf.put(cls, preferred);
-                    break;
+                    usable.add(preferred);
                 }
+            }
+            if (!usable.isEmpty()) {
+                ctorOf.put(cls, usable);
             }
         }
         List<String> models = new ArrayList<String>();
@@ -633,34 +641,38 @@ public final class AndroidRemapper {
         mv.visitCode();
         Label none = new Label();
         for (String cls : models) {
-            String desc = ctorOf.get(cls);
-            boolean app = desc.contains(APPLICATION);
-            boolean handle = desc.contains(SAVED_STATE_HANDLE);
             Label next = new Label();
             mv.visitLdcInsn(cls.replace('/', '.'));
             mv.visitVarInsn(Opcodes.ALOAD, 0);
             mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
             mv.visitJumpInsn(Opcodes.IFEQ, next);
-            if (app) {
-                mv.visitVarInsn(Opcodes.ALOAD, 1);
-                mv.visitJumpInsn(Opcodes.IFNULL, none);
+            for (String desc : ctorOf.get(cls)) {
+                boolean app = desc.contains(APPLICATION);
+                boolean handle = desc.contains(SAVED_STATE_HANDLE);
+                Label skip = new Label();
+                if (app) {
+                    mv.visitVarInsn(Opcodes.ALOAD, 1);
+                    mv.visitJumpInsn(Opcodes.IFNULL, skip);
+                }
+                if (handle) {
+                    mv.visitVarInsn(Opcodes.ALOAD, 2);
+                    mv.visitJumpInsn(Opcodes.IFNULL, skip);
+                }
+                mv.visitTypeInsn(Opcodes.NEW, cls);
+                mv.visitInsn(Opcodes.DUP);
+                if (app) {
+                    mv.visitVarInsn(Opcodes.ALOAD, 1);
+                    mv.visitTypeInsn(Opcodes.CHECKCAST, APPLICATION);
+                }
+                if (handle) {
+                    mv.visitVarInsn(Opcodes.ALOAD, 2);
+                    mv.visitTypeInsn(Opcodes.CHECKCAST, SAVED_STATE_HANDLE);
+                }
+                mv.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
+                mv.visitInsn(Opcodes.ARETURN);
+                mv.visitLabel(skip);
             }
-            if (handle) {
-                mv.visitVarInsn(Opcodes.ALOAD, 2);
-                mv.visitJumpInsn(Opcodes.IFNULL, none);
-            }
-            mv.visitTypeInsn(Opcodes.NEW, cls);
-            mv.visitInsn(Opcodes.DUP);
-            if (app) {
-                mv.visitVarInsn(Opcodes.ALOAD, 1);
-                mv.visitTypeInsn(Opcodes.CHECKCAST, APPLICATION);
-            }
-            if (handle) {
-                mv.visitVarInsn(Opcodes.ALOAD, 2);
-                mv.visitTypeInsn(Opcodes.CHECKCAST, SAVED_STATE_HANDLE);
-            }
-            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
-            mv.visitInsn(Opcodes.ARETURN);
+            mv.visitJumpInsn(Opcodes.GOTO, none);
             mv.visitLabel(next);
         }
         mv.visitLabel(none);
