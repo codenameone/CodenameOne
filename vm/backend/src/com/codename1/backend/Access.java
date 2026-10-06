@@ -70,6 +70,11 @@ final class Access extends BackendAccess {
     }
 
     @Override
+    public void testApplication(Backend.Builder builder) {
+        builder.testApplication();
+    }
+
+    @Override
     public void mcpTool(Backend.Builder builder, McpTool tool) {
         builder.mcpTool(tool);
     }

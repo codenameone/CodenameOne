@@ -44,6 +44,36 @@ import java.util.TreeSet;
 /// file describes a different deployment, and baking `application-dev.properties`
 /// into a production binary would make the dev settings its defaults.
 final class BackendSettings {
+    /// `cn1.security.schema.enabled`: register the security layer's tables.
+    static final String SECURITY_SCHEMA_KEY = "cn1.security.schema.enabled";
+    /// `cn1.management.enabled`: link the management endpoints.
+    static final String MANAGEMENT_KEY = "cn1.management.enabled";
+    /// `cn1.mcp.enabled`: link the MCP endpoint.
+    static final String MCP_KEY = "cn1.mcp.enabled";
+    /// `cn1.otel.enabled`: link the OpenTelemetry exporters.
+    static final String TELEMETRY_KEY = "cn1.otel.enabled";
+
+    /// Every key whose truth, in the module's properties files, makes the build link
+    /// something into the server that would not otherwise be there. These are the
+    /// build-time settings: set anywhere the build does not read, the part they ask for is
+    /// not in the binary. The runtime's `com.codename1.backend.BuildTimeSettings` refuses
+    /// each one found true at run time in a server built without its part, and
+    /// `BackendSettingsTest` holds the two lists to each other -- so a key added here
+    /// without a rule there fails the build.
+    ///
+    /// Every read of such a key goes through one of these constants; nothing else in the
+    /// build names one.
+    static final String[] BUILD_TIME_KEYS = {
+        SECURITY_SCHEMA_KEY, MANAGEMENT_KEY, MCP_KEY, TELEMETRY_KEY
+    };
+
+    /// Keys whose mere presence in a properties file links the MCP endpoint, because
+    /// moving the endpoint or naming its origins is asking for it. Unlike
+    /// [#BUILD_TIME_KEYS] they are ordinary run-time settings of an endpoint that is
+    /// there, and they do not turn one on: with no tool to serve, the endpoint stays off
+    /// until [#MCP_KEY] says otherwise. So the runtime has nothing to refuse for them.
+    static final String[] MCP_LINKING_KEYS = {"cn1.mcp.path", "cn1.mcp.allowedOrigins"};
+
     /// The owner recorded for a key the properties file set.
     private static final String FILE = "application.properties";
     /// Key and value pairs, in the order they were found.
@@ -86,17 +116,22 @@ final class BackendSettings {
             out.read(cls);
         }
         out.management |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
-                "cn1.management.enabled");
-        out.securitySchema |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
-                "cn1.security.schema.enabled");
+                MANAGEMENT_KEY);
+        out.securitySchema |= securitySchema(ctx);
+        out.mcp |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx, MCP_KEY);
         // Moving the endpoint or naming its origins is asking for it; the
         // endpoint's own default -- on when the server has a tool to serve --
         // still decides whether it answers.
-        out.mcp |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx, "cn1.mcp.enabled")
-                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx, "cn1.mcp.path")
-                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
-                        "cn1.mcp.allowedOrigins");
+        for (String key : MCP_LINKING_KEYS) {
+            out.mcp |= RestControllerAnnotationProcessor.applicationPropertyKnown(ctx, key);
+        }
         return out;
+    }
+
+    /// Whether the module asked for the security layer's tables.
+    static boolean securitySchema(ProcessorContext ctx) {
+        return RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
+                SECURITY_SCHEMA_KEY);
     }
 
     /// The pairs as the flat array the runtime takes.

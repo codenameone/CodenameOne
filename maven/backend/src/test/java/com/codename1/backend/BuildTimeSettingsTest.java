@@ -155,4 +155,148 @@ class BuildTimeSettingsTest {
             backend.stop();
         }
     }
+    // ---- the same two rules for every key the build reads ----
+
+    /// A tracer that records whether the start asked it to open.
+    private static final class Opened implements Tracer {
+        boolean asked;
+
+        @Override
+        public boolean open(Config config) {
+            asked = true;
+            return false;
+        }
+
+        @Override
+        public Span startSpan(String name, int kind, Span parent, String traceparent,
+                String tracestate) {
+            return null;
+        }
+
+        @Override
+        public void flush(int timeoutMillis) {
+        }
+
+        @Override
+        public void shutdown(int timeoutMillis) {
+        }
+
+        @Override
+        public HttpServer.Handler relay() {
+            return null;
+        }
+
+        @Override
+        public void metrics(java.util.Map out) {
+        }
+    }
+
+    @Test
+    @DisplayName("each key is its owner's, and the list is the four the build reads")
+    void theKeysAreTheirOwners() {
+        assertEquals(java.util.Arrays.asList(SecuritySchema.ENABLED,
+                com.codename1.impl.backend.Management.ENABLED,
+                com.codename1.impl.backend.mcp.McpServer.ENABLED, "cn1.otel.enabled"),
+                java.util.Arrays.asList(BuildTimeSettings.keys()));
+    }
+
+    private static String refusal(String key, String what, String consequence, String byHand) {
+        return key + " is true in this server's run-time configuration, but " + what
+                + " not built into this server, so " + consequence + ". It is a build-time "
+                + "setting: the build reads it from the module's application.properties and "
+                + "nowhere else -- not from the environment, a system property or a properties "
+                + "file beside the server. Put " + key + "=true in the module's "
+                + "application.properties and build again." + byHand;
+    }
+
+    @Test
+    @DisplayName("management, MCP and OpenTelemetry asked for at run time in a build without them stop the start")
+    void everyOtherKeyIsRefusedTheSameWay() {
+        String[][] cases = {
+            {"cn1.management.enabled", refusal("cn1.management.enabled",
+                    "the management endpoints were", "nothing would serve them", "")},
+            {"cn1.mcp.enabled", refusal("cn1.mcp.enabled", "the MCP endpoint was",
+                    "nothing would serve it", "")},
+            {"cn1.otel.enabled", refusal("cn1.otel.enabled", "the OpenTelemetry exporters were",
+                    "nothing would be exported", " A server assembled by hand passes an "
+                    + "OtlpTracer to Backend.Builder.tracing() and an OtlpMetricExporter to "
+                    + "metrics() instead.")},
+        };
+        for (String[] c : cases) {
+            IllegalStateException refused = assertThrows(IllegalStateException.class,
+                    () -> Backend.builder(config(c[0], "true")).quiet().port(0)
+                            .handler(NOTHING).start(), c[0]);
+            assertEquals(c[1], refused.getMessage());
+            // Absent or false in such a build: nothing was asked for.
+            for (Config fine : new Config[] {config(), config(c[0], "false")}) {
+                try {
+                    Backend.builder(fine).quiet().port(0).handler(NOTHING).start().stop();
+                } catch (Exception failed) {
+                    throw new AssertionError(c[0] + " absent or false must start", failed);
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("the same keys in a server built with the part start it")
+    void builtInIsNotAMismatch() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty("cn1.management.enabled", "true");
+        settings.setProperty("cn1.management.token", "operator-token");
+        settings.setProperty("cn1.mcp.enabled", "true");
+        settings.setProperty("cn1.mcp.token", "agent-token");
+        settings.setProperty("cn1.otel.enabled", "true");
+        Opened tracer = new Opened();
+        Backend backend = Backend.builder(Config.of(settings, "prod")).quiet().port(0)
+                .handler(NOTHING).management().mcp(null).tracing(tracer).start();
+        try {
+            assertTrue(tracer.asked, "a tracer that was built in and asked for is opened");
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("cn1.otel.enabled=false at run time leaves a built-in tracer unopened")
+    void telemetryFalseAtRunTimeIsHonoured() throws Exception {
+        Opened tracer = new Opened();
+        Backend.Builder builder = Backend.builder(config("cn1.otel.enabled", "false")).quiet()
+                .port(0).handler(NOTHING).tracing(tracer);
+        // As the build compiles it in for a module that asked.
+        BackendAccess.get().compiledSettings(builder, new String[] {"cn1.otel.enabled", "true"});
+        builder.start().stop();
+        assertFalse(tracer.asked, "told at run time not to export, the tracer was opened anyway");
+
+        // Unset at run time, the compiled-in true stands.
+        Opened kept = new Opened();
+        Backend.Builder asBuilt = Backend.builder(config()).quiet().port(0).handler(NOTHING)
+                .tracing(kept);
+        BackendAccess.get().compiledSettings(asBuilt, new String[] {"cn1.otel.enabled", "true"});
+        asBuilt.start().stop();
+        assertTrue(kept.asked);
+    }
+
+    @Test
+    @DisplayName("a @BackendTest application is built without those parts and is not refused for them")
+    void theTestApplicationIsNotAPackagedServer() throws Exception {
+        open();
+        Backend.Builder builder = Backend.builder(config()).quiet().port(0).handler(NOTHING);
+        BackendAccess.get().testApplication(builder);
+        // The module's application.properties, compiled into the test build too.
+        BackendAccess.get().compiledSettings(builder, new String[] {
+            "cn1.management.enabled", "true", "cn1.management.token", "t",
+            "cn1.mcp.enabled", "true", "cn1.otel.enabled", "true"});
+        builder.start().stop();
+
+        // The tables are another matter: the test build registers them when asked, so
+        // asked for and absent is still the mismatch.
+        Backend.Builder tables = Backend.builder(config(SecuritySchema.ENABLED, "true")).quiet()
+                .port(0).handler(NOTHING).dataSource(pool);
+        BackendAccess.get().testApplication(tables);
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> tables.start());
+        assertTrue(refused.getMessage().startsWith("cn1.security.schema.enabled is true"),
+                refused.getMessage());
+    }
 }

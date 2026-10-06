@@ -59,45 +59,11 @@ public final class Migrations {
     /// text. The class that owns both --
     /// `com.codename1.backend.security.SecuritySchema` -- is not named here: a reference
     /// from this class would put the security tables into every server with a database.
-    static final String SECURITY_SCHEMA_KEY = "cn1.security.schema.enabled";
-    static final String SECURITY_SCHEMA_SET = "security";
+    /// [BuildTimeSettings] holds the rule for this key and the others like it.
+    static final String SECURITY_SCHEMA_KEY = BuildTimeSettings.SECURITY_SCHEMA;
+    static final String SECURITY_SCHEMA_SET = BuildTimeSettings.SECURITY_SCHEMA_SET;
 
     private Migrations() {
-    }
-
-    /// Whether the configuration says, in so many words, not to create the security tables.
-    private static boolean securitySchemaSwitchedOff(Config config) throws IOException {
-        String set = config.get(SECURITY_SCHEMA_KEY, null);
-        return set != null && set.trim().length() > 0
-                && !config.getBoolean(SECURITY_SCHEMA_KEY, true);
-    }
-
-    /// Refuses a configuration that asks at run time for something only the build can
-    /// give.
-    ///
-    /// `cn1.security.schema.enabled=true` makes the build register the security layer's
-    /// tables in the server's entry point; that is the only place that can, because a
-    /// server that did not ask must not carry them. Set where the build does not read
-    /// it -- the environment, a system property, a properties file beside the binary --
-    /// it used to do nothing at all, and the first sign was a query against a table
-    /// that was never created. `false` at run time is honoured, by
-    /// [#migrate(DataSource, Config)]: there is something to leave out.
-    /// @param config the server's configuration, compiled-in settings included
-    /// @throws IllegalStateException when the key is true and the set is not registered
-    /// @throws IOException if the setting cannot be read
-    static void requireBuildTimeSettings(Config config) throws IOException {
-        if (config.getBoolean(SECURITY_SCHEMA_KEY, false)
-                && MigrationRegistry.find(SECURITY_SCHEMA_SET) == null) {
-            throw new IllegalStateException(SECURITY_SCHEMA_KEY + " is true in this server's "
-                    + "run-time configuration, but the security tables were not built into "
-                    + "this server, so nothing would create them. It is a build-time setting: "
-                    + "the build reads it from the module's application.properties and "
-                    + "nowhere else -- not from the environment, a system property or a "
-                    + "properties file beside the server. Put " + SECURITY_SCHEMA_KEY
-                    + "=true in the module's application.properties and build again. A "
-                    + "server assembled by hand calls Migrations.register(SecuritySchema"
-                    + ".migrations()) before it starts instead.");
-        }
     }
 
     /// Registers a migration set. The build registers the application's own; a library that
@@ -205,7 +171,8 @@ public final class Migrations {
     public static int migrate(DataSource pool, Config config) throws IOException {
         int ran = 0;
         for (MigrationSet set : MigrationRegistry.sets()) {
-            if (SECURITY_SCHEMA_SET.equals(set.getName()) && securitySchemaSwitchedOff(config)) {
+            if (SECURITY_SCHEMA_SET.equals(set.getName())
+                    && BuildTimeSettings.switchedOff(config, SECURITY_SCHEMA_KEY)) {
                 System.out.println("cn1: migrations (" + set.getName() + "): skipped, because "
                         + SECURITY_SCHEMA_KEY + " is false in this server's configuration; the "
                         + "security tables are then whatever the database already has");

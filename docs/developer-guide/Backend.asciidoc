@@ -385,6 +385,22 @@ there is nothing next to the binary.
 
 | `cn1.datasource.busyTimeoutMillis`
 | How long SQLite waits on a locked database file, 5 seconds by default.
+
+| `cn1.management.enabled`
+| Build-time. `true` links the management endpoints into the server; see
+  <<backend-observability>> and <<backend-build-time-settings>>.
+
+| `cn1.mcp.enabled`
+| Build-time. `true` links the MCP endpoint into the server; see <<backend-mcp>>
+  and <<backend-build-time-settings>>.
+
+| `cn1.otel.enabled`
+| Build-time. `true` links the OpenTelemetry exporters into the server; see
+  <<backend-observability>> and <<backend-build-time-settings>>.
+
+| `cn1.security.schema.enabled`
+| Build-time. `true` links the security tables into the server; see
+  <<backend-security-schema>> and <<backend-build-time-settings>>.
 |===
 
 One limit is read only from the environment, because it's fixed when the server
@@ -411,5 +427,45 @@ rather than becoming a production binary's defaults.
 Secrets -- a token, a password inside a database URL -- don't belong in a
 committed file. Name them as `${NAME}`, which is resolved from the environment
 when the value is read, or leave the key to the environment entirely.
+
+[[backend-build-time-settings]]
+==== Build-time settings
+
+Four keys are read by the build, because each decides whether a part of the
+runtime is linked into the server at all. A server that doesn't ask for a part
+has none of its code.
+
+[cols="2,3", options="header"]
+|===
+| Key | What `true` links
+
+| `cn1.security.schema.enabled`
+| The tables of the security layer's database stores.
+
+| `cn1.management.enabled`
+| The management endpoints.
+
+| `cn1.mcp.enabled`
+| The MCP endpoint. A class with an `@McpTool` method links it too, and so does
+  `cn1.mcp.path` or `cn1.mcp.allowedOrigins` in a properties file.
+
+| `cn1.otel.enabled`
+| The OpenTelemetry exporters. The `@OpenTelemetry` annotation links them too.
+|===
+
+The build reads these from the module's `application.properties` and the
+`application-<profile>.properties` files beside it. It doesn't read the
+environment, a system property or a properties file beside the finished server.
+The same two rules hold for all four:
+
+* `true` at run time in a server built without the part stops the start. The
+  error names the key, says that it's a build-time setting, and says to put it in
+  the module's `application.properties` and build again. The part isn't in the
+  server, so the setting can't be honored.
+* `false` at run time in a server built with the part leaves the part out. The
+  endpoints aren't served, nothing is exported, and the tables aren't created.
+
+Every other key is read when the server starts, from wherever its configuration
+comes from.
 
 Handlers that need any of this get it from the entry point the build writes.

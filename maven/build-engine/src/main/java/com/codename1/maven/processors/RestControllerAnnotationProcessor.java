@@ -92,7 +92,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// The application.properties key that enables tracing without touching the
     /// source, read at build time from the module directory -- where Config reads
     /// the same file at run time.
-    static final String OTEL_ENABLED_PROPERTY = "cn1.otel.enabled";
+    static final String OTEL_ENABLED_PROPERTY = BackendSettings.TELEMETRY_KEY;
 
     /** Mapping annotation to the HTTP method it stands for. */
     private static final Map<String, String> MAPPINGS;

@@ -129,6 +129,13 @@ public abstract class BackendAccess {
     /// included: the settings a test names for itself.
     public abstract Config testConfig(java.util.Properties values, String profile);
 
+    /// Marks the server as the application of a `@BackendTest`. The test build links the
+    /// application and its security and leaves the management endpoints, the MCP endpoint
+    /// and the OpenTelemetry exporters out on purpose, while it compiles in the module's
+    /// `application.properties` -- which may well ask for them. That is not the mismatch
+    /// the start refuses for a packaged server.
+    public abstract void testApplication(Backend.Builder builder);
+
     /// Adds a tool to the MCP endpoint.
     public abstract void mcpTool(Backend.Builder builder, McpTool tool);
 

@@ -1334,7 +1334,8 @@ this is a build-time setting. It has to be in the module's
 the environment, a system property or a properties file beside it, doesn't
 start, and the error says where the key belongs. Set to `false` at run time in
 a server built with it, the set isn't applied, and the tables are whatever the
-database already has.
+database already has. The other build-time keys follow the same two rules; see
+<<backend-build-time-settings>>.
 
 The `cn1:migrate` goals of a module that asks for the tables apply them too,
 before the module's own scripts, and `cn1:migrate-info` lists both histories.

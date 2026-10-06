@@ -51,6 +51,9 @@ import com.codename1.backend.metrics.Metrics;
 ///
 /// Off by default outside a development profile; `cn1.management.enabled`
 /// turns it on or off explicitly, and `cn1.management.path` moves it.
+/// The key is a build-time setting too: a packaged server has these endpoints
+/// only when its build found the key true, and one built without them that finds
+/// it true at run time does not start.
 /// Everything but health needs `Authorization: Bearer `.
 /// Without a token, a development profile serves the read-only views to anyone
 /// who can reach the port -- a laptop -- and no profile serves an operation,

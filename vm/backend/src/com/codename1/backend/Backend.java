@@ -1370,6 +1370,7 @@ public final class Backend {
         private MetricReader metricReader;
         private OwnRoute managementRoute;
         private OwnRoute mcpRoute;
+        private boolean testApplication;
         private SecurityRoute securityRoute;
         private String[] compiledSettings;
         private String serviceName;
@@ -1615,6 +1616,15 @@ public final class Backend {
             return this;
         }
 
+        /// Says this is the application of a `@BackendTest`, which is built without the
+        /// management endpoints, the MCP endpoint and the exporters whatever the module's
+        /// settings ask for; see
+        /// [com.codename1.impl.backend.BackendAccess#testApplication(Backend.Builder)].
+        Builder testApplication() {
+            this.testApplication = true;
+            return this;
+        }
+
         /// Serves the management endpoints -- health, metrics, jobs and managed
         /// beans -- when the configuration turns them on; see [Management]. Like
         /// [#mcp], this is the only code that names them, and the generated entry
@@ -1719,11 +1729,16 @@ public final class Backend {
             config = config.withCompiledDefaults(compiledSettings);
             // Before anything is opened: a setting only the build could have
             // acted on is refused here rather than silently doing nothing.
-            Migrations.requireBuildTimeSettings(config);
+            BuildTimeSettings.require(config, managementRoute != null || testApplication,
+                    mcpRoute != null || testApplication,
+                    tracer != null || metricReader != null || testApplication);
+            // And the other way: a server built to export that is told not to.
+            boolean telemetryOff = BuildTimeSettings.switchedOff(config,
+                    BuildTimeSettings.TELEMETRY);
             // BEFORE the database, so the statements start-up runs -- the ORM's
             // CREATE TABLE -- are traced like any other, and before anything that
             // could fail, so a refused configuration is refused up front.
-            boolean tracing = tracer != null && tracer.open(config);
+            boolean tracing = tracer != null && !telemetryOff && tracer.open(config);
             // Installed without stopping whatever tracer was there before -- another
             // server's, or one the program installed -- which is retired only once
             // this start-up commits, and put back if it does not.
@@ -2160,7 +2175,9 @@ public final class Backend {
             // down here stopped that server's exporter.
             boolean readerOpen = false;
             try {
-                if (metricReader != null) {
+                // Not for a server told at run time to leave the exporters out.
+                if (metricReader != null
+                        && !BuildTimeSettings.switchedOff(config, BuildTimeSettings.TELEMETRY)) {
                     readerOpen = metricReader.open(config);
                     measuring |= readerOpen;
                 }
