@@ -44,6 +44,9 @@ public class AlertDialog extends Dialog implements DialogInterface {
     public static final int THEME_DEVICE_DEFAULT_LIGHT = 5;
 
     private CharSequence mMessage;
+    /// The message's view once built, or null: the dialog is built once, so
+    /// a later `setMessage` updates this view, as Android's does.
+    private TextView mMessageView;
     private View mView;
     private Drawable mIcon;
     private final Button[] mButtons = new Button[3];
@@ -68,6 +71,9 @@ public class AlertDialog extends Dialog implements DialogInterface {
 
     public void setMessage(CharSequence message) {
         mMessage = message;
+        if (mMessageView != null) {
+            mMessageView.setText(message);
+        }
     }
 
     public void setView(View view) {
@@ -149,6 +155,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
             m.setTextColor(textSecondary);
             m.setPadding(dp(24), 0, dp(24), dp(16));
             root.addView(m);
+            mMessageView = m;
         }
         if (mItems != null) {
             for (int i = 0; i < mItems.length; i++) {

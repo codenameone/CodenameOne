@@ -88,6 +88,29 @@ public class BroadcastFilterMatchTest {
         }
     }
 
+    /// The broadcast delivered is the one sent: changing or reusing the
+    /// intent after `sendBroadcast` returns, before the queued delivery runs,
+    /// used to change what the receivers matched and saw.
+    @Test
+    public void aReusedIntentDoesNotChangeASentBroadcast() {
+        Context c = AndroidTestSupport.context();
+        Recorder ping = new Recorder();
+        IntentFilter filter = new IntentFilter("com.codename1.test.PING");
+        filter.addDataScheme("myapp");
+        c.registerReceiver(ping, filter);
+        try {
+            Intent reused = new Intent("com.codename1.test.PING", Uri.parse("myapp://first"));
+            c.sendBroadcast(reused);
+            reused.setAction("com.codename1.test.OTHER");
+            reused.setData(Uri.parse("myapp://second"));
+            MainThreadRule.drain();
+            assertEquals(ping.seen.toString(), 1, ping.seen.size());
+            assertEquals("myapp://first", ping.seen.get(0));
+        } finally {
+            c.unregisterReceiver(ping);
+        }
+    }
+
     @Test
     public void launchIntentsExistOnlyForThisPackage() {
         Context c = AndroidTestSupport.context();

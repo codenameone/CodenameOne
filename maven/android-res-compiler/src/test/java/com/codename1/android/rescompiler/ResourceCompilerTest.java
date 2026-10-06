@@ -142,6 +142,22 @@ public class ResourceCompilerTest {
         assertFalse(impl, impl.contains("launchMode(com.other.Second.class"));
     }
 
+    /// `android:noHistory="true"` reaches the runtime, so the activity is
+    /// finished once another covers it, as the launch flag already was.
+    @Test
+    public void compilesNoHistory() throws IOException {
+        File res = project();
+        File manifest = new File(res.getParentFile(), "AndroidManifest.xml");
+        String m = new String(Files.readAllBytes(manifest.toPath()), "UTF-8");
+        write(manifest, m.replace("<activity android:name=\".Main\">",
+                "<activity android:name=\".Main\" android:noHistory=\"true\">"));
+        ResourceCompiler.Result r = compile(res);
+        assertFalse(r.diagnostics.toString(), r.hasErrors());
+        String impl = new String(Files.readAllBytes(r.javaFiles.get(1).toPath()), "UTF-8");
+        assertTrue(impl, impl.contains("noHistory(com.x.Main.class);"));
+        assertFalse(impl, impl.contains("noHistory(com.other.Second.class"));
+    }
+
     @Test
     public void unknownLaunchModeWarnsAndStaysStandard() throws IOException {
         File res = project();

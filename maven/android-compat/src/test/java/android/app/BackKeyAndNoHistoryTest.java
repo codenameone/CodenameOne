@@ -142,6 +142,72 @@ public class BackKeyAndNoHistoryTest {
         });
     }
 
+    /// `android:noHistory="true"` in the manifest means the same as the
+    /// launch flag. Only the flag used to count, so the activity came back.
+    @Test
+    public void aManifestNoHistoryActivityIsFinishedWhenCovered() {
+        onEdt(new StackWork() {
+            @Override
+            public void run(Context app) {
+                Activity root = start(app, Intent.FLAG_ACTIVITY_NEW_TASK);
+                root.startActivity(new Intent(root, AndroidTestSupport.NoHistoryActivity.class));
+                Activity noHistory = ActivityThread.getTopActivity();
+                assertTrue(noHistory instanceof AndroidTestSupport.NoHistoryActivity);
+                Activity top = start(noHistory, 0);
+                assertTrue("the covered manifest no-history activity was kept", noHistory.isFinishing());
+                assertEquals(2, ActivityThread.getActivityCount());
+                top.finish();
+                assertSame(root, ActivityThread.getTopActivity());
+            }
+        });
+    }
+
+    /// A no-history activity started for a result still answers when it is
+    /// finished by being covered: RESULT_CANCELED, as Android's no-history
+    /// stop path finishes it. The caller used to never hear back.
+    @Test
+    public void aCoveredNoHistoryActivityStillReturnsItsResult() {
+        onEdt(new StackWork() {
+            @Override
+            public void run(Context app) {
+                AndroidTestSupport.TestActivity root =
+                        (AndroidTestSupport.TestActivity) start(app, Intent.FLAG_ACTIVITY_NEW_TASK);
+                Intent i = new Intent(root, AndroidTestSupport.TestActivity.class);
+                i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                root.startActivityForResult(i, 7);
+                Activity noHistory = ActivityThread.getTopActivity();
+                Activity top = start(noHistory, 0);
+                assertTrue(noHistory.isFinishing());
+                assertEquals("delivered before the caller resumed", -1, root.resultRequestCode);
+                top.finish();
+                assertSame(root, ActivityThread.getTopActivity());
+                assertEquals(7, root.resultRequestCode);
+                assertEquals(Activity.RESULT_CANCELED, root.resultCode);
+            }
+        });
+    }
+
+    /// The same when it is covered by an activity brought forward with
+    /// REORDER_TO_FRONT: the caller it owes a result is the one brought
+    /// forward, and hears RESULT_CANCELED at once.
+    @Test
+    public void aNoHistoryActivityCoveredByAReorderStillReturnsItsResult() {
+        onEdt(new StackWork() {
+            @Override
+            public void run(Context app) {
+                AndroidTestSupport.TestActivity root =
+                        (AndroidTestSupport.TestActivity) start(app, Intent.FLAG_ACTIVITY_NEW_TASK);
+                root.startActivityForResult(new Intent(root, AndroidTestSupport.NoHistoryActivity.class), 9);
+                Activity noHistory = ActivityThread.getTopActivity();
+                start(noHistory, Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                assertSame(root, ActivityThread.getTopActivity());
+                assertTrue(noHistory.isFinishing());
+                assertEquals(9, root.resultRequestCode);
+                assertEquals(Activity.RESULT_CANCELED, root.resultCode);
+            }
+        });
+    }
+
     /// A no-history activity recreated for a configuration change is still
     /// no-history: the replacement used to drop the flag and come back once
     /// the activity it started finished.

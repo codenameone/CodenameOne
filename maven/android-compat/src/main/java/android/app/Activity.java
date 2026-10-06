@@ -86,6 +86,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
     HashMap<String, ArrayList<Fragment>> mLastRetainedFragments;
     boolean mChangingConfigurations;
     int mConfigChangeFlags;
+    /// The instance that replaced this one when it was recreated, or null.
+    Activity mReplacement;
 
     public Activity() {
         super();

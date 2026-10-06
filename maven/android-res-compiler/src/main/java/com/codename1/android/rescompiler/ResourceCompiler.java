@@ -872,6 +872,7 @@ public final class ResourceCompiler {
                 a.launchMode = idx;
             }
         }
+        a.noHistory = "true".equals(n.attr(RawNode.NS_KEY_ANDROID, "noHistory"));
         String changes = n.attr(RawNode.NS_KEY_ANDROID, "configChanges");
         if (changes != null) {
             for (String flag : changes.split("\\|")) {

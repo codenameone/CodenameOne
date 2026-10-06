@@ -58,6 +58,10 @@ public abstract class AndroidApp {
         /// all mean "reuse the instance in the stack, clearing what is above
         /// it"; none of them opens a separate task.
         public int launchMode;
+        /// `android:noHistory="true"`: finished as soon as another activity
+        /// covers it, exactly as if every launch carried
+        /// `Intent.FLAG_ACTIVITY_NO_HISTORY`.
+        public boolean noHistory;
         /// The manifest's `<intent-filter>`s, data and categories included.
         public final List<android.content.IntentFilter> filters = new ArrayList<android.content.IntentFilter>();
     }
@@ -115,6 +119,13 @@ public abstract class AndroidApp {
         ActivityInfo a = activityInfo(type);
         if (a != null) {
             a.launchMode = mode;
+        }
+    }
+
+    protected final void noHistory(Class<?> type) {
+        ActivityInfo a = activityInfo(type);
+        if (a != null) {
+            a.noHistory = true;
         }
     }
 

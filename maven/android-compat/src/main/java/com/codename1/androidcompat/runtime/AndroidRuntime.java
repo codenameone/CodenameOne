@@ -429,8 +429,12 @@ public final class AndroidRuntime {
         }
     }
 
+    /// Delivered later, on the main queue, so the intent is copied now: the
+    /// broadcast is the one sent even if the caller reuses or changes the
+    /// intent afterwards, as on Android, which hands it to the system
+    /// before `sendBroadcast` returns.
     public void sendBroadcast(final Context from, final Intent intent) {
-        CN.callSerially(new Broadcast(new ArrayList<Object[]>(receivers), from, intent));
+        CN.callSerially(new Broadcast(new ArrayList<Object[]>(receivers), from, new Intent(intent)));
     }
 
     /// Delivers one broadcast to the receivers registered when it was sent.

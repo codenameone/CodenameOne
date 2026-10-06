@@ -156,6 +156,32 @@ public final class AndroidTestSupport {
         }
     }
 
+    /// An activity declared `android:noHistory="true"`.
+    public static final class NoHistoryActivity extends Activity {
+    }
+
+    /// A `ComponentActivity` that registers a `GetContent` launcher in
+    /// `onCreate`, as an application does, and keeps what it receives.
+    public static final class GalleryActivity extends androidx.activity.ComponentActivity {
+        /// The launcher this instance registered.
+        public androidx.activity.result.ActivityResultLauncher<String> launcher;
+
+        /// The results this instance's callback received.
+        public final java.util.List<android.net.Uri> results = new java.util.ArrayList<android.net.Uri>();
+
+        @Override
+        protected void onCreate(android.os.Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            launcher = registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+                    new androidx.activity.result.ActivityResultCallback<android.net.Uri>() {
+                        @Override
+                        public void onActivityResult(android.net.Uri result) {
+                            results.add(result);
+                        }
+                    });
+        }
+    }
+
     /// Builds a test activity's options menu.
     public interface OptionsMenu {
         void fill(android.view.Menu menu);
@@ -175,6 +201,11 @@ public final class AndroidTestSupport {
             activity(SingleTaskActivity.class, SingleTaskActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "SingleTask", null, null, false);
             launchMode(SingleTaskActivity.class, android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK);
+            activity(NoHistoryActivity.class, NoHistoryActivity.class.getName(),
+                    android.R.style.Theme_Material_Light_DarkActionBar, 0, "NoHistory", null, null, false);
+            noHistory(NoHistoryActivity.class);
+            activity(GalleryActivity.class, GalleryActivity.class.getName(),
+                    android.R.style.Theme_Material_Light_DarkActionBar, 0, "Gallery", null, null, false);
         }
 
         @Override
@@ -197,6 +228,12 @@ public final class AndroidTestSupport {
             }
             if (type == SingleTaskActivity.class) {
                 return new SingleTaskActivity();
+            }
+            if (type == NoHistoryActivity.class) {
+                return new NoHistoryActivity();
+            }
+            if (type == GalleryActivity.class) {
+                return new GalleryActivity();
             }
             return type == UiModeHandlingActivity.class ? new UiModeHandlingActivity() : null;
         }

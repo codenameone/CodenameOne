@@ -156,6 +156,9 @@ final class JavaWriter {
                     sb.append("        launchMode(").append(a.className).append(".class, ")
                             .append(a.launchMode).append(");\n");
                 }
+                if (a.noHistory) {
+                    sb.append("        noHistory(").append(a.className).append(".class);\n");
+                }
                 for (ManifestInfo.IntentFilter f : a.filters) {
                     writeIntentFilter(sb, a.className, f);
                 }

@@ -124,6 +124,19 @@ public final class ActivityThread {
         return d.getCurrent();
     }
 
+    /// The live instance standing for `a`: `a` itself, or the instance
+    /// that replaced it when it was recreated (a configuration change,
+    /// `recreate()`), followed through every recreation since. Null when
+    /// that instance is destroyed for good. A result that arrives from
+    /// outside the activity stack -- the gallery -- goes here, as Android
+    /// delivers it to the recreated activity rather than the old one.
+    public static Activity currentInstance(Activity a) {
+        while (a != null && a.mReplacement != null) {
+            a = a.mReplacement;
+        }
+        return a == null || a.mDestroyed ? null : a;
+    }
+
     private static Record top() {
         return STACK.isEmpty() ? null : STACK.get(STACK.size() - 1);
     }
@@ -248,6 +261,7 @@ public final class ActivityThread {
                     resumeRecord(target, false);
                     if (current.noHistory && STACK.remove(current)) {
                         destroy(current, false);
+                        queueResult(current);
                     } else {
                         stop(current);
                     }
@@ -288,7 +302,8 @@ public final class ActivityThread {
         r.caller = requestCode >= 0 ? callerActivity : null;
         r.requestCode = requestCode;
         r.info = info;
-        r.noHistory = (intent.getFlags() & Intent.FLAG_ACTIVITY_NO_HISTORY) != 0;
+        // The manifest's android:noHistory and the launch flag mean the same.
+        r.noHistory = info.noHistory || (intent.getFlags() & Intent.FLAG_ACTIVITY_NO_HISTORY) != 0;
         attach(r, intent);
         if (STACK.isEmpty() && recreated == null) {
             // The first activity of an application hosted inside a Codename
@@ -303,8 +318,11 @@ public final class ActivityThread {
             if (prev.noHistory && STACK.remove(prev)) {
                 // Never returned to, as on Android: finishing the new
                 // activity resumes the one beneath. A result it asked for
-                // is lost with it, which Android documents too.
+                // is lost with it, which Android documents too. It is
+                // finished, not just destroyed: the result it owes its own
+                // caller (RESULT_CANCELED unless it set one) still goes out.
                 destroy(prev, false);
+                queueResult(prev);
             } else {
                 stop(prev);
             }
@@ -657,6 +675,7 @@ public final class ActivityThread {
         Activity fresh = AndroidRuntime.getInstance().getApp().createActivity(r.info.type);
         fresh.mLastNonConfigurationInstance = nonConfig;
         fresh.mLastRetainedFragments = retained;
+        a.mReplacement = fresh;
         Record n = new Record();
         n.activity = fresh;
         n.caller = r.caller;

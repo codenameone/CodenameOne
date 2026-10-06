@@ -43,6 +43,9 @@ public final class ManifestInfo {
         /// `android:launchMode` as `ActivityInfo.LAUNCH_*`: 0 standard,
         /// 1 singleTop, 2 singleTask, 3 singleInstance, 4 singleInstancePerTask.
         public int launchMode;
+        /// `android:noHistory="true"`: finished as soon as another activity
+        /// covers it, so it is never returned to.
+        public boolean noHistory;
         public boolean launcher;
         /// Every `<intent-filter>`, kept whole: an implicit intent must match
         /// a filter's data, MIME types and categories as well as its action.

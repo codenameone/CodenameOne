@@ -23,6 +23,7 @@
 package androidx.activity;
 
 import android.app.Activity;
+import android.app.ActivityThread;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -312,7 +313,10 @@ public class ComponentActivity extends Activity
     /// anything for other MIME types. The result goes to whatever is
     /// registered under `requestCode` when the picker returns, as
     /// `onActivityResult` does, so a launcher unregistered while the gallery
-    /// was open hears nothing.
+    /// was open hears nothing. When the activity was recreated meanwhile
+    /// (rotated with the gallery open) that is the replacement's
+    /// registration, made under the same code; one finished for good hears
+    /// nothing.
     private void pickContent(final int requestCode, String mimeType) {
         int type = CN.GALLERY_ALL;
         if (mimeType != null && mimeType.regionMatches(true, 0, "image/", 0, 6)) {
@@ -323,7 +327,12 @@ public class ComponentActivity extends Activity
         CN.openGallery(new ActionListener<ActionEvent>() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                Registration<?, ?> r = mRegistrations.get(Integer.valueOf(requestCode));
+                Activity current = ActivityThread.currentInstance(ComponentActivity.this);
+                if (!(current instanceof ComponentActivity)) {
+                    return;
+                }
+                Registration<?, ?> r =
+                        ((ComponentActivity) current).mRegistrations.get(Integer.valueOf(requestCode));
                 if (r == null) {
                     return;
                 }
