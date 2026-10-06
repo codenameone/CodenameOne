@@ -45,6 +45,21 @@ public final class PlaygroundSmokeHarness {
     }
 
     public static void main(String[] args) throws Exception {
+        try {
+            runAll();
+        } catch (Throwable t) {
+            // A failed check left the JavaSE port's non-daemon threads running, so
+            // the JVM hung until the CI watchdog killed it; fail fast instead.
+            t.printStackTrace();
+            System.exit(1);
+        }
+        System.out.println("Playground smoke tests passed.");
+        // Codename One/JavaSE initialization may leave non-daemon threads running.
+        // Force a clean exit so CI jobs don't hang after successful completion.
+        System.exit(0);
+    }
+
+    private static void runAll() throws Exception {
         smokeApiIndex();
         smokeFormShowIsCaptured();
         smokeLifecycleWrapperScript();
@@ -60,10 +75,6 @@ public final class PlaygroundSmokeHarness {
         smokeRuntimeErrorIsReported();
         smokeBuildMethodScript();
         smokeRecordsAndPatternsRun();
-        System.out.println("Playground smoke tests passed.");
-        // Codename One/JavaSE initialization may leave non-daemon threads running.
-        // Force a clean exit so CI jobs don't hang after successful completion.
-        System.exit(0);
     }
 
     private static PlaygroundRunner.RunResult run(String script, PlaygroundContext context) {

@@ -66,10 +66,21 @@ final class HarnessSupport {
     static PlaygroundContext context(final List<String> log) {
         Display.init(null);
         install();
-        Form host = new Form("Host", new BorderLayout());
+        final Form host = new Form("Host", new BorderLayout());
         Container preview = new Container(new BorderLayout());
         host.add(BorderLayout.CENTER, preview);
-        host.show();
+        // Off the EDT, show() only queues the form switch, so a check that reads
+        // Display.getCurrent() right after it raced the EDT and lost whenever a
+        // slow frame was still painting. Show it on the EDT and wait.
+        if (Display.getInstance().isEdt()) {
+            host.show();
+        } else {
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                public void run() {
+                    host.show();
+                }
+            });
+        }
         return new PlaygroundContext(host, preview, null, new PlaygroundContext.Logger() {
             public void log(String message) {
                 if (log != null) {
