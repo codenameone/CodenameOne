@@ -33,4 +33,17 @@ public interface RegisteredClientRepository {
 
     /// The client that calls itself this, or null.
     RegisteredClient findByClientId(String clientId);
+
+    /// Every client there is, when that is known as the server starts and
+    /// does not change behind it; null otherwise, which is what a repository
+    /// answers unless it says more.
+    ///
+    /// The authorization server reads it once, to refuse to start over a
+    /// mistake that every request would otherwise meet one at a time: a
+    /// client with a secret, and nothing to check a secret with. A repository
+    /// over a table that is written to while the server runs answers null,
+    /// and such a mistake is then found when the client calls.
+    default java.util.List<RegisteredClient> findAll() {
+        return null;
+    }
 }

@@ -51,6 +51,11 @@ public final class InMemoryRegisteredClientRepository implements RegisteredClien
     }
 
     @Override
+    public synchronized java.util.List<RegisteredClient> findAll() {
+        return new java.util.ArrayList<RegisteredClient>(byId.values());
+    }
+
+    @Override
     public synchronized RegisteredClient findById(String id) {
         return byId.get(id);
     }

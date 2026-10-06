@@ -142,7 +142,13 @@ import java.io.IOException;
 /// grants are its [OAuth2AuthorizationService] bean; without one they are kept
 /// in this process, which a line at start-up says, and are lost when it stops
 /// and unknown to any other process. Client secrets are compared through the
-/// application's [PasswordEncoder] bean.
+/// application's [PasswordEncoder] bean, or the one given to
+/// [#clientSecretEncoder]. With neither, a server whose clients are all known
+/// when it starts -- an
+/// [com.codename1.backend.security.oauth2.server.authorization.InMemoryRegisteredClientRepository]
+/// -- does not start if one of them has a secret. One whose clients are in a
+/// table starts, says once that it cannot check secrets, and refuses a client
+/// that presents one with `invalid_client`.
 ///
 /// ## Not here
 ///
@@ -256,6 +262,40 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
         }
     }
 
+    /// What a server with no [PasswordEncoder] does about its clients'
+    /// secrets. Clients that are all known now are checked now, and one with a
+    /// secret stops the start: every request it made would be refused, and a
+    /// log line per request is a poor way to learn that. Clients kept
+    /// somewhere they can be added to later cannot be checked, so the start is
+    /// told once what will happen to one that has a secret.
+    ///
+    /// No encoder is assumed in either case: one named here would be in every
+    /// authorization server, whether or not a client of it has a secret.
+    private static void requireNoSecrets(RegisteredClientRepository clients) {
+        java.util.List<
+                com.codename1.backend.security.oauth2.server.authorization.RegisteredClient> all =
+                clients.findAll();
+        if (all == null) {
+            System.err.println("cn1: the authorization server has no PasswordEncoder, so a "
+                    + "registered client that authenticates with a secret will be refused with "
+                    + "invalid_client. Declare a PasswordEncoder bean, or call "
+                    + "clientSecretEncoder(...) on the authorizationServer() configurer; a "
+                    + "server whose clients are all public needs neither.");
+            return;
+        }
+        for (com.codename1.backend.security.oauth2.server.authorization.RegisteredClient client
+                : all) {
+            if (client.getClientSecret() != null) {
+                throw new IllegalStateException("The registered client \""
+                        + client.getClientId() + "\" has a secret, and the authorization "
+                        + "server has nothing to check a secret with. Declare a "
+                        + "PasswordEncoder bean -- the one the secret was encoded with -- or "
+                        + "call clientSecretEncoder(...) on the authorizationServer() "
+                        + "configurer.");
+            }
+        }
+    }
+
     @Override
     public void configure(HttpSecurity http) {
         AuthorizationServerSettings s = settings();
@@ -312,6 +352,9 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
             }
             if (secrets == null) {
                 secrets = http.getSharedObject(PasswordEncoder.class);
+            }
+            if (secrets == null) {
+                requireNoSecrets(clients);
             }
             if (verificationLimiter == null) {
                 verificationLimiter = http.getSharedObject(RateLimiter.class);

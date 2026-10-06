@@ -830,9 +830,11 @@ accepted.
 
 The second client is confidential. It has a secret, which is stored as a
 `PasswordEncoder` wrote it and compared through the application's
-`PasswordEncoder` bean. A server with confidential clients and no such bean
-refuses their secrets and says so in its log, so declare the bean or call
-`clientSecretEncoder(...)`.
+`PasswordEncoder` bean, or the one given to `clientSecretEncoder(...)`. With
+neither, a server whose clients are declared in memory doesn't start if one of
+them has a secret, and the error names the client. A server that keeps its
+clients in a table can't know them all when it starts. It warns once at
+start-up, and answers a client that presents a secret with `invalid_client`.
 
 A redirect address is matched whole, character for character. There are no
 wildcards. The one exception is an `http` address on `127.0.0.1` or `[::1]`,

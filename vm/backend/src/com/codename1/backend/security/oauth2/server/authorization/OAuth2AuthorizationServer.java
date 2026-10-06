@@ -92,7 +92,6 @@ public final class OAuth2AuthorizationServer {
     private final Clock clock;
     private final Attempts attempts = new Attempts();
     private long purgedAt;
-    private boolean warnedNoEncoder;
 
     /// @param fixedIssuer the issuer, or null to read it off each request: a
     /// development profile only
@@ -303,15 +302,8 @@ public final class OAuth2AuthorizationServer {
         }
         if (!ClientAuthenticationMethod.NONE.equals(method)) {
             if (secrets == null) {
-                synchronized (this) {
-                    if (!warnedNoEncoder) {
-                        warnedNoEncoder = true;
-                        System.err.println("cn1: a client presented a secret and the "
-                                + "authorization server has no PasswordEncoder to check it "
-                                + "with: declare a PasswordEncoder bean, or call "
-                                + "clientSecretEncoder(...)");
-                    }
-                }
+                // Nothing to check a secret with, which the start-up said. A
+                // secret that cannot be checked is one that was not proven.
                 throw invalidClient(basic);
             }
             if (client.getClientSecret() == null

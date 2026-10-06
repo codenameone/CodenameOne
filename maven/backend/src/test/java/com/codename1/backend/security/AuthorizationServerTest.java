@@ -626,6 +626,88 @@ class AuthorizationServerTest {
 
     // --------------------------------------------------------- the client
 
+    private SecuredServer startWithoutEncoder(RegisteredClientRepository clients)
+            throws Exception {
+        int port = OAuth2Testing.freePort();
+        issuer = "http://127.0.0.1:" + port;
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(AuthorizationServerSettings.ISSUER, issuer);
+        return SecuredServer.start(settings, "test", users(), APP,
+                http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .formLogin(Customizer.withDefaults())
+                        .authorizationServer(as -> as.registeredClientRepository(clients)
+                                .authorizationService(grants).clock(clock)).build());
+    }
+
+    @Test
+    @DisplayName("a client with a secret and nothing to check it with stops the start, by name")
+    void aSecretNothingCanCheckFailsTheStart() throws Exception {
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> startWithoutEncoder(clients()));
+        assertEquals("The registered client \"web\" has a secret, and the authorization server "
+                + "has nothing to check a secret with. Declare a PasswordEncoder bean -- the one "
+                + "the secret was encoded with -- or call clientSecretEncoder(...) on the "
+                + "authorizationServer() configurer.", refused.getMessage());
+
+        // Public clients alone need no encoder, and none is assumed.
+        RegisteredClient open = RegisteredClient.withId("1").clientId("app")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.DEVICE_CODE).build();
+        try (SecuredServer server = startWithoutEncoder(
+                new InMemoryRegisteredClientRepository(open))) {
+            assertEquals(200, server.call("POST", "/oauth2/device_authorization",
+                    form("client_id", "app"), FORM).status);
+        }
+    }
+
+    @Test
+    @DisplayName("clients that cannot be listed: the start says once, and a secret is invalid_client")
+    void aRepositoryThatCannotBeListed() throws Exception {
+        final RegisteredClientRepository all = clients();
+        RegisteredClientRepository table = new RegisteredClientRepository() {
+            @Override
+            public void save(RegisteredClient registeredClient) {
+                all.save(registeredClient);
+            }
+
+            @Override
+            public RegisteredClient findById(String id) {
+                return all.findById(id);
+            }
+
+            @Override
+            public RegisteredClient findByClientId(String clientId) {
+                return all.findByClientId(clientId);
+            }
+        };
+        java.io.PrintStream err = System.err;
+        java.io.ByteArrayOutputStream said = new java.io.ByteArrayOutputStream();
+        System.setErr(new java.io.PrintStream(said, true, "UTF-8"));
+        try (SecuredServer server = startWithoutEncoder(table)) {
+            for (int attempt = 0 ; attempt < 3 ; attempt++) {
+                Reply reply = server.call("POST", "/oauth2/token", form("grant_type",
+                        "client_credentials"), FORM, "Authorization",
+                        OAuth2Testing.basic("service", "service-secret"));
+                refused(reply, 401, "invalid_client");
+                assertEquals("Basic realm=\"oauth2\"", reply.header("WWW-Authenticate"));
+            }
+            // A public client is not affected.
+            assertEquals(200, server.call("POST", "/oauth2/device_authorization",
+                    form("client_id", "app"), FORM).status);
+        } finally {
+            System.setErr(err);
+        }
+        String log = said.toString("UTF-8");
+        String line = "the authorization server has no PasswordEncoder, so a registered client "
+                + "that authenticates with a secret will be refused with invalid_client";
+        int first = log.indexOf(line);
+        assertTrue(first >= 0, log);
+        assertEquals(-1, log.indexOf(line, first + 1), "said once, at the start: " + log);
+        assertEquals(-1, log.indexOf("presented a secret"), log);
+    }
+
+
     @Test
     @DisplayName("an unknown client and a wrong secret are both invalid_client, with a 401")
     void clientAuthentication() throws Exception {
