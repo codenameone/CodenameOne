@@ -356,7 +356,7 @@ same transaction a script would get.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/migrations.txt[tag=migrations-java,indent=0]
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/NormalizeNotes.java[tag=migrations-java,indent=0]
 ----
 
 A Java migration has no checksum, so editing one after it has run goes
