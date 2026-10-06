@@ -1,0 +1,33 @@
+plugins { id 'com.android.application' version '8.13.2' }
+
+android {
+    namespace 'com.codename1.camera.regression'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.codename1.camera.regression'
+        minSdk 23
+        targetSdk 36
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    sourceSets.main.java.srcDir layout.buildDirectory.dir('generated/production')
+}
+
+tasks.register('extractProduction', Exec) {
+    commandLine 'python3', '../extract-android.py', layout.buildDirectory.dir('generated/production').get().asFile
+    inputs.files('../../../Ports/Android/src/com/codename1/impl/android/AndroidCameraImpl.java',
+            '../../../Ports/Android/src/com/codename1/impl/android/AndroidCameraFrameConverter.java',
+            '../../../CodenameOne/src/com/codename1/camera/CameraFrame.java',
+            '../../../CodenameOne/src/com/codename1/camera/FrameFormat.java')
+    outputs.dir layout.buildDirectory.dir('generated/production')
+}
+preBuild.dependsOn extractProduction
+
+dependencies {
+    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
+    androidTestImplementation 'com.google.zxing:core:3.5.3'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+}

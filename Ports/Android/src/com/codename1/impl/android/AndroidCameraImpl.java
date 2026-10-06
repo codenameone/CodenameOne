@@ -120,6 +120,8 @@ public class AndroidCameraImpl extends CameraImpl {
     private final AtomicBoolean listenerBusy = new AtomicBoolean();
     private volatile FrameListener frameListener;
     private volatile FrameFormat frameFormat = FrameFormat.JPEG;
+    private volatile long frameIntervalNanos;
+    private long lastFrameNanos;
     private CameraInfo info;
     private CameraSessionOptions options;
     private ExecutorService cameraExecutor;
@@ -422,8 +424,9 @@ public class AndroidCameraImpl extends CameraImpl {
 
     @Override
     public void setFrameListener(FrameListener listener, FrameFormat format, int maxFps) {
-        this.frameListener = listener;
         this.frameFormat = format == null ? FrameFormat.JPEG : format;
+        this.frameIntervalNanos = maxFps > 0 ? 1000000000L / maxFps : 0;
+        this.frameListener = listener;
     }
 
     private void installFrameAnalyzer() {
@@ -459,25 +462,23 @@ public class AndroidCameraImpl extends CameraImpl {
             return;
         }
         try {
-            // Convert ImageProxy -> Image -> JPEG bytes
-            byte[] jpeg = null;
-            int w = 0, h = 0;
-            int rotation = 0;
+            long now = System.nanoTime();
+            if (lastFrameNanos != 0 && now - lastFrameNanos < frameIntervalNanos) {
+                return;
+            }
+            CameraFrame frame;
             try {
                 Image img = (Image) imageProxy.getClass().getMethod("getImage").invoke(imageProxy);
                 Object imageInfo = imageProxy.getClass().getMethod("getImageInfo").invoke(imageProxy);
-                rotation = (Integer) imageInfo.getClass().getMethod("getRotationDegrees").invoke(imageInfo);
-                if (img != null) {
-                    w = img.getWidth();
-                    h = img.getHeight();
-                    jpeg = yuvImageToJpeg(img);
-                }
+                int rotation = (Integer) imageInfo.getClass().getMethod("getRotationDegrees").invoke(imageInfo);
+                frame = img == null ? null : createFrame(img, rotation, now, frameFormat);
             } catch (Throwable t) {
                 Log.w(TAG, "Frame conversion failed: " + t.getMessage());
+                return;
             }
-            if (jpeg != null) {
-                l.onFrame(new CameraFrame(jpeg, null, w, h, rotation,
-                        System.nanoTime(), frameFormat));
+            if (frame != null) {
+                lastFrameNanos = now;
+                l.onFrame(frame);
             }
         } finally {
             listenerBusy.set(false);
@@ -491,31 +492,39 @@ public class AndroidCameraImpl extends CameraImpl {
         } catch (Throwable ignored) { }
     }
 
-    private static byte[] yuvImageToJpeg(Image image) {
+    private static CameraFrame createFrame(Image image, int rotation, long timestamp,
+                                           FrameFormat requested) {
+        final int w = image.getWidth();
+        final int h = image.getHeight();
         if (image.getFormat() == ImageFormat.JPEG) {
-            ByteBuffer buf = image.getPlanes()[0].getBuffer();
-            byte[] out = new byte[buf.remaining()];
-            buf.get(out);
-            return out;
+            ByteBuffer buf = image.getPlanes()[0].getBuffer().duplicate();
+            byte[] jpeg = new byte[buf.remaining()];
+            buf.get(jpeg);
+            return new CameraFrame(jpeg, null, w, h, rotation, timestamp, requested);
         }
-        // YUV_420_888 -> NV21 -> JPEG via YuvImage
-        int w = image.getWidth();
-        int h = image.getHeight();
+        if (image.getFormat() != ImageFormat.YUV_420_888) {
+            throw new IllegalArgumentException("Unsupported camera image format");
+        }
         Image.Plane[] planes = image.getPlanes();
-        ByteBuffer y = planes[0].getBuffer();
-        ByteBuffer u = planes[1].getBuffer();
-        ByteBuffer v = planes[2].getBuffer();
-        int ySize = y.remaining();
-        int uSize = u.remaining();
-        int vSize = v.remaining();
-        byte[] nv21 = new byte[ySize + uSize + vSize];
-        y.get(nv21, 0, ySize);
-        v.get(nv21, ySize, vSize);
-        u.get(nv21, ySize + vSize, uSize);
-        YuvImage yuv = new YuvImage(nv21, ImageFormat.NV21, w, h, null);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        yuv.compressToJpeg(new Rect(0, 0, w, h), 80, baos);
-        return baos.toByteArray();
+        final byte[] nv21 = AndroidCameraFrameConverter.toNV21(w, h,
+                planes[0].getBuffer(), planes[0].getRowStride(), planes[0].getPixelStride(),
+                planes[1].getBuffer(), planes[1].getRowStride(), planes[1].getPixelStride(),
+                planes[2].getBuffer(), planes[2].getRowStride(), planes[2].getPixelStride());
+        CameraFrame.JpegEncoder encoder = new CameraFrame.JpegEncoder() {
+            public byte[] encode() {
+                YuvImage yuv = new YuvImage(nv21, ImageFormat.NV21, w, h, null);
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                if (!yuv.compressToJpeg(new Rect(0, 0, w, h), 80, baos)) {
+                    throw new IllegalStateException("Could not encode camera frame");
+                }
+                return baos.toByteArray();
+            }
+        };
+        if (requested == FrameFormat.NV21) {
+            return new CameraFrame(null, nv21, w, h, rotation, timestamp, requested, encoder);
+        }
+        // JPEG remains the fallback for raw formats this port cannot expose.
+        return new CameraFrame(encoder.encode(), null, w, h, rotation, timestamp, requested);
     }
 
     @Override

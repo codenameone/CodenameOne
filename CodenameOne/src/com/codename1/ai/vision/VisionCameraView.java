@@ -230,7 +230,7 @@ public class VisionCameraView<T> extends Container implements AutoCloseable {
                         "No camera is available on this device");
             }
             opened = Camera.open(info, new CameraSessionOptions()
-                    .frameFormat(FrameFormat.JPEG)
+                    .frameFormat(FrameFormat.NV21)
                     .frameMaxFps(maxFps)
                     .captureAudio(false));
         } catch (Throwable error) {
