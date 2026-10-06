@@ -40,4 +40,20 @@ public interface WebsiteThemeNative extends NativeInterface {
     /// generate button is shifted left by this amount so the launcher does not
     /// cover it.
     int chatLauncherClearance();
+
+    /// Whether this Initializr is embedded in the Codename One website itself,
+    /// the only page allowed to receive an email address from it. A third-party
+    /// page can frame the public /initializr-app/ and would otherwise collect
+    /// every address typed into the panel, so the email field is shown only when
+    /// this answers true.
+    boolean canRequestSteps();
+
+    /// Asks the embedding website page to email the next steps to `email`, once.
+    /// The page forwards it to BuildCloud (docs/website/assets/js/
+    /// cn1-initializr-beacon.js), which may follow up if that project never
+    /// reaches a first build. ide and build (see GeneratorModel#buildKind) pick
+    /// the steps BuildCloud sends -- the same ones the panel shows; the page
+    /// hashes the package name before anything leaves the browser. Returns true
+    /// only when the page confirmed it sent the request.
+    boolean requestSteps(String email, String packageName, String template, String ide, String build);
 }

@@ -336,6 +336,9 @@ jobs:
           grep -Fq 'cn1-initializr-project-downloaded' \
             docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
           grep -Fq 'cn1-initializr-project-downloaded' docs/website/public/initializr/index.html
+          grep -Fq 'cn1-initializr-steps-request' \
+            docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
+          grep -Fq 'cn1-initializr-steps-request' docs/website/public/initializr/index.html
           node docs/website/scripts/test-initializr-download-bridge.mjs \
             docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
 
