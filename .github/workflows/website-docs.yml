@@ -372,7 +372,8 @@ jobs:
             if curl -fsS http://127.0.0.1:8793/playground/ >/dev/null; then break; fi
             sleep 0.2
           done
-          node scripts/cn1playground/tools/verify-playground-demos.mjs http://127.0.0.1:8793/playground/
+          # Firefox needs an X display to initialize Mesa WebGL even in headless mode.
+          xvfb-run -a node scripts/cn1playground/tools/verify-playground-demos.mjs http://127.0.0.1:8793/playground/
 
       - name: Upload website Playground rendering evidence
         if: always()
