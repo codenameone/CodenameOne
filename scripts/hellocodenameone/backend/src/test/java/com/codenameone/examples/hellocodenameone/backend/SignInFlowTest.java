@@ -139,21 +139,43 @@ class SignInFlowTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_grant"));
 
-        // Issued as 10.0.2.2 and used as 127.0.0.1: the token is verified by its
-        // signature, whichever name the request came in under.
-        mvc.perform(get("/api/secure/notes").header("Host", "127.0.0.1:8765")
+        // The token is for the secured API, not for the client it was issued to.
+        Map claims = Json.parseObject(new String(java.util.Base64.getUrlDecoder().decode(
+                access.split("\\.")[1]), "UTF-8"));
+        assertEquals(SecurityConfig.AUDIENCE, claims.get("aud"));
+        assertEquals(SecurityConfig.CLIENT_ID, claims.get("client_id"));
+        assertEquals("http://" + HOST, claims.get("iss"));
+
+        // Used at the address it was issued at.
+        mvc.perform(get("/api/secure/notes").header("Host", HOST)
                         .header("Authorization", "Bearer " + access))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("first"))
                 .andExpect(jsonPath("$.length()").value(Long.valueOf(3)));
-        mvc.perform(get("/api/secure/whoami").header("Authorization", "Bearer " + access))
+        mvc.perform(get("/api/secure/whoami").header("Host", HOST)
+                        .header("Authorization", "Bearer " + access))
                 .andExpect(jsonPath("$.name").value("ada"))
                 .andExpect(jsonPath("$.issuer").value("http://10.0.2.2:8765"));
-        mvc.perform(get("/api/secure/summary/ada").header("Authorization", "Bearer " + access))
+        mvc.perform(get("/api/secure/summary/ada").header("Host", HOST)
+                        .header("Authorization", "Bearer " + access))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.owner").value("ada"));
+        // Issued as 10.0.2.2 and carried to 127.0.0.1: the signature is good and
+        // the issuer is not the one this request knows the server by.
+        String elsewhere = mvc.perform(get("/api/secure/notes").header("Host", "127.0.0.1:8765")
+                        .header("Authorization", "Bearer " + access))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getHeader("WWW-Authenticate");
+        assertTrue(elsewhere.contains("The iss claim is not valid"), elsewhere);
+        // An ID token is signed with the same key and is for the client, not for
+        // this API: its audience is refused.
+        String idToken = mvc.perform(get("/api/secure/whoami").header("Host", HOST)
+                        .header("Authorization", "Bearer " + issued.get("id_token")))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getHeader("WWW-Authenticate");
+        assertTrue(idToken.contains("The aud claim is not valid"), idToken);
         // It was not asked for notes:write, so it does not have it.
-        String denied = mvc.perform(get("/api/secure/admin")
+        String denied = mvc.perform(get("/api/secure/admin").header("Host", HOST)
                         .header("Authorization", "Bearer " + access))
                 .andExpect(status().isForbidden())
                 .andReturn().getResponse().getHeader("WWW-Authenticate");
@@ -161,14 +183,15 @@ class SignInFlowTest {
         // One character of the signature changed.
         char last = access.charAt(access.length() - 1);
         String forged = access.substring(0, access.length() - 1) + (last == 'A' ? 'B' : 'A');
-        String refused = mvc.perform(get("/api/secure/notes")
+        String refused = mvc.perform(get("/api/secure/notes").header("Host", HOST)
                         .header("Authorization", "Bearer " + forged))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getHeader("WWW-Authenticate");
         assertTrue(refused.startsWith("Bearer error=\"invalid_token\""), refused);
 
         // The refresh token is replaced when it is used.
-        String refreshed = mvc.perform(post("/oauth2/token").param("grant_type", "refresh_token")
+        String refreshed = mvc.perform(post("/oauth2/token").header("Host", HOST)
+                        .param("grant_type", "refresh_token")
                         .param("refresh_token", refresh)
                         .param("client_id", SecurityConfig.CLIENT_ID))
                 .andExpect(status().isOk())
@@ -176,9 +199,30 @@ class SignInFlowTest {
         Map second = Json.parseObject(refreshed);
         assertNotNull(second.get("refresh_token"));
         assertFalse(refresh.equals(second.get("refresh_token")), "the refresh token rotates");
-        mvc.perform(get("/api/secure/notes")
+        mvc.perform(get("/api/secure/notes").header("Host", HOST)
                         .header("Authorization", "Bearer " + second.get("access_token")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void aSecondFactorIsNotSkippedByBasicCredentials() throws Exception {
+        // grace has an authenticator app. Her password alone, sent as HTTP Basic,
+        // used to get her an authorization code; it gets a 401 that says why.
+        MockResponse refused = mvc.perform(get(authorize("openid%20notes:read",
+                        "http://127.0.0.1/callback")).header("Host", HOST)
+                        .with(httpBasic(SecurityConfig.MFA_USER, SecurityConfig.MFA_USER_PASSWORD)))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse();
+        assertEquals("Basic realm=\"hellocodenameone\", error=\"second_factor_required\"",
+                refused.getHeader("WWW-Authenticate"));
+        assertTrue(refused.getContentAsString().startsWith("This account has a second factor"),
+                refused.getContentAsString());
+        // The same request with a wrong password learns nothing of that.
+        assertEquals("Basic realm=\"hellocodenameone\"", mvc.perform(get(authorize(
+                        "openid", "http://127.0.0.1/callback")).header("Host", HOST)
+                        .with(httpBasic(SecurityConfig.MFA_USER, "not-her-password")))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getHeader("WWW-Authenticate"));
     }
 
     @Test
@@ -191,7 +235,7 @@ class SignInFlowTest {
                 .andReturn().getResponse().getRedirectedUrl();
         assertTrue(location.startsWith(redirect + "?code="), location);
         Map issued = tokens(query(location, "code"), redirect);
-        mvc.perform(get("/api/secure/admin")
+        mvc.perform(get("/api/secure/admin").header("Host", HOST)
                         .header("Authorization", "Bearer " + issued.get("access_token")))
                 .andExpect(status().isOk());
         // An address the client never registered is refused outright, not redirected to.

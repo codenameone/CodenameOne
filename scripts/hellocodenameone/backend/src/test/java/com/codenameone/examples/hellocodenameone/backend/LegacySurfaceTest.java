@@ -29,6 +29,7 @@ import com.codename1.backend.test.MockResponse;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
@@ -106,6 +107,26 @@ class LegacySurfaceTest {
         mvc.perform(get("/api/auth/bearer"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().doesNotExist("WWW-Authenticate"));
+    }
+
+    @Test
+    void aPathUnderNoChainIsNotJudgedForHowItIsWritten() throws Exception {
+        // Each of these was answered 400 by the security layer while its path
+        // check ran for every request. None is under a chain, so each is the
+        // routers' to answer again: a route that is not there is a 404.
+        String[] spelled = {"/api/pets;v=1", "/api//pets", "/api/./pets", "/api/nothing/..",
+            "/nothing%2F1", "/nothing/%3B", "/nothing/a;b"};
+        for (String path : spelled) {
+            MockResponse response = mvc.perform(get(path)).andReturn().getResponse();
+            assertTrue(response.getStatus() == 404 || response.getStatus() == 200,
+                    path + " answered " + response.getStatus());
+            assertEquals(null, response.getHeader("X-Frame-Options"), path);
+        }
+        // Spelled to slip into a chain's path, they stay the chain's to refuse.
+        for (String path : new String[] {"/api/pets/..%2Fsecure/notes", "//api/secure/notes",
+            "/api/secure/notes;x=1", "/x/../oauth2/token"}) {
+            mvc.perform(get(path)).andExpect(status().isBadRequest());
+        }
     }
 
     @Test

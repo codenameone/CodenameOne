@@ -49,17 +49,22 @@ class SecureApiTest {
 
     @Test
     void withoutATokenEveryRouteIsChallenged() throws Exception {
-        String[] routes = {"/api/secure/whoami", "/api/secure/notes", "/api/secure/admin",
-                "/api/secure/summary/ada", "/api/secure/nothing-here"};
-        for (String route : routes) {
-            mvc.perform(get(route))
+        // {route, the challenge}: no error, since no token was sent to be wrong,
+        // and the scope to ask for where the route's rule turns on one.
+        String[][] routes = {{"/api/secure/whoami", "Bearer"},
+            {"/api/secure/notes", "Bearer scope=\"notes:read\""},
+            {"/api/secure/admin", "Bearer scope=\"notes:write\""},
+            {"/api/secure/summary/ada", "Bearer"},
+            {"/api/secure/nothing-here", "Bearer"}};
+        for (String[] route : routes) {
+            mvc.perform(get(route[0]))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(header().string("WWW-Authenticate", "Bearer"));
+                    .andExpect(header().string("WWW-Authenticate", route[1]));
         }
         mvc.perform(post("/api/secure/notes").contentType("application/json")
                         .content("{\"title\":\"t\",\"body\":\"b\"}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string("WWW-Authenticate", "Bearer"));
+                .andExpect(header().string("WWW-Authenticate", "Bearer scope=\"notes:write\""));
     }
 
     @Test

@@ -161,6 +161,14 @@ public abstract class BackendAuthTestBase extends BackendClientTest {
             return this;
         }
 
+        /// Sends `body` as JSON and asks for JSON back.
+        Call json(String body) {
+            setContentType("application/json");
+            setRequestBody(body);
+            addRequestHeader("Accept", "application/json");
+            return this;
+        }
+
         /// The redirect is the answer, not something to follow.
         Call unfollowed() {
             setFollowRedirects(false);

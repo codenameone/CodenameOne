@@ -30,7 +30,9 @@ import java.util.Map;
 
 /// The device grant from both ends. The app is the device -- it asks for a code
 /// and polls with `OidcClient` -- and it is also the user at another screen, who
-/// signs in and approves the code on the server's verification page.
+/// signs in and approves the code -- through the JSON form of the server's
+/// verification endpoint, which is what an app with its own approval screen uses.
+/// The page a browser gets is tested with the server, in `SignInFlowTest`.
 ///
 /// Three devices are started so no step has to out-wait the server's polling
 /// interval: one is approved and polled by the client, one is polled twice in a
@@ -66,7 +68,7 @@ public class BackendDeviceGrantTest extends BackendAuthTestBase {
         });
         step(() -> {
             final int id = currentStep();
-            decide(device.getUserCode(), "approve", "Device approved", () -> proceed(id));
+            decide(device.getUserCode(), "approve", "approved", () -> proceed(id));
         });
         // The client waits one interval, asks once, and has its tokens.
         step(() -> {
@@ -109,7 +111,7 @@ public class BackendDeviceGrantTest extends BackendAuthTestBase {
             final int id = currentStep();
             start(started -> {
                 final String code = (String) started.get("device_code");
-                decide((String) started.get("user_code"), "deny", null, () -> poll(code, denied -> {
+                decide((String) started.get("user_code"), "deny", "denied", () -> poll(code, denied -> {
                     if (expect(denied.code == 400 && OidcException.ACCESS_DENIED.equals(error(denied)),
                             "a refused device answered " + denied.code + " " + denied.text())) {
                         proceed(id);
@@ -146,29 +148,34 @@ public class BackendDeviceGrantTest extends BackendAuthTestBase {
         return error == null ? null : error.toString();
     }
 
-    /// The user's side: sign in, look the code up, and answer the question the
-    /// page asks. The page binds its question to the session with a ticket, so the
-    /// second request must carry the first one's cookie and the ticket it showed.
+    /// The user's side, as an app with a screen of its own would do it: look the
+    /// code up through the verification endpoint's JSON form, read who is asking,
+    /// and answer. The server binds its question to the session with a ticket, so
+    /// the second request carries the first one's cookie and the ticket it gave.
+    ///
+    /// @param expected the `status` the answer must report
     private void decide(final String userCode, final String decision, final String expected,
             final Runnable then) {
         new Call("POST", "/oauth2/device_verification").basic(USER, USER_PASSWORD)
-                .form("user_code", userCode).send(asked -> {
-                    String page = asked.text();
-                    String marker = "name=\"ticket\" value=\"";
-                    int at = page.indexOf(marker);
-                    if (!expect(asked.code == 200 && at > 0, "looking the code up answered "
-                            + asked.code + " " + page)
-                            || !expect(asked.session != null, "the verification page set no session")) {
+                .json("{\"user_code\":\"" + userCode + "\"}").send(asked -> {
+                    Map<String, Object> question = asked.json();
+                    Object ticket = field(question, "ticket");
+                    if (!expect(asked.code == 200 && ticket instanceof String,
+                            "looking the code up answered " + asked.code + " " + asked.text())
+                            || !expect("Hello Codename One".equals(field(question, "client_name"))
+                            && CLIENT_ID.equals(field(question, "client_id"))
+                            && USER.equals(field(question, "principal"))
+                            && ("openid " + SCOPE_READ).equals(field(question, "scope")),
+                            "the question was " + asked.text())
+                            || !expect(asked.session != null, "the lookup set no session")) {
                         return;
                     }
-                    String ticket = page.substring(at + marker.length(),
-                            page.indexOf('"', at + marker.length()));
                     new Call("POST", "/oauth2/device_verification").basic(USER, USER_PASSWORD)
                             .cookie(asked.session)
-                            .form("user_code", userCode).form("ticket", ticket)
-                            .form("decision", decision).send(decided -> {
-                                if (expect(decided.code == 200 && (expected == null
-                                        || decided.text().indexOf(expected) >= 0),
+                            .json("{\"user_code\":\"" + userCode + "\",\"ticket\":\"" + ticket
+                                    + "\",\"decision\":\"" + decision + "\"}").send(decided -> {
+                                if (expect(decided.code == 200 && expected.equals(
+                                        field(decided.json(), "status")),
                                         "the decision answered " + decided.code + " " + decided.text())) {
                                     then.run();
                                 }

@@ -29,6 +29,7 @@ import com.codename1.backend.annotations.Configuration;
 import com.codename1.backend.annotations.Order;
 import com.codename1.backend.security.AntPathRequestMatcher;
 import com.codename1.backend.security.HttpSecurity;
+import com.codename1.backend.security.SecurityExchange;
 import com.codename1.backend.security.SecurityFilterChain;
 import com.codename1.backend.security.SessionCreationPolicy;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
@@ -43,13 +44,16 @@ import com.codename1.backend.security.mfa.TotpService;
 import com.codename1.backend.security.oauth2.core.AuthorizationGrantType;
 import com.codename1.backend.security.oauth2.core.ClientAuthenticationMethod;
 import com.codename1.backend.security.oauth2.jwt.DefaultJwtDecoder;
+import com.codename1.backend.security.oauth2.jwt.JwtAudienceValidator;
+import com.codename1.backend.security.oauth2.jwt.JwtClaimValidator;
+import com.codename1.backend.security.oauth2.jwt.JwtValidators;
 import com.codename1.backend.security.oauth2.server.authorization.AuthorizationServerKeys;
+import com.codename1.backend.security.oauth2.server.authorization.AuthorizationServerSettings;
 import com.codename1.backend.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import com.codename1.backend.security.oauth2.server.authorization.JdbcRegisteredClientRepository;
 import com.codename1.backend.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import com.codename1.backend.security.oauth2.server.authorization.RegisteredClient;
 import com.codename1.backend.security.oauth2.server.authorization.RegisteredClientRepository;
-import com.codename1.backend.security.ratelimit.InMemoryRateLimiter;
 import com.codename1.security.Base32;
 
 import java.io.IOException;
@@ -73,10 +77,11 @@ import java.util.List;
 /// before this class existed, with no sign-in. Neither chain may ever be widened
 /// to "any request": every device leg's screenshots arrive unauthenticated.
 ///
-/// One thing does reach those routes. With any chain declared, the server refuses
-/// a request whose PATH is written to be read two ways -- a `;`, `//`, a dot
-/// segment, an encoded slash, backslash, percent, dot or semicolon -- with 400
-/// before any chain or route sees it. No route here is spelled that way.
+/// A request neither chain claims is not the security layer's at all: however
+/// its path is written, it is answered as it was before. A path spelled to be
+/// read two ways -- a `;`, `//`, a dot segment, an encoded separator -- is refused
+/// with 400 only when it is, or could be read as, a path one of the two chains
+/// guards.
 ///
 /// ## The issuer is whatever address the client used
 ///
@@ -87,8 +92,11 @@ import java.util.List;
 /// no issuer configured takes it from each request's `Host`: the metadata, the
 /// `iss` of a redirect and the `iss` of every token name the address that client
 /// used. The resource-server chain verifies with the signing keys themselves
-/// rather than fetching `/oauth2/jwks` from itself, and checks no issuer, so a
-/// token is good whichever address it was issued under.
+/// rather than fetching `/oauth2/jwks` from itself. It still checks who issued a
+/// token and whom it is for: the issuer must be the address the request carrying
+/// the token came in on -- the one address that device knows this server by --
+/// and the audience must be [#AUDIENCE], which is what the authorization server
+/// here puts in every access token that asks for nothing else.
 ///
 /// ## Every credential here is a fixture
 ///
@@ -108,6 +116,11 @@ public class SecurityConfig {
     public static final String SCOPE_READ = "notes:read";
     /// The scope the app's tests never ask for, so they can be refused for it.
     public static final String SCOPE_WRITE = "notes:write";
+
+    /// What [SecureApi] is called in a token's `aud`: the authorization server's
+    /// default audience, and the one audience the resource chain accepts. A name
+    /// and not an address, because this server has no one address.
+    public static final String AUDIENCE = "urn:hellocodenameone:secure-api";
 
     /// A user with a password and nothing else.
     public static final String USER = "ada";
@@ -205,10 +218,11 @@ public class SecurityConfig {
     /// whatever this says. The device verification form keeps its own one-use
     /// `ticket`, which no setting removes.
     ///
-    /// The bound on how many device codes one user may try is raised from ten in
-    /// five minutes to ten a second. Every test user here is `ada`, each approval
-    /// costs two tries, and a suite run again against a server left up would
-    /// otherwise be answered 429 by the limit of the run before it.
+    /// The two limits the layer keeps itself are raised in `application.properties`
+    /// from a handful in five minutes to ten a second: the device codes one user
+    /// may try, and the attempts at a one-time code. Both are counted per user,
+    /// every test user here is `ada` or `grace`, and a suite run again against a
+    /// server left up would otherwise be answered 429 by the run before it.
     @Bean
     @Order(1)
     public SecurityFilterChain signIn(HttpSecurity http) {
@@ -220,16 +234,36 @@ public class SecurityConfig {
             .httpBasic(basic -> basic.realmName("hellocodenameone"))
             .mfa(mfa -> mfa.defaultSuccessUrl("/account/me"))
             .authorizationServer(server -> server
-                    .deviceVerificationRateLimiter(new InMemoryRateLimiter(600, 60)));
+                    .settings(AuthorizationServerSettings.builder()
+                            .defaultAudience(AUDIENCE).build()));
         return http.build();
+    }
+
+    /// Whether `issuer` is this server as the request being served names it: the
+    /// scheme it arrived over and its `Host`. A token carried to another name for
+    /// the same server is refused, as a real resource server refuses one from an
+    /// issuer it was not told about.
+    static boolean issuedAtThisAddress(Object issuer) {
+        SecurityExchange exchange = SecurityExchange.current();
+        if (exchange == null || !(issuer instanceof String)) {
+            return false;
+        }
+        String host = exchange.getRequest().getHeader("Host");
+        return host != null && ((exchange.isSecure() ? "https://" : "http://") + host)
+                .equals(issuer);
     }
 
     /// The routes of [SecureApi]: a bearer token on every request and no session.
     /// The token is verified against [#signingKeys] directly; see the class
-    /// comment for why not through the issuer's address.
+    /// comment for why not through the issuer's address, and for what is asked
+    /// of its issuer and audience instead.
     @Bean
     @Order(2)
     public SecurityFilterChain secured(HttpSecurity http, JwkSource signingKeys) {
+        DefaultJwtDecoder decoder = DefaultJwtDecoder.withJwkSource(signingKeys).build();
+        decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
+                new JwtAudienceValidator(AUDIENCE),
+                new JwtClaimValidator("iss", SecurityConfig::issuedAtThisAddress)));
         http.securityMatcher("/api/secure/**")
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -240,8 +274,7 @@ public class SecurityConfig {
                             "/api/secure/admin")
                         .hasAuthority("SCOPE_" + SCOPE_WRITE)
                     .anyRequest().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(
-                    DefaultJwtDecoder.withJwkSource(signingKeys).build())));
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoder)));
         return http.build();
     }
 }
