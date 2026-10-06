@@ -52,6 +52,14 @@
    * fire-and-forget download beacon, true when a request was issued; with
    * `confirm`, true only when the server ANSWERED with a success status.
    */
+  // How long a confirmed request may take before it is aborted and reported
+  // as not sent. Shorter than the Initializr bridge's own wait (20 s), so the
+  // page always answers first with a definite result -- the bridge never
+  // reports "not sent" while this request could still succeed. If an aborted
+  // request did reach BuildCloud, a retry is harmless: it sends one email per
+  // address per day and answers a repeat as accepted.
+  var CONFIRM_TIMEOUT_MS = 15000;
+
   function post(endpoint, packageName, fields, confirm) {
     try {
       var host = window.location && window.location.hostname;
@@ -77,20 +85,31 @@
         // "no-cors" gives an opaque response that looks the same for a 202 as
         // for a 400, 429 or 503, and the steps panel would claim an email that
         // was refused.
+        var controller = confirm && typeof AbortController === "function" ? new AbortController() : null;
+        var timer = controller && typeof window.setTimeout === "function"
+          ? window.setTimeout(function () { controller.abort(); }, CONFIRM_TIMEOUT_MS) : null;
+        var settle = function (value) {
+          if (timer !== null && typeof window.clearTimeout === "function") {
+            window.clearTimeout(timer);
+          }
+          return value;
+        };
         return window.fetch(endpoint, {
           method: "POST",
           mode: confirm ? "cors" : "no-cors",
+          signal: controller ? controller.signal : undefined,
           credentials: "omit",
           keepalive: true,
           referrerPolicy: "no-referrer",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: body
         }).then(function (response) {
-          return confirm ? !!(response && response.ok) : true;
+          return settle(confirm ? !!(response && response.ok) : true);
         }, function () {
-          // The request never left (offline, blocked): say so, so the steps
-          // panel does not claim an email is on its way. Still never rejects.
-          return false;
+          // The request never left (offline, blocked) or was aborted at the
+          // deadline: say so, so the steps panel does not claim an email is on
+          // its way. Still never rejects.
+          return settle(false);
         });
       }).catch(function () {
         return false;

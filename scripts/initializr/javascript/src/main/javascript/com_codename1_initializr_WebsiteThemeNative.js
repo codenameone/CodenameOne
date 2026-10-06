@@ -163,7 +163,11 @@ var o = {};
     // or a browser without fetch/WebCrypto the host drops it, and the panel
     // must not say "Check your inbox" for an email nobody asked for. No answer
     // within STEPS_ACK_TIMEOUT_MS counts as not sent.
-    var STEPS_ACK_TIMEOUT_MS = 6000;
+    // Longer than the host page's own deadline for the request (15 s, see
+    // CONFIRM_TIMEOUT_MS in cn1-initializr-beacon.js), which aborts it and
+    // answers false. So this only fires when no host answers at all; it never
+    // reports "not sent" for a request that is still in flight.
+    var STEPS_ACK_TIMEOUT_MS = 20000;
     var stepsSeq = 0;
 
     // The only pages allowed to receive an email address typed into the panel.

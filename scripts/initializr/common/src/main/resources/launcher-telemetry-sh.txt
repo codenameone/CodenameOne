@@ -127,12 +127,14 @@ function cn1_mvnw {
   # exactly what Maven returned: a tee that fails (a full disk) cannot change
   # it, and no status file is needed. stdout and stderr stay separate -- each
   # is copied to the log by its own tee and passed through on its own channel,
-  # so redirecting one still shows the other. stdin is passed through
-  # explicitly: a background job's stdin is /dev/null otherwise.
+  # so redirecting one still shows the other. stdin is redirected ON the
+  # background subshell itself: bash gives an asynchronous command /dev/null
+  # as stdin unless that command carries its own redirection, so a `<&0`
+  # inside it would only duplicate /dev/null and a Maven prompt would read EOF.
   if [ -n "$log" ]; then
-    ( ./mvnw "$@" <&0 2> >(tee -a "$log" >&2) | tee -a "$log"; exit "${PIPESTATUS[0]}" ) &
+    ( ./mvnw "$@" 2> >(tee -a "$log" >&2) | tee -a "$log"; exit "${PIPESTATUS[0]}" ) <&0 &
   else
-    ( ./mvnw "$@" <&0 ) &
+    ( ./mvnw "$@" ) <&0 &
   fi
   pipe_pid=$!
   wait "$pipe_pid"

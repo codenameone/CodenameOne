@@ -128,7 +128,7 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
             noisy = project / 'mvnw-stderr-probe.sh'
             noisy.write_text('#!/bin/sh\necho to-stdout\necho to-stderr >&2\nexit 0\n')
             noisy.chmod(0o755)
-            probe = (project / 'build.sh').read_text().replace('./mvnw "$@" <&0', './mvnw-stderr-probe.sh "$@" <&0')
+            probe = (project / 'build.sh').read_text().replace('( ./mvnw "$@" 2>', '( ./mvnw-stderr-probe.sh "$@" 2>')
             assert probe != (project / 'build.sh').read_text(), 'probe hook not found in build.sh'
             (project / 'build-probe.sh').write_text(probe)
             (project / 'build-probe.sh').chmod(0o755)
@@ -137,6 +137,12 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
             assert result.returncode == 0, result
             assert 'to-stdout' in result.stdout and 'to-stderr' not in result.stdout, result.stdout
             assert 'to-stderr' in result.stderr, result.stderr
+            # Maven (and its plugins) can prompt: the launcher's stdin must reach it,
+            # not the /dev/null bash gives a background command by default.
+            noisy.write_text('#!/bin/sh\nread line\necho "got:$line"\nexit 0\n')
+            result = subprocess.run([str(project / 'build-probe.sh'), 'javascript_cloud'], cwd=parent, env=env,
+                                    input='typed-answer\n', text=True, capture_output=True, timeout=30)
+            assert result.returncode == 0 and 'got:typed-answer' in result.stdout, (result.stdout, result.stderr)
     else:
         assert not events, ('the archetype launchers report nothing', events)
     recorder.shutdown()

@@ -20,7 +20,10 @@ function sha256Hex(text) {
 
 function loadBeacon({ hostname = "www.codenameone.com", fetchImpl, subtle = crypto.webcrypto.subtle } = {}) {
   const calls = [];
+  const timers = [];
   const window = {
+    setTimeout(fn, ms) { timers.push({ fn, ms }); return timers.length; },
+    clearTimeout(id) { if (timers[id - 1]) timers[id - 1].cleared = true; },
     location: { hostname },
     crypto: subtle ? { subtle } : undefined,
     fetch: fetchImpl === null ? undefined : (url, init) => {
@@ -29,9 +32,9 @@ function loadBeacon({ hostname = "www.codenameone.com", fetchImpl, subtle = cryp
     },
   };
   vm.runInNewContext(beaconSource, {
-    window, TextEncoder, Uint8Array, Promise, encodeURIComponent, String,
+    window, TextEncoder, Uint8Array, Promise, encodeURIComponent, String, AbortController,
   });
-  return { beacon: window.cn1InitializrBeacon, calls };
+  return { beacon: window.cn1InitializrBeacon, calls, timers };
 }
 
 // Hash correctness: lower-cased package name, lowercase hex SHA-256, form body.
@@ -151,6 +154,29 @@ for (const status of [400, 429, 503]) {
 {
   const accepted = loadBeacon({ fetchImpl: () => Promise.resolve({ ok: true, status: 202 }) });
   assert.equal(await accepted.beacon.sendSteps("dev@example.org", "com.example.app", "", "", "maven"), true);
+}
+
+// A steps request that hangs is aborted at the page's deadline and reported
+// as not sent -- before the Initializr bridge's own (longer) wait runs out, so
+// the panel never says "not sent" for a request still in flight.
+{
+  const hanging = loadBeacon({ fetchImpl: (url, init) => new Promise((resolve, reject) => {
+    init.signal.addEventListener("abort", () => reject(new Error("AbortError")));
+  }) });
+  const pending = hanging.beacon.sendSteps("dev@example.org", "com.example.app", "", "", "maven");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(hanging.timers.length, 1, "a deadline is armed for the confirmed request");
+  assert.ok(hanging.timers[0].ms < 20000, "shorter than the bridge's 20 s wait");
+  hanging.timers[0].fn();
+  assert.equal(await pending, false);
+}
+{
+  const quick = loadBeacon({ fetchImpl: () => Promise.resolve({ ok: true, status: 202 }) });
+  assert.equal(await quick.beacon.sendSteps("dev@example.org", "com.example.app", "", "", "maven"), true);
+  assert.ok(quick.timers[0].cleared, "the deadline is cleared once the server answered");
+  const beacon = loadBeacon();
+  await beacon.beacon.send("com.example.app", "");
+  assert.equal(beacon.timers.length, 0, "the fire-and-forget download beacon arms no deadline");
 }
 
 // Page wiring: one download message -> exactly one beacon + one Crisp event,
