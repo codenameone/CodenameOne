@@ -2913,7 +2913,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append("\n                .metrics(new com.codename1.backend.otel.OtlpMetricExporter(")
               .append(name).append("))");
         }
-        if (beans != null && beans.needsDatabase) {
+        boolean securitySchema = settings != null && settings.securitySchema;
+        if ((beans != null && beans.needsDatabase) || securitySchema) {
             // A bean that declares a DataSource, an EntityManager or a Session
             // needs a database, and this is where the build says so: the builder
             // opens one for a server that has no entities either, which is how a
@@ -2930,6 +2931,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append(i == 0 ? "" : ", ").append(quote(flat.get(i)));
             }
             sb.append("});\n");
+        }
+        if (securitySchema) {
+            // cn1.security.schema.enabled=true, read here at build time because
+            // this is the only place that can act on it without every server
+            // carrying the schema: the ONLY reference to it, made for a build
+            // that asked. Registered before the server starts, so the tables
+            // exist before the application's own migrations and its beans.
+            sb.append("        com.codename1.backend.Migrations.register(")
+              .append("com.codename1.backend.security.SecuritySchema.migrations());\n");
         }
         if (beans != null && beans.hasSecurityChains()) {
             // The ONLY call that names the security layer, made for a build with

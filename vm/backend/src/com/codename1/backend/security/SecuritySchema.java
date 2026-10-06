@@ -1,0 +1,223 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend.security;
+
+import com.codename1.backend.Database;
+import com.codename1.backend.sql.Dialect;
+import com.codename1.migration.JavaMigration;
+import com.codename1.migration.MigrationContext;
+import com.codename1.migration.MigrationSet;
+import java.io.IOException;
+
+/// The tables the security layer's database-backed stores keep, as a migration
+/// set of the layer's own.
+///
+/// Nothing registers it unless the application asks, and an application that
+/// does not ask carries none of it. To ask, set
+///
+/// ```
+/// cn1.security.schema.enabled=true
+/// ```
+///
+/// in `application.properties` -- the build reads it there and registers the
+/// set in the server's entry point -- or, in a server assembled by hand and in
+/// a test, call
+///
+/// ```java
+/// Migrations.register(SecuritySchema.migrations());
+/// ```
+///
+/// before the server starts. The set is named `security`, keeps its history in
+/// `cn1_security_schema_history`, and runs before the application's own
+/// migrations, so those may refer to its tables.
+///
+/// Every table is named `cn1_...`, and the same on SQLite, PostgreSQL and
+/// MySQL:
+///
+/// | Version | Tables | Used by |
+/// |---|---|---|
+/// | 1 | `cn1_users`, `cn1_authorities` | [com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager] |
+/// | 2 | `cn1_api_key` | [com.codename1.backend.security.apikey.JdbcApiKeyRepository] |
+/// | 3 | `cn1_persistent_logins` | [com.codename1.backend.security.rememberme.JdbcTokenRepository] |
+/// | 4 | `cn1_mfa_totp`, `cn1_mfa_recovery_code` | [com.codename1.backend.security.mfa.JdbcTotpRepository], [com.codename1.backend.security.mfa.JdbcRecoveryCodeRepository] |
+/// | 5 | `cn1_rate_limit` | [com.codename1.backend.security.ratelimit.JdbcRateLimiter] |
+///
+/// A user name is kept twice: as it was given, and folded to lower case in the
+/// `username_key` column every table is keyed by, which is what makes a lookup
+/// ignore case the same way on all three engines. Only `A` to `Z` are folded;
+/// see [#usernameKey].
+///
+/// A moment is epoch milliseconds in a 64-bit integer and a truth value is 0 or
+/// 1, as everywhere in the backend's own schemas.
+public final class SecuritySchema {
+    /// The name of the set.
+    public static final String NAME = "security";
+    /// The setting that makes the build register the set.
+    public static final String ENABLED = "cn1.security.schema.enabled";
+
+    // The versions of this set. A version is never edited once released: a new
+    // table, or a change to one, is a new version appended in migrations().
+    // Reserved for the parts of the layer that keep tables and are not here yet,
+    // so that they can be written side by side without colliding:
+    //   6  cn1_federated_identity          (OAuth2 / OIDC login)
+    //   7  cn1_oauth2_registered_client    (authorization server)
+    //   8  cn1_oauth2_authorization        (authorization server)
+    //   9  cn1_webauthn_credential         (passkeys)
+    // Anything after those takes 10 and up. Each version is one method below
+    // that returns the statements for an engine, a case in Tables.migrate, and a
+    // line in migrations().
+
+    private SecuritySchema() {
+    }
+
+    /// The set, for `Migrations.register`.
+    public static MigrationSet migrations() {
+        return MigrationSet.builder(NAME)
+                .java("1", "users and authorities", new Tables(1))
+                .java("2", "api keys", new Tables(2))
+                .java("3", "persistent logins", new Tables(3))
+                .java("4", "second factors", new Tables(4))
+                .java("5", "rate limits", new Tables(5))
+                .build();
+    }
+
+    /// One version of the set. Written in Java rather than as a script because
+    /// what a key column is called is the connected engine's to say -- MySQL and
+    /// MariaDB, which a script cannot tell apart, do not even share a collation
+    /// that compares text byte for byte -- and [Dialect] is where that is known.
+    private static final class Tables implements JavaMigration {
+        private final int version;
+
+        Tables(int version) {
+            this.version = version;
+        }
+
+        @Override
+        public void migrate(MigrationContext context) throws IOException {
+            Object connection = context.connection();
+            if (!(connection instanceof Database)) {
+                throw new IOException("The security schema is the server's: it cannot be "
+                        + "applied to " + connection);
+            }
+            Dialect d = ((Database) connection).dialect();
+            String[] statements;
+            switch (version) {
+                case 1: statements = users(d); break;
+                case 2: statements = apiKeys(d); break;
+                case 3: statements = persistentLogins(d); break;
+                case 4: statements = secondFactors(d); break;
+                default: statements = rateLimits(d); break;
+            }
+            for (String statement : statements) {
+                context.execute(statement, null);
+            }
+        }
+    }
+
+    /// A user name as the tables are keyed by it: `A` to `Z` folded to lower
+    /// case, and nothing else changed. Folded by hand because the platform's
+    /// own fold follows the server's locale, and a key must not.
+    public static String usernameKey(String username) {
+        if (username == null) {
+            return null;
+        }
+        char[] chars = username.toCharArray();
+        boolean changed = false;
+        for (int iter = 0 ; iter < chars.length ; iter++) {
+            char c = chars[iter];
+            if (c >= 'A' && c <= 'Z') {
+                chars[iter] = (char) (c + ('a' - 'A'));
+                changed = true;
+            }
+        }
+        return changed ? new String(chars) : username;
+    }
+
+    /// The type of a text column that is a key or part of one: bounded and
+    /// compared byte for byte on MySQL, where plain text can be neither.
+    private static String key(Dialect d) {
+        String column = d.assignedKeyColumn(Dialect.TEXT);
+        String suffix = " NOT NULL PRIMARY KEY";
+        if (!column.endsWith(suffix)) {
+            throw new IllegalStateException("Unexpected key column for " + d.getName() + ": "
+                    + column);
+        }
+        return column.substring(0, column.length() - suffix.length());
+    }
+
+    private static String text(Dialect d) {
+        return d.columnType(Dialect.TEXT) + " NOT NULL";
+    }
+
+    private static String flag(Dialect d) {
+        return d.columnType(Dialect.BOOLEAN) + " NOT NULL";
+    }
+
+    private static String moment(Dialect d) {
+        return d.columnType(Dialect.BIGINT) + " NOT NULL";
+    }
+
+    private static String[] users(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_users (username_key " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "username " + text(d) + ", password " + text(d) + ", enabled " + flag(d)
+                + ", account_non_expired " + flag(d) + ", account_non_locked " + flag(d)
+                + ", credentials_non_expired " + flag(d) + ")",
+            "CREATE TABLE cn1_authorities (username_key " + key(d) + " NOT NULL, "
+                + "authority " + key(d) + " NOT NULL, PRIMARY KEY (username_key, authority))"};
+    }
+
+    private static String[] apiKeys(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_api_key (key_hash " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "id " + key(d) + " NOT NULL, owner " + key(d) + " NOT NULL, scopes " + text(d)
+                + ", prefix " + text(d) + ", last_four " + text(d) + ", revoked " + flag(d)
+                + ", created_at " + moment(d) + ")",
+            "CREATE UNIQUE INDEX cn1_api_key_id ON cn1_api_key (id)",
+            "CREATE INDEX cn1_api_key_owner ON cn1_api_key (owner)"};
+    }
+
+    private static String[] persistentLogins(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_persistent_logins (series " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "username_key " + key(d) + " NOT NULL, username " + text(d) + ", token_hash "
+                + text(d) + ", last_used " + moment(d) + ")",
+            "CREATE INDEX cn1_persistent_logins_user ON cn1_persistent_logins (username_key)"};
+    }
+
+    private static String[] secondFactors(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_mfa_totp (username_key " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "secret " + text(d) + ", nonce " + text(d) + ", confirmed " + flag(d)
+                + ", last_used_step " + moment(d) + ", created_at " + moment(d) + ")",
+            "CREATE TABLE cn1_mfa_recovery_code (username_key " + key(d) + " NOT NULL, "
+                + "code_hash " + key(d) + " NOT NULL, PRIMARY KEY (username_key, code_hash))"};
+    }
+
+    private static String[] rateLimits(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_rate_limit (limit_key " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "window_start " + moment(d) + ", hits " + d.columnType(Dialect.INTEGER)
+                + " NOT NULL)"};
+    }
+}

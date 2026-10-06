@@ -510,6 +510,35 @@ public class MethodSecurityTest {
         assertFalse(errors, errors.contains("not accessible from com.example.Uses"));
     }
 
+    @Test
+    public void theSecuritySchemaIsRegisteredOnlyWhenTheBuildAsks() throws Exception {
+        String register = "com.codename1.backend.Migrations.register("
+                + "com.codename1.backend.security.SecuritySchema.migrations());";
+        File classes = compile(sample());
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(classes, proc));
+        String bootstrap = proc.generateBootstrap("com.example");
+        // Not asked for: the entry point does not name the schema, so the
+        // server does not carry it.
+        assertFalse(bootstrap, bootstrap.contains("SecuritySchema"));
+        assertFalse(bootstrap, bootstrap.contains(".requiresDataSource()"));
+
+        classes = compile(sample());
+        java.io.FileWriter w = new java.io.FileWriter(new File(classes, "application.properties"));
+        w.write("cn1.security.schema.enabled=true\n");
+        w.close();
+        proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(classes, proc));
+        bootstrap = proc.generateBootstrap("com.example");
+        assertTrue(bootstrap, bootstrap.contains("        " + register + "\n"));
+        // Its tables need a database, whether or not a bean asked for one.
+        assertTrue(bootstrap, bootstrap.contains(".requiresDataSource()"));
+        // Before the server is built and started.
+        assertTrue(bootstrap, bootstrap.indexOf(register) < bootstrap.indexOf("cn1Builder.run()"));
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private Backend start(URLClassLoader loader, int port) throws Exception {

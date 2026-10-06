@@ -54,6 +54,9 @@ final class BackendSettings {
     boolean management;
     /// Whether the build asked for the MCP endpoint, tools aside.
     boolean mcp;
+    /// Whether the build asked for the security layer's own tables:
+    /// `cn1.security.schema.enabled=true`.
+    boolean securitySchema;
 
     private final ProcessorContext ctx;
 
@@ -84,6 +87,8 @@ final class BackendSettings {
         }
         out.management |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
                 "cn1.management.enabled");
+        out.securitySchema |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
+                "cn1.security.schema.enabled");
         // Moving the endpoint or naming its origins is asking for it; the
         // endpoint's own default -- on when the server has a tool to serve --
         // still decides whether it answers.

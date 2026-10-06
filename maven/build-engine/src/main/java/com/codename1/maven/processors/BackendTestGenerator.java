@@ -530,6 +530,11 @@ final class BackendTestGenerator {
         sb.append("    public String[] mockBeans() {\n        return ").append(array(mockNames))
           .append(";\n    }\n\n");
         sb.append("    public void configure(com.codename1.backend.Backend.Builder builder) {\n");
+        if (settings.securitySchema) {
+            // As the generated main registers it, for a build that asked.
+            sb.append("        com.codename1.backend.Migrations.register(")
+              .append("com.codename1.backend.security.SecuritySchema.migrations());\n");
+        }
         if (spec.model.hasSecurityChains()) {
             // What the generated main does for a build with a chain bean, and
             // named only here: a test application without one links none of it.
