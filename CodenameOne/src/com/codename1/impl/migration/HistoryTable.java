@@ -43,8 +43,8 @@ public final class HistoryTable {
         public int rank;
         /// The version, or null for a repeatable migration.
         public String version;
-        /// The description.
-        public String description;
+        /// The description; never null.
+        public String description = "";
         /// `SQL`, `JAVA` or `BASELINE`.
         public String type;
         /// The script or class name.
@@ -154,7 +154,7 @@ public final class HistoryTable {
             Row row = new Row();
             row.rank = (int) number(values[0]);
             row.version = values[1];
-            row.description = values[2];
+            row.description = values[2] == null ? "" : values[2];
             row.type = values[3];
             row.script = values[4];
             row.checksum = values[5] == null ? null : Integer.valueOf((int) number(values[5]));

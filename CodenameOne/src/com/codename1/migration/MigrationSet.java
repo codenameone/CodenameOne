@@ -166,8 +166,10 @@ public final class MigrationSet {
             if (migration == null) {
                 throw new IllegalArgumentException("A Java migration is required");
             }
-            return add(new MigrationEntry(version, description, migration.getClass().getName(), null, null, null, 0,
-                    null, migration));
+            // A nested class is spelled Outer$Inner by one runtime and Outer.Inner by the
+            // translated one. The history is compared across them, so it gets one spelling.
+            return add(new MigrationEntry(version, description, migration.getClass().getName().replace('$', '.'),
+                    null, null, null, 0, null, migration));
         }
 
         /// Marks the migration added last as running outside a transaction. A script that must
