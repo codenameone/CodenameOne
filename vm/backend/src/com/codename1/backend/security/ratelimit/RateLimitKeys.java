@@ -31,11 +31,10 @@ import com.codename1.backend.security.apikey.ApiKeyAuthenticationToken;
 
 /// The keys a request is usually counted under.
 public final class RateLimitKeys {
-    private static final RateLimitKeyResolver CLIENT_ADDRESS = new ClientAddress();
-    private static final RateLimitKeyResolver PRINCIPAL = new Principal();
-    private static final RateLimitKeyResolver SESSION = new Session();
-    private static final RateLimitKeyResolver API_KEY = new Key();
 
+    // Each resolver is made by the method that hands it out, not held in a
+    // static: a constant would put every one of them -- and with the API key
+    // one, the API key classes -- into any server that limits by address.
     private RateLimitKeys() {
     }
 
@@ -47,23 +46,23 @@ public final class RateLimitKeys {
     /// for every client there is -- until the server is told to believe the
     /// forwarding headers: `cn1.server.forwardHeaders`.
     public static RateLimitKeyResolver clientAddress() {
-        return CLIENT_ADDRESS;
+        return new ClientAddress();
     }
 
     /// The name of who is signed in; no key for a request nobody signed in for.
     public static RateLimitKeyResolver principal() {
-        return PRINCIPAL;
+        return new Principal();
     }
 
     /// The id of the request's session; no key for a request without one.
     public static RateLimitKeyResolver sessionId() {
-        return SESSION;
+        return new Session();
     }
 
     /// The id of the API key the request presented; no key for a request that
     /// signed in another way.
     public static RateLimitKeyResolver apiKeyId() {
-        return API_KEY;
+        return new Key();
     }
 
     /// The first of `resolvers` that has a key for the request: who is signed

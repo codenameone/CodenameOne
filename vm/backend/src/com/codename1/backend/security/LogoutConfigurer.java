@@ -27,8 +27,9 @@ import com.codename1.backend.HttpSession;
 import java.util.ArrayList;
 import java.util.List;
 
-/// Sign-out. On by default: `POST /logout` ends the session, forgets who was
-/// signed in and redirects to `/login?logout`.
+/// Sign-out: `POST /logout` ends the session, forgets who was signed in and
+/// redirects to `/login?logout`. A chain with `formLogin` has it without
+/// asking; any other chain has it once it calls `http.logout(...)`.
 ///
 /// ```java
 /// http.logout(logout -> logout
@@ -55,7 +56,7 @@ public final class LogoutConfigurer extends SecurityConfigurer {
 
     /// The path that signs out.
     public LogoutConfigurer logoutUrl(String logoutUrl) {
-        this.logoutUrl = FormLoginConfigurer.path(logoutUrl, "logoutUrl");
+        this.logoutUrl = Responses.path(logoutUrl, "logoutUrl");
         return this;
     }
 
@@ -67,7 +68,7 @@ public final class LogoutConfigurer extends SecurityConfigurer {
 
     /// Where a signed-out user goes.
     public LogoutConfigurer logoutSuccessUrl(String logoutSuccessUrl) {
-        this.logoutSuccessUrl = FormLoginConfigurer.path(logoutSuccessUrl, "logoutSuccessUrl");
+        this.logoutSuccessUrl = Responses.path(logoutSuccessUrl, "logoutSuccessUrl");
         return this;
     }
 
@@ -117,15 +118,16 @@ public final class LogoutConfigurer extends SecurityConfigurer {
         if (logoutSuccessUrl != null) {
             return logoutSuccessUrl;
         }
-        FormLoginConfigurer form = http.getConfigurer(FormLoginConfigurer.class);
-        return (form == null ? "/login" : form.getLoginPage()) + "?logout";
+        // Asked of the chain rather than of the form login's configurer: a
+        // chain that signs out without a form has none of that code.
+        return http.loginPage() + "?logout";
     }
 
     @Override
     public void init(HttpSecurity http) {
         if (permitAll) {
             http.permit(AntPathRequestMatcher.antMatcher("GET",
-                    FormLoginConfigurer.pathOnly(successUrl(http))));
+                    Responses.pathOnly(successUrl(http))));
             http.permit(matcher(http));
         }
     }
@@ -154,7 +156,7 @@ public final class LogoutConfigurer extends SecurityConfigurer {
                 http.sessionCreationPolicy() == SessionCreationPolicy.STATELESS));
         LogoutSuccessHandler success = logoutSuccessHandler != null ? logoutSuccessHandler
                 : new SimpleUrlLogoutSuccessHandler(successUrl(http));
-        http.addFilter(new LogoutFilter(matcher(http), all, success), LogoutFilter.class);
+        http.addFilter(new LogoutFilter(matcher(http), all, success), HttpSecurity.ORDER_LOGOUT);
     }
 
     /// Tells the client to drop cookies, each set with the path `/`.

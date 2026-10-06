@@ -26,7 +26,8 @@ package com.codename1.backend.security;
 /// [RequestCache]. A chain that sends such a request to a login page remembers
 /// it in the session; one that only challenges -- HTTP Basic -- has nothing to
 /// come back from and remembers nothing, unless a cache is set here.
-public final class RequestCacheConfigurer extends SecurityConfigurer {
+public final class RequestCacheConfigurer extends SecurityConfigurer
+        implements HttpSecurity.RequestCacheSource {
     private RequestCache requestCache;
 
     RequestCacheConfigurer() {
@@ -40,7 +41,8 @@ public final class RequestCacheConfigurer extends SecurityConfigurer {
     /// @param redirects whether the chain answers a request that must sign in
     /// by sending it to a login page, which is when there is somewhere to come
     /// back from
-    RequestCache resolve(SessionCreationPolicy policy, boolean redirects) {
+    @Override
+    public RequestCache resolve(SessionCreationPolicy policy, boolean redirects) {
         if (requestCache != null) {
             return requestCache;
         }

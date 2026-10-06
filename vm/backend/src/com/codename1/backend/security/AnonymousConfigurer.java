@@ -58,6 +58,6 @@ public final class AnonymousConfigurer extends SecurityConfigurer {
     @Override
     public void configure(HttpSecurity http) {
         http.addFilter(new AnonymousAuthenticationFilter(key, principal,
-                new ArrayList<GrantedAuthority>(authorities)), AnonymousAuthenticationFilter.class);
+                new ArrayList<GrantedAuthority>(authorities)), HttpSecurity.ORDER_ANONYMOUS);
     }
 }

@@ -24,7 +24,6 @@ package com.codename1.backend.security;
 
 import com.codename1.backend.Config;
 import com.codename1.backend.HttpServer;
-import com.codename1.backend.security.crypto.NoOpPasswordEncoder;
 import com.codename1.impl.backend.BackendAccess;
 import com.codename1.impl.backend.RequestSecurity;
 import java.util.List;
@@ -58,7 +57,8 @@ final class FilterChainEngine implements RequestSecurity {
             }
         }
         this.tls = tls;
-        NoOpPasswordEncoder.setDevelopmentProfile(config != null && config.isDevelopmentProfile());
+        com.codename1.impl.backend.security.SecuritySupport.developmentProfile(
+                config != null && config.isDevelopmentProfile());
     }
 
     private SecurityFilterChain match(HttpServer.Request request) {

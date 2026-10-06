@@ -41,6 +41,10 @@ import java.util.Map;
 /// SecurityExchange.current().setResponseHeader("X-Request-Trace", id);
 /// ```
 public final class SecurityExchange {
+    /// The attribute a filter sets on a request whose `Authorization: Bearer`
+    /// credential it has judged, so the filter that verifies tokens leaves it
+    /// alone. Here, where neither filter has to name the other.
+    static final String BEARER_CLAIMED = "com.codename1.backend.security.bearer.claimed";
     private static final ThreadLocal<SecurityExchange> CURRENT = new ThreadLocal<SecurityExchange>();
 
     private final HttpServer.Request request;

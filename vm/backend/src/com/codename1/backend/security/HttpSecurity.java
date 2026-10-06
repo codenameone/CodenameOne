@@ -23,12 +23,7 @@
 package com.codename1.backend.security;
 
 import com.codename1.backend.Config;
-import com.codename1.backend.security.core.userdetails.InMemoryUserDetailsManager;
-import com.codename1.backend.security.core.userdetails.User;
-import com.codename1.backend.security.core.userdetails.UserDetailsPasswordService;
 import com.codename1.backend.security.core.userdetails.UserDetailsService;
-import com.codename1.backend.security.crypto.PasswordEncoder;
-import com.codename1.backend.security.crypto.PasswordEncoderFactories;
 import com.codename1.backend.security.ratelimit.RateLimitKeyResolver;
 import com.codename1.backend.security.ratelimit.RateLimiter;
 import java.util.ArrayList;
@@ -52,16 +47,33 @@ import java.util.Map;
 /// }
 /// ```
 ///
-/// Out of the box a chain guards every request, protects against CSRF, writes
-/// the security headers, keeps who is signed in in the HTTP session, remembers
-/// where an anonymous request was going and signs out at `POST /logout`. It has
-/// no way of signing in and no authorization rules until it is given them.
+/// Out of the box a chain guards every request, writes the security headers,
+/// keeps who is signed in in the HTTP session, protects that session against
+/// CSRF and gives a request nobody signed in for an anonymous authentication.
+/// It has no way of signing in and no authorization rules until it is given
+/// them.
+///
+/// Everything else is there only when the chain asks for it, and a server
+/// carries the code of only what its chains ask for: [#formLogin] -- which
+/// brings sign-out and the memory of where a request was going with it --
+/// [#httpBasic], [#oauth2ResourceServer], [#apiKey], [#rateLimit],
+/// [#rememberMe], [#mfa], [#logout] and [#requestCache]. A server that only
+/// verifies tokens has no login page, no password hashing and no user store in
+/// it. The one departure from Spring Security this makes: a chain without
+/// `formLogin` has no `POST /logout` until it calls [#logout].
+///
+/// A chain whose session policy is
+/// [SessionCreationPolicy#STATELESS] keeps nothing a forged request could
+/// ride on, and has no CSRF filter unless [#csrf] asks for one. One that takes
+/// HTTP Basic credentials from browsers should ask.
 ///
 /// Users come from the application's beans: a
-/// [UserDetailsService] and, if there is one, a [PasswordEncoder] and a
-/// [UserDetailsPasswordService] -- or [AuthenticationProvider] beans, or an
-/// [AuthenticationManager] bean. A chain can also be told directly, with
-/// [#userDetailsService], [#authenticationProvider] or [#authenticationManager].
+/// [UserDetailsService] and, if there is one, a
+/// [com.codename1.backend.security.crypto.PasswordEncoder] and a
+/// [com.codename1.backend.security.core.userdetails.UserDetailsPasswordService]
+/// -- or [AuthenticationProvider] beans, or an [AuthenticationManager] bean. A
+/// chain can also be told directly, with [#userDetailsService],
+/// [#authenticationProvider] or [#authenticationManager].
 public final class HttpSecurity {
     /// The name of the one user a server with no user store has, when
     /// [#USER_PASSWORD] is set; `user` unless set.
@@ -81,7 +93,27 @@ public final class HttpSecurity {
     private final Map<Class<?>, Object> sharedObjects = new HashMap<Class<?>, Object>();
     private final Map<Class<?>, SecurityConfigurer> configurers =
             new LinkedHashMap<Class<?>, SecurityConfigurer>();
-    private final Map<Class<?>, Integer> filterOrder = new HashMap<Class<?>, Integer>();
+    /// The place of each of the layer's own filters, by class NAME. A name, and
+    /// the numbers below, rather than the classes: naming a filter class here
+    /// would put every sign-in mechanism into every server with a chain.
+    private final Map<String, Integer> filterOrder = new HashMap<String, Integer>();
+    private static final String PACKAGE = "com.codename1.backend.security.";
+    static final int ORDER_RATE_LIMIT = 50;
+    static final int ORDER_SECURITY_CONTEXT = 100;
+    static final int ORDER_HEADERS = 200;
+    static final int ORDER_CSRF = 400;
+    static final int ORDER_LOGOUT = 500;
+    static final int ORDER_FORM_LOGIN = 1000;
+    static final int ORDER_SECOND_FACTOR = 1050;
+    static final int ORDER_LOGIN_PAGE = 1100;
+    static final int ORDER_API_KEY = 1200;
+    static final int ORDER_BEARER_TOKEN = 1300;
+    static final int ORDER_BASIC = 1500;
+    static final int ORDER_REMEMBER_ME = 1700;
+    static final int ORDER_ANONYMOUS = 2000;
+    static final int ORDER_AUTHENTICATED_RATE_LIMIT = 2100;
+    static final int ORDER_EXCEPTION_TRANSLATION = 2400;
+    static final int ORDER_AUTHORIZATION = 2500;
     /// {Integer order, SecurityFilter}, in the order they were added.
     private final List<Object[]> filters = new ArrayList<Object[]>();
     private final List<RequestMatcher> permitted = new ArrayList<RequestMatcher>();
@@ -93,6 +125,17 @@ public final class HttpSecurity {
     private UserDetailsService userDetailsService;
     private boolean built;
     private boolean redirectsToSignIn;
+    private boolean csrfAsked;
+    private String loginPage = "/login";
+    private RequestCacheSource requestCacheSource;
+    /// The parts a chain took out with disable(), which nothing puts back.
+    private final List<Class<?>> disabled = new ArrayList<Class<?>>();
+
+    /// Where a chain's [RequestCache] comes from, when it has one: the
+    /// configurer, seen through a type that does not name it.
+    interface RequestCacheSource {
+        RequestCache resolve(SessionCreationPolicy policy, boolean redirects);
+    }
 
     HttpSecurity(Config config, Object[] beans) {
         this.config = config;
@@ -100,26 +143,35 @@ public final class HttpSecurity {
         // The order the filters of a chain run in. The gaps are where the
         // filters of the sign-in mechanisms that are not here yet belong:
         // between CSRF and the form login for a redirect to another identity
-        // provider, between the form login and HTTP Basic for a bearer token.
-        filterOrder.put(SecurityContextHolderFilter.class, Integer.valueOf(100));
-        filterOrder.put(HeaderWriterFilter.class, Integer.valueOf(200));
-        filterOrder.put(CsrfFilter.class, Integer.valueOf(400));
-        filterOrder.put(LogoutFilter.class, Integer.valueOf(500));
-        filterOrder.put(UsernamePasswordAuthenticationFilter.class, Integer.valueOf(1000));
-        filterOrder.put(DefaultLoginPageGeneratingFilter.class, Integer.valueOf(1100));
-        filterOrder.put(ApiKeyAuthenticationFilter.class, Integer.valueOf(1200));
-        filterOrder.put(BearerTokenAuthenticationFilter.class, Integer.valueOf(1300));
-        filterOrder.put(BasicAuthenticationFilter.class, Integer.valueOf(1500));
-        filterOrder.put(AnonymousAuthenticationFilter.class, Integer.valueOf(2000));
-        filterOrder.put(ExceptionTranslationFilter.class, Integer.valueOf(2400));
-        filterOrder.put(AuthorizationFilter.class, Integer.valueOf(2500));
+        // provider, between HTTP Basic and the anonymous filter for a cookie.
+        filterOrder.put(PACKAGE + "RateLimitFilter", Integer.valueOf(ORDER_RATE_LIMIT));
+        filterOrder.put(PACKAGE + "SecurityContextHolderFilter",
+                Integer.valueOf(ORDER_SECURITY_CONTEXT));
+        filterOrder.put(PACKAGE + "HeaderWriterFilter", Integer.valueOf(ORDER_HEADERS));
+        filterOrder.put(PACKAGE + "CsrfFilter", Integer.valueOf(ORDER_CSRF));
+        filterOrder.put(PACKAGE + "LogoutFilter", Integer.valueOf(ORDER_LOGOUT));
+        filterOrder.put(PACKAGE + "UsernamePasswordAuthenticationFilter",
+                Integer.valueOf(ORDER_FORM_LOGIN));
+        filterOrder.put(PACKAGE + "SecondFactorAuthenticationFilter",
+                Integer.valueOf(ORDER_SECOND_FACTOR));
+        filterOrder.put(PACKAGE + "DefaultLoginPageGeneratingFilter",
+                Integer.valueOf(ORDER_LOGIN_PAGE));
+        filterOrder.put(PACKAGE + "ApiKeyAuthenticationFilter", Integer.valueOf(ORDER_API_KEY));
+        filterOrder.put(PACKAGE + "BearerTokenAuthenticationFilter",
+                Integer.valueOf(ORDER_BEARER_TOKEN));
+        filterOrder.put(PACKAGE + "BasicAuthenticationFilter", Integer.valueOf(ORDER_BASIC));
+        filterOrder.put(PACKAGE + "RememberMeAuthenticationFilter",
+                Integer.valueOf(ORDER_REMEMBER_ME));
+        filterOrder.put(PACKAGE + "AnonymousAuthenticationFilter",
+                Integer.valueOf(ORDER_ANONYMOUS));
+        filterOrder.put(PACKAGE + "ExceptionTranslationFilter",
+                Integer.valueOf(ORDER_EXCEPTION_TRANSLATION));
+        filterOrder.put(PACKAGE + "AuthorizationFilter", Integer.valueOf(ORDER_AUTHORIZATION));
         // What every chain has until it says otherwise.
         apply(new SecurityContextConfigurer());
         apply(new HeadersConfigurer());
         apply(new CsrfConfigurer());
-        apply(new LogoutConfigurer());
         apply(new SessionManagementConfigurer());
-        apply(new RequestCacheConfigurer());
         apply(new AnonymousConfigurer());
         apply(new ExceptionHandlingConfigurer());
     }
@@ -152,32 +204,61 @@ public final class HttpSecurity {
     /// The authorization rules; see [AuthorizeHttpRequestsConfigurer].
     public HttpSecurity authorizeHttpRequests(Customizer<
             AuthorizeHttpRequestsConfigurer.AuthorizationManagerRequestMatcherRegistry> customizer) {
-        customizer.customize(getOrApply(AuthorizeHttpRequestsConfigurer.class).getRegistry());
+        AuthorizeHttpRequestsConfigurer configurer = getConfigurer(
+                AuthorizeHttpRequestsConfigurer.class);
+        if (configurer == null) {
+            configurer = new AuthorizeHttpRequestsConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer.getRegistry());
         return this;
     }
 
-    /// Sign-in through an HTML form; see [FormLoginConfigurer].
+    /// Sign-in through an HTML form; see [FormLoginConfigurer]. Brings sign-out
+    /// ([#logout]) and the memory of where a request was going
+    /// ([#requestCache]) with it, unless the chain has turned those off.
     public HttpSecurity formLogin(Customizer<FormLoginConfigurer> customizer) {
-        customizer.customize(getOrApply(FormLoginConfigurer.class));
+        FormLoginConfigurer configurer = getConfigurer(FormLoginConfigurer.class);
+        if (configurer == null) {
+            configurer = new FormLoginConfigurer();
+            apply(configurer);
+            sessionSignIn();
+        }
+        customizer.customize(configurer);
         return this;
     }
 
     /// Sign-in with HTTP Basic credentials; see [HttpBasicConfigurer].
     public HttpSecurity httpBasic(Customizer<HttpBasicConfigurer> customizer) {
-        customizer.customize(getOrApply(HttpBasicConfigurer.class));
+        HttpBasicConfigurer configurer = getConfigurer(HttpBasicConfigurer.class);
+        if (configurer == null) {
+            configurer = new HttpBasicConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
     /// Sign-in with a bearer token that is a JWT; see
     /// [OAuth2ResourceServerConfigurer].
     public HttpSecurity oauth2ResourceServer(Customizer<OAuth2ResourceServerConfigurer> customizer) {
-        customizer.customize(getOrApply(OAuth2ResourceServerConfigurer.class));
+        OAuth2ResourceServerConfigurer configurer = getConfigurer(OAuth2ResourceServerConfigurer.class);
+        if (configurer == null) {
+            configurer = new OAuth2ResourceServerConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
     /// Sign-in with an API key; see [ApiKeyConfigurer].
     public HttpSecurity apiKey(Customizer<ApiKeyConfigurer> customizer) {
-        customizer.customize(getOrApply(ApiKeyConfigurer.class));
+        ApiKeyConfigurer configurer = getConfigurer(ApiKeyConfigurer.class);
+        if (configurer == null) {
+            configurer = new ApiKeyConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
@@ -208,7 +289,12 @@ public final class HttpSecurity {
     /// counts in this process alone.
     public HttpSecurity rateLimit(RequestMatcher matcher, RateLimitKeyResolver keyResolver,
                                   RateLimiter limiter) {
-        getOrApply(RateLimitConfigurer.class).add(matcher, keyResolver, limiter);
+        RateLimitConfigurer configurer = getConfigurer(RateLimitConfigurer.class);
+        if (configurer == null) {
+            configurer = new RateLimitConfigurer();
+            apply(configurer);
+        }
+        configurer.add(matcher, keyResolver, limiter);
         return this;
     }
 
@@ -219,54 +305,93 @@ public final class HttpSecurity {
         return rateLimit(new AntPathRequestMatcher(pattern), keyResolver, limiter);
     }
 
-    /// Sign-out; see [LogoutConfigurer].
+    /// Sign-out; see [LogoutConfigurer]. A chain with [#formLogin] has it
+    /// already; any other chain has none until it calls this.
     public HttpSecurity logout(Customizer<LogoutConfigurer> customizer) {
-        customizer.customize(getOrApply(LogoutConfigurer.class));
+        LogoutConfigurer configurer = getConfigurer(LogoutConfigurer.class);
+        if (configurer == null) {
+            configurer = new LogoutConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
-    /// CSRF protection; see [CsrfConfigurer].
+    /// CSRF protection; see [CsrfConfigurer]. On for every chain that keeps a
+    /// session; a [SessionCreationPolicy#STATELESS] chain has it only when it
+    /// calls this.
     public HttpSecurity csrf(Customizer<CsrfConfigurer> customizer) {
-        customizer.customize(getOrApply(CsrfConfigurer.class));
+        CsrfConfigurer configurer = getConfigurer(CsrfConfigurer.class);
+        if (configurer == null) {
+            configurer = new CsrfConfigurer();
+            apply(configurer);
+        }
+        csrfAsked = true;
+        customizer.customize(configurer);
         return this;
     }
 
     /// The use of the HTTP session; see [SessionManagementConfigurer].
     public HttpSecurity sessionManagement(Customizer<SessionManagementConfigurer> customizer) {
-        customizer.customize(getOrApply(SessionManagementConfigurer.class));
+        SessionManagementConfigurer configurer = getConfigurer(SessionManagementConfigurer.class);
+        if (configurer == null) {
+            configurer = new SessionManagementConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
     /// The security headers; see [HeadersConfigurer].
     public HttpSecurity headers(Customizer<HeadersConfigurer> customizer) {
-        customizer.customize(getOrApply(HeadersConfigurer.class));
+        HeadersConfigurer configurer = getConfigurer(HeadersConfigurer.class);
+        if (configurer == null) {
+            configurer = new HeadersConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
     /// Where an anonymous request's address is remembered; see
     /// [RequestCacheConfigurer].
     public HttpSecurity requestCache(Customizer<RequestCacheConfigurer> customizer) {
-        customizer.customize(getOrApply(RequestCacheConfigurer.class));
+        customizer.customize(requestCacheConfigurer());
         return this;
     }
 
     /// The answers to a request that must sign in or is denied; see
     /// [ExceptionHandlingConfigurer].
     public HttpSecurity exceptionHandling(Customizer<ExceptionHandlingConfigurer> customizer) {
-        customizer.customize(getOrApply(ExceptionHandlingConfigurer.class));
+        ExceptionHandlingConfigurer configurer = getConfigurer(ExceptionHandlingConfigurer.class);
+        if (configurer == null) {
+            configurer = new ExceptionHandlingConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
     /// Where who is signed in is kept; see [SecurityContextConfigurer].
     public HttpSecurity securityContext(Customizer<SecurityContextConfigurer> customizer) {
-        customizer.customize(getOrApply(SecurityContextConfigurer.class));
+        SecurityContextConfigurer configurer = getConfigurer(SecurityContextConfigurer.class);
+        if (configurer == null) {
+            configurer = new SecurityContextConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
     /// The authentication of a request nobody signed in for; see
     /// [AnonymousConfigurer].
     public HttpSecurity anonymous(Customizer<AnonymousConfigurer> customizer) {
-        customizer.customize(getOrApply(AnonymousConfigurer.class));
+        AnonymousConfigurer configurer = getConfigurer(AnonymousConfigurer.class);
+        if (configurer == null) {
+            configurer = new AnonymousConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
         return this;
     }
 
@@ -354,7 +479,7 @@ public final class HttpSecurity {
         if (filter == null) {
             throw new IllegalArgumentException("filter cannot be null");
         }
-        Integer position = filterOrder.get(registered);
+        Integer position = filterOrder.get(registered.getName());
         if (position == null) {
             throw new IllegalArgumentException("The Filter class " + registered.getName()
                     + " does not have a registered order: name one of the chain's own filter "
@@ -363,20 +488,16 @@ public final class HttpSecurity {
         int order = position.intValue() + offset;
         filters.add(new Object[] {Integer.valueOf(order), filter});
         // So that a later filter can be placed relative to this one.
-        if (!filterOrder.containsKey(filter.getClass())) {
-            filterOrder.put(filter.getClass(), Integer.valueOf(order));
+        String name = filter.getClass().getName();
+        if (!filterOrder.containsKey(name)) {
+            filterOrder.put(name, Integer.valueOf(order));
         }
         return this;
     }
 
-    /// Adds one of the chain's own filters at its own place.
-    void addFilter(SecurityFilter filter, Class<? extends SecurityFilter> type) {
-        filters.add(new Object[] {filterOrder.get(type), filter});
-    }
-
-    /// Adds a filter at a place given as a number: for a part whose one filter
-    /// class stands in two places.
-    void addFilterAtOrder(SecurityFilter filter, int order) {
+    /// Adds one of the layer's own filters at its place: one of the ORDER_
+    /// numbers, or a number between two of them for a part of a library's.
+    void addFilter(SecurityFilter filter, int order) {
         filters.add(new Object[] {Integer.valueOf(order), filter});
     }
 
@@ -388,9 +509,6 @@ public final class HttpSecurity {
         Object set = sharedObjects.get(sharedType);
         if (set != null) {
             return (C) set;
-        }
-        if (sharedType == AuthenticationManager.class) { //NOPMD CompareObjectsWithEquals - a class
-            return (C) resolveAuthenticationManager();
         }
         Object found = null;
         for (Object bean : beans) {
@@ -456,50 +574,51 @@ public final class HttpSecurity {
     }
 
     void removeConfigurer(Class<?> type) {
-        configurers.remove(type);
+        SecurityConfigurer removed = configurers.remove(type);
+        if (removed != null && removed == requestCacheSource) { //NOPMD CompareObjectsWithEquals - the object itself
+            requestCacheSource = null;
+        }
+        if (!disabled.contains(type)) {
+            disabled.add(type);
+        }
     }
 
-    @SuppressWarnings("unchecked")
-    private <C extends SecurityConfigurer> C getOrApply(Class<C> type) {
-        SecurityConfigurer existing = configurers.get(type);
-        if (existing != null) {
-            return (C) existing;
+    /// What a way of signing in that keeps the user in a session brings with
+    /// it: sign-out, and the memory of where a request was going. Called by
+    /// the DSL method of such a mechanism, so a chain without one names neither.
+    void sessionSignIn() {
+        if (getConfigurer(LogoutConfigurer.class) == null
+                && !disabled.contains(LogoutConfigurer.class)) {
+            apply(new LogoutConfigurer());
         }
-        SecurityConfigurer created;
-        // Spelled out: this runtime builds nothing by reflection.
-        if (type == AuthorizeHttpRequestsConfigurer.class) { //NOPMD CompareObjectsWithEquals - classes
-            created = new AuthorizeHttpRequestsConfigurer();
-        } else if (type == FormLoginConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new FormLoginConfigurer();
-        } else if (type == HttpBasicConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new HttpBasicConfigurer();
-        } else if (type == LogoutConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new LogoutConfigurer();
-        } else if (type == CsrfConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new CsrfConfigurer();
-        } else if (type == SessionManagementConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new SessionManagementConfigurer();
-        } else if (type == HeadersConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new HeadersConfigurer();
-        } else if (type == RequestCacheConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new RequestCacheConfigurer();
-        } else if (type == ExceptionHandlingConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new ExceptionHandlingConfigurer();
-        } else if (type == SecurityContextConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new SecurityContextConfigurer();
-        } else if (type == AnonymousConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new AnonymousConfigurer();
-        } else if (type == OAuth2ResourceServerConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new OAuth2ResourceServerConfigurer();
-        } else if (type == ApiKeyConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new ApiKeyConfigurer();
-        } else if (type == RateLimitConfigurer.class) { //NOPMD CompareObjectsWithEquals
-            created = new RateLimitConfigurer();
-        } else {
-            throw new IllegalArgumentException("Not a built-in configurer: " + type.getName());
+        if (requestCacheSource == null && !disabled.contains(RequestCacheConfigurer.class)) {
+            requestCacheConfigurer();
         }
-        apply(created);
-        return (C) created;
+    }
+
+    private RequestCacheConfigurer requestCacheConfigurer() {
+        RequestCacheConfigurer configurer = getConfigurer(RequestCacheConfigurer.class);
+        if (configurer == null) {
+            configurer = new RequestCacheConfigurer();
+            apply(configurer);
+            requestCacheSource = configurer;
+        }
+        return configurer;
+    }
+
+    /// Whether the chain called [#csrf], rather than having it by default.
+    boolean csrfAsked() {
+        return csrfAsked;
+    }
+
+    /// The path of the login page a sign-in mechanism of this chain serves or
+    /// names; `/login` until one says otherwise.
+    String loginPage() {
+        return loginPage;
+    }
+
+    void loginPage(String loginPage) {
+        this.loginPage = loginPage;
     }
 
     /// Says that this chain sends a request that must sign in to a page it can
@@ -544,9 +663,8 @@ public final class HttpSecurity {
     RequestCache resolveRequestCache() {
         RequestCache shared = (RequestCache) sharedObjects.get(RequestCache.class);
         if (shared == null) {
-            RequestCacheConfigurer cache = getConfigurer(RequestCacheConfigurer.class);
-            shared = cache == null ? new NullRequestCache()
-                    : cache.resolve(sessionCreationPolicy(), redirectsToSignIn);
+            shared = requestCacheSource == null ? new NullRequestCache()
+                    : requestCacheSource.resolve(sessionCreationPolicy(), redirectsToSignIn);
             sharedObjects.put(RequestCache.class, shared);
         }
         return shared;
@@ -558,122 +676,36 @@ public final class HttpSecurity {
                 : handling.resolveAccessDeniedHandler();
     }
 
-    /// The manager a sign-in filter authenticates with.
-    AuthenticationManager requireAuthenticationManager(String what) {
-        AuthenticationManager manager = resolveAuthenticationManager();
-        if (manager == null) {
-            throw new IllegalStateException(what + " needs something to check credentials "
-                    + "against, and this application has none. Declare a UserDetailsService "
-                    + "bean, an AuthenticationProvider bean or an AuthenticationManager bean, "
-                    + "call userDetailsService(...) on the HttpSecurity, or set "
-                    + USER_PASSWORD + ".");
-        }
-        return manager;
+    // ---- what PasswordAuthentication, which builds the manager of a chain that
+    // checks passwords, reads and records. Kept apart from it so that a chain
+    // that checks none carries no user store and no password hashing.
+
+    AuthenticationManager explicitAuthenticationManager() {
+        return explicitAuthenticationManager;
     }
 
-    private AuthenticationManager resolveAuthenticationManager() {
-        if (authenticationManagerResolved) {
-            return authenticationManager;
-        }
-        authenticationManagerResolved = true;
-        if (explicitAuthenticationManager != null) {
-            authenticationManager = explicitAuthenticationManager;
-            return authenticationManager;
-        }
-        List<AuthenticationProvider> all = new ArrayList<AuthenticationProvider>(providers);
-        for (Object bean : beans) {
-            if (bean instanceof AuthenticationProvider && !all.contains(bean)) {
-                all.add((AuthenticationProvider) bean);
-            }
-        }
-        AuthenticationManager parent = null;
-        int managers = 0;
-        for (Object bean : beans) {
-            if (bean instanceof AuthenticationManager) {
-                parent = (AuthenticationManager) bean;
-                managers++;
-            }
-        }
-        if (managers != 1) {
-            parent = null;
-        }
-        UserDetailsService users = userDetailsService;
-        if (users == null && all.isEmpty() && parent == null) {
-            // The application's user store, when it has exactly one and no
-            // provider of its own: as Spring Boot wires it.
-            users = getSharedObject(UserDetailsService.class);
-            if (users == null) {
-                users = configuredUser();
-            }
-        }
-        if (users != null) {
-            DaoAuthenticationProvider dao = new DaoAuthenticationProvider(users);
-            dao.setMaxConcurrentPasswordChecks(maxConcurrentPasswordChecks());
-            PasswordEncoder encoder = getSharedObject(PasswordEncoder.class);
-            dao.setPasswordEncoder(encoder != null ? encoder
-                    : PasswordEncoderFactories.createDelegatingPasswordEncoder());
-            UserDetailsPasswordService passwords = getSharedObject(UserDetailsPasswordService.class);
-            if (passwords == null && users instanceof UserDetailsPasswordService) {
-                passwords = (UserDetailsPasswordService) users;
-            }
-            dao.setUserDetailsPasswordService(passwords);
-            all.add(dao);
-        }
-        if (all.isEmpty()) {
-            authenticationManager = parent;
-        } else {
-            authenticationManager = new ProviderManager(all, parent);
-        }
+    List<AuthenticationProvider> providers() {
+        return providers;
+    }
+
+    UserDetailsService chosenUserDetailsService() {
+        return userDetailsService;
+    }
+
+    Object[] beans() {
+        return beans;
+    }
+
+    boolean authenticationManagerResolved() {
+        return authenticationManagerResolved;
+    }
+
+    AuthenticationManager resolvedAuthenticationManager() {
         return authenticationManager;
     }
 
-    private int maxConcurrentPasswordChecks() {
-        if (config == null) {
-            return 0;
-        }
-        try {
-            return config.getInt(PASSWORD_MAX_CONCURRENT, 0);
-        } catch (java.io.IOException err) {
-            throw new IllegalStateException(err.getMessage(), err);
-        }
-    }
-
-    /// The one user `cn1.security.user.*` describes, or null.
-    private UserDetailsService configuredUser() {
-        if (config == null) {
-            return null;
-        }
-        String password;
-        String name;
-        String roles;
-        try {
-            password = config.get(USER_PASSWORD);
-            name = config.get(USER_NAME, "user");
-            roles = config.get(USER_ROLES, "");
-        } catch (java.io.IOException err) {
-            throw new IllegalStateException(err.getMessage(), err);
-        }
-        if (password == null || password.length() == 0) {
-            return null;
-        }
-        if (!(password.startsWith("{") && password.indexOf('}') > 1)) {
-            password = "{noop}" + password;
-        }
-        List<String> granted = new ArrayList<String>();
-        int start = 0;
-        while (start <= roles.length()) {
-            int comma = roles.indexOf(',', start);
-            int end = comma < 0 ? roles.length() : comma;
-            String role = roles.substring(start, end).trim();
-            if (role.length() > 0) {
-                granted.add(role);
-            }
-            if (comma < 0) {
-                break;
-            }
-            start = comma + 1;
-        }
-        return new InMemoryUserDetailsManager(User.withUsername(name).password(password)
-                .roles(granted.toArray(new String[granted.size()])).build());
+    void resolvedAuthenticationManager(AuthenticationManager manager) {
+        authenticationManagerResolved = true;
+        authenticationManager = manager;
     }
 }

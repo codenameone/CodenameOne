@@ -33,7 +33,6 @@ import com.codename1.backend.Crypto;
 /// from a laptop.
 public final class NoOpPasswordEncoder implements PasswordEncoder {
     private static final NoOpPasswordEncoder INSTANCE = new NoOpPasswordEncoder();
-    private static boolean development;
     private static boolean warned;
 
     private NoOpPasswordEncoder() {
@@ -46,11 +45,13 @@ public final class NoOpPasswordEncoder implements PasswordEncoder {
     /// Says whether this process runs on a development profile. The security
     /// layer calls it from the configuration it is built with; a test that uses
     /// the encoder on its own calls it too.
-    public static synchronized void setDevelopmentProfile(boolean value) {
-        development = value;
+    public static void setDevelopmentProfile(boolean value) {
+        com.codename1.impl.backend.security.SecuritySupport.developmentProfile(value);
     }
 
     private static synchronized boolean allowed() {
+        boolean development = com.codename1.impl.backend.security.SecuritySupport
+                .isDevelopmentProfile();
         if (!development && !warned) {
             warned = true;
             System.err.println("cn1: a {noop} password was presented for checking and "

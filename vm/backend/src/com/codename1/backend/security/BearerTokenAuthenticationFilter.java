@@ -35,10 +35,6 @@ import com.codename1.backend.security.oauth2.server.resource.BearerTokenResolver
 /// judge. One whose token is refused is answered at once -- 401 with the reason
 /// in `WWW-Authenticate` -- and never reaches the application.
 public final class BearerTokenAuthenticationFilter implements SecurityFilter {
-    /// The exchange attribute a filter ahead of this one sets to say the
-    /// request's bearer value was its own to judge -- an API key -- and is not
-    /// a token for this filter.
-    static final String CLAIMED = "com.codename1.backend.security.bearer.claimed";
 
     private final AuthenticationManagerResolver managers;
     private final BearerTokenResolver resolver;
@@ -56,7 +52,7 @@ public final class BearerTokenAuthenticationFilter implements SecurityFilter {
     public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
             throws Exception {
         SecurityExchange exchange = SecurityExchange.of(request);
-        if (exchange != null && exchange.getAttribute(CLAIMED) != null) {
+        if (exchange != null && exchange.getAttribute(SecurityExchange.BEARER_CLAIMED) != null) {
             return chain.doFilter(request);
         }
         String token;

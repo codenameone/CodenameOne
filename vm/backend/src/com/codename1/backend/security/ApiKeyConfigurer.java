@@ -124,7 +124,7 @@ public final class ApiKeyConfigurer extends SecurityConfigurer {
                     + "repository(...) on the apiKey() configurer.");
         }
         http.addFilter(new ApiKeyAuthenticationFilter(keys, prefix, headerName,
-                authenticationEntryPoint), ApiKeyAuthenticationFilter.class);
+                authenticationEntryPoint), HttpSecurity.ORDER_API_KEY);
     }
 
     /// Matches a request that presents an API key.

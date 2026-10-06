@@ -29,11 +29,6 @@ import java.util.List;
 
 /// The rate limits of a chain; filled in by [HttpSecurity#rateLimit].
 public final class RateLimitConfigurer extends SecurityConfigurer {
-    /// Where the limits that need nothing but the request go: first of all.
-    static final int FIRST = 50;
-    /// Where the limits that need to know who signed in go: after every way of
-    /// signing in, and before the rules are consulted.
-    static final int AUTHENTICATED = 2100;
 
     /// {RequestMatcher, RateLimitKeyResolver, RateLimiter or null}.
     private final List<Object[]> rules = new ArrayList<Object[]>();
@@ -70,10 +65,11 @@ public final class RateLimitConfigurer extends SecurityConfigurer {
             }
         }
         if (!first.isEmpty()) {
-            http.addFilterAtOrder(new RateLimitFilter(first), FIRST);
+            http.addFilter(new RateLimitFilter(first), HttpSecurity.ORDER_RATE_LIMIT);
         }
         if (!authenticated.isEmpty()) {
-            http.addFilterAtOrder(new RateLimitFilter(authenticated), AUTHENTICATED);
+            http.addFilter(new RateLimitFilter(authenticated),
+                    HttpSecurity.ORDER_AUTHENTICATED_RATE_LIMIT);
         }
     }
 }

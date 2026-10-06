@@ -175,6 +175,6 @@ public final class ExceptionHandlingConfigurer extends SecurityConfigurer {
     public void configure(HttpSecurity http) {
         http.addFilter(new ExceptionTranslationFilter(resolveEntryPoint(),
                 resolveAccessDeniedHandler(), http.resolveRequestCache()),
-                ExceptionTranslationFilter.class);
+                HttpSecurity.ORDER_EXCEPTION_TRANSLATION);
     }
 }

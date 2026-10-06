@@ -192,7 +192,7 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
             managers = new Fixed(jwt.manager(http));
         }
         http.addFilter(new BearerTokenAuthenticationFilter(managers, resolver(),
-                authenticationEntryPoint), BearerTokenAuthenticationFilter.class);
+                authenticationEntryPoint), HttpSecurity.ORDER_BEARER_TOKEN);
     }
 
     /// Matches a request that carries a bearer token.

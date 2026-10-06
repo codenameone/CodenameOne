@@ -31,7 +31,22 @@ import com.codename1.backend.security.HttpSecurity;
 /// What generated code calls: one static method per thing it needs, so a
 /// generated line stays a line.
 public final class SecuritySupport {
+    private static boolean development;
+
     private SecuritySupport() {
+    }
+
+    /// Whether the server the layer was last stood up for runs on a development
+    /// profile: what lets a clear-text `{noop}` password verify. Kept here so
+    /// that the layer can record it without naming a password encoder, which a
+    /// server that checks no passwords does not carry.
+    public static synchronized boolean isDevelopmentProfile() {
+        return development;
+    }
+
+    /// Records the profile; see [#isDevelopmentProfile].
+    public static synchronized void developmentProfile(boolean value) {
+        development = value;
     }
 
     /// The [HttpSecurity] a `SecurityFilterChain` bean method is handed. A new

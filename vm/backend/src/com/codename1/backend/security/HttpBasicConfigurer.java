@@ -62,7 +62,7 @@ public final class HttpBasicConfigurer extends SecurityConfigurer {
     @Override
     public void configure(HttpSecurity http) {
         http.addFilter(new BasicAuthenticationFilter(
-                http.requireAuthenticationManager("httpBasic()"), authenticationEntryPoint),
-                BasicAuthenticationFilter.class);
+                PasswordAuthentication.require(http, "httpBasic()"), authenticationEntryPoint),
+                HttpSecurity.ORDER_BASIC);
     }
 }

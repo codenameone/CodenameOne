@@ -73,6 +73,21 @@ final class Responses {
         return sb.toString();
     }
 
+    /// `value`, required to be a path on this server.
+    static String path(String value, String what) {
+        if (value == null || !value.startsWith("/") || value.startsWith("//")) {
+            throw new IllegalArgumentException(what + " must be a path on this server, starting "
+                    + "with one /: " + value);
+        }
+        return value;
+    }
+
+    /// `url` without its query.
+    static String pathOnly(String url) {
+        int query = url.indexOf('?');
+        return query < 0 ? url : url.substring(0, query);
+    }
+
     /// A request parameter, from the query or a form body; null when it is not
     /// there or the body cannot be read as a form.
     static String param(HttpServer.Request request, String name) {

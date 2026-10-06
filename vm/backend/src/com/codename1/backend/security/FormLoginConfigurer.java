@@ -54,14 +54,16 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
 
     /// The application's own login page: a path the application serves.
     public FormLoginConfigurer loginPage(String loginPage) {
-        this.loginPage = path(loginPage, "loginPage");
+        this.loginPage = Responses.path(loginPage, "loginPage");
         this.customLoginPage = true;
+        // Told to the chain at once: sign-out reads it for its redirect.
+        getBuilder().loginPage(this.loginPage);
         return this;
     }
 
     /// Where the form is posted; the login page's path unless set.
     public FormLoginConfigurer loginProcessingUrl(String loginProcessingUrl) {
-        this.loginProcessingUrl = path(loginProcessingUrl, "loginProcessingUrl");
+        this.loginProcessingUrl = Responses.path(loginProcessingUrl, "loginProcessingUrl");
         return this;
     }
 
@@ -82,14 +84,14 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
 
     /// @param alwaysUse go there even when a page asked for the sign-in
     public FormLoginConfigurer defaultSuccessUrl(String defaultSuccessUrl, boolean alwaysUse) {
-        this.defaultSuccessUrl = path(defaultSuccessUrl, "defaultSuccessUrl");
+        this.defaultSuccessUrl = Responses.path(defaultSuccessUrl, "defaultSuccessUrl");
         this.alwaysUseDefaultSuccessUrl = alwaysUse;
         return this;
     }
 
     /// Where a refused sign-in goes; the login page with `?error` unless set.
     public FormLoginConfigurer failureUrl(String failureUrl) {
-        this.failureUrl = path(failureUrl, "failureUrl");
+        this.failureUrl = Responses.path(failureUrl, "failureUrl");
         return this;
     }
 
@@ -126,20 +128,6 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
         return failureUrl != null ? failureUrl : loginPage + "?error";
     }
 
-    static String path(String value, String what) {
-        if (value == null || !value.startsWith("/") || value.startsWith("//")) {
-            throw new IllegalArgumentException(what + " must be a path on this server, starting "
-                    + "with one /: " + value);
-        }
-        return value;
-    }
-
-    /// `url` without its query.
-    static String pathOnly(String url) {
-        int query = url.indexOf('?');
-        return query < 0 ? url : url.substring(0, query);
-    }
-
     @Override
     public void init(HttpSecurity http) {
         http.redirectsToSignIn();
@@ -154,7 +142,7 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
         if (permitAll) {
             http.permit(AntPathRequestMatcher.antMatcher("GET", loginPage));
             http.permit(AntPathRequestMatcher.antMatcher("POST", processingUrl()));
-            http.permit(AntPathRequestMatcher.antMatcher("GET", pathOnly(failure())));
+            http.permit(AntPathRequestMatcher.antMatcher("GET", Responses.pathOnly(failure())));
         }
     }
 
@@ -173,12 +161,12 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
                 : new SimpleUrlAuthenticationFailureHandler(failure());
         http.addFilter(new UsernamePasswordAuthenticationFilter(
                 AntPathRequestMatcher.antMatcher("POST", processingUrl()), usernameParameter,
-                passwordParameter, http.requireAuthenticationManager("formLogin()"), success,
+                passwordParameter, PasswordAuthentication.require(http, "formLogin()"), success,
                 failed, http.resolveSecurityContextRepository(), http.sessionAuthentication()),
-                UsernamePasswordAuthenticationFilter.class);
+                HttpSecurity.ORDER_FORM_LOGIN);
         if (!customLoginPage) {
             http.addFilter(new DefaultLoginPageGeneratingFilter(loginPage, processingUrl(),
-                    usernameParameter, passwordParameter), DefaultLoginPageGeneratingFilter.class);
+                    usernameParameter, passwordParameter), HttpSecurity.ORDER_LOGIN_PAGE);
         }
     }
 }

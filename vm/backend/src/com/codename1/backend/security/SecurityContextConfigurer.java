@@ -55,6 +55,6 @@ public final class SecurityContextConfigurer extends SecurityConfigurer {
     public void configure(HttpSecurity http) {
         http.addFilter(new SecurityContextHolderFilter(http.resolveSecurityContextRepository(),
                 http.sessionCreationPolicy() == SessionCreationPolicy.ALWAYS),
-                SecurityContextHolderFilter.class);
+                HttpSecurity.ORDER_SECURITY_CONTEXT);
     }
 }

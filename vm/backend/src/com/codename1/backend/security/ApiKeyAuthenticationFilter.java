@@ -94,7 +94,7 @@ public final class ApiKeyAuthenticationFilter implements SecurityFilter {
             // that verifies tokens.
             SecurityExchange exchange = SecurityExchange.of(request);
             if (exchange != null) {
-                exchange.setAttribute(BearerTokenAuthenticationFilter.CLAIMED, Boolean.TRUE);
+                exchange.setAttribute(SecurityExchange.BEARER_CLAIMED, Boolean.TRUE);
             }
         }
         ApiKey found = null;

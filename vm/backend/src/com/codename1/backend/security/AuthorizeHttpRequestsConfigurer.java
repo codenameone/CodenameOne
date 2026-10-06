@@ -74,7 +74,8 @@ public final class AuthorizeHttpRequestsConfigurer extends SecurityConfigurer {
             rules.add(new Object[] {open, PERMIT_ALL});
         }
         rules.addAll(mappings);
-        http.addFilter(new AuthorizationFilter(new Delegating(rules)), AuthorizationFilter.class);
+        http.addFilter(new AuthorizationFilter(new Delegating(rules)),
+                HttpSecurity.ORDER_AUTHORIZATION);
     }
 
     private static final AuthorizationManager<RequestAuthorizationContext> PERMIT_ALL =

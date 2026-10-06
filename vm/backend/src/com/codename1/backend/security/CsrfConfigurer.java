@@ -86,12 +86,18 @@ public final class CsrfConfigurer extends SecurityConfigurer {
 
     @Override
     public void configure(HttpSecurity http) {
+        if (http.sessionCreationPolicy() == SessionCreationPolicy.STATELESS && !http.csrfAsked()) {
+            // Nothing is kept between requests for a forged one to ride on, and
+            // the token itself would have to live in a session the chain was
+            // told not to have. A chain that wants it anyway says so.
+            return;
+        }
         RequestMatcher protect = requireProtection;
         if (!ignored.isEmpty()) {
             protect = RequestMatchers.allOf(requireProtection, RequestMatchers.not(
                     RequestMatchers.anyOf(ignored.toArray(new RequestMatcher[ignored.size()]))));
         }
         http.addFilter(new CsrfFilter(repository, protect, http.resolveAccessDeniedHandler()),
-                CsrfFilter.class);
+                HttpSecurity.ORDER_CSRF);
     }
 }

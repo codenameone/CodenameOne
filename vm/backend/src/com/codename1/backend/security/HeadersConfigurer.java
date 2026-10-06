@@ -132,7 +132,7 @@ public final class HeadersConfigurer extends SecurityConfigurer {
                 contentSecurityPolicy.directives, contentSecurityPolicy.reportOnly
                 ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy"));
         all.addAll(writers);
-        http.addFilter(new HeaderWriterFilter(all), HeaderWriterFilter.class);
+        http.addFilter(new HeaderWriterFilter(all), HttpSecurity.ORDER_HEADERS);
     }
 
     /// The built-in headers, as this chain has them configured.

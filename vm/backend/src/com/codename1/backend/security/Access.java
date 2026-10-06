@@ -24,7 +24,6 @@ package com.codename1.backend.security;
 
 import com.codename1.backend.Config;
 import com.codename1.backend.HttpServer;
-import com.codename1.backend.security.crypto.NoOpPasswordEncoder;
 import com.codename1.impl.backend.RequestSecurity;
 import com.codename1.impl.backend.security.SecurityAccess;
 import java.util.List;
@@ -34,7 +33,8 @@ import java.util.List;
 final class Access extends SecurityAccess {
     @Override
     public HttpSecurity httpSecurity(Config config, Object[] beans) {
-        NoOpPasswordEncoder.setDevelopmentProfile(config != null && config.isDevelopmentProfile());
+        com.codename1.impl.backend.security.SecuritySupport.developmentProfile(
+                config != null && config.isDevelopmentProfile());
         return new HttpSecurity(config, beans);
     }
 
