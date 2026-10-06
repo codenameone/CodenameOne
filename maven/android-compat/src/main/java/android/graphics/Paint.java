@@ -434,8 +434,9 @@ public class Paint {
 
     public int getTextWidths(String text, int start, int end, float[] widths) {
         Font f = cn1Font();
+        float extra = letterSpacing * textSize;
         for (int i = start; i < end; i++) {
-            widths[i - start] = f.charWidth(text.charAt(i)) * textScaleX;
+            widths[i - start] = (f.charWidth(text.charAt(i)) + extra) * textScaleX;
         }
         return end - start;
     }
@@ -459,9 +460,13 @@ public class Paint {
         float w = 0;
         int count = 0;
         Font f = cn1Font();
+        // The same per-character advance measureText, getTextWidths and
+        // Canvas.drawText use, letter spacing included, so the count agrees
+        // with what is measured and drawn.
+        float extra = letterSpacing * textSize;
         if (measureForwards) {
             for (int i = 0; i < n; i++) {
-                float cw = f.charWidth(text.charAt(i)) * textScaleX;
+                float cw = (f.charWidth(text.charAt(i)) + extra) * textScaleX;
                 if (w + cw > maxWidth) {
                     break;
                 }
@@ -470,7 +475,7 @@ public class Paint {
             }
         } else {
             for (int i = n - 1; i >= 0; i--) {
-                float cw = f.charWidth(text.charAt(i)) * textScaleX;
+                float cw = (f.charWidth(text.charAt(i)) + extra) * textScaleX;
                 if (w + cw > maxWidth) {
                     break;
                 }

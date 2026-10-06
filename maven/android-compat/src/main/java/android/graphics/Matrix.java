@@ -107,8 +107,18 @@ public class Matrix {
         System.arraycopy(m, 0, values, 0, 9);
     }
 
+    /// Perspective is not supported: every operation here and the canvas
+    /// that draws through this matrix are affine. Rather than store a third
+    /// row that mapping, concatenation, inversion and drawing would all
+    /// silently ignore -- so a point would be hit tested somewhere other than
+    /// where it is drawn -- a non-affine row is refused. The `0, 0, 1` row
+    /// every Android affine matrix reports through `getValues` is accepted,
+    /// so copying values between matrices keeps working.
     public void setValues(float[] values) {
         checkMutable();
+        if (values[MPERSP_0] != 0 || values[MPERSP_1] != 0 || values[MPERSP_2] != 1) {
+            throw new IllegalArgumentException("Perspective matrices are not supported");
+        }
         System.arraycopy(values, 0, m, 0, 9);
     }
 

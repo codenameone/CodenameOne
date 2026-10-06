@@ -284,13 +284,56 @@ public final class Bitmap {
         }
     }
 
+    /// Validates a single pixel coordinate the way Android does. The pixels
+    /// are one flattened array, so without this `x == width` (or a negative
+    /// `x`) quietly addressed a pixel of the neighbouring row.
+    private void checkPixelAccess(int x, int y) {
+        if (x < 0) {
+            throw new IllegalArgumentException("x must be >= 0");
+        }
+        if (y < 0) {
+            throw new IllegalArgumentException("y must be >= 0");
+        }
+        if (x >= width) {
+            throw new IllegalArgumentException("x must be < bitmap.width()");
+        }
+        if (y >= height) {
+            throw new IllegalArgumentException("y must be < bitmap.height()");
+        }
+    }
+
+    /// Validates a pixel region the way Android does, for the same reason:
+    /// a row that runs past `width` would spill into the next one.
+    private void checkPixelsAccess(int x, int y, int w, int h) {
+        if (x < 0) {
+            throw new IllegalArgumentException("x must be >= 0");
+        }
+        if (y < 0) {
+            throw new IllegalArgumentException("y must be >= 0");
+        }
+        if (w < 0) {
+            throw new IllegalArgumentException("width must be >= 0");
+        }
+        if (h < 0) {
+            throw new IllegalArgumentException("height must be >= 0");
+        }
+        if (x + w > width) {
+            throw new IllegalArgumentException("x + width must be <= bitmap.width()");
+        }
+        if (y + h > height) {
+            throw new IllegalArgumentException("y + height must be <= bitmap.height()");
+        }
+    }
+
     public int getPixel(int x, int y) {
         checkNotRecycled("Can't call getPixel() on a recycled bitmap");
+        checkPixelAccess(x, y);
         return pixels()[y * width + x];
     }
 
     public void getPixels(int[] out, int offset, int stride, int x, int y, int w, int h) {
         checkNotRecycled("Can't call getPixels() on a recycled bitmap");
+        checkPixelsAccess(x, y, w, h);
         int[] p = pixels();
         for (int row = 0; row < h; row++) {
             System.arraycopy(p, (y + row) * width + x, out, offset + row * stride, w);
@@ -312,12 +355,14 @@ public final class Bitmap {
 
     public void setPixel(int x, int y, int color) {
         checkWritable("setPixel");
+        checkPixelAccess(x, y);
         pixels()[y * width + x] = color;
         pixelsDirty = true;
     }
 
     public void setPixels(int[] in, int offset, int stride, int x, int y, int w, int h) {
         checkWritable("setPixels");
+        checkPixelsAccess(x, y, w, h);
         int[] p = pixels();
         for (int row = 0; row < h; row++) {
             System.arraycopy(in, offset + row * stride, p, (y + row) * width + x, w);
