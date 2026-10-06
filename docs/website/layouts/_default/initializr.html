@@ -249,6 +249,18 @@ body.cn1-initializr-page-body .main {
         if (window.cn1CrispEvents && window.cn1CrispEvents.initializrProjectDownloaded) {
           window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
         }
+      } else if (evt.data.type === "cn1-initializr-steps-request") {
+        // "Email me these steps" from the post-download panel: the visitor
+        // typed the address and pressed the button, so this one is theirs to
+        // send. The package name is hashed by the beacon before it leaves.
+        try {
+          if (window.cn1InitializrBeacon && window.cn1InitializrBeacon.sendSteps) {
+            window.cn1InitializrBeacon.sendSteps(evt.data.email, evt.data.packageName,
+              evt.data.template, evt.data.ide);
+          }
+        } catch (e) {
+          // Never surface to the visitor.
+        }
       }
     });
   }

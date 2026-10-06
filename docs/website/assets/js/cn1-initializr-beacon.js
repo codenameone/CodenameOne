@@ -17,6 +17,10 @@
   "use strict";
 
   var ENDPOINT = "https://cloud.codenameone.com/api/v2/funnel/initializr-download";
+  // "Email me these steps" from the Initializr's post-download panel. Unlike
+  // the download beacon this one carries what the visitor typed -- an email
+  // address they asked us to write to -- and nothing else that identifies them.
+  var STEPS_ENDPOINT = "https://cloud.codenameone.com/api/v2/funnel/initializr-steps";
 
   // Only the production site reports. Local `hugo server`, PR previews and
   // forks would otherwise post their test downloads into the production funnel
@@ -43,10 +47,11 @@
   }
 
   /*
-   * Returns a promise that always resolves (true when a request was issued),
-   * so callers never see a rejection.
+   * Posts `fields` plus pkg (the hashed package name) to `endpoint`. Returns a
+   * promise that always resolves (true when a request was issued), so callers
+   * never see a rejection.
    */
-  function send(packageName, template) {
+  function post(endpoint, packageName, fields) {
     try {
       var host = window.location && window.location.hostname;
       if (!REPORTING_HOSTS[host] || !packageName || typeof window.fetch !== "function") {
@@ -56,15 +61,17 @@
         if (!pkg) {
           return false;
         }
-        var body = "pkg=" + encodeURIComponent(pkg)
-          + "&template=" + encodeURIComponent(template ? String(template) : "");
+        var body = "pkg=" + encodeURIComponent(pkg);
+        for (var i = 0; i < fields.length; i++) {
+          body += "&" + fields[i][0] + "=" + encodeURIComponent(fields[i][1] ? String(fields[i][1]) : "");
+        }
         // fetch rather than navigator.sendBeacon: sendBeacon always sends
         // credentials, and cloud.codenameone.com is same-site with the website,
         // so it would attach the visitor's BuildCloud cookies -- an identifier
         // this beacon must not carry. credentials:"omit" and no-referrer keep
         // the request anonymous; keepalive lets it outlive a page navigation.
         // A form-encoded body is a CORS "simple" request, so no preflight.
-        return window.fetch(ENDPOINT, {
+        return window.fetch(endpoint, {
           method: "POST",
           mode: "no-cors",
           credentials: "omit",
@@ -85,5 +92,22 @@
     }
   }
 
-  window.cn1InitializrBeacon = { send: send };
+  function send(packageName, template) {
+    return post(ENDPOINT, packageName, [["template", template]]);
+  }
+
+  /*
+   * The visitor asked for the next steps by email. BuildCloud sends them once
+   * and may follow up if the hashed package never reaches a first build. No
+   * request without an address.
+   */
+  function sendSteps(email, packageName, template, ide) {
+    var address = email ? String(email).trim() : "";
+    if (!address) {
+      return Promise.resolve(false);
+    }
+    return post(STEPS_ENDPOINT, packageName, [["email", address], ["template", template], ["ide", ide]]);
+  }
+
+  window.cn1InitializrBeacon = { send: send, sendSteps: sendSteps };
 })();

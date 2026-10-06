@@ -1,0 +1,26 @@
+:finish
+set "CN1_EXIT_CODE=%errorlevel%"
+REM Why it stopped. build.sh reads Maven's output for this; cmd cannot tee it
+REM without hiding it from you, so here the class comes from what was checked
+REM before the build: no JDK, or one older than this project's Java level, are
+REM the two failures a first build hits most and both are known without the
+REM log. Anything else is reported as build_failed. cmd cannot trap Ctrl+C
+REM either, so an interrupted build sends no exit report.
+set "CN1_REASON=build_failed"
+if "%CN1_JAVA%"=="none" set "CN1_REASON=no_jdk"
+set "CN1_JMAJ=0"
+set /a CN1_JMAJ=%CN1_JAVA% >nul 2>&1
+if not "%CN1_JAVA%"=="none" if %CN1_JMAJ% GTR 0 if %CN1_JMAJ% LSS %CN1_MIN_JAVA% set "CN1_REASON=java_too_old"
+if "%CN1_EXIT_CODE%"=="0" set "CN1_REASON=ok"
+set "CN1_SECS="
+if defined CN1_START for /f %%s in ('powershell -NoProfile -NonInteractive -Command "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - %CN1_START%" 2^>nul') do set "CN1_SECS=%%s"
+if /i not "%CN1_TARGET%"=="help" call :cn1_event "step=exit" "exit=%CN1_EXIT_CODE%" "reason=%CN1_REASON%" "secs=%CN1_SECS%"
+popd
+exit /b %CN1_EXIT_CODE%
+
+REM Fire-and-forget: three seconds at most, and a failure is never an error.
+:cn1_event
+if "%CN1_TELEMETRY%"=="0" goto :eof
+where curl.exe >nul 2>&1 || goto :eof
+curl.exe -s -o nul -m 3 -X POST "%CN1_EVENTS_URL%" --data-urlencode "pkg=%CN1_PROJECT_ID%" --data-urlencode "target=%CN1_TARGET%" --data-urlencode "os=windows" --data-urlencode "java=%CN1_JAVA%" --data-urlencode %1 --data-urlencode %2 --data-urlencode %3 --data-urlencode %4 >nul 2>&1
+goto :eof

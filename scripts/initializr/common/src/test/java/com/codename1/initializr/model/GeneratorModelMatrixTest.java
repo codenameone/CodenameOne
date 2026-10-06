@@ -44,6 +44,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // Run the targeted regression checks first so they don't get masked when an
         // earlier broad assertion in validateCombination(...) fails first.
         validateClaudeSkillBundled();
+        validateSha256Vectors();
+        validateLauncherTelemetry();
+        validateNextSteps();
         validateJava17DefaultRegressionFixes();
         validateLegacyJava8Generation();
         validateCoordinateGuardRejectsBrokenArtifacts();
@@ -959,6 +962,114 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(themeCss, "useLargerTextScaleBool: true;", "Barebones templates should default useLargerTextScaleBool to true");
         assertContains(themeCss, "@media (prefers-color-scheme: dark)", "Default theme should adapt to dark mode out of the box");
         assertFalse(themeCss.indexOf("Initializr Theme Overrides") >= 0, "Default theme must not carry baked-in top-level theme overrides");
+    }
+
+    /// The hand-written SHA-256 against the FIPS 180-2 vectors (empty, one block,
+    /// and a 56-byte message that spills the padding into a second block), and
+    /// the project id against the value the website beacon test pins for the
+    /// same package -- the two must agree or downloads and builds stop joining.
+    private void validateSha256Vectors() {
+        assertEqual("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Sha256.hex(""),
+                "SHA-256 of the empty string");
+        assertEqual("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", Sha256.hex("abc"),
+                "SHA-256 of abc");
+        assertEqual("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+                Sha256.hex("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
+                "SHA-256 of the two-block FIPS vector");
+        assertEqual("f110a249cb67c33e0d30f847bc485759068f15989484537ed28d97c7c63ecae7",
+                Sha256.hex("com.example.myapp"), "SHA-256 of com.example.myapp");
+        assertEqual("f110a249cb67c33e0d30f847bc485759068f15989484537ed28d97c7c63ecae7",
+                GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Example.MyApp").projectId(),
+                "The project id hashes the LOWER-CASED package name, like the website beacon");
+    }
+
+    /// Initializr Maven downloads report build progress from build.sh/build.bat:
+    /// the hashed package id, the events URL and the opt-out are in both, the
+    /// package name itself is in neither, and every target still runs Maven.
+    private void validateLauncherTelemetry() throws IOException {
+        String packageName = "com.acme.telemetryprobe";
+        String id = Sha256.hex(packageName);
+        for (ProjectOptions.JavaVersion version : ProjectOptions.JavaVersion.values()) {
+            ProjectOptions options = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
+                    true, false, ProjectOptions.PreviewLanguage.ENGLISH, version);
+            String min = version == ProjectOptions.JavaVersion.JAVA_17 ? "17" : "8";
+            Map<String, byte[]> entries = readZipEntries(createProjectZip(IDE.INTELLIJ, Template.BAREBONES,
+                    "TelemetryProbe", packageName, options));
+            String label = version + ": ";
+
+            String sh = getText(entries, "build.sh");
+            assertContains(sh, "MVNW=\"cn1_mvnw\"\n", label + "build.sh should route Maven through the reporter");
+            assertFalse(sh.indexOf("MVNW=\"./mvnw\"") >= 0, label + "build.sh should not bypass the reporter");
+            assertContains(sh, "CN1_PROJECT_ID=\"" + id + "\"", label + "build.sh should carry the hashed package");
+            assertContains(sh, "CN1_MIN_JAVA=\"" + min + "\"", label + "build.sh should know the project's Java level");
+            assertContains(sh, GeneratorModel.LAUNCHER_EVENTS_URL, label + "build.sh should report to the events URL");
+            assertContains(sh, "CN1_TELEMETRY", label + "build.sh should honour the opt-out");
+            assertContains(sh, "Opt out with CN1_TELEMETRY=0", label + "build.sh should explain the opt-out");
+            assertContains(sh, "reason=interrupted", label + "build.sh should report Ctrl+C");
+            assertContains(sh, "./mvnw \"$@\"", label + "build.sh should still run the Maven wrapper");
+            assertContains(sh, "function javascript_cloud", label + "build.sh keeps every target");
+            assertContains(sh, "CMD=\"jar\"", label + "build.sh keeps the local default");
+            assertTrue(sh.startsWith("#!/bin/bash\n"), label + "build.sh keeps its shebang");
+
+            String bat = getText(entries, "build.bat");
+            assertContains(bat, "set \"CN1_PROJECT_ID=" + id + "\"", label + "build.bat should carry the hashed package");
+            assertContains(bat, "set \"CN1_MIN_JAVA=" + min + "\"", label + "build.bat should know the Java level");
+            assertContains(bat, GeneratorModel.LAUNCHER_EVENTS_URL, label + "build.bat should report to the events URL");
+            assertContains(bat, "if \"%CN1_TELEMETRY%\"==\"0\" goto :eof", label + "build.bat should honour the opt-out");
+            assertContains(bat, "set CN1_TELEMETRY=0", label + "build.bat should explain the opt-out");
+            int launch = bat.indexOf("call :cn1_event \"step=launch\"");
+            int jump = bat.indexOf("\ngoto %CMD%\n");
+            int finish = bat.indexOf(":finish\n");
+            int exit = bat.indexOf("call :cn1_event \"step=exit\"");
+            assertTrue(launch > 0 && launch < jump && jump < finish && finish < exit,
+                    label + "build.bat should report launch before the jump and exit in :finish");
+            assertTrue(bat.indexOf("exit /b %CN1_EXIT_CODE%") < bat.indexOf(":cn1_event\n"),
+                    label + "build.bat should exit before falling into the reporting subroutine");
+            assertContains(bat, ":javascript_cloud", label + "build.bat keeps every target");
+
+            for (String text : new String[] {sh, bat}) {
+                assertFalse(text.indexOf(packageName) >= 0, label + "a launcher must never carry the package name");
+                assertFalse(text.indexOf("__CN1_") >= 0, label + "a launcher still has a template token");
+            }
+            String readme = getText(entries, "README.md");
+            assertContains(readme, "## Build progress reporting", label + "README should explain the reporting");
+            assertContains(readme, "CN1_TELEMETRY=0", label + "README should give the opt-out");
+            assertContains(readme, "create a free Codename One account", label + "README should mention the account");
+        }
+
+        // The injection is anchored on the archetype's launcher lines; a launcher of
+        // another shape is shipped untouched, never half-patched.
+        GeneratorModel model = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "A", "com.acme.a");
+        assertEqual("#!/bin/bash\necho hi\n", model.withShellTelemetry("#!/bin/bash\necho hi\n"),
+                "An unknown build.sh is left alone");
+        assertEqual("@echo off\r\ngoto %CMD%\r\n", model.withBatchTelemetry("@echo off\r\ngoto %CMD%\r\n"),
+                "An unknown build.bat is left alone");
+    }
+
+    /// The post-download panel's steps: per IDE, the README's own commands, and no
+    /// account line for a project with no cloud build.
+    private void validateNextSteps() {
+        ProjectOptions maven = ProjectOptions.defaults();
+        for (IDE ide : IDE.values()) {
+            GeneratorModel.NextSteps steps = GeneratorModel.create(ide, Template.BAREBONES, "StepsApp", "com.acme.steps",
+                    maven).nextSteps();
+            assertEqual(Integer.valueOf(3), Integer.valueOf(steps.steps.length), ide + ": three steps");
+            assertContains(steps.steps[0], "stepsapp.zip", ide + ": extract names the download");
+            assertTrue(steps.cloudBuild, ide + ": the first Maven build is a cloud build");
+            assertEqual("./mvnw -v\n./build.sh javascript_cloud", steps.unixCommands, ide + ": README's unix commands");
+            assertEqual(".\\mvnw.cmd -v\n.\\build.bat javascript_cloud", steps.windowsCommands,
+                    ide + ": README's Windows commands");
+        }
+        assertContains(GeneratorModel.create(IDE.ECLIPSE, Template.BAREBONES, "A", "com.acme.a", maven)
+                .nextSteps().steps[1], "Existing Maven Projects", "Eclipse imports a Maven project");
+        GeneratorModel.NextSteps gradle = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "A", "com.acme.a",
+                gradleOptions(ProjectOptions.ProjectType.APP)).nextSteps();
+        assertEqual("./gradlew buildJavascript", gradle.unixCommands, "Gradle's first cloud build");
+        assertTrue(gradle.cloudBuild, "Gradle app builds in the cloud");
+        GeneratorModel.NextSteps backend = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "A", "com.acme.a",
+                gradleOptions(ProjectOptions.ProjectType.BACKEND_ONLY)).nextSteps();
+        assertFalse(backend.cloudBuild, "A backend-only project has no cloud build, so no account line");
+        assertEqual("./gradlew runBackend", backend.unixCommands, "A backend-only project starts its server");
     }
 
     /// A download at the current plugin version. A Maven one is the full layout, which

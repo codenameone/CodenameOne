@@ -89,8 +89,12 @@ public class Initializr extends Lifecycle {
             "InitializrValidationError", "InitializrHelpButton", "InitializrGenerateBar",
             "InitializrGenerateInfo", "InitializrPrimaryButton", "InitializrPreviewWrap",
             "InitializrPreviewTitle", "InitializrLiveDot", "InitializrCard", "InitializrPreviewHolder",
-            "InitializrSummaryText", "InitializrPhoneStage", "InitializrLiveFrame"
+            "InitializrSummaryText", "InitializrPhoneStage", "InitializrLiveFrame", "InitializrStep"
     };
+
+    /** The post-download "next steps" panel at the top of the column, or null
+     *  when it is not showing. Held so a second download replaces it. */
+    private Container nextStepsPanel;
 
     @Override
     public void runApp() {
@@ -225,7 +229,11 @@ public class Initializr extends Lifecycle {
             ProjectOptions options = downloadOptions(includeLocalizationBundles, previewLanguage, javaVersion)
                     .withBuild(buildTool[0], projectType[0])
                         .withPlatformModules(allPlatformModules[0]);
-            GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
+            GeneratorModel model = GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName,
+                    options);
+            if (model.generate()) {
+                showNextSteps(form, column, model);
+            }
         });
 
         Container generateBar = new Container(new BorderLayout());
@@ -599,6 +607,162 @@ public class Initializr extends Lifecycle {
         wrap.add(BorderLayout.NORTH, head);
         wrap.add(BorderLayout.CENTER, phoneStage);
         return wrap;
+    }
+
+    // ---------- next steps after a download ----------
+
+    // A visitor who downloads a project used to see nothing happen at all: no
+    // hint of what to open, which command starts the first build, or that the
+    // first cloud build asks for an account -- and most never built. This panel
+    // says it at the moment they are looking. It sits at the TOP of the column,
+    // not in a dialog: it never blocks the form, scrolls with it on a small
+    // screen, and stays clear of the host page's Crisp widget, which floats
+    // over the bottom-right (see applyChatLauncherClearance).
+    void showNextSteps(Form form, Container column, GeneratorModel model) {
+        if (nextStepsPanel != null && nextStepsPanel.getParent() != null) {
+            nextStepsPanel.remove();
+        }
+        GeneratorModel.NextSteps next = model.nextSteps();
+
+        Label title = new Label("Your project is downloading");
+        title.setUIID("InitializrPanelTitle");
+        final Button close = new Button();
+        close.setUIID("InitializrPanelChevron");
+        FontImage.setMaterialIcon(close, FontImage.MATERIAL_CLOSE, 3.4f);
+        Container header = new Container(new BorderLayout());
+        header.setUIID("InitializrPanelHeader");
+        header.add(BorderLayout.CENTER, title);
+        header.add(BorderLayout.EAST, close);
+
+        Container body = new Container(BoxLayout.y());
+        for (int i = 0; i < next.steps.length; i++) {
+            body.add(stepText((i + 1) + ". " + next.steps[i], "InitializrStep"));
+        }
+        // Both command lines: guessing the visitor's OS from a browser is
+        // fragile, and the wrong one is worse than two short blocks.
+        body.add(labeledField("macOS / Linux", commandBlock(next.unixCommands)));
+        body.add(labeledField("Windows (PowerShell or Command Prompt)", commandBlock(next.windowsCommands)));
+        if (next.cloudBuild) {
+            body.add(stepText("The first cloud build opens your browser and asks you to sign in or create a "
+                    + "free account (100 cloud build credits a month). Local builds need no account.",
+                    "InitializrStep"));
+        }
+        WebsiteThemeNative bridge = NativeLookup.create(WebsiteThemeNative.class);
+        if (bridge != null && bridge.isSupported()) {
+            body.add(createEmailStepsRow(bridge, model));
+        }
+
+        Container bodyWrap = new Container(new BorderLayout());
+        bodyWrap.setUIID("InitializrPanelBody");
+        bodyWrap.add(BorderLayout.CENTER, body);
+
+        final Container panel = BoxLayout.encloseY(header, bodyWrap);
+        panel.setUIID("InitializrPanel");
+        close.addActionListener(e -> {
+            panel.remove();
+            if (nextStepsPanel == panel) {
+                nextStepsPanel = null;
+            }
+            form.revalidate();
+        });
+        nextStepsPanel = panel;
+        if (darkMode) {
+            applyTheme(panel, true);
+        }
+        column.addComponent(0, panel);
+        form.revalidate();
+        column.scrollComponentToVisible(panel);
+    }
+
+    /// "Email me these steps": optional, one email, and the button only lights up
+    /// for something that looks like an address. The website page forwards the
+    /// request (WebsiteThemeNative#requestSteps); nothing is stored here.
+    private Container createEmailStepsRow(WebsiteThemeNative bridge, GeneratorModel model) {
+        final TextField email = new TextField("", "you@example.com", 30, TextField.EMAILADDR);
+        email.setUIID("InitializrField");
+        final Button send = new Button("Email me these steps");
+        send.setUIID("InitializrPrimaryButton");
+        send.setEnabled(false);
+        final SpanLabel note = stepText("We'll email the steps once and may follow up if you get stuck. "
+                + "Nothing else.", "InitializrTip");
+        final boolean[] requested = new boolean[1];
+        email.addDataChangedListener((type, index) -> {
+            if (!requested[0]) {
+                send.setEnabled(isPlausibleEmail(email.getText()));
+            }
+        });
+        send.addActionListener(e -> {
+            String address = email.getText() == null ? "" : email.getText().trim();
+            if (!isPlausibleEmail(address)) {
+                return;
+            }
+            boolean sent;
+            try {
+                sent = bridge.requestSteps(address, model.getPackageName(), model.templateId(), model.ideId());
+            } catch (Throwable t) {
+                sent = false;
+            }
+            if (!sent) {
+                note.setText("Couldn't send the email from here. The README in your project has the same steps.");
+            } else {
+                requested[0] = true;
+                note.setText("Check your inbox.");
+                send.setEnabled(false);
+                email.setEnabled(false);
+            }
+            Form f = note.getComponentForm();
+            if (f != null) {
+                f.revalidate();
+            }
+        });
+        Container row = new Container(new BorderLayout());
+        row.add(BorderLayout.CENTER, email);
+        row.add(BorderLayout.EAST, send);
+        return BoxLayout.encloseY(row, note);
+    }
+
+    private SpanLabel stepText(String text, String uiid) {
+        SpanLabel label = new SpanLabel(text);
+        label.setUIID(uiid);
+        label.setTextUIID(uiid);
+        return label;
+    }
+
+    private SpanLabel commandBlock(String commands) {
+        SpanLabel block = new SpanLabel(commands);
+        block.setUIID("InitializrSummary");
+        block.setTextUIID("InitializrSummaryText");
+        return block;
+    }
+
+    /// Whether `value` looks enough like an email address to send to: one @, a
+    /// non-empty local part, a dotted domain with a two-letter-or-longer last
+    /// label, and nothing that cannot appear unquoted. Deliberately loose -- the
+    /// server is the real check; this only keeps the button off for typos.
+    static boolean isPlausibleEmail(String value) {
+        if (value == null) {
+            return false;
+        }
+        String s = value.trim();
+        if (s.length() < 6 || s.length() > 254) {
+            return false;
+        }
+        int at = s.indexOf('@');
+        if (at < 1 || at != s.lastIndexOf('@')) {
+            return false;
+        }
+        String domain = s.substring(at + 1);
+        int dot = domain.lastIndexOf('.');
+        if (dot < 1 || dot > domain.length() - 3 || domain.startsWith(".") || domain.indexOf("..") >= 0) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c <= ' ' || c == 127 || ",;:<>()[]\\\"".indexOf(c) >= 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // ---------- panel helper ----------

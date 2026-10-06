@@ -13,4 +13,8 @@ public class WebsiteThemeNativeImpl {
     public int chatLauncherClearance() {
         return 0;
     }
+
+    public boolean requestSteps(String email, String packageName, String template, String ide) {
+        return false;
+    }
 }

@@ -89,4 +89,51 @@ function invokeDownload(state) {
   assert.deepEqual(state.posts, []);
 }
 
+function invokeSteps(state, email) {
+  let result;
+  state.bridge.requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String(
+    email,
+    "com.Example.MyApp",
+    "kotlin",
+    "vs_code",
+    { complete(value) { result = value; } }
+  );
+  return result;
+}
+
+{
+  const state = loadBridge(() => {});
+  assert.equal(invokeSteps(state, "dev@example.org"), true);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(state.posts)),
+    [{
+      type: "cn1-initializr-steps-request",
+      email: "dev@example.org",
+      packageName: "com.Example.MyApp",
+      template: "kotlin",
+      ide: "vs_code"
+    }]
+  );
+  assert.deepEqual(state.actions, ["post"], "a steps request downloads nothing");
+}
+
+{
+  const state = loadBridge(() => {});
+  assert.equal(invokeSteps(state, ""), false, "no request without an email");
+  assert.deepEqual(state.posts, []);
+}
+
+{
+  // No embedding page (the app opened on its own): nothing to ask, so false.
+  const nativeInterfaces = {};
+  const window = { matchMedia() { return { matches: false }; } };
+  window.parent = window;
+  vm.runInNewContext(source, { window, cn1_get_native_interfaces: () => nativeInterfaces });
+  let result;
+  nativeInterfaces.com_codename1_initializr_WebsiteThemeNative
+    .requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String(
+      "dev@example.org", "a.b", "", "", { complete(value) { result = value; } });
+  assert.equal(result, false);
+}
+
 console.log("Initializr download bridge tests passed");

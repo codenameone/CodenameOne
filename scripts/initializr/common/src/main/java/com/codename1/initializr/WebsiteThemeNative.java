@@ -40,4 +40,12 @@ public interface WebsiteThemeNative extends NativeInterface {
     /// generate button is shifted left by this amount so the launcher does not
     /// cover it.
     int chatLauncherClearance();
+
+    /// Asks the embedding website page to email the next steps to `email`, once.
+    /// The page forwards it to BuildCloud (docs/website/assets/js/
+    /// cn1-initializr-beacon.js), which may follow up if that project never
+    /// reaches a first build. packageName/template/ide pick the steps to send;
+    /// the page hashes the package name before anything leaves the browser.
+    /// Returns true when the request was handed to the page.
+    boolean requestSteps(String email, String packageName, String template, String ide);
 }

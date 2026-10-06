@@ -44,7 +44,12 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         executable.write_text('#!/bin/sh\npwd > "$CN1_TEST_RECORD"\nprintf "%s\\n" "$@" >> "$CN1_TEST_RECORD"\nexit "$CN1_TEST_EXIT"\n')
         executable.chmod(0o755)
     record = parent / 'record.txt'
-    env = dict(os.environ, MAVEN_USER_HOME=str(cache), CN1_TEST_RECORD=str(record), CN1_TEST_EXIT='0')
+    # Initializr launchers report build progress (see launcher-telemetry-sh.txt in
+    # scripts/initializr). Point them at a closed local port: the reporting code
+    # still runs -- and must stay silent and harmless when its request fails --
+    # but no test run lands in the production funnel.
+    env = dict(os.environ, MAVEN_USER_HOME=str(cache), CN1_TEST_RECORD=str(record), CN1_TEST_EXIT='0',
+               CN1_EVENTS_URL='http://127.0.0.1:9/cn1-launcher-test')
     if windows:
         env.update(MVNW_USERNAME='wrapper-test-user', MVNW_PASSWORD='wrapper-test-password')
     env.pop('MVNW_REPOURL', None)

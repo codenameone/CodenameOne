@@ -154,6 +154,30 @@ var o = {};
         callback.complete(true);
     };
 
+    // "Email me these steps" from the post-download panel. The embedding page
+    // (layouts/_default/initializr.html) forwards it to BuildCloud through
+    // cn1-initializr-beacon.js, which hashes the package name before it leaves
+    // the browser. Answers false only when there is no embedding page to ask,
+    // so the panel does not claim an email is on its way.
+    o.requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String = function(email, packageName, template, ide, callback) {
+        try {
+            if (email && window.parent && window.parent !== window && window.parent.postMessage) {
+                window.parent.postMessage({
+                    type: "cn1-initializr-steps-request",
+                    email: String(email),
+                    packageName: packageName ? String(packageName) : "",
+                    template: template ? String(template) : "",
+                    ide: ide ? String(ide) : ""
+                }, "*");
+                callback.complete(true);
+                return;
+            }
+        } catch (ignored) {
+            // Cross-origin or sandbox restrictions: report that nothing was sent.
+        }
+        callback.complete(false);
+    };
+
     // Horizontal clearance (CSS px) the host page's Crisp widget needs so the
     // generate button can sit to its left. Measured, not assumed: the round
     // launcher is ~64px, but a first-time visitor usually sees Crisp folded
