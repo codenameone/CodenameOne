@@ -107,3 +107,32 @@ touch('touchmove', 80);
 touch('touchend', 80, false);
 assert.deepEqual(relayed, [], 'selection handles stay native');
 console.log('PASS native text event ownership and synchronous context-menu cancellation');
+
+// Exercise the real JSO bridge, including focus suppression before the worker's
+// semantic snapshot can overwrite a newly focused native editor.
+let bridge;
+Object.assign(context, {
+  hostBridge: { register(name, handler) { bridge = handler; } },
+  resolveHostRef: ref => ref,
+  mapHostArgs: args => args,
+  hostResult: value => value,
+  noteDrawTarget() {},
+  isCanvasLike: () => false
+});
+const bridgeStart = source.indexOf("  hostBridge.register('__cn1_jso_bridge__',");
+const bridgeEnd = source.indexOf('\n  });', bridgeStart) + '\n  });'.length;
+vm.runInContext(source.slice(bridgeStart, bridgeEnd), context);
+let focusCalls = 0;
+const semanticTarget = { closest: selector => selector === '#cn1-accessibility-tree', focus() { focusCalls++; } };
+for (const [tagName, readOnly, disabled, shouldFocus] of [
+  ['INPUT', false, false, false], ['TEXTAREA', false, false, false],
+  ['INPUT', true, false, true], ['TEXTAREA', true, false, true],
+  ['TEXTAREA', false, true, true], ['SPAN', false, false, true]
+]) {
+  Object.assign(text, { tagName, readOnly, disabled });
+  doc.activeElement = text;
+  focusCalls = 0;
+  bridge({ kind: 'method', member: 'focus', receiver: semanticTarget });
+  assert.equal(focusCalls, shouldFocus ? 1 : 0, `${tagName} readonly=${readOnly} disabled=${disabled} focus handoff`);
+}
+console.log('PASS semantic focus protection only applies to editable native controls');

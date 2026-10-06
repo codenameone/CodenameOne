@@ -732,13 +732,40 @@ public class Component implements Animation, StyleListener, Editable {
         return nativeOverlay;
     }
 
+    // Internal text listeners whose selection/editor lifecycle is supplied by a native control.
+    interface NativeTextSelectionListener extends ActionListener {
+    }
+
+    private boolean hasApplicationPointerListeners(EventDispatcher dispatcher) {
+        if (dispatcher != null && dispatcher.hasListeners()) {
+            for (Object listener : dispatcher.getListenerCollection()) {
+                if (!(listener instanceof NativeTextSelectionListener)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasTopLevelPointerListeners() {
+        TopLevelContainer top = getTopLevelContainer();
+        if (top == null) {
+            return false;
+        }
+        Component owner = top.asContainer();
+        return hasApplicationPointerListeners(owner.pointerPressedListeners)
+                || hasApplicationPointerListeners(owner.pointerReleasedListeners)
+                || hasApplicationPointerListeners(owner.pointerDraggedListeners)
+                || hasApplicationPointerListeners(owner.longPressListeners);
+    }
+
     // Port accessors use this before giving pointer gestures to a native text control.
     boolean hasPointerInteractionListeners() {
         return pointerPressedListeners != null && pointerPressedListeners.hasListeners()
                 || pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()
                 || pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()
                 || longPressListeners != null && longPressListeners.hasListeners()
-                || hasContextMenuOrStylusHandling();
+                || hasContextMenuOrStylusHandling() || hasTopLevelPointerListeners();
     }
 
     private boolean hasContextMenuOrStylusHandling() {

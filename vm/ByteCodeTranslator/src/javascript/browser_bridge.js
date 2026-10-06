@@ -2360,8 +2360,13 @@
     // gesture. Do not let its late focus request steal the editor's first input
     // or selection. An intentional CN1 focus change blurs the editor first via
     // its FocusListener, so it still reaches the semantic target normally.
+    // Read-only selection never acquires CN1 focus and has no such focusLost
+    // handoff, so it must not block the application's semantic focus requests.
+    var activeEditor = global.document && global.document.activeElement;
     if (member === 'focus' && receiver.closest && receiver.closest('#cn1-accessibility-tree')
-        && global.document && nativeSelectionElement(global.document.activeElement)) return null;
+        && activeEditor && /^(INPUT|TEXTAREA)$/.test(activeEditor.tagName)
+        && !activeEditor.readOnly && !activeEditor.disabled
+        && nativeSelectionElement(activeEditor)) return null;
     var value;
     if (kind === 'getter') {
       value = receiver[member];

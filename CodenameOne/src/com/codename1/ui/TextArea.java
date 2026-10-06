@@ -224,7 +224,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// and remove it when we remove the textarea.
     ///
     /// Reference bug https://github.com/codenameone/CodenameOne/issues/2472
-    private final ActionListener formPressListener = new ActionListener() {
+    private final ActionListener formPressListener = new NativeTextSelectionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
             // The top level, not the form: this listener is registered on the window
@@ -750,8 +750,17 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `b`: true is text are is editable; otherwise false
     public void setEditable(boolean b) {
-        editable = b;
-        updateCursor();
+        if (editable != b) {
+            editable = b;
+            updateCursor();
+            // Refresh native controls even when no other screen content changes.
+            TopLevelContainer top = getTopLevelContainer();
+            if (top != null) {
+                top.asContainer().repaint();
+            } else {
+                repaint();
+            }
+        }
     }
 
     @Override

@@ -196,7 +196,7 @@ public class TextSelection {
     private Component selectionRoot;
     private boolean ignoreEvents;
     /// The listener that handles all of the pointer events to update the selections.
-    private final ActionListener pressListener = new ActionListener() {
+    private final ActionListener pressListener = new Component.NativeTextSelectionListener() {
         final Rectangle startSelectedBounds = new Rectangle();
         private final int ONE_MM = CN.convertToPixels(1);
         int startX;

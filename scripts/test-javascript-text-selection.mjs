@@ -90,6 +90,48 @@ async function exercise(context, name, host, mobileDevice = null) {
     }
     console.log('PASS', name, 'selection flags refresh static text without unrelated repaints');
 
+    await openReview('editable');
+    await page.locator('.cn1-selection-editor[aria-label="toggleEditable"]').waitFor({ state: 'visible' });
+    for (const readOnly of [false, true, false]) {
+      await page.waitForFunction(readOnly =>
+        document.querySelector('.cn1-selection-editor[aria-label="toggleEditable"]')?.readOnly === readOnly, readOnly);
+    }
+    console.log('PASS', name, 'editability refreshes native controls on a static form');
+
+    for (const label of ['focusReadOnly', 'focusDisabled']) {
+      await openReview('focus');
+      const editor = page.locator(`.cn1-selection-editor[aria-label="${label}"]`);
+      await editor.waitFor({ state: 'visible' });
+      await editor.focus();
+      await page.waitForTimeout(300);
+      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), label);
+      await clickButton('Move focus');
+      await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Focus destination');
+    }
+    console.log('PASS', name, 'readonly and disabled text release DOM focus to semantic targets');
+
+    for (const handler of ['press', 'release', 'drag', 'long']) {
+      await openReview('formpointer&handler=' + handler);
+      const span = page.locator('#cn1-text-layer span').filter({ hasText: 'Form pointer label' }).first();
+      await span.waitFor({ state: 'attached' });
+      assert.equal(await span.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+      assert.equal(await page.locator('.cn1-selection-editor[aria-label="formPointerArea"]').count(), 0);
+      const bounds = await span.evaluate(el => el.getBoundingClientRect().toJSON());
+      const x = bounds.x + 5, y = bounds.y + bounds.height / 2;
+      assert.equal(await page.evaluate(({x, y}) => document.elementFromPoint(x, y)?.tagName, {x, y}), 'CANVAS');
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      if (handler === 'drag') {
+        await page.waitForTimeout(200);
+        await page.mouse.move(x + 100, y, { steps: 10 });
+        await page.waitForTimeout(200);
+      }
+      if (handler === 'long') await page.waitForTimeout(1500);
+      await page.mouse.up();
+      await page.waitForFunction(handler => document.body.innerText.includes('Form ' + handler + ' received'), handler);
+    }
+    console.log('PASS', name, 'form pointer callbacks retain canvas gestures');
+
     await openReview('snapshot');
     await page.locator('.cn1-selection-editor[aria-label="snapshotField"]').waitFor({ state: 'visible' });
     await page.locator('.cn1-selection-editor[aria-label="snapshotArea"]').waitFor({ state: 'visible' });

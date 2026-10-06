@@ -125,6 +125,38 @@ public class JavaScriptSelectionApp extends Lifecycle {
             com.codename1.ui.util.UITimer.timer(11000, false, form, () -> form.getTextSelection().setEnabled(false));
             com.codename1.ui.util.UITimer.timer(13000, false, form, () -> form.getTextSelection().setEnabled(true));
             form.addAll(selectable, readOnly);
+        } else if (query.indexOf("review=editable") >= 0) {
+            TextArea area = new TextArea("Static editability");
+            area.setName("toggleEditable");
+            com.codename1.ui.util.UITimer.timer(3000, false, form, () -> area.setEditable(false));
+            com.codename1.ui.util.UITimer.timer(5000, false, form, () -> area.setEditable(true));
+            form.add(area);
+        } else if (query.indexOf("review=focus") >= 0) {
+            TextArea area = new TextArea("Readonly focus");
+            area.setName("focusReadOnly");
+            area.setEditable(false);
+            TextArea disabled = new TextArea("Disabled focus");
+            disabled.setName("focusDisabled");
+            disabled.setEnabled(false);
+            Button target = new Button("Focus destination");
+            Button move = new Button("Move focus");
+            move.addActionListener(e -> target.requestFocus());
+            form.addAll(area, disabled, target, move);
+        } else if (query.indexOf("review=formpointer") >= 0) {
+            Label label = new Label("Form pointer label");
+            TextArea area = new TextArea("Form pointer area");
+            area.setEditable(false);
+            area.setName("formPointerArea");
+            if (query.indexOf("handler=release") >= 0) {
+                form.addPointerReleasedListener(e -> status.setText("Form release received"));
+            } else if (query.indexOf("handler=drag") >= 0) {
+                form.addPointerDraggedListener(e -> status.setText("Form drag received"));
+            } else if (query.indexOf("handler=long") >= 0) {
+                form.addLongPressListener(e -> status.setText("Form long received"));
+            } else {
+                form.addPointerPressedListener(e -> status.setText("Form press received"));
+            }
+            form.addAll(label, area, status);
         } else if (query.indexOf("review=snapshot") >= 0) {
             TextField field = new TextField("Snapshot field value");
             field.setName("snapshotField");
