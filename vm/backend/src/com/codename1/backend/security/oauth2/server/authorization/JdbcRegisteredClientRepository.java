@@ -83,7 +83,7 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
         settings.put("deviceCodeTimeToLive", Long.valueOf(t.getDeviceCodeTimeToLive()));
         settings.put("reuseRefreshTokens", Boolean.valueOf(t.isReuseRefreshTokens()));
         if (!client.getResources().isEmpty()) {
-            settings.put("resources", new java.util.ArrayList<Object>(client.getResources()));
+            settings.put("resources", new ArrayList<Object>(client.getResources()));
         }
         Object[] values = {client.getClientId(),
             client.getClientSecret() == null ? "" : client.getClientSecret(),
@@ -190,8 +190,8 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
             t.reuseRefreshTokens(Boolean.TRUE.equals(settings.get("reuseRefreshTokens")));
             b.tokenSettings(t.build());
             Object resources = settings.get("resources");
-            if (resources instanceof java.util.List) {
-                for (Object resource : (java.util.List) resources) {
+            if (resources instanceof List) {
+                for (Object resource : (List) resources) {
                     if (resource instanceof String) {
                         b.resource((String) resource);
                     }

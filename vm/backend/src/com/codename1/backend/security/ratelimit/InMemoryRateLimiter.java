@@ -80,7 +80,7 @@ public final class InMemoryRateLimiter implements RateLimiter {
     @Override
     public synchronized RateLimiter derive(String name, int permits, long periodSeconds) {
         InMemoryRateLimiter derived = new InMemoryRateLimiter(permits, periodSeconds, maxKeys);
-        derived.clock = clock;
+        derived.setClock(clock);
         return derived;
     }
 
