@@ -49,10 +49,20 @@ import static org.junit.jupiter.api.Assertions.fail;
  * reference puts bcrypt, the login page and the JWT stack into every server with a chain, and
  * every test stays green.
  *
- * So this builds three whole servers, vm/backend/demo/linknone, linkjwt and linkform -- no
- * security, a JWT resource server only, a form login only -- runs each to prove it works, and
- * reads the symbols of each binary. A class that is linked has a static initializer symbol;
- * the classes of what a server did not declare must have none.
+ * So this builds five whole servers, vm/backend/demo/linknone, linkjwt, linkform,
+ * linkoauthlogin and linkauthserver -- no security, a JWT resource server only, a form login
+ * only, a sign-in through another provider only, an authorization server only -- runs each to
+ * prove it works, and reads the symbols of each binary. A class that is linked has a static
+ * initializer symbol; the classes of what a server did not declare must have none.
+ *
+ * The same goes for the natives. They are compiled whole, and what leaves an uncalled one out
+ * is the linker (see the dead-strip flags in vm/backend/build.sh): a server that signs nothing
+ * must not hold the signature native, and the one that does sign must.
+ *
+ * Because the linker now drops what nothing reaches, a class the translator kept and nothing
+ * calls has no symbol either. What is read here is the binary, which is the thing a server
+ * pays for; the floor on the number of classes below is what keeps a stripped binary from
+ * passing by holding nothing.
  */
 class BackendLinkingTest {
     private static final String SECURITY = "com_codename1_backend_security_";
@@ -88,6 +98,39 @@ class BackendLinkingTest {
         "mfa_RecoveryCodeService", "mfa_JdbcTotpRepository", "SecuritySchema",
         "core_userdetails_JdbcUserDetailsManager", "apikey_JdbcApiKeyRepository"};
 
+    /** Sign-in through another provider. */
+    private static final String[] OAUTH_LOGIN = {"OAuth2LoginConfigurer",
+        "OAuth2LoginAuthenticationFilter", "OAuth2AuthorizationRequestRedirectFilter",
+        "oauth2_client_ClientRegistration", "oauth2_client_InMemoryClientRegistrationRepository",
+        "oauth2_client_DefaultOAuth2AuthorizationRequestResolver",
+        "oauth2_client_DefaultAuthorizationCodeTokenResponseClient",
+        "oauth2_client_OidcIdTokenDecoderFactory", "oauth2_client_OidcUserService",
+        "oauth2_client_OAuth2AuthorizationRequest"};
+    /** The authorization server. */
+    private static final String[] AUTH_SERVER = {"AuthorizationServerConfigurer",
+        "OAuth2AuthorizationServerFilter", "OAuth2AuthorizationEndpointFilter",
+        "oauth2_server_authorization_OAuth2AuthorizationServer",
+        "oauth2_server_authorization_RegisteredClient",
+        "oauth2_server_authorization_InMemoryRegisteredClientRepository",
+        "oauth2_server_authorization_InMemoryOAuth2AuthorizationService",
+        "oauth2_server_authorization_AuthorizationServerKeys",
+        "oauth2_server_authorization_AuthorizationServerSettings",
+        "oauth2_server_authorization_TokenSettings", "oauth2_jwt_DefaultJwtEncoder"};
+    /** What keeps a table, or ties a provider's user to a local one: an application's to name. */
+    private static final String[] OAUTH_OPTIONAL = {
+        "oauth2_client_JdbcFederatedIdentityRepository",
+        "oauth2_client_InMemoryFederatedIdentityRepository",
+        "oauth2_client_LinkingOAuth2UserService",
+        "oauth2_server_authorization_JdbcOAuth2AuthorizationService",
+        "oauth2_server_authorization_JdbcRegisteredClientRepository"};
+    /** The form login alone, without the sign-out and the saved request any session sign-in has. */
+    private static final String[] FORM_ONLY = {"FormLoginConfigurer",
+        "UsernamePasswordAuthenticationFilter", "DefaultLoginPageGeneratingFilter",
+        "LoginUrlAuthenticationEntryPoint"};
+    /** The natives only a server that signs, verifies or encrypts calls. */
+    private static final String[] SIGNING_NATIVES = {"Crypto_signImpl", "Crypto_verifyImpl",
+        "Crypto_aesGcmImpl", "Crypto_generateRsaKeyImpl"};
+
     @Test
     @DisplayName("a server links the security it declares and no other")
     void eachServerCarriesOnlyWhatItDeclares() throws Exception {
@@ -108,6 +151,12 @@ class BackendLinkingTest {
         Set<String> form = build(work, "LinkForm", "demo/linkform", jdk8,
                 "LINKCHECK form open=200 redirect=302 to=/login page=200 refused=/login?error "
                         + "signedIn=/ home=200 logout=302 after=302");
+        Set<String> login = build(work, "LinkOAuthLogin", "demo/linkoauthlogin", jdk8,
+                "LINKCHECK oauthlogin open=200 redirect=302 to=/oauth2/authorization/acme "
+                        + "asked=true refused=/login?error page=200 home=302");
+        Set<String> issuer = build(work, "LinkAuthServer", "demo/linkauthserver", jdk8,
+                "LINKCHECK authserver open=200 metadata=200 jwks=200 token=200 signed=true "
+                        + "wrong=401 device=200 authorize=401 elsewhere=403");
 
         // No chain, no layer: not one class of it, the internals included.
         List<String> stray = new ArrayList<String>();
@@ -132,7 +181,78 @@ class BackendLinkingTest {
         absent("LinkForm", form, TOKENS);
         absent("LinkForm", form, NEVER);
         absent("LinkForm", form, "oauth2_");
+        absent("LinkJwt", jwt, OAUTH_LOGIN);
+        absent("LinkJwt", jwt, "oauth2_client_", "oauth2_server_authorization_");
+        absent("LinkJwt", jwt, "AuthorizationServerConfigurer", "OAuth2AuthorizationServerFilter",
+                "OAuth2AuthorizationEndpointFilter");
+        absent("LinkForm", form, OAUTH_LOGIN);
+        absent("LinkForm", form, AUTH_SERVER);
+
+        // A sign-in through another provider: that, the session it ends in, and
+        // the verification of the ID token -- and no authorization server, no
+        // form, no passwords, nothing that keeps a table.
+        present("LinkOAuthLogin", login, OAUTH_LOGIN);
+        present("LinkOAuthLogin", login, "SessionSignIn", "LogoutFilter", "HttpSessionRequestCache",
+                "oauth2_jwt_DefaultJwtDecoder", "oauth2_jwt_RemoteJwkSet", "crypto_Jwk");
+        absent("LinkOAuthLogin", login, "oauth2_server_");
+        absent("LinkOAuthLogin", login, "AuthorizationServerConfigurer",
+                "OAuth2AuthorizationServerFilter", "OAuth2AuthorizationEndpointFilter",
+                "OAuth2ResourceServerConfigurer", "BearerTokenAuthenticationFilter");
+        absent("LinkOAuthLogin", login, FORM_ONLY);
+        absent("LinkOAuthLogin", login, PASSWORDS);
+        absent("LinkOAuthLogin", login, NEVER);
+        absent("LinkOAuthLogin", login, OAUTH_OPTIONAL);
+        // It verifies ID tokens and signs nothing: not even Apple's client
+        // secret, which only a server that signs in with Apple makes.
+        absent("LinkOAuthLogin", login, "oauth2_client_AppleClientSecret",
+                "oauth2_jwt_DefaultJwtEncoder");
+
+        // An authorization server: that, and what signs -- and no sign-in of any
+        // kind, since this one declares none, no passwords, nothing that keeps a
+        // table.
+        present("LinkAuthServer", issuer, AUTH_SERVER);
+        present("LinkAuthServer", issuer, "crypto_Jwk", "oauth2_jwt_DefaultJwtDecoder");
+        absent("LinkAuthServer", issuer, "oauth2_client_", "oauth2_server_resource_");
+        absent("LinkAuthServer", issuer, OAUTH_LOGIN);
+        absent("LinkAuthServer", issuer, "OAuth2ResourceServerConfigurer",
+                "BearerTokenAuthenticationFilter", "oauth2_jwt_RemoteJwkSet");
+        absent("LinkAuthServer", issuer, FORM);
+        absent("LinkAuthServer", issuer, PASSWORDS);
+        absent("LinkAuthServer", issuer, NEVER);
+        absent("LinkAuthServer", issuer, OAUTH_OPTIONAL);
+
+        // The natives, which only the linker can leave out. The server that
+        // signs holds the signature native -- so its absence elsewhere is the
+        // linker's doing and not a symbol that was renamed.
+        String signs = NATIVES.get("LinkAuthServer");
+        assertTrue(signs.contains("com_codename1_backend_Crypto_signImpl")
+                && signs.contains("com_codename1_backend_Crypto_generateRsaKeyImpl"),
+                "LinkAuthServer signs tokens with a key it makes, and its binary holds no "
+                        + "native for it");
+        assertTrue(NATIVES.get("LinkNone").contains("com_codename1_backend_Crypto_sha256Impl"),
+                "LinkNone hashes, and its binary holds no native for it");
+        for (String symbol : SIGNING_NATIVES) {
+            for (String main : new String[] {"LinkNone", "LinkForm"}) {
+                assertTrue(!NATIVES.get(main).contains("com_codename1_backend_" + symbol),
+                        main + " never signs, verifies or encrypts, and its binary holds the "
+                                + "native " + symbol + ": the link no longer drops what "
+                                + "nothing calls; see the dead-strip flags in "
+                                + "vm/backend/build.sh");
+            }
+        }
+        assertTrue(NATIVES.get("LinkOAuthLogin").contains("com_codename1_backend_Crypto_verifyImpl"),
+                "LinkOAuthLogin verifies ID tokens, and its binary holds no native for it");
+        for (String symbol : new String[] {"Crypto_signImpl", "Crypto_generateRsaKeyImpl",
+            "Crypto_aesGcmImpl"}) {
+            assertTrue(!NATIVES.get("LinkOAuthLogin").contains("com_codename1_backend_" + symbol),
+                    "LinkOAuthLogin signs nothing and makes no keys, and its binary holds the "
+                            + "native " + symbol);
+        }
     }
+
+    /** The native symbols of the Crypto class in each binary built, by main class. */
+    private static final java.util.Map<String, String> NATIVES =
+            new java.util.HashMap<String, String>();
 
     /** Builds and runs one server; answers the classes its binary holds. */
     private static Set<String> build(Path work, String main, String demo, Path jdk8,
@@ -154,7 +274,11 @@ class BackendLinkingTest {
         assertTrue(symbols != null, "nm could not read " + binary);
         Set<String> classes = new TreeSet<String>();
         String marker = "STATIC_INITIALIZER_";
+        StringBuilder natives = new StringBuilder();
         for (String line : symbols.split("\n")) {
+            if (line.contains("com_codename1_backend_Crypto_") && line.contains("Impl___")) {
+                natives.append(line).append('\n');
+            }
             int at = line.indexOf(marker);
             if (at >= 0) {
                 classes.add(line.substring(at + marker.length()).trim());
@@ -164,6 +288,7 @@ class BackendLinkingTest {
         // holding nothing at all.
         assertTrue(classes.size() > 300 && classes.contains("com_codename1_backend_Backend"),
                 "could not read the classes of " + main + " from its symbols: " + classes.size());
+        NATIVES.put(main, natives.toString());
         return classes;
     }
 

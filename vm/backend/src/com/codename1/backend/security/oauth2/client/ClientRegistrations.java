@@ -51,11 +51,14 @@ import java.util.Map;
 /// registration's own id is tried as both. Under a registration:
 /// `client-id`, `client-secret`, `client-authentication-method`
 /// (`client_secret_basic`, `client_secret_post`, `none`), `scope`,
-/// `redirect-uri`, `client-name`, `response-mode`, `provider`, and for Sign in
-/// with Apple `apple-team-id`, `apple-key-id` and `apple-private-key` (the path
-/// of the `.p8` file) in place of a secret. Under a provider: `issuer-uri`,
-/// `authorization-uri`, `token-uri`, `user-info-uri`, `jwk-set-uri`,
-/// `user-name-attribute`.
+/// `redirect-uri`, `client-name`, `response-mode` and `provider`. Under a
+/// provider: `issuer-uri`, `authorization-uri`, `token-uri`, `user-info-uri`,
+/// `jwk-set-uri`, `user-name-attribute`.
+///
+/// Sign in with Apple is declared in code, as a
+/// [ClientRegistrationRepository] bean, because its secret is a token signed
+/// with a key and not a setting -- see [AppleClientSecret] -- and a server
+/// that does not sign in with Apple should not carry what signs one.
 public final class ClientRegistrations {
     /// The prefix of every registration's settings.
     public static final String REGISTRATION = "cn1.security.oauth2.client.registration.";
@@ -98,11 +101,6 @@ public final class ClientRegistrations {
         String secret = config.get(prefix + "client-secret");
         if (secret != null && secret.length() > 0) {
             b.clientSecret(secret);
-        }
-        String team = config.get(prefix + "apple-team-id");
-        if (team != null) {
-            b.clientSecretSupplier(AppleClientSecret.fromFile(team,
-                    config.get(prefix + "apple-key-id"), config.get(prefix + "apple-private-key")));
         }
         String method = config.get(prefix + "client-authentication-method");
         if (method != null) {

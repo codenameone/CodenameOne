@@ -223,8 +223,6 @@ class OAuth2ClientTest {
     @Test
     @DisplayName("registrations are read from the settings, by common provider or by a provider block")
     void fromConfig() throws Exception {
-        File key = new File(dir, "AuthKey.p8");
-        Files.write(key.toPath(), KeyFixtures.EC256_PKCS8_PEM.getBytes("US-ASCII"));
         Properties p = new Properties();
         String r = ClientRegistrations.REGISTRATION;
         p.setProperty(r + "google.client-id", "g-id");
@@ -234,9 +232,6 @@ class OAuth2ClientTest {
         p.setProperty(r + "work.client-secret", "m-secret");
         p.setProperty(r + "work.scope", "openid, email");
         p.setProperty(r + "apple.client-id", "com.example.web");
-        p.setProperty(r + "apple.apple-team-id", "TEAM123456");
-        p.setProperty(r + "apple.apple-key-id", "KEY1234567");
-        p.setProperty(r + "apple.apple-private-key", key.getPath());
         p.setProperty(r + "acme.client-id", "web");
         p.setProperty(r + "acme.client-authentication-method", "none");
         p.setProperty(r + "acme.provider", "acme-id");
@@ -270,8 +265,14 @@ class OAuth2ClientTest {
         assertEquals(ClientRegistration.FORM_POST, apple.getResponseMode());
         assertEquals(ClientAuthenticationMethod.CLIENT_SECRET_POST,
                 apple.getClientAuthenticationMethod());
+        // Its secret is a signed token, which is given in code and not here.
         assertNull(apple.getClientSecret());
-        assertEquals(3, apple.resolveClientSecret().split("\\.").length);
+        assertNull(apple.resolveClientSecret());
+        File key = new File(dir, "AuthKey.p8");
+        Files.write(key.toPath(), KeyFixtures.EC256_PKCS8_PEM.getBytes("US-ASCII"));
+        assertEquals(3, ClientRegistration.withClientRegistration(apple).clientSecretSupplier(
+                AppleClientSecret.fromFile("TEAM123456", "KEY1234567", key.getPath())).build()
+                .resolveClientSecret().split("\\.").length);
 
         ClientRegistration acme = byId.get("acme");
         assertEquals(ClientAuthenticationMethod.NONE, acme.getClientAuthenticationMethod());
