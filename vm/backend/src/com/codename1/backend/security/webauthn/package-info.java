@@ -22,4 +22,26 @@
  */
 /// Passkeys: signing in with a credential an authenticator holds, as the Web
 /// Authentication specification defines it.
+///
+/// `http.webAuthn(...)` turns them on for a chain and serves the two
+/// ceremonies -- registering a passkey for a user who is signed in, and
+/// signing in with one. Behind those endpoints is
+/// [com.codename1.backend.security.webauthn.WebAuthnRelyingPartyOperations],
+/// which makes the options a client starts a ceremony from and verifies what
+/// the authenticator answered; an application that serves the ceremonies at
+/// addresses of its own uses it directly.
+///
+/// What is kept is a
+/// [com.codename1.backend.security.webauthn.CredentialRecord] for each
+/// passkey, in a
+/// [com.codename1.backend.security.webauthn.UserCredentialRepository], and
+/// for each user the handle authenticators know them by, in a
+/// [com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntityRepository]:
+/// both in memory or in the server's database. Neither holds a secret.
+///
+/// The options and the answers travel as the specification's JSON forms,
+/// byte strings in base64url, which is what a browser's
+/// `PublicKeyCredential.parseCreationOptionsFromJSON` and `toJSON()`, and the
+/// Codename One client's `com.codename1.io.webauthn.WebAuthnClient`, read and
+/// write.
 package com.codename1.backend.security.webauthn;
