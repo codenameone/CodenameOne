@@ -630,6 +630,16 @@ public final class HttpServer {
             return Sessions.cookieValue(getHeader("cookie"), name);
         }
 
+        /// Forgets the session this request resolved, once it has been stored and
+        /// released, so a later lookup on the same request starts again. A
+        /// WebSocket handshake is looked at twice -- by the upgrade guard and then
+        /// by a fallback router -- and each finishes the sessions it used.
+        void forgetSession() {
+            this.session = null;
+            this.sessionResolved = false;
+            this.endedSessions = null;
+        }
+
         /// The session, if this request looked it up.
         HttpSession resolvedSession() {
             return session;
@@ -1401,6 +1411,17 @@ public final class HttpServer {
     /// status as a CORS failure. Package-private: only Backend's chain is one.
     interface FallbackDecorator {
         void decorateFallback(Request request, Response response);
+    }
+
+    /// A handler that is also asked before a WebSocket upgrade is routed, for an
+    /// exact route and a fallback router alike. The upgrade does not pass through
+    /// [Handler#handle], so without this a handshake reached its endpoint having
+    /// met none of what guards the HTTP routes beside it. Package-private: only
+    /// Backend's chain is one.
+    interface UpgradeGuard {
+        /// 0 to let the handshake reach its endpoint, otherwise the status it is
+        /// refused with.
+        int checkUpgrade(Request request);
     }
 
     /// The status-only answer for `request`, decorated by the handler when it asks.
@@ -4426,6 +4447,17 @@ public final class HttpServer {
                 || request.getHeader("transfer-encoding") != null) {
             writeStatusOnly(conn, 400, "a websocket handshake carries no body");
             return false;
+        }
+
+        // Before the route is chosen, so a handshake the guard refuses learns
+        // nothing about which paths have an endpoint behind them -- an HTTP
+        // request to a path that does not exist is refused the same way.
+        if (handler instanceof UpgradeGuard) {
+            int refused = ((UpgradeGuard) handler).checkUpgrade(request);
+            if (refused != 0) {
+                writeStatusOnly(conn, refused, null);
+                return false;
+            }
         }
 
         WebSocket endpoint;

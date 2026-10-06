@@ -240,6 +240,14 @@ final class Cors {
                 : authority;
     }
 
+    /// Whether `request` is a CORS preflight: an OPTIONS naming the origin and the
+    /// method of the request to come. A browser sends one without credentials, so
+    /// it is answered by this policy and never asked to authenticate.
+    static boolean isPreflight(HttpServer.Request request) {
+        return "OPTIONS".equals(request.getMethod()) && request.getHeader("Origin") != null
+                && request.getHeader("Access-Control-Request-Method") != null;
+    }
+
     /// The answer to a preflight no handler took, or null when `request` is not
     /// one. A preflight from an origin the policy does not list is a 403.
     HttpServer.Response preflight(HttpServer.Request request) {

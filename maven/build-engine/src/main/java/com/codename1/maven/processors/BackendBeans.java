@@ -76,6 +76,7 @@ final class BackendBeans {
     static final String AUTOWIRED = PKG + "Autowired;";
     static final String QUALIFIER = PKG + "Qualifier;";
     static final String PRIMARY = PKG + "Primary;";
+    static final String ORDER = PKG + "Order;";
     static final String LAZY = PKG + "Lazy;";
     static final String VALUE = PKG + "Value;";
     static final String CONFIG_PROPERTIES = PKG + "ConfigurationProperties;";
@@ -253,6 +254,8 @@ final class BackendBeans {
         AnnotatedClass factoryOwnerClass;
         String scope = SINGLETON;
         boolean primary;
+        /// @Order's value; a bean without one comes last, as in Spring.
+        int order = Integer.MAX_VALUE;
         boolean lazy;
         boolean onMissing;
         /// @ConditionalOnMissingBean's explicit types, empty for the default.
@@ -974,6 +977,10 @@ final class BackendBeans {
             bean.scope = s;
         }
         bean.primary = annotations.get(PRIMARY) != null;
+        AnnotationValues order = annotations.get(ORDER);
+        if (order != null) {
+            bean.order = order.getIntOrDefault("value", Integer.MAX_VALUE);
+        }
         AnnotationValues lazy = annotations.get(LAZY);
         bean.lazy = lazy != null && lazy.getBoolOrDefault("value", true);
         if (bean.lazy && !SINGLETON.equals(bean.scope)) {
@@ -2186,6 +2193,7 @@ final class BackendBeans {
                         p.candidates.add(b);
                     }
                 }
+                sortByOrder(p.candidates);
                 return;
             }
         }
@@ -2277,6 +2285,18 @@ final class BackendBeans {
         // is on. Proving at build time that every combination of profiles and
         // properties is covered is not attempted -- Spring does not either.
         p.candidates.addAll(matches);
+    }
+
+    /// Orders `list` by @Order, lowest first. Stable, so beans with the same
+    /// value -- every bean that has none, usually -- keep the order the build
+    /// found them in, which is the order such a list always had.
+    static void sortByOrder(List<Bean> list) {
+        Collections.sort(list, new java.util.Comparator<Bean>() {
+            @Override
+            public int compare(Bean a, Bean b) {
+                return a.order < b.order ? -1 : a.order == b.order ? 0 : 1;
+            }
+        });
     }
 
     private void warnIfUnset(Point p, AnnotatedClass where) {

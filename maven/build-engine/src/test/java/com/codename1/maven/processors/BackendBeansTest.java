@@ -2454,6 +2454,47 @@ public class BackendBeansTest {
         }
     }
 
+    @Test
+    public void orderDecidesWhereABeanStandsInAnInjectedList() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Step", PKG + "public interface Step { String name(); }\n");
+        // Declared against the order asked for: without @Order a list follows the
+        // order the build found the beans in, which is this one.
+        s.put("com.example.Alpha", PKG + "@Component @Order(30)\n"
+                + "public class Alpha implements Step { public String name() { return \"alpha\"; } }\n");
+        s.put("com.example.Beta", PKG + "@Component\n"
+                + "public class Beta implements Step { public String name() { return \"beta\"; } }\n");
+        s.put("com.example.Gamma", PKG + "@Component @Order(-1)\n"
+                + "public class Gamma implements Step { public String name() { return \"gamma\"; } }\n");
+        s.put("com.example.Delta", PKG + "@Component\n"
+                + "public class Delta implements Step { public String name() { return \"delta\"; } }\n");
+        s.put("com.example.Steps", PKG + "@Configuration public class Steps {\n"
+                + "    @Bean @Order(5) public Step made() {\n"
+                + "        return new Step() { public String name() { return \"made\"; } };\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final List<Step> steps;\n"
+                + "    public Api(List<Step> steps) { this.steps = steps; }\n"
+                + "    @GetMapping(\"/steps\") public String steps() {\n"
+                + "        StringBuilder sb = new StringBuilder();\n"
+                + "        for (Step step : steps) { sb.append(step.name()).append(' '); }\n"
+                + "        return sb.toString().trim();\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            // Lowest value first; the two without one come last, as they were found.
+            assertEquals("gamma made alpha beta delta", http("GET", port, "/steps"));
+        } finally {
+            backend.stop();
+        }
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private Backend start(File classes, int port, Properties settings) throws Exception {
