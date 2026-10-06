@@ -65,7 +65,13 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         def log_message(self, *args):
             pass
 
-    recorder = ThreadingHTTPServer(('127.0.0.1', 0), Recorder)
+    class QuietServer(ThreadingHTTPServer):
+        # A launcher's curl gives up after 3 s by design; a connection it drops
+        # mid-request is not a test failure, so do not print a traceback for it.
+        def handle_error(self, request, client_address):
+            pass
+
+    recorder = QuietServer(('127.0.0.1', 0), Recorder)
     threading.Thread(target=recorder.serve_forever, daemon=True).start()
     env = dict(os.environ, MAVEN_USER_HOME=str(cache), CN1_TEST_RECORD=str(record), CN1_TEST_EXIT='0',
                CN1_EVENTS_URL='http://127.0.0.1:%d/cn1-launcher-test' % recorder.server_address[1])
@@ -103,7 +109,6 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     run('run', '', '-Psimulator')
     run('build', 'javascript_cloud', '-Dcodename1.buildTarget=javascript', 37)
     run('run', 'simulator', '-Psimulator', 37)
-    recorder.shutdown()
     reporting = 'CN1_PROJECT_ID' in (project / ('build.bat' if windows else 'build.sh')).read_text()
     if reporting:
         # An Initializr launcher: every build reports launch then exit, keyed by
@@ -112,8 +117,29 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         assert 'launch' in steps and 'exit' in steps, events
         assert all(len(e.get('pkg', '')) == 64 for e in events), events
         assert any(e.get('step') == 'exit' and e.get('exit') == '37' for e in events), events
+        if not windows:
+            # Reporting must never change the build itself. A TMPDIR that does
+            # not exist leaves no room for the reason log: the build still
+            # returns Maven's own status. And Maven's stderr stays on stderr.
+            missing_tmp = dict(env, TMPDIR=str(parent / 'no-such-tmp'), CN1_TEST_EXIT='0')
+            result = subprocess.run([str(project / 'build.sh'), 'javascript_cloud'], cwd=parent, env=missing_tmp,
+                                    text=True, capture_output=True, timeout=30)
+            assert result.returncode == 0, ('missing TMPDIR failed the build', result.returncode, result.stderr)
+            noisy = project / 'mvnw-stderr-probe.sh'
+            noisy.write_text('#!/bin/sh\necho to-stdout\necho to-stderr >&2\nexit 0\n')
+            noisy.chmod(0o755)
+            probe = (project / 'build.sh').read_text().replace('./mvnw "$@" <&0', './mvnw-stderr-probe.sh "$@" <&0')
+            assert probe != (project / 'build.sh').read_text(), 'probe hook not found in build.sh'
+            (project / 'build-probe.sh').write_text(probe)
+            (project / 'build-probe.sh').chmod(0o755)
+            result = subprocess.run([str(project / 'build-probe.sh'), 'javascript_cloud'], cwd=parent, env=env,
+                                    text=True, capture_output=True, timeout=30)
+            assert result.returncode == 0, result
+            assert 'to-stdout' in result.stdout and 'to-stderr' not in result.stdout, result.stdout
+            assert 'to-stderr' in result.stderr, result.stderr
     else:
         assert not events, ('the archetype launchers report nothing', events)
+    recorder.shutdown()
     print('PASS: targets, local defaults, parent cwd, spaces/apostrophes, failure exit codes'
           + (', Windows credential isolation' if windows else '')
           + (', build progress reports' if reporting else ''))

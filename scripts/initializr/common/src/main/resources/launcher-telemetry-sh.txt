@@ -89,60 +89,55 @@ function cn1_mvnw {
     ./mvnw "$@"
     return $?
   fi
-  local target="${CMD:-unknown}" os java start log code
+  local target="${CMD:-unknown}" os java start log code pipe_pid
   os="$(cn1_os)"
   java="$(cn1_java_major)"
   start="$(date +%s)"
   cn1_event --data-urlencode "step=launch" --data-urlencode "target=$target" \
     --data-urlencode "os=$os" --data-urlencode "java=$java" &
-  # The log only feeds the one-word reason. If it cannot be created, build
-  # without it (the reason becomes "unknown") rather than risk the build.
-  log="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/cn1-build-$$.log")"
-  if ! : > "$log" 2>/dev/null; then
+  # A copy of Maven's output, read only for the one-word reason. Nothing else
+  # touches the disk: if no temp file can be created (TMPDIR missing, read-only
+  # or full), Maven runs without the copy and the reason is just "unknown".
+  log="$(mktemp 2>/dev/null)" || log=""
+  if [ -n "$log" ] && ! : > "$log" 2>/dev/null; then
     log=""
   fi
   # Ctrl+C or a kill while Maven runs must still report how the run ended: a
   # developer who gave up on a hung download or a sign-in that never came
-  # otherwise looks like one whose run never finished. The Maven pipeline runs
-  # in the BACKGROUND and the script waits for it, because bash defers a trap
-  # until a foreground command returns -- a `kill` aimed at this script alone
-  # would otherwise wait for a hung Maven forever. The trap stops Maven itself
-  # (its pid is recorded from inside the pipeline), waits for tee to flush, then
-  # reports and exits with the signal's own status: 130 for Ctrl+C (SIGINT),
-  # 143 for SIGTERM, so a caller can still tell them apart. tee drains every
-  # line Maven wrote before it exits, so nothing at the end of the output (the
-  # failure summary) is lost. stdin is passed through explicitly: a background
-  # job's stdin is /dev/null otherwise.
-  local pipe_pid tmpbase="${log:-${TMPDIR:-/tmp}/cn1-build-$$}"
-  local pidfile="$tmpbase.pid" codefile="$tmpbase.code"
+  # otherwise looks like one whose run never finished. Maven runs in a
+  # BACKGROUND subshell the script waits for, because bash defers a trap until
+  # a foreground command returns -- a `kill` aimed at this script alone would
+  # otherwise wait for a hung Maven forever. The trap stops that subshell and
+  # everything under it (Maven included), then reports and exits with the
+  # signal's own status: 130 for Ctrl+C (SIGINT), 143 for SIGTERM.
   function cn1_on_signal {
-    cn1_kill_tree "$(cat "$pidfile" 2>/dev/null)"
+    cn1_kill_tree "$pipe_pid"
     wait "$pipe_pid" 2>/dev/null
     cn1_event --data-urlencode "step=exit" --data-urlencode "target=$target" \
       --data-urlencode "os=$os" --data-urlencode "java=$java" --data-urlencode "exit=$1" \
       --data-urlencode "reason=interrupted" --data-urlencode "secs=$(( $(date +%s) - start ))"
-    rm -f "$log" "$pidfile" "$codefile"
+    [ -n "$log" ] && rm -f "$log"
     trap - INT TERM
     exit "$1"
   }
   trap 'cn1_on_signal 130' INT
   trap 'cn1_on_signal 143' TERM
   set +e
-  # Maven's own exit status is written from inside the pipeline, so tee failing
-  # (a full disk, an unwritable log) can never turn a successful build into a
-  # failed one -- the launcher returns exactly what Maven returned.
+  # The subshell exits with Maven's own status (PIPESTATUS[0]), so wait returns
+  # exactly what Maven returned: a tee that fails (a full disk) cannot change
+  # it, and no status file is needed. stdout and stderr stay separate -- each
+  # is copied to the log by its own tee and passed through on its own channel,
+  # so redirecting one still shows the other. stdin is passed through
+  # explicitly: a background job's stdin is /dev/null otherwise.
   if [ -n "$log" ]; then
-    { ./mvnw "$@" <&0 2>&1 & echo $! > "$pidfile"; wait $! 2>/dev/null; echo $? > "$codefile"; } \
-      | { tee "$log" 2>/dev/null || cat; } &
+    ( ./mvnw "$@" <&0 2> >(tee -a "$log" >&2) | tee -a "$log"; exit "${PIPESTATUS[0]}" ) &
   else
-    { ./mvnw "$@" <&0 & echo $! > "$pidfile"; wait $! 2>/dev/null; echo $? > "$codefile"; } &
+    ( ./mvnw "$@" <&0 ) &
   fi
   pipe_pid=$!
   wait "$pipe_pid"
-  code="$(cat "$codefile" 2>/dev/null)"
-  [ -z "$code" ] && code=1
+  code=$?
   set -e
-  rm -f "$pidfile" "$codefile"
   trap - INT TERM
   cn1_event --data-urlencode "step=exit" --data-urlencode "target=$target" \
     --data-urlencode "os=$os" --data-urlencode "java=$java" --data-urlencode "exit=$code" \
