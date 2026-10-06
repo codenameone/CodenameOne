@@ -26,29 +26,49 @@ import java.util.function.Supplier;
 
 /// Grants access by whether the caller signed in at all.
 public final class AuthenticatedAuthorizationManager<T> implements AuthorizationManager<T> {
-    private final boolean wantAnonymous;
+    private static final int AUTHENTICATED = 0;
+    private static final int ANONYMOUS = 1;
+    private static final int FULLY = 2;
+    private static final int REMEMBERED = 3;
+    private final int wanted;
 
-    private AuthenticatedAuthorizationManager(boolean wantAnonymous) {
-        this.wantAnonymous = wantAnonymous;
+    private AuthenticatedAuthorizationManager(int wanted) {
+        this.wanted = wanted;
     }
 
     /// The caller signed in: any authentication but the anonymous one.
     public static <T> AuthenticatedAuthorizationManager<T> authenticated() {
-        return new AuthenticatedAuthorizationManager<T>(false);
+        return new AuthenticatedAuthorizationManager<T>(AUTHENTICATED);
     }
 
     /// The caller did not sign in.
     public static <T> AuthenticatedAuthorizationManager<T> anonymous() {
-        return new AuthenticatedAuthorizationManager<T>(true);
+        return new AuthenticatedAuthorizationManager<T>(ANONYMOUS);
+    }
+
+    /// The caller signed in during this session, rather than being recognized
+    /// by a remember-me cookie.
+    public static <T> AuthenticatedAuthorizationManager<T> fullyAuthenticated() {
+        return new AuthenticatedAuthorizationManager<T>(FULLY);
+    }
+
+    /// The caller was recognized by a remember-me cookie.
+    public static <T> AuthenticatedAuthorizationManager<T> rememberMe() {
+        return new AuthenticatedAuthorizationManager<T>(REMEMBERED);
     }
 
     @Override
     public AuthorizationDecision check(Supplier<Authentication> authentication, T object) {
         Authentication current = authentication.get();
         boolean anonymous = current == null || current instanceof AnonymousAuthenticationToken;
-        if (wantAnonymous) {
+        if (wanted == ANONYMOUS) {
             return new AuthorizationDecision(anonymous);
         }
-        return new AuthorizationDecision(!anonymous && current.isAuthenticated());
+        boolean signedIn = !anonymous && current.isAuthenticated();
+        boolean remembered = current instanceof RememberMeAuthenticationToken;
+        if (wanted == REMEMBERED) {
+            return new AuthorizationDecision(signedIn && remembered);
+        }
+        return new AuthorizationDecision(signedIn && !(wanted == FULLY && remembered));
     }
 }

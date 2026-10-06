@@ -103,6 +103,12 @@ public class HttpSessionSecurityContextRepository implements SecurityContextRepo
         }
         out.put("authorities", authorities);
         out.put("authenticated", Boolean.valueOf(authentication.isAuthenticated()));
+        if (authentication instanceof RememberMeAuthenticationToken) {
+            // A session that started from a remember-me cookie stays one that
+            // did, on every later request: what asks for a full sign-in must
+            // keep refusing it.
+            out.put("rememberMe", Boolean.TRUE);
+        }
         Object details = authentication.getDetails();
         if (isPlain(details, 0)) {
             out.put("details", details);
@@ -128,8 +134,15 @@ public class HttpSessionSecurityContextRepository implements SecurityContextRepo
         if (!Boolean.TRUE.equals(stored.get("authenticated"))) {
             return null;
         }
+        User user = new User((String) name, "", authorities);
+        if (Boolean.TRUE.equals(stored.get("rememberMe"))) {
+            RememberMeAuthenticationToken remembered = new RememberMeAuthenticationToken(
+                    "session", user, authorities);
+            remembered.setDetails(stored.get("details"));
+            return remembered;
+        }
         UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken
-                .authenticated(new User((String) name, "", authorities), null, authorities);
+                .authenticated(user, null, authorities);
         token.setDetails(stored.get("details"));
         return token;
     }

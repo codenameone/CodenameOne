@@ -162,11 +162,12 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
         http.addFilter(new UsernamePasswordAuthenticationFilter(
                 AntPathRequestMatcher.antMatcher("POST", processingUrl()), usernameParameter,
                 passwordParameter, PasswordAuthentication.require(http, "formLogin()"), success,
-                failed, http.resolveSecurityContextRepository(), http.sessionAuthentication()),
+                failed, http.signIn()),
                 HttpSecurity.ORDER_FORM_LOGIN);
         if (!customLoginPage) {
             http.addFilter(new DefaultLoginPageGeneratingFilter(loginPage, processingUrl(),
-                    usernameParameter, passwordParameter), HttpSecurity.ORDER_LOGIN_PAGE);
+                    usernameParameter, passwordParameter, http.rememberMeParameter()),
+                    HttpSecurity.ORDER_LOGIN_PAGE);
         }
     }
 }

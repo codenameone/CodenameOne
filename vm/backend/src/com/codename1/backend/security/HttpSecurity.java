@@ -222,7 +222,7 @@ public final class HttpSecurity {
         if (configurer == null) {
             configurer = new FormLoginConfigurer();
             apply(configurer);
-            sessionSignIn();
+            sessionMechanism();
         }
         customizer.customize(configurer);
         return this;
@@ -246,6 +246,19 @@ public final class HttpSecurity {
         if (configurer == null) {
             configurer = new OAuth2ResourceServerConfigurer();
             apply(configurer);
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
+    /// A cookie that signs a returning user in; see [RememberMeConfigurer].
+    /// Brings sign-out with it, as [#formLogin] does.
+    public HttpSecurity rememberMe(Customizer<RememberMeConfigurer> customizer) {
+        RememberMeConfigurer configurer = getConfigurer(RememberMeConfigurer.class);
+        if (configurer == null) {
+            configurer = new RememberMeConfigurer();
+            apply(configurer);
+            sessionMechanism();
         }
         customizer.customize(configurer);
         return this;
@@ -586,7 +599,7 @@ public final class HttpSecurity {
     /// What a way of signing in that keeps the user in a session brings with
     /// it: sign-out, and the memory of where a request was going. Called by
     /// the DSL method of such a mechanism, so a chain without one names neither.
-    void sessionSignIn() {
+    void sessionMechanism() {
         if (getConfigurer(LogoutConfigurer.class) == null
                 && !disabled.contains(LogoutConfigurer.class)) {
             apply(new LogoutConfigurer());
@@ -606,6 +619,36 @@ public final class HttpSecurity {
         return configurer;
     }
 
+    private final List<SessionSignIn.Listener> signInListeners =
+            new ArrayList<SessionSignIn.Listener>();
+    private SecondFactorPolicy secondFactorPolicy;
+    private SessionSignIn signIn;
+
+    /// How a mechanism of this chain signs a user in to a session; see
+    /// [SessionSignIn]. Asked for from a configurer's configure(), once every
+    /// part has said in its init() what it adds to a sign-in.
+    SessionSignIn signIn() {
+        if (signIn == null) {
+            signIn = new SessionSignIn(resolveSecurityContextRepository(), sessionAuthentication(),
+                    signInListeners, secondFactorPolicy);
+        }
+        return signIn;
+    }
+
+    /// Something to tell of every sign-in; from a configurer's init().
+    void addSignInListener(SessionSignIn.Listener listener) {
+        signInListeners.add(listener);
+    }
+
+    /// What holds a sign-in back for a second factor; from a configurer's
+    /// init(). A chain has one.
+    void secondFactorPolicy(SecondFactorPolicy policy) {
+        if (secondFactorPolicy != null && policy != secondFactorPolicy) { //NOPMD CompareObjectsWithEquals - the object itself
+            throw new IllegalStateException("This chain already has a SecondFactorPolicy");
+        }
+        secondFactorPolicy = policy;
+    }
+
     /// Whether the chain called [#csrf], rather than having it by default.
     boolean csrfAsked() {
         return csrfAsked;
@@ -619,6 +662,18 @@ public final class HttpSecurity {
 
     void loginPage(String loginPage) {
         this.loginPage = loginPage;
+    }
+
+    private String rememberMeParameter;
+
+    /// The form field that asks to be remembered, when the chain remembers:
+    /// what the generated login page offers as a checkbox. Null otherwise.
+    String rememberMeParameter() {
+        return rememberMeParameter;
+    }
+
+    void rememberMeParameter(String rememberMeParameter) {
+        this.rememberMeParameter = rememberMeParameter;
     }
 
     /// Says that this chain sends a request that must sign in to a page it can

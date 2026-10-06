@@ -31,9 +31,12 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
     private final String processingUrl;
     private final String usernameParameter;
     private final String passwordParameter;
+    private final String rememberMeParameter;
 
     DefaultLoginPageGeneratingFilter(String loginPage, String processingUrl,
-                                     String usernameParameter, String passwordParameter) {
+                                     String usernameParameter, String passwordParameter,
+                                     String rememberMeParameter) {
+        this.rememberMeParameter = rememberMeParameter;
         this.loginPage = loginPage;
         this.processingUrl = processingUrl;
         this.usernameParameter = usernameParameter;
@@ -68,6 +71,11 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
             .append("<p><label for=\"password\">Password</label>\n<input type=\"password\" "
                 + "id=\"password\" name=\"").append(Responses.escape(passwordParameter))
             .append("\" required autocomplete=\"current-password\"></p>\n");
+        if (rememberMeParameter != null) {
+            page.append("<p><input type=\"checkbox\" id=\"remember-me\" name=\"")
+                .append(Responses.escape(rememberMeParameter))
+                .append("\"> <label for=\"remember-me\">Remember me on this computer</label></p>\n");
+        }
         if (token != null) {
             page.append("<input type=\"hidden\" name=\"")
                 .append(Responses.escape(token.getParameterName())).append("\" value=\"")

@@ -218,6 +218,19 @@ public final class AuthorizeHttpRequestsConfigurer extends SecurityConfigurer {
         }
 
         /// Only callers who did not sign in.
+        /// Signed in during this session: not recognized by a remember-me
+        /// cookie. For what should ask for the password again.
+        public AuthorizationManagerRequestMatcherRegistry fullyAuthenticated() {
+            return access(AuthenticatedAuthorizationManager
+                    .<RequestAuthorizationContext>fullyAuthenticated());
+        }
+
+        /// Recognized by a remember-me cookie, and not signed in since.
+        public AuthorizationManagerRequestMatcherRegistry rememberMe() {
+            return access(AuthenticatedAuthorizationManager
+                    .<RequestAuthorizationContext>rememberMe());
+        }
+
         public AuthorizationManagerRequestMatcherRegistry anonymous() {
             return access(AuthenticatedAuthorizationManager.<RequestAuthorizationContext>anonymous());
         }

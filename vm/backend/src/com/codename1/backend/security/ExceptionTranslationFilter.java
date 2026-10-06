@@ -93,7 +93,10 @@ public final class ExceptionTranslationFilter implements SecurityFilter {
         }
         SecurityContext context = SecurityContextHolder.peek();
         Authentication authentication = context == null ? null : context.getAuthentication();
-        if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
+        if (authentication == null || authentication instanceof AnonymousAuthenticationToken
+                || authentication instanceof RememberMeAuthenticationToken) {
+            // A remembered user too: what refused them may be asking for a
+            // sign-in made in this session, and signing in is how they get it.
             return startAuthentication(request, new InsufficientAuthenticationException(
                     "Full authentication is required to access this resource", denied));
         }

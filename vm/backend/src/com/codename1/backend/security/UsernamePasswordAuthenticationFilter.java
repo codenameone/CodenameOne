@@ -27,9 +27,10 @@ import com.codename1.backend.HttpServer;
 /// Signs a user in from the login form: a POST to the login processing URL
 /// carrying `username` and `password`.
 ///
-/// On success the session id changes, the authentication is saved for later
-/// requests, and the chain's [AuthenticationSuccessHandler] answers -- by
-/// default with a redirect to where the user was going. On failure nothing is
+/// On success the chain's [SessionSignIn] takes over: the session id changes,
+/// the authentication is saved for later requests, and the
+/// [AuthenticationSuccessHandler] answers -- by default with a redirect to
+/// where the user was going -- unless the chain asks for a second factor first. On failure nothing is
 /// kept and the [AuthenticationFailureHandler] answers.
 public final class UsernamePasswordAuthenticationFilter implements SecurityFilter {
     private final RequestMatcher loginRequest;
@@ -38,22 +39,19 @@ public final class UsernamePasswordAuthenticationFilter implements SecurityFilte
     private final AuthenticationManager authenticationManager;
     private final AuthenticationSuccessHandler successHandler;
     private final AuthenticationFailureHandler failureHandler;
-    private final SecurityContextRepository repository;
-    private final SessionAuthentication sessionAuthentication;
+    private final SessionSignIn signIn;
 
     UsernamePasswordAuthenticationFilter(RequestMatcher loginRequest, String usernameParameter,
             String passwordParameter, AuthenticationManager authenticationManager,
             AuthenticationSuccessHandler successHandler,
-            AuthenticationFailureHandler failureHandler, SecurityContextRepository repository,
-            SessionAuthentication sessionAuthentication) {
+            AuthenticationFailureHandler failureHandler, SessionSignIn signIn) {
         this.loginRequest = loginRequest;
         this.usernameParameter = usernameParameter;
         this.passwordParameter = passwordParameter;
         this.authenticationManager = authenticationManager;
         this.successHandler = successHandler;
         this.failureHandler = failureHandler;
-        this.repository = repository;
-        this.sessionAuthentication = sessionAuthentication;
+        this.signIn = signIn;
     }
 
     @Override
@@ -71,20 +69,18 @@ public final class UsernamePasswordAuthenticationFilter implements SecurityFilte
             result = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(username, password));
         } catch (AuthenticationException refused) {
-            SecurityContextHolder.clearContext();
+            signIn.failure(request);
             return failureHandler.onAuthenticationFailure(request, refused);
         }
         if (result == null) {
-            SecurityContextHolder.clearContext();
+            signIn.failure(request);
             return failureHandler.onAuthenticationFailure(request,
                     new AuthenticationServiceException("The AuthenticationManager returned no "
                             + "authentication"));
         }
-        sessionAuthentication.onAuthentication(request);
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(result);
-        SecurityContextHolder.setContext(context);
-        repository.saveContext(context, request);
-        return successHandler.onAuthenticationSuccess(request, result);
+        // The session, the context and what follows a sign-in are the chain's
+        // to do, the same way for every mechanism; and a chain that asks for a
+        // second factor holds this one back here.
+        return signIn.success(request, result, successHandler);
     }
 }
