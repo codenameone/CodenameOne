@@ -96,8 +96,21 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// implementation's job), so it refuses with
     /// [SQLiteDatabaseLockedException] -- SQLite's own answer when a busy
     /// wait runs out -- rather than silently folding the second thread's
-    /// work into the first one's transaction. A stale read of this field on
-    /// another thread is harmless: the engine then refuses the nested BEGIN.
+    /// work into the first one's transaction.
+    ///
+    /// This field is deliberately neither volatile nor guarded by a lock.
+    /// Codename One is single threaded by design (the runtime and its ports
+    /// add no memory-model fences of their own), and the owner check is a
+    /// best-effort diagnostic for apps that share one database across
+    /// threads, not the mechanism that makes such sharing safe. A stale read
+    /// on another thread has two cases. In `beginTransaction` it is
+    /// harmless: the engine refuses the second BEGIN on the one connection.
+    /// In a plain statement or query it lets that statement run on the
+    /// connection inside the open transaction -- exactly what happens with
+    /// no check at all, i.e. what this runtime did before the check
+    /// existed. An app that needs strict isolation between threads must
+    /// confine the database to one thread or serialize its own access, as
+    /// it must for every other Codename One API.
     private Thread mTransactionOwner;
 
     /// Refuses a statement or query from a thread other than the one whose

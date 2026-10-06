@@ -31,6 +31,10 @@ public class BufferedWriter extends Writer {
     private final Writer out;
     private final char[] buf;
     private int count;
+    /// Set by [#close()]. The buffer and the underlying writer are kept, so
+    /// without it a later write would land in the buffer and a second close
+    /// could hand that data to a writer whose own close is a no-op.
+    private boolean closed;
 
     public BufferedWriter(Writer out) {
         this(out, 8192);
@@ -39,6 +43,12 @@ public class BufferedWriter extends Writer {
     public BufferedWriter(Writer out, int size) {
         this.out = out;
         this.buf = new char[size];
+    }
+
+    private void ensureOpen() throws IOException {
+        if (closed) {
+            throw new IOException("Stream closed");
+        }
     }
 
     private void flushBuffer() throws IOException {
@@ -50,6 +60,7 @@ public class BufferedWriter extends Writer {
 
     @Override
     public void write(int c) throws IOException {
+        ensureOpen();
         if (count >= buf.length) {
             flushBuffer();
         }
@@ -58,6 +69,7 @@ public class BufferedWriter extends Writer {
 
     @Override
     public void write(char[] cbuf, int off, int len) throws IOException {
+        ensureOpen();
         if (len >= buf.length) {
             flushBuffer();
             out.write(cbuf, off, len);
@@ -72,6 +84,7 @@ public class BufferedWriter extends Writer {
 
     @Override
     public void write(String s, int off, int len) throws IOException {
+        ensureOpen();
         char[] c = new char[len];
         s.getChars(off, off + len, c, 0);
         write(c, 0, len);
@@ -83,13 +96,22 @@ public class BufferedWriter extends Writer {
 
     @Override
     public void flush() throws IOException {
+        ensureOpen();
         flushBuffer();
         out.flush();
     }
 
     @Override
     public void close() throws IOException {
-        flushBuffer();
-        out.close();
+        if (closed) {
+            return;
+        }
+        closed = true;
+        try {
+            flushBuffer();
+        } finally {
+            count = 0;
+            out.close();
+        }
     }
 }

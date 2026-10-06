@@ -348,6 +348,12 @@ public class File implements Comparable<File>, java.io.Serializable {
         if (!exists() || dest == null) {
             return false;
         }
+        // A file renamed onto itself is already where it was asked to be.
+        // The copy path below would open the same storage path for reading
+        // and writing, truncating it, and then delete it.
+        if (resolveDots(storagePath()).equals(resolveDots(dest.storagePath()))) {
+            return true;
+        }
         String parent = getParent();
         String destParent = dest.getParent();
         if (parent != null && parent.equals(destParent) && !dest.exists()) {

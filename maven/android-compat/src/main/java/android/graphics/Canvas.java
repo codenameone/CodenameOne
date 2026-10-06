@@ -896,10 +896,18 @@ public class Canvas {
                 if (paint.getLetterSpacing() != 0 || advance != 1) {
                     float cx = px;
                     float extra = paint.getLetterSpacing() * p.getTextSize();
-                    for (int i = 0; i < s.length(); i++) {
-                        char c = s.charAt(i);
-                        g.drawChar(c, Math.round(cx), top);
-                        cx += (f.charWidth(c) + extra) * advance;
+                    int n = s.length();
+                    for (int i = 0; i < n;) {
+                        // A surrogate pair is drawn and advanced as one
+                        // character, matching Paint.measureText.
+                        int len = Paint.charLength(s, i, n);
+                        if (len == 2) {
+                            g.drawString(s.substring(i, i + 2), Math.round(cx), top);
+                        } else {
+                            g.drawChar(s.charAt(i), Math.round(cx), top);
+                        }
+                        cx += (Paint.charAdvance(f, s, i, len) + extra) * advance;
+                        i += len;
                     }
                 } else {
                     g.drawString(s, tx, top);

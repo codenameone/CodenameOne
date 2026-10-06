@@ -411,8 +411,10 @@ public class Paint {
             // a view sized to it clipped its last letters.
             w = 0;
             float extra = letterSpacing * textSize;
-            for (int i = start; i < end; i++) {
-                w += f.charWidth(text.charAt(i)) + extra;
+            for (int i = start; i < end;) {
+                int n = charLength(text, i, end);
+                w += charAdvance(f, text, i, n) + extra;
+                i += n;
             }
         } else {
             w = f.substringWidth(text, start, end - start);
@@ -435,10 +437,31 @@ public class Paint {
     public int getTextWidths(String text, int start, int end, float[] widths) {
         Font f = cn1Font();
         float extra = letterSpacing * textSize;
-        for (int i = start; i < end; i++) {
-            widths[i - start] = (f.charWidth(text.charAt(i)) + extra) * textScaleX;
+        // A surrogate pair is one character: its advance goes on the high
+        // surrogate and the low one gets 0, as Android reports it.
+        for (int i = start; i < end;) {
+            int n = charLength(text, i, end);
+            widths[i - start] = (charAdvance(f, text, i, n) + extra) * textScaleX;
+            if (n == 2) {
+                widths[i + 1 - start] = 0;
+            }
+            i += n;
         }
         return end - start;
+    }
+
+    /// How many chars the character at `i` spans before `end`: 2 for a
+    /// surrogate pair (an emoji, say), 1 otherwise. Spaced text is measured
+    /// and drawn a character at a time, and a pair taken as two chars drew
+    /// two replacement glyphs with the spacing inside the character.
+    static int charLength(String text, int i, int end) {
+        return i + 1 < end && Character.isHighSurrogate(text.charAt(i))
+                && Character.isLowSurrogate(text.charAt(i + 1)) ? 2 : 1;
+    }
+
+    /// The advance of the `n`-char character at `i`, as [#charLength] split it.
+    static float charAdvance(Font f, String text, int i, int n) {
+        return n == 2 ? f.substringWidth(text, i, 2) : f.charWidth(text.charAt(i));
     }
 
     public void getTextBounds(String text, int start, int end, Rect bounds) {
@@ -465,22 +488,27 @@ public class Paint {
         // with what is measured and drawn.
         float extra = letterSpacing * textSize;
         if (measureForwards) {
-            for (int i = 0; i < n; i++) {
-                float cw = (f.charWidth(text.charAt(i)) + extra) * textScaleX;
+            for (int i = 0; i < n;) {
+                int len = charLength(text, i, n);
+                float cw = (charAdvance(f, text, i, len) + extra) * textScaleX;
                 if (w + cw > maxWidth) {
                     break;
                 }
                 w += cw;
-                count++;
+                count += len;
+                i += len;
             }
         } else {
-            for (int i = n - 1; i >= 0; i--) {
-                float cw = (f.charWidth(text.charAt(i)) + extra) * textScaleX;
+            for (int i = n - 1; i >= 0;) {
+                int first = i > 0 && charLength(text, i - 1, n) == 2 ? i - 1 : i;
+                int len = i - first + 1;
+                float cw = (charAdvance(f, text, first, len) + extra) * textScaleX;
                 if (w + cw > maxWidth) {
                     break;
                 }
                 w += cw;
-                count++;
+                count += len;
+                i = first - 1;
             }
         }
         if (measuredWidth != null && measuredWidth.length > 0) {
