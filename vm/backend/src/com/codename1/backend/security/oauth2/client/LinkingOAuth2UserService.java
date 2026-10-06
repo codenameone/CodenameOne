@@ -45,7 +45,9 @@ import java.util.Map;
 /// ```java
 /// LinkingOAuth2UserService linking = new LinkingOAuth2UserService(identities, users);
 /// linking.setCreateUsers(true);
-/// http.oauth2Login(oauth2 -> oauth2.accountLinking(linking));
+/// http.oauth2Login(oauth2 -> oauth2
+///         .userService(linking)
+///         .oidcUserService(linking.oidc()));
 /// ```
 ///
 /// Who the provider's user is here is decided in this order:

@@ -251,7 +251,8 @@ final class FilterChainEngine implements RequestSecurity {
     /// Whether `path` is one this layer will judge. A path written to look like
     /// one thing to a rule and another to whatever serves it is refused before
     /// either sees it: a `;` parameter, a backslash, an empty or dot segment, an
-    /// encoded slash, backslash, percent or NUL, or a control character.
+    /// encoded slash, backslash, percent, dot, semicolon or NUL, or a control
+    /// character.
     static boolean wellFormed(String path) {
         if (path.length() == 0 || path.charAt(0) != '/') {
             // OPTIONS * and a CONNECT authority match no path rule; let the

@@ -60,10 +60,10 @@ import java.util.Map;
 /// [#authorizationServer], [#apiKey], [#rateLimit], [#rememberMe], [#mfa],
 /// [#webAuthn], [#logout] and [#requestCache]. A server that only
 /// verifies tokens has no login page, no password hashing and no user store in
-/// it. The one departure from Spring Security this makes: a chain without
-/// `formLogin` has no `POST /logout` until it calls [#logout].
+/// it. This makes two departures from Spring Security. The first: a chain
+/// without `formLogin` has no `POST /logout` until it calls [#logout].
 ///
-/// A chain whose session policy is
+/// The second: a chain whose session policy is
 /// [SessionCreationPolicy#STATELESS] keeps nothing a forged request could
 /// ride on, and has no CSRF filter unless [#csrf] asks for one. One that takes
 /// HTTP Basic credentials from browsers should ask.

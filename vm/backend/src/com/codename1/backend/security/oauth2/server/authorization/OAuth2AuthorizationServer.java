@@ -1154,6 +1154,14 @@ public final class OAuth2AuthorizationServer {
             }
         }
         if (decision == null) {
+            if (session == null) {
+                // An answer that arrived with no session at all -- a user signed
+                // in by credentials on the request itself, or one whose session
+                // ended while the question was on their screen. It was discarded
+                // above like any answer without its ticket; the question it is
+                // asked instead needs somewhere to keep the new one.
+                session = request.getSession(true);
+            }
             String ticket = OAuth2Parameters.random(32);
             session.setAttribute(DEVICE_TICKET, ticket + "." + hash);
             // The question, naming who is asking: a code somebody else sent the
