@@ -79,6 +79,10 @@ public final class OAuth2ErrorCodes {
     /// The user's attributes could not be read from the identity provider.
     public static final String INVALID_USER_INFO_RESPONSE = "invalid_user_info_response";
 
+    /// A `resource` asked for is not an absolute address, or not one the
+    /// client may have tokens for (RFC 8707).
+    public static final String INVALID_TARGET = "invalid_target";
+
     private OAuth2ErrorCodes() {
     }
 }

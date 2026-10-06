@@ -74,6 +74,8 @@ class AuthorizationServerTest {
     private static final String APP_REDIRECT = "com.acme.app:/oauth2redirect";
     private static final String WEB_REDIRECT = "https://web.example.com/login/oauth2/code/own";
     private static final String FORM = "application/x-www-form-urlencoded";
+    private static final String ORDERS = "https://orders.example.com";
+    private static final String BILLING = "https://billing.example.com/v2";
 
     private static final HttpServer.Handler APP = new HttpServer.Handler() {
         @Override
@@ -112,6 +114,14 @@ class AuthorizationServerTest {
                         .scope("openid").scope("profile").scope("api")
                         .tokenSettings(TokenSettings.builder().reuseRefreshTokens(true).build())
                         .build(),
+                RegisteredClient.withId("4").clientId("orders-app")
+                        .clientSecret(OAuth2Testing.PLAIN.encode("orders-secret"))
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .redirectUri(WEB_REDIRECT).scope("openid").scope("orders:read")
+                        .resource(ORDERS).resource(BILLING).build(),
                 RegisteredClient.withId("3").clientId("service")
                         .clientSecret(OAuth2Testing.PLAIN.encode("service-secret"))
                         .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
@@ -238,6 +248,118 @@ class AuthorizationServerTest {
         }
     }
 
+    // ------------------------------------------------------------- audience
+
+    private Jwt access(SecuredServer server, Reply reply) throws Exception {
+        assertEquals(200, reply.status, reply.toString());
+        return OAuth2Testing.verify((String) json(reply).get("access_token"),
+                server.get("/oauth2/jwks").body);
+    }
+
+    @Test
+    @DisplayName("an access token is for the resource server the request named, not for the client")
+    void audienceFromTheResourceParameter() throws Exception {
+        try (SecuredServer server = start()) {
+            String verifier = OAuth2Parameters.random(32);
+            // Two resources asked for: the grant is for both.
+            Reply back = authorize(server, authorizeUrl("orders-app", WEB_REDIRECT,
+                    "openid orders:read", verifier, "s", "n") + "&" + form("resource", ORDERS,
+                    "resource", BILLING));
+            String code = query(back.header("Location")).get("code");
+            assertNotNull(code, back.toString());
+            Reply first = token(server, "grant_type", "authorization_code", "client_id",
+                    "orders-app", "client_secret", "orders-secret", "code", code, "redirect_uri",
+                    WEB_REDIRECT, "code_verifier", verifier);
+            Map tokens = json(first);
+            Jwt both = access(server, first);
+            assertEquals(Arrays.asList(ORDERS, BILLING), both.getAudience());
+            assertEquals("orders-app", both.getClaimAsString("client_id"));
+            // The ID token is the client's, as it always was.
+            assertEquals(Arrays.asList("orders-app"), OAuth2Testing.verify(
+                    (String) tokens.get("id_token"), server.get("/oauth2/jwks").body)
+                    .getAudience());
+
+            // A refresh may narrow to one of them, and no further out.
+            Reply narrowed = token(server, "grant_type", "refresh_token", "client_id",
+                    "orders-app", "client_secret", "orders-secret", "refresh_token",
+                    (String) tokens.get("refresh_token"), "resource", BILLING);
+            assertEquals(Arrays.asList(BILLING), access(server, narrowed).getAudience());
+            String next = (String) json(narrowed).get("refresh_token");
+            // Without the parameter, a refresh is for what the grant is for.
+            Reply again = token(server, "grant_type", "refresh_token", "client_id",
+                    "orders-app", "client_secret", "orders-secret", "refresh_token", next);
+            assertEquals(Arrays.asList(ORDERS, BILLING), access(server, again).getAudience());
+        }
+    }
+
+    @Test
+    @DisplayName("a resource the client or the grant does not have is refused as invalid_target")
+    void resourcesRefused() throws Exception {
+        try (SecuredServer server = start()) {
+            String verifier = OAuth2Parameters.random(32);
+            // At the authorization endpoint the refusal goes back to the client.
+            for (String bad : new String[] {"https://other.example.com", "orders",
+                ORDERS + "#frag", "/relative"}) {
+                Reply back = authorize(server, authorizeUrl("orders-app", WEB_REDIRECT,
+                        "orders:read", verifier, "s", "n") + "&" + form("resource", bad));
+                assertEquals(302, back.status, bad + " -> " + back);
+                assertEquals("invalid_target", query(back.header("Location")).get("error"),
+                        bad + " -> " + back.header("Location"));
+            }
+            // A grant made for one resource does not stretch to the other.
+            Reply back = authorize(server, authorizeUrl("orders-app", WEB_REDIRECT, "orders:read",
+                    verifier, "s", "n") + "&" + form("resource", ORDERS));
+            Reply stretched = token(server, "grant_type", "authorization_code", "client_id",
+                    "orders-app", "client_secret", "orders-secret", "code",
+                    query(back.header("Location")).get("code"), "redirect_uri", WEB_REDIRECT,
+                    "code_verifier", verifier, "resource", BILLING);
+            refused(stretched, 400, "invalid_target");
+            assertTrue(stretched.body.contains("not one the grant was made for"), stretched.body);
+
+            // client_credentials: the client's own list.
+            Reply own = token(server, "grant_type", "client_credentials", "client_id",
+                    "orders-app", "client_secret", "orders-secret", "resource", ORDERS);
+            assertEquals(Arrays.asList(ORDERS), access(server, own).getAudience());
+            Reply other = token(server, "grant_type", "client_credentials", "client_id",
+                    "orders-app", "client_secret", "orders-secret", "resource",
+                    "https://other.example.com");
+            refused(other, 400, "invalid_target");
+            assertTrue(other.body.contains("not one the client was registered with"), other.body);
+            // Asking for nothing is the default audience, whatever is registered.
+            assertEquals(Arrays.asList(issuer), access(server, token(server, "grant_type",
+                    "client_credentials", "client_id", "orders-app", "client_secret",
+                    "orders-secret")).getAudience());
+
+            // A client registered with no resources may name any that is one.
+            Reply any = server.call("POST", "/oauth2/token", form("grant_type",
+                    "client_credentials", "resource", "urn:example:reports"), FORM,
+                    "Authorization", OAuth2Testing.basic("service", "service-secret"));
+            assertEquals(Arrays.asList("urn:example:reports"), access(server, any).getAudience());
+            refused(server.call("POST", "/oauth2/token", form("grant_type", "client_credentials",
+                    "resource", "not a uri"), FORM, "Authorization",
+                    OAuth2Testing.basic("service", "service-secret")), 400, "invalid_target");
+        }
+    }
+
+    @Test
+    @DisplayName("the default audience is the issuer unless the settings or the configuration name one")
+    void defaultAudience() throws Exception {
+        try (SecuredServer server = start(as -> as.settings(AuthorizationServerSettings.builder()
+                .defaultAudience("https://api.example.com").build()))) {
+            assertEquals(Arrays.asList("https://api.example.com"), access(server,
+                    server.call("POST", "/oauth2/token", form("grant_type", "client_credentials"),
+                            FORM, "Authorization", OAuth2Testing.basic("service",
+                                    "service-secret"))).getAudience());
+        }
+        assertEquals("An audience is an absolute address with no fragment: api",
+                assertThrows(IllegalArgumentException.class, () -> AuthorizationServerSettings
+                        .builder().defaultAudience("api")).getMessage());
+        assertEquals("A resource is an absolute address with no fragment: /orders",
+                assertThrows(IllegalArgumentException.class, () -> RegisteredClient.withId("x")
+                        .clientId("x").authorizationGrantType(AuthorizationGrantType.DEVICE_CODE)
+                        .resource("/orders").build()).getMessage());
+    }
+
     // ------------------------------------------------ authorization code + PKCE
 
     @Test
@@ -283,7 +405,9 @@ class AuthorizationServerTest {
             assertEquals("RS256", access.getHeaders().get("alg"));
             assertEquals(issuer, access.getIssuer());
             assertEquals("ada", access.getSubject());
-            assertEquals(Arrays.asList("app"), access.getAudience());
+            // For the resource server -- this one, when the request named
+            // none -- and issued to the client, which is its own claim.
+            assertEquals(Arrays.asList(issuer), access.getAudience());
             assertEquals("app", access.getClaimAsString("client_id"));
             assertEquals("openid profile orders:read", access.getClaimAsString("scope"));
             assertEquals(before + 300, access.getExpiresAt().longValue());

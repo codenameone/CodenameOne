@@ -226,6 +226,7 @@ class OAuth2StoresTest {
                 .redirectUri("com.acme.app:/oauth2redirect")
                 .redirectUri("https://app.example/cb?tenant=a%20b&x=1,2")
                 .scope("openid").scope("orders:read")
+                .resource("https://orders.example/api").resource("urn:acme:billing")
                 .clientSettings(ClientSettings.builder().requireProofKey(true).build())
                 .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(120)
                         .refreshTokenTimeToLive(86400).reuseRefreshTokens(true).build())
@@ -247,6 +248,8 @@ class OAuth2StoresTest {
             assertEquals(new ArrayList<String>(app.getRedirectUris()),
                     new ArrayList<String>(read.getRedirectUris()));
             assertEquals("[openid, orders:read]", read.getScopes().toString());
+            assertEquals("[https://orders.example/api, urn:acme:billing]",
+                    read.getResources().toString());
             assertTrue(read.getClientSettings().isRequireProofKey());
             assertEquals(120, read.getTokenSettings().getAccessTokenTimeToLive());
             assertEquals(86400, read.getTokenSettings().getRefreshTokenTimeToLive());

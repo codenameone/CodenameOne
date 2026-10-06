@@ -40,6 +40,7 @@ import com.codename1.backend.security.apikey.JdbcApiKeyRepository;
 import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpEnrollment;
 import com.codename1.backend.security.mfa.TotpService;
+import com.codename1.backend.security.oauth2.server.authorization.AuthorizationServerSettings;
 import com.codename1.backend.security.oauth2.server.resource.JwtIssuerAuthenticationManagerResolver;
 import com.codename1.backend.security.ratelimit.InMemoryRateLimiter;
 import com.codename1.backend.security.ratelimit.JdbcRateLimiter;
@@ -222,6 +223,15 @@ http.csrf(csrf -> csrf.ignoringRequestMatchers(
         AntPathRequestMatcher.antMatcher("POST", "/webauthn/**"),
         AntPathRequestMatcher.antMatcher("POST", "/login/webauthn")));
 // end::backend-security-webauthn-csrf[]
+    }
+
+    public static void audience(HttpSecurity http) {
+// tag::backend-security-authserver-audience[]
+http.authorizationServer(as -> as.settings(AuthorizationServerSettings.builder()
+        .issuer("https://id.example.com")
+        .defaultAudience("https://api.example.com")
+        .build()));
+// end::backend-security-authserver-audience[]
     }
 
     public static void schema() {

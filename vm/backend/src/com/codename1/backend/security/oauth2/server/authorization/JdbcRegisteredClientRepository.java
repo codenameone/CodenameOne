@@ -82,6 +82,9 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
         settings.put("refreshTokenTimeToLive", Long.valueOf(t.getRefreshTokenTimeToLive()));
         settings.put("deviceCodeTimeToLive", Long.valueOf(t.getDeviceCodeTimeToLive()));
         settings.put("reuseRefreshTokens", Boolean.valueOf(t.isReuseRefreshTokens()));
+        if (!client.getResources().isEmpty()) {
+            settings.put("resources", new java.util.ArrayList<Object>(client.getResources()));
+        }
         Object[] values = {client.getClientId(),
             client.getClientSecret() == null ? "" : client.getClientSecret(),
             client.getClientName(), OAuth2Parameters.scopes(methods),
@@ -186,6 +189,14 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
             t.deviceCodeTimeToLive(seconds(settings, "deviceCodeTimeToLive", 300));
             t.reuseRefreshTokens(Boolean.TRUE.equals(settings.get("reuseRefreshTokens")));
             b.tokenSettings(t.build());
+            Object resources = settings.get("resources");
+            if (resources instanceof java.util.List) {
+                for (Object resource : (java.util.List) resources) {
+                    if (resource instanceof String) {
+                        b.resource((String) resource);
+                    }
+                }
+            }
         } catch (IOException malformed) {
             System.err.println("cn1: the settings of the registered client " + row.get("client_id")
                     + " cannot be read; the defaults are used");

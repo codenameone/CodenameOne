@@ -114,7 +114,18 @@ import java.io.IOException;
 ///
 /// ## Tokens and keys
 ///
-/// An access token is a JWT of type `at+jwt` (RFC 9068), an ID token carries
+/// An access token is a JWT of type `at+jwt` (RFC 9068). Its `aud` is the
+/// resource server it is for: what the request named with the `resource`
+/// parameter (RFC 8707) -- at the authorization endpoint, the device
+/// authorization endpoint or the token endpoint, where it may only narrow what
+/// the grant was made for -- or else the server's default audience, which is
+/// the issuer unless
+/// [AuthorizationServerSettings.Builder#defaultAudience] or
+/// `cn1.security.authorizationserver.audience` says otherwise. A client
+/// registered with resources may ask for those only; `invalid_target` answers
+/// anything else. The client the token was issued to is its `client_id`
+/// claim. An ID token is for the client, and its `aud` is the client id: it
+/// carries
 /// `nonce`, `auth_time`, `azp` and `at_hash`, and both are signed RS256 -- or
 /// ES256 when the signing key is a P-256 one. The keys are the application's
 /// [JwkSource] bean, or the files named by
@@ -249,6 +260,7 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
     public void configure(HttpSecurity http) {
         AuthorizationServerSettings s = settings();
         String issuer = s.getIssuer();
+        String audience = s.getDefaultAudience();
         try {
             if (issuer == null) {
                 String configured = http.getConfig().get(AuthorizationServerSettings.ISSUER);
@@ -259,6 +271,14 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
                 throw new IllegalStateException("The authorization server needs to be told its "
                         + "issuer: set " + AuthorizationServerSettings.ISSUER + " to the address "
                         + "clients reach this server at, such as https://id.example.com");
+            }
+            if (audience == null) {
+                audience = http.getConfig().get(AuthorizationServerSettings.AUDIENCE);
+                if (audience != null && !com.codename1.backend.security.oauth2.server
+                        .authorization.RegisteredClient.isResource(audience)) {
+                    throw new IllegalStateException(AuthorizationServerSettings.AUDIENCE
+                            + " must be an absolute address with no fragment: " + audience);
+                }
             }
             if (clients == null) {
                 clients = http.getSharedObject(RegisteredClientRepository.class);
@@ -300,7 +320,8 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
             throw new IllegalStateException("The authorization server could not be set up: "
                     + err.getMessage(), err);
         }
-        OAuth2AuthorizationServer server = new OAuth2AuthorizationServer(s, issuer, clients,
+        OAuth2AuthorizationServer server = new OAuth2AuthorizationServer(s, issuer, audience,
+                clients,
                 authorizations, keys, encoder, secrets, customizer, userInfo, verificationLimiter,
                 clock);
         http.addFilter(new OAuth2AuthorizationServerFilter(server),

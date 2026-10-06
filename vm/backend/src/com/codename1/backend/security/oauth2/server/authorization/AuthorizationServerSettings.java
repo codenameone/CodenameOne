@@ -38,8 +38,12 @@ package com.codename1.backend.security.oauth2.server.authorization;
 public final class AuthorizationServerSettings {
     /// The setting that holds the issuer.
     public static final String ISSUER = "cn1.security.authorizationserver.issuer";
+    /// The setting that holds the default audience; see
+    /// [Builder#defaultAudience].
+    public static final String AUDIENCE = "cn1.security.authorizationserver.audience";
 
     private final String issuer;
+    private final String defaultAudience;
     private final String authorizationEndpoint;
     private final String tokenEndpoint;
     private final String jwkSetEndpoint;
@@ -50,6 +54,7 @@ public final class AuthorizationServerSettings {
 
     private AuthorizationServerSettings(Builder b) {
         this.issuer = b.issuer;
+        this.defaultAudience = b.defaultAudience;
         this.authorizationEndpoint = b.authorizationEndpoint;
         this.tokenEndpoint = b.tokenEndpoint;
         this.jwkSetEndpoint = b.jwkSetEndpoint;
@@ -66,6 +71,12 @@ public final class AuthorizationServerSettings {
     /// The issuer, or null to read it from the configuration.
     public String getIssuer() {
         return issuer;
+    }
+
+    /// The `aud` of an access token whose request named no `resource`, or
+    /// null for the configured one, and the issuer when there is none.
+    public String getDefaultAudience() {
+        return defaultAudience;
     }
 
     /// `/oauth2/authorize` unless set.
@@ -106,6 +117,7 @@ public final class AuthorizationServerSettings {
     /// Builds an [AuthorizationServerSettings].
     public static final class Builder {
         private String issuer;
+        private String defaultAudience;
         private String authorizationEndpoint = "/oauth2/authorize";
         private String tokenEndpoint = "/oauth2/token";
         private String jwkSetEndpoint = "/oauth2/jwks";
@@ -128,6 +140,24 @@ public final class AuthorizationServerSettings {
 
         public Builder issuer(String issuer) {
             this.issuer = validIssuer(issuer);
+            return this;
+        }
+
+        /// The resource server an access token is for when the request that
+        /// had it issued named none: its `aud` (RFC 9068). Also given as
+        /// `cn1.security.authorizationserver.audience`. Unless set either
+        /// way it is the issuer, which suits a server that issues tokens for
+        /// its own API.
+        ///
+        /// A request names a resource server with the `resource` parameter
+        /// (RFC 8707), and the token is then for that one instead. Who the
+        /// token was issued to is its `client_id` claim, never its audience.
+        public Builder defaultAudience(String defaultAudience) {
+            if (!RegisteredClient.isResource(defaultAudience)) {
+                throw new IllegalArgumentException("An audience is an absolute address with "
+                        + "no fragment: " + defaultAudience);
+            }
+            this.defaultAudience = defaultAudience;
             return this;
         }
 

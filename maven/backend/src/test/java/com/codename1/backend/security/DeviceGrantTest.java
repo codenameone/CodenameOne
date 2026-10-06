@@ -95,6 +95,37 @@ class DeviceGrantTest {
         return json(reply);
     }
 
+    @Test
+    @DisplayName("a device names the resource server its tokens are for when it asks for its codes")
+    void theAudienceOfADeviceGrant() throws Exception {
+        try (SecuredServer server = start(as -> { })) {
+            Reply begun = server.call("POST", "/oauth2/device_authorization", form("client_id",
+                    "app", "scope", "profile", "resource", "https://tv.example.com/api"), FORM);
+            assertEquals(200, begun.status, begun.toString());
+            Map device = json(begun);
+            OAuth2Testing.signIn(server, "ada", "ada-pw");
+            Reply page = server.get(PAGE, "Accept", "text/html");
+            Reply question = server.post(PAGE, form("user_code", (String) device.get("user_code"),
+                    "_csrf", field(page.body, "_csrf")));
+            Reply approved = server.post(PAGE, form("user_code", field(question.body, "user_code"),
+                    "decision", "approve", "ticket", field(question.body, "ticket"), "_csrf",
+                    field(question.body, "_csrf")));
+            assertTrue(approved.body.contains("Device approved"), approved.body);
+            Reply reply = poll(server, device.get("device_code"));
+            assertEquals(200, reply.status, reply.toString());
+            Jwt access = OAuth2Testing.verify((String) json(reply).get("access_token"),
+                    server.get("/oauth2/jwks").body);
+            // Kept through the user's answer, which replaces what the grant holds.
+            assertEquals(java.util.Arrays.asList("https://tv.example.com/api"),
+                    access.getAudience());
+            assertEquals("app", access.getClaimAsString("client_id"));
+
+            Reply bad = server.call("POST", "/oauth2/device_authorization", form("client_id",
+                    "app", "resource", "tv"), FORM);
+            refused(bad, "invalid_target");
+        }
+    }
+
     private static Reply poll(SecuredServer server, Object deviceCode) throws Exception {
         return server.call("POST", "/oauth2/token", form("grant_type", GRANT, "client_id", "app",
                 "device_code", (String) deviceCode), FORM);

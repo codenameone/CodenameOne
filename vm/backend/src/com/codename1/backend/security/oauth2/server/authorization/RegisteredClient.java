@@ -57,6 +57,7 @@ public final class RegisteredClient {
     private final Set<AuthorizationGrantType> authorizationGrantTypes;
     private final Set<String> redirectUris;
     private final Set<String> scopes;
+    private final Set<String> resources;
     private final ClientSettings clientSettings;
     private final TokenSettings tokenSettings;
 
@@ -71,6 +72,7 @@ public final class RegisteredClient {
                 new LinkedHashSet<AuthorizationGrantType>(b.grants));
         this.redirectUris = Collections.unmodifiableSet(new LinkedHashSet<String>(b.redirectUris));
         this.scopes = Collections.unmodifiableSet(new LinkedHashSet<String>(b.scopes));
+        this.resources = Collections.unmodifiableSet(new LinkedHashSet<String>(b.resources));
         this.clientSettings = b.clientSettings;
         this.tokenSettings = b.tokenSettings;
     }
@@ -115,6 +117,13 @@ public final class RegisteredClient {
         return scopes;
     }
 
+    /// The resource servers the client may ask for tokens for, each by the
+    /// address it is named with in a token's `aud`; empty when the client was
+    /// registered with none, and may then name any. See [Builder#resource].
+    public Set<String> getResources() {
+        return resources;
+    }
+
     public ClientSettings getClientSettings() {
         return clientSettings;
     }
@@ -134,6 +143,30 @@ public final class RegisteredClient {
         return "RegisteredClient[" + id + ", clientId=" + clientId + "]";
     }
 
+    /// Whether `resource` can name a resource server: an absolute URI with no
+    /// fragment, as RFC 8707 section 2 requires of the parameter.
+    public static boolean isResource(String resource) {
+        if (resource == null || resource.length() > 2048 || resource.indexOf('#') >= 0) {
+            return false;
+        }
+        int colon = resource.indexOf(':');
+        if (colon <= 0 || colon == resource.length() - 1) {
+            return false;
+        }
+        for (int iter = 0 ; iter < resource.length() ; iter++) {
+            char c = resource.charAt(iter);
+            if (c <= 0x20 || c >= 0x7f || c == '"' || c == '\\') {
+                return false;
+            }
+            if (iter < colon && !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (iter > 0 && ((c >= '0' && c <= '9') || c == '+' || c == '-'
+                    || c == '.')))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Builds a [RegisteredClient].
     public static final class Builder {
         private final String id;
@@ -146,6 +179,7 @@ public final class RegisteredClient {
                 new LinkedHashSet<AuthorizationGrantType>();
         private final Set<String> redirectUris = new LinkedHashSet<String>();
         private final Set<String> scopes = new LinkedHashSet<String>();
+        private final Set<String> resources = new LinkedHashSet<String>();
         private ClientSettings clientSettings = ClientSettings.builder().build();
         private TokenSettings tokenSettings = TokenSettings.builder().build();
 
@@ -193,6 +227,22 @@ public final class RegisteredClient {
             return this;
         }
 
+        /// A resource server this client may ask for tokens for, named as the
+        /// client names it in the `resource` parameter of a request (RFC
+        /// 8707): an absolute address with no fragment, compared whole.
+        ///
+        /// An access token's `aud` is what the request asked for with
+        /// `resource`, or the server's default audience when it asked for
+        /// nothing; see [AuthorizationServerSettings.Builder#defaultAudience].
+        /// A client registered with resources is refused any other with
+        /// `invalid_target`. One registered with none may name any: the
+        /// audience limits where a token is accepted, and a client that could
+        /// not be trusted to choose it should be given a list.
+        public Builder resource(String resource) {
+            this.resources.add(resource);
+            return this;
+        }
+
         public Builder clientSettings(ClientSettings clientSettings) {
             this.clientSettings = clientSettings;
             return this;
@@ -236,6 +286,12 @@ public final class RegisteredClient {
                         || uri.indexOf('*') >= 0 || uri.indexOf(' ') >= 0) {
                     throw new IllegalArgumentException("A redirect address is a whole address "
                             + "with no fragment and no wildcard: " + uri);
+                }
+            }
+            for (String resource : resources) {
+                if (!isResource(resource)) {
+                    throw new IllegalArgumentException("A resource is an absolute address "
+                            + "with no fragment: " + resource);
                 }
             }
             for (String scope : scopes) {

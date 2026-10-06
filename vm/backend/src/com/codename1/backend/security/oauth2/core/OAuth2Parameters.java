@@ -25,9 +25,11 @@ package com.codename1.backend.security.oauth2.core;
 import com.codename1.backend.Base64Url;
 import com.codename1.backend.Crypto;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -121,6 +123,36 @@ public final class OAuth2Parameters {
                 String value = eq < 0 || eq > end ? "" : decode(form.substring(eq + 1, end));
                 if (name != null && value != null && !out.containsKey(name)) {
                     out.put(name, value);
+                }
+            }
+            if (amp < 0) {
+                break;
+            }
+            start = amp + 1;
+        }
+        return out;
+    }
+
+    /// Every value the field `name` has in a form or a query, in order: for a
+    /// parameter that may be sent more than once, as `resource` may. A value
+    /// that does not decode is left out.
+    public static List<String> values(String form, String name) {
+        List<String> out = new ArrayList<String>();
+        if (form == null || name == null) {
+            return out;
+        }
+        int start = 0;
+        while (start <= form.length()) {
+            int amp = form.indexOf('&', start);
+            int end = amp < 0 ? form.length() : amp;
+            if (end > start) {
+                int eq = form.indexOf('=', start);
+                String field = decode(form.substring(start, eq < 0 || eq > end ? end : eq));
+                if (name.equals(field)) {
+                    String value = eq < 0 || eq > end ? "" : decode(form.substring(eq + 1, end));
+                    if (value != null) {
+                        out.add(value);
+                    }
                 }
             }
             if (amp < 0) {

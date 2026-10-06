@@ -74,9 +74,12 @@ public final class OAuth2AuthorizationServer {
     private static final long REUSE_GRACE_MILLIS = 10000;
     private static final String AUTH_TIME = "cn1.security.oauth2.authTime";
     private static final String DEVICE_TICKET = "cn1.security.oauth2.deviceTicket";
+    /// The attribute of a grant that holds the resource servers it is for.
+    private static final String RESOURCE = "resource";
 
     private final AuthorizationServerSettings settings;
     private final String fixedIssuer;
+    private final String defaultAudience;
     private final RegisteredClientRepository clients;
     private final OAuth2AuthorizationService authorizations;
     private final JwkSource keys;
@@ -93,12 +96,14 @@ public final class OAuth2AuthorizationServer {
 
     /// @param fixedIssuer the issuer, or null to read it off each request: a
     /// development profile only
+    /// @param defaultAudience the `aud` of an access token whose request named
+    /// no `resource`; null for the issuer
     /// @param secrets what client secrets were encoded with; null when no
     /// client has one
     /// @param verificationLimiter what bounds wrong user codes; null to count
     /// in this process
     public OAuth2AuthorizationServer(AuthorizationServerSettings settings, String fixedIssuer,
-            RegisteredClientRepository clients, OAuth2AuthorizationService authorizations,
+            String defaultAudience, RegisteredClientRepository clients, OAuth2AuthorizationService authorizations,
             JwkSource keys, JwtEncoder encoder, PasswordEncoder secrets,
             OAuth2TokenCustomizer customizer, OidcUserInfoMapper userInfo,
             RateLimiter verificationLimiter, Clock clock) {
@@ -109,6 +114,8 @@ public final class OAuth2AuthorizationServer {
         }
         this.settings = settings;
         this.fixedIssuer = fixedIssuer;
+        this.defaultAudience = defaultAudience != null ? defaultAudience
+                : settings.getDefaultAudience();
         this.clients = clients;
         this.authorizations = authorizations;
         this.keys = keys;
@@ -386,6 +393,13 @@ public final class OAuth2AuthorizationServer {
             return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.INVALID_SCOPE,
                     "A scope asked for is not one the client was registered with");
         }
+        List<String> resources;
+        try {
+            resources = resources(client, OAuth2Parameters.values(query(request), "resource"));
+        } catch (Refusal target) {
+            return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.INVALID_TARGET,
+                    target.description);
+        }
         String challenge = request.queryParam("code_challenge");
         String challengeMethod = request.queryParam("code_challenge_method");
         if (challenge == null) {
@@ -425,6 +439,9 @@ public final class OAuth2AuthorizationServer {
         }
         attributes.put("auth_time", Long.valueOf(authTime(request, now)));
         attributes.put("authorities", authorities(authentication));
+        if (!resources.isEmpty()) {
+            attributes.put(RESOURCE, new ArrayList<Object>(resources));
+        }
         TokenSettings tokens = client.getTokenSettings();
         long codeExpires = now + tokens.getAuthorizationCodeTimeToLive() * 1000L;
         OAuth2Authorization authorization = new OAuth2Authorization(OAuth2Parameters.random(16),
@@ -735,7 +752,7 @@ public final class OAuth2AuthorizationServer {
         }
         scopes.remove("openid");
         return issue(request, client, null, client.getClientId(), "client_credentials", scopes,
-                now, null);
+                now, null, resources(client, OAuth2Parameters.values(form(request), RESOURCE)));
     }
 
     /// Signs what a grant yields and answers with it.
@@ -746,6 +763,79 @@ public final class OAuth2AuthorizationServer {
     private Map<String, Object> issue(HttpServer.Request request, RegisteredClient client,
             OAuth2Authorization authorization, String principal, String grantType,
             Set<String> scopes, long now, String keptRefreshToken) {
+        return issue(request, client, authorization, principal, grantType, scopes, now,
+                keptRefreshToken, granted(request, client, authorization));
+    }
+
+    /// The resource servers a token issued under `authorization` is for: what
+    /// this request to the token endpoint names, which must be among those
+    /// the grant was made for when it was made for any (RFC 8707 section
+    /// 2.2); otherwise the grant's own. Empty for the default audience.
+    private List<String> granted(HttpServer.Request request, RegisteredClient client,
+                                 OAuth2Authorization authorization) {
+        List<String> of = new ArrayList<String>();
+        Object kept = authorization.getAttribute(RESOURCE);
+        if (kept instanceof List) {
+            for (Object one : (List) kept) {
+                if (one instanceof String) {
+                    of.add((String) one);
+                }
+            }
+        }
+        List<String> asked = resources(client, OAuth2Parameters.values(form(request), RESOURCE));
+        if (asked.isEmpty()) {
+            return of;
+        }
+        if (!of.isEmpty() && !of.containsAll(asked)) {
+            throw new Refusal(400, OAuth2ErrorCodes.INVALID_TARGET,
+                    "A resource asked for is not one the grant was made for");
+        }
+        return asked;
+    }
+
+    /// `asked`, checked: each an absolute address with no fragment, and one
+    /// the client was registered with when it was registered with any.
+    private static List<String> resources(RegisteredClient client, List<String> asked) {
+        List<String> out = new ArrayList<String>();
+        for (String resource : asked) {
+            if (!RegisteredClient.isResource(resource)) {
+                throw new Refusal(400, OAuth2ErrorCodes.INVALID_TARGET,
+                        "A resource is an absolute address with no fragment");
+            }
+            if (!client.getResources().isEmpty() && !client.getResources().contains(resource)) {
+                throw new Refusal(400, OAuth2ErrorCodes.INVALID_TARGET,
+                        "A resource asked for is not one the client was registered with");
+            }
+            if (!out.contains(resource)) {
+                out.add(resource);
+            }
+        }
+        return out;
+    }
+
+    /// The request's query, without the `?`; empty when it has none.
+    private static String query(HttpServer.Request request) {
+        String target = request.getTarget();
+        int mark = target == null ? -1 : target.indexOf('?');
+        return mark < 0 ? "" : target.substring(mark + 1);
+    }
+
+    /// The request's form body; empty when it sent another kind.
+    private static String form(HttpServer.Request request) {
+        String type = request.getHeader("Content-Type");
+        if (type == null || !type.trim().regionMatches(true, 0,
+                "application/x-www-form-urlencoded", 0, 33)) {
+            return "";
+        }
+        String body = request.getBody();
+        return body == null ? "" : body;
+    }
+
+    /// @param resources the resource servers the access token is for; empty
+    /// for the default audience
+    private Map<String, Object> issue(HttpServer.Request request, RegisteredClient client,
+            OAuth2Authorization authorization, String principal, String grantType,
+            Set<String> scopes, long now, String keptRefreshToken, List<String> resources) {
         String issuer = issuer(request);
         TokenSettings settings = client.getTokenSettings();
         long nowSeconds = now / 1000L;
@@ -765,8 +855,16 @@ public final class OAuth2AuthorizationServer {
         // info and revocation endpoints find the grant a token was issued under.
         String jti = (authorization == null ? "" : authorization.getId() + ".")
                 + OAuth2Parameters.random(12);
+        // Who the token is for is the resource server (RFC 9068 section 3):
+        // what the request named, or this server's default. Who it was issued
+        // to is the client_id claim. An ID token, below, is the other way
+        // round -- it is for the client.
+        List<String> audience = new ArrayList<String>(resources);
+        if (audience.isEmpty()) {
+            audience.add(defaultAudience != null ? defaultAudience : issuer);
+        }
         JwtClaimsSet.Builder access = JwtClaimsSet.builder().issuer(issuer).subject(principal)
-                .audience(client.getClientId()).issuedAt(nowSeconds).notBefore(nowSeconds)
+                .audience(audience).issuedAt(nowSeconds).notBefore(nowSeconds)
                 .expiresAt(nowSeconds + settings.getAccessTokenTimeToLive()).id(jti)
                 .claim("client_id", client.getClientId());
         if (!scopes.isEmpty()) {
@@ -962,13 +1060,20 @@ public final class OAuth2AuthorizationServer {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_SCOPE,
                     "A scope asked for is not one the client was registered with");
         }
+        List<String> resources = resources(client,
+                OAuth2Parameters.values(form(request), RESOURCE));
+        Map<String, Object> asked = null;
+        if (!resources.isEmpty()) {
+            asked = new LinkedHashMap<String, Object>();
+            asked.put(RESOURCE, new ArrayList<Object>(resources));
+        }
         long now = clock.currentTimeMillis();
         purge(now);
         long ttl = client.getTokenSettings().getDeviceCodeTimeToLive();
         long expires = now + ttl * 1000L;
         OAuth2Authorization authorization = new OAuth2Authorization(OAuth2Parameters.random(16),
                 client.getId(), "", AuthorizationGrantType.DEVICE_CODE.getValue(), scopes,
-                OAuth2Authorization.PENDING, null, now, expires);
+                OAuth2Authorization.PENDING, asked, now, expires);
         authorizations.save(authorization);
         String deviceCode = OAuth2Parameters.random(32);
         String userCode = newUserCode();
@@ -1196,6 +1301,11 @@ public final class OAuth2AuthorizationServer {
         Map<String, Object> attributes = new LinkedHashMap<String, Object>();
         attributes.put("auth_time", Long.valueOf(authTime(request, now)));
         attributes.put("authorities", authorities(authentication));
+        Object resource = authorization.getAttribute(RESOURCE);
+        if (resource != null) {
+            // What the device asked the tokens to be for is part of the grant.
+            attributes.put(RESOURCE, resource);
+        }
         if (!authorizations.decide(authorization.getId(), approve, who, attributes)) {
             return page(200, codeForm(action, hidden, "",
                     "That code is not valid, or has expired. Check the device and try again."));

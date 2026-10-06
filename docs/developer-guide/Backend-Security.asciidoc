@@ -947,11 +947,32 @@ include::../demos/common/src/main/snippets/developer-guide/backend-security.txt[
 ----
 
 `sub` is the user's name, or the client's id for the client credentials grant.
-`aud` is the client's id, so that's the value a resource server lists in its
-`audiences`. `scope` becomes the `SCOPE_` authorities that
-<<backend-security-resource-server>> describes.
+`client_id` is the client the token was issued to. `scope` becomes the
+`SCOPE_` authorities that <<backend-security-resource-server>> describes.
 
-An ID token also carries `nonce`, `auth_time`, `azp` and `at_hash`. Without a
+`aud` is the resource server the token is for, and it's the value that
+resource server lists in its `audiences`. A client names the resource server
+with the `resource` parameter of its request, at the authorization endpoint,
+the device authorization endpoint, or the token endpoint. A request can carry
+the parameter more than once, and `aud` is then a list. At the token endpoint
+the parameter can only narrow what the grant was made for.
+
+A request that names no resource gets the default audience. That's the issuer,
+unless `defaultAudience` on the settings or
+`cn1.security.authorizationserver.audience` names another:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-authserver-audience,indent=0]
+----
+
+A client registered with `resource(...)` can ask for those resources and no
+others. Anything else is answered `invalid_target`. A client registered with
+none can name any resource, so give a client a list when it shouldn't choose.
+
+An ID token is for the client, so its `aud` is the client's id.
+
+It also carries `nonce`, `auth_time`, `azp` and `at_hash`. Without a
 `userInfoMapper`, the `profile` scope yields `preferred_username` and the
 `email` scope yields nothing, because the server doesn't know that a username
 is an address.
@@ -1425,6 +1446,10 @@ That keeps the binary small, and it has consequences you can see:
 | `cn1.security.authorizationserver.issuer`
 | The address clients reach the authorization server at. Required outside a
   development profile.
+
+| `cn1.security.authorizationserver.audience`
+| The `aud` of an access token whose request named no `resource`. The issuer
+  unless set.
 
 | `cn1.security.authorizationserver.jwk.keys`
 | The PEM files of the signing keys, the signing one first. Required outside a

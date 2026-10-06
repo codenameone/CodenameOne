@@ -36,7 +36,7 @@ the annotations.
 {
   "iss": "https://id.example.com",
   "sub": "ada",
-  "aud": "acme-app",
+  "aud": "https://api.example.com",
   "client_id": "acme-app",
   "scope": "openid profile orders:read",
   "iat": 1767225600,
