@@ -53,7 +53,10 @@ import java.util.Map;
 /// (`client_secret_basic`, `client_secret_post`, `none`), `scope`,
 /// `redirect-uri`, `client-name`, `response-mode` and `provider`. Under a
 /// provider: `issuer-uri`, `authorization-uri`, `token-uri`, `user-info-uri`,
-/// `jwk-set-uri`, `user-name-attribute`.
+/// `jwk-set-uri`, `user-name-attribute`, and
+/// `authorization-response-iss-parameter-supported` (`true` for a provider
+/// whose endpoints are named here and that sends `iss` with its answers; one
+/// read from its issuer's metadata says so itself).
 ///
 /// Sign in with Apple is declared in code, as a
 /// [ClientRegistrationRepository] bean, because its secret is a token signed
@@ -147,6 +150,10 @@ public final class ClientRegistrations {
         if (value != null) {
             b.userNameAttributeName(value);
         }
+        value = config.get(provider + "authorization-response-iss-parameter-supported");
+        if (value != null) {
+            b.authorizationResponseIssParameterSupported("true".equals(value.trim()));
+        }
         return b.build();
     }
 
@@ -193,6 +200,9 @@ public final class ClientRegistrations {
         }
         if (p.getUserInfoUri() == null) {
             b.userInfoUri(text(metadata, "userinfo_endpoint"));
+        }
+        if (Boolean.TRUE.equals(metadata.get("authorization_response_iss_parameter_supported"))) {
+            b.authorizationResponseIssParameterSupported(true);
         }
         if (p.getIdTokenAlgorithms() == null) {
             Object listed = metadata.get("id_token_signing_alg_values_supported");

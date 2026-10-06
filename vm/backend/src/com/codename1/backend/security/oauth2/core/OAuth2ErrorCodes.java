@@ -73,6 +73,9 @@ public final class OAuth2ErrorCodes {
     public static final String INVALID_ID_TOKEN = "invalid_id_token";
     /// The `nonce` of the ID token is not the one that was sent.
     public static final String INVALID_NONCE = "invalid_nonce";
+    /// The answer a browser came back with names another issuer than the
+    /// provider it was sent to, or none where the provider always names one.
+    public static final String INVALID_ISSUER = "invalid_issuer";
     /// The user's attributes could not be read from the identity provider.
     public static final String INVALID_USER_INFO_RESPONSE = "invalid_user_info_response";
 

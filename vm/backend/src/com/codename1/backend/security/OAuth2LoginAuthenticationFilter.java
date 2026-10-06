@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security;
 
+import com.codename1.backend.Base64Url;
+import com.codename1.backend.Crypto;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.security.oauth2.client.AuthorizationRequestRepository;
 import com.codename1.backend.security.oauth2.client.ClientRegistration;
@@ -137,12 +139,15 @@ public final class OAuth2LoginAuthenticationFilter implements SecurityFilter {
             throw refused(OAuth2ErrorCodes.INVALID_REQUEST,
                     "The answer did not arrive the way the registration asks for it");
         }
+        registration = resolved(registration);
+        // Before the error as much as before the code: an answer from another
+        // issuer is not this provider refusing anything.
+        answeredBy(registration, Responses.param(request, "iss"));
         if (error != null) {
             // The code, and nothing else the provider wrote beside it.
             throw refused(DefaultAuthorizationCodeTokenResponseClient.sanitizeErrorCode(error),
                     "The provider refused the sign-in");
         }
-        registration = resolved(registration);
         OAuth2AccessTokenResponse tokens = tokenClient.getTokenResponse(registration, sent, code);
         OAuth2User user;
         if (registration.getScopes().contains("openid")) {
@@ -187,6 +192,60 @@ public final class OAuth2LoginAuthenticationFilter implements SecurityFilter {
         return complete;
     }
 
+    /// Holds the answer to the provider the browser was sent to (RFC 9207). A
+    /// client registered with several providers is otherwise open to one of
+    /// them answering a sign-in that was started at another, and having its
+    /// code sent to the wrong token endpoint.
+    ///
+    /// An `iss` that is there must be the registration's issuer. One that is
+    /// missing is refused when the provider says it always sends it. A
+    /// registration that names no issuer has nothing to hold an `iss` to, and
+    /// it is ignored.
+    private static void answeredBy(ClientRegistration registration, String iss) {
+        ClientRegistration.ProviderDetails p = registration.getProviderDetails();
+        if (iss == null) {
+            if (p.isAuthorizationResponseIssParameterSupported()) {
+                throw refused(OAuth2ErrorCodes.INVALID_ISSUER, "The provider names itself in "
+                        + "every answer, and this one has no iss");
+            }
+            return;
+        }
+        if (p.getIssuerUri() == null && p.getIssuerTemplate() == null) {
+            return;
+        }
+        if (!p.isIssuer(iss)) {
+            throw refused(OAuth2ErrorCodes.INVALID_ISSUER, "The answer is from another issuer "
+                    + "than the provider this sign-in was sent to");
+        }
+    }
+
+    /// Holds an ID token's `at_hash`, when it has one, to the access token it
+    /// came with: the left half of the token's hash under the digest of the
+    /// algorithm that signed the ID token. An access token swapped for
+    /// another on the way has another hash.
+    private static void accessTokenHash(Jwt idToken, String accessToken) {
+        if (!idToken.hasClaim("at_hash")) {
+            return;
+        }
+        Object claimed = idToken.getClaim("at_hash");
+        Object alg = idToken.getHeaders().get("alg");
+        String expected = null;
+        if (accessToken != null && alg instanceof String) {
+            byte[] token = OAuth2Parameters.utf8(accessToken);
+            String name = (String) alg;
+            byte[] digest = name.endsWith("384") ? Crypto.sha384(token)
+                    : name.endsWith("512") ? Crypto.sha512(token) : Crypto.sha256(token);
+            byte[] half = new byte[digest.length / 2];
+            System.arraycopy(digest, 0, half, 0, half.length);
+            expected = Base64Url.encode(half);
+        }
+        if (expected == null || !(claimed instanceof String)
+                || !OAuth2Parameters.equalsConstantTime(expected, (String) claimed)) {
+            throw refused(OAuth2ErrorCodes.INVALID_ID_TOKEN, "The at_hash of the ID token is "
+                    + "not the hash of the access token it came with");
+        }
+    }
+
     private Jwt idToken(ClientRegistration registration, OAuth2AuthorizationRequest sent,
                         OAuth2AccessTokenResponse tokens) {
         String encoded = tokens.getIdToken();
@@ -210,6 +269,7 @@ public final class OAuth2LoginAuthenticationFilter implements SecurityFilter {
             throw refused(OAuth2ErrorCodes.INVALID_NONCE,
                     "The nonce of the ID token is not the one that was sent");
         }
+        accessTokenHash(idToken, tokens.getAccessToken());
         return idToken;
     }
 

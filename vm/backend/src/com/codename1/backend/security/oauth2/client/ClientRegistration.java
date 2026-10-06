@@ -115,6 +115,7 @@ public final class ClientRegistration {
         b.issuerUri = p.issuerUri;
         b.issuerTemplate = p.issuerTemplate;
         b.idTokenAlgorithms = p.idTokenAlgorithms;
+        b.issParameterSupported = p.issParameterSupported;
         return b;
     }
 
@@ -185,6 +186,7 @@ public final class ClientRegistration {
         private final String issuerUri;
         private final String issuerTemplate;
         private final String[] idTokenAlgorithms;
+        private final boolean issParameterSupported;
 
         ProviderDetails(Builder b) {
             this.authorizationUri = b.authorizationUri;
@@ -195,6 +197,7 @@ public final class ClientRegistration {
             this.issuerUri = b.issuerUri;
             this.issuerTemplate = b.issuerTemplate;
             this.idTokenAlgorithms = b.idTokenAlgorithms;
+            this.issParameterSupported = b.issParameterSupported;
         }
 
         public String getAuthorizationUri() {
@@ -237,6 +240,58 @@ public final class ClientRegistration {
         public String[] getIdTokenAlgorithms() {
             return idTokenAlgorithms == null ? null : idTokenAlgorithms.clone();
         }
+
+        /// Whether the provider says it names itself in every answer it sends
+        /// back with the browser: the `iss` parameter of RFC 9207, announced in
+        /// its metadata as `authorization_response_iss_parameter_supported`.
+        /// An answer without one is then refused.
+        public boolean isAuthorizationResponseIssParameterSupported() {
+            return issParameterSupported;
+        }
+
+        /// Whether `issuer` is this provider: its [#getIssuerUri], character
+        /// for character, or for a provider with one issuer per tenant its
+        /// [#getIssuerTemplate] with a tenant id where `{tenantid}` is. False
+        /// when the registration names no issuer at all.
+        public boolean isIssuer(String issuer) {
+            if (issuer == null) {
+                return false;
+            }
+            if (issuerUri != null) {
+                return issuerUri.equals(issuer);
+            }
+            if (issuerTemplate == null) {
+                return false;
+            }
+            int at = issuerTemplate.indexOf("{tenantid}");
+            if (at < 0) {
+                return issuerTemplate.equals(issuer);
+            }
+            String before = issuerTemplate.substring(0, at);
+            String after = issuerTemplate.substring(at + "{tenantid}".length());
+            if (issuer.length() <= before.length() + after.length()
+                    || !issuer.startsWith(before) || !issuer.endsWith(after)) {
+                return false;
+            }
+            return isTenant(issuer.substring(before.length(),
+                    issuer.length() - after.length()));
+        }
+
+        /// A tenant id is a GUID: letters, digits and dashes, so that what an
+        /// answer says of itself cannot write another host into the issuer.
+        static boolean isTenant(String tenant) {
+            if (tenant == null || tenant.length() == 0 || tenant.length() > 64) {
+                return false;
+            }
+            for (int iter = 0 ; iter < tenant.length() ; iter++) {
+                char c = tenant.charAt(iter);
+                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                        || c == '-')) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     /// Builds a [ClientRegistration].
@@ -258,6 +313,7 @@ public final class ClientRegistration {
         private String issuerUri;
         private String issuerTemplate;
         private String[] idTokenAlgorithms;
+        private boolean issParameterSupported;
 
         Builder(String registrationId) {
             if (registrationId == null || registrationId.length() == 0) {
@@ -365,6 +421,14 @@ public final class ClientRegistration {
         /// See [ProviderDetails#getIssuerTemplate].
         public Builder issuerTemplate(String issuerTemplate) {
             this.issuerTemplate = issuerTemplate;
+            return this;
+        }
+
+        /// See [ProviderDetails#isAuthorizationResponseIssParameterSupported].
+        /// Read from the issuer's metadata when the registration's endpoints
+        /// are; a registration that names its endpoints itself says so here.
+        public Builder authorizationResponseIssParameterSupported(boolean supported) {
+            this.issParameterSupported = supported;
             return this;
         }
 

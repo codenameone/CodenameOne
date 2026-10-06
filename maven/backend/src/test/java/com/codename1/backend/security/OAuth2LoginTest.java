@@ -362,12 +362,14 @@ class OAuth2LoginTest {
             Side app = new Side(server);
             String state = query(app.get("/oauth2/authorization/own").header("Location"))
                     .get("state");
+            // This provider names itself in every answer, a refusal included.
+            String iss = "&iss=" + OAuth2Parameters.encode(issuer);
             Reply denied = app.get("/login/oauth2/code/own?error=access_denied&error_description="
-                    + "%3Cscript%3Ealert(1)%3C/script%3E&state=" + state);
+                    + "%3Cscript%3Ealert(1)%3C/script%3E&state=" + state + iss);
             assertEquals("/login?error", denied.header("Location"));
             state = query(app.get("/oauth2/authorization/own").header("Location")).get("state");
             // Not a code at all: what arrives is not repeated anywhere.
-            app.get("/login/oauth2/code/own?error=%3Cscript%3E&state=" + state);
+            app.get("/login/oauth2/code/own?error=%3Cscript%3E&state=" + state + iss);
             assertEquals(Arrays.asList("access_denied", "invalid_request"), failures);
             assertFalse(app.get("/login?error").body.contains("script"));
 
@@ -375,7 +377,7 @@ class OAuth2LoginTest {
             // its reason stays on this side.
             state = query(app.get("/oauth2/authorization/own").header("Location")).get("state");
             app.get("/login/oauth2/code/own?code=" + OAuth2Parameters.random(32) + "&state="
-                    + state);
+                    + state + iss);
             assertEquals("invalid_grant", failures.get(2));
         }
     }
@@ -823,5 +825,163 @@ class OAuth2LoginTest {
                 new InMemoryClientRegistrationRepository(ClientRegistration
                         .withRegistrationId("x").clientId("c").authorizationUri("https://a/b")
                         .tokenUri("https://a/c").build())));
+    }
+
+    // ------------------------------- the issuer of an answer, and at_hash
+
+    @Test
+    @DisplayName("an answer is held to the issuer the browser was sent to (RFC 9207)")
+    void authorizationResponseIssuer() throws Exception {
+        try (Stub provider = stubServer() ; SecuredServer app = stubApp(
+                stubRegistration("says").issuerUri("https://stub.example").scope("openid")
+                        .authorizationResponseIssParameterSupported(true).build(),
+                stubRegistration("silent").issuerUri("https://stub.example").scope("openid")
+                        .build(),
+                stubRegistration("hub").userInfoUri(stubUrl + "/user")
+                        .userNameAttributeName("id").scope("read:user").build())) {
+            String right = "&iss=" + OAuth2Parameters.encode("https://stub.example");
+            String wrong = "&iss=" + OAuth2Parameters.encode("https://evil.example");
+
+            // A provider that says it names itself: the right name signs in.
+            Map<String, String> sent = begin(app, "says");
+            answerWith(sign(idClaims(sent.get("nonce")).build()));
+            Reply good = app.get("/login/oauth2/code/says?code=c&state=" + sent.get("state")
+                    + right);
+            assertEquals("/", good.header("Location"), good.toString() + failures);
+            int exchanges = stub.tokenRequests.size();
+
+            // No name, another name, and a name that only starts like it.
+            for (String iss : new String[] {"", wrong,
+                "&iss=" + OAuth2Parameters.encode("https://stub.example/"),
+                "&iss=" + OAuth2Parameters.encode("https://stub.example.evil.example")}) {
+                failures.clear();
+                sent = begin(app, "says");
+                answerWith(sign(idClaims(sent.get("nonce")).build()));
+                Reply reply = app.get("/login/oauth2/code/says?code=c&state="
+                        + sent.get("state") + iss);
+                assertEquals("/login?error", reply.header("Location"), iss);
+                assertEquals(Arrays.asList("invalid_issuer"), failures, iss);
+            }
+            // Refused before the code went anywhere.
+            assertEquals(exchanges, stub.tokenRequests.size());
+
+            // An error from another issuer is not this provider's refusal.
+            failures.clear();
+            sent = begin(app, "says");
+            app.get("/login/oauth2/code/says?error=access_denied&state=" + sent.get("state")
+                    + wrong);
+            sent = begin(app, "says");
+            app.get("/login/oauth2/code/says?error=access_denied&state=" + sent.get("state")
+                    + right);
+            assertEquals(Arrays.asList("invalid_issuer", "access_denied"), failures);
+
+            // A provider that does not say so may leave the name out, and is
+            // held to it when it sends one.
+            failures.clear();
+            sent = begin(app, "silent");
+            answerWith(sign(idClaims(sent.get("nonce")).build()));
+            assertEquals("/", app.get("/login/oauth2/code/silent?code=c&state="
+                    + sent.get("state")).header("Location"), failures.toString());
+            sent = begin(app, "silent");
+            answerWith(sign(idClaims(sent.get("nonce")).build()));
+            assertEquals("/", app.get("/login/oauth2/code/silent?code=c&state="
+                    + sent.get("state") + right).header("Location"), failures.toString());
+            sent = begin(app, "silent");
+            answerWith(sign(idClaims(sent.get("nonce")).build()));
+            assertEquals("/login?error", app.get("/login/oauth2/code/silent?code=c&state="
+                    + sent.get("state") + wrong).header("Location"));
+            assertEquals(Arrays.asList("invalid_issuer"), failures);
+
+            // A registration that names no issuer has nothing to hold one to.
+            failures.clear();
+            sent = begin(app, "hub");
+            stub.tokenAnswer = "access_token=stub-access&scope=read%3Auser&token_type=bearer";
+            stub.userAnswer = "{\"id\":583231}";
+            assertEquals("/", app.get("/login/oauth2/code/hub?code=c&state=" + sent.get("state")
+                    + wrong).header("Location"), failures.toString());
+        }
+    }
+
+    @Test
+    @DisplayName("our own provider says it names itself, and an answer without the name is refused")
+    void ownProviderNamesItself() throws Exception {
+        try (SecuredServer server = start(o -> { })) {
+            Side provider = new Side(server);
+            Side app = new Side(server);
+            String callback = throughProvider(app, provider, "ada");
+            assertEquals(issuer, query(callback).get("iss"), callback);
+            // The same answer with the name taken off: read from the metadata,
+            // this provider always sends one.
+            int at = callback.indexOf("&iss=");
+            int end = callback.indexOf('&', at + 1);
+            String stripped = callback.substring(0, at) + (end < 0 ? "" : callback.substring(end));
+            assertEquals("/login?error", app.get(stripped).header("Location"));
+            assertEquals(Arrays.asList("invalid_issuer"), failures);
+
+            failures.clear();
+            callback = throughProvider(app, provider, "ada");
+            Reply done = app.get(callback);
+            assertEquals(302, done.status, done.toString() + failures);
+            assertTrue(app.get("/private/x").body.startsWith("/private/x ada "), failures.toString());
+        }
+    }
+
+    @Test
+    @DisplayName("an issuer per tenant matches the template with a tenant id in it, and nothing else")
+    void issuerTemplate() {
+        ClientRegistration.ProviderDetails p = ClientRegistration.withRegistrationId("ms")
+                .clientId("c").authorizationUri("https://a/b").tokenUri("https://a/c")
+                .issuerTemplate("https://login.example/{tenantid}/v2.0").build()
+                .getProviderDetails();
+        assertTrue(p.isIssuer("https://login.example/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"));
+        assertFalse(p.isIssuer("https://login.example//v2.0"));
+        assertFalse(p.isIssuer("https://login.example/a/b/v2.0"));
+        assertFalse(p.isIssuer("https://login.example/evil.example%2f/v2.0"));
+        assertFalse(p.isIssuer("https://evil.example/tenant/v2.0"));
+        assertFalse(p.isIssuer("https://login.example/tenant/v2.0/more"));
+        assertFalse(p.isIssuer(null));
+        ClientRegistration.ProviderDetails none = ClientRegistration.withRegistrationId("x")
+                .clientId("c").authorizationUri("https://a/b").tokenUri("https://a/c").build()
+                .getProviderDetails();
+        assertFalse(none.isIssuer("https://a"));
+        assertFalse(none.isAuthorizationResponseIssParameterSupported());
+    }
+
+    private static String leftHalf(String accessToken) throws Exception {
+        byte[] digest = com.codename1.backend.Crypto.sha256(accessToken.getBytes("US-ASCII"));
+        return Base64Url.encode(Arrays.copyOf(digest, digest.length / 2));
+    }
+
+    @Test
+    @DisplayName("an ID token's at_hash is held to the access token it came with")
+    void accessTokenHash() throws Exception {
+        try (Stub provider = stubServer() ; SecuredServer app = stubApp(
+                stubRegistration("oidc").issuerUri("https://stub.example").scope("openid")
+                        .build())) {
+            // The hash of the token that came with it.
+            Map<String, String> sent = begin(app, "oidc");
+            answerWith(sign(idClaims(sent.get("nonce")).claim("at_hash",
+                    leftHalf("stub-access")).build()));
+            Reply good = app.get("/login/oauth2/code/oidc?code=c&state=" + sent.get("state"));
+            assertEquals("/", good.header("Location"), good.toString() + failures);
+
+            List<Object> wrong = new ArrayList<Object>();
+            // The hash of another token, the whole hash rather than half, the
+            // right one in another encoding's padding, and not text at all.
+            wrong.add(leftHalf("somebody-elses-access"));
+            wrong.add(Base64Url.encode(com.codename1.backend.Crypto.sha256(
+                    "stub-access".getBytes("US-ASCII"))));
+            wrong.add(leftHalf("stub-access") + "==");
+            wrong.add("");
+            wrong.add(Long.valueOf(7));
+            for (Object hash : wrong) {
+                failures.clear();
+                sent = begin(app, "oidc");
+                answerWith(sign(idClaims(sent.get("nonce")).claim("at_hash", hash).build()));
+                Reply reply = app.get("/login/oauth2/code/oidc?code=c&state=" + sent.get("state"));
+                assertEquals("/login?error", reply.header("Location"), String.valueOf(hash));
+                assertEquals(Arrays.asList("invalid_id_token"), failures, String.valueOf(hash));
+            }
+        }
     }
 }

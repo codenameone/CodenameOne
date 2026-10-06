@@ -120,7 +120,7 @@ public final class OidcIdTokenDecoderFactory {
             String expected = p.getIssuerUri();
             if (expected == null && p.getIssuerTemplate() != null) {
                 String tenant = token.getClaimAsString("tid");
-                expected = tenant == null || !isTenant(tenant) ? null
+                expected = !ClientRegistration.ProviderDetails.isTenant(tenant) ? null
                         : replace(p.getIssuerTemplate(), "{tenantid}", tenant);
             }
             if (issuer == null || expected == null || !expected.equals(issuer)) {
@@ -149,22 +149,6 @@ public final class OidcIdTokenDecoderFactory {
 
         private static OAuth2Error invalid(String description) {
             return new OAuth2Error(OAuth2ErrorCodes.INVALID_ID_TOKEN, description, null);
-        }
-
-        /// A tenant id is a GUID: letters, digits and dashes, so that what a
-        /// token says of itself cannot write another host into the issuer.
-        private static boolean isTenant(String tenant) {
-            if (tenant.length() == 0 || tenant.length() > 64) {
-                return false;
-            }
-            for (int iter = 0 ; iter < tenant.length() ; iter++) {
-                char c = tenant.charAt(iter);
-                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                        || c == '-')) {
-                    return false;
-                }
-            }
-            return true;
         }
 
         private static String replace(String text, String what, String with) {
