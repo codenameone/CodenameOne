@@ -67,6 +67,23 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertEqual(expected[i], id, "ideId for " + ides[i]);
         }
         assertEqual(ides.length, IDE.values().length, "a new IDE needs a name BuildCloud's steps email knows");
+
+        // buildKind() names which of nextSteps()' four sets BuildCloud emails;
+        // its endpoint knows exactly these four.
+        assertEqual("maven", GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "Kinds", "com.acme.kinds")
+                .buildKind(), "Maven app");
+        assertEqual("gradle", GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "Kinds", "com.acme.kinds",
+                ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.GRADLE, ProjectOptions.ProjectType.APP))
+                .buildKind(), "Gradle app");
+        assertEqual("gradle-backend", GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "Kinds", "com.acme.kinds",
+                ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.GRADLE,
+                        ProjectOptions.ProjectType.BACKEND_ONLY)).buildKind(), "Gradle backend-only");
+        String mavenBackend = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "Kinds", "com.acme.kinds",
+                ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN,
+                        ProjectOptions.ProjectType.BACKEND_ONLY)).buildKind();
+        // Maven backend-only depends on the plugin-version gate (mavenLayoutsEnabled).
+        assertTrue("maven-backend".equals(mavenBackend) || "maven".equals(mavenBackend),
+                "Maven backend-only: " + mavenBackend);
     }
 
     @Override
@@ -1070,6 +1087,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             String readme = getText(entries, "README.md");
             assertContains(readme, "## Build progress reporting", label + "README should explain the reporting");
             assertContains(readme, "CN1_TELEMETRY=0", label + "README should give the opt-out");
+            // `set` in PowerShell does not reach build.bat's environment.
+            assertContains(readme, "$Env:CN1_TELEMETRY = \"0\"", label + "README should give the PowerShell opt-out");
             assertContains(readme, "create a free Codename One account", label + "README should mention the account");
         }
 

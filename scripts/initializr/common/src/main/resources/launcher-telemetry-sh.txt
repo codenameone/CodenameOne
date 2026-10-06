@@ -84,13 +84,23 @@ function cn1_kill_tree {
 # Runs ./mvnw exactly as before, with the output still on your terminal, and
 # reports how it ended.
 function cn1_mvnw {
+  # Opted out: no wrapper at all, Maven runs exactly as in any other project.
+  if [ "${CN1_TELEMETRY:-1}" = "0" ]; then
+    ./mvnw "$@"
+    return $?
+  fi
   local target="${CMD:-unknown}" os java start log code
   os="$(cn1_os)"
   java="$(cn1_java_major)"
   start="$(date +%s)"
   cn1_event --data-urlencode "step=launch" --data-urlencode "target=$target" \
     --data-urlencode "os=$os" --data-urlencode "java=$java" &
+  # The log only feeds the one-word reason. If it cannot be created, build
+  # without it (the reason becomes "unknown") rather than risk the build.
   log="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/cn1-build-$$.log")"
+  if ! : > "$log" 2>/dev/null; then
+    log=""
+  fi
   # Ctrl+C or a kill while Maven runs must still report how the run ended: a
   # developer who gave up on a hung download or a sign-in that never came
   # otherwise looks like one whose run never finished. The Maven pipeline runs
@@ -98,29 +108,48 @@ function cn1_mvnw {
   # until a foreground command returns -- a `kill` aimed at this script alone
   # would otherwise wait for a hung Maven forever. The trap stops Maven itself
   # (its pid is recorded from inside the pipeline), waits for tee to flush, then
-  # reports and cleans up. tee drains every line Maven wrote before it exits, so
-  # nothing at the end of the output (the failure summary) is lost. stdin is
-  # passed through explicitly: a background job's stdin is /dev/null otherwise.
-  local pipe_pid pidfile="$log.pid"
-  trap 'cn1_kill_tree "$(cat "$pidfile" 2>/dev/null)"; wait "$pipe_pid" 2>/dev/null; \
+  # reports and exits with the signal's own status: 130 for Ctrl+C (SIGINT),
+  # 143 for SIGTERM, so a caller can still tell them apart. tee drains every
+  # line Maven wrote before it exits, so nothing at the end of the output (the
+  # failure summary) is lost. stdin is passed through explicitly: a background
+  # job's stdin is /dev/null otherwise.
+  local pipe_pid tmpbase="${log:-${TMPDIR:-/tmp}/cn1-build-$$}"
+  local pidfile="$tmpbase.pid" codefile="$tmpbase.code"
+  function cn1_on_signal {
+    cn1_kill_tree "$(cat "$pidfile" 2>/dev/null)"
+    wait "$pipe_pid" 2>/dev/null
     cn1_event --data-urlencode "step=exit" --data-urlencode "target=$target" \
-    --data-urlencode "os=$os" --data-urlencode "java=$java" --data-urlencode "exit=130" \
-    --data-urlencode "reason=interrupted" --data-urlencode "secs=$(( $(date +%s) - start ))"; \
-    rm -f "$log" "$pidfile"; trap - INT TERM; exit 130' INT TERM
+      --data-urlencode "os=$os" --data-urlencode "java=$java" --data-urlencode "exit=$1" \
+      --data-urlencode "reason=interrupted" --data-urlencode "secs=$(( $(date +%s) - start ))"
+    rm -f "$log" "$pidfile" "$codefile"
+    trap - INT TERM
+    exit "$1"
+  }
+  trap 'cn1_on_signal 130' INT
+  trap 'cn1_on_signal 143' TERM
   set +e
-  set -o pipefail
-  { ./mvnw "$@" <&0 2>&1 & echo $! > "$pidfile"; wait $! 2>/dev/null; } | tee "$log" &
+  # Maven's own exit status is written from inside the pipeline, so tee failing
+  # (a full disk, an unwritable log) can never turn a successful build into a
+  # failed one -- the launcher returns exactly what Maven returned.
+  if [ -n "$log" ]; then
+    { ./mvnw "$@" <&0 2>&1 & echo $! > "$pidfile"; wait $! 2>/dev/null; echo $? > "$codefile"; } \
+      | { tee "$log" 2>/dev/null || cat; } &
+  else
+    { ./mvnw "$@" <&0 & echo $! > "$pidfile"; wait $! 2>/dev/null; echo $? > "$codefile"; } &
+  fi
   pipe_pid=$!
   wait "$pipe_pid"
-  code=$?
-  set +o pipefail
+  code="$(cat "$codefile" 2>/dev/null)"
+  [ -z "$code" ] && code=1
   set -e
-  rm -f "$pidfile"
+  rm -f "$pidfile" "$codefile"
   trap - INT TERM
   cn1_event --data-urlencode "step=exit" --data-urlencode "target=$target" \
     --data-urlencode "os=$os" --data-urlencode "java=$java" --data-urlencode "exit=$code" \
-    --data-urlencode "reason=$(cn1_reason "$code" "$log" "$java")" \
+    --data-urlencode "reason=$(cn1_reason "$code" "${log:-/dev/null}" "$java")" \
     --data-urlencode "secs=$(( $(date +%s) - start ))"
-  rm -f "$log"
+  if [ -n "$log" ]; then
+    rm -f "$log"
+  fi
   return "$code"
 }

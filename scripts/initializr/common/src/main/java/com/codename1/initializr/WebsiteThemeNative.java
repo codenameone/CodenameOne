@@ -41,11 +41,19 @@ public interface WebsiteThemeNative extends NativeInterface {
     /// cover it.
     int chatLauncherClearance();
 
+    /// Whether this Initializr is embedded in the Codename One website itself,
+    /// the only page allowed to receive an email address from it. A third-party
+    /// page can frame the public /initializr-app/ and would otherwise collect
+    /// every address typed into the panel, so the email field is shown only when
+    /// this answers true.
+    boolean canRequestSteps();
+
     /// Asks the embedding website page to email the next steps to `email`, once.
     /// The page forwards it to BuildCloud (docs/website/assets/js/
     /// cn1-initializr-beacon.js), which may follow up if that project never
-    /// reaches a first build. packageName/template/ide pick the steps to send;
-    /// the page hashes the package name before anything leaves the browser.
-    /// Returns true when the request was handed to the page.
-    boolean requestSteps(String email, String packageName, String template, String ide);
+    /// reaches a first build. ide and build (see GeneratorModel#buildKind) pick
+    /// the steps BuildCloud sends -- the same ones the panel shows; the page
+    /// hashes the package name before anything leaves the browser. Returns true
+    /// only when the page confirmed it sent the request.
+    boolean requestSteps(String email, String packageName, String template, String ide, String build);
 }

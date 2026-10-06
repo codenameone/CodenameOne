@@ -32,7 +32,11 @@
     return NO;
 }
 
--(BOOL)requestSteps:(NSString*)param param1:(NSString*)param1 param2:(NSString*)param2 param3:(NSString*)param3{
+-(BOOL)canRequestSteps{
+    return NO;
+}
+
+-(BOOL)requestSteps:(NSString*)param param1:(NSString*)param1 param2:(NSString*)param2 param3:(NSString*)param3 param4:(NSString*)param4{
     return NO;
 }
 

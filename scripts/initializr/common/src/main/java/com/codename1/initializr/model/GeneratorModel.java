@@ -467,6 +467,18 @@ public class GeneratorModel {
         }
     }
 
+    /// Which of nextSteps()' four sets of steps this project gets, as BuildCloud's
+    /// "email me these steps" endpoint names them: maven, gradle, maven-backend or
+    /// gradle-backend. Sent with the request so the email carries the same
+    /// commands -- and the same account line, absent for a backend-only project
+    /// -- as the panel; BuildCloud picks from a fixed set, never from text sent here.
+    public String buildKind() {
+        boolean gradle = options.isGradle();
+        boolean backendOnly = gradle ? options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY
+                : isMavenBackendOnly();
+        return (gradle ? "gradle" : "maven") + (backendOnly ? "-backend" : "");
+    }
+
     public NextSteps nextSteps() {
         boolean gradle = options.isGradle();
         boolean backendOnly = gradle ? options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY
@@ -1641,8 +1653,10 @@ public class GeneratorModel {
                 .append("package name (never the name itself), the build target, the OS family, the Java ")
                 .append("version, the exit code, a one-word failure reason and the duration, to ")
                 .append(LAUNCHER_EVENTS_URL).append(". Never your code, paths, user name or build output.\n\n")
-                .append("To opt out, set `CN1_TELEMETRY=0` in your environment ")
-                .append("(`export CN1_TELEMETRY=0`, or `set CN1_TELEMETRY=0` on Windows).\n\n");
+                .append("To opt out, set `CN1_TELEMETRY` to `0` in the environment the build runs in:\n\n")
+                .append("- macOS/Linux: `export CN1_TELEMETRY=0`\n")
+                .append("- Windows PowerShell: `$Env:CN1_TELEMETRY = \"0\"`\n")
+                .append("- Windows Command Prompt: `set CN1_TELEMETRY=0`\n\n");
     }
 
     private void appendIdeSection(StringBuilder out) {

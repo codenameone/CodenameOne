@@ -95,11 +95,11 @@ for (const [label, options, pkg] of [
 }
 
 // sendSteps: the steps endpoint, the visitor's email, the hashed package, the
-// template and IDE, and nothing else -- under the same transport rules.
+// template, IDE and build kind, and nothing else -- under the same transport rules.
 const STEPS_ENDPOINT = "https://cloud.codenameone.com/api/v2/funnel/initializr-steps";
 {
   const { beacon, calls } = loadBeacon();
-  assert.equal(await beacon.sendSteps(" dev@example.org ", "COM.Example.MyApp", "kotlin", "intellij"), true);
+  assert.equal(await beacon.sendSteps(" dev@example.org ", "COM.Example.MyApp", "kotlin", "intellij", "gradle"), true);
   assert.equal(calls.length, 1);
   const { url, init } = calls[0];
   assert.equal(url, STEPS_ENDPOINT);
@@ -110,7 +110,8 @@ const STEPS_ENDPOINT = "https://cloud.codenameone.com/api/v2/funnel/initializr-s
   assert.equal(init.referrerPolicy, "no-referrer");
   assert.equal(init.headers["Content-Type"], "application/x-www-form-urlencoded");
   const params = new URLSearchParams(init.body);
-  assert.deepEqual([...params.keys()], ["pkg", "email", "template", "ide"], "exactly these fields");
+  assert.deepEqual([...params.keys()], ["pkg", "email", "template", "ide", "build"], "exactly these fields");
+  assert.equal(params.get("build"), "gradle");
   assert.equal(params.get("pkg"), "f110a249cb67c33e0d30f847bc485759068f15989484537ed28d97c7c63ecae7");
   assert.equal(params.get("email"), "dev@example.org");
   assert.equal(params.get("template"), "kotlin");
@@ -167,8 +168,8 @@ function runPage({ beaconThrows = false, stepsResult = true, noBeacon = false } 
         if (beaconThrows) throw new Error("beacon failure");
         return Promise.resolve(true);
       },
-      sendSteps(email, pkg, template, ide) {
-        steps.push([email, pkg, template, ide]);
+      sendSteps(email, pkg, template, ide, build) {
+        steps.push([email, pkg, template, ide, build]);
         if (beaconThrows) throw new Error("beacon failure");
         return Promise.resolve(stepsResult);
       },
@@ -211,9 +212,9 @@ function runPage({ beaconThrows = false, stepsResult = true, noBeacon = false } 
 
 {
   const page = runPage();
-  page.post({ type: "cn1-initializr-steps-request", email: "dev@example.org",
+  page.post({ type: "cn1-initializr-steps-request", email: "dev@example.org", build: "maven-backend",
     packageName: "com.Example.App", template: "barebones", ide: "eclipse" });
-  assert.deepEqual(page.steps, [["dev@example.org", "com.Example.App", "barebones", "eclipse"]]);
+  assert.deepEqual(page.steps, [["dev@example.org", "com.Example.App", "barebones", "eclipse", "maven-backend"]]);
   assert.equal(page.sends.length, 0, "a steps request is not a download");
   assert.equal(page.crisp.length, 0, "a steps request is not a download");
   page.post({ type: "cn1-initializr-steps-request", email: "x@y.zz", packageName: "a.b" }, {});

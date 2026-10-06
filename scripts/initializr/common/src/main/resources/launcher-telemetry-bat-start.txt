@@ -12,7 +12,8 @@ REM many seconds it took. Never your code, paths, user name or build output.
 REM Each report is a single request with a 3 second limit; a failure is ignored
 REM and never changes the build's output or exit code.
 REM
-REM Opt out with:  set CN1_TELEMETRY=0
+REM Opt out in Command Prompt:  set CN1_TELEMETRY=0
+REM Opt out in PowerShell:      $Env:CN1_TELEMETRY = "0"
 set "CN1_PROJECT_ID=__CN1_PROJECT_ID__"
 set "CN1_MIN_JAVA=__CN1_MIN_JAVA__"
 if not defined CN1_EVENTS_URL set "CN1_EVENTS_URL=https://cloud.codenameone.com/api/v2/funnel/initializr-event"

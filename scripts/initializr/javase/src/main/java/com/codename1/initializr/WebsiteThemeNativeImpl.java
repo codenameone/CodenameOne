@@ -47,7 +47,11 @@ public class WebsiteThemeNativeImpl implements com.codename1.initializr.WebsiteT
     }
 
     /** No embedding website in the simulator; answers false so nothing claims it was sent. */
-    public boolean requestSteps(String email, String packageName, String template, String ide) {
+    public boolean canRequestSteps() {
+        return false;
+    }
+
+    public boolean requestSteps(String email, String packageName, String template, String ide, String build) {
         return false;
     }
 

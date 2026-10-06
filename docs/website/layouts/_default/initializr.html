@@ -268,7 +268,7 @@ body.cn1-initializr-page-body .main {
         try {
           if (window.cn1InitializrBeacon && window.cn1InitializrBeacon.sendSteps) {
             window.cn1InitializrBeacon.sendSteps(evt.data.email, evt.data.packageName,
-              evt.data.template, evt.data.ide).then(answer, function () { answer(false); });
+              evt.data.template, evt.data.ide, evt.data.build).then(answer, function () { answer(false); });
           } else {
             answer(false);
           }

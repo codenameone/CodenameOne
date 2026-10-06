@@ -103,12 +103,13 @@
    * and may follow up if the hashed package never reaches a first build. No
    * request without an address.
    */
-  function sendSteps(email, packageName, template, ide) {
+  function sendSteps(email, packageName, template, ide, build) {
     var address = email ? String(email).trim() : "";
     if (!address) {
       return Promise.resolve(false);
     }
-    return post(STEPS_ENDPOINT, packageName, [["email", address], ["template", template], ["ide", ide]]);
+    return post(STEPS_ENDPOINT, packageName,
+      [["email", address], ["template", template], ["ide", ide], ["build", build]]);
   }
 
   window.cn1InitializrBeacon = { send: send, sendSteps: sendSteps };

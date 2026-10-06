@@ -36,7 +36,11 @@ public class WebsiteThemeNativeImpl {
         return 0;
     }
 
-    public boolean requestSteps(String email, String packageName, String template, String ide) {
+    public boolean canRequestSteps() {
+        return false;
+    }
+
+    public boolean requestSteps(String email, String packageName, String template, String ide, String build) {
         return false;
     }
 }

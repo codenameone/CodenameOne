@@ -166,11 +166,39 @@ var o = {};
     var STEPS_ACK_TIMEOUT_MS = 6000;
     var stepsSeq = 0;
 
-    o.requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String = function(email, packageName, template, ide, callback) {
+    // The only pages allowed to receive an email address typed into the panel.
+    // /initializr-app/ is publicly reachable, so any site could frame it; a
+    // postMessage to "*" would hand that site every address. Reading
+    // window.parent.location throws for a cross-origin parent, so a frame whose
+    // parent is NOT this same Codename One origin gets null here, and the panel
+    // neither shows the email field nor sends anything.
+    var STEPS_PARENT_ORIGINS = {
+        "https://www.codenameone.com": true,
+        "https://codenameone.com": true
+    };
+
+    function trustedParentOrigin() {
+        try {
+            if (!window.parent || window.parent === window) {
+                return null;
+            }
+            var origin = window.parent.location.origin;
+            return STEPS_PARENT_ORIGINS[origin] ? origin : null;
+        } catch (crossOrigin) {
+            return null;
+        }
+    }
+
+    o.canRequestSteps_ = function(callback) {
+        callback.complete(trustedParentOrigin() !== null);
+    };
+
+    o.requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String = function(email, packageName, template, ide, build, callback) {
         var done = false;
         var id = "steps-" + (++stepsSeq) + "-" + new Date().getTime();
+        var parentOrigin = trustedParentOrigin();
         var onAnswer = function(evt) {
-            if (!evt || evt.source !== window.parent || !evt.data
+            if (!evt || evt.source !== window.parent || evt.origin !== parentOrigin || !evt.data
                     || evt.data.type !== "cn1-initializr-steps-result" || evt.data.id !== id) {
                 return;
             }
@@ -189,7 +217,7 @@ var o = {};
             callback.complete(ok);
         };
         try {
-            if (email && window.parent && window.parent !== window && window.parent.postMessage) {
+            if (email && parentOrigin) {
                 window.addEventListener("message", onAnswer);
                 window.setTimeout(function() { finish(false); }, STEPS_ACK_TIMEOUT_MS);
                 window.parent.postMessage({
@@ -198,8 +226,9 @@ var o = {};
                     email: String(email),
                     packageName: packageName ? String(packageName) : "",
                     template: template ? String(template) : "",
-                    ide: ide ? String(ide) : ""
-                }, "*");
+                    ide: ide ? String(ide) : "",
+                    build: build ? String(build) : ""
+                }, parentOrigin);
                 return;
             }
         } catch (ignored) {
