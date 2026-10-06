@@ -28,7 +28,6 @@ import com.codename1.migration.MigrateResult;
 import com.codename1.migration.MigrationSet;
 import com.codename1.migration.Migrator;
 import java.io.IOException;
-import java.util.List;
 
 /// Versioned schema migrations for the server's database.
 ///
@@ -163,16 +162,14 @@ public final class Migrations {
     /// @throws IOException if the database fails
     public static int migrate(DataSource pool, Config config) throws IOException {
         int ran = 0;
-        MigrationSet[] sets = MigrationRegistry.sets();
-        for (int i = 0; i < sets.length; i++) {
-            MigrateResult result = configure(of(pool, sets[i]), config).migrate();
+        for (MigrationSet set : MigrationRegistry.sets()) {
+            MigrateResult result = configure(of(pool, set), config).migrate();
             ran += result.getMigrationsExecuted();
-            List warnings = result.getWarnings();
-            for (int w = 0; w < warnings.size(); w++) {
-                System.out.println("cn1: migrations (" + sets[i].getName() + "): " + warnings.get(w));
+            for (String warning : result.getWarnings()) {
+                System.out.println("cn1: migrations (" + set.getName() + "): " + warning);
             }
             if (result.getMigrationsExecuted() > 0) {
-                System.out.println("cn1: migrations (" + sets[i].getName() + "): applied "
+                System.out.println("cn1: migrations (" + set.getName() + "): applied "
                         + result.getMigrationsExecuted() + ", schema now at version "
                         + (result.getTargetVersion() == null ? "none" : result.getTargetVersion()));
             }

@@ -27,7 +27,6 @@ import com.codename1.backend.Database;
 import com.codename1.backend.sql.Dialect;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -105,16 +104,16 @@ public final class BackendMigrationTarget implements MigrationTarget {
     public List<String[]> query(String sql, Object[] params) throws IOException {
         List rows = db().query(sql, params == null ? new Object[0] : params);
         List<String[]> out = new ArrayList<String[]>(rows.size());
-        for (int i = 0; i < rows.size(); i++) {
-            Object row = rows.get(i);
+        for (Object row : rows) {
             if (!(row instanceof Map)) {
                 continue;
             }
             Map map = (Map) row;
             String[] values = new String[map.size()];
             int at = 0;
-            for (Iterator it = map.values().iterator(); it.hasNext();) {
-                values[at++] = text(it.next());
+            for (Object value : map.values()) {
+                values[at] = text(value);
+                at++;
             }
             out.add(values);
         }
@@ -128,9 +127,9 @@ public final class BackendMigrationTarget implements MigrationTarget {
         if (value instanceof byte[]) {
             byte[] bytes = (byte[]) value;
             StringBuilder hex = new StringBuilder(bytes.length * 2);
-            for (int i = 0; i < bytes.length; i++) {
-                hex.append("0123456789abcdef".charAt((bytes[i] >> 4) & 0xF));
-                hex.append("0123456789abcdef".charAt(bytes[i] & 0xF));
+            for (byte b : bytes) {
+                hex.append("0123456789abcdef".charAt((b >> 4) & 0xF));
+                hex.append("0123456789abcdef".charAt(b & 0xF));
             }
             return hex.toString();
         }
@@ -306,7 +305,7 @@ public final class BackendMigrationTarget implements MigrationTarget {
         try {
             return db();
         } catch (IOException failure) {
-            throw new IllegalStateException("No connection: " + failure.getMessage());
+            throw new IllegalStateException("No connection: " + failure.getMessage(), failure);
         }
     }
 

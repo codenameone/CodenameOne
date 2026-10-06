@@ -65,8 +65,8 @@ public final class MigrationCli {
         DataSource pool = DataSource.fromConfig(config);
         try {
             System.out.println("cn1: " + command + " on " + pool);
-            for (int i = 0; i < sets.length; i++) {
-                run(command, sets[i], Migrations.configure(Migrations.of(pool, sets[i]), config));
+            for (MigrationSet set : sets) {
+                run(command, set, Migrations.configure(Migrations.of(pool, set), config));
             }
         } finally {
             pool.close();
@@ -77,13 +77,12 @@ public final class MigrationCli {
         String label = "cn1: " + set.getName() + ": ";
         if ("migrate".equals(command)) {
             MigrateResult result = migrator.migrate();
-            List warnings = result.getWarnings();
-            for (int i = 0; i < warnings.size(); i++) {
-                System.out.println(label + warnings.get(i));
+            for (String warning : result.getWarnings()) {
+                System.out.println(label + warning);
             }
-            List applied = result.getApplied();
-            for (int i = 0; i < applied.size(); i++) {
-                System.out.println(label + "applied " + applied.get(i));
+            List<String> applied = result.getApplied();
+            for (String script : applied) {
+                System.out.println(label + "applied " + script);
             }
             System.out.println(label + (applied.isEmpty() ? "nothing to apply" : applied.size() + " applied")
                     + ", schema at version " + (result.getTargetVersion() == null ? "none"
@@ -92,10 +91,10 @@ public final class MigrationCli {
             MigrationInfo[] info = migrator.info();
             System.out.println(label + info.length + " migration(s) in " + set.getTable());
             System.out.println(row("Version", "Description", "Type", "State", "Installed on"));
-            for (int i = 0; i < info.length; i++) {
-                System.out.println(row(info[i].getVersion() == null ? "" : info[i].getVersion(),
-                        info[i].getDescription(), info[i].getType(), info[i].getState().toString(),
-                        info[i].getInstalledOn() == null ? "" : info[i].getInstalledOn()));
+            for (MigrationInfo migration : info) {
+                System.out.println(row(migration.getVersion() == null ? "" : migration.getVersion(),
+                        migration.getDescription(), migration.getType(), migration.getState().toString(),
+                        migration.getInstalledOn() == null ? "" : migration.getInstalledOn()));
             }
         } else if ("validate".equals(command)) {
             migrator.validate();
