@@ -239,9 +239,43 @@ public class ScrollView extends FrameLayout {
         int scrollRange = 0;
         if (getChildCount() > 0) {
             View child = getChildAt(0);
-            scrollRange = Math.max(0, child.getHeight() - (getHeight() - mPaddingBottom - mPaddingTop));
+            scrollRange = Math.max(0, childHeightWithMargins(child) - (getHeight() - mPaddingBottom - mPaddingTop));
         }
         return scrollRange;
+    }
+
+    /// The child's height plus its vertical margins. `FrameLayout` lays the
+    /// child out below its top margin, so every scroll range and clamp has to
+    /// reach the bottom margin too, or the end of the content is unreachable.
+    static int childHeightWithMargins(View child) {
+        int height = child.getHeight();
+        ViewGroup.LayoutParams params = child.getLayoutParams();
+        if (params instanceof MarginLayoutParams) {
+            MarginLayoutParams lp = (MarginLayoutParams) params;
+            height += lp.topMargin + lp.bottomMargin;
+        }
+        return height;
+    }
+
+    /// The child's width plus its horizontal margins; see [#childHeightWithMargins(View)].
+    static int childWidthWithMargins(View child) {
+        int width = child.getWidth();
+        ViewGroup.LayoutParams params = child.getLayoutParams();
+        if (params instanceof MarginLayoutParams) {
+            MarginLayoutParams lp = (MarginLayoutParams) params;
+            width += lp.leftMargin + lp.rightMargin;
+        }
+        return width;
+    }
+
+    /// The child's bottom edge plus its bottom margin.
+    static int childBottomWithMargin(View child) {
+        int bottom = child.getBottom();
+        ViewGroup.LayoutParams params = child.getLayoutParams();
+        if (params instanceof MarginLayoutParams) {
+            bottom += ((MarginLayoutParams) params).bottomMargin;
+        }
+        return bottom;
     }
 
     @Override
@@ -448,7 +482,7 @@ public class ScrollView extends FrameLayout {
     public void fling(int velocityY) {
         if (getChildCount() > 0) {
             int height = getHeight() - mPaddingBottom - mPaddingTop;
-            int bottom = getChildAt(0).getHeight();
+            int bottom = childHeightWithMargins(getChildAt(0));
             mScroller.fling(mScrollX, mScrollY, 0, velocityY, 0, 0, 0, Math.max(0, bottom - height), 0, height / 2);
             mAnimator.start();
         }
@@ -479,7 +513,7 @@ public class ScrollView extends FrameLayout {
         long duration = SystemClock.uptimeMillis() - mLastScroll;
         if (duration > ANIMATED_SCROLL_GAP) {
             final int height = getHeight() - mPaddingBottom - mPaddingTop;
-            final int bottom = getChildAt(0).getHeight();
+            final int bottom = childHeightWithMargins(getChildAt(0));
             final int maxY = Math.max(0, bottom - height);
             final int scrollY = mScrollY;
             dy = Math.max(0, Math.min(scrollY + dy, maxY)) - scrollY;
@@ -503,8 +537,8 @@ public class ScrollView extends FrameLayout {
     public void scrollTo(int x, int y) {
         if (getChildCount() > 0) {
             View child = getChildAt(0);
-            x = clamp(x, getWidth() - mPaddingRight - mPaddingLeft, child.getWidth());
-            y = clamp(y, getHeight() - mPaddingBottom - mPaddingTop, child.getHeight());
+            x = clamp(x, getWidth() - mPaddingRight - mPaddingLeft, childWidthWithMargins(child));
+            y = clamp(y, getHeight() - mPaddingBottom - mPaddingTop, childHeightWithMargins(child));
             if (x != mScrollX || y != mScrollY) {
                 mLastScrollActivity = SystemClock.uptimeMillis();
                 super.scrollTo(x, y);
@@ -528,7 +562,7 @@ public class ScrollView extends FrameLayout {
         int height = getHeight();
         int target = 0;
         if (down && getChildCount() > 0) {
-            target = Math.max(0, getChildAt(0).getBottom() + mPaddingBottom - height);
+            target = Math.max(0, childBottomWithMargin(getChildAt(0)) + mPaddingBottom - height);
         }
         return scrollAndReport(target);
     }
@@ -628,7 +662,7 @@ public class ScrollView extends FrameLayout {
             } else {
                 scrollYDelta += (rect.bottom - screenBottom);
             }
-            int bottom = getChildAt(0).getBottom();
+            int bottom = childBottomWithMargin(getChildAt(0));
             int distanceToBottom = bottom - screenBottom;
             scrollYDelta = Math.min(scrollYDelta, distanceToBottom);
         } else if (rect.top < screenTop && rect.bottom < screenBottom) {

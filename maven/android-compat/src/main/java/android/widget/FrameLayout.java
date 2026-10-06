@@ -39,7 +39,6 @@ public class FrameLayout extends ViewGroup {
     private static final int DEFAULT_CHILD_GRAVITY = Gravity.TOP | Gravity.START;
 
     private boolean mMeasureAllChildren;
-    private int mForegroundGravity = Gravity.FILL;
     private final ArrayList<View> mMatchParentChildren = new ArrayList<View>(1);
 
     public static class LayoutParams extends ViewGroup.MarginLayoutParams {
@@ -91,7 +90,7 @@ public class FrameLayout extends ViewGroup {
     public FrameLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         TypedArray a = context.obtainStyledAttributes(attrs, android.R.styleable.FrameLayout, defStyleAttr, defStyleRes);
-        mForegroundGravity = a.getInt(android.R.styleable.FrameLayout_foregroundGravity, mForegroundGravity);
+        setForegroundGravity(a.getInt(android.R.styleable.FrameLayout_foregroundGravity, getForegroundGravity()));
         mMeasureAllChildren = a.getBoolean(android.R.styleable.FrameLayout_measureAllChildren, false);
         a.recycle();
     }
@@ -102,15 +101,6 @@ public class FrameLayout extends ViewGroup {
 
     public boolean getMeasureAllChildren() {
         return mMeasureAllChildren;
-    }
-
-    @Override
-    public void setForegroundGravity(int foregroundGravity) {
-        mForegroundGravity = foregroundGravity;
-    }
-
-    public int getForegroundGravity() {
-        return mForegroundGravity;
     }
 
     @Override

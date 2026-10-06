@@ -31,6 +31,7 @@ import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 
 /// A progress bar with a draggable thumb: the base of SeekBar and RatingBar.
 public abstract class AbsSeekBar extends ProgressBar {
@@ -40,6 +41,7 @@ public abstract class AbsSeekBar extends ProgressBar {
     private int mThumbOffset;
     private int mKeyProgressIncrement = 1;
     private boolean mIsDragging;
+    private float mTouchDownX;
     boolean mIsUserSeekable = true;
 
     public AbsSeekBar(Context context) {
@@ -153,16 +155,21 @@ public abstract class AbsSeekBar extends ProgressBar {
         }
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                setPressed(true);
-                onStartTrackingTouch();
-                trackTouchEvent(event);
-                if (getParent() != null) {
-                    getParent().requestDisallowInterceptTouchEvent(true);
+                // Inside a scrolling parent the gesture may be a scroll, so
+                // the drag waits for horizontal movement past the touch slop
+                // and the parent stays free to intercept a vertical one.
+                if (isInScrollingContainer()) {
+                    mTouchDownX = event.getX();
+                } else {
+                    startDrag(event);
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (mIsDragging) {
                     trackTouchEvent(event);
+                } else if (Math.abs(event.getX() - mTouchDownX)
+                        > ViewConfiguration.get(getContext()).getScaledTouchSlop()) {
+                    startDrag(event);
                 }
                 break;
             case MotionEvent.ACTION_UP:
@@ -170,6 +177,11 @@ public abstract class AbsSeekBar extends ProgressBar {
                     trackTouchEvent(event);
                     onStopTrackingTouch();
                     setPressed(false);
+                } else {
+                    // A tap that never crossed the slop seeks to where it landed.
+                    onStartTrackingTouch();
+                    trackTouchEvent(event);
+                    onStopTrackingTouch();
                 }
                 invalidate();
                 break;
@@ -184,6 +196,15 @@ public abstract class AbsSeekBar extends ProgressBar {
                 break;
         }
         return true;
+    }
+
+    private void startDrag(MotionEvent event) {
+        setPressed(true);
+        onStartTrackingTouch();
+        trackTouchEvent(event);
+        if (getParent() != null) {
+            getParent().requestDisallowInterceptTouchEvent(true);
+        }
     }
 
     private void trackTouchEvent(MotionEvent event) {

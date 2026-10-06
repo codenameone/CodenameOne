@@ -348,6 +348,33 @@ public class LinearLayout extends ViewGroup {
         return (mShowDividers & SHOW_DIVIDER_MIDDLE) != 0;
     }
 
+    /// The space the dividers take along the orientation. The first measure
+    /// pass counts them while it walks the children; every later pass that
+    /// rebuilds `mTotalLength` from the children alone must add them back, or
+    /// gravity reads the divider space as free and pushes the children over
+    /// the edge. (Android's own weighted pass forgets them; we do not.)
+    private int dividerLength(int count, int dividerSize) {
+        if (mDivider == null) {
+            return 0;
+        }
+        int total = 0;
+        boolean anyVisible = false;
+        for (int i = 0; i < count; i++) {
+            final View child = getVirtualChildAt(i);
+            if (child == null || child.getVisibility() == GONE) {
+                continue;
+            }
+            anyVisible = true;
+            if (hasDividerBeforeChildAt(i)) {
+                total += dividerSize;
+            }
+        }
+        if (anyVisible && hasDividerBeforeChildAt(count)) {
+            total += dividerSize;
+        }
+        return total;
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         if (mOrientation == VERTICAL) {
@@ -444,6 +471,7 @@ public class LinearLayout extends ViewGroup {
                 final int totalLength = mTotalLength;
                 mTotalLength = Math.max(totalLength, totalLength + largestChildHeight + lp.topMargin + lp.bottomMargin);
             }
+            mTotalLength += dividerLength(count, mDividerHeight);
         }
 
         mTotalLength += mPaddingTop + mPaddingBottom;
@@ -492,6 +520,7 @@ public class LinearLayout extends ViewGroup {
                 mTotalLength = Math.max(totalLength, totalLength + child.getMeasuredHeight() + lp.topMargin
                         + lp.bottomMargin);
             }
+            mTotalLength += dividerLength(count, mDividerHeight);
             mTotalLength += mPaddingTop + mPaddingBottom;
         } else {
             alternativeMaxWidth = Math.max(alternativeMaxWidth, weightedMaxWidth);
@@ -667,6 +696,7 @@ public class LinearLayout extends ViewGroup {
                             + lp.rightMargin);
                 }
             }
+            mTotalLength += dividerLength(count, mDividerWidth);
         }
         mTotalLength += mPaddingLeft + mPaddingRight;
         int widthSize = mTotalLength;
@@ -729,6 +759,7 @@ public class LinearLayout extends ViewGroup {
                     }
                 }
             }
+            mTotalLength += dividerLength(count, mDividerWidth);
             mTotalLength += mPaddingLeft + mPaddingRight;
             if (maxAscent[INDEX_TOP] != -1 || maxAscent[INDEX_CENTER_VERTICAL] != -1
                     || maxAscent[INDEX_BOTTOM] != -1 || maxAscent[INDEX_FILL] != -1) {
@@ -968,6 +999,23 @@ public class LinearLayout extends ViewGroup {
                 drawVerticalDivider(canvas, child.getLeft() - lp.leftMargin - mDividerWidth);
             }
         }
+        if (hasDividerBeforeChildAt(count)) {
+            // layoutHorizontal() reserves the ending divider's space after the
+            // rightmost child: the last child, or the first one in RTL, where
+            // the children are laid out in reverse.
+            final boolean rtl = isLayoutRtl();
+            View last = null;
+            for (int i = 0; i < count; i++) {
+                View c = getVirtualChildAt(rtl ? i : count - 1 - i);
+                if (c != null && c.getVisibility() != GONE) {
+                    last = c;
+                    break;
+                }
+            }
+            int left = last == null ? getWidth() - mPaddingRight - mDividerWidth
+                    : last.getRight() + ((LayoutParams) last.getLayoutParams()).rightMargin;
+            drawVerticalDivider(canvas, left);
+        }
     }
 
     void drawHorizontalDivider(Canvas canvas, int top) {
@@ -980,6 +1028,12 @@ public class LinearLayout extends ViewGroup {
         mDivider.setBounds(left, mPaddingTop + mDividerPadding, left + mDividerWidth,
                 getHeight() - mPaddingBottom - mDividerPadding);
         mDivider.draw(canvas);
+    }
+
+    /// A plain layout never scrolls, so a child's press and drag start at once.
+    @Override
+    public boolean shouldDelayChildPressedState() {
+        return false;
     }
 
     public CharSequence getAccessibilityClassName() {

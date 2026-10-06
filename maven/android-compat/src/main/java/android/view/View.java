@@ -262,6 +262,9 @@ public class View implements Drawable.Callback {
     protected ViewGroup.LayoutParams mLayoutParams;
     private Drawable mBackground;
     private Drawable mForeground;
+    private int mForegroundGravity = Gravity.FILL;
+    private Rect mForegroundSelfBounds;
+    private Rect mForegroundBounds;
     private ColorStateList mBackgroundTint;
     private PorterDuff.Mode mBackgroundTintMode;
     private int mVisibility = VISIBLE;
@@ -1941,7 +1944,17 @@ public class View implements Drawable.Callback {
         invalidate();
     }
 
+    /// Where the foreground drawable sits; [Gravity#FILL], the default,
+    /// stretches it over the whole view.
     public void setForegroundGravity(int gravity) {
+        if (mForegroundGravity != gravity) {
+            mForegroundGravity = gravity;
+            invalidate();
+        }
+    }
+
+    public int getForegroundGravity() {
+        return mForegroundGravity;
     }
 
     protected boolean verifyDrawable(Drawable who) {
@@ -2400,12 +2413,33 @@ public class View implements Drawable.Callback {
 
     public void onDrawForeground(Canvas canvas) {
         Drawable fg = mForeground;
-        if (fg != null) {
-            if (fg.getBounds().width() != getWidth() || fg.getBounds().height() != getHeight()) {
-                fg.setBounds(0, 0, getWidth(), getHeight());
-            }
-            fg.draw(canvas);
+        if (fg == null) {
+            return;
         }
+        final int width = getWidth();
+        final int height = getHeight();
+        final int gravity = mForegroundGravity;
+        if ((gravity & Gravity.FILL) == Gravity.FILL) {
+            if (fg.getBounds().width() != width || fg.getBounds().height() != height) {
+                fg.setBounds(0, 0, width, height);
+            }
+        } else {
+            // A drawable with no intrinsic size (a color) fills that axis
+            // rather than collapsing to nothing.
+            int fgWidth = fg.getIntrinsicWidth();
+            int fgHeight = fg.getIntrinsicHeight();
+            if (mForegroundSelfBounds == null) {
+                mForegroundSelfBounds = new Rect();
+                mForegroundBounds = new Rect();
+            }
+            mForegroundSelfBounds.set(0, 0, width, height);
+            Gravity.apply(gravity, fgWidth < 0 ? width : fgWidth, fgHeight < 0 ? height : fgHeight,
+                    mForegroundSelfBounds, mForegroundBounds, getLayoutDirection());
+            if (!fg.getBounds().equals(mForegroundBounds)) {
+                fg.setBounds(mForegroundBounds);
+            }
+        }
+        fg.draw(canvas);
     }
 
     // ------------------------------------------------------------ scrolling
@@ -2659,6 +2693,20 @@ public class View implements Drawable.Callback {
     }
 
     public void playSoundEffect(int soundConstant) {
+    }
+
+    /// True when an ancestor may turn a touch into a scroll -- one whose
+    /// [ViewGroup#shouldDelayChildPressedState()] answers true -- so a control
+    /// that drags should wait for the gesture's direction before claiming it.
+    public boolean isInScrollingContainer() {
+        ViewParent p = mParent;
+        while (p instanceof ViewGroup) {
+            if (((ViewGroup) p).shouldDelayChildPressedState()) {
+                return true;
+            }
+            p = p.getParent();
+        }
+        return false;
     }
 
     public boolean dispatchTouchEvent(MotionEvent event) {

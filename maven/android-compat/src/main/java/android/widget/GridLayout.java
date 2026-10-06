@@ -642,4 +642,10 @@ public class GridLayout extends ViewGroup {
     public CharSequence getAccessibilityClassName() {
         return GridLayout.class.getName();
     }
+
+    /// A plain layout never scrolls, so a child's press and drag start at once.
+    @Override
+    public boolean shouldDelayChildPressedState() {
+        return false;
+    }
 }
