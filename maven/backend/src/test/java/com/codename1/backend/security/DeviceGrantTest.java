@@ -99,6 +99,132 @@ class DeviceGrantTest {
         return json(reply);
     }
 
+    private static final String JSON = "application/json";
+
+    private static Reply postJson(SecuredServer server, String csrf, String... pairs)
+            throws Exception {
+        Map<String, Object> body = new java.util.LinkedHashMap<String, Object>();
+        for (int iter = 0 ; iter + 1 < pairs.length ; iter += 2) {
+            body.put(pairs[iter], pairs[iter + 1]);
+        }
+        String text = com.codename1.backend.Json.write(body);
+        return csrf == null ? server.call("POST", PAGE, text, JSON, "Accept", JSON)
+                : server.call("POST", PAGE, text, JSON, "Accept", JSON, "X-CSRF-TOKEN", csrf);
+    }
+
+    @Test
+    @DisplayName("the verification endpoint as JSON: the same steps and the same protections, for an app's own screen")
+    void theJsonForm() throws Exception {
+        try (SecuredServer server = start(as -> { })) {
+            Map device = begin(server, "openid profile");
+            String userCode = (String) device.get("user_code");
+
+            // Signed out, a program is told so; it is not sent to a login page.
+            Reply signedOut = server.get(PAGE, "Accept", JSON);
+            assertEquals(401, signedOut.status, signedOut.toString());
+            assertEquals("login_required", json(signedOut).get("error"));
+
+            assertEquals(302, OAuth2Testing.signIn(server, "ada", "ada-pw").status);
+            Reply first = server.get(PAGE, "Accept", JSON);
+            assertEquals(200, first.status, first.toString());
+            assertEquals("no-store", first.header("Cache-Control"));
+            assertEquals("frame-ancestors 'none'", first.header("Content-Security-Policy"));
+            Map csrfInfo = (Map) json(first).get("csrf");
+            assertEquals("X-CSRF-TOKEN", csrfInfo.get("headerName"));
+            assertEquals("_csrf", csrfInfo.get("parameterName"));
+            String csrf = (String) csrfInfo.get("token");
+            // The same token the page would have carried.
+            assertNotNull(csrf);
+
+            // CSRF protection covers the JSON posts as it covers the form's.
+            assertEquals(403, postJson(server, null, "user_code", userCode).status);
+            refused(pollLater(server, device), "authorization_pending");
+
+            // A wrong code, and what a body that is not JSON is called.
+            Reply wrong = postJson(server, csrf, "user_code", "BBBB-BBBB");
+            assertEquals(400, wrong.status, wrong.toString());
+            assertEquals("invalid_grant", json(wrong).get("error"));
+            Reply garbage = server.call("POST", PAGE, "user_code=" + userCode, JSON, "Accept",
+                    JSON, "X-CSRF-TOKEN", csrf);
+            assertEquals(400, garbage.status, garbage.toString());
+            assertEquals("invalid_request", json(garbage).get("error"));
+
+            // The lookup: who is asking, for what, and the ticket of the question.
+            Reply looked = postJson(server, csrf, "user_code", userCode.toLowerCase());
+            assertEquals(200, looked.status, looked.toString());
+            Map question = json(looked);
+            assertEquals(userCode, question.get("user_code"));
+            assertEquals("app", question.get("client_id"));
+            assertEquals("Acme App", question.get("client_name"));
+            assertEquals("openid profile", question.get("scope"));
+            assertEquals("ada", question.get("principal"));
+            String ticket = (String) question.get("ticket");
+            assertEquals(43, ticket.length());
+            refused(pollLater(server, device), "authorization_pending");
+
+            // An answer without the ticket, or with another's, decides nothing
+            // -- and spends the question it was not the answer to.
+            Reply forged = postJson(server, csrf, "user_code", userCode, "decision", "approve",
+                    "ticket", OAuth2Parameters.random(32));
+            assertEquals(400, forged.status, forged.toString());
+            assertEquals("invalid_request", json(forged).get("error"));
+            assertTrue(forged.body.contains("does not carry the ticket"), forged.body);
+            Reply late = postJson(server, csrf, "user_code", userCode, "decision", "approve",
+                    "ticket", ticket);
+            assertEquals(400, late.status, "the ticket is good once: " + late);
+            assertEquals(400, postJson(server, csrf, "user_code", userCode, "decision",
+                    "approve").status);
+            refused(pollLater(server, device), "authorization_pending");
+
+            // Asked again and answered with that question's ticket.
+            ticket = (String) json(postJson(server, csrf, "user_code", userCode)).get("ticket");
+            Reply approved = postJson(server, csrf, "user_code", userCode, "decision", "approve",
+                    "ticket", ticket);
+            assertEquals(200, approved.status, approved.toString());
+            assertEquals("{\"status\":\"approved\"}", approved.body);
+            Reply reply = pollLater(server, device);
+            assertEquals(200, reply.status, reply.toString());
+            assertEquals("ada", OAuth2Testing.verify((String) json(reply).get("access_token"),
+                    server.get("/oauth2/jwks").body).getSubject());
+            // The code worked once.
+            assertEquals("invalid_grant", json(postJson(server, csrf, "user_code", userCode))
+                    .get("error"));
+
+            // Refusing, the same way.
+            Map second = begin(server, "openid");
+            String code = (String) second.get("user_code");
+            ticket = (String) json(postJson(server, csrf, "user_code", code)).get("ticket");
+            Reply denied = postJson(server, csrf, "user_code", code, "decision", "deny",
+                    "ticket", ticket);
+            assertEquals("{\"status\":\"denied\"}", denied.body);
+            refused(pollLater(server, second), "access_denied");
+
+            // A browser on the same endpoint still gets the page.
+            assertTrue(server.get(PAGE, "Accept", "text/html,application/json;q=0.9").body
+                    .contains("<form method=\"post\""));
+        }
+    }
+
+    @Test
+    @DisplayName("tries through the JSON form are counted with the page's, and limited as slow_down")
+    void theJsonFormIsLimited() throws Exception {
+        try (SecuredServer server = startConfigured("3", "90", null, as -> { })) {
+            assertEquals(302, OAuth2Testing.signIn(server, "ada", "ada-pw").status);
+            Map device = begin(server, "openid");
+            String csrf = (String) ((Map) json(server.get(PAGE, "Accept", JSON)).get("csrf"))
+                    .get("token");
+            // One through the page and two through JSON: one count.
+            assertEquals(200, server.post(PAGE, form("user_code", "BBBBBBBB", "_csrf", csrf))
+                    .status);
+            assertEquals(400, postJson(server, csrf, "user_code", "BBBBBBBB").status);
+            assertEquals(400, postJson(server, csrf, "user_code", "BBBBBBBB").status);
+            Reply limited = postJson(server, csrf, "user_code", (String) device.get("user_code"));
+            assertEquals(429, limited.status, limited.toString());
+            assertEquals("slow_down", json(limited).get("error"));
+            assertEquals("90", limited.header("Retry-After"));
+        }
+    }
+
     @Test
     @DisplayName("a device names the resource server its tokens are for when it asks for its codes")
     void theAudienceOfADeviceGrant() throws Exception {

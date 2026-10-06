@@ -57,6 +57,7 @@ public final class OAuth2AuthorizationEndpointFilter implements SecurityFilter {
         CsrfToken token = CsrfFilter.getToken(request);
         return server.deviceVerification(request, authentication,
                 token == null ? null : token.getParameterName(),
+                token == null ? null : token.getHeaderName(),
                 token == null ? null : token.getToken());
     }
 }

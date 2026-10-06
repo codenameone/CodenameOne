@@ -28,6 +28,19 @@ curl -d grant_type=urn:ietf:params:oauth:grant-type:device_code \
      https://id.example.com/oauth2/token
 // end::backend-security-bash-device[]
 
+// tag::backend-security-bash-device-json[]
+curl -b cookies.txt -H "Accept: application/json" \
+     https://id.example.com/oauth2/device_verification
+
+curl -b cookies.txt -H "Content-Type: application/json" -H "X-CSRF-TOKEN: the-token" \
+     -d '{"user_code":"BCDF-GHJK"}' \
+     https://id.example.com/oauth2/device_verification
+
+curl -b cookies.txt -H "Content-Type: application/json" -H "X-CSRF-TOKEN: the-token" \
+     -d '{"user_code":"BCDF-GHJK","ticket":"the-ticket","decision":"approve"}' \
+     https://id.example.com/oauth2/device_verification
+// end::backend-security-bash-device-json[]
+
 // tag::backend-security-bash-apk-hash[]
 keytool -exportcert -alias upload -keystore release.keystore \
     | openssl sha256 -binary | openssl base64 | tr '+/' '-_' | tr -d '='

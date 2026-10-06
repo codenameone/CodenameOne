@@ -1186,19 +1186,205 @@ public final class OAuth2AuthorizationServer {
     /// @param csrfToken its value
     public HttpServer.Response deviceVerification(HttpServer.Request request,
             Authentication authentication, String csrfParameter, String csrfToken) {
+        return deviceVerification(request, authentication, csrfParameter, null, csrfToken);
+    }
+
+    /// [#deviceVerification(HttpServer.Request, Authentication, String, String)],
+    /// told the header a CSRF token may come back in as well.
+    ///
+    /// The endpoint has two forms, and the request chooses. A browser gets the
+    /// pages. A request that asks for JSON -- its `Accept` names
+    /// `application/json` and not `text/html`, or its body is
+    /// `application/json` -- gets the same three steps as data, so that an
+    /// application that signed the user in itself can put its own screen in
+    /// front of them:
+    ///
+    /// 1. `GET`: `{"csrf": {"headerName", "parameterName", "token"}}`, the
+    ///    token a post must carry when the chain protects against CSRF.
+    /// 2. `POST {"user_code": "..."}`: the question, as
+    ///    `{"user_code", "client_id", "client_name", "scope", "principal",
+    ///    "ticket"}`.
+    /// 3. `POST {"user_code": "...", "ticket": "...", "decision": "approve"}`
+    ///    or `"deny"`: `{"status": "approved"}` or `{"status": "denied"}`.
+    ///
+    /// Nothing is relaxed for it. The user must be signed in -- a request that
+    /// is not is answered 401 `login_required` rather than sent to a login
+    /// page -- the chain's CSRF protection covers both posts, each try at a
+    /// code is counted, and an answer counts only with the ticket this server
+    /// put in that session with the question, once. A code that is not valid
+    /// is 400 `invalid_grant`, an answer without its ticket 400
+    /// `invalid_request`, and too many tries 429 `slow_down`.
+    ///
+    /// @param csrfHeader the name of the header a CSRF token may be sent in,
+    /// or null
+    public HttpServer.Response deviceVerification(HttpServer.Request request,
+            Authentication authentication, String csrfParameter, String csrfHeader,
+            String csrfToken) {
+        boolean json = asksForJson(request);
         if (authentication == null) {
+            if (json) {
+                // A program, which cannot use a login page: told so directly.
+                return error(401, OAuth2ErrorCodes.LOGIN_REQUIRED, "Nobody is signed in", null);
+            }
             throw new InsufficientAuthenticationException(
                     "Full authentication is required to approve a device");
         }
         try {
-            return verificationChecked(request, authentication, csrfParameter, csrfToken);
+            return json ? verificationJson(request, authentication, csrfParameter, csrfHeader,
+                    csrfToken) : verificationChecked(request, authentication, csrfParameter,
+                    csrfToken);
         } catch (Refusal refusal) {
             return refusal.response();
         } catch (IllegalStateException failed) {
             System.err.println("cn1: the device verification page could not answer: "
                     + failed.getMessage());
-            return page(500, "<p role=\"alert\">The server could not answer. Try again.</p>");
+            return json ? error(500, OAuth2ErrorCodes.SERVER_ERROR, "The server could not answer",
+                    null) : page(500, "<p role=\"alert\">The server could not answer. Try "
+                    + "again.</p>");
         }
+    }
+
+    /// Whether a request to the verification endpoint wants its JSON form.
+    private static boolean asksForJson(HttpServer.Request request) {
+        if (isJson(request.getHeader("Content-Type"))) {
+            return true;
+        }
+        String accept = request.getHeader("Accept");
+        return accept != null && contains(accept, "application/json")
+                && !contains(accept, "text/html");
+    }
+
+    private static boolean isJson(String contentType) {
+        return contentType != null && contentType.trim().regionMatches(true, 0,
+                "application/json", 0, 16);
+    }
+
+    /// Whether `header` names `type`, in any case: a media type is ASCII, and
+    /// is compared without folding either side.
+    private static boolean contains(String header, String type) {
+        for (int at = 0 ; at + type.length() <= header.length() ; at++) {
+            if (header.regionMatches(true, at, type, 0, type.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// What one step at the verification endpoint comes to, whichever form
+    /// asked: the pages and the JSON are two ways of writing these down.
+    private static final class Verification {
+        static final int LIMITED = 0;
+        static final int INVALID = 1;
+        static final int QUESTION = 2;
+        static final int NO_TICKET = 3;
+        static final int APPROVED = 4;
+        static final int DENIED = 5;
+
+        final int outcome;
+        long retryAfter;
+        String typed;
+        String ticket;
+        String who;
+        RegisteredClient client;
+        OAuth2Authorization authorization;
+
+        Verification(int outcome) {
+            this.outcome = outcome;
+        }
+    }
+
+    /// One post to the verification endpoint: a code looked up, or a question
+    /// answered.
+    ///
+    /// @param typed the user code as sent
+    /// @param decision `approve`, `deny`, or null for a lookup
+    /// @param ticket what came back with the decision
+    /// @param reask whether an answer without its ticket is turned into the
+    /// question again, as the page does, rather than refused
+    private Verification verify(HttpServer.Request request, Authentication authentication,
+            String typed, String decision, String ticket, boolean reask) {
+        typed = normalizeUserCode(typed);
+        String who = authentication.getName();
+        // Counted before the code is looked at, wrong or right: what is being
+        // bounded is how many codes one user may try.
+        boolean allowed = verificationLimiter != null
+                ? verificationLimiter.tryAcquire("device-verification:" + who)
+                : attempts.tryAcquire(who, clock.currentTimeMillis());
+        if (!allowed) {
+            Verification limited = new Verification(Verification.LIMITED);
+            long wait = verificationLimiter != null
+                    ? verificationLimiter.retryAfterSeconds("device-verification:" + who)
+                    : attempts.windowMillis / 1000L;
+            limited.retryAfter = wait < 1 ? 1 : wait;
+            return limited;
+        }
+        long now = clock.currentTimeMillis();
+        String hash = OAuth2Parameters.sha256(typed);
+        OAuth2AuthorizationService.StoredToken stored = typed.length() == USER_CODE_LENGTH
+                ? authorizations.findToken(OAuth2AuthorizationService.USER_CODE, hash) : null;
+        OAuth2Authorization authorization = stored == null || stored.isUsed()
+                || stored.getExpiresAt() <= now ? null
+                : authorizations.findById(stored.getAuthorizationId());
+        RegisteredClient client = authorization == null ? null
+                : clients.findById(authorization.getRegisteredClientId());
+        if (client == null || !OAuth2Authorization.PENDING.equals(authorization.getStatus())) {
+            return new Verification(Verification.INVALID);
+        }
+        HttpSession session = request.getSession(decision == null);
+        if (decision != null) {
+            // An answer counts only from the question this server put to this
+            // session: the ticket that went out with it comes back, once. The
+            // chain's CSRF protection covers this form too, but a device handed
+            // to whoever asks is not left to a setting an application may have
+            // turned off.
+            Object issued = session == null ? null : session.getAttribute(DEVICE_TICKET);
+            if (session != null) {
+                session.removeAttribute(DEVICE_TICKET);
+            }
+            if (!(issued instanceof String) || ticket == null
+                    || !OAuth2Parameters.equalsConstantTime((String) issued, ticket + "." + hash)) {
+                if (!reask) {
+                    return new Verification(Verification.NO_TICKET);
+                }
+                decision = null;
+            }
+        }
+        if (decision == null) {
+            if (session == null) {
+                // An answer that arrived with no session at all -- a user signed
+                // in by credentials on the request itself, or one whose session
+                // ended while the question was on their screen. It was discarded
+                // above like any answer without its ticket; the question it is
+                // asked instead needs somewhere to keep the new one.
+                session = request.getSession(true);
+            }
+            Verification question = new Verification(Verification.QUESTION);
+            question.ticket = OAuth2Parameters.random(32);
+            session.setAttribute(DEVICE_TICKET, question.ticket + "." + hash);
+            question.typed = typed;
+            question.who = who;
+            question.client = client;
+            question.authorization = authorization;
+            return question;
+        }
+        boolean approve = "approve".equals(decision);
+        // The code is used up by one statement, and only the request that used
+        // it up answers the grant.
+        if (!authorizations.consumeToken(OAuth2AuthorizationService.USER_CODE, hash, now)) {
+            return new Verification(Verification.INVALID);
+        }
+        Map<String, Object> attributes = new LinkedHashMap<String, Object>();
+        attributes.put("auth_time", Long.valueOf(authTime(request, now)));
+        attributes.put("authorities", authorities(authentication));
+        Object resource = authorization.getAttribute(RESOURCE);
+        if (resource != null) {
+            // What the device asked the tokens to be for is part of the grant.
+            attributes.put(RESOURCE, resource);
+        }
+        if (!authorizations.decide(authorization.getId(), approve, who, attributes)) {
+            return new Verification(Verification.INVALID);
+        }
+        return new Verification(approve ? Verification.APPROVED : Verification.DENIED);
     }
 
     private HttpServer.Response verificationChecked(HttpServer.Request request,
@@ -1212,106 +1398,131 @@ public final class OAuth2AuthorizationServer {
                     normalizeUserCode(request.queryParam("user_code")), null));
         }
         requireMethod(request, "POST");
-        String typed = normalizeUserCode(param(request, "user_code"));
-        String who = authentication.getName();
-        // Counted before the code is looked at, wrong or right: what is being
-        // bounded is how many codes one user may try.
-        boolean allowed = verificationLimiter != null
-                ? verificationLimiter.tryAcquire("device-verification:" + who)
-                : attempts.tryAcquire(who, clock.currentTimeMillis());
-        if (!allowed) {
-            HttpServer.Response busy = page(429, "<p role=\"alert\">Too many codes were tried. "
-                    + "Wait a few minutes and try again.</p>");
-            long wait = verificationLimiter != null
-                    ? verificationLimiter.retryAfterSeconds("device-verification:" + who)
-                    : attempts.windowMillis / 1000L;
-            return busy.header("Retry-After", String.valueOf(wait < 1 ? 1 : wait));
+        Verification step = verify(request, authentication, param(request, "user_code"),
+                param(request, "decision"), param(request, "ticket"), true);
+        switch (step.outcome) {
+            case Verification.LIMITED:
+                return page(429, "<p role=\"alert\">Too many codes were tried. "
+                        + "Wait a few minutes and try again.</p>")
+                        .header("Retry-After", String.valueOf(step.retryAfter));
+            case Verification.QUESTION:
+                return page(200, question(step, action, hidden));
+            case Verification.APPROVED:
+                return page(200, "<h2>Device approved</h2>\n<p>You can go back to it now.</p>\n");
+            case Verification.DENIED:
+                return page(200, "<h2>Device refused</h2>\n<p>Nothing was given access.</p>\n");
+            default:
+                return page(200, codeForm(action, hidden, "",
+                        "That code is not valid, or has expired. Check the device and try "
+                        + "again."));
         }
-        long now = clock.currentTimeMillis();
-        String hash = OAuth2Parameters.sha256(typed);
-        OAuth2AuthorizationService.StoredToken stored = typed.length() == USER_CODE_LENGTH
-                ? authorizations.findToken(OAuth2AuthorizationService.USER_CODE, hash) : null;
-        OAuth2Authorization authorization = stored == null || stored.isUsed()
-                || stored.getExpiresAt() <= now ? null
-                : authorizations.findById(stored.getAuthorizationId());
-        RegisteredClient client = authorization == null ? null
-                : clients.findById(authorization.getRegisteredClientId());
-        if (client == null || !OAuth2Authorization.PENDING.equals(authorization.getStatus())) {
-            return page(200, codeForm(action, hidden, "",
-                    "That code is not valid, or has expired. Check the device and try again."));
+    }
+
+    /// The question, naming who is asking: a code somebody else sent the user
+    /// is for a device of theirs, and this is where the user sees it.
+    private static String question(Verification step, String action, String hidden) {
+        StringBuilder body = new StringBuilder();
+        body.append("<h2>Sign in a device</h2>\n<p><strong>").append(escape(
+                step.client.getClientName())).append("</strong> is asking to act as <strong>")
+            .append(escape(step.who)).append("</strong>");
+        if (!step.authorization.getScopes().isEmpty()) {
+            body.append(", with: ").append(escape(OAuth2Parameters.scopes(
+                    step.authorization.getScopes())));
         }
-        String decision = param(request, "decision");
-        HttpSession session = request.getSession(decision == null);
-        if (decision != null) {
-            // An answer counts only from the question this server put to this
-            // session: the ticket that went out with it comes back, once. The
-            // chain's CSRF protection covers this form too, but a device handed
-            // to whoever asks is not left to a setting an application may have
-            // turned off.
-            Object issued = session == null ? null : session.getAttribute(DEVICE_TICKET);
-            String ticket = param(request, "ticket");
-            if (session != null) {
-                session.removeAttribute(DEVICE_TICKET);
+        body.append(".</p>\n<p>Approve only if you started this on a device of your own, and "
+                + "the code it shows is ").append(step.typed.substring(0, 4)).append('-')
+                .append(step.typed.substring(4)).append(".</p>\n<form method=\"post\" action=\"")
+                .append(action).append("\">\n").append(hidden)
+                .append("<input type=\"hidden\" name=\"ticket\" value=\"").append(step.ticket)
+                .append("\">\n")
+                .append("<input type=\"hidden\" name=\"user_code\" value=\"").append(step.typed)
+                .append("\">\n<button type=\"submit\" name=\"decision\" value=\"approve\">Approve"
+                    + "</button>\n<button type=\"submit\" name=\"decision\" value=\"deny\">Deny"
+                    + "</button>\n</form>\n");
+        return body.toString();
+    }
+
+    /// The verification endpoint for a request that asked for JSON; see
+    /// [#deviceVerification(HttpServer.Request, Authentication, String, String, String)].
+    private HttpServer.Response verificationJson(HttpServer.Request request,
+            Authentication authentication, String csrfParameter, String csrfHeader,
+            String csrfToken) {
+        Map<String, Object> answer = new LinkedHashMap<String, Object>();
+        if ("GET".equals(request.getMethod())) {
+            if (csrfToken != null) {
+                Map<String, Object> csrf = new LinkedHashMap<String, Object>();
+                if (csrfHeader != null) {
+                    csrf.put("headerName", csrfHeader);
+                }
+                if (csrfParameter != null) {
+                    csrf.put("parameterName", csrfParameter);
+                }
+                csrf.put("token", csrfToken);
+                answer.put("csrf", csrf);
             }
-            if (!(issued instanceof String) || ticket == null
-                    || !OAuth2Parameters.equalsConstantTime((String) issued, ticket + "." + hash)) {
-                decision = null;
+            return frameless(json(200, answer));
+        }
+        requireMethod(request, "POST");
+        Map sent = null;
+        if (isJson(request.getHeader("Content-Type"))) {
+            try {
+                sent = Json.parseObject(request.getBody());
+            } catch (IOException malformed) {
+                sent = null;
+            } catch (RuntimeException malformed) {
+                sent = null;
+            }
+            if (sent == null) {
+                throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST,
+                        "The body is not a JSON object");
             }
         }
-        if (decision == null) {
-            if (session == null) {
-                // An answer that arrived with no session at all -- a user signed
-                // in by credentials on the request itself, or one whose session
-                // ended while the question was on their screen. It was discarded
-                // above like any answer without its ticket; the question it is
-                // asked instead needs somewhere to keep the new one.
-                session = request.getSession(true);
-            }
-            String ticket = OAuth2Parameters.random(32);
-            session.setAttribute(DEVICE_TICKET, ticket + "." + hash);
-            // The question, naming who is asking: a code somebody else sent the
-            // user is for a device of theirs, and this is where the user sees it.
-            StringBuilder body = new StringBuilder();
-            body.append("<h2>Sign in a device</h2>\n<p><strong>").append(escape(
-                    client.getClientName())).append("</strong> is asking to act as <strong>")
-                .append(escape(who)).append("</strong>");
-            if (!authorization.getScopes().isEmpty()) {
-                body.append(", with: ").append(escape(OAuth2Parameters.scopes(
-                        authorization.getScopes())));
-            }
-            body.append(".</p>\n<p>Approve only if you started this on a device of your own, and "
-                    + "the code it shows is ").append(typed.substring(0, 4)).append('-')
-                    .append(typed.substring(4)).append(".</p>\n<form method=\"post\" action=\"")
-                    .append(action).append("\">\n").append(hidden)
-                    .append("<input type=\"hidden\" name=\"ticket\" value=\"").append(ticket)
-                    .append("\">\n")
-                    .append("<input type=\"hidden\" name=\"user_code\" value=\"").append(typed)
-                    .append("\">\n<button type=\"submit\" name=\"decision\" value=\"approve\">Approve"
-                        + "</button>\n<button type=\"submit\" name=\"decision\" value=\"deny\">Deny"
-                        + "</button>\n</form>\n");
-            return page(200, body.toString());
+        Verification step = verify(request, authentication, text(request, sent, "user_code"),
+                text(request, sent, "decision"), text(request, sent, "ticket"), false);
+        switch (step.outcome) {
+            case Verification.LIMITED:
+                return frameless(error(429, OAuth2ErrorCodes.SLOW_DOWN,
+                        "Too many codes were tried; wait and try again", null)
+                        .header("Retry-After", String.valueOf(step.retryAfter)));
+            case Verification.QUESTION:
+                answer.put("user_code", step.typed.substring(0, 4) + "-"
+                        + step.typed.substring(4));
+                answer.put("client_id", step.client.getClientId());
+                answer.put("client_name", step.client.getClientName());
+                answer.put("scope", OAuth2Parameters.scopes(step.authorization.getScopes()));
+                answer.put("principal", step.who);
+                answer.put("ticket", step.ticket);
+                return frameless(json(200, answer));
+            case Verification.NO_TICKET:
+                return frameless(error(400, OAuth2ErrorCodes.INVALID_REQUEST, "The answer does "
+                        + "not carry the ticket of the question it answers; look the code up "
+                        + "again", null));
+            case Verification.APPROVED:
+                answer.put("status", "approved");
+                return frameless(json(200, answer));
+            case Verification.DENIED:
+                answer.put("status", "denied");
+                return frameless(json(200, answer));
+            default:
+                return frameless(error(400, OAuth2ErrorCodes.INVALID_GRANT,
+                        "That code is not valid, or has expired", null));
         }
-        boolean approve = "approve".equals(decision);
-        // The code is used up by one statement, and only the request that used
-        // it up answers the grant.
-        if (!authorizations.consumeToken(OAuth2AuthorizationService.USER_CODE, hash, now)) {
-            return page(200, codeForm(action, hidden, "",
-                    "That code is not valid, or has expired. Check the device and try again."));
+    }
+
+    /// A field of a JSON body, as text; of the form or the query when the
+    /// request sent no JSON. Null when it is absent or is not text.
+    private static String text(HttpServer.Request request, Map sent, String name) {
+        if (sent == null) {
+            return param(request, name);
         }
-        Map<String, Object> attributes = new LinkedHashMap<String, Object>();
-        attributes.put("auth_time", Long.valueOf(authTime(request, now)));
-        attributes.put("authorities", authorities(authentication));
-        Object resource = authorization.getAttribute(RESOURCE);
-        if (resource != null) {
-            // What the device asked the tokens to be for is part of the grant.
-            attributes.put(RESOURCE, resource);
-        }
-        if (!authorizations.decide(authorization.getId(), approve, who, attributes)) {
-            return page(200, codeForm(action, hidden, "",
-                    "That code is not valid, or has expired. Check the device and try again."));
-        }
-        return page(200, approve ? "<h2>Device approved</h2>\n<p>You can go back to it now.</p>\n"
-                : "<h2>Device refused</h2>\n<p>Nothing was given access.</p>\n");
+        Object value = sent.get(name);
+        return value instanceof String ? (String) value : null;
+    }
+
+    /// `response`, never to be shown in a frame: it is an answer about a
+    /// signed-in user, as the pages are.
+    private static HttpServer.Response frameless(HttpServer.Response response) {
+        return response.header("Content-Security-Policy", "frame-ancestors 'none'");
     }
 
     private static String codeForm(String action, String hidden, String code, String problem) {

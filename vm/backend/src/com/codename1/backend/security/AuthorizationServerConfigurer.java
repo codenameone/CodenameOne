@@ -70,7 +70,7 @@ import java.io.IOException;
 /// | `GET /oauth2/jwks` | the public halves of the signing keys |
 /// | `POST /oauth2/revoke` | revocation (RFC 7009) |
 /// | `POST /oauth2/device_authorization` | starts a device grant (RFC 8628) |
-/// | `/oauth2/device_verification` | the page where the signed-in user types the device's code |
+/// | `/oauth2/device_verification` | the page where the signed-in user types the device's code, and the same steps as JSON for a request that asks for it |
 /// | `GET /userinfo` | the user's claims, for an access token granted `openid` |
 /// | `GET /.well-known/openid-configuration`, `/.well-known/oauth-authorization-server` | the metadata |
 ///

@@ -986,6 +986,29 @@ asked by name whether to let that client in. Until they answer, the device's
 polling is answered `authorization_pending`, `slow_down`, `access_denied` or
 `expired_token`.
 
+The verification endpoint also answers in JSON, for an application that
+signed the user in itself and wants its own approval screen. A request gets
+the JSON form when its `Accept` header names `application/json` and not
+`text/html`, or when its body is `application/json`:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.sh[tag=backend-security-bash-device-json,indent=0]
+----
+
+The first request answers with the CSRF token to send back, when the chain has
+CSRF protection. The second looks the code up and answers with `client_id`,
+`client_name`, `scope`, `principal` and a `ticket`. The third carries that
+ticket with `"decision": "approve"` or `"deny"`, and is answered
+`{"status":"approved"}` or `{"status":"denied"}`.
+
+Nothing is relaxed for the JSON form. The user has to be signed in, and a
+request that isn't is answered `401` with `login_required` instead of a
+redirect. The chain's CSRF protection covers both posts. An answer counts only
+with the ticket from the lookup in the same session, and a ticket works once.
+A code that isn't valid is `invalid_grant`, an answer without its ticket is
+`invalid_request`, and too many tries is `429` with `slow_down`.
+
 One user may try ten codes in five minutes at the verification page. Change
 the numbers with
 `cn1.security.authorizationserver.device.verificationAttempts` and
