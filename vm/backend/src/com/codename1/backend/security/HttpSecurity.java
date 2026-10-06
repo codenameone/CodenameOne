@@ -264,6 +264,19 @@ public final class HttpSecurity {
         return this;
     }
 
+    /// A second factor at sign-in; see [MfaConfigurer]. Brings sign-out with
+    /// it, as [#formLogin] does.
+    public HttpSecurity mfa(Customizer<MfaConfigurer> customizer) {
+        MfaConfigurer configurer = getConfigurer(MfaConfigurer.class);
+        if (configurer == null) {
+            configurer = new MfaConfigurer();
+            apply(configurer);
+            sessionMechanism();
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
     /// Sign-in with an API key; see [ApiKeyConfigurer].
     public HttpSecurity apiKey(Customizer<ApiKeyConfigurer> customizer) {
         ApiKeyConfigurer configurer = getConfigurer(ApiKeyConfigurer.class);

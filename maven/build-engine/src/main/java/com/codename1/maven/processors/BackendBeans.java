@@ -155,6 +155,11 @@ final class BackendBeans {
         SECURITY_PKG + "apikey/ApiKeyRepository",
         // What rateLimit() counts with, when the rule names none.
         SECURITY_PKG + "ratelimit/RateLimiter",
+        // What rememberMe() and mfa() use when the chain names none of its own.
+        SECURITY_PKG + "rememberme/RememberMeServices",
+        SECURITY_PKG + "rememberme/PersistentTokenRepository",
+        SECURITY_PKG + "mfa/TotpService",
+        SECURITY_PKG + "mfa/RecoveryCodeService",
     };
 
     static final String SINGLETON = "singleton";

@@ -1,0 +1,213 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend.security;
+
+import com.codename1.backend.HttpServer;
+import com.codename1.backend.HttpSession;
+import com.codename1.backend.security.core.userdetails.User;
+import com.codename1.backend.security.mfa.RecoveryCodeService;
+import com.codename1.backend.security.mfa.TotpService;
+import com.codename1.backend.security.ratelimit.RateLimiter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Asks a user who has a second factor for it, between their password being
+/// accepted and their being signed in.
+///
+/// It is the chain's [SecondFactorPolicy]: handed an authentication whose first
+/// factor has passed, it signs nobody in. It notes in the session who is
+/// waiting -- a marker that is not a security context, and that lasts five
+/// minutes unless set otherwise -- and redirects to the page that asks for the
+/// code. Until the code arrives every request of that session is anonymous.
+///
+/// It is also the filter that takes the code, at `POST /login/mfa` unless
+/// changed, in the field `code`: a one-time code from the user's authenticator
+/// app, or one of their recovery codes. A right one completes the sign-in
+/// through the chain's [SessionSignIn] -- the session id changes, the context
+/// is stored, remember-me is issued if it was asked for at the first step, and
+/// the user goes where they were going. A wrong one is counted against the
+/// session, and too many of them are answered 429 until time has passed.
+public final class SecondFactorAuthenticationFilter implements SecurityFilter, SecondFactorPolicy {
+    /// The session attribute the pending sign-in is kept under.
+    public static final String PENDING = "CN1_SECURITY_SECOND_FACTOR_PENDING";
+
+    private final TotpService totp;
+    private final RecoveryCodeService recoveryCodes;
+    private final String page;
+    private final boolean servePage;
+    private final String processingUrl;
+    private final String codeParameter;
+    private final long pendingMillis;
+    private final RateLimiter attempts;
+    private final AuthenticationSuccessHandler successHandler;
+    private final AuthenticationFailureHandler expiredHandler;
+    private final Clock clock;
+    private SessionSignIn signIn;
+
+    SecondFactorAuthenticationFilter(TotpService totp, RecoveryCodeService recoveryCodes,
+            String page, boolean servePage, String processingUrl, String codeParameter,
+            long pendingMillis, RateLimiter attempts, AuthenticationSuccessHandler successHandler,
+            AuthenticationFailureHandler expiredHandler, Clock clock) {
+        this.totp = totp;
+        this.recoveryCodes = recoveryCodes;
+        this.page = page;
+        this.servePage = servePage;
+        this.processingUrl = processingUrl;
+        this.codeParameter = codeParameter;
+        this.pendingMillis = pendingMillis;
+        this.attempts = attempts;
+        this.successHandler = successHandler;
+        this.expiredHandler = expiredHandler;
+        this.clock = clock;
+    }
+
+    /// Given once the chain's sign-in exists, which is after this is installed
+    /// as its policy.
+    void signIn(SessionSignIn signIn) {
+        this.signIn = signIn;
+    }
+
+    // ------------------------------------------------------------ the policy
+
+    @Override
+    public HttpServer.Response intercept(HttpServer.Request request,
+            Authentication authentication, boolean rememberMe) {
+        if (authentication == null || !totp.isEnabled(authentication.getName())) {
+            return null;
+        }
+        Map<String, Object> pending = new LinkedHashMap<String, Object>();
+        pending.put("name", authentication.getName());
+        List<String> authorities = new ArrayList<String>();
+        for (GrantedAuthority authority : authentication.getAuthorities()) {
+            authorities.add(authority.getAuthority());
+        }
+        pending.put("authorities", authorities);
+        pending.put("expires", Long.valueOf(clock.currentTimeMillis() + pendingMillis));
+        pending.put("remember", Boolean.valueOf(rememberMe));
+        HttpSession session = request.getSession(true);
+        // Whatever the session held of an earlier user is not this one's, and
+        // an id handed out before a password was accepted is not kept either.
+        session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        session.changeSessionId();
+        session.setAttribute(PENDING, pending);
+        return Responses.redirect(page);
+    }
+
+    // ------------------------------------------------------------ the filter
+
+    @Override
+    public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
+            throws Exception {
+        String path = SecurityExchange.path(request);
+        if (servePage && "GET".equals(request.getMethod()) && page.equals(path)) {
+            return page(request);
+        }
+        if (!"POST".equals(request.getMethod()) || !processingUrl.equals(path)) {
+            return chain.doFilter(request);
+        }
+        HttpSession session = request.getSession(false);
+        Object stored = session == null ? null : session.getAttribute(PENDING);
+        if (!(stored instanceof Map)) {
+            return expired(request, session);
+        }
+        Map pending = (Map) stored;
+        Object name = pending.get("name");
+        Object expires = pending.get("expires");
+        if (!(name instanceof String) || !(expires instanceof Number)
+                || ((Number) expires).longValue() < clock.currentTimeMillis()) {
+            return expired(request, session);
+        }
+        // Counted before the code is looked at, right or wrong: a guess costs
+        // an attempt whether or not it would have been accepted.
+        String counted = "mfa:" + session.getId();
+        if (attempts != null && !attempts.tryAcquire(counted)) {
+            long wait = attempts.retryAfterSeconds(counted);
+            return Responses.status(429, "Too Many Requests")
+                    .header("Retry-After", String.valueOf(wait < 1 ? 1 : wait));
+        }
+        String user = (String) name;
+        String code = Responses.param(request, codeParameter);
+        boolean accepted = code != null && (totp.verify(user, code)
+                || (recoveryCodes != null && recoveryCodes.consume(user, code)));
+        if (!accepted) {
+            return Responses.redirect(page + "?error");
+        }
+        session.removeAttribute(PENDING);
+        List<GrantedAuthority> authorities = new ArrayList<GrantedAuthority>();
+        Object listed = pending.get("authorities");
+        if (listed instanceof List) {
+            for (Object authority : (List) listed) {
+                if (authority instanceof String && ((String) authority).length() > 0) {
+                    authorities.add(new SimpleGrantedAuthority((String) authority));
+                }
+            }
+        }
+        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
+                new User(user, "", authorities), null, authorities);
+        SessionSignIn complete = signIn;
+        if (complete == null) {
+            throw new IllegalStateException("The second factor filter was not given the "
+                    + "chain's sign-in; it is installed by http.mfa(...)");
+        }
+        return complete.complete(request, authentication,
+                Boolean.TRUE.equals(pending.get("remember")), successHandler);
+    }
+
+    private HttpServer.Response expired(HttpServer.Request request, HttpSession session)
+            throws Exception {
+        if (session != null && session.getAttribute(PENDING) != null) {
+            session.removeAttribute(PENDING);
+        }
+        return expiredHandler.onAuthenticationFailure(request,
+                new InsufficientAuthenticationException("The sign-in was not completed in time; "
+                        + "start again"));
+    }
+
+    private HttpServer.Response page(HttpServer.Request request) {
+        boolean error = request.queryParam("error") != null;
+        CsrfToken token = CsrfFilter.getToken(request);
+        StringBuilder html = new StringBuilder(1024);
+        html.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n")
+            .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
+            .append("<title>Enter your code</title>\n</head>\n<body>\n")
+            .append("<form method=\"post\" action=\"").append(Responses.escape(processingUrl))
+            .append("\">\n<h2>Enter your code</h2>\n");
+        if (error) {
+            html.append("<p role=\"alert\">That code was not accepted</p>\n");
+        }
+        html.append("<p><label for=\"code\">The code from your authenticator app, or a "
+                + "recovery code</label>\n<input type=\"text\" id=\"code\" name=\"")
+            .append(Responses.escape(codeParameter))
+            .append("\" required autofocus autocomplete=\"one-time-code\" "
+                + "inputmode=\"numeric\"></p>\n");
+        if (token != null) {
+            html.append("<input type=\"hidden\" name=\"")
+                .append(Responses.escape(token.getParameterName())).append("\" value=\"")
+                .append(Responses.escape(token.getToken())).append("\">\n");
+        }
+        html.append("<button type=\"submit\">Continue</button>\n</form>\n</body>\n</html>\n");
+        return Responses.html(200, html.toString());
+    }
+}
