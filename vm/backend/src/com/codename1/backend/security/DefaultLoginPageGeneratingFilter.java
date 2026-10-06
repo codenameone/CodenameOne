@@ -57,11 +57,12 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
         boolean loggedOut = request.queryParam("logout") != null;
         CsrfToken token = CsrfFilter.getToken(request);
         StringBuilder page = new StringBuilder(1024);
-        page.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n")
-            .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
-            .append("<title>Please sign in</title>\n</head>\n<body>\n")
-            .append("<form method=\"post\" action=\"").append(Responses.escape(processingUrl))
-            .append("\">\n<h2>Please sign in</h2>\n");
+        page.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n");
+        page.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
+        page.append("<title>Please sign in</title>\n</head>\n<body>\n");
+        page.append("<form method=\"post\" action=\"");
+        page.append(Responses.escape(processingUrl));
+        page.append("\">\n<h2>Please sign in</h2>\n");
         if (error) {
             page.append("<p role=\"alert\">Bad credentials</p>\n");
         }
@@ -69,15 +70,17 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
             page.append("<p role=\"status\">You have been signed out</p>\n");
         }
         page.append("<p><label for=\"username\">Username</label>\n<input type=\"text\" id=\"username\" "
-                + "name=\"").append(Responses.escape(usernameParameter))
-            .append("\" required autofocus autocomplete=\"username\"></p>\n")
-            .append("<p><label for=\"password\">Password</label>\n<input type=\"password\" "
-                + "id=\"password\" name=\"").append(Responses.escape(passwordParameter))
-            .append("\" required autocomplete=\"current-password\"></p>\n");
+                + "name=\"");
+        page.append(Responses.escape(usernameParameter));
+        page.append("\" required autofocus autocomplete=\"username\"></p>\n");
+        page.append("<p><label for=\"password\">Password</label>\n<input type=\"password\" "
+                + "id=\"password\" name=\"");
+        page.append(Responses.escape(passwordParameter));
+        page.append("\" required autocomplete=\"current-password\"></p>\n");
         if (rememberMeParameter != null) {
-            page.append("<p><input type=\"checkbox\" id=\"remember-me\" name=\"")
-                .append(Responses.escape(rememberMeParameter))
-                .append("\"> <label for=\"remember-me\">Remember me on this computer</label></p>\n");
+            page.append("<p><input type=\"checkbox\" id=\"remember-me\" name=\"");
+            page.append(Responses.escape(rememberMeParameter));
+            page.append("\"> <label for=\"remember-me\">Remember me on this computer</label></p>\n");
         }
         if (token != null) {
             page.append("<input type=\"hidden\" name=\"")

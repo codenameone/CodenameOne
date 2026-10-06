@@ -189,18 +189,19 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         boolean error = request.queryParam("error") != null;
         CsrfToken token = CsrfFilter.getToken(request);
         StringBuilder html = new StringBuilder(1024);
-        html.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n")
-            .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
-            .append("<title>Enter your code</title>\n</head>\n<body>\n")
-            .append("<form method=\"post\" action=\"").append(Responses.escape(processingUrl))
-            .append("\">\n<h2>Enter your code</h2>\n");
+        html.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n");
+        html.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
+        html.append("<title>Enter your code</title>\n</head>\n<body>\n");
+        html.append("<form method=\"post\" action=\"");
+        html.append(Responses.escape(processingUrl));
+        html.append("\">\n<h2>Enter your code</h2>\n");
         if (error) {
             html.append("<p role=\"alert\">That code was not accepted</p>\n");
         }
         html.append("<p><label for=\"code\">The code from your authenticator app, or a "
-                + "recovery code</label>\n<input type=\"text\" id=\"code\" name=\"")
-            .append(Responses.escape(codeParameter))
-            .append("\" required autofocus autocomplete=\"one-time-code\" "
+                + "recovery code</label>\n<input type=\"text\" id=\"code\" name=\"");
+        html.append(Responses.escape(codeParameter));
+        html.append("\" required autofocus autocomplete=\"one-time-code\" "
                 + "inputmode=\"numeric\"></p>\n");
         if (token != null) {
             html.append("<input type=\"hidden\" name=\"")

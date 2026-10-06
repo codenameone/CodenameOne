@@ -330,6 +330,29 @@
                             <goal>checkstyle</goal>
                         </goals>
                     </execution>
+                    <!-- The goal above only writes the report: on its own it
+                         lets verify pass with any number of errors in it, and
+                         the report was only ever judged by the quality script
+                         PR CI runs afterwards. So six errors sat here while
+                         every local build was green. This one reads the same
+                         sources and fails verify on any violation of severity
+                         error, which is what "zero errors" has to mean on a
+                         developer's machine too. The core's ruleset is all
+                         errors or nothing, so there is no lower severity to
+                         let through. -->
+                    <execution>
+                        <id>checkstyle-zero-errors</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <failOnViolation>true</failOnViolation>
+                            <violationSeverity>error</violationSeverity>
+                            <maxAllowedViolations>0</maxAllowedViolations>
+                            <logViolationsToConsole>true</logViolationsToConsole>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
