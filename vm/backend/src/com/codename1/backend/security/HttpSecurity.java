@@ -101,6 +101,7 @@ public final class HttpSecurity {
         filterOrder.put(LogoutFilter.class, Integer.valueOf(500));
         filterOrder.put(UsernamePasswordAuthenticationFilter.class, Integer.valueOf(1000));
         filterOrder.put(DefaultLoginPageGeneratingFilter.class, Integer.valueOf(1100));
+        filterOrder.put(ApiKeyAuthenticationFilter.class, Integer.valueOf(1200));
         filterOrder.put(BearerTokenAuthenticationFilter.class, Integer.valueOf(1300));
         filterOrder.put(BasicAuthenticationFilter.class, Integer.valueOf(1500));
         filterOrder.put(AnonymousAuthenticationFilter.class, Integer.valueOf(2000));
@@ -165,6 +166,12 @@ public final class HttpSecurity {
     /// [OAuth2ResourceServerConfigurer].
     public HttpSecurity oauth2ResourceServer(Customizer<OAuth2ResourceServerConfigurer> customizer) {
         customizer.customize(getOrApply(OAuth2ResourceServerConfigurer.class));
+        return this;
+    }
+
+    /// Sign-in with an API key; see [ApiKeyConfigurer].
+    public HttpSecurity apiKey(Customizer<ApiKeyConfigurer> customizer) {
+        customizer.customize(getOrApply(ApiKeyConfigurer.class));
         return this;
     }
 
@@ -434,6 +441,8 @@ public final class HttpSecurity {
             created = new AnonymousConfigurer();
         } else if (type == OAuth2ResourceServerConfigurer.class) { //NOPMD CompareObjectsWithEquals
             created = new OAuth2ResourceServerConfigurer();
+        } else if (type == ApiKeyConfigurer.class) { //NOPMD CompareObjectsWithEquals
+            created = new ApiKeyConfigurer();
         } else {
             throw new IllegalArgumentException("Not a built-in configurer: " + type.getName());
         }
