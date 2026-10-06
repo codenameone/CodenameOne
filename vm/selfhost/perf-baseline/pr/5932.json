@@ -1,28 +1,6 @@
 {
  "pr": 5932,
  "rebaseline": {
-  "linux-x64@amd-epyc-9v74-80-core-processor": {
-   "objectAllocation": {
-    "all": {
-     "from": {
-      "memory": 0.388,
-      "time": 4.756,
-      "tolerance": {
-       "memory": 0.3,
-       "time": 0.5
-      }
-     },
-     "memory": 0.388,
-     "reason": "#5940's cheaper allocation path and generational collection; this runner's baseline predates it (the fold that followed #5940 did not cover amd-epyc-9v74)",
-     "runs": 1,
-     "time": 1.17,
-     "tolerance": {
-      "memory": 0.3,
-      "time": 0.5
-     }
-    }
-   }
-  },
   "windows-x64@intel64-family-6-model-173-genuineintel": {
    "objectAllocation": {
     "all": {
