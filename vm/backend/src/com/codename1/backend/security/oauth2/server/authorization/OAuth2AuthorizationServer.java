@@ -73,6 +73,7 @@ public final class OAuth2AuthorizationServer {
     private static final long PURGE_GRACE_MILLIS = 600000;
     private static final long REUSE_GRACE_MILLIS = 10000;
     private static final String AUTH_TIME = "cn1.security.oauth2.authTime";
+    private static final String DEVICE_TICKET = "cn1.security.oauth2.deviceTicket";
 
     private final AuthorizationServerSettings settings;
     private final String fixedIssuer;
@@ -1129,7 +1130,26 @@ public final class OAuth2AuthorizationServer {
                     "That code is not valid, or has expired. Check the device and try again."));
         }
         String decision = param(request, "decision");
+        HttpSession session = request.getSession(decision == null);
+        if (decision != null) {
+            // An answer counts only from the question this server put to this
+            // session: the ticket that went out with it comes back, once. The
+            // chain's CSRF protection covers this form too, but a device handed
+            // to whoever asks is not left to a setting an application may have
+            // turned off.
+            Object issued = session == null ? null : session.getAttribute(DEVICE_TICKET);
+            String ticket = param(request, "ticket");
+            if (session != null) {
+                session.removeAttribute(DEVICE_TICKET);
+            }
+            if (!(issued instanceof String) || ticket == null
+                    || !OAuth2Parameters.equalsConstantTime((String) issued, ticket + "." + hash)) {
+                decision = null;
+            }
+        }
         if (decision == null) {
+            String ticket = OAuth2Parameters.random(32);
+            session.setAttribute(DEVICE_TICKET, ticket + "." + hash);
             // The question, naming who is asking: a code somebody else sent the
             // user is for a device of theirs, and this is where the user sees it.
             StringBuilder body = new StringBuilder();
@@ -1144,6 +1164,8 @@ public final class OAuth2AuthorizationServer {
                     + "the code it shows is ").append(typed.substring(0, 4)).append('-')
                     .append(typed.substring(4)).append(".</p>\n<form method=\"post\" action=\"")
                     .append(action).append("\">\n").append(hidden)
+                    .append("<input type=\"hidden\" name=\"ticket\" value=\"").append(ticket)
+                    .append("\">\n")
                     .append("<input type=\"hidden\" name=\"user_code\" value=\"").append(typed)
                     .append("\">\n<button type=\"submit\" name=\"decision\" value=\"approve\">Approve"
                         + "</button>\n<button type=\"submit\" name=\"decision\" value=\"deny\">Deny"
@@ -1160,7 +1182,10 @@ public final class OAuth2AuthorizationServer {
         Map<String, Object> attributes = new LinkedHashMap<String, Object>();
         attributes.put("auth_time", Long.valueOf(authTime(request, now)));
         attributes.put("authorities", authorities(authentication));
-        authorizations.decide(authorization.getId(), approve, who, attributes);
+        if (!authorizations.decide(authorization.getId(), approve, who, attributes)) {
+            return page(200, codeForm(action, hidden, "",
+                    "That code is not valid, or has expired. Check the device and try again."));
+        }
         return page(200, approve ? "<h2>Device approved</h2>\n<p>You can go back to it now.</p>\n"
                 : "<h2>Device refused</h2>\n<p>Nothing was given access.</p>\n");
     }

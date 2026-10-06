@@ -163,8 +163,19 @@ class DeviceGrantTest {
             assertTrue(question.body.contains(userCode), question.body);
             refused(pollLater(server, device), "authorization_pending");
 
+            // An answer that does not come from that question decides nothing,
+            // whatever else it carries: not without the ticket, not with another's.
+            for (String ticket : new String[] {null, OAuth2Parameters.random(32)}) {
+                Reply forged = server.post(PAGE, form("user_code", userCode, "decision",
+                        "approve", "ticket", ticket, "_csrf", csrf));
+                assertTrue(forged.body.contains("is asking to act as"), forged.body);
+                question = forged;
+            }
+            refused(pollLater(server, device), "authorization_pending");
+
             Reply approved = server.post(PAGE, form("user_code", field(question.body, "user_code"),
-                    "decision", "approve", "_csrf", field(question.body, "_csrf")));
+                    "decision", "approve", "ticket", field(question.body, "ticket"), "_csrf",
+                    field(question.body, "_csrf")));
             assertEquals(200, approved.status, approved.toString());
             assertTrue(approved.body.contains("Device approved"), approved.body);
 
@@ -195,6 +206,17 @@ class DeviceGrantTest {
         }
     }
 
+    /// Types the code, and answers the question that follows.
+    private static Reply answer(SecuredServer server, Object userCode, String decision,
+                                String csrf) throws Exception {
+        Reply question = server.post(PAGE, form("user_code", (String) userCode, "_csrf", csrf));
+        if (!question.body.contains("name=\"ticket\"")) {
+            return question;
+        }
+        return server.post(PAGE, form("user_code", (String) userCode, "decision", decision,
+                "ticket", field(question.body, "ticket"), "_csrf", csrf));
+    }
+
     private Reply pollLater(SecuredServer server, Map device) throws Exception {
         clock.now += 5000;
         return poll(server, device.get("device_code"));
@@ -207,8 +229,7 @@ class DeviceGrantTest {
             assertEquals(302, OAuth2Testing.signIn(server, "ada", "ada-pw").status);
             Map device = begin(server, "openid");
             String csrf = field(server.get(PAGE).body, "_csrf");
-            Reply denied = server.post(PAGE, form("user_code", (String) device.get("user_code"),
-                    "decision", "deny", "_csrf", csrf));
+            Reply denied = answer(server, device.get("user_code"), "deny", csrf);
             assertTrue(denied.body.contains("Device refused"), denied.body);
             refused(poll(server, device.get("device_code")), "access_denied");
             // And that is the end of it.
@@ -217,8 +238,7 @@ class DeviceGrantTest {
             Map late = begin(server, "openid");
             clock.now += 301000;
             refused(poll(server, late.get("device_code")), "expired_token");
-            Reply tooLate = server.post(PAGE, form("user_code", (String) late.get("user_code"),
-                    "decision", "approve", "_csrf", csrf));
+            Reply tooLate = answer(server, late.get("user_code"), "approve", csrf);
             assertTrue(tooLate.body.contains("That code is not valid"), tooLate.body);
 
             // Another client's device code, a made-up one, a client without the
@@ -264,8 +284,8 @@ class DeviceGrantTest {
             // Five minutes later the user may try again.
             clock.now += 300000;
             Map again = begin(server, "openid");
-            assertTrue(server.post(PAGE, form("user_code", (String) again.get("user_code"),
-                    "decision", "approve", "_csrf", csrf)).body.contains("Device approved"));
+            assertTrue(answer(server, again.get("user_code"), "approve", csrf).body.contains(
+                    "Device approved"));
         }
         // Codes do not repeat, and are spread over the alphabet.
         Set<String> seen = new HashSet<String>();

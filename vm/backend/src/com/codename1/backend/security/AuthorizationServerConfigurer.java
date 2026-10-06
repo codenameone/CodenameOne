@@ -103,8 +103,10 @@ import java.io.IOException;
 ///   too -- the rotation is what protects it there.
 /// - `client_credentials`, for a client with a secret.
 /// - `urn:ietf:params:oauth:grant-type:device_code`: the device shows a code
-///   of eight letters, the user types it at the verification page and
-///   approves, and the device's polling is answered `authorization_pending`,
+///   of eight letters, the user types it at the verification page, is asked
+///   -- by name -- whether to let that client in, and approves; the answer
+///   counts only from the question this server put to that session. The
+///   device's polling is answered `authorization_pending`,
 ///   `slow_down`, `access_denied` or `expired_token` until it is.
 ///
 /// A client is never granted a scope it was not registered with, and there is
