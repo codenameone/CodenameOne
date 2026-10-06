@@ -169,6 +169,11 @@ final class BackendBeans {
         SECURITY_PKG + "oauth2/server/authorization/OAuth2AuthorizationService",
         SECURITY_PKG + "crypto/JwkSource",
         SECURITY_PKG + "oauth2/jwt/JwtEncoder",
+        // Where webAuthn() keeps passkeys, or the ceremonies themselves when
+        // the application makes them.
+        SECURITY_PKG + "webauthn/UserCredentialRepository",
+        SECURITY_PKG + "webauthn/PublicKeyCredentialUserEntityRepository",
+        SECURITY_PKG + "webauthn/WebAuthnRelyingPartyOperations",
     };
 
     static final String SINGLETON = "singleton";

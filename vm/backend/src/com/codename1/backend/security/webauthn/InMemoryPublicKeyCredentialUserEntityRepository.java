@@ -23,7 +23,6 @@
 package com.codename1.backend.security.webauthn;
 
 import com.codename1.backend.Base64Url;
-import com.codename1.backend.security.SecuritySchema;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,6 +37,21 @@ public final class InMemoryPublicKeyCredentialUserEntityRepository
     private final Map<String, PublicKeyCredentialUserEntity> byId =
             new HashMap<String, PublicKeyCredentialUserEntity>();
 
+    /// A name as users are keyed by it: `A` to `Z` folded to lower case and
+    /// nothing else, as the database-backed repository keys them. Folded here
+    /// rather than by the schema's own method, so that a server which keeps
+    /// passkeys in memory does not carry the schema.
+    private static String key(String username) {
+        char[] chars = username.toCharArray();
+        for (int iter = 0 ; iter < chars.length ; iter++) {
+            char c = chars[iter];
+            if (c >= 'A' && c <= 'Z') {
+                chars[iter] = (char) (c + ('a' - 'A'));
+            }
+        }
+        return new String(chars);
+    }
+
     @Override
     public synchronized PublicKeyCredentialUserEntity findById(byte[] id) {
         return id == null ? null : byId.get(Base64Url.encode(id));
@@ -45,12 +59,12 @@ public final class InMemoryPublicKeyCredentialUserEntityRepository
 
     @Override
     public synchronized PublicKeyCredentialUserEntity findByUsername(String username) {
-        return username == null ? null : byName.get(SecuritySchema.usernameKey(username));
+        return username == null ? null : byName.get(key(username));
     }
 
     @Override
     public synchronized PublicKeyCredentialUserEntity save(PublicKeyCredentialUserEntity user) {
-        String key = SecuritySchema.usernameKey(user.getName());
+        String key = key(user.getName());
         PublicKeyCredentialUserEntity first = byName.get(key);
         if (first != null) {
             return first;
@@ -71,7 +85,7 @@ public final class InMemoryPublicKeyCredentialUserEntityRepository
         }
         PublicKeyCredentialUserEntity gone = byId.remove(Base64Url.encode(id));
         if (gone != null) {
-            byName.remove(SecuritySchema.usernameKey(gone.getName()));
+            byName.remove(key(gone.getName()));
         }
     }
 }

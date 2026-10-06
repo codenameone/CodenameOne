@@ -70,11 +70,30 @@ public final class SessionSignIn {
     /// @return the answer to the request
     public HttpServer.Response success(HttpServer.Request request, Authentication authentication,
                                        AuthenticationSuccessHandler handler) throws Exception {
+        return success(request, authentication, handler, false);
+    }
+
+    /// A mechanism accepted `authentication`, and says whether what it checked
+    /// was two factors already.
+    ///
+    /// A passkey whose authenticator verified the user -- a fingerprint, a
+    /// PIN -- is something they have and something they are or know, in one
+    /// step: asking for a one-time code after it would add nothing, so the
+    /// chain's [SecondFactorPolicy] is not consulted. A mechanism that checked
+    /// one factor passes false, and the policy decides as it does for a
+    /// password.
+    ///
+    /// @param secondFactorSatisfied true when the sign-in needs no second
+    /// factor whatever the chain's policy would say
+    /// @return the answer to the request
+    public HttpServer.Response success(HttpServer.Request request, Authentication authentication,
+                                       AuthenticationSuccessHandler handler,
+                                       boolean secondFactorSatisfied) throws Exception {
         boolean remember = false;
         for (Listener listener : listeners) {
             remember |= listener.requested(request);
         }
-        if (secondFactor != null) {
+        if (secondFactor != null && !secondFactorSatisfied) {
             HttpServer.Response held = secondFactor.intercept(request, authentication, remember);
             if (held != null) {
                 // Not signed in yet, and the request must not look as if it were.

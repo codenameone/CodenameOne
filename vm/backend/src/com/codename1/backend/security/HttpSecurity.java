@@ -58,7 +58,7 @@ import java.util.Map;
 /// brings sign-out and the memory of where a request was going with it --
 /// [#httpBasic], [#oauth2Login], [#oauth2ResourceServer],
 /// [#authorizationServer], [#apiKey], [#rateLimit], [#rememberMe], [#mfa],
-/// [#logout] and [#requestCache]. A server that only
+/// [#webAuthn], [#logout] and [#requestCache]. A server that only
 /// verifies tokens has no login page, no password hashing and no user store in
 /// it. The one departure from Spring Security this makes: a chain without
 /// `formLogin` has no `POST /logout` until it calls [#logout].
@@ -107,6 +107,7 @@ public final class HttpSecurity {
     static final int ORDER_OAUTH2_AUTHORIZATION_REQUEST = 600;
     static final int ORDER_AUTHORIZATION_SERVER = 700;
     static final int ORDER_OAUTH2_LOGIN = 900;
+    static final int ORDER_WEBAUTHN_LOGIN = 950;
     static final int ORDER_FORM_LOGIN = 1000;
     static final int ORDER_SECOND_FACTOR = 1050;
     static final int ORDER_LOGIN_PAGE = 1100;
@@ -119,6 +120,7 @@ public final class HttpSecurity {
     static final int ORDER_EXCEPTION_TRANSLATION = 2400;
     static final int ORDER_AUTHORIZATION_SERVER_USER = 2450;
     static final int ORDER_AUTHORIZATION = 2500;
+    static final int ORDER_WEBAUTHN_REGISTRATION = 2600;
     /// {Integer order, SecurityFilter}, in the order they were added.
     private final List<Object[]> filters = new ArrayList<Object[]>();
     private final List<RequestMatcher> permitted = new ArrayList<RequestMatcher>();
@@ -161,6 +163,8 @@ public final class HttpSecurity {
                 Integer.valueOf(ORDER_AUTHORIZATION_SERVER));
         filterOrder.put(PACKAGE + "OAuth2LoginAuthenticationFilter",
                 Integer.valueOf(ORDER_OAUTH2_LOGIN));
+        filterOrder.put(PACKAGE + "WebAuthnAuthenticationFilter",
+                Integer.valueOf(ORDER_WEBAUTHN_LOGIN));
         filterOrder.put(PACKAGE + "UsernamePasswordAuthenticationFilter",
                 Integer.valueOf(ORDER_FORM_LOGIN));
         filterOrder.put(PACKAGE + "SecondFactorAuthenticationFilter",
@@ -180,6 +184,10 @@ public final class HttpSecurity {
         filterOrder.put(PACKAGE + "OAuth2AuthorizationEndpointFilter",
                 Integer.valueOf(ORDER_AUTHORIZATION_SERVER_USER));
         filterOrder.put(PACKAGE + "AuthorizationFilter", Integer.valueOf(ORDER_AUTHORIZATION));
+        // After the rules, as the one filter that is: registering a passkey is
+        // something a signed-in user does, and the rules are what say who is.
+        filterOrder.put(PACKAGE + "WebAuthnRegistrationFilter",
+                Integer.valueOf(ORDER_WEBAUTHN_REGISTRATION));
         // What every chain has until it says otherwise.
         apply(new SecurityContextConfigurer());
         apply(new HeadersConfigurer());
@@ -312,6 +320,20 @@ public final class HttpSecurity {
         MfaConfigurer configurer = getConfigurer(MfaConfigurer.class);
         if (configurer == null) {
             configurer = new MfaConfigurer();
+            apply(configurer);
+            sessionMechanism();
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
+    /// Passkeys: registering one for a user who is signed in, and signing in
+    /// with one; see [WebAuthnConfigurer]. Brings sign-out with it, as
+    /// [#formLogin] does.
+    public HttpSecurity webAuthn(Customizer<WebAuthnConfigurer> customizer) {
+        WebAuthnConfigurer configurer = getConfigurer(WebAuthnConfigurer.class);
+        if (configurer == null) {
+            configurer = new WebAuthnConfigurer();
             apply(configurer);
             sessionMechanism();
         }
@@ -715,8 +737,8 @@ public final class HttpSecurity {
 
     /// Keeps one more kind of [Authentication] in the session as itself; see
     /// [AuthenticationCodec]. Called before the chain is built, or from a
-    /// configurer's `init`: a way of signing in that has a kind of its own,
-    /// such as [#oauth2Login], calls it for its own.
+    /// configurer's `init`: the ways of signing in that have a kind of their
+    /// own -- [#oauth2Login], [#webAuthn] -- each call it for theirs.
     public HttpSecurity authenticationCodec(AuthenticationCodec codec) {
         if (codec == null) {
             throw new IllegalArgumentException("codec cannot be null");
