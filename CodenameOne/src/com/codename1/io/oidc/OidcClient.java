@@ -31,6 +31,7 @@ import com.codename1.io.Util;
 import com.codename1.security.Jwt;
 import com.codename1.security.SecureRandom;
 import com.codename1.ui.CN;
+import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.StringUtil;
@@ -672,11 +673,28 @@ public final class OidcClient {
     }
 
     /// Lets one [OidcRequestAuthorizer] follow the tokens this client obtains and clears.
+    /// Called on the event dispatch thread.
     void setTokenListener(OidcRequestAuthorizer listener) {
         this.tokenListener = listener;
     }
 
-    private void tokensChanged(OidcTokens tokens) {
+    /// Tells the authorizer following this client. A token response is read on a network
+    /// thread, and the authorizer's state belongs to the event dispatch thread, so this is
+    /// where the tokens are handed over: the listener is looked up and told on the EDT.
+    private void tokensChanged(final OidcTokens tokens) {
+        if (Display.isInitialized() && !CN.isEdt()) {
+            CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    tellTokenListener(tokens);
+                }
+            });
+            return;
+        }
+        tellTokenListener(tokens);
+    }
+
+    private void tellTokenListener(OidcTokens tokens) {
         if (tokenListener != null) {
             tokenListener.tokensChanged(tokens);
         }

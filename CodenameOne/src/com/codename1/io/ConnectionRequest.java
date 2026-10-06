@@ -192,8 +192,10 @@ public class ConnectionRequest implements IOProgressListener {
     private int authorizationAttempt;
     /// The header the service refused, sent again by the attempt that delivers the refusal.
     private String refusedAuthorization;
-    /// The scheme and authority an authorizer set on this request first sent its header to.
-    private String authorizationOrigin;
+    /// What the event dispatch thread decided about this request's header when it queued or
+    /// released it: an immutable value, handed over with the request. The network thread
+    /// reads this and never calls the authorizer, whose state belongs to the EDT.
+    private CapturedAuthorization capturedAuthorization;
     /// True from the moment a 401 is held until the request is queued again or given up.
     boolean authorizationPending;
     /// Whether the request is being kept out of the queue while its authorizer renews a
@@ -735,52 +737,90 @@ public class ConnectionRequest implements IOProgressListener {
         return authorizer;
     }
 
+    /// The header an authorizer supplied for a request, with the addresses it may be sent
+    /// to. Created on the event dispatch thread and never changed, so it can be handed to a
+    /// network thread with the request.
+    static final class CapturedAuthorization {
+        /// Whose header this is. Only ever called on the EDT.
+        final RequestAuthorizer authorizer;
+        /// The header value, or null when the authorizer had none to give.
+        final String value;
+        /// The origin the header may be sent to.
+        final String origin;
+        /// The base path it may be sent under, without a trailing slash; null for an
+        /// authorizer set on the request, which has no base URL and is held to the origin.
+        final String path;
+
+        CapturedAuthorization(RequestAuthorizer authorizer, String value, String origin,
+                String path) {
+            this.authorizer = authorizer;
+            this.value = value;
+            this.origin = origin;
+            this.path = path;
+        }
+    }
+
+    /// The authorizer this request would take its header from, and the addresses that
+    /// header may go to; the value itself is still to be asked for. Null for a request that
+    /// carries its own `Authorization` header, or has no authorizer. Called on the EDT.
+    ///
+    /// `fresh` says the request is being queued by the application, as opposed to sent again
+    /// after a refusal: an authorizer set on the request is then held to the origin the
+    /// request has now, and otherwise to the one it was first sent to.
+    private CapturedAuthorization authorizerInCharge(boolean fresh) {
+        NetworkManager nm = NetworkManager.getInstance();
+        if (getRequestHeader("Authorization") != null || nm.hasDefaultAuthorizationHeader()) {
+            // The caller's own header wins, and so does a default header of NetworkManager.
+            // Neither is an authorizer's to renew, and the authorizer is not asked.
+            return null;
+        }
+        if (authorizer != null) {
+            // A default authorizer is matched against the URL of every attempt, so a redirect
+            // away from its base URL drops it. One set on the request has no base URL to be
+            // matched against, so it is held to the first origin instead.
+            CapturedAuthorization before = capturedAuthorization;
+            String origin = !fresh && before != null && before.path == null
+                    ? before.origin : originOf(url);
+            return new CapturedAuthorization(authorizer, null, origin, null);
+        }
+        return nm.defaultAuthorization(url);
+    }
+
     /// The authorizer to ask, as this request is queued, whether its credential needs
     /// renewing first: the one that would add this request's header, when it is one that can
     /// tell. Null for a request that carries its own `Authorization` header, or none.
+    /// Called on the EDT.
     RequestAuthorizer.Proactive proactiveAuthorizer() {
-        RequestAuthorizer a = authorizer;
-        if (a == null) {
-            a = NetworkManager.getInstance().getAuthorizer(url);
-        }
-        if (!(a instanceof RequestAuthorizer.Proactive) || getRequestHeader("Authorization") != null) {
+        CapturedAuthorization inCharge = authorizerInCharge(true);
+        if (inCharge == null || !(inCharge.authorizer instanceof RequestAuthorizer.Proactive)) {
             return null;
         }
-        return (RequestAuthorizer.Proactive) a;
+        return (RequestAuthorizer.Proactive) inCharge.authorizer;
     }
 
-    /// Decides what `Authorization` header, if any, an authorizer adds to the attempt about to
-    /// be made, and records whose it is so a 401 can be taken back to the same authorizer.
-    private String resolveAuthorization() {
-        attachedAuthorizer = null;
-        attachedAuthorization = null;
-        RequestAuthorizer a = authorizer;
-        boolean own = a != null;
-        if (!own) {
-            a = NetworkManager.getInstance().getAuthorizer(url);
-        }
-        if (a == null || getRequestHeader("Authorization") != null) {
-            // The caller's own header wins, and so does a default header of NetworkManager,
-            // which is on the request by now. Neither is this authorizer's to renew.
+    /// Asks the authorizer for the header of the attempt about to be queued. Called on the
+    /// EDT -- the only thread an authorizer is called on -- and answered with a value the
+    /// network thread can be given.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fresh`: true when the application is queueing the request, false when it is sent
+    ///   again after a refusal
+    ///
+    /// #### Returns
+    ///
+    /// what to send and where, or null for a request no authorizer adds a header to
+    CapturedAuthorization captureAuthorization(boolean fresh) {
+        CapturedAuthorization inCharge = authorizerInCharge(fresh);
+        if (inCharge == null) {
             return null;
         }
-        if (own) {
-            // A default authorizer is matched against the URL of every attempt, so a redirect
-            // away from its base URL drops it. One set on the request has no base URL to be
-            // matched against, so it is held to the first host instead.
-            String origin = originOf(url);
-            if (authorizationOrigin == null) {
-                authorizationOrigin = origin;
-            } else if (!authorizationOrigin.equals(origin)) {
-                return null;
-            }
-        }
         String value;
-        if (authorizationAttempt == AUTHORIZATION_REFUSED) {
+        if (!fresh && authorizationAttempt == AUTHORIZATION_REFUSED) {
             value = refusedAuthorization;
         } else {
             try {
-                value = a.getAuthorization(this);
+                value = inCharge.authorizer.getAuthorization(this);
             } catch (RuntimeException err) {
                 // An authorizer that throws must not take the request down with it: the
                 // request goes without a header and the service answers for itself.
@@ -788,12 +828,42 @@ public class ConnectionRequest implements IOProgressListener {
                 value = null;
             }
         }
-        if (value == null) {
+        return new CapturedAuthorization(inCharge.authorizer, value, inCharge.origin,
+                inCharge.path);
+    }
+
+    /// Takes what [#captureAuthorization(boolean)] answered. Called where the request is
+    /// handed to the queue, or on the EDT while no network thread has the request.
+    void setCapturedAuthorization(CapturedAuthorization captured) {
+        capturedAuthorization = captured;
+    }
+
+    /// Decides what `Authorization` header, if any, the attempt about to be made carries,
+    /// and records whose it is so a 401 can be taken back to the same authorizer.
+    ///
+    /// Runs on a network thread and reads only this request: the value was captured on the
+    /// EDT. The address is checked here, for every attempt, because a redirect changes it
+    /// on this thread.
+    private String resolveAuthorization() {
+        attachedAuthorizer = null;
+        attachedAuthorization = null;
+        CapturedAuthorization captured = capturedAuthorization;
+        if (captured == null || captured.value == null
+                || getRequestHeader("Authorization") != null) {
+            // The caller's own header wins, and so does a default header of NetworkManager,
+            // which is on the request by now. Neither is this authorizer's to renew.
             return null;
         }
-        attachedAuthorizer = a;
-        attachedAuthorization = value;
-        return value;
+        if (!captured.origin.equals(originOf(url))) {
+            return null;
+        }
+        if (captured.path != null
+                && !NetworkManager.pathCovers(captured.path, NetworkManager.pathOf(url))) {
+            return null;
+        }
+        attachedAuthorizer = captured.authorizer;
+        attachedAuthorization = captured.value;
+        return captured.value;
     }
 
     /// The origin of a URL as [NetworkManager] compares one: scheme and host in lower case,
@@ -807,7 +877,6 @@ public class ConnectionRequest implements IOProgressListener {
     void resetAuthorization() {
         authorizationAttempt = AUTHORIZATION_FIRST;
         refusedAuthorization = null;
-        authorizationOrigin = null;
         authorizationPending = false;
     }
 
@@ -867,6 +936,9 @@ public class ConnectionRequest implements IOProgressListener {
             authorizationAttempt = AUTHORIZATION_REFUSED;
             refusedAuthorization = refused;
         }
+        // On the EDT, and no network thread has this request: its refused attempt is over
+        // and the next one is queued below.
+        capturedAuthorization = captureAuthorization(false);
         NetworkManager.getInstance().addToQueue(this, true);
     }
 

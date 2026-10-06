@@ -578,4 +578,135 @@ public class RequestAuthorizerTest extends UITestBase {
         assertEquals(Collections.singletonList("Bearer T1"), seenByApi, "a killed request is not sent");
         assertTrue(p.delivered.isEmpty());
     }
+    // ---- threads -------------------------------------------------------
+
+    /** Renews ahead of time once, then on a 401, and notes the thread of every call it gets. */
+    private static final class ThreadNotingAuthorizer implements RequestAuthorizer.Proactive {
+        final List<String> offTheEdt = Collections.synchronizedList(new ArrayList<String>());
+        final List<String> calls = Collections.synchronizedList(new ArrayList<String>());
+        // Plain fields, as the contract allows: every call is on one thread.
+        String token = "T0";
+        boolean preparedOnce;
+
+        private void note(String method) {
+            calls.add(method);
+            if (!Display.getInstance().isEdt()) {
+                offTheEdt.add(method + " on " + Thread.currentThread().getName());
+            }
+        }
+
+        public String getAuthorization(ConnectionRequest request) {
+            note("getAuthorization");
+            return "Bearer " + token;
+        }
+
+        public AsyncResource<Boolean> prepareAuthorization(ConnectionRequest request) {
+            note("prepareAuthorization");
+            if (preparedOnce) {
+                return null;
+            }
+            preparedOnce = true;
+            token = "T1";
+            // Not done yet, so the request is really held and released later.
+            final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    out.complete(Boolean.TRUE);
+                }
+            });
+            return out;
+        }
+
+        public AsyncResource<Boolean> refreshAuthorization(ConnectionRequest request,
+                String rejected) {
+            note("refreshAuthorization");
+            token = "T2";
+            AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            out.complete(Boolean.TRUE);
+            return out;
+        }
+    }
+
+    @Test
+    void anAuthorizerIsNeverCalledOffTheEdt() throws Exception {
+        assertFalse(Display.getInstance().isEdt(), "this test has to queue from another thread");
+        final ThreadNotingAuthorizer noting = new ThreadNotingAuthorizer();
+        NetworkManager.getInstance().setAuthorizer(API, noting);
+
+        // Held before it is sent, refused with T1, renewed, and sent again with T2 -- every
+        // step an authorizer takes part in, for a request queued from this thread.
+        Probe first = send(new Probe(API + "/pets"));
+        assertEquals(Collections.singletonList(Integer.valueOf(200)), first.delivered);
+        assertEquals(Arrays.asList("Bearer T1", "Bearer T2"), seenByApi);
+
+        // And from threads of their own, with one set on the request too.
+        final Probe second = new Probe(API + "/owners");
+        final Probe third = new Probe(ELSEWHERE + "/visits");
+        third.setAuthorizer(noting);
+        Thread[] queueing = new Thread[] {
+            new Thread(new Runnable() {
+                public void run() {
+                    NetworkManager.getInstance().addToQueueAndWait(second);
+                }
+            }, "queues-second"),
+            new Thread(new Runnable() {
+                public void run() {
+                    NetworkManager.getInstance().addToQueueAndWait(third);
+                }
+            }, "queues-third")
+        };
+        for (Thread t : queueing) {
+            t.start();
+        }
+        for (Thread t : queueing) {
+            long deadline = System.currentTimeMillis() + 20000;
+            while (t.isAlive() && System.currentTimeMillis() < deadline) {
+                DisplayTest.flushEdt();
+                t.join(20);
+            }
+            assertFalse(t.isAlive(), t.getName() + " never returned");
+        }
+        DisplayTest.flushEdt();
+
+        assertEquals(Collections.singletonList("Bearer T2"), seenElsewhere,
+                "the header captured on the EDT is the one the network thread sent");
+        assertTrue(noting.calls.contains("getAuthorization")
+                && noting.calls.contains("prepareAuthorization")
+                && noting.calls.contains("refreshAuthorization"),
+                "every method must have been exercised: " + noting.calls);
+        assertTrue(noting.calls.size() >= 6, "too few calls to mean anything: " + noting.calls);
+        assertEquals(Collections.emptyList(), noting.offTheEdt,
+                "an authorizer's state belongs to the EDT; it was called from another thread");
+    }
+
+    @Test
+    void theRegistrationsAreReadAndChangedOnTheEdtWhoeverAsks() {
+        assertFalse(Display.getInstance().isEdt());
+        final List<String> offTheEdt = Collections.synchronizedList(new ArrayList<String>());
+        RequestAuthorizer watching = new RequestAuthorizer() {
+            public String getAuthorization(ConnectionRequest request) {
+                if (!Display.getInstance().isEdt()) {
+                    offTheEdt.add(Thread.currentThread().getName());
+                }
+                return "Bearer T2";
+            }
+
+            public AsyncResource<Boolean> refreshAuthorization(ConnectionRequest request,
+                    String rejected) {
+                return null;
+            }
+        };
+        NetworkManager nm = NetworkManager.getInstance();
+
+        // Registered and read back from this thread, at once: the call waits for the EDT.
+        nm.setAuthorizer(API + "/v1", watching);
+        assertSame(watching, nm.getAuthorizer(API + "/v1/pets"));
+        send(new Probe(API + "/v1/pets"));
+        nm.setAuthorizer(API + "/v1", null);
+        assertNull(nm.getAuthorizer(API + "/v1/pets"));
+        send(new Probe(API + "/v1/pets"));
+
+        assertEquals(Arrays.asList("Bearer T2", "null"), seenByApi);
+        assertEquals(Collections.emptyList(), offTheEdt);
+    }
 }

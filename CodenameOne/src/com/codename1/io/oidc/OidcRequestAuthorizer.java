@@ -27,6 +27,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.RequestAuthorizer;
 import com.codename1.ui.CN;
+import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 
@@ -77,6 +78,18 @@ import java.util.ArrayList;
 ///
 /// A token whose response carried no `expires_in` has no known expiry, and is renewed only
 /// when the service refuses it.
+///
+/// #### Threads
+///
+/// Everything an authorizer holds -- the tokens, the exchange in progress, the listeners --
+/// belongs to the event dispatch thread and is read and changed nowhere else. Nothing here
+/// is locked. A network thread never calls an authorizer: it sends the header the EDT put
+/// on the request when the request was queued. Tokens that arrive on a network thread, and
+/// a `401` seen there, are passed to the EDT before the authorizer hears of them.
+///
+/// Call this class on the EDT. The methods that read or change its state can also be
+/// called from another thread, and then wait for the EDT to do the work -- so not from a
+/// thread the EDT is itself waiting for.
 public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive {
     /// How long after an exchange failed without an answer before one is tried ahead of
     /// time again. A request refused in between is still renewed at once.
@@ -96,16 +109,25 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     }
 
     private final OidcClient client;
-    private final Object lock = new Object();
+    // Everything below is read and written on the event dispatch thread only.
     private final ArrayList<SignInRequiredListener> listeners =
             new ArrayList<SignInRequiredListener>();
-    /// Written on the EDT and read on network threads, under [#lock].
     private OidcTokens tokens;
     /// The exchange in progress, shared by every request refused or held while it runs.
     private AsyncResource<Boolean> renewal;
     private int refreshLeewaySeconds = 60;
-    /// When an exchange started ahead of time last failed without an answer; under [#lock].
+    /// When an exchange started ahead of time last failed without an answer.
     private long aheadFailedAt;
+
+    /// Runs `work` on the event dispatch thread and returns when it has run: at once on
+    /// the EDT itself, and before there is one.
+    private static void onEdt(Runnable work) {
+        if (!Display.isInitialized() || CN.isEdt()) {
+            work.run();
+        } else {
+            CN.callSeriallyAndWait(work);
+        }
+    }
 
     /// An authorizer for the tokens of `client`.
     ///
@@ -120,7 +142,12 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
             throw new IllegalArgumentException("client must not be null");
         }
         this.client = client;
-        client.setTokenListener(this);
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                OidcRequestAuthorizer.this.client.setTokenListener(OidcRequestAuthorizer.this);
+            }
+        });
     }
 
     /// Registers this authorizer for every request under a base URL. Shorthand for
@@ -149,11 +176,22 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
         final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
         client.loadStoredTokens().ready(new SuccessCallback<OidcTokens>() {
             @Override
-            public void onSucess(OidcTokens stored) {
-                if (stored != null) {
-                    setTokens(stored);
+            public void onSucess(final OidcTokens stored) {
+                Runnable take = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (stored != null) {
+                            tokens = stored;
+                        }
+                        out.complete(stored);
+                    }
+                };
+                if (!Display.isInitialized() || CN.isEdt()) {
+                    take.run();
+                } else {
+                    // A store may answer on a thread of its own, which is not made to wait.
+                    CN.callSerially(take);
                 }
-                out.complete(stored);
             }
         }).except(new SuccessCallback<Throwable>() {
             @Override
@@ -170,9 +208,14 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     ///
     /// the tokens, or null when nobody is signed in
     public OidcTokens getTokens() {
-        synchronized (lock) {
-            return tokens;
-        }
+        final OidcTokens[] out = new OidcTokens[1];
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                out[0] = tokens;
+            }
+        });
+        return out[0];
     }
 
     /// Replaces the tokens in use. Tokens the client obtains arrive here by themselves; this
@@ -181,10 +224,13 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     /// #### Parameters
     ///
     /// - `tokens`: the tokens, or null for none
-    public void setTokens(OidcTokens tokens) {
-        synchronized (lock) {
-            this.tokens = tokens;
-        }
+    public void setTokens(final OidcTokens tokens) {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                OidcRequestAuthorizer.this.tokens = tokens;
+            }
+        });
     }
 
     /// Whether there is an access token to send.
@@ -206,15 +252,25 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     }
 
     /// Adds a listener told when the session can't be renewed.
-    public void addSignInRequiredListener(SignInRequiredListener listener) {
-        if (listener != null && !listeners.contains(listener)) {
-            listeners.add(listener);
-        }
+    public void addSignInRequiredListener(final SignInRequiredListener listener) {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                if (listener != null && !listeners.contains(listener)) {
+                    listeners.add(listener);
+                }
+            }
+        });
     }
 
     /// Removes a listener.
-    public void removeSignInRequiredListener(SignInRequiredListener listener) {
-        listeners.remove(listener);
+    public void removeSignInRequiredListener(final SignInRequiredListener listener) {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                listeners.remove(listener);
+            }
+        });
     }
 
     /// How close to its expiry an access token is renewed before a request is sent with it.
@@ -229,77 +285,47 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     /// #### Returns
     ///
     /// this authorizer
-    public OidcRequestAuthorizer setRefreshLeeway(int seconds) {
-        synchronized (lock) {
-            this.refreshLeewaySeconds = seconds;
-        }
+    public OidcRequestAuthorizer setRefreshLeeway(final int seconds) {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                refreshLeewaySeconds = seconds;
+            }
+        });
         return this;
     }
 
     /// The leeway set with [#setRefreshLeeway(int)].
     public int getRefreshLeeway() {
-        synchronized (lock) {
-            return refreshLeewaySeconds;
-        }
-    }
-
-    @Override
-    public String getAuthorization(ConnectionRequest request) {
-        return headerOf(getTokens());
-    }
-
-    @Override
-    public AsyncResource<Boolean> prepareAuthorization(ConnectionRequest request) {
-        final OidcTokens current;
-        synchronized (lock) {
-            current = tokens;
-            if (refreshLeewaySeconds < 0 || current == null || current.getAccessToken() == null
-                    || current.getRefreshToken() == null
-                    || !current.isExpiringWithin(refreshLeewaySeconds)
-                    || System.currentTimeMillis() - aheadFailedAt < RETRY_AHEAD_MILLIS) {
-                return null;
-            }
-        }
-        if (CN.isEdt()) {
-            return renewAhead(current);
-        }
-        // The exchange in progress is kept on the event dispatch thread, where a refusal
-        // is handled too; a request queued from another thread joins it from there.
-        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        CN.callSerially(new Runnable() {
+        final int[] out = new int[1];
+        onEdt(new Runnable() {
             @Override
             public void run() {
-                AsyncResource<Boolean> joined = renewAhead(current);
-                if (joined == null) {
-                    out.complete(Boolean.TRUE);
-                    return;
-                }
-                joined.ready(new SuccessCallback<Boolean>() {
-                    @Override
-                    public void onSucess(Boolean renewed) {
-                        out.complete(renewed);
-                    }
-                }).except(new SuccessCallback<Throwable>() {
-                    @Override
-                    public void onSucess(Throwable err) {
-                        out.complete(Boolean.FALSE);
-                    }
-                });
+                out[0] = refreshLeewaySeconds;
             }
         });
-        return out;
+        return out[0];
     }
 
-    /// Joins the exchange in progress or starts one for `expiring`, on the event dispatch
-    /// thread. Null when the token has been replaced since it was looked at.
-    private AsyncResource<Boolean> renewAhead(OidcTokens expiring) {
+    /// Called on the event dispatch thread as a request is queued; the request carries the
+    /// answer to the network thread.
+    @Override
+    public String getAuthorization(ConnectionRequest request) {
+        return headerOf(tokens);
+    }
+
+    /// Called on the event dispatch thread as a request is queued.
+    @Override
+    public AsyncResource<Boolean> prepareAuthorization(ConnectionRequest request) {
+        OidcTokens current = tokens;
+        if (refreshLeewaySeconds < 0 || current == null || current.getAccessToken() == null
+                || current.getRefreshToken() == null
+                || !current.isExpiringWithin(refreshLeewaySeconds)
+                || System.currentTimeMillis() - aheadFailedAt < RETRY_AHEAD_MILLIS) {
+            return null;
+        }
         if (renewal != null) {
             return renewal;
-        }
-        OidcTokens current = getTokens();
-        if (current != expiring) { //NOPMD CompareObjectsWithEquals - the set that was looked at
-            // Renewed, or dropped, between the look and now.
-            return null;
         }
         return exchange(current, true);
     }
@@ -310,7 +336,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
         if (renewal != null) {
             return renewal;
         }
-        OidcTokens current = getTokens();
+        OidcTokens current = tokens;
         String header = headerOf(current);
         if (header != null && !header.equals(rejectedAuthorization)) {
             // Refused with a token that has been replaced since: this request left before
@@ -346,7 +372,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
             public void onSucess(OidcTokens fresh) {
                 // The client has handed the new set over already; this covers a client
                 // whose listener is another authorizer by now.
-                setTokens(fresh);
+                tokens = fresh;
                 renewal = null;
                 out.complete(Boolean.TRUE);
             }
@@ -361,9 +387,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
                 } else if (ahead) {
                     // Nothing said the token is bad; it is sent as it is, and the next
                     // request does not try again at once.
-                    synchronized (lock) {
-                        aheadFailedAt = System.currentTimeMillis();
-                    }
+                    aheadFailedAt = System.currentTimeMillis();
                 }
                 out.complete(Boolean.FALSE);
             }
@@ -371,13 +395,15 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
         return out;
     }
 
-    /// Called by the client for every token set it obtains, and with null when it clears them.
+    /// Called by the client for every token set it obtains, and with null when it clears
+    /// them. On the event dispatch thread: the client passes over there what a network
+    /// thread read.
     void tokensChanged(OidcTokens fresh) {
-        setTokens(fresh);
+        tokens = fresh;
     }
 
     private void endSession(Throwable reason) {
-        setTokens(null);
+        tokens = null;
         client.clearStoredTokens();
         SignInRequiredListener[] told =
                 listeners.toArray(new SignInRequiredListener[listeners.size()]);

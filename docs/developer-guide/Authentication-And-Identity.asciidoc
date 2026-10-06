@@ -351,7 +351,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/B
 
 The base URL is matched by origin and by whole path segments. The origin is the scheme, the host and the port. Scheme and host are compared without regard to case, and a port that's left out is the scheme's own, so `https://api.example.com` and `https://API.example.com:443` are the same base URL. The path is compared exactly and ends where a segment ends, so `/v1` covers `/v1/pets` and doesn't cover `/v10`. When two registrations cover a request, the one with the longer path wins.
 
-A token is never sent to another origin. That holds for a redirect too: a request the server redirects to another host, another port or plain `http` is sent there without the header. This is the behavior where Codename One follows the redirect itself. On iOS the system follows redirects before the app sees them, so don't have a token-protected API redirect to a host you don't control.
+A token is never sent to another origin. That holds for a redirect too: a request the server redirects to another host, another port or plain `http` is sent there without the header. A request redirected to a path outside the base URL goes without it too. This is the behavior where Codename One follows the redirect itself. On iOS the system follows redirects before the app sees them, so don't have a token-protected API redirect to a host you don't control.
+
+The authorizer works on the event dispatch thread only. It puts the header on a request when you queue it, and the network thread sends what the request carries. A request you queue from another thread is passed to the event dispatch thread first and queued from there, without making your thread wait. Call the authorizer's own methods, such as `setTokens` and `signOut`, on the event dispatch thread. Called from another thread they wait for it, so don't call them from a thread the event dispatch thread is itself waiting for.
 
 ==== Renewing before the token expires
 
