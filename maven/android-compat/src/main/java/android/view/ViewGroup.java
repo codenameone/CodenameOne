@@ -1042,13 +1042,23 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             }
         } else if (!dispatchedToNewTarget) {
             if (intercepted) {
-                // The event that starts the interception only cancels the
-                // child; it is not also handed to this group's onTouchEvent.
-                // That is Android's contract: per onInterceptTouchEvent's
-                // documentation the target receives this same event as
-                // ACTION_CANCEL and only the events that follow reach the
-                // group's onTouchEvent. Parents such as ScrollView rely on it
-                // and start their drag inside onInterceptTouchEvent.
+                // Deliberately NOT dispatched to this group's onTouchEvent.
+                // AOSP ViewGroup.dispatchTouchEvent tests
+                // `mFirstTouchTarget == null` (send to super) BEFORE its
+                // touch-target loop; in the loop, `cancelChild = ... ||
+                // intercepted` sends the child ACTION_CANCEL and unlinks it,
+                // so mFirstTouchTarget only becomes null after the super
+                // branch has been passed for this event. The intercepting
+                // event therefore reaches the group as nothing but
+                // onInterceptTouchEvent; only the NEXT event takes the
+                // `mFirstTouchTarget == null` branch into onTouchEvent. The
+                // onInterceptTouchEvent documentation states the same: the
+                // target "will receive the same event but with the action
+                // ACTION_CANCEL, and no further messages will be delivered
+                // here", the following events going to onTouchEvent. This is
+                // why ScrollView and RecyclerView record the drag start inside
+                // onInterceptTouchEvent; delivering the event twice would
+                // count the threshold-crossing move twice in those parents.
                 MotionEvent cancel = MotionEvent.obtain(ev);
                 cancel.setAction(MotionEvent.ACTION_CANCEL);
                 dispatchTransformed(mTouchTarget, cancel);

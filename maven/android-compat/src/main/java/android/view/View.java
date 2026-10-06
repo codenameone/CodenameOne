@@ -1914,15 +1914,13 @@ public class View implements Drawable.Callback {
     public void scheduleDrawable(Drawable who, Runnable what, long when) {
         if (verifyDrawable(who) && what != null) {
             long delay = when - android.os.SystemClock.uptimeMillis();
-            getHandler().postDelayed(what, Math.max(0, delay));
+            postDelayed(what, Math.max(0, delay));
         }
     }
 
     @Override
     public void unscheduleDrawable(Drawable who, Runnable what) {
-        if (what != null) {
-            getHandler().removeCallbacks(what);
-        }
+        removeCallbacks(what);
     }
 
     public void unscheduleDrawable(Drawable who) {
@@ -2746,6 +2744,7 @@ public class View implements Drawable.Callback {
         }
         mAttached = attached;
         if (attached) {
+            runPendingActions();
             onAttachedToWindow();
             if (mAttachListeners != null) {
                 for (OnAttachStateChangeListener l : new ArrayList<OnAttachStateChangeListener>(mAttachListeners)) {
@@ -2837,16 +2836,52 @@ public class View implements Drawable.Callback {
         return sHandler;
     }
 
+    /// Null while the view is not attached to a window, as on Android.
     public Handler getHandler() {
-        return mainHandler();
+        return mAttached ? mainHandler() : null;
+    }
+
+    /// Work posted while the view is detached, held until it is attached
+    /// (Android's per-view run queue): a freshly inflated view's posts run
+    /// once the view has a window, not before. The delay counts from the
+    /// attach, as Android's does.
+    private ArrayList<PendingAction> mPendingActions;
+
+    private static final class PendingAction {
+        final Runnable action;
+        final long delayMillis;
+
+        PendingAction(Runnable action, long delayMillis) {
+            this.action = action;
+            this.delayMillis = delayMillis;
+        }
+    }
+
+    private void runPendingActions() {
+        ArrayList<PendingAction> pending = mPendingActions;
+        if (pending == null) {
+            return;
+        }
+        mPendingActions = null;
+        Handler h = mainHandler();
+        for (PendingAction p : pending) {
+            h.postDelayed(p.action, p.delayMillis);
+        }
     }
 
     public boolean post(Runnable action) {
-        return getHandler().post(action);
+        return postDelayed(action, 0);
     }
 
     public boolean postDelayed(Runnable action, long delayMillis) {
-        return getHandler().postDelayed(action, delayMillis);
+        if (mAttached) {
+            return mainHandler().postDelayed(action, delayMillis);
+        }
+        if (mPendingActions == null) {
+            mPendingActions = new ArrayList<PendingAction>();
+        }
+        mPendingActions.add(new PendingAction(action, Math.max(0, delayMillis)));
+        return true;
     }
 
     public void postOnAnimation(Runnable action) {
@@ -2858,7 +2893,17 @@ public class View implements Drawable.Callback {
     }
 
     public boolean removeCallbacks(Runnable action) {
-        getHandler().removeCallbacks(action);
+        if (action == null) {
+            return true;
+        }
+        if (mPendingActions != null) {
+            for (int i = mPendingActions.size() - 1; i >= 0; i--) {
+                if (mPendingActions.get(i).action == action) {
+                    mPendingActions.remove(i);
+                }
+            }
+        }
+        mainHandler().removeCallbacks(action);
         return true;
     }
 

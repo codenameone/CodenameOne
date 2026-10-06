@@ -99,7 +99,7 @@ public final class MotionEvent {
 
     /// Runtime use: a touch at local (`x`, `y`) and screen (`rawX`, `rawY`).
     public static MotionEvent create(int action, float x, float y, float rawX, float rawY, long downTime) {
-        MotionEvent e = obtain(downTime, System.currentTimeMillis(), action, x, y, 0);
+        MotionEvent e = obtain(downTime, android.os.SystemClock.uptimeMillis(), action, x, y, 0);
         e.rawX = rawX;
         e.rawY = rawY;
         return e;

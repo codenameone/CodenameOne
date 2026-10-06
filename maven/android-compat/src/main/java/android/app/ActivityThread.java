@@ -501,7 +501,10 @@ public final class ActivityThread {
                         r.caller = below.activity;
                     }
                 }
-                deliverResult(r, below);
+                // Queued rather than delivered now: resumeRecord restarts the
+                // stopped caller (onRestart, onStart) and only then hands it
+                // its pending results, before onResume, as Android does.
+                queueResult(r);
                 resumeRecord(below, true);
             }
             destroy(r, false);

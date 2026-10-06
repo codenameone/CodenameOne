@@ -500,6 +500,45 @@ public class SQLiteDatabaseTest {
         rw.close();
     }
 
+    /// A query on an `OPEN_READONLY` database runs on the same writable
+    /// connection, so a query-shaped write must be refused too. `rawQuery`
+    /// used to skip the read-only check and change the file.
+    @Test
+    public void readOnlyDatabaseRefusesQueryShapedWrites() throws Exception {
+        JdbcDatabase engine = new JdbcDatabase();
+        SQLiteDatabase rw = SQLiteDatabase.wrap(engine, "roq.db", null, null);
+        rw.execSQL("CREATE TABLE t (v INTEGER)");
+        rw.execSQL("INSERT INTO t VALUES (1)");
+        SQLiteDatabase ro = SQLiteDatabase.wrap(engine, "roq.db", SQLiteDatabase.OPEN_READONLY, null, null);
+        String[] writes = {"PRAGMA user_version = 123", "INSERT INTO t VALUES (2) RETURNING v",
+            "WITH x AS (SELECT 3 AS v) INSERT INTO t SELECT v FROM x RETURNING v"};
+        for (String sql : writes) {
+            try {
+                Cursor c = ro.rawQuery(sql, null);
+                c.moveToFirst();
+                c.close();
+                fail("query-shaped write on a read-only database: " + sql);
+            } catch (SQLiteReadOnlyDatabaseException expected) {
+                // refused
+            }
+        }
+        try {
+            ro.compileStatement("PRAGMA user_version = 9").simpleQueryForLong();
+            fail("pragma write through simpleQueryForLong on a read-only database");
+        } catch (SQLiteReadOnlyDatabaseException expected) {
+            // refused
+        }
+        assertEquals(0, rw.getVersion());
+        assertEquals(1, DatabaseUtils.longForQuery(rw, "SELECT COUNT(*) FROM t", null));
+        // Reads, including a common table expression, still work.
+        assertEquals(1, DatabaseUtils.longForQuery(ro,
+                "WITH x AS (SELECT v FROM t WHERE v <> 'delete') SELECT COUNT(*) FROM x", null));
+        Cursor c = ro.rawQuery("SELECT v FROM t", null);
+        assertTrue(c.moveToFirst());
+        c.close();
+        rw.close();
+    }
+
     private static final class Helper extends SQLiteOpenHelper {
         private final List<String> calls;
 

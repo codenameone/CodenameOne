@@ -23,15 +23,21 @@
 package android.os;
 
 /// Clocks. `uptimeMillis` is the time base the message queue uses.
+///
+/// Both clocks count from class initialization on `System.nanoTime()`, which
+/// is monotonic (`CLOCK_MONOTONIC` on ParparVM's POSIX targets,
+/// `performance.now()` in the browser, the JVM's own on the simulator), so a
+/// wall-clock change cannot move a queued deadline. Native Windows has no
+/// monotonic source in ParparVM and reads the wall clock there.
 public final class SystemClock {
 
-    private static final long START = System.currentTimeMillis();
+    private static final long START_NANOS = System.nanoTime();
 
     private SystemClock() {
     }
 
     public static long uptimeMillis() {
-        return System.currentTimeMillis() - START;
+        return elapsedRealtimeNanos() / 1000000L;
     }
 
     public static long elapsedRealtime() {
@@ -39,7 +45,7 @@ public final class SystemClock {
     }
 
     public static long elapsedRealtimeNanos() {
-        return uptimeMillis() * 1000000L;
+        return System.nanoTime() - START_NANOS;
     }
 
     public static long currentThreadTimeMillis() {
@@ -53,7 +59,7 @@ public final class SystemClock {
     /// same, including on the event dispatch thread, where Android code
     /// should not be sleeping either.
     public static void sleep(long ms) {
-        long end = System.currentTimeMillis() + ms;
+        long end = uptimeMillis() + ms;
         synchronized (SLEEP_LOCK) {
             long left = ms;
             while (left > 0) {
@@ -62,7 +68,7 @@ public final class SystemClock {
                 } catch (InterruptedException e) {
                     // Matches Android: the interrupt is swallowed.
                 }
-                left = end - System.currentTimeMillis();
+                left = end - uptimeMillis();
             }
         }
     }

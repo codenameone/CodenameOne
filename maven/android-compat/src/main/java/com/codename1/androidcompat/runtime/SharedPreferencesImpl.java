@@ -226,11 +226,17 @@ final class SharedPreferencesImpl implements SharedPreferences {
             return this;
         }
 
-        // Deliberately unsynchronized. Codename One code is single threaded:
-        // preferences are edited on the EDT, the runtime adds no locks, and the
-        // platform Storage layer serializes its own writes. Two worker threads
-        // committing the same file at once is outside that model and is not
-        // guarded here.
+        // DELIBERATELY UNSYNCHRONIZED -- a design decision, not an oversight.
+        // AOSP's SharedPreferencesImpl does guard commits with mLock and
+        // mWritingToDiskLock; this runtime intentionally does not. Codename
+        // One's threading model is a single event dispatch thread: the
+        // compatibility runtime adds no locks, synchronized blocks or
+        // volatile fields anywhere (they cost on ParparVM and every one is a
+        // deadlock surface across the EDT), preferences are edited on the
+        // EDT, and the platform Storage layer serializes its own file writes.
+        // Concurrent commits of one file from several worker threads are
+        // outside the supported model, so they are not guarded here; an app
+        // that needs them must marshal its edits to the main thread.
         @Override
         public boolean commit() {
             // As on Android, a commit consumes the editor's batch: an editor

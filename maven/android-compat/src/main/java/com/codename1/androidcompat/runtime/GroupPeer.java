@@ -167,7 +167,7 @@ public class GroupPeer extends Container {
         if (!isRoot()) {
             return;
         }
-        downTime = System.currentTimeMillis();
+        downTime = android.os.SystemClock.uptimeMillis();
         tracking = true;
         AndroidRuntime.dispatchTouch(view, event(MotionEvent.ACTION_DOWN, x, y));
     }

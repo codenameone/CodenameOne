@@ -36,6 +36,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
 /// Work a view posts can be cancelled through any view, and a root view's
 /// tree observer hears pre-draw and draw before the tree paints.
@@ -66,6 +68,37 @@ public class ViewCallbacksTest {
         }
         MainThreadRule.drain();
         assertEquals("cancelled callbacks still ran", "[]", log.toString());
+    }
+
+    /// A detached view has no handler and holds what it is posted until it
+    /// is attached, as Android's run queue does. It used to post straight to
+    /// the main handler, so the work ran against a view with no window.
+    @Test
+    public void postsMadeBeforeAttachRunAfterAttach() {
+        final View v = new View(AndroidTestSupport.context());
+        final List<String> log = new ArrayList<String>();
+        assertNull(v.getHandler());
+        v.post(new Runnable() {
+            @Override
+            public void run() {
+                log.add("ran attached=" + v.isAttachedToWindow());
+            }
+        });
+        Runnable cancelled = new Runnable() {
+            @Override
+            public void run() {
+                log.add("cancelled ran");
+            }
+        };
+        v.post(cancelled);
+        v.removeCallbacks(cancelled);
+        MainThreadRule.drain();
+        assertEquals("[]", log.toString());
+        v.dispatchAttachedToWindow(true);
+        assertNotNull(v.getHandler());
+        MainThreadRule.drain();
+        assertEquals("[ran attached=true]", log.toString());
+        v.dispatchAttachedToWindow(false);
     }
 
     @Test

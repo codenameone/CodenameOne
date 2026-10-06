@@ -55,6 +55,9 @@ public final class AndroidTestSupport {
         /// The result code of the last result delivered.
         public int resultCode;
 
+        /// How many `onStart` calls preceded the last result delivered, or -1.
+        public int startsBeforeResult = -1;
+
         /// The start and restore callbacks this instance received, in order.
         public final java.util.List<String> calls = new java.util.ArrayList<String>();
 
@@ -95,6 +98,12 @@ public final class AndroidTestSupport {
 
         @Override
         protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+            startsBeforeResult = 0;
+            for (String c : calls) {
+                if ("start".equals(c)) {
+                    startsBeforeResult++;
+                }
+            }
             resultRequestCode = requestCode;
             this.resultCode = resultCode;
         }

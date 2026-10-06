@@ -496,12 +496,10 @@ public class Intent implements Parcelable, Cloneable {
         return extras == null ? defaultValue : extras.getDouble(name, defaultValue);
     }
 
+    /// Null when the extra is missing or is not a `String` (an `int` put
+    /// under the name is not converted), as on Android.
     public String getStringExtra(String name) {
-        if (extras == null) {
-            return null;
-        }
-        Object o = extras.get(name);
-        return o == null ? null : o.toString();
+        return extras == null ? null : extras.getString(name);
     }
 
     public CharSequence getCharSequenceExtra(String name) {

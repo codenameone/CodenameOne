@@ -357,10 +357,12 @@ public abstract class Context {
         return names;
     }
 
+    /// The same rule as `checkFileName`: a backslash is refused as well as
+    /// `/`, because the JavaSE simulator's `Database` reads any name holding
+    /// one as a file system path, so `..\outside.db` would leave the
+    /// database directory instead of naming a private database.
     private static void checkDatabaseName(String name) {
-        if (name.indexOf('/') >= 0) {
-            throw new IllegalArgumentException("File " + name + " contains a path separator");
-        }
+        checkFileName(name);
     }
 
     public void sendBroadcast(Intent intent) {

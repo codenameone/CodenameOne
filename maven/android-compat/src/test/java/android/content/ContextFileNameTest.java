@@ -64,4 +64,27 @@ public class ContextFileNameTest {
             }
         }
     }
+
+    /// A database name follows the same rule: the JavaSE simulator reads a
+    /// name holding a backslash as a file system path, so it used to open a
+    /// database outside the database directory.
+    @Test
+    public void backslashIsRefusedInDatabaseNames() {
+        Context ctx = AndroidTestSupport.context();
+        String[] bad = {"../outside.db", "..\\outside.db", "a\\b.db"};
+        for (String name : bad) {
+            try {
+                ctx.openOrCreateDatabase(name, Context.MODE_PRIVATE, null);
+                fail("openOrCreateDatabase accepted " + name);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage(), expected.getMessage().indexOf("path separator") >= 0);
+            }
+            try {
+                ctx.deleteDatabase(name);
+                fail("deleteDatabase accepted " + name);
+            } catch (IllegalArgumentException expected) {
+                // refused
+            }
+        }
+    }
 }

@@ -728,7 +728,10 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// legal on a read-only database. Any other `PRAGMA` with a value
     /// (`user_version = 3`, `journal_mode = WAL`, `page_size = 8192`) is
     /// refused: those are stored in the database file, and the connection
-    /// underneath is writable. Queries (`rawQuery`) are not inspected.
+    /// underneath is writable. Queries (`rawQuery`, `simpleQueryForLong`)
+    /// go through the same check in `runQuery`. A statement led by `WITH`
+    /// reads unless one of its words is `INSERT`, `UPDATE`, `DELETE` or
+    /// `REPLACE` (quoted text aside); see `isReadOnlyWith`.
     private static final String[] READ_ONLY_KEYWORDS = {"SELECT", "EXPLAIN", "VALUES", "BEGIN",
         "COMMIT", "END", "ROLLBACK", "SAVEPOINT", "RELEASE"};
 
@@ -759,6 +762,9 @@ public final class SQLiteDatabase extends SQLiteClosable {
         int len = end - start;
         if (len == 6 && sql.regionMatches(true, start, "PRAGMA", 0, 6)) {
             return isReadOnlyPragma(sql, end);
+        }
+        if (len == 4 && sql.regionMatches(true, start, "WITH", 0, 4)) {
+            return isReadOnlyWith(sql, end);
         }
         for (String k : READ_ONLY_KEYWORDS) {
             if (k.length() == len && sql.regionMatches(true, start, k, 0, len)) {
@@ -810,12 +816,56 @@ public final class SQLiteDatabase extends SQLiteClosable {
         return false;
     }
 
+    /// `pos` is just past a leading `WITH`. A common table expression can
+    /// front a `SELECT` or a write; this answers true only when no word
+    /// outside quotes is a data-changing keyword. A table or column that is
+    /// literally named `delete` makes it refuse a read, which errs on the
+    /// side of the read-only promise.
+    private static boolean isReadOnlyWith(String sql, int pos) {
+        int n = sql.length();
+        int i = pos;
+        while (i < n) {
+            char c = sql.charAt(i);
+            if (c == '\'' || c == '"' || c == '`' || c == '[') {
+                int close = sql.indexOf(c == '[' ? ']' : c, i + 1);
+                if (close < 0) {
+                    return true;
+                }
+                i = close + 1;
+            } else if (isPragmaNameChar(c)) {
+                int wordEnd = i;
+                while (wordEnd < n && isPragmaNameChar(sql.charAt(wordEnd))) {
+                    wordEnd++;
+                }
+                int len = wordEnd - i;
+                for (String k : WRITE_KEYWORDS) {
+                    if (k.length() == len && sql.regionMatches(true, i, k, 0, len)) {
+                        return false;
+                    }
+                }
+                i = wordEnd;
+            } else {
+                i++;
+            }
+        }
+        return true;
+    }
+
+    private static final String[] WRITE_KEYWORDS = {"INSERT", "UPDATE", "DELETE", "REPLACE"};
+
     private static boolean isPragmaNameChar(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
     }
 
     com.codename1.db.Cursor runQuery(String sql, Object[] bindArgs) {
         Database d = db();
+        // A query runs on the same writable connection as a statement, so a
+        // query-shaped write (`PRAGMA user_version = 3`, `INSERT ...
+        // RETURNING`) is refused here exactly as `runStatement` refuses it.
+        if (isReadOnly() && !isReadOnlyStatement(sql)) {
+            throw new SQLiteReadOnlyDatabaseException(
+                    "attempt to write a readonly database (code 8 SQLITE_READONLY), while executing: " + sql);
+        }
         Object[] args = normalize(bindArgs);
         try {
             return args == null ? d.executeQuery(sql) : d.executeQuery(sql, args);

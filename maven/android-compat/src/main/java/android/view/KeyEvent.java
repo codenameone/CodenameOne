@@ -59,7 +59,7 @@ public class KeyEvent {
     private final int metaState;
 
     public KeyEvent(int action, int code) {
-        this(0, System.currentTimeMillis(), action, code, 0, 0);
+        this(0, android.os.SystemClock.uptimeMillis(), action, code, 0, 0);
     }
 
     public KeyEvent(long downTime, long eventTime, int action, int code, int repeat) {
