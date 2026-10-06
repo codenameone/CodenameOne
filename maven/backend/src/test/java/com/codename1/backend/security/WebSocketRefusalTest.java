@@ -172,7 +172,9 @@ class WebSocketRefusalTest {
             int port = server.port();
             try (RawWebSocketClient anonymous = new RawWebSocketClient(port, "/ws", null)) {
                 assertEquals("HTTP/1.1 401 Unauthorized", anonymous.getStatusLine());
-                assertEquals("Bearer", anonymous.getResponseHeader("WWW-Authenticate"));
+                // No token: no error, and the scope the route asks for.
+                assertEquals("Bearer scope=\"feed:read\"",
+                        anonymous.getResponseHeader("WWW-Authenticate"));
                 anonymous.readRefusal();
             }
             try (RawWebSocketClient forged = new RawWebSocketClient(port, "/ws",

@@ -109,8 +109,12 @@ public final class ApiKeyConfigurer extends SecurityConfigurer {
         }
         ExceptionHandlingConfigurer handling = http.getConfigurer(ExceptionHandlingConfigurer.class);
         if (handling != null) {
-            handling.defaultAuthenticationEntryPointFor(authenticationEntryPoint, carriesKey);
-            handling.defaultAccessDeniedHandlerFor(new BearerTokenAccessDeniedHandler(), carriesKey);
+            // By the key it carries, or by a key having been accepted for it
+            // some other way -- a test's apiKey() sends none -- so that both
+            // are refused the same.
+            RequestMatcher byKey = RequestMatchers.anyOf(carriesKey, new AcceptedKey());
+            handling.defaultAuthenticationEntryPointFor(authenticationEntryPoint, byKey);
+            handling.defaultAccessDeniedHandlerFor(new BearerTokenAccessDeniedHandler(), byKey);
         }
     }
 
@@ -145,6 +149,21 @@ public final class ApiKeyConfigurer extends SecurityConfigurer {
         @Override
         public String toString() {
             return "ApiKey";
+        }
+    }
+
+    /// Matches a request whose user is who an API key said.
+    private static final class AcceptedKey implements RequestMatcher {
+        @Override
+        public boolean matches(HttpServer.Request request) {
+            SecurityContext context = SecurityContextHolder.peek();
+            return context != null && context.getAuthentication()
+                    instanceof com.codename1.backend.security.apikey.ApiKeyAuthenticationToken;
+        }
+
+        @Override
+        public String toString() {
+            return "AcceptedApiKey";
         }
     }
 }

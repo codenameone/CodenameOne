@@ -498,6 +498,17 @@ answered 401 with the reason in `WWW-Authenticate`. A good token that doesn't
 grant enough is answered 403 with `insufficient_scope`. No session is started
 for a request that carries a token.
 
+A request with no token is answered 401 with a challenge and no error, because
+nothing was wrong with a token it didn't send. When the rule that refused the
+request asks for a scope, the challenge names it, and so does the 403:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.txt[tag=backend-security-bearer-challenge,indent=0]
+----
+
+`realmName` on `oauth2ResourceServer` adds a `realm` to every challenge.
+
 ==== Keys
 
 For an issuer that publishes no metadata, set `jwk-set-uri` instead, or
@@ -1426,10 +1437,13 @@ The request post-processors say something about one request:
 | A signed-in user, with the role `USER` unless told otherwise.
 
 | `jwt().subject("svc").scopes("orders:read")`
-| A bearer token that was accepted. No token is sent and none is verified.
+| A bearer token that was accepted. No token is sent and none is verified. A
+  request it's refused for gets the 403 a real token gets, `insufficient_scope`
+  included.
 
 | `apiKey("billing").scopes("orders:read")`
-| An API key of that owner that was accepted. No repository is asked.
+| An API key of that owner that was accepted. No repository is asked. A
+  refusal is the one a real key gets.
 
 | `httpBasic("svc", "secret")`
 | Real credentials in an `Authorization: Basic` header, for the chain to check.

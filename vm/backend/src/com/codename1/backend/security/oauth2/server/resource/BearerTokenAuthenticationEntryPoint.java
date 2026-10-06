@@ -33,13 +33,16 @@ import com.codename1.backend.security.oauth2.core.OAuth2Error;
 ///
 /// ```java
 /// 401   WWW-Authenticate: Bearer
+/// 401   WWW-Authenticate: Bearer realm="orders", scope="orders:read"
 /// 401   WWW-Authenticate: Bearer error="invalid_token", error_description="Jwt expired at ...",
 ///                         error_uri="https://tools.ietf.org/html/rfc6750#section-3.1"
 /// 400   WWW-Authenticate: Bearer error="invalid_request", error_description="Found multiple ..."
 /// ```
 ///
-/// A request that sent no token is told only that one is wanted. One that sent
-/// a token is told what was wrong with it.
+/// A request that sent no token is told that one is wanted, never an error.
+/// When the rule that refused it asks for a scope the challenge names it,
+/// and it names the realm when one was set. One that sent a token is told
+/// what was wrong with it.
 public final class BearerTokenAuthenticationEntryPoint implements AuthenticationEntryPoint {
     private String realmName;
 
@@ -73,8 +76,38 @@ public final class BearerTokenAuthenticationEntryPoint implements Authentication
                 }
                 status = bearer.getHttpStatus();
             }
+        } else {
+            // No token was sent, so there is no error to report (RFC 6750 3:
+            // a request without credentials gets no error code). What the
+            // route wants may be named all the same.
+            String scope = requiredScope();
+            if (scope != null) {
+                parameter(challenge, first, "scope", scope);
+            }
         }
         return HttpServer.Response.text(status, "").header("WWW-Authenticate", challenge.toString());
+    }
+
+    /// The scopes the rule that refused this thread's request would have
+    /// accepted, separated by spaces; null when it did not turn on a scope.
+    /// A scope is an authority granted as `SCOPE_` and its name.
+    static String requiredScope() {
+        com.codename1.backend.security.SecurityExchange exchange =
+                com.codename1.backend.security.SecurityExchange.current();
+        Object required = exchange == null ? null : exchange.getAttribute(
+                com.codename1.backend.security.AuthorizationFilter.REQUIRED_AUTHORITIES);
+        if (!(required instanceof java.util.List)) {
+            return null;
+        }
+        StringBuilder scope = new StringBuilder();
+        for (Object authority : (java.util.List) required) {
+            if (authority instanceof String && ((String) authority).startsWith("SCOPE_")
+                    && ((String) authority).length() > 6) {
+                scope.append(scope.length() == 0 ? "" : " ")
+                        .append(((String) authority).substring(6));
+            }
+        }
+        return scope.length() == 0 ? null : scope.toString();
     }
 
     /// Appends `name="value"`; answers false, for "no longer the first".

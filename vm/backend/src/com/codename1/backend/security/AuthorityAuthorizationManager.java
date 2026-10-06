@@ -82,7 +82,7 @@ public final class AuthorityAuthorizationManager<T> implements AuthorizationMana
     public AuthorizationDecision check(Supplier<Authentication> authentication, T object) {
         Authentication current = authentication.get();
         if (current == null || !current.isAuthenticated()) {
-            return new AuthorizationDecision(false);
+            return new AuthorityAuthorizationDecision(false, authorities);
         }
         for (GrantedAuthority granted : current.getAuthorities()) {
             String name = granted.getAuthority();
@@ -92,7 +92,7 @@ public final class AuthorityAuthorizationManager<T> implements AuthorizationMana
                 }
             }
         }
-        return new AuthorizationDecision(false);
+        return new AuthorityAuthorizationDecision(false, authorities);
     }
 
     @Override

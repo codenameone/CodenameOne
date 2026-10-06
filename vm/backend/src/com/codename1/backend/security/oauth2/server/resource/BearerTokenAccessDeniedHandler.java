@@ -32,8 +32,11 @@ import com.codename1.backend.security.AccessDeniedHandler;
 /// ```java
 /// 403   WWW-Authenticate: Bearer error="insufficient_scope",
 ///           error_description="The request requires higher privileges than provided by the
-///           access token.", error_uri="https://tools.ietf.org/html/rfc6750#section-3.1"
+///           access token.", error_uri="https://tools.ietf.org/html/rfc6750#section-3.1",
+///           scope="orders:write"
 /// ```
+///
+/// The `scope` is there when the rule that refused the request asks for one.
 public final class BearerTokenAccessDeniedHandler implements AccessDeniedHandler {
     private String realmName;
 
@@ -55,8 +58,12 @@ public final class BearerTokenAccessDeniedHandler implements AccessDeniedHandler
                 "insufficient_scope");
         first = BearerTokenAuthenticationEntryPoint.parameter(challenge, first, "error_description",
                 "The request requires higher privileges than provided by the access token.");
-        BearerTokenAuthenticationEntryPoint.parameter(challenge, first, "error_uri",
+        first = BearerTokenAuthenticationEntryPoint.parameter(challenge, first, "error_uri",
                 "https://tools.ietf.org/html/rfc6750#section-3.1");
+        String scope = BearerTokenAuthenticationEntryPoint.requiredScope();
+        if (scope != null) {
+            BearerTokenAuthenticationEntryPoint.parameter(challenge, first, "scope", scope);
+        }
         return HttpServer.Response.text(403, "").header("WWW-Authenticate", challenge.toString());
     }
 }

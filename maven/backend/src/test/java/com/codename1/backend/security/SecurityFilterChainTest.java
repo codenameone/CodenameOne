@@ -157,6 +157,30 @@ class SecurityFilterChainTest {
     }
 
     @Test
+    @DisplayName("a status line carries the status's own reason phrase")
+    void reasonPhrases() throws Exception {
+        try (SecuredServer server = SecuredServer.start(dev(), "test", beans(), APP,
+                http -> http.authorizeHttpRequests(auth -> auth
+                                .requestMatchers("/open/**").permitAll()
+                                .requestMatchers("/admin/**").hasRole("ADMIN")
+                                .anyRequest().authenticated())
+                        .formLogin(Customizer.withDefaults())
+                        .httpBasic(Customizer.withDefaults()).build())) {
+            List<String> lines = server.onOneConnection(
+                    SecuredServer.request("/private", "Accept: text/html"),
+                    SecuredServer.request("/open/x"),
+                    SecuredServer.request("/private", "X-Requested-With: XMLHttpRequest"),
+                    SecuredServer.request("/admin/x", "Authorization: " + basic("ada", "ada-pw")),
+                    SecuredServer.request("/open/a;b"));
+            assertEquals("HTTP/1.1 302 Found / ", lines.get(0));
+            assertEquals("HTTP/1.1 200 OK / ok /open/x", lines.get(1));
+            assertEquals("HTTP/1.1 401 Unauthorized / Unauthorized", lines.get(2));
+            assertEquals("HTTP/1.1 403 Forbidden / Forbidden", lines.get(3));
+            assertEquals("HTTP/1.1 400 Bad Request / Bad Request", lines.get(4));
+        }
+    }
+
+    @Test
     @DisplayName("a chain for every request that is not the last is refused at start-up")
     void aCatchAllChainMustComeLast() {
         IllegalStateException refused = assertThrows(IllegalStateException.class,

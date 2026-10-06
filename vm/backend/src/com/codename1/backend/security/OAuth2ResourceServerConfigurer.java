@@ -100,6 +100,7 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
     private AuthenticationEntryPoint authenticationEntryPoint =
             new BearerTokenAuthenticationEntryPoint();
     private AccessDeniedHandler accessDeniedHandler = new BearerTokenAccessDeniedHandler();
+    private String realmName;
     private AuthenticationManagerResolver authenticationManagerResolver;
     private JwtConfigurer jwt;
 
@@ -122,6 +123,17 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
             throw new IllegalArgumentException("bearerTokenResolver cannot be null");
         }
         this.bearerTokenResolver = resolver;
+        return this;
+    }
+
+    /// The realm the challenges name: `WWW-Authenticate: Bearer realm="..."`.
+    /// None unless set. It applies to the entry point and the access-denied
+    /// handler this configurer brings, not to ones given in their place.
+    public OAuth2ResourceServerConfigurer realmName(String realmName) {
+        if (realmName == null || realmName.length() == 0) {
+            throw new IllegalArgumentException("realmName cannot be empty");
+        }
+        this.realmName = realmName;
         return this;
     }
 
@@ -173,6 +185,15 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
             throw new IllegalStateException("oauth2ResourceServer() was given both jwt(...) and "
                     + "authenticationManagerResolver(...); it takes one");
         }
+        if (realmName != null) {
+            if (authenticationEntryPoint instanceof BearerTokenAuthenticationEntryPoint) {
+                ((BearerTokenAuthenticationEntryPoint) authenticationEntryPoint)
+                        .setRealmName(realmName);
+            }
+            if (accessDeniedHandler instanceof BearerTokenAccessDeniedHandler) {
+                ((BearerTokenAccessDeniedHandler) accessDeniedHandler).setRealmName(realmName);
+            }
+        }
         RequestMatcher carriesToken = new CarriesToken(resolver());
         CsrfConfigurer csrf = http.getConfigurer(CsrfConfigurer.class);
         if (csrf != null) {
@@ -180,8 +201,12 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
         }
         ExceptionHandlingConfigurer handling = http.getConfigurer(ExceptionHandlingConfigurer.class);
         if (handling != null) {
-            handling.defaultAuthenticationEntryPointFor(authenticationEntryPoint, carriesToken);
-            handling.defaultAccessDeniedHandlerFor(accessDeniedHandler, carriesToken);
+            // By the token it carries, or by a token having been accepted for
+            // it some other way -- a test's jwt() sends none -- so that both
+            // are refused the same.
+            RequestMatcher byToken = RequestMatchers.anyOf(carriesToken, new AcceptedToken());
+            handling.defaultAuthenticationEntryPointFor(authenticationEntryPoint, byToken);
+            handling.defaultAccessDeniedHandlerFor(accessDeniedHandler, byToken);
         }
     }
 
@@ -193,6 +218,22 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
         }
         http.addFilter(new BearerTokenAuthenticationFilter(managers, resolver(),
                 authenticationEntryPoint), HttpSecurity.ORDER_BEARER_TOKEN);
+    }
+
+    /// Matches a request whose user is who a bearer token said.
+    private static final class AcceptedToken implements RequestMatcher {
+        @Override
+        public boolean matches(HttpServer.Request request) {
+            SecurityContext context = SecurityContextHolder.peek();
+            return context != null && context.getAuthentication()
+                    instanceof com.codename1.backend.security.oauth2.server.resource
+                            .JwtAuthenticationToken;
+        }
+
+        @Override
+        public String toString() {
+            return "AcceptedBearerToken";
+        }
     }
 
     /// Matches a request that carries a bearer token.

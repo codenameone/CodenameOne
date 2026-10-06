@@ -37,6 +37,14 @@ public final class AuthorizationFilter implements SecurityFilter {
         }
     };
 
+    /// The attribute of the request's [SecurityExchange] that holds, as a list
+    /// of text, the authorities any one of which the rule that refused the
+    /// request would have accepted. Set when that rule was one about
+    /// authorities, so that whatever answers the refusal can say what to ask
+    /// for.
+    public static final String REQUIRED_AUTHORITIES =
+            "com.codename1.backend.security.requiredAuthorities";
+
     private final AuthorizationManager<HttpServer.Request> authorizationManager;
 
     AuthorizationFilter(AuthorizationManager<HttpServer.Request> authorizationManager) {
@@ -48,6 +56,11 @@ public final class AuthorizationFilter implements SecurityFilter {
             throws Exception {
         AuthorizationDecision decision = authorizationManager.check(CURRENT, request);
         if (decision != null && !decision.isGranted()) {
+            SecurityExchange exchange = SecurityExchange.of(request);
+            if (exchange != null && decision instanceof AuthorityAuthorizationDecision) {
+                exchange.setAttribute(REQUIRED_AUTHORITIES,
+                        ((AuthorityAuthorizationDecision) decision).getAuthorities());
+            }
             throw new AccessDeniedException("Access Denied");
         }
         return chain.doFilter(request);

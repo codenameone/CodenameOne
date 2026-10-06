@@ -154,6 +154,13 @@ class OAuth2ResourceServerTest {
             Reply none = server.get("/api/me");
             assertEquals(401, none.status);
             assertEquals("Bearer", none.header("WWW-Authenticate"));
+            // Where the rule asks for a scope the challenge names it -- and
+            // still no error: none was made (RFC 6750 3).
+            Reply scoped = server.get("/api/orders/7");
+            assertEquals(401, scoped.status);
+            assertEquals("Bearer scope=\"orders:read\"", scoped.header("WWW-Authenticate"));
+            // A role is not a scope, and is not offered as one.
+            assertEquals("Bearer", server.get("/api/admin/x").header("WWW-Authenticate"));
             // An open route stays open.
             assertEquals(200, server.get("/api/open/docs").status);
 
@@ -222,16 +229,58 @@ class OAuth2ResourceServerTest {
     }
 
     @Test
+    @DisplayName("a realm, when the chain names one, is in every challenge")
+    void realm() throws Exception {
+        try (SecuredServer server = start(o -> o.realmName("orders").jwt(
+                jwt -> jwt.decoder(rsaDecoder())))) {
+            assertEquals("Bearer realm=\"orders\"", server.get("/api/me")
+                    .header("WWW-Authenticate"));
+            assertEquals("Bearer realm=\"orders\", scope=\"orders:read\"",
+                    server.get("/api/orders/7").header("WWW-Authenticate"));
+            assertTrue(server.get("/api/me", "Authorization", "Bearer x.y.z")
+                    .header("WWW-Authenticate").startsWith("Bearer realm=\"orders\", "
+                            + "error=\"invalid_token\""));
+            assertTrue(server.get("/api/orders/7", "Authorization", bearer(token(rsa(),
+                    claims("orders:write").build()))).header("WWW-Authenticate").startsWith(
+                            "Bearer realm=\"orders\", error=\"insufficient_scope\""));
+        }
+    }
+
+    @Test
     @DisplayName("A good token that grants too little is 403 insufficient_scope")
     void insufficientScope() throws Exception {
         try (SecuredServer server = start(o -> o.jwt(jwt -> jwt.decoder(rsaDecoder())))) {
             String writeOnly = token(rsa(), claims("orders:write").build());
             Reply denied = server.get("/api/orders/7", "Authorization", bearer(writeOnly));
             assertEquals(403, denied.status, denied.toString());
-            assertEquals("Bearer error=\"insufficient_scope\", error_description=\"The request "
-                    + "requires higher privileges than provided by the access token.\", error_uri=\""
-                    + SPEC + "\"", denied.header("WWW-Authenticate"));
+            String insufficient = "Bearer error=\"insufficient_scope\", error_description=\"The "
+                    + "request requires higher privileges than provided by the access token.\", "
+                    + "error_uri=\"" + SPEC + "\", scope=\"orders:read\"";
+            assertEquals(insufficient, denied.header("WWW-Authenticate"));
             assertEquals(200, server.get("/api/me", "Authorization", bearer(writeOnly)).status);
+
+            // A token accepted without being sent -- what a test's jwt() does
+            // -- is refused exactly as the one that was sent.
+            java.util.Map<String, Object> headers = new java.util.LinkedHashMap<String, Object>();
+            headers.put("alg", "none");
+            java.util.Map<String, Object> accepted = new java.util.LinkedHashMap<String, Object>();
+            accepted.put("sub", "ada");
+            accepted.put("scope", "orders:write");
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(new com.codename1.backend.security.oauth2.server.resource
+                    .JwtAuthenticationToken(new com.codename1.backend.security.oauth2.jwt.Jwt(
+                            "token", headers, accepted), java.util.Collections.singletonList(
+                                    new SimpleGrantedAuthority("SCOPE_orders:write"))));
+            com.codename1.impl.backend.security.SecurityAccess.get().testContext(context);
+            try {
+                Reply simulated = server.get("/api/orders/7");
+                assertEquals(403, simulated.status, simulated.toString());
+                assertEquals(insufficient, simulated.header("WWW-Authenticate"));
+                assertEquals(denied.body, simulated.body);
+                assertEquals(200, server.get("/api/me").status);
+            } finally {
+                com.codename1.impl.backend.security.SecurityAccess.get().testContext(null);
+            }
             // No scope claim at all: authenticated, and granted nothing.
             String scopeless = token(rsa(), claims(null).build());
             assertEquals("ada [] Jwt", server.get("/api/me", "Authorization", bearer(scopeless)).body);
