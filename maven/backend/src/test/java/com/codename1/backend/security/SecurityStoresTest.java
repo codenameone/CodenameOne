@@ -82,7 +82,8 @@ class SecurityStoresTest {
 
     private static final String[] TABLES = {"cn1_users", "cn1_authorities", "cn1_api_key",
         "cn1_persistent_logins", "cn1_mfa_totp", "cn1_mfa_recovery_code", "cn1_rate_limit",
-        "cn1_security_schema_history"};
+        "cn1_federated_identity", "cn1_oauth2_registered_client", "cn1_oauth2_authorization",
+        "cn1_oauth2_token", "cn1_security_schema_history"};
 
     private final List<DataSource> shared = new ArrayList<DataSource>();
 
@@ -146,20 +147,23 @@ class SecurityStoresTest {
             }
         }
         MigrationInfo[] info = Migrations.of(pool, SecuritySchema.migrations()).info();
-        assertEquals(5, info.length);
+        assertEquals(8, info.length);
         for (int i = 0; i < info.length; i++) {
             assertEquals(String.valueOf(i + 1), info[i].getVersion());
             assertEquals(MigrationState.SUCCESS, info[i].getState());
         }
         assertEquals("users and authorities", info[0].getDescription());
         assertEquals("rate limits", info[4].getDescription());
+        assertEquals("federated identities", info[5].getDescription());
+        assertEquals("oauth2 registered clients", info[6].getDescription());
+        assertEquals("oauth2 authorizations", info[7].getDescription());
         // Its own history, not the application's.
-        assertEquals(5L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM "
+        assertEquals(8L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM "
                 + "cn1_security_schema_history", null).get("n")).longValue());
         // And a second run finds nothing to do.
         MigrateResult again = Migrations.of(pool, SecuritySchema.migrations()).migrate();
         assertEquals(0, again.getMigrationsExecuted());
-        assertEquals("5", again.getTargetVersion());
+        assertEquals("8", again.getTargetVersion());
         assertEquals("security", SecuritySchema.migrations().getName());
         assertEquals("cn1_security_schema_history", SecuritySchema.migrations().getTable());
     }

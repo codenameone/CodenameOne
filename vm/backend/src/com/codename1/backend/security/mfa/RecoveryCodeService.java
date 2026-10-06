@@ -134,7 +134,7 @@ public final class RecoveryCodeService {
         StringBuilder hex = new StringBuilder(digest.length * 2);
         for (byte b : digest) {
             hex.append("0123456789abcdef".charAt((b >> 4) & 15))
-               .append("0123456789abcdef".charAt(b & 15));
+                    .append("0123456789abcdef".charAt(b & 15));
         }
         return hex.toString();
     }

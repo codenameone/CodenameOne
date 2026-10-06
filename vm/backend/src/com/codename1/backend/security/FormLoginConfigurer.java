@@ -131,6 +131,9 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
     @Override
     public void init(HttpSecurity http) {
         http.redirectsToSignIn();
+        if (!customLoginPage) {
+            http.servesLoginPage();
+        }
         ExceptionHandlingConfigurer handling = http.getConfigurer(ExceptionHandlingConfigurer.class);
         if (handling != null) {
             // A person's browser is sent to the login page; a script -- which
@@ -166,7 +169,8 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
                 HttpSecurity.ORDER_FORM_LOGIN);
         if (!customLoginPage) {
             http.addFilter(new DefaultLoginPageGeneratingFilter(loginPage, processingUrl(),
-                    usernameParameter, passwordParameter, http.rememberMeParameter()),
+                    usernameParameter, passwordParameter, http.rememberMeParameter(),
+                    http.loginLinks()),
                     HttpSecurity.ORDER_LOGIN_PAGE);
         }
     }

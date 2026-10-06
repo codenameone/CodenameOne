@@ -61,6 +61,9 @@ import java.io.IOException;
 /// | 3 | `cn1_persistent_logins` | [com.codename1.backend.security.rememberme.JdbcTokenRepository] |
 /// | 4 | `cn1_mfa_totp`, `cn1_mfa_recovery_code` | [com.codename1.backend.security.mfa.JdbcTotpRepository], [com.codename1.backend.security.mfa.JdbcRecoveryCodeRepository] |
 /// | 5 | `cn1_rate_limit` | [com.codename1.backend.security.ratelimit.JdbcRateLimiter] |
+/// | 6 | `cn1_federated_identity` | [com.codename1.backend.security.oauth2.client.JdbcFederatedIdentityRepository] |
+/// | 7 | `cn1_oauth2_registered_client` | [com.codename1.backend.security.oauth2.server.authorization.JdbcRegisteredClientRepository] |
+/// | 8 | `cn1_oauth2_authorization`, `cn1_oauth2_token` | [com.codename1.backend.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService] |
 ///
 /// A user name is kept twice: as it was given, and folded to lower case in the
 /// `username_key` column every table is keyed by, which is what makes a lookup
@@ -77,13 +80,10 @@ public final class SecuritySchema {
 
     // The versions of this set. A version is never edited once released: a new
     // table, or a change to one, is a new version appended in migrations().
-    // Reserved for the parts of the layer that keep tables and are not here yet,
-    // so that they can be written side by side without colliding:
-    //   6  cn1_federated_identity          (OAuth2 / OIDC login)
-    //   7  cn1_oauth2_registered_client    (authorization server)
-    //   8  cn1_oauth2_authorization        (authorization server)
+    // Reserved for the part of the layer that keeps a table and is not here yet,
+    // so that it can be written side by side without colliding:
     //   9  cn1_webauthn_credential         (passkeys)
-    // Anything after those takes 10 and up. Each version is one method below
+    // Anything after that takes 10 and up. Each version is one method below
     // that returns the statements for an engine, a case in Tables.migrate, and a
     // line in migrations().
 
@@ -98,6 +98,9 @@ public final class SecuritySchema {
                 .java("3", "persistent logins", new Tables(3))
                 .java("4", "second factors", new Tables(4))
                 .java("5", "rate limits", new Tables(5))
+                .java("6", "federated identities", new Tables(6))
+                .java("7", "oauth2 registered clients", new Tables(7))
+                .java("8", "oauth2 authorizations", new Tables(8))
                 .build();
     }
 
@@ -126,7 +129,11 @@ public final class SecuritySchema {
                 case 2: statements = apiKeys(d); break;
                 case 3: statements = persistentLogins(d); break;
                 case 4: statements = secondFactors(d); break;
-                default: statements = rateLimits(d); break;
+                case 5: statements = rateLimits(d); break;
+                case 6: statements = federatedIdentities(d); break;
+                case 7: statements = registeredClients(d); break;
+                case 8: statements = authorizations(d); break;
+                default: throw new IOException("The security schema has no version " + version);
             }
             for (String statement : statements) {
                 context.execute(statement, null);
@@ -219,5 +226,42 @@ public final class SecuritySchema {
             "CREATE TABLE cn1_rate_limit (limit_key " + key(d) + " NOT NULL PRIMARY KEY, "
                 + "window_start " + moment(d) + ", hits " + d.columnType(Dialect.INTEGER)
                 + " NOT NULL)"};
+    }
+
+    private static String[] federatedIdentities(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_federated_identity (provider " + key(d) + " NOT NULL, subject "
+                + key(d) + " NOT NULL, username_key " + key(d) + " NOT NULL, username " + text(d)
+                + ", created_at " + moment(d) + ", PRIMARY KEY (provider, subject))",
+            "CREATE INDEX cn1_federated_identity_user ON cn1_federated_identity (username_key)"};
+    }
+
+    private static String[] registeredClients(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_oauth2_registered_client (id " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "client_id " + key(d) + " NOT NULL, client_secret " + text(d)
+                + ", client_name " + text(d) + ", authentication_methods " + text(d)
+                + ", grant_types " + text(d) + ", redirect_uris " + text(d) + ", scopes "
+                + text(d) + ", settings " + text(d) + ", created_at " + moment(d) + ")",
+            "CREATE UNIQUE INDEX cn1_oauth2_registered_client_cid ON "
+                + "cn1_oauth2_registered_client (client_id)"};
+    }
+
+    /// A grant, and beside it the secrets issued under it -- the authorization
+    /// code, the refresh tokens, the device and user codes -- each as one row
+    /// keyed by its SHA-256, so that using one up is one statement on one row.
+    private static String[] authorizations(Dialect d) {
+        return new String[] {
+            "CREATE TABLE cn1_oauth2_authorization (id " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "registered_client_id " + key(d) + " NOT NULL, principal_name " + text(d)
+                + ", grant_type " + text(d) + ", scopes " + text(d) + ", status " + key(d)
+                + " NOT NULL, attributes " + text(d) + ", created_at " + moment(d)
+                + ", expires_at " + moment(d) + ")",
+            "CREATE INDEX cn1_oauth2_authorization_exp ON cn1_oauth2_authorization (expires_at)",
+            "CREATE TABLE cn1_oauth2_token (token_hash " + key(d) + " NOT NULL PRIMARY KEY, "
+                + "authorization_id " + key(d) + " NOT NULL, kind " + key(d) + " NOT NULL, used "
+                + flag(d) + ", expires_at " + moment(d) + ", polled_at " + moment(d) + ")",
+            "CREATE INDEX cn1_oauth2_token_auth ON cn1_oauth2_token (authorization_id)",
+            "CREATE INDEX cn1_oauth2_token_exp ON cn1_oauth2_token (expires_at)"};
     }
 }

@@ -160,6 +160,15 @@ final class BackendBeans {
         SECURITY_PKG + "rememberme/PersistentTokenRepository",
         SECURITY_PKG + "mfa/TotpService",
         SECURITY_PKG + "mfa/RecoveryCodeService",
+        // The providers oauth2Login() signs users in through.
+        SECURITY_PKG + "oauth2/client/ClientRegistrationRepository",
+        // What authorizationServer() issues tokens to, keeps its grants in and
+        // signs with; an application that signs tokens of its own shares the
+        // last two.
+        SECURITY_PKG + "oauth2/server/authorization/RegisteredClientRepository",
+        SECURITY_PKG + "oauth2/server/authorization/OAuth2AuthorizationService",
+        SECURITY_PKG + "crypto/JwkSource",
+        SECURITY_PKG + "oauth2/jwt/JwtEncoder",
     };
 
     static final String SINGLETON = "singleton";

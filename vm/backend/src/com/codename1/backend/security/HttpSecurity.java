@@ -56,8 +56,8 @@ import java.util.Map;
 /// Everything else is there only when the chain asks for it, and a server
 /// carries the code of only what its chains ask for: [#formLogin] -- which
 /// brings sign-out and the memory of where a request was going with it --
-/// [#httpBasic], [#oauth2ResourceServer], [#apiKey], [#rateLimit],
-/// [#rememberMe], [#mfa], [#logout] and [#requestCache]. A server that only
+/// [#httpBasic], [#oauth2Login], [#oauth2ResourceServer], [#apiKey],
+/// [#rateLimit], [#rememberMe], [#mfa], [#logout] and [#requestCache]. A server that only
 /// verifies tokens has no login page, no password hashing and no user store in
 /// it. The one departure from Spring Security this makes: a chain without
 /// `formLogin` has no `POST /logout` until it calls [#logout].
@@ -103,6 +103,9 @@ public final class HttpSecurity {
     static final int ORDER_HEADERS = 200;
     static final int ORDER_CSRF = 400;
     static final int ORDER_LOGOUT = 500;
+    static final int ORDER_OAUTH2_AUTHORIZATION_REQUEST = 600;
+    static final int ORDER_AUTHORIZATION_SERVER = 700;
+    static final int ORDER_OAUTH2_LOGIN = 900;
     static final int ORDER_FORM_LOGIN = 1000;
     static final int ORDER_SECOND_FACTOR = 1050;
     static final int ORDER_LOGIN_PAGE = 1100;
@@ -113,6 +116,7 @@ public final class HttpSecurity {
     static final int ORDER_ANONYMOUS = 2000;
     static final int ORDER_AUTHENTICATED_RATE_LIMIT = 2100;
     static final int ORDER_EXCEPTION_TRANSLATION = 2400;
+    static final int ORDER_AUTHORIZATION_SERVER_USER = 2450;
     static final int ORDER_AUTHORIZATION = 2500;
     /// {Integer order, SecurityFilter}, in the order they were added.
     private final List<Object[]> filters = new ArrayList<Object[]>();
@@ -150,6 +154,12 @@ public final class HttpSecurity {
         filterOrder.put(PACKAGE + "HeaderWriterFilter", Integer.valueOf(ORDER_HEADERS));
         filterOrder.put(PACKAGE + "CsrfFilter", Integer.valueOf(ORDER_CSRF));
         filterOrder.put(PACKAGE + "LogoutFilter", Integer.valueOf(ORDER_LOGOUT));
+        filterOrder.put(PACKAGE + "OAuth2AuthorizationRequestRedirectFilter",
+                Integer.valueOf(ORDER_OAUTH2_AUTHORIZATION_REQUEST));
+        filterOrder.put(PACKAGE + "OAuth2AuthorizationServerFilter",
+                Integer.valueOf(ORDER_AUTHORIZATION_SERVER));
+        filterOrder.put(PACKAGE + "OAuth2LoginAuthenticationFilter",
+                Integer.valueOf(ORDER_OAUTH2_LOGIN));
         filterOrder.put(PACKAGE + "UsernamePasswordAuthenticationFilter",
                 Integer.valueOf(ORDER_FORM_LOGIN));
         filterOrder.put(PACKAGE + "SecondFactorAuthenticationFilter",
@@ -166,6 +176,8 @@ public final class HttpSecurity {
                 Integer.valueOf(ORDER_ANONYMOUS));
         filterOrder.put(PACKAGE + "ExceptionTranslationFilter",
                 Integer.valueOf(ORDER_EXCEPTION_TRANSLATION));
+        filterOrder.put(PACKAGE + "OAuth2AuthorizationEndpointFilter",
+                Integer.valueOf(ORDER_AUTHORIZATION_SERVER_USER));
         filterOrder.put(PACKAGE + "AuthorizationFilter", Integer.valueOf(ORDER_AUTHORIZATION));
         // What every chain has until it says otherwise.
         apply(new SecurityContextConfigurer());
@@ -246,6 +258,20 @@ public final class HttpSecurity {
         if (configurer == null) {
             configurer = new OAuth2ResourceServerConfigurer();
             apply(configurer);
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
+    /// Sign-in through another identity provider, with OAuth2 or OpenID
+    /// Connect; see [OAuth2LoginConfigurer]. Brings sign-out and the memory of
+    /// where a request was going with it, as [#formLogin] does.
+    public HttpSecurity oauth2Login(Customizer<OAuth2LoginConfigurer> customizer) {
+        OAuth2LoginConfigurer configurer = getConfigurer(OAuth2LoginConfigurer.class);
+        if (configurer == null) {
+            configurer = new OAuth2LoginConfigurer();
+            apply(configurer);
+            sessionMechanism();
         }
         customizer.customize(configurer);
         return this;
@@ -681,6 +707,31 @@ public final class HttpSecurity {
 
     void loginPage(String loginPage) {
         this.loginPage = loginPage;
+    }
+
+    /// {path, name} of each other way of signing in the login page links to.
+    private final List<String[]> loginLinks = new ArrayList<String[]>();
+    private boolean loginPageServed;
+
+    /// A way of signing in that starts at a path of this server rather than
+    /// with the login form: what a generated login page offers as a link. Told
+    /// from a configurer's init().
+    void loginLink(String path, String name) {
+        loginLinks.add(new String[] {path, name});
+    }
+
+    List<String[]> loginLinks() {
+        return loginLinks;
+    }
+
+    /// Says that a part of this chain serves the login page; from a
+    /// configurer's init(). Another part that would serve one then does not.
+    void servesLoginPage() {
+        loginPageServed = true;
+    }
+
+    boolean loginPageServed() {
+        return loginPageServed;
     }
 
     private String rememberMeParameter;

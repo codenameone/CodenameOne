@@ -32,10 +32,13 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
     private final String usernameParameter;
     private final String passwordParameter;
     private final String rememberMeParameter;
+    private final java.util.List<String[]> links;
 
     DefaultLoginPageGeneratingFilter(String loginPage, String processingUrl,
                                      String usernameParameter, String passwordParameter,
-                                     String rememberMeParameter) {
+                                     String rememberMeParameter,
+                                     java.util.List<String[]> links) {
+        this.links = links;
         this.rememberMeParameter = rememberMeParameter;
         this.loginPage = loginPage;
         this.processingUrl = processingUrl;
@@ -81,7 +84,13 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
                 .append(Responses.escape(token.getParameterName())).append("\" value=\"")
                 .append(Responses.escape(token.getToken())).append("\">\n");
         }
-        page.append("<button type=\"submit\">Sign in</button>\n</form>\n</body>\n</html>\n");
+        page.append("<button type=\"submit\">Sign in</button>\n</form>\n");
+        // The other ways of signing in the chain declares: a link to each.
+        for (String[] link : links) {
+            page.append("<p><a href=\"").append(Responses.escape(link[0])).append("\">Sign in with ")
+                .append(Responses.escape(link[1])).append("</a></p>\n");
+        }
+        page.append("</body>\n</html>\n");
         return Responses.html(200, page.toString());
     }
 }

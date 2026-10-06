@@ -22,7 +22,8 @@
  */
 package com.codename1.backend.security.oauth2.core;
 
-/// The error codes of RFC 6749 and RFC 6750 this layer answers with.
+/// The error codes this layer answers with: those of RFC 6749, RFC 6750, RFC
+/// 7009 and RFC 8628, and the ones a sign-in through another provider fails with.
 public final class OAuth2ErrorCodes {
     /// The request is missing a parameter, repeats one, or is otherwise
     /// malformed.
@@ -33,6 +34,47 @@ public final class OAuth2ErrorCodes {
     public static final String INSUFFICIENT_SCOPE = "insufficient_scope";
     /// The server met something that stopped it answering.
     public static final String SERVER_ERROR = "server_error";
+    /// The client is unknown, or did not authenticate as itself.
+    public static final String INVALID_CLIENT = "invalid_client";
+    /// The grant -- an authorization code, a refresh token, a device code -- is
+    /// not valid, has expired, was used already or was issued to another client.
+    public static final String INVALID_GRANT = "invalid_grant";
+    /// The client may not use this grant.
+    public static final String UNAUTHORIZED_CLIENT = "unauthorized_client";
+    /// The server does not issue tokens for this grant.
+    public static final String UNSUPPORTED_GRANT_TYPE = "unsupported_grant_type";
+    /// The server does not answer this response type.
+    public static final String UNSUPPORTED_RESPONSE_TYPE = "unsupported_response_type";
+    /// A scope asked for is unknown, malformed or more than the client may have.
+    public static final String INVALID_SCOPE = "invalid_scope";
+    /// The user, or the server, refused the request.
+    public static final String ACCESS_DENIED = "access_denied";
+    /// The server cannot answer for now.
+    public static final String TEMPORARILY_UNAVAILABLE = "temporarily_unavailable";
+    /// The token type is one the server does not revoke.
+    public static final String UNSUPPORTED_TOKEN_TYPE = "unsupported_token_type";
+    /// RFC 8628: the user has not answered yet; ask again after the interval.
+    public static final String AUTHORIZATION_PENDING = "authorization_pending";
+    /// RFC 8628: the client asks too often; the interval is now five seconds longer.
+    public static final String SLOW_DOWN = "slow_down";
+    /// RFC 8628: the device code ran out before the user answered.
+    public static final String EXPIRED_TOKEN = "expired_token";
+    /// OpenID Connect: the user is not signed in and the client cannot show a page.
+    public static final String LOGIN_REQUIRED = "login_required";
+    /// The redirect address is not one the client registered.
+    public static final String INVALID_REDIRECT_URI = "invalid_redirect_uri";
+    /// The `state` that came back is not the one that was sent.
+    public static final String INVALID_STATE_PARAMETER = "invalid_state_parameter";
+    /// No request for authorization was waiting for this answer.
+    public static final String AUTHORIZATION_REQUEST_NOT_FOUND = "authorization_request_not_found";
+    /// The identity provider's answer could not be used.
+    public static final String INVALID_TOKEN_RESPONSE = "invalid_token_response";
+    /// The ID token did not verify.
+    public static final String INVALID_ID_TOKEN = "invalid_id_token";
+    /// The `nonce` of the ID token is not the one that was sent.
+    public static final String INVALID_NONCE = "invalid_nonce";
+    /// The user's attributes could not be read from the identity provider.
+    public static final String INVALID_USER_INFO_RESPONSE = "invalid_user_info_response";
 
     private OAuth2ErrorCodes() {
     }
