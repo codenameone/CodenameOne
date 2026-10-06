@@ -621,6 +621,52 @@ needs `JdbcRateLimiter`, which counts in the `cn1_rate_limit` table so that
 every process shares one limit. It costs a statement or two per request. When
 the database can't be reached it refuses nobody.
 
+[[backend-security-builtin-limits]]
+==== The limits the layer keeps itself
+
+Two parts of the layer count something without being asked. `mfa` counts the
+attempts at a one-time code for each user, and the authorization server counts
+the device codes each user tries at the verification page.
+
+[cols="2,2,1,1",options="header"]
+|===
+| What's counted | Keys | Limit | Window
+
+| Attempts at a second factor
+| `cn1.security.mfa.attempts`, `cn1.security.mfa.attemptsWindowSeconds`
+| 5
+| 300 seconds
+
+| Device codes tried
+| `cn1.security.authorizationserver.device.verificationAttempts`,
+  `cn1.security.authorizationserver.device.verificationWindowSeconds`
+| 10
+| 300 seconds
+|===
+
+With no `RateLimiter` bean, both are counted in the process. Declare one
+`RateLimiter` bean and they're counted wherever that bean counts. A
+`JdbcRateLimiter` bean makes each a single count for every instance:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecondFactorConfig.java[tag=backend-security-limiter-bean,indent=0]
+----
+
+The bean's own limit doesn't apply to them. The layer asks the bean for a
+separate limiter for each purpose, with the numbers in the table, so a bean
+that throttles an API at 600 requests a minute doesn't allow 600 guesses at a
+code.
+
+`attemptLimiter` on `mfa` and `deviceVerificationRateLimiter` on the
+authorization server take a limiter directly, and it counts by its own limit.
+A bean of your own `RateLimiter` class that doesn't implement `derive` does
+the same. Setting the keys as well is then refused when the server starts,
+because they'd decide nothing.
+
+Attempts at a second factor are counted for the user, not for the session.
+Signing in again with the password doesn't buy more guesses.
+
 [[backend-security-proxies]]
 ==== Client addresses behind a proxy
 
@@ -940,9 +986,11 @@ asked by name whether to let that client in. Until they answer, the device's
 polling is answered `authorization_pending`, `slow_down`, `access_denied` or
 `expired_token`.
 
-One user may try ten codes in five minutes at the verification page. That
-count is kept in the process unless you give `deviceVerificationRateLimiter`
-a limiter that counts in the database.
+One user may try ten codes in five minutes at the verification page. Change
+the numbers with
+`cn1.security.authorizationserver.device.verificationAttempts` and
+`cn1.security.authorizationserver.device.verificationWindowSeconds`. See
+<<backend-security-builtin-limits>> for where the tries are counted.
 
 ==== What a resource server sees
 
@@ -1003,7 +1051,9 @@ request stays anonymous, and the user is sent to `/login/mfa`, which asks for
 the code. Posting a right one there signs them in. A user who hasn't enrolled
 signs in as before. The chain serves a plain page at `GET /login/mfa` unless
 `secondFactorPage` names your own. The user has five minutes to enter the
-code, and five attempts.
+code, and five attempts in five minutes. See
+<<backend-security-builtin-limits>> to change the limit or to count across
+instances.
 
 ==== What counts as a sign-in
 
@@ -1473,6 +1523,14 @@ read by the build, because it decides what's linked into the server.
 | `cn1.security.authorizationserver.jwk.keys`
 | The PEM files of the signing keys, the signing one first. Required outside a
   development profile.
+
+| `cn1.security.authorizationserver.device.verificationAttempts`, `cn1.security.authorizationserver.device.verificationWindowSeconds`
+| How many device codes one user may try, and in how many seconds. 10 and 300
+  unless set.
+
+| `cn1.security.mfa.attempts`, `cn1.security.mfa.attemptsWindowSeconds`
+| How many attempts at a one-time code a user has, and in how many seconds. 5
+  and 300 unless set.
 
 | `cn1.security.mfa.encryptionKey`
 | The key that seals authenticator secrets in the database, 32 bytes in

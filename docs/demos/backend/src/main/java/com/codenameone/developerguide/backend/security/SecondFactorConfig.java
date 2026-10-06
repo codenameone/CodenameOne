@@ -33,6 +33,8 @@ import com.codename1.backend.security.mfa.JdbcRecoveryCodeRepository;
 import com.codename1.backend.security.mfa.JdbcTotpRepository;
 import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpService;
+import com.codename1.backend.security.ratelimit.JdbcRateLimiter;
+import com.codename1.backend.security.ratelimit.RateLimiter;
 import com.codename1.backend.security.webauthn.JdbcPublicKeyCredentialUserEntityRepository;
 import com.codename1.backend.security.webauthn.JdbcUserCredentialRepository;
 import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntityRepository;
@@ -60,6 +62,13 @@ public class SecondFactorConfig {
         return http.build();
     }
 // end::backend-security-mfa[]
+
+// tag::backend-security-limiter-bean[]
+    @Bean
+    RateLimiter limits(DataSource dataSource) {
+        return new JdbcRateLimiter(dataSource, "api", 600, 60);
+    }
+// end::backend-security-limiter-bean[]
 
 // tag::backend-security-webauthn-store[]
     @Bean

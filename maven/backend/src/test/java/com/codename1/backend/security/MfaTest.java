@@ -345,10 +345,12 @@ class MfaTest {
             assertNotNull(limited.header("Retry-After"));
             assertNull(limited.header("Location"));
             assertEquals("/open nobody", server.get("/open").body);
-            // The code was not spent by the refusal.
+            // Signing in again does not buy more guesses: the count is the
+            // user's, not the session's.
             server.cookies.clear();
-            server.post("/login", "username=ada&password=ada-pw");
-            assertEquals("/", server.post("/login/mfa", "code=" + code).header("Location"));
+            server.post("/login", "username=ADA&password=ada-pw");
+            assertEquals(429, server.post("/login/mfa", "code=" + code).status);
+            assertEquals("/open nobody", server.get("/open").body);
         }
     }
 
@@ -500,6 +502,122 @@ class MfaTest {
                     key.getPlaintext()).body);
             assertEquals("/me ada []", server.get("/me", "Authorization", "Bearer " + jwt).body);
         }
+    }
+
+    private SecuredServer startLimited(java.util.Properties settings, Object limiterBean,
+            Customizer<MfaConfigurer> more) throws Exception {
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
+                User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
+        assertTrue(totp.isEnabled("ada") || enrol("ada"));
+        Object[] beans = limiterBean == null ? new Object[] {users, totp}
+                : new Object[] {users, totp, limiterBean};
+        return SecuredServer.start(settings, "dev", beans, APP,
+                http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable())
+                        .formLogin(Customizer.withDefaults())
+                        .mfa(mfa -> {
+                            mfa.clock(clock);
+                            more.customize(mfa);
+                        }).build());
+    }
+
+    /// How many wrong codes are let through before a 429.
+    private int guessesAllowed(SecuredServer server) throws Exception {
+        server.post("/login", "username=ada&password=ada-pw");
+        String code = totp.currentCode("ada");
+        String wrong = "000000".equals(code) ? "000001" : "000000";
+        for (int guess = 0 ; guess < 50 ; guess++) {
+            if (server.post("/login/mfa", "code=" + wrong).status == 429) {
+                return guess;
+            }
+        }
+        return 50;
+    }
+
+    /// A limiter of the application's own kind: it counts, and derives nothing.
+    private static final class Counting implements
+            com.codename1.backend.security.ratelimit.RateLimiter {
+        private final int limit;
+        final java.util.List<String> keys = new java.util.ArrayList<String>();
+
+        Counting(int limit) {
+            this.limit = limit;
+        }
+
+        @Override
+        public synchronized boolean tryAcquire(String key) {
+            keys.add(key);
+            return keys.size() <= limit;
+        }
+    }
+
+    @Test
+    @DisplayName("the attempt limit comes from the configuration, and counts where the limiter bean counts")
+    void theAttemptLimitIsConfigured() throws Exception {
+        java.util.Properties two = SecuredServer.settings();
+        two.setProperty(MfaConfigurer.ATTEMPTS, "2");
+        two.setProperty(MfaConfigurer.ATTEMPTS_WINDOW, "60");
+        try (SecuredServer server = startLimited(two, null, mfa -> { })) {
+            assertEquals(2, guessesAllowed(server));
+        }
+        // A limiter bean that throttles something else at 600 a minute: the
+        // attempts are counted by one it derives, at the configured limit and
+        // not at 600, and apart from the bean's own counts.
+        final java.util.List<String> derivedAs = new java.util.ArrayList<String>();
+        com.codename1.backend.security.ratelimit.RateLimiter bean =
+                new com.codename1.backend.security.ratelimit.RateLimiter() {
+                    private final com.codename1.backend.security.ratelimit.InMemoryRateLimiter api =
+                            new com.codename1.backend.security.ratelimit.InMemoryRateLimiter(600, 60);
+
+                    @Override
+                    public boolean tryAcquire(String key) {
+                        return api.tryAcquire(key);
+                    }
+
+                    @Override
+                    public com.codename1.backend.security.ratelimit.RateLimiter derive(String name,
+                            int permits, long periodSeconds) {
+                        derivedAs.add(name + " " + permits + "/" + periodSeconds);
+                        return api.derive(name, permits, periodSeconds);
+                    }
+                };
+        try (SecuredServer server = startLimited(two, bean, mfa -> { })) {
+            assertEquals("[mfa 2/60]", derivedAs.toString());
+            assertEquals(2, guessesAllowed(server));
+        }
+        derivedAs.clear();
+        try (SecuredServer server = startLimited(SecuredServer.settings(), bean, mfa -> { })) {
+            assertEquals("[mfa 5/300]", derivedAs.toString());
+            assertEquals(5, guessesAllowed(server));
+        }
+        // A bean that derives nothing counts itself, under the user's name.
+        Counting own = new Counting(3);
+        try (SecuredServer server = startLimited(SecuredServer.settings(), own, mfa -> { })) {
+            assertEquals(3, guessesAllowed(server));
+            assertEquals("mfa:ada", own.keys.get(0));
+        }
+    }
+
+    @Test
+    @DisplayName("settings that would decide nothing are refused when the chain is built")
+    void anIgnoredAttemptLimitIsRefused() {
+        java.util.Properties two = SecuredServer.settings();
+        two.setProperty(MfaConfigurer.ATTEMPTS, "2");
+        IllegalStateException given = assertThrows(IllegalStateException.class,
+                () -> startLimited(two, null, mfa -> mfa.attemptLimiter(new Counting(9))));
+        assertEquals("cn1.security.mfa.attempts and cn1.security.mfa.attemptsWindowSeconds would "
+                + "decide nothing: attempts are counted by the limiter given to "
+                + "attemptLimiter(...), by a limit of its own. Remove the settings, or give that "
+                + "limiter the numbers.", given.getMessage());
+        IllegalStateException bean = assertThrows(IllegalStateException.class,
+                () -> startLimited(two, new Counting(9), mfa -> { }));
+        assertTrue(bean.getMessage().contains("the application's RateLimiter bean, which "
+                + "derives no limiter"), bean.getMessage());
+        java.util.Properties zero = SecuredServer.settings();
+        zero.setProperty(MfaConfigurer.ATTEMPTS, "0");
+        assertEquals("cn1.security.mfa.attempts and cn1.security.mfa.attemptsWindowSeconds must "
+                + "each be at least 1", assertThrows(IllegalStateException.class,
+                        () -> startLimited(zero, null, mfa -> { })).getMessage());
     }
 
     @Test

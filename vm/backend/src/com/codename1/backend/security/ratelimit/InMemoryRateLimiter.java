@@ -75,6 +75,15 @@ public final class InMemoryRateLimiter implements RateLimiter {
         this.maxKeys = maxKeys;
     }
 
+    /// A limiter in this process with counts of its own, read on the same
+    /// clock; the name is not needed to keep them apart.
+    @Override
+    public synchronized RateLimiter derive(String name, int permits, long periodSeconds) {
+        InMemoryRateLimiter derived = new InMemoryRateLimiter(permits, periodSeconds, maxKeys);
+        derived.clock = clock;
+        return derived;
+    }
+
     /// Reads the time from `clock` instead of the machine.
     public synchronized void setClock(Clock clock) {
         if (clock == null) {

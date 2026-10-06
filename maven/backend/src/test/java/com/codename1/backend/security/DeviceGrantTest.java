@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codename1.backend.Config;
@@ -43,7 +44,10 @@ import com.codename1.backend.security.oauth2.server.authorization.AuthorizationS
 import com.codename1.backend.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
 import com.codename1.backend.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import com.codename1.backend.security.ratelimit.InMemoryRateLimiter;
+import com.codename1.backend.security.ratelimit.RateLimiter;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -384,5 +388,92 @@ class DeviceGrantTest {
         }
         assertFalse(seen.isEmpty());
         assertNotEquals("", issuer);
+    }
+
+    private SecuredServer startConfigured(String attempts, String window, Object bean,
+            Customizer<AuthorizationServerConfigurer> more) throws Exception {
+        int port = OAuth2Testing.freePort();
+        issuer = "http://127.0.0.1:" + port;
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(AuthorizationServerSettings.ISSUER, issuer);
+        if (attempts != null) {
+            settings.setProperty(AuthorizationServerConfigurer.DEVICE_VERIFICATION_ATTEMPTS,
+                    attempts);
+        }
+        if (window != null) {
+            settings.setProperty(AuthorizationServerConfigurer.DEVICE_VERIFICATION_WINDOW, window);
+        }
+        Object users = new InMemoryUserDetailsManager(
+                User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
+        Object[] beans = bean == null ? new Object[] {users} : new Object[] {users, bean};
+        return SecuredServer.start(settings, "test", beans, APP,
+                http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .formLogin(Customizer.withDefaults())
+                        .authorizationServer(as -> {
+                            as.registeredClientRepository(AuthorizationServerTest.clients())
+                                    .authorizationService(grants)
+                                    .clientSecretEncoder(OAuth2Testing.PLAIN).clock(clock);
+                            more.customize(as);
+                        }).build());
+    }
+
+    /// How many wrong user codes are looked at before a 429, and what the 429
+    /// says to wait.
+    private static String triesAllowed(SecuredServer server) throws Exception {
+        assertEquals(302, OAuth2Testing.signIn(server, "ada", "ada-pw").status);
+        String csrf = field(server.get(PAGE).body, "_csrf");
+        for (int tries = 0 ; tries < 50 ; tries++) {
+            Reply reply = server.post(PAGE, form("user_code", "BBBBBBBB", "_csrf", csrf));
+            if (reply.status == 429) {
+                return tries + " then wait " + reply.header("Retry-After");
+            }
+        }
+        return "50";
+    }
+
+    @Test
+    @DisplayName("the tries at a user code come from the configuration, and count where the limiter bean counts")
+    void theVerificationLimitIsConfigured() throws Exception {
+        try (SecuredServer server = startConfigured("3", "90", null, as -> { })) {
+            assertEquals("3 then wait 90", triesAllowed(server));
+        }
+        final List<String> derivedAs = new ArrayList<String>();
+        RateLimiter bean = new RateLimiter() {
+            private final InMemoryRateLimiter api = new InMemoryRateLimiter(600, 60);
+
+            @Override
+            public boolean tryAcquire(String key) {
+                return api.tryAcquire(key);
+            }
+
+            @Override
+            public RateLimiter derive(String name, int permits, long periodSeconds) {
+                derivedAs.add(name + " " + permits + "/" + periodSeconds);
+                return api.derive(name, permits, periodSeconds);
+            }
+        };
+        try (SecuredServer server = startConfigured("3", "90", bean, as -> { })) {
+            assertEquals("[device-verification 3/90]", derivedAs.toString());
+            assertTrue(triesAllowed(server).startsWith("3 then wait "), "the bean's 600 applied");
+        }
+        derivedAs.clear();
+        try (SecuredServer server = startConfigured(null, null, bean, as -> { })) {
+            assertEquals("[device-verification 10/300]", derivedAs.toString());
+        }
+        // A limiter given by name counts by its own limit, and the settings
+        // beside it would decide nothing.
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> startConfigured("3", null, null, as -> as.deviceVerificationRateLimiter(
+                        new InMemoryRateLimiter(2, 60))));
+        assertEquals("cn1.security.authorizationserver.device.verificationAttempts and "
+                + "cn1.security.authorizationserver.device.verificationWindowSeconds would decide "
+                + "nothing: tries are counted by the limiter given to "
+                + "deviceVerificationRateLimiter(...), by a limit of its own. Remove the "
+                + "settings, or give that limiter the numbers.", refused.getMessage());
+        assertEquals("cn1.security.authorizationserver.device.verificationAttempts and "
+                + "cn1.security.authorizationserver.device.verificationWindowSeconds must each "
+                + "be at least 1", assertThrows(IllegalStateException.class,
+                        () -> startConfigured("0", null, null, as -> { })).getMessage());
     }
 }

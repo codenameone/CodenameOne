@@ -90,7 +90,7 @@ public final class OAuth2AuthorizationServer {
     private final OidcUserInfoMapper userInfo;
     private final RateLimiter verificationLimiter;
     private final Clock clock;
-    private final Attempts attempts = new Attempts();
+    private final Attempts attempts;
     private long purgedAt;
 
     /// @param fixedIssuer the issuer, or null to read it off each request: a
@@ -101,11 +101,15 @@ public final class OAuth2AuthorizationServer {
     /// client has one
     /// @param verificationLimiter what bounds wrong user codes; null to count
     /// in this process
+    /// @param verificationAttempts how many user codes one user may try in a
+    /// window, when this process counts
+    /// @param verificationWindowSeconds the length of that window
     public OAuth2AuthorizationServer(AuthorizationServerSettings settings, String fixedIssuer,
             String defaultAudience, RegisteredClientRepository clients, OAuth2AuthorizationService authorizations,
             JwkSource keys, JwtEncoder encoder, PasswordEncoder secrets,
             OAuth2TokenCustomizer customizer, OidcUserInfoMapper userInfo,
-            RateLimiter verificationLimiter, Clock clock) {
+            RateLimiter verificationLimiter, int verificationAttempts,
+            long verificationWindowSeconds, Clock clock) {
         if (settings == null || clients == null || authorizations == null || keys == null
                 || encoder == null) {
             throw new IllegalArgumentException("The settings, the clients, the authorizations, "
@@ -123,6 +127,7 @@ public final class OAuth2AuthorizationServer {
         this.customizer = customizer;
         this.userInfo = userInfo;
         this.verificationLimiter = verificationLimiter;
+        this.attempts = new Attempts(verificationAttempts, verificationWindowSeconds * 1000L);
         this.clock = clock == null ? Clock.SYSTEM : clock;
         // Tokens of this server's own, read back at the user info and
         // revocation endpoints: under the two algorithms it signs with, and
@@ -1217,7 +1222,10 @@ public final class OAuth2AuthorizationServer {
         if (!allowed) {
             HttpServer.Response busy = page(429, "<p role=\"alert\">Too many codes were tried. "
                     + "Wait a few minutes and try again.</p>");
-            return busy.header("Retry-After", "300");
+            long wait = verificationLimiter != null
+                    ? verificationLimiter.retryAfterSeconds("device-verification:" + who)
+                    : attempts.windowMillis / 1000L;
+            return busy.header("Retry-After", String.valueOf(wait < 1 ? 1 : wait));
         }
         long now = clock.currentTimeMillis();
         String hash = OAuth2Parameters.sha256(typed);
@@ -1348,9 +1356,14 @@ public final class OAuth2AuthorizationServer {
 
     /// Wrong codes one user may try: ten in five minutes, counted here.
     private static final class Attempts {
-        private static final int LIMIT = 10;
-        private static final long WINDOW_MILLIS = 5 * 60 * 1000L;
+        private final int limit;
+        private final long windowMillis;
         private final Map<String, long[]> windows = new HashMap<String, long[]>();
+
+        Attempts(int limit, long windowMillis) {
+            this.limit = limit;
+            this.windowMillis = windowMillis;
+        }
 
         synchronized boolean tryAcquire(String key, long now) {
             if (windows.size() > 10000) {
@@ -1359,12 +1372,12 @@ public final class OAuth2AuthorizationServer {
                 windows.clear();
             }
             long[] window = windows.get(key);
-            if (window == null || now - window[0] >= WINDOW_MILLIS) {
+            if (window == null || now - window[0] >= windowMillis) {
                 window = new long[] {now, 0};
                 windows.put(key, window);
             }
             window[1]++;
-            return window[1] <= LIMIT;
+            return window[1] <= limit;
         }
     }
 

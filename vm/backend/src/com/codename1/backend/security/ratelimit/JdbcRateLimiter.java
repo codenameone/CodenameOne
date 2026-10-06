@@ -68,6 +68,14 @@ public final class JdbcRateLimiter implements RateLimiter {
         this.periodMillis = periodSeconds * 1000L;
     }
 
+    /// A limiter over the same table, under `name`, read on the same clock.
+    @Override
+    public RateLimiter derive(String name, int permits, long periodSeconds) {
+        JdbcRateLimiter derived = new JdbcRateLimiter(dataSource, name, permits, periodSeconds);
+        derived.clock = clock;
+        return derived;
+    }
+
     public void setClock(Clock clock) {
         if (clock == null) {
             throw new IllegalArgumentException("clock cannot be null");

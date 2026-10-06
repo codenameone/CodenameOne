@@ -38,4 +38,22 @@ public interface RateLimiter {
     default long retryAfterSeconds(String key) {
         return 1;
     }
+
+    /// A limiter that keeps its counts where this one does, apart from this
+    /// one's, with a limit of its own; null when this limiter cannot make one,
+    /// which is what it answers unless it says more.
+    ///
+    /// The parts of the layer that count something themselves -- attempts at
+    /// a second factor, tries at a device's code -- ask the application's
+    /// limiter bean for one each. That is how a bean declared to throttle an
+    /// API at 600 a minute comes to count guesses at a one-time code at five
+    /// in five minutes, in the same database, without the two sharing either
+    /// a count or a limit.
+    ///
+    /// @param name what keeps the new limiter's counts apart
+    /// @param permits how many requests a key may make in a period
+    /// @param periodSeconds the length of the period
+    default RateLimiter derive(String name, int permits, long periodSeconds) {
+        return null;
+    }
 }

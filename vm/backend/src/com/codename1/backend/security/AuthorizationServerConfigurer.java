@@ -157,6 +157,15 @@ import java.io.IOException;
 /// pushed authorization requests, DPoP, encrypted tokens, the implicit and
 /// password grants, and back-channel or RP-initiated logout.
 public final class AuthorizationServerConfigurer extends SecurityConfigurer {
+    /// The setting that holds how many device codes one user may try at the
+    /// verification page in one window; 10 unless set.
+    public static final String DEVICE_VERIFICATION_ATTEMPTS =
+            "cn1.security.authorizationserver.device.verificationAttempts";
+    /// The setting that holds the length of that window in seconds; 300
+    /// unless set.
+    public static final String DEVICE_VERIFICATION_WINDOW =
+            "cn1.security.authorizationserver.device.verificationWindowSeconds";
+
     private AuthorizationServerSettings settings;
     private RegisteredClientRepository clients;
     private OAuth2AuthorizationService authorizations;
@@ -225,10 +234,19 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
     }
 
     /// What bounds how many device codes one user may try at the verification
-    /// page. Unless set, ten in five minutes, counted in this process; give
-    /// one that counts in the database -- see
-    /// [com.codename1.backend.security.ratelimit.JdbcRateLimiter] -- to count
-    /// across processes.
+    /// page, in place of what the application's [RateLimiter] bean would
+    /// count and of the count kept in this process.
+    ///
+    /// Ten tries in five minutes are allowed unless
+    /// `cn1.security.authorizationserver.device.verificationAttempts` and
+    /// `cn1.security.authorizationserver.device.verificationWindowSeconds`
+    /// say otherwise. With no limiter they are counted in this process. With
+    /// one [RateLimiter] bean they are counted wherever it counts -- a
+    /// [com.codename1.backend.security.ratelimit.JdbcRateLimiter] makes that
+    /// every process -- in a limiter the bean derives, with that limit; see
+    /// [RateLimiter#derive]. A limiter given here, or a bean that derives
+    /// none, counts by its own limit, and setting the two keys as well is
+    /// then refused when the chain is built, since they would decide nothing.
     public AuthorizationServerConfigurer deviceVerificationRateLimiter(RateLimiter rateLimiter) {
         this.verificationLimiter = rateLimiter;
         return this;
@@ -301,6 +319,8 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
         AuthorizationServerSettings s = settings();
         String issuer = s.getIssuer();
         String audience = s.getDefaultAudience();
+        int verificationAttempts;
+        int verificationWindow;
         try {
             if (issuer == null) {
                 String configured = http.getConfig().get(AuthorizationServerSettings.ISSUER);
@@ -356,8 +376,32 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
             if (secrets == null) {
                 requireNoSecrets(clients);
             }
+            boolean configured = http.getConfig().get(DEVICE_VERIFICATION_ATTEMPTS, null) != null
+                    || http.getConfig().get(DEVICE_VERIFICATION_WINDOW, null) != null;
+            verificationAttempts = http.getConfig().getInt(DEVICE_VERIFICATION_ATTEMPTS, 10);
+            verificationWindow = http.getConfig().getInt(DEVICE_VERIFICATION_WINDOW, 300);
+            if (verificationAttempts < 1 || verificationWindow < 1) {
+                throw new IllegalStateException(DEVICE_VERIFICATION_ATTEMPTS + " and "
+                        + DEVICE_VERIFICATION_WINDOW + " must each be at least 1");
+            }
+            String counted = "the limiter given to deviceVerificationRateLimiter(...)";
             if (verificationLimiter == null) {
-                verificationLimiter = http.getSharedObject(RateLimiter.class);
+                RateLimiter bean = http.getSharedObject(RateLimiter.class);
+                RateLimiter derived = bean == null ? null : bean.derive("device-verification",
+                        verificationAttempts, verificationWindow);
+                if (derived != null) {
+                    verificationLimiter = derived;
+                    configured = false;
+                } else {
+                    verificationLimiter = bean;
+                    counted = "the application's RateLimiter bean, which derives no limiter";
+                }
+            }
+            if (verificationLimiter != null && configured) {
+                throw new IllegalStateException(DEVICE_VERIFICATION_ATTEMPTS + " and "
+                        + DEVICE_VERIFICATION_WINDOW + " would decide nothing: tries are "
+                        + "counted by " + counted + ", by a limit of its own. Remove the "
+                        + "settings, or give that limiter the numbers.");
             }
         } catch (IOException err) {
             throw new IllegalStateException("The authorization server could not be set up: "
@@ -366,7 +410,7 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
         OAuth2AuthorizationServer server = new OAuth2AuthorizationServer(s, issuer, audience,
                 clients,
                 authorizations, keys, encoder, secrets, customizer, userInfo, verificationLimiter,
-                clock);
+                verificationAttempts, verificationWindow, clock);
         http.addFilter(new OAuth2AuthorizationServerFilter(server),
                 HttpSecurity.ORDER_AUTHORIZATION_SERVER);
         http.addFilter(new OAuth2AuthorizationEndpointFilter(server),

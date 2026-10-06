@@ -48,9 +48,21 @@ import com.codename1.backend.security.ratelimit.RateLimiter;
 ///
 /// The codes come from the [TotpService] given here or the application's bean
 /// of that type, and recovery codes are accepted when there is a
-/// [RecoveryCodeService] the same way. Five attempts are allowed in five
-/// minutes for each pending sign-in, counted in this process; see
-/// [#attemptLimiter] to count across processes or to change the limit.
+/// [RecoveryCodeService] the same way.
+///
+/// Attempts at the code are counted for each user, whichever session they
+/// come from: signing in again with the password does not buy more guesses.
+/// Five are allowed in five minutes unless `cn1.security.mfa.attempts` and
+/// `cn1.security.mfa.attemptsWindowSeconds` say otherwise.
+///
+/// Where they are counted depends on what the application declares. With
+/// nothing, in this process. With one [RateLimiter] bean, wherever that bean
+/// counts -- a [com.codename1.backend.security.ratelimit.JdbcRateLimiter]
+/// makes it one count for every process -- in a limiter the bean derives for
+/// the purpose, with the limit above and not the bean's own; see
+/// [RateLimiter#derive]. A limiter given to [#attemptLimiter], or a bean that
+/// derives none, counts by its own limit, and setting the two keys as well is
+/// then refused when the chain is built, since they would decide nothing.
 ///
 /// What holds a sign-in back is the chain's [SecondFactorPolicy], which every
 /// sign-in that ends in a session consults; see [SessionSignIn].
@@ -81,6 +93,13 @@ import com.codename1.backend.security.ratelimit.RateLimiter;
 /// A filter or provider of the application's own that makes a request a
 /// user's is outside all of this; it can ask [SecondFactorPolicy#requires].
 public final class MfaConfigurer extends SecurityConfigurer {
+    /// The setting that holds how many attempts at a code a user has in one
+    /// window; 5 unless set.
+    public static final String ATTEMPTS = "cn1.security.mfa.attempts";
+    /// The setting that holds the length of that window in seconds; 300
+    /// unless set.
+    public static final String ATTEMPTS_WINDOW = "cn1.security.mfa.attemptsWindowSeconds";
+
     private TotpService totp;
     private RecoveryCodeService recoveryCodes;
     private String page = "/login/mfa";
@@ -88,7 +107,8 @@ public final class MfaConfigurer extends SecurityConfigurer {
     private String processingUrl;
     private String codeParameter = "code";
     private int pendingSeconds = 300;
-    private RateLimiter attempts = new InMemoryRateLimiter(5, 300);
+    private RateLimiter attempts;
+    private boolean attemptsGiven;
     private String defaultSuccessUrl = "/";
     private AuthenticationSuccessHandler successHandler;
     private Clock clock = Clock.SYSTEM;
@@ -138,11 +158,54 @@ public final class MfaConfigurer extends SecurityConfigurer {
         return this;
     }
 
-    /// What counts attempts, each pending sign-in under a key of its own; null
-    /// to count none.
+    /// What counts attempts, each user under a key of their own, in place of
+    /// the application's [RateLimiter] bean and of the count kept in this
+    /// process; null to count none.
     public MfaConfigurer attemptLimiter(RateLimiter attemptLimiter) {
         this.attempts = attemptLimiter;
+        this.attemptsGiven = true;
         return this;
+    }
+
+    /// What counts attempts for this chain: the limiter given; or one the
+    /// application's [RateLimiter] bean derives, sized by the configuration;
+    /// or that bean itself when it derives none; or a count in this process.
+    private RateLimiter attempts(HttpSecurity http) {
+        try {
+            com.codename1.backend.Config config = http.getConfig();
+            boolean configured = config.get(ATTEMPTS, null) != null
+                    || config.get(ATTEMPTS_WINDOW, null) != null;
+            int permits = config.getInt(ATTEMPTS, 5);
+            int window = config.getInt(ATTEMPTS_WINDOW, 300);
+            if (permits < 1 || window < 1) {
+                throw new IllegalStateException(ATTEMPTS + " and " + ATTEMPTS_WINDOW
+                        + " must each be at least 1");
+            }
+            RateLimiter limiter = attempts;
+            String counted = "the limiter given to attemptLimiter(...)";
+            if (!attemptsGiven) {
+                RateLimiter bean = http.getSharedObject(RateLimiter.class);
+                if (bean == null) {
+                    return new InMemoryRateLimiter(permits, window);
+                }
+                RateLimiter derived = bean.derive("mfa", permits, window);
+                if (derived != null) {
+                    return derived;
+                }
+                limiter = bean;
+                counted = "the application's RateLimiter bean, which derives no limiter";
+            }
+            if (configured) {
+                throw new IllegalStateException(ATTEMPTS + " and " + ATTEMPTS_WINDOW
+                        + " would decide nothing: attempts are counted by " + counted
+                        + ", by a limit of its own. Remove the settings, or give that limiter "
+                        + "the numbers.");
+            }
+            return limiter;
+        } catch (java.io.IOException err) {
+            throw new IllegalStateException("The second factor's attempt limit could not be "
+                    + "read from the configuration: " + err.getMessage(), err);
+        }
     }
 
     /// Where a user goes after the code when no page asked for the sign-in.
@@ -186,7 +249,7 @@ public final class MfaConfigurer extends SecurityConfigurer {
             success = saved;
         }
         filter = new SecondFactorAuthenticationFilter(codes, recovery, page, !customPage,
-                processing(), codeParameter, pendingSeconds * 1000L, attempts, success,
+                processing(), codeParameter, pendingSeconds * 1000L, attempts(http), success,
                 new SimpleUrlAuthenticationFailureHandler(http.loginPage() + "?error"), clock);
         http.secondFactorPolicy(filter);
         http.redirectsToSignIn();

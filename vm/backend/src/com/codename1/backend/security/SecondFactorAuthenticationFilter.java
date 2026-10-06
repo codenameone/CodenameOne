@@ -47,8 +47,8 @@ import java.util.Map;
 /// app, or one of their recovery codes. A right one completes the sign-in
 /// through the chain's [SessionSignIn] -- the session id changes, the context
 /// is stored, remember-me is issued if it was asked for at the first step, and
-/// the user goes where they were going. A wrong one is counted against the
-/// session, and too many of them are answered 429 until time has passed.
+/// the user goes where they were going. Every attempt is counted against the
+/// user, and too many of them are answered 429 until time has passed.
 public final class SecondFactorAuthenticationFilter implements SecurityFilter, SecondFactorPolicy {
     /// The session attribute the pending sign-in is kept under.
     public static final String PENDING = "CN1_SECURITY_SECOND_FACTOR_PENDING";
@@ -158,8 +158,10 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
             return expired(request, session);
         }
         // Counted before the code is looked at, right or wrong: a guess costs
-        // an attempt whether or not it would have been accepted.
-        String counted = "mfa:" + session.getId();
+        // an attempt whether or not it would have been accepted. Under the
+        // user and not the session: whoever has the password can start as
+        // many sessions as they like, and must not get five guesses with each.
+        String counted = "mfa:" + asciiLower((String) name);
         if (attempts != null && !attempts.tryAcquire(counted)) {
             long wait = attempts.retryAfterSeconds(counted);
             return Responses.status(429, "Too Many Requests")
@@ -203,6 +205,22 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         }
         return complete.complete(request, authentication,
                 Boolean.TRUE.equals(pending.get("remember")), successHandler, true);
+    }
+
+    /// `value` with `A` to `Z` folded, by hand: a name is compared this way by
+    /// the stores, and `toLowerCase()` follows the device's locale.
+    private static String asciiLower(String value) {
+        StringBuilder sb = null;
+        for (int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            if (c >= 'A' && c <= 'Z') {
+                if (sb == null) {
+                    sb = new StringBuilder(value);
+                }
+                sb.setCharAt(iter, (char) (c + ('a' - 'A')));
+            }
+        }
+        return sb == null ? value : sb.toString();
     }
 
     private HttpServer.Response expired(HttpServer.Request request, HttpSession session)
