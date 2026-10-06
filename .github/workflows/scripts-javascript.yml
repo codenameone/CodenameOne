@@ -24,6 +24,9 @@ on:
       - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/test-javascript-weak-refs.mjs'
       - 'scripts/test-javascript-native-stub-bindings.mjs'
+      - 'scripts/ci/tests/cn1ss-async-sink-test.sh'
+      - 'scripts/ci/tests/Cn1ssAsyncSinkTest.java'
+      - 'scripts/fidelity-app/common/src/main/java/com/codenameone/fidelity/Cn1ssAsyncSink.java'
       - 'scripts/test-javascript-vault-bridge.mjs'
       - 'scripts/test-javascript-composited-rendering.mjs'
       - 'scripts/javascript/composited-app/**'
@@ -69,6 +72,9 @@ on:
       - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/test-javascript-weak-refs.mjs'
       - 'scripts/test-javascript-native-stub-bindings.mjs'
+      - 'scripts/ci/tests/cn1ss-async-sink-test.sh'
+      - 'scripts/ci/tests/Cn1ssAsyncSinkTest.java'
+      - 'scripts/fidelity-app/common/src/main/java/com/codenameone/fidelity/Cn1ssAsyncSink.java'
       - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
@@ -184,6 +190,13 @@ jobs:
       # JSString.valueOf made every directory marker a delete.
       - name: Interop stub bindings
         run: node scripts/test-javascript-native-stub-bindings.mjs
+
+      # Plain JVM, no build, so it also runs ahead of the ParparVM build. The
+      # sink the Java-side captures ship through must redial after the test
+      # server sheds its idle socket (close 1006): latching "failed" on that
+      # close lost VideoIODecodedFrames with websocket-unavailable.
+      - name: CN1SS async sink reconnect
+        run: bash scripts/ci/tests/cn1ss-async-sink-test.sh
 
       - name: Cache codenameone-tools
         uses: actions/cache@v5
