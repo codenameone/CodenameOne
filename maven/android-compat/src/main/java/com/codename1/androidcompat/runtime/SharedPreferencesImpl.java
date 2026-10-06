@@ -25,6 +25,7 @@ package com.codename1.androidcompat.runtime;
 import android.content.SharedPreferences;
 import com.codename1.io.Storage;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,8 +41,12 @@ final class SharedPreferencesImpl implements SharedPreferences {
 
     private final String file;
     private final HashMap<String, Object> values = new HashMap<String, Object>();
-    private final ArrayList<OnSharedPreferenceChangeListener> listeners =
-            new ArrayList<OnSharedPreferenceChangeListener>();
+    /// Held weakly, as Android's preferences hold them: an activity that
+    /// registers itself (or an anonymous listener) and is destroyed without
+    /// unregistering is not kept alive by this application-lifetime object.
+    /// As on Android, a caller keeps its own reference to a listener it
+    /// wants to go on hearing from.
+    private final ArrayList<WeakReference> listeners = new ArrayList<WeakReference>();
 
     SharedPreferencesImpl(String name) {
         this.file = "shared_prefs_" + name;
@@ -187,14 +192,43 @@ final class SharedPreferencesImpl implements SharedPreferences {
 
     @Override
     public void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
-        if (!listeners.contains(listener)) {
-            listeners.add(listener);
+        if (listener != null && indexOfListener(listener) < 0) {
+            listeners.add(new WeakReference(listener));
         }
     }
 
     @Override
     public void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
-        listeners.remove(listener);
+        int i = indexOfListener(listener);
+        if (i >= 0) {
+            listeners.remove(i);
+        }
+    }
+
+    /// The index of `listener` among the live listeners, or -1. Entries
+    /// whose listener has been collected are dropped on the way.
+    private int indexOfListener(Object listener) {
+        for (int i = listeners.size() - 1; i >= 0; i--) {
+            Object l = listeners.get(i).get();
+            if (l == null) {
+                listeners.remove(i);
+            } else if (l.equals(listener)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// The listeners still alive, in registration order.
+    private ArrayList<OnSharedPreferenceChangeListener> liveListeners() {
+        ArrayList<OnSharedPreferenceChangeListener> out = new ArrayList<OnSharedPreferenceChangeListener>();
+        for (int i = 0; i < listeners.size(); i++) {
+            Object l = listeners.get(i).get();
+            if (l instanceof OnSharedPreferenceChangeListener) {
+                out.add((OnSharedPreferenceChangeListener) l);
+            }
+        }
+        return out;
     }
 
     /// The editor's mark for a removed key.
@@ -343,8 +377,7 @@ final class SharedPreferencesImpl implements SharedPreferences {
         private void notifyChanged(ArrayList<String> changed) {
             if (!listeners.isEmpty()) {
                 for (String k : changed) {
-                    for (OnSharedPreferenceChangeListener l
-                            : new ArrayList<OnSharedPreferenceChangeListener>(listeners)) {
+                    for (OnSharedPreferenceChangeListener l : liveListeners()) {
                         l.onSharedPreferenceChanged(SharedPreferencesImpl.this, k);
                     }
                 }

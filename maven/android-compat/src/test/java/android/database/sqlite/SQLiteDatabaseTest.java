@@ -431,6 +431,38 @@ public class SQLiteDatabaseTest {
         assertEquals(2, DatabaseUtils.queryNumEntries(db, "notes"));
     }
 
+    /// A plain statement or query from another thread is refused while this
+    /// thread's transaction is open. It used to run on the shared connection
+    /// inside that transaction, so this rollback silently discarded the other
+    /// thread's insert, and its query saw rows that were never committed.
+    @Test
+    public void anotherThreadsStatementDoesNotJoinThisThreadsTransaction() throws Exception {
+        db.beginTransaction();
+        db.insert("notes", null, note("uncommitted", 1));
+        final Throwable[] failures = new Throwable[2];
+        Thread other = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    db.insertOrThrow("notes", null, note("theirs", 2));
+                } catch (Throwable t) {
+                    failures[0] = t;
+                }
+                try {
+                    DatabaseUtils.queryNumEntries(db, "notes");
+                } catch (Throwable t) {
+                    failures[1] = t;
+                }
+            }
+        });
+        other.start();
+        other.join();
+        db.endTransaction();
+        assertTrue(String.valueOf(failures[0]), failures[0] instanceof SQLiteDatabaseLockedException);
+        assertTrue(String.valueOf(failures[1]), failures[1] instanceof SQLiteDatabaseLockedException);
+        assertEquals(0, DatabaseUtils.queryNumEntries(db, "notes"));
+    }
+
     /// A database opened `OPEN_READONLY` refuses writes through the Android
     /// API. It used to report `isReadOnly()` and still insert, update, drop
     /// tables and bump the version.

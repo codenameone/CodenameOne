@@ -79,4 +79,68 @@ public class SpannableSubSequenceTest {
         assertEquals(8, cut.getSpanEnd(LINK));
         assertEquals(-1, cut.getSpanStart(TAIL));
     }
+
+    /// A `Spanned` the runtime did not write, as an app or library supplies.
+    static final class ForeignSpanned implements Spanned {
+        private final SpannableString d;
+
+        ForeignSpanned(SpannableString d) {
+            this.d = d;
+        }
+
+        @Override
+        public <T> T[] getSpans(int start, int end, Class<T> type) {
+            return d.getSpans(start, end, type);
+        }
+
+        @Override
+        public int getSpanStart(Object tag) {
+            return d.getSpanStart(tag);
+        }
+
+        @Override
+        public int getSpanEnd(Object tag) {
+            return d.getSpanEnd(tag);
+        }
+
+        @Override
+        public int getSpanFlags(Object tag) {
+            return d.getSpanFlags(tag);
+        }
+
+        @Override
+        public int nextSpanTransition(int start, int limit, Class type) {
+            return d.nextSpanTransition(start, limit, type);
+        }
+
+        @Override
+        public int length() {
+            return d.length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            return d.charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return d.subSequence(start, end);
+        }
+
+        @Override
+        public String toString() {
+            return d.toString();
+        }
+    }
+
+    /// A builder made from any `Spanned` copies its spans, clipped to the
+    /// slice. Only the runtime's own two classes used to be read, so styling
+    /// from any other implementation was silently dropped.
+    @Test
+    public void builderCopiesSpansFromAnySpanned() {
+        SpannableString s = new SpannableString("Hello brave world");
+        styled(s);
+        assertCut(new SpannableStringBuilder(new ForeignSpanned(s), 3, 11));
+    }
 }

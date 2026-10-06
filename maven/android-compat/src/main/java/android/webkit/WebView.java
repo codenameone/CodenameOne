@@ -108,6 +108,10 @@ public class WebView extends View {
     /// through without asking the client (Android does not ask for
     /// `loadUrl`). Written on the EDT only.
     private String mPendingLoad;
+    /// The base URL of the last `loadDataWithBaseURL` page and the history
+    /// URL reported in its place, or null. Written on the EDT only.
+    private String mHistoryBase;
+    private String mHistoryUrl;
     private final Map<String, Object> mJsInterfaces = new HashMap<String, Object>();
     private SuccessCallback<BrowserComponent.JSRef> mJsCallback;
     private boolean mDestroyed;
@@ -283,12 +287,18 @@ public class WebView extends View {
         return true;
     }
 
+    /// The URL the application is told for `url`: the history URL in place
+    /// of the base of a `loadDataWithBaseURL` page.
+    private String reported(String url) {
+        return mHistoryUrl != null && url.equals(mHistoryBase) ? mHistoryUrl : url;
+    }
+
     private void pageStarted(String url) {
         if (mDestroyed) {
             return;
         }
         if (url != null && !isInternal(url)) {
-            mUrl = url;
+            mUrl = reported(url);
         }
         mProgress = 10;
         if (mClient != null) {
@@ -305,7 +315,7 @@ public class WebView extends View {
         }
         mPendingLoad = null;
         if (url != null && !isInternal(url)) {
-            mUrl = url;
+            mUrl = reported(url);
         }
         mProgress = 100;
         installJsInterfaces();
@@ -351,6 +361,10 @@ public class WebView extends View {
             mBrowser.execute(url.substring("javascript:".length()));
             return;
         }
+        if (url.equals(mHistoryBase)) {
+            mHistoryBase = null;
+            mHistoryUrl = null;
+        }
         mOriginalUrl = url;
         mUrl = url;
         String loadable = WebAssets.toLoadableUrl(url);
@@ -386,8 +400,22 @@ public class WebView extends View {
             return;
         }
         String base = baseUrl == null ? "about:blank" : baseUrl;
-        mUrl = base;
-        mOriginalUrl = base;
+        // Android names the page by `historyUrl` (when the base is not a
+        // `data:` URL): `getUrl()`, the client callbacks and the history
+        // entry report it. The native browser only knows the base, so the
+        // base is reported as the history URL -- also when going back to
+        // the page -- until another `loadDataWithBaseURL` replaces it or the
+        // base itself is loaded. A null `historyUrl` keeps reporting the
+        // base rather than Android's `about:blank`.
+        if (historyUrl != null && !URLUtil.isDataUrl(base)) {
+            mHistoryBase = base;
+            mHistoryUrl = historyUrl;
+        } else {
+            mHistoryBase = null;
+            mHistoryUrl = null;
+        }
+        mUrl = reported(base);
+        mOriginalUrl = mUrl;
         String loadableBase = WebAssets.toLoadableUrl(base);
         if (!isInternal(loadableBase)) {
             mPendingLoad = loadableBase;

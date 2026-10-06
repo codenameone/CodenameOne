@@ -54,7 +54,27 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         // prefixing another scheme gave `file://file:///...`.
         String s = file instanceof com.codename1.androidcompat.jdk.File
                 ? ((com.codename1.androidcompat.jdk.File) file).storagePath() : String.valueOf(file);
-        return new Uri(s.startsWith("file:") ? s : "file://" + s);
+        // The path is percent-encoded (everything but `/`) as Android's
+        // fromFile does: a raw `#` or `?` in a file name started a fragment
+        // or query, so `getPath()` named another file. The authority a
+        // sandboxed port's storage path carries (`file://home/`) is kept.
+        String prefix;
+        String path;
+        if (s.startsWith("file://")) {
+            int slash = s.indexOf('/', 7);
+            if (slash < 0) {
+                slash = s.length();
+            }
+            prefix = s.substring(0, slash);
+            path = s.substring(slash);
+        } else if (s.startsWith("file:")) {
+            prefix = "file:";
+            path = s.substring(5);
+        } else {
+            prefix = "file://";
+            path = s;
+        }
+        return new Uri(prefix + encode(path, "/"));
     }
 
     public String getScheme() {

@@ -57,6 +57,16 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
             spans = ((SpannableStringBuilder) source).spans.slice(start, end);
         } else if (source instanceof SpannableStringInternal) {
             spans = ((SpannableStringInternal) source).spans().slice(start, end);
+        } else if (source instanceof Spanned) {
+            // Any other implementation (an app's or a library's own) is
+            // read through the interface, then clipped like the others.
+            Spanned sp = (Spanned) source;
+            SpanSet all = new SpanSet();
+            for (Object what : sp.getSpans(0, source.length(), Object.class)) {
+                all.entries.add(new SpanSet.Entry(what, sp.getSpanStart(what), sp.getSpanEnd(what),
+                        sp.getSpanFlags(what)));
+            }
+            spans = all.slice(start, end);
         } else {
             spans = new SpanSet();
         }

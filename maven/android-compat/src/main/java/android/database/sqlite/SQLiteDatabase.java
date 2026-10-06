@@ -100,6 +100,21 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// another thread is harmless: the engine then refuses the nested BEGIN.
     private Thread mTransactionOwner;
 
+    /// Refuses a statement or query from a thread other than the one whose
+    /// transaction is open. With one engine connection it would otherwise
+    /// run inside that transaction: a write would commit or roll back with
+    /// the other thread's work, and a read would see its uncommitted rows.
+    /// Android blocks such a thread on its connection pool; for the same
+    /// no-lock reason as `beginTransaction` this refuses it with the same
+    /// [SQLiteDatabaseLockedException].
+    private void checkNotInOtherThreadsTransaction(String sql) {
+        Thread owner = mTransactionOwner;
+        if (owner != null && owner != Thread.currentThread()) {
+            throw new SQLiteDatabaseLockedException("database is locked: another thread's transaction is open, "
+                    + "while executing: " + sql);
+        }
+    }
+
     private static final class Transaction {
         boolean markedSuccessful;
         boolean childFailed;
@@ -701,6 +716,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
     void runStatement(String sql, Object[] bindArgs) {
         Database d = db();
+        checkNotInOtherThreadsTransaction(sql);
         if (isReadOnly() && !isReadOnlyStatement(sql)) {
             throw new SQLiteReadOnlyDatabaseException(
                     "attempt to write a readonly database (code 8 SQLITE_READONLY), while executing: " + sql);
@@ -859,6 +875,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
     com.codename1.db.Cursor runQuery(String sql, Object[] bindArgs) {
         Database d = db();
+        checkNotInOtherThreadsTransaction(sql);
         // A query runs on the same writable connection as a statement, so a
         // query-shaped write (`PRAGMA user_version = 3`, `INSERT ...
         // RETURNING`) is refused here exactly as `runStatement` refuses it.

@@ -48,4 +48,20 @@ public class UriFromFileTest {
     public void anAbsolutePathGainsTheScheme() {
         assertEquals("file:///data/report.pdf", Uri.fromFile(new File("/data/report.pdf")).toString());
     }
+
+    /// Reserved characters in a file name are percent-encoded, so the whole
+    /// name survives as the path. A raw `#` used to start a fragment and
+    /// `getPath()` answered `/data/a`.
+    @Test
+    public void encodesReservedCharactersInThePath() {
+        Uri u = Uri.fromFile(new File("/data/a#b?c d.txt"));
+        assertEquals("file:///data/a%23b%3Fc%20d.txt", u.toString());
+        assertEquals("/data/a#b?c d.txt", u.getPath());
+        assertEquals(null, u.getFragment());
+
+        Uri home = Uri.fromFile(new File("file://home/x#1.txt"));
+        assertEquals("file://home/x%231.txt", home.toString());
+        assertEquals("home", home.getAuthority());
+        assertEquals("/x#1.txt", home.getPath());
+    }
 }
