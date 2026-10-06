@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from urllib.parse import parse_qs
 
 source = Path(sys.argv[1]).resolve()
@@ -143,6 +144,37 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
             result = subprocess.run([str(project / 'build-probe.sh'), 'javascript_cloud'], cwd=parent, env=env,
                                     input='typed-answer\n', text=True, capture_output=True, timeout=30)
             assert result.returncode == 0 and 'got:typed-answer' in result.stdout, (result.stdout, result.stderr)
+            if os.path.isdir('/proc'):
+                # Cancelling must stop Maven even on a Linux without pgrep (a slim
+                # container without procps): the launcher then finds Maven's pid
+                # through /proc. PATH here has every tool except pgrep.
+                nopgrep = parent / 'bin-without-pgrep'
+                nopgrep.mkdir(exist_ok=True)
+                for folder in os.environ.get('PATH', '').split(os.pathsep):
+                    if not os.path.isdir(folder):
+                        continue
+                    for name in os.listdir(folder):
+                        link = nopgrep / name
+                        if name != 'pgrep' and not link.exists():
+                            try:
+                                link.symlink_to(Path(folder) / name)
+                            except OSError:
+                                pass
+                pidfile = parent / 'hung-maven.pid'
+                noisy.write_text('#!/bin/sh\necho $$ > "%s"\nexec sleep 60\n' % pidfile)
+                proc = subprocess.Popen([str(project / 'build-probe.sh'), 'javascript_cloud'], cwd=parent,
+                                        env=dict(env, PATH=str(nopgrep)), stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL)
+                for _ in range(100):
+                    if pidfile.exists() and pidfile.read_text().strip():
+                        break
+                    time.sleep(0.1)
+                maven_pid = int(pidfile.read_text().strip())
+                proc.terminate()
+                assert proc.wait(timeout=30) == 143, 'SIGTERM must exit 143'
+                time.sleep(0.5)
+                assert not Path('/proc/%d' % maven_pid).exists(), 'Maven survived the cancel without pgrep'
+
     else:
         assert not events, ('the archetype launchers report nothing', events)
     recorder.shutdown()

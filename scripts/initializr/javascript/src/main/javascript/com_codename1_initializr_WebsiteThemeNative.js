@@ -194,7 +194,10 @@ var o = {};
     }
 
     o.canRequestSteps_ = function(callback) {
-        callback.complete(trustedParentOrigin() !== null);
+        // The host can only send a request it is able to cancel at its deadline
+        // (cn1-initializr-beacon.js declines otherwise), so do not offer the
+        // field in a browser without AbortController.
+        callback.complete(trustedParentOrigin() !== null && typeof AbortController === "function");
     };
 
     o.requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String = function(email, packageName, template, ide, build, callback) {

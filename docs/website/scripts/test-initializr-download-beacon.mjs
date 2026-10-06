@@ -179,6 +179,23 @@ for (const status of [400, 429, 503]) {
   assert.equal(beacon.timers.length, 0, "the fire-and-forget download beacon arms no deadline");
 }
 
+// Without AbortController a confirmed request could not be cancelled at its
+// deadline, so it is not sent at all; the fire-and-forget beacon still is.
+{
+  const calls = [];
+  const window = {
+    location: { hostname: "www.codenameone.com" },
+    crypto: { subtle: crypto.webcrypto.subtle },
+    setTimeout() { return 1; }, clearTimeout() {},
+    fetch: (url, init) => { calls.push(url); return Promise.resolve({ ok: true }); },
+  };
+  vm.runInNewContext(beaconSource, { window, TextEncoder, Uint8Array, Promise, encodeURIComponent, String });
+  assert.equal(await window.cn1InitializrBeacon.sendSteps("dev@example.org", "a.b", "", "", "maven"), false);
+  assert.equal(await window.cn1InitializrBeacon.send("a.b", ""), true);
+  assert.deepEqual(calls, ["https://cloud.codenameone.com/api/v2/funnel/initializr-download"],
+    "only the download beacon went out");
+}
+
 // Page wiring: one download message -> exactly one beacon + one Crisp event,
 // and a throwing beacon does not stop the Crisp event.
 function runPage({ beaconThrows = false, stepsResult = true, noBeacon = false } = {}) {

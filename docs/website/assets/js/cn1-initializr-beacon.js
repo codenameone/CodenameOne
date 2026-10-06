@@ -85,8 +85,15 @@
         // "no-cors" gives an opaque response that looks the same for a 202 as
         // for a 400, 429 or 503, and the steps panel would claim an email that
         // was refused.
-        var controller = confirm && typeof AbortController === "function" ? new AbortController() : null;
-        var timer = controller && typeof window.setTimeout === "function"
+        // A confirmed request must be cancellable at its deadline; one that
+        // cannot be could still be accepted after the panel already reported
+        // failure. Without AbortController (or timers) it is not sent at all,
+        // and the panel falls back to "the README has the same steps".
+        if (confirm && (typeof AbortController !== "function" || typeof window.setTimeout !== "function")) {
+          return false;
+        }
+        var controller = confirm ? new AbortController() : null;
+        var timer = controller
           ? window.setTimeout(function () { controller.abort(); }, CONFIRM_TIMEOUT_MS) : null;
         var settle = function (value) {
           if (timer !== null && typeof window.clearTimeout === "function") {

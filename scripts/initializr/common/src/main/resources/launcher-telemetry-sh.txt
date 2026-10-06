@@ -67,15 +67,35 @@ function cn1_reason {
   fi
 }
 
+# The direct children of a process. pgrep where it exists (macOS, any Linux
+# with procps); otherwise the parent pid read from /proc/<pid>/stat, so a slim
+# Linux container without procps still finds Maven under the launcher.
+function cn1_children {
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -P "$1" 2>/dev/null
+    return 0
+  fi
+  local stat rest state ppid pid
+  for stat in /proc/[0-9]*/stat; do
+    rest="$(cat "$stat" 2>/dev/null)" || continue
+    # Field 2 is the command name in parentheses and may contain spaces, so
+    # read the fields after its closing ")": state, then the parent pid.
+    rest="${rest##*) }"
+    read -r state ppid _ <<< "$rest"
+    if [ "$ppid" = "$1" ]; then
+      pid="${stat#/proc/}"
+      echo "${pid%/stat}"
+    fi
+  done
+}
+
 # Stops a process AND everything it started, children first. Killing only the
-# wrapper's pid left its children -- the curl/unzip of a first run's Maven
-# download, a forked JVM -- holding the output pipe open, so tee never saw EOF
-# and the script hung instead of reporting. pgrep is on macOS and on any Linux
-# with procps; without it, the parent alone is signalled.
+# parent left its children -- the curl/unzip of a first run's Maven download, a
+# forked JVM -- running after the launcher reported the build as cancelled.
 function cn1_kill_tree {
   [ -z "$1" ] && return 0
   local child
-  for child in $(pgrep -P "$1" 2>/dev/null); do
+  for child in $(cn1_children "$1"); do
     cn1_kill_tree "$child"
   done
   kill -TERM "$1" 2>/dev/null || true

@@ -10,7 +10,7 @@ const SITE = "https://www.codenameone.com";
 
 // parentOrigin: what window.parent.location.origin reads as; null makes reading
 // it throw, which is what a browser does for a cross-origin parent.
-function loadBridge(click, parentOrigin = SITE) {
+function loadBridge(click, parentOrigin = SITE, withAbort = true) {
   const nativeInterfaces = {};
   const posts = [];
   const targets = [];
@@ -68,6 +68,7 @@ function loadBridge(click, parentOrigin = SITE) {
 
   vm.runInNewContext(source, {
     window,
+    AbortController: withAbort ? AbortController : undefined,
     cn1_get_native_interfaces: () => nativeInterfaces
   });
 
@@ -178,6 +179,13 @@ for (const [label, origin] of [
   assert.equal(canRequest(state), false, label + ": no email field");
   assert.equal(invokeSteps(state, "dev@example.org").value, false, label);
   assert.deepEqual(state.posts, [], label + ": the address is never posted");
+}
+
+{
+  // A browser without AbortController: the host could not cancel the request
+  // at its deadline, so the email field is not offered.
+  const state = loadBridge(() => {}, SITE, false);
+  assert.equal(canRequest(state), false);
 }
 
 {
