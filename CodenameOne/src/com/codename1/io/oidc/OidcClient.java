@@ -1096,6 +1096,12 @@ public final class OidcClient {
                             "Token endpoint response has no access_token"));
                     return;
                 }
+                Object tokenType = parsed.get("token_type");
+                if (!(tokenType instanceof String) || !"Bearer".equalsIgnoreCase((String) tokenType)) {
+                    out.error(new OidcException(OidcException.INVALID_RESPONSE,
+                            "Token endpoint response must use the Bearer token_type"));
+                    return;
+                }
                 OidcTokens received = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);
                 final OidcTokens tokens = received.getIdToken() == null && previous != null
                         ? received.withIdentityFrom(previous) : received;

@@ -308,6 +308,24 @@ public class OidcClientTest extends UITestBase {
     }
 
     @Test
+    void unsupportedOrMissingTokenTypesAreNeverAcceptedOrStored() {
+        for (String type : new String[] {"", ",\"token_type\":\"DPoP\"",
+                ",\"token_type\":42", ",\"token_type\":null"}) {
+            MemoryTokenStore store = new MemoryTokenStore();
+            OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+            mock(TOKEN_EP, 200, "{\"access_token\":\"AT-new\"" + type + "}");
+            Outcome<OidcTokens> r = await(c.refresh("RT"));
+            assertNull(r.value);
+            assertInstanceOf(OidcException.class, r.error);
+            assertEquals(OidcException.INVALID_RESPONSE, ((OidcException) r.error).getError());
+            assertNull(store.saved, "unsupported token type was persisted: " + type);
+        }
+        OidcClient c = configuredClient(fullConfig());
+        mock(TOKEN_EP, 200, "{\"access_token\":\"AT-new\",\"token_type\":\"bEaReR\"}");
+        assertNotNull(await(c.refresh("RT")).value);
+    }
+
+    @Test
     void aSuccessWithoutAnAccessTokenIsNotASession() {
         MemoryTokenStore store = new MemoryTokenStore();
         OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
