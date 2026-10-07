@@ -137,6 +137,47 @@ public class DatePicker extends FrameLayout {
         updateSpinners();
     }
 
+    @Override
+    protected android.os.Parcelable onSaveInstanceState() {
+        return new SavedState(super.onSaveInstanceState(), mYear, mMonth, mDay);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(android.os.Parcelable state) {
+        if (!(state instanceof SavedState)) {
+            super.onRestoreInstanceState(state);
+            return;
+        }
+        SavedState saved = (SavedState) state;
+        super.onRestoreInstanceState(saved.superState);
+        // Restore the spinners without reporting a new user selection.
+        init(saved.year, saved.month, saved.day, mOnDateChangedListener);
+    }
+
+    /// In-memory view state for activity recreation, like the other widgets.
+    private static final class SavedState implements android.os.Parcelable {
+        final android.os.Parcelable superState;
+        final int year;
+        final int month;
+        final int day;
+
+        SavedState(android.os.Parcelable superState, int year, int month, int day) {
+            this.superState = superState;
+            this.year = year;
+            this.month = month;
+            this.day = day;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(android.os.Parcel dest, int flags) {
+        }
+    }
+
     private static String[] shortMonths() {
         try {
             String[] m = new com.codename1.l10n.DateFormatSymbols().getShortMonths();

@@ -250,11 +250,7 @@ public class GridLayoutManager extends LinearLayoutManager {
         for (int i = 0; i < mRow.size(); i++) {
             View view = mRow.get(i);
             if (mOrientationHelper.getDecoratedMeasurement(view) != maxSize) {
-                LayoutParams lp = (LayoutParams) view.getLayoutParams();
-                int dim = mOrientation == VERTICAL ? lp.height : lp.width;
-                if (dim == ViewGroup.LayoutParams.MATCH_PARENT) {
-                    measureInSpans(view, borders, true, maxSize);
-                }
+                measureInSpans(view, borders, true, maxSize);
             }
         }
         int sL = dir > 0 ? edge : edge - maxSize;

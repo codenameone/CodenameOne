@@ -138,6 +138,10 @@ final class SpanSet {
             if (e.end < e.start) {
                 e.end = e.start;
             }
+            if (en > st && e.start == e.end
+                    && (e.flags & 0xff) == Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) {
+                entries.remove(i);
+            }
         }
     }
 

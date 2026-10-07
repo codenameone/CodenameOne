@@ -44,7 +44,7 @@ public class ShareStreamTest {
 
     @Test
     public void fileStreamsNameTheirPathAndOthersAreRefused() {
-        assertEquals("/data/report.pdf", AndroidRuntime.sharedFilePath(Uri.parse("file:///data/report.pdf")));
+        assertEquals("file:///data/report.pdf", AndroidRuntime.sharedFilePath(Uri.parse("file:///data/report.pdf")));
         assertNull(AndroidRuntime.sharedFilePath(Uri.parse("content://com.example.provider/report.pdf")));
 
         AndroidTestSupport.context();
@@ -53,4 +53,12 @@ public class ShareStreamTest {
         send.putExtra(Intent.EXTRA_STREAM, Uri.parse("content://com.example.provider/report.pdf"));
         assertFalse(AndroidRuntime.getInstance().handleImplicitIntent(send));
     }
+    @Test
+    public void sandboxedFileStreamsKeepTheirAuthority() {
+        assertEquals("file://home/files/my image.png",
+                AndroidRuntime.sharedFilePath(Uri.parse("file://home/files/my%20image.png")));
+        assertEquals("/files/my image.png",
+                AndroidRuntime.sharedFilePath(Uri.parse("/files/my%20image.png")));
+    }
+
 }

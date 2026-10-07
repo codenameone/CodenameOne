@@ -351,7 +351,12 @@ public final class AndroidRuntime {
     /// a file the runtime can open.
     static String sharedFilePath(Uri uri) {
         String s = uri.toString();
-        if ("file".equals(uri.getScheme()) || s.startsWith("/")) {
+        if ("file".equals(uri.getScheme())) {
+            String authority = uri.getEncodedAuthority() == null ? "" : uri.getAuthority();
+            String path = uri.getPath();
+            return "file://" + authority + (path == null ? "" : path);
+        }
+        if (s.startsWith("/")) {
             return uri.getPath();
         }
         return null;

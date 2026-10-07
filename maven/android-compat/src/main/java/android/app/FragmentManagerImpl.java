@@ -650,6 +650,7 @@ public final class FragmentManagerImpl extends FragmentManager implements Layout
                     // fall through
                 case Fragment.ACTIVITY_CREATED:
                     if (newState < Fragment.ACTIVITY_CREATED) {
+                        saveFragmentViewState(f);
                         f.performDestroyView();
                         callback(f, "viewDestroyed");
                         if (f.mView != null && f.mContainer != null) {
@@ -693,6 +694,7 @@ public final class FragmentManagerImpl extends FragmentManager implements Layout
     private void performAttach(Fragment f) {
         Bundle saved = f.mSavedFragmentState;
         if (saved != null) {
+            f.mSavedViewState = saved.getSparseParcelableArray(Fragment.VIEW_STATE_TAG);
             int target = saved.getInt(Fragment.TARGET_STATE_TAG, -1);
             if (target >= 0 && target < mActive.size()) {
                 f.mTarget = mActive.get(target);
@@ -1209,8 +1211,20 @@ public final class FragmentManagerImpl extends FragmentManager implements Layout
 
     // ------------------------------------------------------------ saving
 
+    private void saveFragmentViewState(Fragment f) {
+        if (f.mView != null) {
+            android.util.SparseArray<android.os.Parcelable> state = new android.util.SparseArray<android.os.Parcelable>();
+            f.mView.saveHierarchyState(state);
+            f.mSavedViewState = state.size() == 0 ? null : state;
+        }
+    }
+
     Bundle saveFragmentBasicState(Fragment f) {
         Bundle result = f.performSaveInstanceState();
+        saveFragmentViewState(f);
+        if (f.mSavedViewState != null) {
+            result.putSparseParcelableArray(Fragment.VIEW_STATE_TAG, f.mSavedViewState);
+        }
         callbackSave(f, result);
         if (f.mTarget != null && f.mTarget.mIndex >= 0) {
             result.putInt(Fragment.TARGET_STATE_TAG, f.mTarget.mIndex);

@@ -61,10 +61,12 @@ public class Fragment implements View.OnCreateContextMenuListener {
     static final String TARGET_STATE_TAG = "android:target_state";
     static final String TARGET_REQUEST_CODE_STATE_TAG = "android:target_req_state";
     static final String USER_VISIBLE_HINT_TAG = "android:user_visible_hint";
+    static final String VIEW_STATE_TAG = "android:view_state";
     static final String CHILD_FRAGMENTS_TAG = "android:fragments";
 
     int mState = INITIALIZING;
     Bundle mSavedFragmentState;
+    android.util.SparseArray<Parcelable> mSavedViewState;
     int mIndex = -1;
     Bundle mArguments;
     Fragment mTarget;
@@ -201,6 +203,7 @@ public class Fragment implements View.OnCreateContextMenuListener {
     /// Back to a fresh instance's state, when the manager forgets the
     /// fragment; the application may add it again.
     final void initState() {
+        mSavedViewState = null;
         mIndex = -1;
         mAdded = false;
         mRemoving = false;
@@ -695,6 +698,10 @@ public class Fragment implements View.OnCreateContextMenuListener {
     }
 
     final void restoreViewState(Bundle savedInstanceState) {
+        if (mSavedViewState != null) {
+            mView.restoreHierarchyState(mSavedViewState);
+            mSavedViewState = null;
+        }
         mCalled = false;
         onViewStateRestored(savedInstanceState);
         check("onViewStateRestored");
