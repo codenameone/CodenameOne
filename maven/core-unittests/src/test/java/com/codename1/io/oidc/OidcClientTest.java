@@ -208,14 +208,40 @@ public class OidcClientTest extends UITestBase {
     }
 
     @Test
-    void discoverToleratesTrailingSlashesOnIssuer() {
+    void discoverPreservesIssuerWhileRemovingTrailingSlashesFromRequestUrl() {
         mock(ISSUER + "/.well-known/openid-configuration", 200,
-                "{\"issuer\":\"" + ISSUER + "\",\"authorization_endpoint\":\""
+                "{\"issuer\":\"" + ISSUER + "///\",\"authorization_endpoint\":\""
                         + AUTH_EP + "\"}");
 
         Outcome<OidcClient> r = await(OidcClient.discover(ISSUER + "///"));
         assertNull(r.error);
+        assertEquals(ISSUER + "///", r.value.getConfiguration().getIssuer());
         assertEquals(AUTH_EP, r.value.getConfiguration().getAuthorizationEndpoint());
+    }
+
+    @Test
+    void discoverRejectsMissingMalformedOrDifferentIssuer() {
+        for (String named : new String[] {null, "null", "42", "\"\"",
+                "\"https://other.example.com\"", "\"" + ISSUER + "/tenant\"",
+                "\"" + ISSUER + "/\"", "\"https://ISSUER.example.com\""}) {
+            mock(ISSUER + "/.well-known/openid-configuration", 200,
+                    "{" + (named == null ? "" : "\"issuer\":" + named + ",")
+                            + "\"authorization_endpoint\":\"" + AUTH_EP + "\"}");
+            Outcome<OidcClient> r = await(OidcClient.discover(ISSUER));
+            assertNull(r.value, "must not adopt metadata issuer " + named);
+            assertInstanceOf(OidcException.class, r.error);
+            assertEquals(OidcException.DISCOVERY_FAILED, ((OidcException) r.error).getError());
+        }
+    }
+
+    @Test
+    void discoverDoesNotNormalizeIssuerBeforeComparingMetadata() {
+        mock(ISSUER + "/.well-known/openid-configuration", 200,
+                "{\"issuer\":\"" + ISSUER + "\",\"authorization_endpoint\":\"" + AUTH_EP + "\"}");
+        Outcome<OidcClient> r = await(OidcClient.discover(ISSUER + "/"));
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals(OidcException.DISCOVERY_FAILED, ((OidcException) r.error).getError());
     }
 
     @Test

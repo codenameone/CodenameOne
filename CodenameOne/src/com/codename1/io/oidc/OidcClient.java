@@ -156,8 +156,10 @@ public final class OidcClient {
     /// returned client still needs `clientId`, `redirectUri` and `scopes`
     /// before [#authorize()] will work.
     ///
-    /// Trailing slashes on `issuer` are tolerated.
-    public static AsyncResource<OidcClient> discover(String issuer) {
+    /// Trailing slashes are removed when building the discovery request URL. The
+    /// metadata's `issuer` must still exactly match the supplied issuer, including
+    /// its trailing slashes, before any discovered endpoints are accepted.
+    public static AsyncResource<OidcClient> discover(final String issuer) {
         if (issuer == null) {
             throw new IllegalArgumentException("issuer must not be null");
         }
@@ -178,6 +180,13 @@ public final class OidcClient {
                     if (parsed == null || parsed.isEmpty()) {
                         out.error(new OidcException(OidcException.DISCOVERY_FAILED,
                                 "Discovery document was empty"));
+                        return;
+                    }
+                    // Discovery establishes the identity trusted by subsequent token
+                    // verification. Do not let metadata select a different issuer.
+                    if (!issuer.equals(parsed.get("issuer"))) {
+                        out.error(new OidcException(OidcException.DISCOVERY_FAILED,
+                                "Discovery document issuer does not match the requested issuer"));
                         return;
                     }
                     OidcConfiguration cfg = OidcConfiguration.fromDiscoveryJson(parsed);
