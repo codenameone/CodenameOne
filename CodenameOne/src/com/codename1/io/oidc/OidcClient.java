@@ -678,8 +678,14 @@ public final class OidcClient {
     }
 
     private void scheduleDevicePoll(final OidcDeviceAuthorization authorization,
-            final int intervalSeconds, final AsyncResource<OidcTokens> out) {
-        CN.setTimeout(intervalSeconds * devicePollUnitMillis, new Runnable() {
+            final long intervalSeconds, final AsyncResource<OidcTokens> out) {
+        long delay = intervalSeconds * devicePollUnitMillis;
+        if (intervalSeconds < 1 || devicePollUnitMillis < 1 || delay > Integer.MAX_VALUE || delay < 1) {
+            out.error(new OidcException(OidcException.INVALID_RESPONSE,
+                    "The device polling interval does not fit the timer"));
+            return;
+        }
+        CN.setTimeout((int) delay, new Runnable() {
             @Override
             public void run() {
                 devicePoll(authorization, intervalSeconds, out);
@@ -688,7 +694,7 @@ public final class OidcClient {
     }
 
     private void devicePoll(final OidcDeviceAuthorization authorization,
-            final int intervalSeconds, final AsyncResource<OidcTokens> out) {
+            final long intervalSeconds, final AsyncResource<OidcTokens> out) {
         if (out.isDone()) {
             // Cancelled while the timer ran.
             return;
@@ -724,7 +730,7 @@ public final class OidcClient {
                 } else if (OidcException.TRANSPORT_ERROR.equals(code)) {
                     // The server was not reached, so it has not said no. Asking less often
                     // is what the grant requires of a device that cannot get through.
-                    scheduleDevicePoll(authorization, Math.min(intervalSeconds * 2, 60), out);
+                    scheduleDevicePoll(authorization, intervalSeconds * 2, out);
                 } else {
                     out.error(err);
                 }

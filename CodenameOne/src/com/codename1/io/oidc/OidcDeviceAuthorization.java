@@ -37,6 +37,7 @@ public final class OidcDeviceAuthorization {
 
     /// The interval RFC 8628 prescribes when the server names none.
     static final int DEFAULT_INTERVAL = 5;
+    static final int MAX_INTERVAL = Integer.MAX_VALUE / 1000;
 
     private final String deviceCode;
     private final String userCode;
@@ -69,7 +70,8 @@ public final class OidcDeviceAuthorization {
     ///
     /// - `IllegalArgumentException`: when the response has no `device_code`, no `user_code`
     ///   or no verification address, or `expires_in` is not a nonnegative integer
-    ///   that can be represented as an expiry time
+    ///   that can be represented as an expiry time, or a supplied `interval` is not a
+    ///   positive integer that fits the polling timer
     public static OidcDeviceAuthorization fromJson(Map<String, Object> json) {
         if (json == null) {
             throw new IllegalArgumentException("json must not be null");
@@ -99,9 +101,12 @@ public final class OidcDeviceAuthorization {
             throw new IllegalArgumentException("A device authorization response needs a valid expires_in");
         }
         Date expiresAt = new Date(now + expiresIn * 1000L);
-        long interval = number(json.get("interval"), DEFAULT_INTERVAL);
-        if (interval < 1) {
-            interval = DEFAULT_INTERVAL;
+        Object requestedInterval = json.get("interval");
+        long interval = json.containsKey("interval") ? number(requestedInterval, -1) : DEFAULT_INTERVAL;
+        if (interval < 1 || interval > MAX_INTERVAL || (requestedInterval instanceof Number
+                && ((Number) requestedInterval).doubleValue() != (double) interval)) {
+            throw new IllegalArgumentException("A device authorization interval must be a positive integer "
+                    + "that fits the polling timer");
         }
         return new OidcDeviceAuthorization(deviceCode, userCode, uri,
                 text(json.get("verification_uri_complete")), expiresAt, (int) interval);

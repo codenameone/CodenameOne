@@ -313,6 +313,34 @@ public class OidcDeviceGrantTest extends UITestBase {
     }
 
     @Test
+    void aPollingDelayThatOverflowsTheTimerFailsWithoutSendingRequests() {
+        OidcDeviceAuthorization authorization = new OidcDeviceAuthorization("DC", "ABCD-EFGH",
+                ISSUER + "/activate", null, new java.util.Date(System.currentTimeMillis() + 600000), 2);
+        client.devicePollUnitMillis = Integer.MAX_VALUE;
+        OidcTestSupport.Outcome<OidcTokens> result = await(client.pollDeviceToken(authorization));
+        assertInstanceOf(OidcException.class, result.error);
+        assertEquals(OidcException.INVALID_RESPONSE, ((OidcException) result.error).getError());
+        assertTrue(polls.isEmpty());
+    }
+
+    @Test
+    void pollingIntervalsMustFitTheTimerWithoutTruncation() {
+        Map<String, Object> json = new HashMap<String, Object>();
+        json.put("device_code", "DC");
+        json.put("user_code", "ABCD-EFGH");
+        json.put("verification_uri", ISSUER + "/activate");
+        json.put("expires_in", 600);
+        for (Object invalid : new Object[] {null, "later", -1, 0, 1.5,
+                Double.NaN, Double.POSITIVE_INFINITY, 2147484L, 2147483648L, Long.MAX_VALUE}) {
+            json.put("interval", invalid);
+            assertThrows(IllegalArgumentException.class, () -> OidcDeviceAuthorization.fromJson(json),
+                    String.valueOf(invalid));
+        }
+        json.put("interval", 2147483);
+        assertEquals(2147483, OidcDeviceAuthorization.fromJson(json).getInterval());
+    }
+
+    @Test
     void theIntervalDefaultsToFiveSecondsAndTheOldUriNameIsRead() {
         Map<String, Object> json = new HashMap<String, Object>();
         json.put("device_code", "DC");
