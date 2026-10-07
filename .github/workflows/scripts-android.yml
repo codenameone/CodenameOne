@@ -52,6 +52,7 @@ name: Test Android build scripts
       # transport.
       - 'scripts/hellocodenameone/backend/**'
       - 'scripts/lib/cn1ss.sh'
+      - 'scripts/ci/tests/cn1ss-selfcheck-test.sh'
   push:
     branches:
       - master
@@ -98,6 +99,7 @@ name: Test Android build scripts
       # transport.
       - 'scripts/hellocodenameone/backend/**'
       - 'scripts/lib/cn1ss.sh'
+      - 'scripts/ci/tests/cn1ss-selfcheck-test.sh'
 
 # The token in secrets.CN1SS_GH_TOKEN was generated on
 # Oct 16th 2025. If in Oct 2026 builds start failing, it
@@ -155,6 +157,8 @@ jobs:
       CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
     steps:
       - uses: actions/checkout@v6
+      - name: Test screenshot server startup probe
+        run: bash scripts/ci/tests/cn1ss-selfcheck-test.sh
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
       - name: Free Disk Space
