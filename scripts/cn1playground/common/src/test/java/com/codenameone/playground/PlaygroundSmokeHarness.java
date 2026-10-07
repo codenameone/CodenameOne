@@ -45,22 +45,30 @@ public final class PlaygroundSmokeHarness {
     }
 
     public static void main(String[] args) throws Exception {
-        smokeApiIndex();
-        smokeFormShowIsCaptured();
-        smokeLifecycleWrapperScript();
-        smokeLooseScriptListeners();
-        smokeLooseScriptListSnippet();
-        smokeLifecycleDemo();
-        smokeRestScriptWithLambda();
-        smokeStringMethods();
-        smokeComponentTypeResolvesWithoutExplicitImport();
-        smokeUIManagerClassImport();
-        smokeCompileErrorNamesTheProblem();
-        smokeUnknownTypeIsACompileError();
-        smokeRuntimeErrorIsReported();
-        smokeBuildMethodScript();
-        smokeRecordsAndPatternsRun();
-        System.out.println("Playground smoke tests passed.");
+        try {
+            smokeApiIndex();
+            smokeHostSetupFinishesBeforeReturning();
+            smokeFormShowIsCaptured();
+            smokeLifecycleWrapperScript();
+            smokeLooseScriptListeners();
+            smokeLooseScriptListSnippet();
+            smokeLifecycleDemo();
+            smokeRestScriptWithLambda();
+            smokeStringMethods();
+            smokeComponentTypeResolvesWithoutExplicitImport();
+            smokeUIManagerClassImport();
+            smokeCompileErrorNamesTheProblem();
+            smokeUnknownTypeIsACompileError();
+            smokeRuntimeErrorIsReported();
+            smokeBuildMethodScript();
+            smokeRecordsAndPatternsRun();
+            System.out.println("Playground smoke tests passed.");
+        } catch (Throwable failure) {
+            failure.printStackTrace();
+            // exec:java otherwise waits for JavaSE's non-daemon UI threads
+            // after an assertion, hiding the actual failure behind a timeout.
+            System.exit(1);
+        }
         // Codename One/JavaSE initialization may leave non-daemon threads running.
         // Force a clean exit so CI jobs don't hang after successful completion.
         System.exit(0);
@@ -96,6 +104,17 @@ public final class PlaygroundSmokeHarness {
             dips |= "UNIT_TYPE_DIPS".equals(f);
         }
         require(dips, "API index should list Style.UNIT_TYPE_DIPS");
+    }
+
+    private static void smokeHostSetupFinishesBeforeReturning() {
+        final boolean[] current = new boolean[1];
+        Display.getInstance().callSeriallyAndWait(() -> {
+            Display.getInstance().getCurrent().setTransitionOutAnimator(
+                    com.codename1.ui.animations.CommonTransitions.createFade(10000));
+            PlaygroundContext next = context();
+            current[0] = Display.getInstance().getCurrent() == next.getHostForm();
+        });
+        require(current[0], "Host setup must finish before the preview is tested");
     }
 
     private static void smokeFormShowIsCaptured() {
