@@ -1412,6 +1412,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (clientProperties != null) {
             clientProperties.clear();
             clientProperties = null;
+            repaintTextSelection();
         }
     }
 
@@ -4814,7 +4815,10 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `ignorePointerEvents`: the ignorePointerEvents to set
     public void setIgnorePointerEvents(boolean ignorePointerEvents) {
-        this.ignorePointerEvents = ignorePointerEvents;
+        if (this.ignorePointerEvents != ignorePointerEvents) {
+            this.ignorePointerEvents = ignorePointerEvents;
+            repaintTextSelection();
+        }
     }
 
     /// Indicates whether the component displays the material design ripple effect

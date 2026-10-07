@@ -1427,19 +1427,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
 
-        private void commit(String value) {
-            if (!ta.isEditable() || !ta.isEnabled()) return;
+        private boolean acceptsInput(String value) {
+            if (!ta.isEditable() || !ta.isEnabled()) return false;
             // A text input preserves arbitrary programmatic NUMERIC values, unlike
-            // type=number. Enforce the integer constraint on user edits before they
-            // reach the model, including paste and input methods.
+            // type=number. Validate both DOM edits and canvas initiating characters.
             if ((ta.getConstraint() & 0xffff) == TextArea.NUMERIC && !value.equals(ta.getText())) {
                 for (int i = 0; i < value.length(); i++) {
                     char ch = value.charAt(i);
-                    if ((ch < '0' || ch > '9') && !(i == 0 && ch == '-')) {
-                        el.setValue(ta.getText());
-                        return;
-                    }
+                    if ((ch < '0' || ch > '9') && !(i == 0 && ch == '-')) return false;
                 }
+            }
+            return true;
+        }
+
+        private void appendInitiatingText(String suffix) {
+            String value = ta.getText() + suffix;
+            if (acceptsInput(value)) ta.setText(value);
+        }
+
+        private void commit(String value) {
+            if (!ta.isEditable() || !ta.isEnabled()) return;
+            if (!acceptsInput(value)) {
+                el.setValue(ta.getText());
+                return;
             }
             browserEdit = true;
             try {
@@ -7331,9 +7341,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         Display.getInstance().onEditingComplete(cmp, ta.getText());
                         return;
                     }
-                    if (ta.getText().length() < maxSize) ta.setText(ta.getText() + "\n");
+                    if (ta.getText().length() < maxSize) ((SelectionTextOverlay) overlayEl).appendInitiatingText("\n");
                 } else if (isEditingInitiatingCharacter(initiatingKeycode) && ta.getText().length() < maxSize) {
-                    ta.setText(ta.getText() + (char) initiatingKeycode);
+                    ((SelectionTextOverlay) overlayEl).appendInitiatingText("" + (char) initiatingKeycode);
                 }
                 overlayEl.updateNativeEditorText(ta.getText());
             }

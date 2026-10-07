@@ -67,6 +67,27 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('ignorepointer');
+    const ignoredArea = page.locator('.cn1-selection-editor[name="ignorePointerArea"]');
+    for (const ignored of [false, true, false]) {
+      if (ignored || await ignoredArea.isHidden()) await clickButton('Toggle ignored pointers');
+      await page.waitForFunction(ignored => {
+        const area = document.querySelector('.cn1-selection-editor[name="ignorePointerArea"]');
+        const label = [...document.querySelectorAll('#cn1-text-layer span')].find(el => el.textContent === 'Ignore pointer label');
+        return !!area && (getComputedStyle(area).display === 'none') === ignored
+          && !!label && getComputedStyle(label).pointerEvents === (ignored ? 'none' : 'auto');
+      }, ignored);
+    }
+    console.log('PASS', name, 'ignore-pointer mutations refresh native labels and editable areas');
+
+    await openReview('numericinitiating');
+    const numericInitiating = page.locator('.cn1-selection-editor[name="numericInitiating"]');
+    await numericInitiating.waitFor({state: 'visible'});
+    await clickButton('Type numeric queued keys');
+    await page.waitForFunction(() => document.body.innerText.includes('Numeric queued 123'));
+    assert.equal(await numericInitiating.inputValue(), '123');
+    console.log('PASS', name, 'numeric initiating letters and line breaks are rejected before model mutation');
+
     await openReview('nativepolicy');
     const policy = page.locator('.cn1-selection-editor[name="nativePolicy"]');
     await policy.waitFor({state: 'visible'});
@@ -96,10 +117,10 @@ async function exercise(context, name, host, mobileDevice = null) {
     console.log('PASS', name, 'display screenshot rasterizes persistent editors and editing continues');
 
     await openReview('autocompletemutation');
-    for (const token of ['off', 'one-time-code', 'clear']) {
+    for (const token of ['off', 'one-time-code', 'clear', 'off', 'bulk-clear']) {
       await clickButton('Autocomplete ' + token);
       await page.waitForFunction(expected => document.querySelector('.cn1-selection-editor[name="autocompleteMutation"]').getAttribute('autocomplete') === expected,
-        token === 'clear' ? 'on' : token);
+        ['clear', 'bulk-clear'].includes(token) ? 'on' : token);
     }
     console.log('PASS', name, 'autocomplete client-property changes refresh a static native editor');
 

@@ -87,6 +87,23 @@ for (const state of ['readOnly', 'disabled']) {
   }
   text[state] = false;
 }
+for (const readOnly of [false, true]) {
+  text.readOnly = readOnly;
+  for (const [modifiers, owns] of [[{ctrlKey: true}, true], [{shiftKey: true}, !readOnly],
+      [{}, false], [{ctrlKey: true, altKey: true}, false], [{shiftKey: true, altKey: true}, false],
+      [{shiftKey: true, metaKey: true}, false]]) {
+    for (const keyInfo of [{key: 'Insert'}, {keyCode: 45}]) {
+      for (const type of ['keydown', 'keyup', 'keypress']) {
+        const e = Object.assign(event(type, text), keyInfo, modifiers);
+        callback(e);
+        assert.equal(messages.length, owns ? 0 : 1, 'Insert clipboard shortcut has one keyboard owner');
+        assert.equal(e.defaultPrevented, false, 'native clipboard default action is preserved');
+        messages.length = 0;
+      }
+    }
+  }
+}
+text.readOnly = false;
 const listeners = {}, relayed = [];
 const doc = { addEventListener(type, listener) { listeners[type] = listener; },
   getElementById() { return canvas; }, activeElement: null };

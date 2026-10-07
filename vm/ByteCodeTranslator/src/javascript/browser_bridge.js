@@ -2029,6 +2029,11 @@
     if (event.ctrlKey && event.altKey) {
       return !!(editable && event.getModifierState && event.getModifierState('AltGraph') && key.length === 1);
     }
+    // Standard Windows/Linux clipboard alternatives also belong to the control.
+    if (key === 'Insert' || code === 45) {
+      return !!(!event.altKey && !event.metaKey
+          && (event.ctrlKey && !event.shiftKey || editable && event.shiftKey && !event.ctrlKey));
+    }
     if (event.ctrlKey || event.metaKey) {
       return /^[ac]$/i.test(key) || [65, 67].indexOf(code) >= 0
           || (editable && (/^[vxyz]$/i.test(key) || [86, 88, 89, 90].indexOf(code) >= 0));

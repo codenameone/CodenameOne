@@ -94,7 +94,24 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=nativepolicy") >= 0) {
+        if (query.indexOf("review=ignorepointer") >= 0) {
+            Label label = new Label("Ignore pointer label");
+            TextArea area = new TextArea("Ignore pointer area", 2, 24); area.setName("ignorePointerArea");
+            Button toggle = new Button("Toggle ignored pointers");
+            toggle.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> {
+                label.setIgnorePointerEvents(!label.isIgnorePointerEvents());
+                area.setIgnorePointerEvents(!area.isIgnorePointerEvents());
+            }));
+            form.addAll(label, area, toggle);
+        } else if (query.indexOf("review=numericinitiating") >= 0) {
+            TextArea area = new TextArea("12", 2, 24, TextArea.NUMERIC); area.setName("numericInitiating");
+            Button type = new Button("Type numeric queued keys");
+            type.addActionListener(e -> {
+                area.keyReleased('A'); area.keyReleased(10); area.keyReleased('3');
+                status.setText("Numeric queued " + area.getText());
+            });
+            form.addAll(type, area, status);
+        } else if (query.indexOf("review=nativepolicy") >= 0) {
             TextField field = new TextField("Policy value"); field.setName("nativePolicy");
             Button toggle = new Button("Toggle native input");
             toggle.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form,
@@ -128,10 +145,13 @@ public class JavaScriptSelectionApp extends Lifecycle {
         } else if (query.indexOf("review=autocompletemutation") >= 0) {
             TextField area = new TextField("Autofill value"); area.setName("autocompleteMutation");
             form.add(area);
-            for (final String token : new String[] {"off", "one-time-code", "clear"}) {
+            for (final String token : new String[] {"off", "one-time-code", "clear", "bulk-clear"}) {
                 Button change = new Button("Autocomplete " + token);
                 change.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form,
-                    () -> area.putClientProperty("cn1$autocomplete", "clear".equals(token) ? null : token)));
+                    () -> {
+                        if ("bulk-clear".equals(token)) area.clearClientProperties();
+                        else area.putClientProperty("cn1$autocomplete", "clear".equals(token) ? null : token);
+                    }));
                 form.add(change);
             }
         } else if (query.indexOf("review=blocklead") >= 0) {

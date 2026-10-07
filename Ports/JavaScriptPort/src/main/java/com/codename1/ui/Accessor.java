@@ -29,7 +29,7 @@ public class Accessor {
         // A Label subclass may override pointer handling without registering listeners
         // (Slider is one example). The same applies to custom TextArea/TextField
         // subclasses: only the known built-in editors are safe to promote.
-        if (c == null) return false;
+        if (c == null || c.isIgnorePointerEvents()) return false;
         for (Container parent = c.getParent(); parent != null; parent = parent.getParent()) {
             if (parent.isFocusable() || parent.isGrabsPointerEvents() || parent.isDraggable()) return false;
         }
