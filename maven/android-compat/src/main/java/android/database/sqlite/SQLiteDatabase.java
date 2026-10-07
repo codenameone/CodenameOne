@@ -780,8 +780,20 @@ public final class SQLiteDatabase extends SQLiteClosable {
     static boolean isReadOnlyStatement(String sql) {
         int start = 0;
         int n = sql.length();
-        while (start < n && (sql.charAt(start) <= ' ' || sql.charAt(start) == '(')) {
-            start++;
+        while (start < n) {
+            char c = sql.charAt(start);
+            if (c <= ' ' || c == '(') {
+                start++;
+            } else if (sql.startsWith("--", start)) {
+                int newline = sql.indexOf('\n', start + 2);
+                start = newline < 0 ? n : newline + 1;
+            } else if (sql.startsWith("/*", start)) {
+                int close = sql.indexOf("*/", start + 2);
+                if (close < 0) return false;
+                start = close + 2;
+            } else {
+                break;
+            }
         }
         int end = start;
         while (end < n) {

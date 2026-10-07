@@ -117,6 +117,9 @@ public class SpannableStringBuilder implements CharSequence, GetChars, Spannable
             }
         }
         int after = src.length();
+        if (st == en && after == 0 && !(src instanceof Spanned)) {
+            return this;
+        }
         for (int i = 0; i < watchers.size(); i++) {
             watchers.get(i).beforeChange(this, st, en - st, after);
         }

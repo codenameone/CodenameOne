@@ -198,6 +198,9 @@ public final class AndroidRemapper {
     /// `AutoCloseable`), and a class file that names an interface twice is
     /// rejected by the JVM; and Kotlin's metadata strings (below).
     private static final class PostRemapFixes extends ClassVisitor {
+        private final Set<String> methods = new LinkedHashSet<String>();
+        private String className;
+
         PostRemapFixes(ClassVisitor next) {
             super(Opcodes.ASM9, next);
         }
@@ -205,6 +208,7 @@ public final class AndroidRemapper {
         @Override
         public void visit(int version, int access, String name, String signature, String superName,
                           String[] interfaces) {
+            className = name;
             String[] distinct = interfaces;
             if (interfaces != null && interfaces.length > 1) {
                 Set<String> seen = new LinkedHashSet<String>(Arrays.asList(interfaces));
@@ -213,6 +217,17 @@ public final class AndroidRemapper {
                 }
             }
             super.visit(version, access, name, signature, superName, distinct);
+        }
+
+        @Override
+        public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                         String signature, String[] exceptions) {
+            if (!methods.add(name + descriptor)) {
+                throw new IllegalArgumentException("Android remapping collapses overloads in "
+                        + className + ": " + name + descriptor
+                        + ". Rename the overload or use one AutoCloseable signature.");
+            }
+            return super.visitMethod(access, name, descriptor, signature, exceptions);
         }
 
         /// Kotlin records the JVM descriptors of a class's members as plain

@@ -93,4 +93,19 @@ public class EditTextEditableWatcherTest {
         e.onPeerTextChanged("abc");
         assertEquals("[before ab 2,0,1, on abc 2,0,1, after abc]", log.toString());
     }
+    @Test
+    public void filteredKeyboardEditsReportOnlyInsertedCharacters() {
+        EditText e = new EditText(AndroidTestSupport.context());
+        e.setText("ab");
+        e.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(3)});
+        List<String> log = new ArrayList<String>();
+        e.addTextChangedListener(recorder(log));
+        e.onPeerTextChanged("abcde");
+        assertEquals("[before ab 2,0,1, on abc 2,0,1, after abc]", log.toString());
+        log.clear();
+        e.onPeerTextChanged("abcd");
+        assertEquals("abc", e.getText().toString());
+        assertEquals("[]", log.toString());
+    }
+
 }

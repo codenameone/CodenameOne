@@ -385,6 +385,15 @@ the gallery and automated tests cover a subset of those behaviors.
   classes (view transforms, colors, progress, drawable alpha and level), because
   there is no reflection. Animate a property of your own class through an
   `android.util.Property` instead.
+* An anchored `PopupWindow` keeps its position until `update()` is called.
+  Applications must update or dismiss it when its anchor scrolls or moves.
+  Automatic anchor tracking is deferred.
+* Options menus use their last prepared contents. Call `invalidateOptionsMenu()`
+  after changing state that affects menu items; opening the overflow alone
+  doesn't prepare the menu again.
+* Overloads that differ only by `Closeable` and `AutoCloseable` can't survive
+  remapping to the Codename One runtime. The build rejects these collisions
+  with the class and method name; rename the overload or use one signature.
 * XML `android:onClick` handlers must be declared in application output classes.
   The dispatcher doesn't discover methods inherited only from dependency JARs.
   Add a public forwarding method in the application activity, or register an

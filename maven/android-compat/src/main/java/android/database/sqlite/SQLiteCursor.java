@@ -42,9 +42,8 @@ import java.util.ArrayList;
 /// Numeric getters convert that text the way SQLite converts a value
 /// (`getLong("12.5")` is 12, non-numeric text is 0).
 ///
-/// Blobs are the exception, because their bytes do not survive a text
-/// conversion: `getBlob` reads the cell from the underlying Codename One
-/// cursor, which stays open until this cursor is closed.
+/// Blob bytes are buffered alongside the text so every getter sees the
+/// same query result, even on ports where moving backward re-runs a query.
 ///
 /// `getType` is inferred from the text, since Codename One reports no
 /// column types: NULL, then INTEGER for an integer literal, FLOAT for any
@@ -60,6 +59,7 @@ public class SQLiteCursor extends AbstractCursor {
     private String[] mColumns;
     private ArrayList<String[]> mRows;
     private ArrayList<boolean[]> mNulls;
+    private ArrayList<byte[][]> mBlobs;
     private com.codename1.db.Cursor mBacking;
 
     @Deprecated
@@ -83,6 +83,7 @@ public class SQLiteCursor extends AbstractCursor {
         com.codename1.db.Cursor c = mQuery.run();
         ArrayList<String[]> rows = new ArrayList<String[]>();
         ArrayList<boolean[]> nulls = new ArrayList<boolean[]>();
+        ArrayList<byte[][]> blobs = new ArrayList<byte[][]>();
         String[] columns;
         try {
             int n = c.getColumnCount();
@@ -94,14 +95,26 @@ public class SQLiteCursor extends AbstractCursor {
                 Row row = c.getRow();
                 String[] values = new String[n];
                 boolean[] isNull = new boolean[n];
+                byte[][] bytes = new byte[n][];
                 for (int i = 0; i < n; i++) {
                     String s = row.getString(i);
                     boolean wasNull = row instanceof RowExt ? ((RowExt) row).wasNull() : s == null;
                     isNull[i] = wasNull;
                     values[i] = wasNull ? null : s;
+                    if (!wasNull) {
+                        try {
+                            byte[] blob = row.getBlob(i);
+                            bytes[i] = blob == null ? null : blob.clone();
+                        } catch (IOException unsupportedConversion) {
+                            // Some ports reject getBlob() for numeric/text cells.
+                            // Preserve the existing UTF-8 fallback in the snapshot.
+                            bytes[i] = s.getBytes("UTF-8");
+                        }
+                    }
                 }
                 rows.add(values);
                 nulls.add(isNull);
+                blobs.add(bytes);
             }
         } catch (IOException e) {
             try {
@@ -114,7 +127,9 @@ public class SQLiteCursor extends AbstractCursor {
         mColumns = columns;
         mRows = rows;
         mNulls = nulls;
+        mBlobs = blobs;
         mBacking = c;
+        closeBacking();
     }
 
     private void closeBacking() {
@@ -212,24 +227,8 @@ public class SQLiteCursor extends AbstractCursor {
 
     @Override
     public byte[] getBlob(int column) {
-        String v = value(column);
-        if (v == null) {
-            return null;
-        }
-        if (mBacking != null) {
-            try {
-                if (mBacking.position(mPos)) {
-                    return mBacking.getRow().getBlob(column);
-                }
-            } catch (IOException e) {
-                Log.w(TAG, "re-reading row " + mPos + " for a blob: " + e);
-            }
-        }
-        try {
-            return v.getBytes("UTF-8");
-        } catch (java.io.UnsupportedEncodingException e) {
-            throw new IllegalStateException("UTF-8 is not supported");
-        }
+        value(column); // validates row and column
+        return mBlobs.get(mPos)[column];
     }
 
     public void setSelectionArguments(String[] selectionArgs) {
@@ -249,6 +248,7 @@ public class SQLiteCursor extends AbstractCursor {
         closeBacking();
         mRows = null;
         mNulls = null;
+        mBlobs = null;
         mQuery.close();
         mDriver.cursorClosed();
     }

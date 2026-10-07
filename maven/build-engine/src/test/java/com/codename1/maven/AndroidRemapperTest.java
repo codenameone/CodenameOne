@@ -669,4 +669,24 @@ public class AndroidRemapperTest {
             z.close();
         }
     }
+    @Test
+    public void descriptorCollisionsAreRejectedBeforeWritingAClass() {
+        for (String name : new String[]{"accept", "<init>"}) {
+            ClassWriter cw = new ClassWriter(0);
+            cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "example/Overloaded", null, "java/lang/Object", null);
+            for (String type : new String[]{"java/io/Closeable", "java/lang/AutoCloseable"}) {
+                MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, name, "(L" + type + ";)V", null, null);
+                mv.visitCode(); mv.visitInsn(Opcodes.RETURN); mv.visitMaxs(0, 2); mv.visitEnd();
+            }
+            cw.visitEnd();
+            try {
+                AndroidRemapper.remap(cw.toByteArray());
+                org.junit.Assert.fail("Overloads collapsed into an invalid class");
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage().contains("example/Overloaded"));
+                assertTrue(expected.getMessage().contains(name));
+            }
+        }
+    }
+
 }

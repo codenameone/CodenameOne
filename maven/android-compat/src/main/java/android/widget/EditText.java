@@ -104,18 +104,16 @@ public class EditText extends TextView {
             ((SpannableStringBuilder) text).addChangeHook(new SpannableStringBuilder.ChangeHook() {
                 @Override
                 public void beforeChange(SpannableStringBuilder t, int start, int before, int after) {
-                    // A native edit (onPeerTextChanged) notifies the
-                    // watchers itself; a live-Editable mutation from app
-                    // code (getText().clear(), replace(), append()) is
-                    // reported here, as Android does.
-                    if (!mSyncing && t == mText) {
+                    // The Editable applies filters before reporting the actual
+                    // replacement, for both native input and application edits.
+                    if (t == mText) {
                         sendBeforeTextChanged(t, start, before, after);
                     }
                 }
 
                 @Override
                 public void afterChange(SpannableStringBuilder t, int start, int before, int after) {
-                    boolean notify = !mSyncing && t == mText;
+                    boolean notify = t == mText;
                     pushTextToPeer();
                     if (notify) {
                         sendOnTextChanged(t, start, before, after);
@@ -162,10 +160,7 @@ public class EditText extends TextView {
         mSyncing = true;
         try {
             Editable e = getText();
-            sendBeforeTextChanged(e, start, oldEnd - start, newEnd - start);
             e.replace(start, oldEnd, newText.substring(start, newEnd));
-            sendOnTextChanged(e, start, oldEnd - start, newEnd - start);
-            sendAfterTextChanged();
         } finally {
             mSyncing = false;
         }

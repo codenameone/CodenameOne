@@ -670,4 +670,27 @@ public class SQLiteDatabaseTest {
             calls.add("open");
         }
     }
+    @Test
+    public void leadingCommentsDoNotTurnReadsIntoWrites() {
+        assertTrue(SQLiteDatabase.isReadOnlyStatement("-- generated\nSELECT 1"));
+        assertTrue(SQLiteDatabase.isReadOnlyStatement(" /* generated */ -- next\n SELECT 1"));
+        assertFalse(SQLiteDatabase.isReadOnlyStatement("/* SELECT */ DELETE FROM notes"));
+        assertFalse(SQLiteDatabase.isReadOnlyStatement("-- only comment"));
+        assertFalse(SQLiteDatabase.isReadOnlyStatement("/* unterminated SELECT"));
+    }
+
+    @Test
+    public void blobsKeepTheSameSnapshotAsOtherColumns() {
+        ContentValues v = note("before", 1);
+        v.put("body", new byte[]{1, 2});
+        db.insertOrThrow("notes", null, v);
+        Cursor c = db.rawQuery("SELECT title, body FROM notes", null);
+        try {
+            db.execSQL("UPDATE notes SET title='after', body=X'0304'");
+            assertTrue(c.moveToFirst());
+            assertEquals("before", c.getString(0));
+            assertArrayEquals(new byte[]{1, 2}, c.getBlob(1));
+        } finally { c.close(); }
+    }
+
 }

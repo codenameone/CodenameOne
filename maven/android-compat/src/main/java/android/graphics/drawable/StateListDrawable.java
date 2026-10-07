@@ -75,7 +75,7 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
             drawable.setTintMode(childTintMode);
         }
         drawable.setBounds(getBounds());
-        drawable.setVisible(isVisible(), true);
+        drawable.setVisible(false, true);
         onStateChange(getState());
     }
 
@@ -115,9 +115,14 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
             idx = findStateDrawableIndex(StateSet.WILD_CARD);
         }
         boolean changed = idx != current;
+        Drawable previous = getCurrent();
+        if (changed && previous != null) {
+            previous.setVisible(false, false);
+        }
         current = idx;
         Drawable d = getCurrent();
         if (d != null && d != this) {
+            d.setVisible(isVisible(), changed);
             d.setBounds(getBounds());
             if (d.setState(state)) {
                 changed = true;
@@ -252,7 +257,8 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
 
     @Override
     public boolean setVisible(boolean visible, boolean restart) {
-        for (Drawable d : drawables) {
+        Drawable d = getCurrent();
+        if (d != null) {
             d.setVisible(visible, restart);
         }
         return super.setVisible(visible, restart);
@@ -273,7 +279,9 @@ public class StateListDrawable extends Drawable implements Drawable.Callback {
 
     @Override
     public void scheduleDrawable(Drawable who, Runnable what, long when) {
-        scheduleSelf(what, when);
+        if (who == getCurrent() && isVisible()) {
+            scheduleSelf(what, when);
+        }
     }
 
     @Override

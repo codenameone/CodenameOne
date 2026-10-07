@@ -140,7 +140,8 @@ public final class Looper {
                     try {
                         l.queue.wait(wait);
                     } catch (InterruptedException e) {
-                        return;
+                        // Interrupting a HandlerThread is not a quit request.
+                        // wait() cleared the flag; keep accepting and draining work.
                     }
                 }
             }
