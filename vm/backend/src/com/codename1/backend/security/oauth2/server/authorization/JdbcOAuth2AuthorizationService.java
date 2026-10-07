@@ -23,6 +23,7 @@
 package com.codename1.backend.security.oauth2.server.authorization;
 
 import com.codename1.backend.DataSource;
+import com.codename1.backend.Database;
 import com.codename1.backend.Json;
 import com.codename1.backend.security.oauth2.core.OAuth2Parameters;
 import java.io.IOException;
@@ -63,7 +64,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
         this.dataSource = dataSource;
     }
 
-    private static IllegalStateException failed(String what, IOException err) {
+    private static IllegalStateException failed(String what, Exception err) {
         return new IllegalStateException("The authorization store could not " + what + ": "
                 + err.getMessage(), err);
     }
@@ -148,6 +149,72 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
                     new Object[] {tokenHash, authorizationId, kind, Long.valueOf(expiresAt)});
         } catch (IOException err) {
             throw failed("store a token", err);
+        }
+    }
+
+    @Override
+    public boolean issueTokens(String authorizationId, long now, long expiresAt,
+                               String refreshTokenHash, boolean reuse) {
+        try {
+            return Boolean.TRUE.equals(dataSource.inTransaction(
+                    new Issuance(authorizationId, now, expiresAt, refreshTokenHash, reuse)));
+        } catch (Exception err) {
+            throw failed("issue tokens", err);
+        }
+    }
+
+    /// The first write locks the grant until both token and grant updates commit.
+    /// remove() deletes that row first, so either issuance finishes first or it
+    /// sees no grant. No upsert can recreate a revoked grant.
+    private static final class Issuance implements DataSource.Work {
+        private final String id;
+        private final long now;
+        private final long expiresAt;
+        private final String hash;
+        private final boolean reuse;
+
+        Issuance(String id, long now, long expiresAt, String hash, boolean reuse) {
+            this.id = id;
+            this.now = now;
+            this.expiresAt = expiresAt;
+            this.hash = hash;
+            this.reuse = reuse;
+        }
+
+        @Override
+        public Object run(Database db) throws Exception {
+            Object[] grant = {id, OAuth2Authorization.ACTIVE, Long.valueOf(now)};
+            // A portable row lock, including SQLite. MySQL may report zero for
+            // this unchanged value, so existence is checked while holding it.
+            db.execute("UPDATE cn1_oauth2_authorization SET expires_at = expires_at "
+                    + "WHERE id = ? AND status = ? AND expires_at > ?", grant);
+            if (db.queryOne("SELECT id FROM cn1_oauth2_authorization WHERE id = ? "
+                    + "AND status = ? AND expires_at > ?", grant) == null) {
+                return Boolean.FALSE;
+            }
+            if (hash != null) {
+                if (reuse) {
+                    Object[] token = {hash, id, REFRESH_TOKEN, Long.valueOf(now)};
+                    db.execute("UPDATE cn1_oauth2_token SET expires_at = CASE WHEN expires_at < ? "
+                            + "THEN ? ELSE expires_at END WHERE token_hash = ? AND authorization_id = ? "
+                            + "AND kind = ? AND used = 0 AND expires_at > ?", new Object[] {
+                                Long.valueOf(expiresAt), Long.valueOf(expiresAt), hash, id,
+                                REFRESH_TOKEN, Long.valueOf(now)});
+                    if (db.queryOne("SELECT token_hash FROM cn1_oauth2_token WHERE token_hash = ? "
+                            + "AND authorization_id = ? AND kind = ? AND used = 0 AND expires_at > ?",
+                            token) == null) {
+                        return Boolean.FALSE;
+                    }
+                } else {
+                    db.execute("INSERT INTO cn1_oauth2_token (token_hash, authorization_id, "
+                            + "kind, used, expires_at, polled_at) VALUES (?, ?, ?, 0, ?, 0)",
+                            new Object[] {hash, id, REFRESH_TOKEN, Long.valueOf(expiresAt)});
+                }
+            }
+            db.execute("UPDATE cn1_oauth2_authorization SET expires_at = CASE WHEN expires_at < ? "
+                    + "THEN ? ELSE expires_at END WHERE id = ?",
+                    new Object[] {Long.valueOf(expiresAt), Long.valueOf(expiresAt), id});
+            return Boolean.TRUE;
         }
     }
 

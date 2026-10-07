@@ -100,6 +100,20 @@ public interface OAuth2AuthorizationService {
     /// @param expiresAt epoch milliseconds
     void addToken(String authorizationId, String kind, String tokenHash, long expiresAt);
 
+    /// Issues tokens only while an active, unexpired grant still exists. Extending
+    /// the grant and adding or extending its refresh token must be one atomic
+    /// operation with respect to [#remove], including across server processes.
+    /// A removed grant must never be recreated. Custom stores must implement this
+    /// operation before issuing user tokens; the default fails closed.
+    ///
+    /// @param refreshTokenHash null when no refresh token is issued
+    /// @param reuse whether the hash names an existing unused, unexpired refresh token
+    /// @return false when the grant or reused refresh token is no longer valid
+    default boolean issueTokens(String authorizationId, long now, long expiresAt,
+                                String refreshTokenHash, boolean reuse) {
+        throw new UnsupportedOperationException("Atomic token issuance is not supported by this store");
+    }
+
     /// What is stored for a secret, whatever its state; null when nothing is.
     StoredToken findToken(String kind, String tokenHash);
 

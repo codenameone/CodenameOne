@@ -70,6 +70,29 @@ public final class InMemoryOAuth2AuthorizationService implements OAuth2Authoriza
     }
 
     @Override
+    public synchronized boolean issueTokens(String authorizationId, long now, long expiresAt,
+                                            String refreshTokenHash, boolean reuse) {
+        OAuth2Authorization grant = authorizations.get(authorizationId);
+        if (grant == null || !OAuth2Authorization.ACTIVE.equals(grant.getStatus())
+                || grant.getExpiresAt() <= now) {
+            return false;
+        }
+        if (refreshTokenHash != null) {
+            if (reuse) {
+                StoredToken token = findToken(REFRESH_TOKEN, refreshTokenHash);
+                if (token == null || !authorizationId.equals(token.getAuthorizationId())
+                        || !extendToken(REFRESH_TOKEN, refreshTokenHash, now, expiresAt)) {
+                    return false;
+                }
+            } else {
+                addToken(authorizationId, REFRESH_TOKEN, refreshTokenHash, expiresAt);
+            }
+        }
+        authorizations.put(authorizationId, grant.withExpiresAt(Math.max(grant.getExpiresAt(), expiresAt)));
+        return true;
+    }
+
+    @Override
     public synchronized StoredToken findToken(String kind, String tokenHash) {
         Object[] row = tokenHash == null ? null : tokens.get(key(kind, tokenHash));
         return row == null ? null : new StoredToken((String) row[0],

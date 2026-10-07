@@ -268,6 +268,8 @@ class AuthorizationServerTest {
                 assertEquals(issuer + "/oauth2/jwks", m.get("jwks_uri"));
                 // No RP-initiated logout, and none advertised.
                 assertNull(m.get("end_session_endpoint"));
+                // The repository also holds orders:read, but cannot enumerate all scopes.
+                assertFalse(m.containsKey("scopes_supported"));
                 assertEquals(issuer + "/oauth2/device_authorization",
                         m.get("device_authorization_endpoint"));
                 assertEquals(Arrays.asList("S256"), m.get("code_challenge_methods_supported"));
@@ -921,6 +923,26 @@ class AuthorizationServerTest {
     }
 
     // ------------------------------------------------------ refresh tokens
+
+    @Test
+    void revocationDuringRefreshCannotRecreateTheGrant() throws Exception {
+        final String[] removed = new String[1];
+        try (SecuredServer server = start(as -> as.tokenCustomizer(context -> {
+            if ("refresh_token".equals(context.getAuthorizationGrantType())) {
+                removed[0] = context.getAuthorization().getId();
+                grants.remove(removed[0]);
+            }
+        }))) {
+            String verifier = OAuth2Parameters.random(32);
+            Map first = json(token(server, "grant_type", "authorization_code", "client_id", "app",
+                    "code", code(server, "app", APP_REDIRECT, "openid", verifier),
+                    "redirect_uri", APP_REDIRECT, "code_verifier", verifier));
+            refused(token(server, "grant_type", "refresh_token", "client_id", "app",
+                    "refresh_token", (String) first.get("refresh_token")), 400, "invalid_grant");
+            assertNotNull(removed[0]);
+            assertNull(grants.findById(removed[0]));
+        }
+    }
 
     @Test
     @DisplayName("a refresh token is replaced on every use, and using a replaced one revokes the grant")

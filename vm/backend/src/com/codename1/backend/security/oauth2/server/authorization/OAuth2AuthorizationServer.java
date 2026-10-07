@@ -236,7 +236,8 @@ public final class OAuth2AuthorizationServer {
             }
         }
         m.put("id_token_signing_alg_values_supported", algorithms);
-        m.put("scopes_supported", list("openid", "profile", "email"));
+        // RegisteredClientRepository cannot enumerate every client's custom scopes.
+        // Omit the optional member rather than advertise an incomplete scope list.
         m.put("token_endpoint_auth_methods_supported", list("client_secret_basic",
                 "client_secret_post", "none"));
         m.put("revocation_endpoint_auth_methods_supported", list("client_secret_basic",
@@ -912,24 +913,19 @@ public final class OAuth2AuthorizationServer {
         if (authorization == null) {
             return answer;
         }
+        String refreshToken = null;
+        long expiresAt = now + settings.getAccessTokenTimeToLive() * 1000L;
         if (client.getAuthorizationGrantTypes().contains(AuthorizationGrantType.REFRESH_TOKEN)) {
-            long refreshExpires = now + settings.getRefreshTokenTimeToLive() * 1000L;
-            String refreshToken = keptRefreshToken;
-            if (refreshToken == null) {
-                refreshToken = OAuth2Parameters.random(32);
-                authorizations.addToken(authorization.getId(),
-                        OAuth2AuthorizationService.REFRESH_TOKEN,
-                        OAuth2Parameters.sha256(refreshToken), refreshExpires);
-            } else if (!authorizations.extendToken(OAuth2AuthorizationService.REFRESH_TOKEN,
-                    OAuth2Parameters.sha256(refreshToken), now, refreshExpires)) {
-                throw invalidGrant();
-            }
-            // Both rotated and reused tokens extend the lifetime of their grant.
-            authorizations.save(authorization.withExpiresAt(Math.max(authorization.getExpiresAt(), refreshExpires)));
+            expiresAt = now + settings.getRefreshTokenTimeToLive() * 1000L;
+            refreshToken = keptRefreshToken == null ? OAuth2Parameters.random(32) : keptRefreshToken;
+        }
+        if (!authorizations.issueTokens(authorization.getId(), now, expiresAt,
+                refreshToken == null ? null : OAuth2Parameters.sha256(refreshToken),
+                keptRefreshToken != null)) {
+            throw invalidGrant();
+        }
+        if (refreshToken != null) {
             answer.put("refresh_token", refreshToken);
-        } else {
-            authorizations.save(authorization.withExpiresAt(
-                    now + settings.getAccessTokenTimeToLive() * 1000L));
         }
         if (scopes.contains("openid")) {
             JwtClaimsSet.Builder id = JwtClaimsSet.builder();

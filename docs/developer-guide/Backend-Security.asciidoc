@@ -1006,6 +1006,12 @@ authorization code, an access token and a device code last 5 minutes, an ID
 token 30 minutes, and a refresh token 60 minutes from its last use.
 `reuseRefreshTokens(true)` turns rotation off.
 
+Token issuance and grant revocation are coordinated by the store. Once a
+grant is removed, a refresh request can't recreate it. Custom stores must
+implement `OAuth2AuthorizationService.issueTokens`: check the active grant,
+record or extend the refresh token, and extend the grant in one operation
+that's atomic with `remove`. The default implementation refuses issuance.
+
 The grants are kept by the application's `OAuth2AuthorizationService` bean:
 
 [source,java]

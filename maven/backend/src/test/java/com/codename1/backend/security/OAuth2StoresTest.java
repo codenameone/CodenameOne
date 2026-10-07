@@ -289,6 +289,63 @@ class OAuth2StoresTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void tokenIssuanceCannotResurrectRevokedGrants(String engine) throws Exception {
+        DataSource pool = open(engine);
+        JdbcOAuth2AuthorizationService issuer = new JdbcOAuth2AuthorizationService(pool);
+        JdbcOAuth2AuthorizationService revoker = new JdbcOAuth2AuthorizationService(again(engine));
+        issuer.save(grant("gone", OAuth2Authorization.ACTIVE, 5000L));
+        issuer.addToken("gone", OAuth2AuthorizationService.REFRESH_TOKEN, "old", 5000L);
+        assertTrue(issuer.consumeToken(OAuth2AuthorizationService.REFRESH_TOKEN, "old", 2000L));
+        revoker.remove("gone");
+        assertFalse(issuer.issueTokens("gone", 2000L, 9000L, "replacement", false));
+        assertNull(issuer.findById("gone"));
+        assertEquals(0L, count(pool, "cn1_oauth2_token"));
+
+        for (int round = 0; round < 12; round++) {
+            final String id = "race-" + round;
+            issuer.save(grant(id, OAuth2Authorization.ACTIVE, 5000L));
+            final CountDownLatch go = new CountDownLatch(1);
+            final java.util.concurrent.atomic.AtomicReference<Throwable> error =
+                    new java.util.concurrent.atomic.AtomicReference<Throwable>();
+            Thread issuing = new Thread(() -> {
+                try {
+                    go.await();
+                    issuer.issueTokens(id, 2000L, 9000L, "token-" + id, false);
+                } catch (Throwable failure) {
+                    error.set(failure);
+                }
+            });
+            Thread revoking = new Thread(() -> {
+                try {
+                    go.await();
+                    revoker.remove(id);
+                } catch (Throwable failure) {
+                    error.set(failure);
+                }
+            });
+            issuing.start();
+            revoking.start();
+            go.countDown();
+            issuing.join(10000);
+            revoking.join(10000);
+            assertFalse(issuing.isAlive() || revoking.isAlive(), "issuance/revocation deadlocked");
+            assertNull(error.get(), String.valueOf(error.get()));
+            assertNull(issuer.findById(id));
+            assertEquals(0L, count(pool, "cn1_oauth2_token"), "revocation left a replacement token");
+        }
+        issuer.save(grant("reuse", OAuth2Authorization.ACTIVE, 5000L));
+        assertTrue(issuer.issueTokens("reuse", 2000L, 9000L, "kept", false));
+        assertTrue(issuer.issueTokens("reuse", 2000L, 9000L, "kept", true));
+        assertTrue(issuer.issueTokens("reuse", 2000L, 12000L, "kept", true));
+        assertEquals(12000L, issuer.findById("reuse").getExpiresAt());
+        assertEquals(12000L, issuer.findToken(OAuth2AuthorizationService.REFRESH_TOKEN,
+                "kept").getExpiresAt());
+        revoker.remove("reuse");
+        assertFalse(issuer.issueTokens("reuse", 2000L, 15000L, "kept", true));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
     void authorizations(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcOAuth2AuthorizationService service = new JdbcOAuth2AuthorizationService(pool);
