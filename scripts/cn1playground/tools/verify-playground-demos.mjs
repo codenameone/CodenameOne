@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {scenePixels, changedPixels, sceneChecks, sampleScene} from './demo-pixels.mjs';
+import {gpuLifecycleScript} from './gpu-lifecycle-fixture.mjs';
 let chromium, firefox;
 try { ({chromium, firefox} = await import('playwright')); }
 catch { ({chromium, firefox} = await import('@playwright/test')); }
@@ -73,7 +74,7 @@ async function check(name, fn) {
   try { await fn(); results.push({name, ok: true}); console.log('PASS ' + name); }
   catch (error) { results.push({name, ok: false, error: error.message}); console.error('FAIL ' + name + ': ' + error.message); }
 }
-async function run(slug, title, width, exercise, caseName = slug) {
+async function run(slug, title, width, exercise, caseName = slug, script = null) {
   const name = browserName + '-' + caseName + '-' + width + 'x' + viewport.height + '-dpr' + deviceScaleFactor;
   if (process.env.PLAYGROUND_DEMO_FILTER && !name.includes(process.env.PLAYGROUND_DEMO_FILTER)) return;
   console.log('RUN ' + name);
@@ -105,6 +106,7 @@ async function run(slug, title, width, exercise, caseName = slug) {
   try {
     await check(name + ' interaction', async () => {
       const target = new URL(url); target.searchParams.set('sample', slug);
+      if (script !== null) target.searchParams.set('code', Buffer.from(script).toString('base64url'));
       await page.goto(target.href, {waitUntil: 'domcontentloaded', timeout: 90000});
       await page.waitForFunction(() => window.cn1Started === true || !!document.querySelector('iframe[title="Codename One Playground"]'));
       const embedded = await page.locator('iframe[title="Codename One Playground"]').elementHandles();
@@ -276,6 +278,8 @@ try {
         const width = viewport.width;
         await run('bouncing-balls', 'Bouncing Balls', width, (p, r, n) => animatedScene(p, r, n, 'balls'));
         await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'));
+        await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'),
+          'gpu-lifecycle', gpuLifecycleScript);
         await run('camera-capture', 'Camera', width, cameraDemo);
         await run('camera-capture', 'Camera', width, demoNavigation, 'demo-navigation');
       }
