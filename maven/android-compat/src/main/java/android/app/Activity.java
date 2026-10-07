@@ -598,6 +598,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
     }
 
     public boolean moveTaskToBack(boolean nonRoot) {
+        if (!nonRoot && !isTaskRoot()) {
+            return false;
+        }
         com.codename1.ui.Display.getInstance().minimizeApplication();
         return true;
     }

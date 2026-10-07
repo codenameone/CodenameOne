@@ -132,6 +132,18 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
         if (drawable != null) {
             drawable.setCallback(this);
             drawable.setState(getState());
+            drawable.setLevel(getLevel());
+            drawable.setVisible(isVisible(), true);
+            drawable.setAlpha(getAlpha());
+            drawable.setLayoutDirection(getLayoutDirection());
+            drawable.setAutoMirrored(isAutoMirrored());
+            if (colorFilter != null) {
+                drawable.setColorFilter(colorFilter);
+            }
+            if (tintList != null) {
+                drawable.setTintList(tintList);
+                drawable.setTintMode(tintMode);
+            }
         }
         onBoundsChange(getBounds());
         invalidateSelf();
@@ -347,6 +359,7 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 
     @Override
     public void setTintList(android.content.res.ColorStateList tint) {
+        super.setTintList(tint);
         for (Layer l : layers) {
             if (l.drawable != null) {
                 l.drawable.setTintList(tint);

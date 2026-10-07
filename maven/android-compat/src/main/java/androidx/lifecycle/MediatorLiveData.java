@@ -99,7 +99,11 @@ public class MediatorLiveData<T> extends MutableLiveData<T> {
     @Override
     protected void onActive() {
         for (Source<?> s : new ArrayList<Source<?>>(mSources)) {
-            s.plug();
+            // An earlier source can synchronously remove this source
+            // (for example when switchMap changes its inner LiveData).
+            if (hasActiveObservers() && mSources.contains(s)) {
+                s.plug();
+            }
         }
     }
 

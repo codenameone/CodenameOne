@@ -23,10 +23,13 @@
 package androidx.lifecycle;
 
 import android.app.Activity;
+import android.app.ActivityThread;
 import android.app.Application;
 import android.os.Bundle;
 
 import com.codename1.androidcompat.runtime.AndroidRuntime;
+
+import java.util.ArrayList;
 
 /// The lifecycle of the whole application: started while any activity is
 /// started, resumed while one is resumed, never destroyed. It follows the
@@ -37,8 +40,8 @@ public final class ProcessLifecycleOwner implements LifecycleOwner {
     private static ProcessLifecycleOwner sInstance;
 
     private final LifecycleRegistry mRegistry = new LifecycleRegistry(this);
-    private int mStartedCounter;
-    private int mResumedCounter;
+    private final ArrayList<Activity> mStarted = new ArrayList<Activity>();
+    private final ArrayList<Activity> mResumed = new ArrayList<Activity>();
 
     private ProcessLifecycleOwner() {
     }
@@ -63,11 +66,12 @@ public final class ProcessLifecycleOwner implements LifecycleOwner {
         if (app == null) {
             return;
         }
-        Activity top = android.app.ActivityThread.getTopActivity();
-        if (top != null && !top.isFinishing()) {
-            mStartedCounter = 1;
-            mResumedCounter = 1;
+        mStarted.addAll(ActivityThread.getStartedActivities());
+        mResumed.addAll(ActivityThread.getResumedActivities());
+        if (!mStarted.isEmpty()) {
             mRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START);
+        }
+        if (!mResumed.isEmpty()) {
             mRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
         }
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
@@ -77,36 +81,38 @@ public final class ProcessLifecycleOwner implements LifecycleOwner {
 
             @Override
             public void onActivityStarted(Activity activity) {
-                mStartedCounter++;
-                if (mStartedCounter == 1) {
+                // Seeding may already include this activity when get()
+                // was called between onStart/onResume and this callback.
+                if (!mStarted.contains(activity)) {
+                    mStarted.add(activity);
+                }
+                if (mStarted.size() == 1) {
                     mRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START);
                 }
             }
 
             @Override
             public void onActivityResumed(Activity activity) {
-                mResumedCounter++;
-                if (mResumedCounter == 1) {
+                if (!mResumed.contains(activity)) {
+                    mResumed.add(activity);
+                }
+                if (mResumed.size() == 1) {
                     mRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
                 }
             }
 
             @Override
             public void onActivityPaused(Activity activity) {
-                if (mResumedCounter > 0) {
-                    mResumedCounter--;
-                }
-                if (mResumedCounter == 0 && mRegistry.getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) {
+                mResumed.remove(activity);
+                if (mResumed.isEmpty() && mRegistry.getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) {
                     mRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE);
                 }
             }
 
             @Override
             public void onActivityStopped(Activity activity) {
-                if (mStartedCounter > 0) {
-                    mStartedCounter--;
-                }
-                if (mStartedCounter == 0 && mRegistry.getCurrentState().isAtLeast(Lifecycle.State.STARTED)) {
+                mStarted.remove(activity);
+                if (mStarted.isEmpty() && mRegistry.getCurrentState().isAtLeast(Lifecycle.State.STARTED)) {
                     mRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP);
                 }
             }

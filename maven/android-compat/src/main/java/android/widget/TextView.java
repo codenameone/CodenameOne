@@ -490,7 +490,7 @@ public class TextView extends View {
             }
             textChanged();
         } else {
-            setText(mText.toString() + text.subSequence(start, end));
+            setText(new android.text.SpannableStringBuilder(mText).append(text, start, end));
         }
     }
 

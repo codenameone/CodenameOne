@@ -214,7 +214,7 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
     }
 
     public List<String> getPathSegments() {
-        String p = getPath();
+        String p = getEncodedPath();
         if (p == null) {
             return Collections.emptyList();
         }
@@ -223,7 +223,7 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         for (int i = 0; i <= p.length(); i++) {
             if (i == p.length() || p.charAt(i) == '/') {
                 if (i > start) {
-                    out.add(p.substring(start, i));
+                    out.add(decode(p.substring(start, i)));
                 }
                 start = i + 1;
             }

@@ -103,6 +103,28 @@ public final class ActivityThread {
         return STACK.isEmpty() ? null : STACK.get(STACK.size() - 1).activity;
     }
 
+    /// Runtime use: snapshots for a process lifecycle observer attaching
+    /// during an activity callback. A record on the stack may still be in
+    /// onCreate and must not be counted as started or resumed yet.
+    public static ArrayList<Activity> getStartedActivities() {
+        return activitiesInState(false);
+    }
+
+    /// Runtime use: activities whose onResume has completed.
+    public static ArrayList<Activity> getResumedActivities() {
+        return activitiesInState(true);
+    }
+
+    private static ArrayList<Activity> activitiesInState(boolean resumed) {
+        ArrayList<Activity> out = new ArrayList<Activity>();
+        for (Record r : STACK) {
+            if (resumed ? r.resumed : r.started) {
+                out.add(r.activity);
+            }
+        }
+        return out;
+    }
+
     public static int getActivityCount() {
         return STACK.size();
     }
