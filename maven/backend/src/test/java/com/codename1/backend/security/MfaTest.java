@@ -643,6 +643,9 @@ class MfaTest {
             assertEquals("/me ray [ROLE_USER]", server.get("/me").body);
             String passwordOnly = server.cookies.get("remember-me");
             assertFalse(passwordOnly.startsWith("2f."), passwordOnly);
+            String series = passwordOnly.substring(0, passwordOnly.indexOf(':'));
+            String hash = tokens.getTokenForSeries(series).getTokenHash();
+            assertTrue(tokens.updateToken(series, hash, hash, System.currentTimeMillis() - 11000));
 
             // Ray enrols. The cookie from before stood for a password alone.
             assertTrue(enrol("ray"));
@@ -655,6 +658,24 @@ class MfaTest {
             }
             assertTrue(withdrawn, refused.toString());
             assertNull(server.cookies.get("remember-me"));
+
+            // Withdrawing it is durable, even if a client ignores deletion cookies
+            // and MFA is subsequently disabled.
+            java.util.List<String> rejected = new java.util.ArrayList<String>();
+            rejected.add(passwordOnly);
+            for (String cookie : refused.headers("Set-Cookie")) {
+                if (cookie.startsWith("remember-me=") && !cookie.startsWith("remember-me=;")) {
+                    rejected.add(cookie.substring("remember-me=".length(), cookie.indexOf(';')));
+                }
+            }
+            assertEquals(2, rejected.size(), "the rejected request rotated before the MFA check");
+            assertTrue(totp.disable("ray"));
+            for (String cookie : rejected) {
+                server.cookies.clear();
+                server.cookies.put("remember-me", cookie);
+                assertEquals(302, server.get("/me", "Accept", "text/html").status);
+            }
+            assertTrue(enrol("ray"));
 
             // Signed in with password and code, and remembered: that cookie
             // carries both, and signs Ray in on a later visit.

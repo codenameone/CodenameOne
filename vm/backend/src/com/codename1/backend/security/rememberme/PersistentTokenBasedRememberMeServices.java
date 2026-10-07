@@ -277,7 +277,14 @@ public final class PersistentTokenBasedRememberMeServices
 
     @Override
     public void loginFail(HttpServer.Request request) {
-        if (request.getCookie(cookieName) != null) {
+        String cookie = request.getCookie(cookieName);
+        if (cookie != null) {
+            int colon = cookie.indexOf(':');
+            if (colon > 0 && cookie.length() <= 200 && cookie.indexOf(':', colon + 1) < 0) {
+                // A cookie withdrawn by a later authentication check (such as MFA)
+                // must remain unusable even if the client ignores Set-Cookie.
+                tokenRepository.removeToken(cookie.substring(0, colon));
+            }
             cancelCookie();
         }
     }
