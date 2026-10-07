@@ -419,6 +419,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
                 }
                 // The client has handed the new set over already; this covers a client
                 // whose listener is another authorizer by now.
+                tokenGeneration++;
                 tokens = fresh;
                 exchanging = null;
                 exchangeAbandoned = null;
@@ -455,6 +456,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     /// them. On the event dispatch thread: the client passes over there what a network
     /// thread read.
     void tokensChanged(OidcTokens fresh) {
+        tokenGeneration++;
         tokens = fresh;
         if (fresh == null) {
             abandonRenewal();
@@ -487,6 +489,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     }
 
     private void endSession(Throwable reason) {
+        tokenGeneration++;
         tokens = null;
         client.clearStoredTokens();
         SignInRequiredListener[] told =

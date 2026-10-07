@@ -177,6 +177,51 @@ public class OidcRequestAuthorizerTest extends UITestBase {
     }
 
     @Test
+    void aDelayedLoadCannotReplaceTokensReceivedFromTheClient() {
+        for (int mode = 0; mode < 4; mode++) {
+            boolean clear = mode == 1 || mode == 3;
+            authorizer = new OidcRequestAuthorizer(client).install(API);
+            authorizer.setTokens(tokens("AT-1", "RT-1"));
+            if (mode >= 2) {
+                // The first authorizer must also invalidate loads when its
+                // renewal completes through the fallback, not this listener.
+                new OidcRequestAuthorizer(client);
+            }
+            final com.codename1.util.AsyncResource<OidcTokens> pending =
+                    new com.codename1.util.AsyncResource<OidcTokens>();
+            client.setTokenStore(new TokenStore() {
+                public com.codename1.util.AsyncResource<OidcTokens> load(String key) {
+                    return pending;
+                }
+                public com.codename1.util.AsyncResource<Boolean> save(String key, OidcTokens value) {
+                    return store.save(key, value);
+                }
+                public com.codename1.util.AsyncResource<Boolean> clear(String key) {
+                    return store.clear(key);
+                }
+            });
+            com.codename1.util.AsyncResource<OidcTokens> loading = authorizer.load();
+            if (mode >= 2) {
+                if (clear) {
+                    tokenStatus = 400;
+                    tokenBody = "{\"error\":\"invalid_grant\"}";
+                }
+                Probe request = new Probe(API + "/pets");
+                NetworkManager.getInstance().addToQueue(request);
+                settle(request);
+            } else if (clear) {
+                await(client.clearStoredTokens());
+            } else {
+                assertNull(await(client.refreshTokens(tokens("OLD", "OLD-RT"))).error);
+            }
+            pending.complete(tokens("STALE", "STALE-RT"));
+            assertNull(await(loading).value);
+            if (clear) assertNull(authorizer.getTokens());
+            else assertEquals("AT-2", authorizer.getTokens().getAccessToken());
+        }
+    }
+
+    @Test
     void aLoadCannotUndoSignOutOrReplaceANewerSignIn() {
         for (boolean signInAgain : new boolean[] {false, true}) {
             final com.codename1.util.AsyncResource<OidcTokens> pending =
