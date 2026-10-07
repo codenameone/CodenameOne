@@ -60,16 +60,20 @@ public final class SystemClock {
     /// should not be sleeping either.
     public static void sleep(long ms) {
         long end = uptimeMillis() + ms;
+        boolean interrupted = false;
         synchronized (SLEEP_LOCK) {
             long left = ms;
             while (left > 0) {
                 try {
                     SLEEP_LOCK.wait(left);
                 } catch (InterruptedException e) {
-                    // Matches Android: the interrupt is swallowed.
+                    interrupted = true;
                 }
                 left = end - uptimeMillis();
             }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 }

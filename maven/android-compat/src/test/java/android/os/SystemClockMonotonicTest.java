@@ -60,4 +60,17 @@ public class SystemClockMonotonicTest {
         assertTrue("key event time " + k.getEventTime() + " not in [" + before + ", " + after + "]",
                 k.getEventTime() >= before && k.getEventTime() <= after);
     }
+
+    @Test
+    public void sleepPreservesInterruptAfterWaiting() {
+        long start = SystemClock.uptimeMillis();
+        Thread.currentThread().interrupt();
+        try {
+            SystemClock.sleep(30);
+            assertTrue(SystemClock.uptimeMillis() - start >= 25);
+            assertTrue("sleep discarded the caller's interrupt", Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
 }

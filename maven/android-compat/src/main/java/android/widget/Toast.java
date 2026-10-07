@@ -67,6 +67,7 @@ public class Toast {
     private float horizontalMargin;
     private float verticalMargin;
     private PopupWindow window;
+    private int displayGeneration;
     private final List<Callback> callbacks = new ArrayList<Callback>();
 
     public Toast(Context context) {
@@ -117,11 +118,12 @@ public class Toast {
         }
         final Toast t = QUEUE.remove(0);
         current = t;
+        final int generation = ++t.displayGeneration;
         t.display();
         handler().postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (current == t) {
+                if (current == t && t.displayGeneration == generation) {
                     t.hide();
                     showNext();
                 }
@@ -165,6 +167,7 @@ public class Toast {
             return;
         }
         if (current == this) {
+            displayGeneration++;
             hide();
             showNext();
         }

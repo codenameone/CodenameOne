@@ -391,6 +391,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
         }
         layoutChildren();
         mDataChanged = false;
+        checkSelectionChanged();
         invokeOnItemScrollListener();
     }
 
@@ -508,8 +509,10 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
             return;
         }
         mFling.stop();
-        mSyncPosition = Math.max(0, Math.min(position, mItemCount - 1));
+        mSyncPosition = mItemCount == 0 ? INVALID_POSITION : Math.max(0, Math.min(position, mItemCount - 1));
         mSyncTop = y;
+        mSelectedPosition = mSyncPosition;
+        mSelectedRowId = mSelectedPosition == INVALID_POSITION ? INVALID_ROW_ID : mAdapter.getItemId(mSelectedPosition);
         requestLayout();
     }
 
@@ -906,6 +909,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
 
     public void setDrawSelectorOnTop(boolean onTop) {
         mDrawSelectorOnTop = onTop;
+        invalidate();
     }
 
     @Override
@@ -914,8 +918,22 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
     }
 
     @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        if (!mDrawSelectorOnTop) {
+            drawSelector(canvas);
+        }
+    }
+
+    @Override
     protected void dispatchDraw(Canvas canvas) {
         super.dispatchDraw(canvas);
+        if (mDrawSelectorOnTop) {
+            drawSelector(canvas);
+        }
+    }
+
+    private void drawSelector(Canvas canvas) {
         View c = mPressedChild;
         if (mSelector != null && c != null && c.getParent() == this) {
             mSelectorRect.set(c.getLeft(), c.getTop(), c.getRight(), c.getBottom());
@@ -1051,7 +1069,12 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
     }
 
     public void setStackFromBottom(boolean stackFromBottom) {
+        if (mStackFromBottom == stackFromBottom) {
+            return;
+        }
         mStackFromBottom = stackFromBottom;
+        resetList();
+        requestLayout();
     }
 
     public boolean isStackFromBottom() {

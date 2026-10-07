@@ -267,6 +267,9 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
     }
 
     public java.util.Set<String> getQueryParameterNames() {
+        if (!isHierarchical()) {
+            throw new UnsupportedOperationException("This isn't a hierarchical URI");
+        }
         java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<String>();
         String q = getEncodedQuery();
         if (q == null) {
@@ -292,6 +295,9 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
     }
 
     private List<String> queryParameters(String key, boolean plusIsSpace) {
+        if (!isHierarchical()) {
+            throw new UnsupportedOperationException("This isn't a hierarchical URI");
+        }
         ArrayList<String> out = new ArrayList<String>();
         String q = getEncodedQuery();
         if (q == null) {
@@ -550,7 +556,7 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
 
         public Builder query(String query) {
             this.opaque = null;
-            this.query = encode(query, "=&");
+            this.query = encode(query);
             return this;
         }
 

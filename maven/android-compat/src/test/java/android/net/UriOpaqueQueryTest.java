@@ -27,6 +27,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /// An opaque URI has no query, as on Android: the `?` in a mailto is part of
 /// its scheme-specific part, and a `?` inside a fragment starts nothing.
@@ -38,10 +39,27 @@ public class UriOpaqueQueryTest {
         assertTrue(u.isOpaque());
         assertNull(u.getEncodedQuery());
         assertNull(u.getQuery());
-        assertNull(u.getQueryParameter("subject"));
-        assertTrue(u.getQueryParameterNames().isEmpty());
+        assertQueryAccessRejected(u);
         assertEquals("user@example.com?subject=x", u.getSchemeSpecificPart());
         assertEquals("mailto:user@example.com?subject=x", u.buildUpon().build().toString());
+    }
+
+    private static void assertQueryAccessRejected(Uri uri) {
+        try {
+            uri.getQueryParameter("subject");
+            fail("opaque URI accepted getQueryParameter");
+        } catch (UnsupportedOperationException expected) {
+        }
+        try {
+            uri.getQueryParameters("subject");
+            fail("opaque URI accepted getQueryParameters");
+        } catch (UnsupportedOperationException expected) {
+        }
+        try {
+            uri.getQueryParameterNames();
+            fail("opaque URI accepted getQueryParameterNames");
+        } catch (UnsupportedOperationException expected) {
+        }
     }
 
     @Test

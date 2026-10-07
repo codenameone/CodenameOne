@@ -60,4 +60,15 @@ public class UriBuilderOpaqueResetTest {
         assertEquals("items", new Uri.Builder().path("items").build().toString());
     }
 
+    @Test
+    public void decodedQueryEncodesStructuralDelimiters() {
+        Uri decoded = new Uri.Builder().scheme("https").authority("example.com")
+                .query("redirect=a&b").build();
+        assertEquals("https://example.com?redirect%3Da%26b", decoded.toString());
+        assertEquals("redirect=a&b", decoded.getQuery());
+        Uri encoded = new Uri.Builder().scheme("https").authority("example.com")
+                .encodedQuery("redirect=a&b").build();
+        assertEquals("a", encoded.getQueryParameter("redirect"));
+    }
+
 }

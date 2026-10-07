@@ -307,6 +307,7 @@ public class ListView extends AbsListView {
             invalidate();
             return;
         }
+        boolean bottomStart = getChildCount() == 0 && mSyncPosition < 0 && isStackFromBottom();
         int top = getChildCount() > 0 ? getChildAt(0).getTop() : listTop();
         if (mSyncPosition >= 0) {
             mFirstPosition = mSyncPosition;
@@ -321,6 +322,11 @@ public class ListView extends AbsListView {
             mFirstPosition = 0;
         }
         recycleAllChildren();
+        if (bottomStart) {
+            fillUp(mItemCount - 1, listBottom());
+            invalidate();
+            return;
+        }
         fillDown(mFirstPosition, top);
         if (scrollToEnd) {
             correctTooHigh();
