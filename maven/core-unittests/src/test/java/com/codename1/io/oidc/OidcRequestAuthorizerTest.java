@@ -580,6 +580,106 @@ public class OidcRequestAuthorizerTest extends UITestBase {
     }
 
     @Test
+    void aTokenEndpointThatFailsWithoutAnOAuthErrorKeepsTheSession() {
+        authorizer.setTokens(tokens("AT-1", "RT-1"));
+        store.saved = authorizer.getTokens();
+        final List<Throwable> told = new ArrayList<Throwable>();
+        authorizer.addSignInRequiredListener(new OidcRequestAuthorizer.SignInRequiredListener() {
+            public void signInRequired(OidcRequestAuthorizer source, Throwable reason) {
+                told.add(reason);
+            }
+        });
+        // The server is failing, in words of its own. It has not said the token is bad.
+        tokenStatus = 500;
+        tokenBody = "{\"message\":\"failure\"}";
+
+        Probe p = new Probe(API + "/pets");
+        NetworkManager.getInstance().addToQueue(p);
+        settle(p);
+
+        assertEquals(Collections.singletonList(Integer.valueOf(401)), p.delivered);
+        assertEquals(1, tokenRequests.size());
+        assertTrue(told.isEmpty(), "nothing said the refresh token is bad");
+        assertEquals("AT-1", authorizer.getTokens().getAccessToken(),
+                "an answer with no tokens in it replaced the ones that were there");
+        assertEquals("RT-1", authorizer.getTokens().getRefreshToken());
+        assertEquals("AT-1", store.saved.getAccessToken());
+    }
+
+    @Test
+    void signingOutDuringARenewalIsNotUndoneWhenTheRenewalSucceeds() throws Exception {
+        authorizer.setTokens(expiring("AT-1", "RT-1", 30));
+        store.saved = authorizer.getTokens();
+        final List<Throwable> told = new ArrayList<Throwable>();
+        authorizer.addSignInRequiredListener(new OidcRequestAuthorizer.SignInRequiredListener() {
+            public void signInRequired(OidcRequestAuthorizer source, Throwable reason) {
+                told.add(reason);
+            }
+        });
+        final java.util.concurrent.CountDownLatch atTokenEndpoint =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch release =
+                new java.util.concurrent.CountDownLatch(1);
+        TestCodenameOneImplementation.getInstance().setNetworkMockHandler(
+                new TestCodenameOneImplementation.NetworkMockHandler() {
+                    public void handle(TestCodenameOneImplementation.TestConnection c) {
+                        String sent = c.getHeaders().get("Authorization");
+                        String body = text(c.getOutputData());
+                        c.clearRequest();
+                        if (c.getUrl().startsWith(TOKEN_EP)) {
+                            tokenRequests.add(body);
+                            atTokenEndpoint.countDown();
+                            try {
+                                release.await(15, java.util.concurrent.TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                            c.respond(200, "OK", utf8(tokenJson("AT-2", "RT-2")));
+                        } else {
+                            seenByApi.add(String.valueOf(sent));
+                            c.respond("Bearer AT-2".equals(sent) ? 200 : 401, "x", utf8("x"));
+                        }
+                    }
+                });
+        Probe held = new Probe(API + "/pets");
+        NetworkManager.getInstance().addToQueue(held);
+        long deadline = System.currentTimeMillis() + 15000;
+        while (atTokenEndpoint.getCount() > 0 && System.currentTimeMillis() < deadline) {
+            DisplayTest.flushEdt();
+        }
+        assertEquals(0, atTokenEndpoint.getCount(), "the exchange never started");
+
+        // The user signs out while the exchange is at the server, which then answers
+        // with a perfectly good new set.
+        await(authorizer.signOut());
+        assertNull(store.saved);
+        release.countDown();
+        settle(held);
+        // Long enough for the answer to have been handed over, had it been.
+        for (int i = 0; i < 20; i++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(10);
+        }
+
+        assertFalse(authorizer.isSignedIn(), "the renewal signed the user back in");
+        assertNull(authorizer.getTokens());
+        assertNull(store.saved, "the renewal put tokens back in the store");
+        assertEquals(Collections.singletonList("null"), seenByApi,
+                "the request that waited goes out with no token");
+        assertEquals(Collections.singletonList(Integer.valueOf(401)), held.delivered);
+        assertTrue(told.isEmpty(), "signing out is not a session the server ended");
+
+        // And the authorizer is not left waiting on the exchange it gave up on.
+        authorizer.setTokens(expiring("AT-1", "RT-1", 30));
+        Probe next = new Probe(API + "/owners");
+        NetworkManager.getInstance().addToQueue(next);
+        settle(next);
+        assertEquals(2, tokenRequests.size());
+        assertEquals(Collections.singletonList(Integer.valueOf(200)), next.delivered);
+        assertEquals("AT-2", authorizer.getTokens().getAccessToken());
+    }
+
+    @Test
     void no401LoopWhenTheServiceRefusesTheNewTokenToo() {
         authorizer.setTokens(tokens("AT-1", "RT-1"));
         accepted = "Bearer something-else";

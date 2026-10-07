@@ -224,6 +224,7 @@ public class OidcDeviceGrantTest extends UITestBase {
         Map<String, Object> json = new HashMap<String, Object>();
         json.put("device_code", "DC");
         json.put("user_code", "AAAA-BBBB");
+        json.put("verification_uri", ISSUER + "/activate");
         json.put("expires_in", Integer.valueOf(0));
         json.put("interval", Integer.valueOf(1));
         OidcDeviceAuthorization expired = OidcDeviceAuthorization.fromJson(json);
@@ -263,6 +264,25 @@ public class OidcDeviceGrantTest extends UITestBase {
         deviceAnswer = "{\"user_code\":\"AAAA-BBBB\"}";
         OidcTestSupport.Outcome<OidcDeviceAuthorization> r = await(client.requestDeviceAuthorization());
         assertInstanceOf(OidcException.class, r.error);
+    }
+
+    @Test
+    void anAnswerWithNoPageToTypeTheCodeOnIsRefused() {
+        Map<String, Object> json = new HashMap<String, Object>();
+        json.put("device_code", "DC");
+        json.put("user_code", "AAAA-BBBB");
+        assertEquals("A device authorization response needs verification_uri",
+                assertThrows(IllegalArgumentException.class,
+                        () -> OidcDeviceAuthorization.fromJson(json)).getMessage());
+        // The complete form alone is not it: it is for a QR code, and optional.
+        json.put("verification_uri_complete", ISSUER + "/activate?user_code=AAAA-BBBB");
+        assertThrows(IllegalArgumentException.class, () -> OidcDeviceAuthorization.fromJson(json));
+
+        deviceAnswer = "{\"device_code\":\"DC\",\"user_code\":\"AAAA-BBBB\",\"expires_in\":600}";
+        OidcTestSupport.Outcome<OidcDeviceAuthorization> r = await(client.requestDeviceAuthorization());
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals("A device authorization response needs verification_uri", r.error.getMessage());
     }
 
     @Test

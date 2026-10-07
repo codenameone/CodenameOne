@@ -281,6 +281,91 @@ public class OidcClientTest extends UITestBase {
         assertEquals("expired", ex.getErrorDescription());
     }
 
+    @Test
+    void aSuccessWithoutAnAccessTokenIsNotASession() {
+        MemoryTokenStore store = new MemoryTokenStore();
+        OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+        mock(TOKEN_EP, 200, "{\"token_type\":\"Bearer\",\"expires_in\":3600}");
+
+        Outcome<OidcTokens> r = await(c.refresh("RT"));
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals(OidcException.INVALID_GRANT, ((OidcException) r.error).getError());
+        assertEquals("Token endpoint response has no access_token", r.error.getMessage());
+        assertNull(store.saved, "a token set with no access token was stored");
+    }
+
+    @Test
+    void aFailingStatusWithNoOAuthErrorIsTheServerFailingNotRefusing() {
+        MemoryTokenStore store = new MemoryTokenStore();
+        OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+        mock(TOKEN_EP, 500, "{\"message\":\"failure\"}");
+
+        Outcome<OidcTokens> r = await(c.refresh("RT"));
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals(OidcException.TRANSPORT_ERROR, ((OidcException) r.error).getError());
+        assertEquals("Token endpoint answered HTTP 500 without an OAuth error", r.error.getMessage());
+        assertNull(store.saved);
+    }
+
+    @Test
+    void aGatewaysErrorPageIsNotARefusalEither() {
+        OidcClient c = configuredClient(fullConfig());
+        mock(TOKEN_EP, 502, "<html>Bad Gateway</html>");
+
+        Outcome<OidcTokens> r = await(c.refresh("RT"));
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals(OidcException.TRANSPORT_ERROR, ((OidcException) r.error).getError());
+    }
+
+    @Test
+    void anOAuthErrorIsReportedAsItselfUnderItsOwnStatus() {
+        OidcClient c = configuredClient(fullConfig());
+        mock(TOKEN_EP, 400, "{\"error\":\"invalid_grant\",\"error_description\":\"revoked\"}");
+
+        Outcome<OidcTokens> r = await(c.refresh("RT"));
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals("invalid_grant", ((OidcException) r.error).getError());
+    }
+
+    @Test
+    void aRefreshCancelledBeforeItsAnswerStoresNothing() throws Exception {
+        MemoryTokenStore store = new MemoryTokenStore();
+        OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+        final CountDownLatch atTokenEndpoint = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        TestCodenameOneImplementation.getInstance().setNetworkMockHandler(
+                new TestCodenameOneImplementation.NetworkMockHandler() {
+                    public void handle(TestCodenameOneImplementation.TestConnection connection) {
+                        connection.clearRequest();
+                        atTokenEndpoint.countDown();
+                        try {
+                            release.await(15, java.util.concurrent.TimeUnit.SECONDS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                        connection.respond(200, "OK", utf8(
+                                "{\"access_token\":\"AT-new\",\"token_type\":\"Bearer\"}"));
+                    }
+                });
+
+        AsyncResource<OidcTokens> pending = c.refresh("RT");
+        long deadline = System.currentTimeMillis() + 15000;
+        while (atTokenEndpoint.getCount() > 0 && System.currentTimeMillis() < deadline) {
+            DisplayTest.flushEdt();
+        }
+        assertEquals(0, atTokenEndpoint.getCount(), "the exchange never started");
+        // Whoever asked stops waiting while the answer is on its way.
+        assertTrue(pending.cancel(false));
+        release.countDown();
+        for (int i = 0; i < 50; i++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(10);
+        }
+        assertNull(store.saved, "an answer nobody was waiting for was stored");
+    }
+
     // ---- revocation --------------------------------------------------
 
     @Test

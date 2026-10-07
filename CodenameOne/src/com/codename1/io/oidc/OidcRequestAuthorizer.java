@@ -115,6 +115,10 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     private OidcTokens tokens;
     /// The exchange in progress, shared by every request refused or held while it runs.
     private AsyncResource<Boolean> renewal;
+    /// The client's exchange behind `renewal`, kept so that signing out can abandon it.
+    private AsyncResource<OidcTokens> exchanging;
+    /// Set to true, for that exchange's callbacks to read, when it is abandoned.
+    private boolean[] exchangeAbandoned;
     private int refreshLeewaySeconds = 60;
     /// When an exchange started ahead of time last failed without an answer.
     private long aheadFailedAt;
@@ -229,6 +233,9 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
             @Override
             public void run() {
                 OidcRequestAuthorizer.this.tokens = tokens;
+                if (tokens == null) {
+                    abandonRenewal();
+                }
             }
         });
     }
@@ -243,10 +250,14 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     /// without a header from then on. This doesn't tell the server; call
     /// [OidcClient#revoke(String)] with the refresh token first for that.
     ///
+    /// A renewal in progress is abandoned: whatever it comes back with is dropped, and the
+    /// requests waiting for it go out with no token.
+    ///
     /// #### Returns
     ///
     /// the result of clearing the store
     public AsyncResource<Boolean> signOut() {
+        // setTokens(null) abandons a renewal in progress before the store is cleared.
         setTokens(null);
         return client.clearStoredTokens();
     }
@@ -359,7 +370,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     private AsyncResource<Boolean> exchange(OidcTokens current, final boolean ahead) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         renewal = out;
-        AsyncResource<OidcTokens> exchange;
+        final AsyncResource<OidcTokens> exchange;
         try {
             exchange = client.refresh(current.getRefreshToken());
         } catch (RuntimeException misconfigured) {
@@ -367,18 +378,34 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
             out.complete(Boolean.FALSE);
             return out;
         }
+        final boolean[] abandoned = new boolean[1];
+        exchanging = exchange;
+        exchangeAbandoned = abandoned;
         exchange.ready(new SuccessCallback<OidcTokens>() {
             @Override
             public void onSucess(OidcTokens fresh) {
+                if (abandoned[0]) {
+                    // Abandoned by a sign-out; see abandonRenewal().
+                    return;
+                }
                 // The client has handed the new set over already; this covers a client
                 // whose listener is another authorizer by now.
                 tokens = fresh;
+                exchanging = null;
+                exchangeAbandoned = null;
                 renewal = null;
                 out.complete(Boolean.TRUE);
             }
         }).except(new SuccessCallback<Throwable>() {
             @Override
             public void onSucess(Throwable err) {
+                if (abandoned[0]) {
+                    // Abandoned by a sign-out, which ended the session already: a refusal
+                    // arriving now must not end whatever session came after it.
+                    return;
+                }
+                exchanging = null;
+                exchangeAbandoned = null;
                 renewal = null;
                 boolean refused = err instanceof OidcException
                         && !OidcException.TRANSPORT_ERROR.equals(((OidcException) err).getError());
@@ -400,6 +427,34 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     /// thread read.
     void tokensChanged(OidcTokens fresh) {
         tokens = fresh;
+        if (fresh == null) {
+            abandonRenewal();
+        }
+    }
+
+    /// Gives up on the exchange in progress, if there is one, because the tokens it would
+    /// renew have just been dropped -- the user signed out. On the event dispatch thread.
+    ///
+    /// Dropping the tokens was not enough. The exchange was still on its way, and when it
+    /// succeeded the client saved the new set and handed it over, so the user who had
+    /// signed out was signed in again a moment later. Cancelling the client's resource is
+    /// what makes the client drop that answer -- it looks, on this thread, before it stores
+    /// or tells anyone. The requests held for the renewal are released as not renewed.
+    private void abandonRenewal() {
+        AsyncResource<OidcTokens> inFlight = exchanging;
+        AsyncResource<Boolean> held = renewal;
+        if (exchangeAbandoned != null) {
+            exchangeAbandoned[0] = true;
+        }
+        exchanging = null;
+        exchangeAbandoned = null;
+        renewal = null;
+        if (inFlight != null) {
+            inFlight.cancel(false);
+        }
+        if (held != null && !held.isDone()) {
+            held.complete(Boolean.FALSE);
+        }
     }
 
     private void endSession(Throwable reason) {

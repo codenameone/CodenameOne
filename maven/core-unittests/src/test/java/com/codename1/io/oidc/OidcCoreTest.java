@@ -197,6 +197,34 @@ public class OidcCoreTest extends UITestBase {
         assertNull(afterClear);
     }
 
+    @Test
+    public void storedTokensKeepArraysAndObjectsAsWhatTheyWere() throws Exception {
+        Map<String, Object> json = new com.codename1.io.JSONParser().parseJSON(new java.io.StringReader(
+                "{\"access_token\":\"at-1\",\"token_type\":\"Bearer\","
+                + "\"authorization_details\":[{\"type\":\"payment\",\"actions\":[\"read\",\"wri\\\"te\"]}]}"));
+        json.put("id_token", base64Url("{\"alg\":\"none\"}") + "." + base64Url("{\"sub\":\"alice\","
+                + "\"aud\":[\"app\",\"api\"],\"address\":{\"country\":\"IL\",\"lines\":[\"1 Main\"]},"
+                + "\"groups\":[\"admin\",\"dev\"],\"empty\":[],\"none\":null}") + ".");
+        OidcTokens issued = OidcTokens.fromTokenResponse(json, null);
+        assertTrue(issued.getIdTokenClaims().get("aud") instanceof java.util.List, "the fixture has no array");
+
+        OidcTokens back = TokenJson.fromJson(TokenJson.toJson(issued));
+
+        Map<String, Object> claims = back.getIdTokenClaims();
+        assertEquals(java.util.Arrays.asList("app", "api"), claims.get("aud"));
+        assertEquals(java.util.Arrays.asList("admin", "dev"), claims.get("groups"));
+        assertTrue(claims.get("address") instanceof Map, String.valueOf(claims.get("address")));
+        assertEquals("IL", ((Map) claims.get("address")).get("country"));
+        assertEquals(java.util.Arrays.asList("1 Main"), ((Map) claims.get("address")).get("lines"));
+        assertEquals(java.util.Collections.emptyList(), claims.get("empty"));
+        assertEquals("alice", back.getSubject());
+        Object details = back.getRawResponse().get("authorization_details");
+        assertTrue(details instanceof java.util.List, String.valueOf(details));
+        Map detail = (Map) ((java.util.List) details).get(0);
+        assertEquals("payment", detail.get("type"));
+        assertEquals(java.util.Arrays.asList("read", "wri\"te"), detail.get("actions"));
+    }
+
     // ------------------------------------------------------------------
 
     private static String base64Url(String json) {

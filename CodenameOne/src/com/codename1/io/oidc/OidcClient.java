@@ -359,6 +359,9 @@ public final class OidcClient {
     /// Exchanges a stored refresh token for a fresh access token. Pass the
     /// value returned from [OidcTokens#getRefreshToken()] on a previous flow.
     /// The new tokens are persisted via the current [TokenStore].
+    ///
+    /// Cancelling the returned resource before it completes drops the answer: nothing is
+    /// stored and no [OidcRequestAuthorizer] is given the new tokens.
     public AsyncResource<OidcTokens> refresh(final String refreshToken) {
         // Only what the exchange itself uses. A client that signed in with the device grant
         // has no redirect URI, and asking for one here would leave it unable to refresh.
@@ -656,7 +659,7 @@ public final class OidcClient {
                 }
             }
         });
-        postToTokenEndpoint(args, null, null, attempt);
+        postToTokenEndpoint(args, null, null, attempt, out);
     }
 
     private void requireDeviceGrant() {
@@ -678,9 +681,44 @@ public final class OidcClient {
         this.tokenListener = listener;
     }
 
-    /// Tells the authorizer following this client. A token response is read on a network
-    /// thread, and the authorizer's state belongs to the event dispatch thread, so this is
-    /// where the tokens are handed over: the listener is looked up and told on the EDT.
+    /// Takes a verified token set: stores it, tells the authorizer and completes `out`.
+    ///
+    /// All three happen on the event dispatch thread, and none of them if `waiting` was
+    /// cancelled first. A token response is read on a network thread, and whoever asked
+    /// for it may have stopped wanting it while it was on its way -- the user signed out
+    /// during a refresh, or the application gave up on a device code. The set used to be
+    /// saved on the network thread as it arrived, so that sign-out was undone a moment
+    /// later: the store held tokens again and the authorizer was handed them. Cancelling
+    /// happens on the EDT and so does this, which makes "was it cancelled" a question with
+    /// one answer rather than a race.
+    private void accept(final OidcTokens tokens, final AsyncResource<OidcTokens> waiting,
+            final AsyncResource<OidcTokens> out) {
+        Runnable take = new Runnable() {
+            @Override
+            public void run() {
+                if (waiting.isCancelled() || out.isCancelled()) {
+                    return;
+                }
+                tokenStore.save(storageKey(), tokens)
+                        .except(new SuccessCallback<Throwable>() {
+                            @Override
+                            public void onSucess(Throwable t) {
+                                // Token persistence failure is non-fatal; tokens are still valid in-memory.
+                            }
+                        });
+                tellTokenListener(tokens);
+                out.complete(tokens);
+            }
+        };
+        if (Display.isInitialized() && !CN.isEdt()) {
+            CN.callSerially(take);
+        } else {
+            take.run();
+        }
+    }
+
+    /// Tells the authorizer following this client that the tokens were cleared, on the
+    /// event dispatch thread, where the authorizer's state lives.
     private void tokensChanged(final OidcTokens tokens) {
         if (Display.isInitialized() && !CN.isEdt()) {
             CN.callSerially(new Runnable() {
@@ -781,18 +819,23 @@ public final class OidcClient {
                             + " says it always names itself"));
             return;
         }
+        // The state before the error, not after it. The state is what ties a response to
+        // the request this client made, and an error is as much a claim about that request
+        // as a code is: the server returns the state with both (RFC 6749 section 4.1.2.1).
+        // Read the other way round, a link anyone could send -- the redirect URI with
+        // error=access_denied -- was reported to the application as the provider's refusal.
+        String returnedState = params.get("state");
+        if (returnedState == null || !returnedState.equals(expectedState)) {
+            out.error(new OidcException(OidcException.STATE_MISMATCH,
+                    "Authorization server returned a different 'state' than the one we sent"));
+            return;
+        }
         String error = params.get("error");
         if (error != null) {
             String description = params.get("error_description");
             String code = "access_denied".equals(error) ? OidcException.ACCESS_DENIED : error;
             out.error(new OidcException(code,
                     description != null ? description : error));
-            return;
-        }
-        String returnedState = params.get("state");
-        if (returnedState == null || !returnedState.equals(expectedState)) {
-            out.error(new OidcException(OidcException.STATE_MISMATCH,
-                    "Authorization server returned a different 'state' than the one we sent"));
             return;
         }
         String code = params.get("code");
@@ -836,6 +879,16 @@ public final class OidcClient {
                                      final String refreshTokenFallback,
                                      final String expectedNonce,
                                      final AsyncResource<OidcTokens> out) {
+        postToTokenEndpoint(args, refreshTokenFallback, expectedNonce, out, out);
+    }
+
+    /// `waiting` is the resource the caller of this client holds, when that is not `out`:
+    /// the device grant polls with a resource of its own per request.
+    private void postToTokenEndpoint(final Map<String, String> args,
+                                     final String refreshTokenFallback,
+                                     final String expectedNonce,
+                                     final AsyncResource<OidcTokens> out,
+                                     final AsyncResource<OidcTokens> waiting) {
         final boolean[] completed = new boolean[1];
         ConnectionRequest req = new ConnectionRequest() {
             @Override
@@ -845,44 +898,58 @@ public final class OidcClient {
                 }
                 byte[] body = Util.readInputStream(input);
                 String json = StringUtil.newString(body);
-                Map<String, Object> parsed;
+                Map<String, Object> parsed = null;
+                Exception malformed = null;
                 try {
                     parsed = new JSONParser().parseJSON(new StringReader(json));
                 } catch (Exception e) {
-                    completed[0] = true;
-                    out.error(new OidcException(OidcException.INVALID_GRANT,
-                            "Token endpoint returned malformed JSON: " + json, e));
-                    return;
+                    malformed = e;
                 }
-                if (parsed == null) {
-                    completed[0] = true;
-                    out.error(new OidcException(OidcException.INVALID_GRANT,
-                            "Token endpoint returned no body"));
-                    return;
-                }
-                if (parsed.get("error") != null) {
-                    completed[0] = true;
+                completed[0] = true;
+                if (parsed != null && parsed.get("error") != null) {
                     Object desc = parsed.get("error_description");
                     out.error(new OidcException(parsed.get("error").toString(),
                             desc != null ? desc.toString() : null));
                     return;
                 }
+                // From here on the body is not an OAuth error, so it is a token set or it
+                // is nothing this client can use. A status that is not a success with no
+                // OAuth error in it -- a gateway's 502 page, a 500 with a message of the
+                // server's own -- is the server failing, not the server refusing: it is
+                // reported as a failure to get an answer, so that a session is kept and a
+                // device keeps polling. It used to be read as tokens whenever it parsed.
+                int status = getResponseCode();
+                if (status < 200 || status >= 300) {
+                    out.error(new OidcException(OidcException.TRANSPORT_ERROR,
+                            "Token endpoint answered HTTP " + status + " without an OAuth error"));
+                    return;
+                }
+                if (malformed != null) {
+                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                            "Token endpoint returned malformed JSON: " + json, malformed));
+                    return;
+                }
+                if (parsed == null) {
+                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                            "Token endpoint returned no body"));
+                    return;
+                }
+                // A success carries an access token (RFC 6749 section 5.1). One without was
+                // stored and returned as a session nothing could be sent with, and on a
+                // refresh it replaced tokens that still worked.
+                Object access = parsed.get("access_token");
+                if (!(access instanceof String) || ((String) access).length() == 0) {
+                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                            "Token endpoint response has no access_token"));
+                    return;
+                }
                 final OidcTokens tokens = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);
-                completed[0] = true;
                 // Nothing is stored, told or returned until the ID token has been held to
                 // its issuer, its audience and its signature.
                 checkIdToken(tokens, enforceNonce ? expectedNonce : null, new Runnable() {
                     @Override
                     public void run() {
-                        tokenStore.save(storageKey(), tokens)
-                                .except(new SuccessCallback<Throwable>() {
-                                    @Override
-                                    public void onSucess(Throwable t) {
-                                        // Token persistence failure is non-fatal; tokens are still valid in-memory.
-                                    }
-                                });
-                        tokensChanged(tokens);
-                        out.complete(tokens);
+                        accept(tokens, waiting, out);
                     }
                 }, out);
             }

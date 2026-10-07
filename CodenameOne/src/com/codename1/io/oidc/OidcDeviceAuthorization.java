@@ -67,7 +67,8 @@ public final class OidcDeviceAuthorization {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: when the response has no `device_code` or no `user_code`
+    /// - `IllegalArgumentException`: when the response has no `device_code`, no `user_code`
+    ///   or no verification address
     public static OidcDeviceAuthorization fromJson(Map<String, Object> json) {
         if (json == null) {
             throw new IllegalArgumentException("json must not be null");
@@ -82,6 +83,12 @@ public final class OidcDeviceAuthorization {
         if (uri == null) {
             // Google's endpoint predates the RFC and still answers with this name.
             uri = text(json.get("verification_url"));
+        }
+        if (uri == null) {
+            // The address is as required as the codes (RFC 8628 section 3.2): a code with
+            // no page to type it on is a sign-in the user has no way to finish.
+            throw new IllegalArgumentException(
+                    "A device authorization response needs verification_uri");
         }
         long expiresIn = number(json.get("expires_in"), -1);
         Date expiresAt = expiresIn < 0 ? null

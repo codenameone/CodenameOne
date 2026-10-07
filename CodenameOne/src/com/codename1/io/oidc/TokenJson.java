@@ -27,6 +27,7 @@ import com.codename1.io.JSONParser;
 import com.codename1.util.regex.StringReader;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,9 +58,9 @@ final class TokenJson {
         }
         StringBuilder sb = new StringBuilder("{");
         sb.append("\"token\":");
-        appendJsonStringMap(sb, token);
+        appendObject(sb, token);
         sb.append(",\"claims\":");
-        appendJsonStringMap(sb, tokens.getIdTokenClaims());
+        appendObject(sb, tokens.getIdTokenClaims());
         if (tokens.getExpiresAt() != null) {
             sb.append(",\"expiresAt\":").append(tokens.getExpiresAt().getTime());
         }
@@ -128,25 +129,48 @@ final class TokenJson {
         return o instanceof String ? (String) o : (o == null ? null : o.toString());
     }
 
-    private static void appendJsonStringMap(StringBuilder sb, Map<String, Object> map) {
+    private static void appendObject(StringBuilder sb, Map<?, ?> map) {
         sb.append('{');
         boolean first = true;
-        for (Map.Entry<String, Object> e : map.entrySet()) {
+        for (Map.Entry<?, ?> e : map.entrySet()) {
             if (!first) {
                 sb.append(',');
             }
             first = false;
-            sb.append('"').append(escape(e.getKey())).append("\":");
-            Object v = e.getValue();
-            if (v == null) {
-                sb.append("null");
-            } else if (v instanceof Number || v instanceof Boolean) {
-                sb.append(v.toString());
-            } else {
-                sb.append('"').append(escape(v.toString())).append('"');
-            }
+            sb.append('"').append(escape(String.valueOf(e.getKey()))).append("\":");
+            appendValue(sb, e.getValue());
         }
         sb.append('}');
+    }
+
+    /// Writes one value as the JSON it was read from.
+    ///
+    /// An object or an array inside a claim or a token response is written as one. It used
+    /// to be written as a string holding Java's rendering of the map or the list, so a
+    /// multi-valued `aud`, an `address`, or a `groups` or `roles` array came back from a
+    /// [TokenStore] as text: a session read the same until the application was restarted,
+    /// and differently after.
+    private static void appendValue(StringBuilder sb, Object v) {
+        if (v == null) {
+            sb.append("null");
+        } else if (v instanceof Number || v instanceof Boolean) {
+            sb.append(v.toString());
+        } else if (v instanceof Map) {
+            appendObject(sb, (Map<?, ?>) v);
+        } else if (v instanceof Collection) {
+            sb.append('[');
+            boolean first = true;
+            for (Object item : (Collection<?>) v) {
+                if (!first) {
+                    sb.append(',');
+                }
+                first = false;
+                appendValue(sb, item);
+            }
+            sb.append(']');
+        } else {
+            sb.append('"').append(escape(v.toString())).append('"');
+        }
     }
 
     private static String escape(String s) {

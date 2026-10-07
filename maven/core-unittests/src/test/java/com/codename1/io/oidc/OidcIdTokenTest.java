@@ -540,6 +540,23 @@ public class OidcIdTokenTest extends UITestBase {
     }
 
     @Test
+    void anErrorIsBelievedOnlyWithTheStateOfTheRequest() throws Exception {
+        // The provider's own refusal carries the state it was sent.
+        OidcTestSupport.Outcome<OidcTokens> denied = redirect(
+                "error=access_denied&error_description=No&state=s-1", "s-1", "n-1");
+        assertEquals(OidcException.ACCESS_DENIED, ((OidcException) denied.error).getError());
+        assertEquals("No", ((OidcException) denied.error).getErrorDescription());
+
+        // A link anyone can send carries none, or a guess.
+        OidcTestSupport.Outcome<OidcTokens> bare = redirect("error=access_denied", "s-1", "n-1");
+        assertEquals(OidcException.STATE_MISMATCH, ((OidcException) bare.error).getError());
+        OidcTestSupport.Outcome<OidcTokens> guessed = redirect(
+                "error=server_error&state=guess", "s-1", "n-1");
+        assertEquals(OidcException.STATE_MISMATCH, ((OidcException) guessed.error).getError());
+        assertEquals(0, tokenRequests.size());
+    }
+
+    @Test
     void theDiscoveryDocumentSaysWhetherTheIssuerIsNamed() throws Exception {
         Map<String, Object> doc = new JSONParser().parseJSON(new StringReader("{\"issuer\":\""
                 + ISSUER + "\",\"authorization_endpoint\":\"" + ISSUER + "/a\",\"jwks_uri\":\""

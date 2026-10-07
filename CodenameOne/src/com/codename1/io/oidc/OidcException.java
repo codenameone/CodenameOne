@@ -64,7 +64,8 @@ public class OidcException extends IOException {
     /// sent to, or none where the provider says it always names one (RFC 9207).
     public static final String ISSUER_MISMATCH = "issuer_mismatch";
 
-    /// Generic transport / network failure.
+    /// Generic transport / network failure: no answer, or an answer that is not an OAuth
+    /// one -- a status other than success with no OAuth `error` in its body.
     public static final String TRANSPORT_ERROR = "transport_error";
 
     /// A [TokenStore] could not read, write or remove the tokens -- the platform has no
