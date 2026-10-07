@@ -130,7 +130,8 @@ public class BackendTokenRefreshTest extends BackendAuthTestBase {
     private static OidcTokens withAccessToken(OidcTokens tokens, String access) {
         Map<String, Object> json = new HashMap<String, Object>(tokens.getRawResponse());
         json.put("access_token", access);
-        json.remove("id_token");
+        // Keep the issued identity: refresh must prove it is still the same subject.
+        // Only the access token is corrupted to exercise the 401 renewal path.
         return OidcTokens.fromTokenResponse(json, tokens.getRefreshToken());
     }
 }
