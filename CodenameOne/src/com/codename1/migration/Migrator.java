@@ -181,7 +181,8 @@ public final class Migrator {
     }
 
     /// Throws unless the database is exactly at this build's migrations: nothing pending,
-    /// nothing edited, nothing missing.
+    /// nothing edited, nothing missing. A repeatable migration that has not run, or whose
+    /// script changed since it last ran, is pending.
     /// @throws MigrationException on any difference
     /// @throws IOException if the history cannot be read
     public void validate() throws IOException {

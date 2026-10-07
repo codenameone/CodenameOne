@@ -333,8 +333,9 @@ include::../demos/common/src/main/snippets/developer-guide/migrations.sh[tag=mig
 
 `migrate-info` lists every migration with its state and changes nothing.
 `migrate-validate` fails when the database isn't exactly at this build's
-scripts, which makes it a useful check before a deployment. Point any of them at
-another database on the command line:
+scripts, which makes it a useful check before a deployment. A repeatable
+migration that changed since it last ran, or never ran, fails it too. Point any
+of them at another database on the command line:
 
 [source,bash]
 ----

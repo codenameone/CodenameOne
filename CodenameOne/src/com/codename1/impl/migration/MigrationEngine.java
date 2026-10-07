@@ -213,6 +213,19 @@ public final class MigrationEngine {
         return latest;
     }
 
+    /// Whether the history's newest successful run of a repeatable migration is the script
+    /// this build carries: the one test of "has nothing to do" that `migrate`, the check
+    /// repeated inside the migration's transaction and `validate` all share.
+    private static boolean upToDate(List<HistoryTable.Row> rows, MigrationEntry entry) {
+        HistoryTable.Row latest = latestRepeatable(rows, entry.description());
+        if (latest == null) {
+            return false;
+        }
+        Integer checksum = entry.checksum();
+        return checksum == null ? latest.checksum == null
+                : latest.checksum != null && latest.checksum.intValue() == checksum.intValue();
+    }
+
     private void refuseFailed(List<HistoryTable.Row> rows) throws MigrationException {
         for (HistoryTable.Row row : rows) {
             if (!row.success) {
@@ -225,8 +238,20 @@ public final class MigrationEngine {
 
     /// Checks the history against the resolved scripts. A history newer than this build is
     /// reported under its own code, because an application handles it differently from drift.
-    private void check(List<HistoryTable.Row> rows, List<MigrationEntry> resolved, boolean pendingAllowed,
-            boolean drift, List<String> warnings) throws MigrationException {
+    ///
+    /// `repeatable` is this build's repeatable migrations when the caller is `validate`,
+    /// and null when it is `migrate`, which is about to run whichever of them is due.
+    /// `validate` answers whether the database is at this build's migrations, and a view
+    /// or a procedure whose script changed, or never ran, is a database that is not: it
+    /// used to pass, and a deploy check built on it accepted stale ones.
+    ///
+    /// A repeatable row whose script is gone is deliberately not a problem here. Retiring
+    /// such a script is ordinary, `migrate` does not refuse it, and nothing removes the
+    /// row -- so reporting it would fail every later check with no command that could
+    /// clear it. `info` shows the row as missing.
+    private void check(List<HistoryTable.Row> rows, List<MigrationEntry> resolved,
+            List<MigrationEntry> repeatable, boolean pendingAllowed, boolean drift, List<String> warnings)
+            throws MigrationException {
         String baseline = baselineOf(rows);
         String newest = highest(resolved);
         String current = current(rows);
@@ -280,6 +305,16 @@ public final class MigrationEngine {
                 } else if (!pendingAllowed && !aboveTarget(entry)) {
                     problem(problems, "version " + entry.version() + " (" + entry.scriptName()
                             + ") has not been applied");
+                }
+            }
+        }
+        if (drift && !pendingAllowed && repeatable != null) {
+            for (MigrationEntry entry : repeatable) {
+                if (latestRepeatable(rows, entry.description()) == null) {
+                    problem(problems, label(entry) + " (" + entry.scriptName() + ") has not been applied");
+                } else if (!upToDate(rows, entry)) {
+                    problem(problems, label(entry) + " (" + entry.scriptName()
+                            + ") changed since it was applied and has not been applied again");
                 }
             }
         }
@@ -349,7 +384,7 @@ public final class MigrationEngine {
         ensureHistory();
         List<HistoryTable.Row> rows = history.read();
         refuseFailed(rows);
-        check(rows, versioned, true, options.validateOnMigrate, warnings);
+        check(rows, versioned, null, true, options.validateOnMigrate, warnings);
         String baseline = baselineOf(rows);
         String initial = current(rows);
         String user = options.installedBy != null ? options.installedBy : target.currentUser();
@@ -368,10 +403,7 @@ public final class MigrationEngine {
             }
         }
         for (MigrationEntry entry : repeatable) {
-            HistoryTable.Row latest = latestRepeatable(rows, entry.description());
-            Integer checksum = entry.checksum();
-            if (latest != null && (checksum == null ? latest.checksum == null
-                    : latest.checksum != null && latest.checksum.intValue() == checksum.intValue())) {
+            if (upToDate(rows, entry)) {
                 continue;
             }
             if (apply(entry, user)) {
@@ -388,6 +420,14 @@ public final class MigrationEngine {
         }
         boolean baseline = false;
         if (set.isDefault() && target.hasUserObjects()) {
+            // Looked for again before the tables are called somebody else's schema. Two
+            // processes starting together both find no history; one creates it and
+            // applies its first script, and the other, arriving here a moment later,
+            // finds that script's table and no memory of the history it did not see.
+            // It refused to start over tables its own twin had just made.
+            if (history.exists()) {
+                return;
+            }
             if (!options.baselineOnMigrate) {
                 throw new MigrationException(MigrationException.NON_EMPTY_SCHEMA, "The database already has "
                         + "tables and no " + history.name() + " table. Call baseline() or enable "
@@ -469,7 +509,15 @@ public final class MigrationEngine {
             if (transaction) {
                 target.begin();
             }
-            if (entry.version() != null && history.applied(entry.version())) {
+            // Asked again under the transaction, for both kinds. The history this run
+            // decided from was read before any lock an engine such as SQLite has -- its
+            // write transaction -- so a second process starting beside this one read the
+            // same history and decided the same. A version is found by its number; a
+            // repeatable migration has none, and is found by the checksum of its newest
+            // run. Without that half a repeatable ran once per process: a duplicate row,
+            // and its inserts twice.
+            if (entry.version() != null ? history.applied(entry.version())
+                    : upToDate(history.read(), entry)) {
                 rollbackQuietly();
                 return false;
             }
@@ -572,11 +620,11 @@ public final class MigrationEngine {
     /// pending migrations included.
     public void validate() throws IOException {
         List<MigrationEntry> versioned = resolve(false);
-        resolve(true);
+        List<MigrationEntry> repeatable = resolve(true);
         try {
             List<HistoryTable.Row> rows = history.exists() ? history.read() : new ArrayList<HistoryTable.Row>();
             refuseFailed(rows);
-            check(rows, versioned, false, true, new ArrayList<String>());
+            check(rows, versioned, repeatable, false, true, new ArrayList<String>());
         } finally {
             target.done();
         }

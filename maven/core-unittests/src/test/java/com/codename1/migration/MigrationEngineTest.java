@@ -332,6 +332,112 @@ class MigrationEngineTest {
         assertEquals(MigrationState.SUCCESS, after[2].getState());
     }
 
+    /// Two processes on an engine whose only lock is its write transaction both read the
+    /// history before either holds it. The second to get the lock must look again, and a
+    /// repeatable migration has no version to be looked up by.
+    @Test
+    void aRepeatableAnotherProcessRanWhileThisOneWaitedIsNotRunAgain() throws IOException {
+        MigrationSet set = MigrationSet.builder("default")
+                .repeatable("seed", "INSERT INTO t VALUES (1)")
+                .build();
+        final FakeMigrationTarget first = new FakeMigrationTarget();
+        assertEquals("[R__seed.sql]", migrator(first, set).migrate().getApplied().toString());
+
+        final FakeMigrationTarget second = new FakeMigrationTarget();
+        second.historyExists = true;
+        second.beforeNextTransaction = new Runnable() {
+            @Override
+            public void run() {
+                second.history.add(first.history.get(0).copy());
+            }
+        };
+        MigrateResult result = migrator(second, set).migrate();
+        assertEquals("[]", result.getApplied().toString());
+        assertEquals("[]", second.statements.toString(), "the seed row must not be inserted twice");
+        assertEquals(1, second.history.size(), "one run, one row");
+
+        // What the other process ran was an older script: this one still has work to do.
+        MigrationSet changed = MigrationSet.builder("default")
+                .repeatable("seed", "INSERT INTO t VALUES (2)")
+                .build();
+        final FakeMigrationTarget third = new FakeMigrationTarget();
+        third.historyExists = true;
+        third.beforeNextTransaction = new Runnable() {
+            @Override
+            public void run() {
+                third.history.add(first.history.get(0).copy());
+            }
+        };
+        assertEquals("[R__seed.sql]", migrator(third, changed).migrate().getApplied().toString());
+        assertEquals("[INSERT INTO t VALUES (2)]", third.statements.toString());
+    }
+
+    @Test
+    void tablesAnotherProcessJustMigratedInAreNotSomebodyElsesSchema() throws IOException {
+        final FakeMigrationTarget first = new FakeMigrationTarget();
+        migrator(first, two().build()).migrate();
+        // The second process found no history table; by the time it asks whether the
+        // database has tables, the first has created the history and applied its scripts.
+        final FakeMigrationTarget second = new FakeMigrationTarget();
+        second.beforeUserObjectsAnswer = new Runnable() {
+            @Override
+            public void run() {
+                second.historyExists = true;
+                second.userObjects = true;
+                for (FakeMigrationTarget.HistoryRow row : first.history) {
+                    second.history.add(row.copy());
+                }
+            }
+        };
+        assertEquals(0, migrator(second, two().build()).migrate().getMigrationsExecuted());
+        assertEquals("[]", second.statements.toString());
+
+        // Tables with no history behind them are still refused.
+        FakeMigrationTarget foreign = new FakeMigrationTarget();
+        foreign.userObjects = true;
+        assertEquals(MigrationException.NON_EMPTY_SCHEMA, code(migrator(foreign, two().build())));
+    }
+
+    @Test
+    void validateHoldsRepeatableMigrationsToThisBuildToo() throws IOException {
+        FakeMigrationTarget target = new FakeMigrationTarget();
+        MigrationSet set = MigrationSet.builder("default")
+                .repeatable("views", "CREATE VIEW v1")
+                .sql("1", "t", "S1")
+                .build();
+        migrator(target, set).migrate();
+        migrator(target, set).validate();
+
+        // The script changed and has not been run again: the view in the database is stale.
+        MigrationSet changed = MigrationSet.builder("default")
+                .repeatable("views", "CREATE VIEW v2")
+                .sql("1", "t", "S1")
+                .build();
+        MigrationException stale = assertThrows(MigrationException.class, migrator(target, changed)::validate);
+        assertEquals(MigrationException.VALIDATE_FAILED, stale.getCode());
+        assertTrue(stale.getMessage().contains("repeatable migration 'views' (R__views.sql) changed since it "
+                + "was applied and has not been applied again"), stale.getMessage());
+        // migrate is what brings it up to date, and is not stopped by its own check.
+        assertEquals("[R__views.sql]", migrator(target, changed).migrate().getApplied().toString());
+        migrator(target, changed).validate();
+
+        // One that never ran.
+        MigrationSet more = MigrationSet.builder("default")
+                .repeatable("views", "CREATE VIEW v2")
+                .repeatable("procedures", "CREATE PROCEDURE p")
+                .sql("1", "t", "S1")
+                .build();
+        MigrationException pending = assertThrows(MigrationException.class, migrator(target, more)::validate);
+        assertEquals(MigrationException.VALIDATE_FAILED, pending.getCode());
+        assertTrue(pending.getMessage().contains("repeatable migration 'procedures' (R__procedures.sql) has "
+                + "not been applied"), pending.getMessage());
+        assertFalse(pending.getMessage().contains("'views'"), pending.getMessage());
+
+        // A retired script is not a difference: migrate accepts it and nothing could clear it.
+        MigrationSet retired = MigrationSet.builder("default").sql("1", "t", "S1").build();
+        migrator(target, retired).validate();
+    }
+
     /** One class for every version of a set, as a library's set is written. */
     private static final class Step implements JavaMigration {
         private final String statement;

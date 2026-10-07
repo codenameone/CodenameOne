@@ -66,6 +66,12 @@ final class FakeMigrationTarget implements MigrationTarget {
     List<String> statements = new ArrayList<String>();
     List<String> locks = new ArrayList<String>();
     boolean dropped;
+    /// Run once, as the next transaction opens and before it is one: what another process
+    /// committed between this run reading the history and this run taking the write lock.
+    Runnable beforeNextTransaction;
+    /// Run once, as the engine asks whether the database has tables of its own: what
+    /// another process did after this run looked for the history table and found none.
+    Runnable beforeUserObjectsAnswer;
     private boolean transaction;
     private boolean savedExists;
     private List<HistoryRow> savedHistory;
@@ -182,6 +188,11 @@ final class FakeMigrationTarget implements MigrationTarget {
 
     @Override
     public boolean hasUserObjects() {
+        if (beforeUserObjectsAnswer != null) {
+            Runnable doneElsewhere = beforeUserObjectsAnswer;
+            beforeUserObjectsAnswer = null;
+            doneElsewhere.run();
+        }
         return userObjects;
     }
 
@@ -194,6 +205,11 @@ final class FakeMigrationTarget implements MigrationTarget {
     public void begin() throws IOException {
         if (transaction) {
             throw new IOException("nested transaction");
+        }
+        if (beforeNextTransaction != null) {
+            Runnable committedElsewhere = beforeNextTransaction;
+            beforeNextTransaction = null;
+            committedElsewhere.run();
         }
         transaction = true;
         savedExists = historyExists;

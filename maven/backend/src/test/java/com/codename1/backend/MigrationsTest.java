@@ -220,6 +220,9 @@ class MigrationsTest {
                     ? "CREATE TABLE mig_notes (id INT PRIMARY KEY, body VARCHAR(100))"
                     : "INSERT INTO mig_notes (id, body) VALUES (" + i + ", 'x')");
         }
+        // A repeatable migration has no version to be found by: the second process to get
+        // the write lock has to find that the first ran it, or this row is inserted twice.
+        many.repeatable("seed", "INSERT INTO mig_notes (id, body) VALUES (100, 'seed')");
         final MigrationSet set = many.build();
         final List<Throwable> failures = Collections.synchronizedList(new ArrayList<Throwable>());
         final int[] ran = new int[2];
@@ -246,9 +249,9 @@ class MigrationsTest {
             thread.join(60000);
         }
         assertTrue(failures.isEmpty(), failures.toString());
-        assertEquals(12, ran[0] + ran[1]);
-        assertEquals(12, count(first, "flyway_schema_history"));
-        assertEquals(11, count(first, "mig_notes"));
+        assertEquals(13, ran[0] + ran[1]);
+        assertEquals(13, count(first, "flyway_schema_history"));
+        assertEquals(12, count(first, "mig_notes"));
     }
 
     @ParameterizedTest
