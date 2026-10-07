@@ -15,3 +15,9 @@ is compared against the PNG with the matching name here via
 Regenerate by running a full suite and copying `$ARTIFACTS_DIR/*.png` into
 this directory — only update after a clean `CN1SS:SUITE:FINISHED` run with no
 `__parparError` in the browser log.
+
+The six GPU/immersive-media references were refreshed from run `37442276559`
+after fixing WebGL compositing at 2× pixel density. Their scenes must fill the
+content area below the title; the previous references incorrectly accepted a
+half-width, half-height scene in the upper-left corner. Comparison tolerances
+were not changed.

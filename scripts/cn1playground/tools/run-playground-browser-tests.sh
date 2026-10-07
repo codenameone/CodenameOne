@@ -1,8 +1,8 @@
 #!/bin/bash
-# Builds the JavaScript Playground and checks it end to end in headless Chromium:
+# Builds the JavaScript Playground and checks it end to end in headless Chromium and Firefox:
 # the in-browser compiler and translator, loading user classes into the running VM,
 # and the editor's input path. Needs Node with Playwright resolvable from scripts/
-# (cd scripts && npm install playwright && npx playwright install chromium).
+# (cd scripts && npm install playwright && npx playwright install chromium firefox).
 #
 #   tools/run-playground-browser-tests.sh            build, then test
 #   PLAYGROUND_SKIP_BUILD=1 tools/run-playground-browser-tests.sh   reuse the last build
@@ -40,6 +40,17 @@ if [ ! -f "$site/index.html" ]; then
   site="$(dirname "$inner")"
 fi
 
+# Exercise the website's iframe height as well as the standalone app. The 76px
+# header reproduces the space used by the site's navigation on a desktop browser.
+cat > "$site/demo-host.html" <<'HTML'
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%;overflow:hidden}header{height:76px;background:#eef3ff}
+iframe{display:block;border:0;width:100%;height:calc(100% - 76px)}</style></head>
+<body><header>Playground browser regression host</header>
+<iframe title="Codename One Playground" allow="camera"></iframe>
+<script>document.querySelector('iframe').src='index.html'+location.search;</script></body></html>
+HTML
+
 port="${PLAYGROUND_BROWSER_PORT:-8793}"
 python3 -m http.server "$port" --bind 127.0.0.1 --directory "$site" >/dev/null 2>&1 &
 server=$!
@@ -53,5 +64,10 @@ done
 
 # Playwright resolves from scripts/node_modules, so run the checks from there.
 cd "$ROOT/.."
-node cn1playground/tools/verify-playground-browser.mjs "http://127.0.0.1:$port/index.html"
-node cn1playground/tools/verify-lightweight-editor-input.mjs "http://127.0.0.1:$port/index.html"
+# Run every suite even if a demo regression fails, and retain the failing status.
+status=0
+node --test cn1playground/tools/demo-pixels.test.mjs || status=1
+node cn1playground/tools/verify-playground-demos.mjs "http://127.0.0.1:$port/demo-host.html" || status=1
+node cn1playground/tools/verify-playground-browser.mjs "http://127.0.0.1:$port/index.html" || status=1
+node cn1playground/tools/verify-lightweight-editor-input.mjs "http://127.0.0.1:$port/index.html" || status=1
+exit "$status"

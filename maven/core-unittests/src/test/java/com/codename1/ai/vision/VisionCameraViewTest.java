@@ -104,6 +104,22 @@ class VisionCameraViewTest extends UITestBase {
     }
 
     @Test
+    void liveAnalysisRequestsRawFramesWithoutForcingJpegEncoding() {
+        view = new VisionCameraView<Barcode[]>(new BarcodeScanner());
+        view.start();
+        assertEquals(com.codename1.camera.FrameFormat.NV21,
+                view.getSession().getOptions().getFrameFormat());
+        final int[] encodings = {0};
+        byte[] raw = new byte[6];
+        camera.frameListener.onFrame(new com.codename1.camera.CameraFrame(
+                null, raw, 2, 2, 90, 1, com.codename1.camera.FrameFormat.NV21,
+                () -> { encodings[0]++; return new byte[] {1}; }));
+        flushSerialCalls();
+        assertEquals(1, vision.analyzeCount);
+        assertEquals(0, encodings[0]);
+    }
+
+    @Test
     void facingSelectsTheCamera() {
         view = new VisionCameraView<Barcode[]>(new BarcodeScanner());
         view.setFacing(CameraFacing.FRONT);

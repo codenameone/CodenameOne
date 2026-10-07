@@ -52,4 +52,31 @@ class CameraFrameTest {
         assertNull(f.getRawBytes());
         assertNotNull(f.getJpegBytes());
     }
+
+    @Test
+    void rawAnalysisDoesNotEncodeJpegAndExplicitJpegAccessIsCached() {
+        final int[] calls = {0};
+        byte[] raw = {16, 32, 48, 64, (byte) 128, (byte) 128};
+        byte[] jpeg = {1, 2, 3};
+        CameraFrame frame = new CameraFrame(null, raw, 2, 2, 90, 7,
+                FrameFormat.NV21, () -> { calls[0]++; return jpeg; });
+        com.codename1.ai.vision.VisionImage image =
+                com.codename1.ai.vision.VisionImage.fromCameraFrame(frame);
+        assertEquals(FrameFormat.NV21, image.getFormat());
+        assertArrayEquals(raw, image.getPixelsUnsafe());
+        assertEquals(0, calls[0]);
+        assertSame(jpeg, frame.getJpegBytes());
+        assertSame(jpeg, frame.getJpegBytes());
+        assertEquals(1, calls[0]);
+    }
+
+    @Test
+    void failedLazyEncodingCanBeRetried() {
+        final int[] calls = {0};
+        CameraFrame frame = new CameraFrame(null, new byte[6], 2, 2, 0, 0,
+                FrameFormat.NV21, () -> ++calls[0] == 1 ? null : new byte[] {1});
+        assertThrows(IllegalStateException.class, frame::getJpegBytes);
+        assertArrayEquals(new byte[] {1}, frame.getJpegBytes());
+        assertEquals(2, calls[0]);
+    }
 }

@@ -71,8 +71,8 @@
  },
  "objectAllocation": {
   "all": {
-   "memory": 0.937,
-   "runs": 1,
+   "memory": 0.708,
+   "runs": 2,
    "time": 1.106,
    "tolerance": {
     "memory": 0.3,
@@ -110,9 +110,9 @@
  },
  "translator": {
   "all": {
-   "memory": 0.739,
-   "runs": 1,
-   "time": 0.539
+   "memory": 0.566,
+   "runs": 2,
+   "time": 0.623
   }
  },
  "valueEscape": {

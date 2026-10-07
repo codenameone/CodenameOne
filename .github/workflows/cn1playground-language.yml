@@ -11,7 +11,10 @@ on:
       - 'maven/javac/**'
       - 'vm/ByteCodeTranslator/src/javascript/**'
       - 'vm/ByteCodeTranslator/src/com/codename1/tools/translator/Javascript*.java'
-      - 'Ports/JavaScriptPort/src/main/webapp/**'
+      - 'Ports/JavaScriptPort/**'
+      - 'CodenameOne/src/com/codename1/gpu/**'
+      - 'CodenameOne/src/com/codename1/camera/**'
+      - 'CodenameOne/src/com/codename1/ui/**'
       - '.github/workflows/cn1playground-language.yml'
   push:
     branches: [main, master]
@@ -23,7 +26,10 @@ on:
       - 'maven/javac/**'
       - 'vm/ByteCodeTranslator/src/javascript/**'
       - 'vm/ByteCodeTranslator/src/com/codename1/tools/translator/Javascript*.java'
-      - 'Ports/JavaScriptPort/src/main/webapp/**'
+      - 'Ports/JavaScriptPort/**'
+      - 'CodenameOne/src/com/codename1/gpu/**'
+      - 'CodenameOne/src/com/codename1/camera/**'
+      - 'CodenameOne/src/com/codename1/ui/**'
       - '.github/workflows/cn1playground-language.yml'
   workflow_dispatch:
 
@@ -104,19 +110,21 @@ jobs:
       - name: Bootstrap local Codename One snapshots
         run: SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright Chromium and Firefox
         run: |
           set -euo pipefail
           cd scripts
           npm install playwright
           bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
-          npx playwright install-deps chromium
-          npx playwright install chromium
+          npx playwright install-deps chromium firefox
+          npx playwright install chromium firefox
 
       # Builds the open-world JavaScript bundle, then compiles, translates and runs
-      # every sample and an editing session inside headless Chromium.
+      # samples/editor in Chromium and demo behavior in Chromium and Firefox.
       - name: Run playground browser tests
         env:
+          # Hosted Linux runners have no hardware GPU. Local runs use browser defaults.
+          PLAYGROUND_SOFTWARE_GL: "1"
           PLAYGROUND_BROWSER_ARTIFACT_DIR: ${{ runner.temp }}/playground-browser
         run: |
           set -euo pipefail
