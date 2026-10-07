@@ -109,6 +109,13 @@ public interface OAuth2AuthorizationService {
     /// @return whether THIS call used it up
     boolean consumeToken(String kind, String tokenHash, long now);
 
+    /// Extends an unused, unexpired token to at least `expiresAt`, atomically.
+    /// Returns false if it is missing, used or expired at `now`. Custom stores
+    /// must implement this before enabling refresh token reuse.
+    default boolean extendToken(String kind, String tokenHash, long now, long expiresAt) {
+        throw new UnsupportedOperationException("Token expiry extension is not supported by this store");
+    }
+
     /// Records that a secret was presented at `now`: how a device code's
     /// polling is paced.
     void touchToken(String kind, String tokenHash, long now);

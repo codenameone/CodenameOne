@@ -941,9 +941,14 @@ class AuthorizationServerTest {
                     "redirect_uri", WEB_REDIRECT), FORM, "Authorization", basic));
             String kept = (String) web.get("refresh_token");
             for (int round = 0 ; round < 3 ; round++) {
+                clock.now += 3599000;
                 Map again = json(server.call("POST", "/oauth2/token", form("grant_type",
                         "refresh_token", "refresh_token", kept), FORM, "Authorization", basic));
                 assertEquals(kept, again.get("refresh_token"));
+                OAuth2AuthorizationService.StoredToken stored = grants.findToken(
+                        OAuth2AuthorizationService.REFRESH_TOKEN, OAuth2Parameters.sha256(kept));
+                assertEquals(clock.now + 3600000, stored.getExpiresAt());
+                assertEquals(stored.getExpiresAt(), grants.findById(stored.getAuthorizationId()).getExpiresAt());
             }
             // And it is the client's alone.
             refused(token(server, "grant_type", "refresh_token", "client_id", "app",

@@ -97,6 +97,16 @@ public final class InMemoryOAuth2AuthorizationService implements OAuth2Authoriza
     }
 
     @Override
+    public synchronized boolean extendToken(String kind, String tokenHash, long now, long expiresAt) {
+        Object[] row = tokenHash == null ? null : tokens.get(key(kind, tokenHash));
+        if (row == null || Boolean.TRUE.equals(row[1]) || ((Long) row[2]).longValue() <= now) {
+            return false;
+        }
+        row[2] = Long.valueOf(Math.max(((Long) row[2]).longValue(), expiresAt));
+        return true;
+    }
+
+    @Override
     public synchronized boolean decide(String id, boolean approved, String principalName,
                                        Map<String, Object> attributes) {
         OAuth2Authorization a = authorizations.get(id);

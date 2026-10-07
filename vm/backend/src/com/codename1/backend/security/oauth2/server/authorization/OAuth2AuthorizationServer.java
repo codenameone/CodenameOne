@@ -920,9 +920,12 @@ public final class OAuth2AuthorizationServer {
                 authorizations.addToken(authorization.getId(),
                         OAuth2AuthorizationService.REFRESH_TOKEN,
                         OAuth2Parameters.sha256(refreshToken), refreshExpires);
-                // The grant lives as long as its newest refresh token.
-                authorizations.save(authorization.withExpiresAt(refreshExpires));
+            } else if (!authorizations.extendToken(OAuth2AuthorizationService.REFRESH_TOKEN,
+                    OAuth2Parameters.sha256(refreshToken), now, refreshExpires)) {
+                throw invalidGrant();
             }
+            // Both rotated and reused tokens extend the lifetime of their grant.
+            authorizations.save(authorization.withExpiresAt(Math.max(authorization.getExpiresAt(), refreshExpires)));
             answer.put("refresh_token", refreshToken);
         } else {
             authorizations.save(authorization.withExpiresAt(

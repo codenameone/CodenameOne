@@ -324,14 +324,20 @@ class OAuth2StoresTest {
                 "the secret itself was stored");
 
         // Used up once: the wrong kind does not, the second call does not.
+        assertFalse(service.extendToken(OAuth2AuthorizationService.REFRESH_TOKEN, hash, 1500L, 4000L));
+        assertTrue(service.extendToken(OAuth2AuthorizationService.CODE, hash, 1500L, 4000L));
+        assertTrue(service.extendToken(OAuth2AuthorizationService.CODE, hash, 1500L, 3000L));
+        assertEquals(4000L, service.findToken(OAuth2AuthorizationService.CODE, hash).getExpiresAt());
         assertFalse(service.consumeToken(OAuth2AuthorizationService.REFRESH_TOKEN, hash, 1500L));
         assertTrue(service.consumeToken(OAuth2AuthorizationService.CODE, hash, 1500L));
         assertFalse(service.consumeToken(OAuth2AuthorizationService.CODE, hash, 1500L));
         // It stays, marked: that is how a second presentation is told apart.
         assertTrue(service.findToken(OAuth2AuthorizationService.CODE, hash).isUsed());
+        assertFalse(service.extendToken(OAuth2AuthorizationService.CODE, hash, 1500L, 9000L));
         // An expired one is not used up, at its last millisecond or after.
         String late = OAuth2Parameters.sha256("late");
         service.addToken("g1", OAuth2AuthorizationService.CODE, late, 2000L);
+        assertFalse(service.extendToken(OAuth2AuthorizationService.CODE, late, 2000L, 9000L));
         assertFalse(service.consumeToken(OAuth2AuthorizationService.CODE, late, 2000L));
         assertFalse(service.consumeToken(OAuth2AuthorizationService.CODE, late, 2001L));
         assertFalse(service.findToken(OAuth2AuthorizationService.CODE, late).isUsed());

@@ -193,6 +193,18 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
     }
 
     @Override
+    public boolean extendToken(String kind, String tokenHash, long now, long expiresAt) {
+        try {
+            return dataSource.execute("UPDATE cn1_oauth2_token SET expires_at = CASE WHEN expires_at < ? "
+                    + "THEN ? ELSE expires_at END WHERE token_hash = ? AND kind = ? AND used = 0 "
+                    + "AND expires_at > ?", new Object[] {Long.valueOf(expiresAt), Long.valueOf(expiresAt),
+                        tokenHash, kind, Long.valueOf(now)}) == 1;
+        } catch (IOException err) {
+            throw failed("extend a token", err);
+        }
+    }
+
+    @Override
     public boolean decide(String id, boolean approved, String principalName,
                           Map<String, Object> attributes) {
         OAuth2Authorization a = findById(id);
