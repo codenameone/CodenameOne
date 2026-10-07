@@ -419,6 +419,38 @@ public class OidcClientTest extends UITestBase {
         assertEquals(Boolean.TRUE, r.value);
     }
 
+    @Test
+    void revokeReportsOAuthErrors() {
+        mock(REVOKE_EP, 400, "{\"error\":\"invalid_client\",\"error_description\":\"Credentials rejected\"}");
+        Outcome<Boolean> r = await(configuredClient(fullConfig()).revoke("tok"));
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals("invalid_client", ((OidcException) r.error).getError());
+        assertEquals("Credentials rejected", r.error.getMessage());
+    }
+
+    @Test
+    void revokeReportsHttpErrorsWithoutOAuthBodies() {
+        int[] statuses = {401, 500, 503};
+        String[] bodies = {"", "{\"message\":\"unavailable\"}", "<html>Gateway unavailable</html>"};
+        for (int i = 0; i < statuses.length; i++) {
+            mock(REVOKE_EP, statuses[i], bodies[i]);
+            Outcome<Boolean> r = await(configuredClient(fullConfig()).revoke("tok"));
+            assertNull(r.value, "HTTP " + statuses[i] + " must not report revocation success");
+            assertInstanceOf(OidcException.class, r.error);
+            assertEquals(OidcException.TRANSPORT_ERROR, ((OidcException) r.error).getError());
+            assertTrue(r.error.getMessage().contains("HTTP " + statuses[i]));
+        }
+    }
+
+    @Test
+    void revokeAcceptsNoContentSuccess() {
+        mock(REVOKE_EP, 204, "");
+        Outcome<Boolean> r = await(configuredClient(fullConfig()).revoke("tok"));
+        assertNull(r.error);
+        assertEquals(Boolean.TRUE, r.value);
+    }
+
     // ---- stored-token helpers ----------------------------------------
 
     @Test

@@ -141,7 +141,6 @@ public final class HttpSession {
     /// Removes and returns an attribute once across every request and server
     /// sharing the session store. A stale request copy cannot consume it again.
     /// @throws java.io.IOException if the store cannot perform the atomic operation
-    /// @since 8.0
     public Object consumeAttribute(String name) throws java.io.IOException {
         String sessionId;
         Object before;

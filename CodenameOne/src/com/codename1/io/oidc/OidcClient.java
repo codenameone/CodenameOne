@@ -451,6 +451,8 @@ public final class OidcClient {
 
     /// Sends a token-revocation request to the issuer (RFC 7009). Silently
     /// no-ops when the issuer does not advertise a `revocation_endpoint`.
+    /// A refused request reports the OAuth error, or a transport error when the
+    /// non-success HTTP response contains no OAuth error.
     public AsyncResource<Boolean> revoke(final String token) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         if (token == null || configuration.getRevocationEndpoint() == null) {
@@ -460,7 +462,27 @@ public final class OidcClient {
         ConnectionRequest req = new ConnectionRequest() {
             @Override
             protected void readResponse(InputStream input) throws IOException {
-                Util.readInputStream(input);
+                byte[] body = Util.readInputStream(input);
+                int status = getResponseCode();
+                if (status < 200 || status >= 300) {
+                    Map<String, Object> parsed = null;
+                    Exception parseFailure = null;
+                    try {
+                        parsed = new JSONParser().parseJSON(new StringReader(StringUtil.newString(body)));
+                    } catch (Exception malformed) {
+                        // An empty body or a gateway page still reports the HTTP failure.
+                        parseFailure = malformed;
+                    }
+                    if (parsed != null && parsed.get("error") instanceof String) {
+                        Object description = parsed.get("error_description");
+                        out.error(new OidcException((String) parsed.get("error"),
+                                description == null ? null : description.toString()));
+                    } else {
+                        out.error(new OidcException(OidcException.TRANSPORT_ERROR,
+                                "Token revocation answered HTTP " + status + " without an OAuth error", parseFailure));
+                    }
+                    return;
+                }
                 out.complete(Boolean.TRUE);
             }
 
@@ -472,10 +494,7 @@ public final class OidcClient {
 
             @Override
             protected void handleErrorResponseCode(int code, String message) {
-                // The answer's body carries the error and readResponse() reports it. The
-                // default handling would put an error dialog in front of the user for what
-                // is an ordinary answer here -- a refused refresh token, a device not yet
-                // approved.
+                // readResponse() reports the status and any OAuth error without a dialog.
             }
         };
         req.setUrl(configuration.getRevocationEndpoint());

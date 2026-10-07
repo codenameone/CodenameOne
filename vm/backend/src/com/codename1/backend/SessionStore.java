@@ -46,7 +46,6 @@ public interface SessionStore {
     /// receive a given value at most once. Used for single-use security challenges.
     /// Custom stores must implement this before serving passkey ceremonies; the
     /// default fails closed instead of emulating an unsafe load/save sequence.
-    /// @since 8.0
     default Object consumeAttribute(String id, String name) throws IOException {
         throw new IOException("This session store does not support atomic attribute consumption");
     }
