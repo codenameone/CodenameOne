@@ -73,17 +73,45 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('stalefocus');
+    const removedEditor = page.locator('.cn1-selection-editor[name="removedEditor"]');
+    await removedEditor.waitFor({state: 'visible'});
+    await page.evaluate(() => {
+      const worker = window.__parparWorker, post = worker.postMessage.bind(worker);
+      window.__heldEditorFocus = null;
+      worker.postMessage = function(message, ...args) {
+        if (!window.__heldEditorFocus && message.type === 'worker-callback' && message.args?.[0]?.type === 'focus') {
+          window.__heldEditorFocus = () => post(message, ...args);
+          worker.postMessage = post;
+        } else post(message, ...args);
+      };
+    });
+    await removedEditor.click();
+    await page.waitForFunction(() => typeof window.__heldEditorFocus === 'function');
+    await clickButton('Remove editor');
+    await removedEditor.waitFor({state: 'detached'});
+    await page.evaluate(() => window.__heldEditorFocus());
+    await page.waitForTimeout(300);
+    await clickButton('Check removed editor');
+    await page.waitForFunction(() => document.body.innerText.includes('Removed editor editing false'));
+    const nextEditor = page.locator('.cn1-selection-editor[name="nextEditor"]');
+    await nextEditor.click(); await nextEditor.fill('Replacement still edits');
+    assert.equal(await nextEditor.inputValue(), 'Replacement still edits');
+    console.log('PASS', name, 'delayed focus from an uninstalled editor cannot reacquire editing ownership');
+
     await openReview('paintcontext');
     const contextEditor = page.locator('.cn1-selection-editor[name="paintContextArea"]');
     await contextEditor.waitFor({state: 'visible'});
-    for (const mode of [1, 0, 2, 0]) {
+    for (const mode of [1, 0, 2, 0, 3, 0]) {
       if (mode) await contextEditor.click();
       await page.evaluate(() => { window.__cn1TextDraws = []; });
       await clickButton('Paint mode ' + mode);
       await contextEditor.waitFor({state: mode ? 'hidden' : 'visible'});
-      if (mode) await page.waitForFunction(() => window.__cn1TextDraws.includes('Context painted value'));
+      if (mode && mode !== 3) await page.waitForFunction(() => window.__cn1TextDraws.includes('Context painted value'));
+      if (mode === 3) assert.ok(!await page.evaluate(() => window.__cn1TextDraws.includes('Context painted value')),
+        'an empty clip paints neither DOM nor canvas text');
     }
-    console.log('PASS', name, 'transformed and shape-clipped editors rasterize and restore native promotion');
+    console.log('PASS', name, 'transforms and shape clips rasterize text; empty clips hide text; native promotion restores');
 
     for (const rtl of [false, true]) {
       await openReview('ancestorgutter&rtl=' + rtl);
@@ -625,6 +653,15 @@ async function exercise(context, name, host, mobileDevice = null) {
     await numeric.fill('');
     await numeric.pressSequentially('456');
     await page.waitForFunction(() => document.body.innerText.includes('Numeric model 456'));
+    await numeric.evaluate(el => el.blur());
+    await page.waitForFunction(() => document.body.innerText.includes('Numeric completed [456]'));
+    await numeric.fill('-');
+    await numeric.evaluate(el => el.blur());
+    await page.waitForFunction(() => document.body.innerText.includes('Numeric completed []'));
+    assert.equal(await numeric.inputValue(), '', 'an unfinished numeric sign is cleared on completion');
+    await numeric.fill('-123');
+    await numeric.evaluate(el => el.blur());
+    await page.waitForFunction(() => document.body.innerText.includes('Numeric completed [-123]'));
     console.log('PASS', name, 'numeric user edits enforce integers while programmatic display values survive');
 
     await openReview('linemode');
@@ -1052,6 +1089,32 @@ async function exerciseMobileEnter(browser, name) {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(String(e)));
+    for (const [selector, expected] of [['#cn1-text-layer span', 'Label'], ['.cn1-selection-editor[name="pinchEditor"]', 'Editor']]) {
+      await page.goto(`http://127.0.0.1:${port}/?review=multitouch`);
+      const target = expected === 'Label' ? page.locator(selector).filter({hasText: 'Pinch promoted label'}).first() : page.locator(selector);
+      await target.waitFor({state: 'visible'});
+      await target.evaluate(async el => {
+        const box = el.getBoundingClientRect();
+        const point = (id, x) => new Touch({identifier: id, target: el, clientX: box.x + x, clientY: box.y + box.height / 2});
+        const send = (type, points, changed) => el.dispatchEvent(new TouchEvent(type, {
+          bubbles: true, cancelable: true, touches: points, targetTouches: points, changedTouches: changed
+        }));
+        const first = point(1, 100), second = point(2, 150), movedFirst = point(1, 5), moved = point(2, 245);
+        const step = () => new Promise(resolve => setTimeout(resolve, 100));
+        send('touchstart', [first], [first]);
+        await step();
+        send('touchstart', [first, second], [second]);
+        await step();
+        send('touchmove', [first, second], [second]);
+        await step();
+        send('touchmove', [movedFirst, moved], [movedFirst, moved]);
+        await step();
+        send('touchend', [], [movedFirst, moved]);
+      });
+      await page.waitForFunction(text => document.body.innerText.includes(text), 'Multitouch received 2');
+    }
+    console.log('PASS', name, 'multi-touch over promoted labels and native editors reaches application multi-touch handlers');
+
     await page.goto(`http://127.0.0.1:${port}/?review=mobileenter`);
     const first = page.locator('.cn1-selection-editor[name="completionFirst"]');
     await first.waitFor({timeout: 60000});

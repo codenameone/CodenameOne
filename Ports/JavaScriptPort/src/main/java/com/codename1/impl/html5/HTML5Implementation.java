@@ -1234,6 +1234,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final TextArea ta;
         final DataChangedListener changes;
         final FocusListener focus;
+        boolean installed = true;
         boolean browserEdit;
         boolean focused;
         boolean editingSession;
@@ -1284,6 +1285,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 public void handleEvent(Event event) {
                     callSerially(new Runnable() {
                         public void run() {
+                            if (!installed) return;
                             stopAfterBlur(new Runnable() {
                                 public void run() {
                                     Form form = ta.getComponentForm();
@@ -1314,6 +1316,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     if (key.getKeyCode() != 9) return;
                     callSerially(new Runnable() {
                         public void run() {
+                            if (!installed) return;
                             Form form = ta.getComponentForm();
                             if (form == null) return;
                             el.blur();
@@ -1334,6 +1337,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     final int scrollY = unscaleCoord(el.getScrollTop());
                     callSerially(new Runnable() {
                         public void run() {
+                            if (!installed) return;
                             // Caret movement and selection can scroll the browser editor too.
                             lastScrollY = scrollY;
                             Accessor.setNativeTextScrollY(ta, scrollY);
@@ -1345,7 +1349,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 public void handleEvent(Event event) {
                     final String value = el.getValue();
                     callSerially(new Runnable() {
-                        public void run() { commit(value); }
+                        public void run() { if (installed) commit(value); }
                     });
                 }
             });
@@ -1353,6 +1357,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 public void handleEvent(Event event) {
                     callSerially(new Runnable() {
                         public void run() {
+                            if (!installed) return;
                             focused = true;
                             if (ta.isEditable() && ta.isEnabled()) {
                                 editingSession = true;
@@ -1371,7 +1376,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     final String value = el.getValue();
                     callSerially(new Runnable() {
                         public void run() {
-                            completeBlur(value);
+                            if (installed) completeBlur(value);
                         }
                     });
                 }
@@ -1454,6 +1459,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         private void commit(String value, boolean completingSession) {
             if (!completingSession && (!ta.isEditable() || !ta.isEnabled())) return;
+            // A lone sign is an unfinished numeric draft. Clear it on completion
+            // before validation, including when input already copied it to the model.
+            if (completingSession && (ta.getConstraint() & 0xffff) == TextArea.NUMERIC
+                    && "-".equals(value)) {
+                value = "";
+                el.setValue(value);
+            }
             if (!acceptsInput(value)) {
                 el.setValue(ta.getText());
                 return;
@@ -1608,6 +1620,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         @Override
         void uninstall() {
+            if (!installed) return;
+            installed = false;
             if (visible) com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidateAll();
             visible = false;
             completeBlur(el.getValue());

@@ -193,6 +193,39 @@ touch('touchend', 80, false);
 assert.deepEqual(relayed, [], 'selection handles stay native');
 console.log('PASS native text event ownership and synchronous context-menu cancellation');
 
+// A second finger transfers the entire gesture to the canvas, including when
+// it lands outside the native text. Canvas relays must not recurse or duplicate
+// the original event's worker delivery.
+for (const tag of ['SPAN', 'TEXTAREA']) {
+  for (const secondTarget of [text, canvas]) {
+    text.tagName = tag;
+    relayed.length = 0;
+    const first = {identifier: 1, target: text, clientX: 20, clientY: 100};
+    const second = {identifier: 2, target: secondTarget, clientX: 60, clientY: 100};
+    function send(type, target, points, changed) {
+      const e = Object.assign(event(type, target), {touches: points, changedTouches: changed});
+      listeners[type](e);
+      if (points.length > 1 || type !== 'touchstart') {
+        assert.equal(e.defaultPrevented, true, 'forwarded pinch suppresses native default');
+        callback(e);
+        assert.equal(messages.length, 0, 'original pinch event is not also sent to worker');
+      }
+    }
+    send('touchstart', text, [first], [first]);
+    send('touchstart', secondTarget, [first, second], [second]);
+    send('touchmove', secondTarget, [first, second], [second]);
+    send('touchend', secondTarget, [first], [second]);
+    send('touchmove', text, [first], [first]);
+    send('touchcancel', text, [], [first]);
+    assert.deepEqual(relayed, ['touchstart', 'touchmove', 'touchend', 'touchmove', 'touchcancel']);
+  }
+}
+relayed.length = 0;
+touch('touchstart', 100);
+touch('touchend', 100, false);
+assert.deepEqual(relayed, [], 'a later single touch returns to native selection');
+console.log('PASS native text multi-touch relays once across mixed targets and releases ownership');
+
 // Exercise the real JSO bridge, including focus suppression before the worker's
 // semantic snapshot can overwrite a newly focused native editor.
 let bridge;

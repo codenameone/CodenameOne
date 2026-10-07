@@ -85,6 +85,10 @@ public class JavaScriptSelectionApp extends Lifecycle {
     private void showReviewFixture(String query) {
         final Label status = new Label("Shortcut ready");
         Form form = new Form("Review regressions", BoxLayout.y()) {
+            public void pointerDragged(int[] x, int[] y) {
+                if (query.indexOf("review=multitouch") >= 0 && x.length > 1) status.setText("Multitouch received " + x.length);
+                super.pointerDragged(x, y);
+            }
             public void keyReleased(int keyCode) {
                 // Application-level shortcuts can consume the key before it is
                 // interpreted as input by the focused TextField.
@@ -94,7 +98,20 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=paintcontext") >= 0) {
+        if (query.indexOf("review=multitouch") >= 0) {
+            Label label = new Label("Pinch promoted label");
+            TextArea area = new TextArea("Pinch native editor", 2, 24);
+            area.setName("pinchEditor");
+            form.addAll(new Button("Initial focus"), label, area, status);
+        } else if (query.indexOf("review=stalefocus") >= 0) {
+            TextArea removed = new TextArea("Removed editor value", 2, 24); removed.setName("removedEditor");
+            TextField next = new TextField("Next editor value"); next.setName("nextEditor");
+            Button remove = new Button("Remove editor");
+            remove.addActionListener(e -> { removed.remove(); form.revalidate(); });
+            Button check = new Button("Check removed editor");
+            check.addActionListener(e -> status.setText("Removed editor editing " + removed.isEditing()));
+            form.addAll(new Button("Initial focus"), removed, next, remove, check, status);
+        } else if (query.indexOf("review=paintcontext") >= 0) {
             final int[] mode = new int[1];
             Container painter = new Container(BoxLayout.y()) {
                 public void paint(Graphics g) {
@@ -108,6 +125,8 @@ public class JavaScriptSelectionApp extends Lifecycle {
                             clip.moveTo(getX(), getY()); clip.lineTo(getX() + getWidth(), getY());
                             clip.lineTo(getX(), getY() + getHeight()); clip.closePath();
                             g.setClip(clip);
+                        } else if (mode[0] == 3) {
+                            g.setClip(0, 0, 0, 0);
                         }
                         super.paint(g);
                     } finally {
@@ -118,7 +137,7 @@ public class JavaScriptSelectionApp extends Lifecycle {
             TextArea area = new TextArea("Context painted value", 2, 24); area.setName("paintContextArea");
             painter.add(area); painter.setPreferredH(120);
             form.addAll(new Button("Initial focus"), painter);
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 4; i++) {
                 final int value = i;
                 Button change = new Button("Paint mode " + i);
                 change.addActionListener(e -> { mode[0] = value; form.repaint(); });
@@ -524,7 +543,9 @@ public class JavaScriptSelectionApp extends Lifecycle {
             Button change = new Button("Change numeric model");
             change.addActionListener(e -> field.setText("Still not numeric"));
             field.addDataChangedListener((type, index) -> status.setText("Numeric model " + field.getText()));
-            form.addAll(field, change, status);
+            Label completion = new Label("Numeric completion pending");
+            field.bindProperty("text", (source, property, oldValue, newValue) -> completion.setText("Numeric completed [" + newValue + "]"));
+            form.addAll(field, change, status, completion);
         } else if (query.indexOf("review=linemode") >= 0) {
             TextArea area = new TextArea("Changing line mode", 2, 24);
             area.setName("changingLineMode");

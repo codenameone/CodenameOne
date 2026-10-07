@@ -1950,8 +1950,10 @@
             pageX: t.pageX, pageY: t.pageY });
         });
       }
-      target.dispatchEvent(new global.TouchEvent(type, { bubbles: true, cancelable: true,
-        touches: copy(event.touches), targetTouches: copy(event.touches), changedTouches: copy(event.changedTouches) }));
+      var relayed = new global.TouchEvent(type, { bubbles: true, cancelable: true,
+        touches: copy(event.touches), targetTouches: copy(event.touches), changedTouches: copy(event.changedTouches) });
+      relayed.__cn1TextTouchRelay = true;
+      target.dispatchEvent(relayed);
     }
     doc.addEventListener('wheel', function(event) {
       if (!nativeSelectionElement(event.target) || !canvas() || event.ctrlKey || event.metaKey) return;
@@ -1962,7 +1964,20 @@
         shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey }));
     }, { passive: false });
     doc.addEventListener('touchstart', function(event) {
+      if (event.__cn1TextTouchRelay) return;
       var el = nativeSelectionElement(event.target);
+      if (event.touches.length > 1 && (touch || el || Array.prototype.some.call(event.touches, function(t) {
+        return !!nativeSelectionElement(t.target);
+      }))) {
+        // Take over the whole sequence, even if the other finger lands on the
+        // canvas. Mark the original before worker listeners see it to avoid
+        // delivering both the original and the canvas relay.
+        touch = { scrolling: true, multi: true };
+        event.__cn1NativeTextGesture = true;
+        event.preventDefault();
+        relayTouch('touchstart', event);
+        return;
+      }
       if (!el) return;
       touch = null;
       if (event.touches.length !== 1) return;
@@ -1973,8 +1988,15 @@
           && (nativeSelectionElement(selected.anchorNode) === el || nativeSelectionElement(selected.focusNode) === el)) return;
       var t = event.touches[0];
       touch = { x: t.clientX, y: t.clientY, at: Date.now(), start: event, scrolling: false };
-    }, { passive: true });
+    }, { passive: false, capture: true });
     doc.addEventListener('touchmove', function(event) {
+      if (event.__cn1TextTouchRelay) return;
+      if (touch && touch.multi) {
+        event.__cn1NativeTextGesture = true;
+        event.preventDefault();
+        relayTouch('touchmove', event);
+        return;
+      }
       if (!touch || !nativeSelectionElement(event.target) || event.touches.length !== 1) return;
       var t = event.touches[0];
       if (!touch.scrolling) {
@@ -1985,17 +2007,18 @@
       }
       event.preventDefault();
       relayTouch('touchmove', event);
-    }, { passive: false });
+    }, { passive: false, capture: true });
     function finishTouch(event) {
-      if (!touch || !nativeSelectionElement(event.target)) return;
+      if (event.__cn1TextTouchRelay || !touch || (!touch.multi && !nativeSelectionElement(event.target))) return;
       if (touch.scrolling) {
+        event.__cn1NativeTextGesture = true;
         event.preventDefault();
         relayTouch(event.type, event);
       }
-      touch = null;
+      if (!touch.multi || event.touches.length === 0) touch = null;
     }
-    doc.addEventListener('touchend', finishTouch, { passive: false });
-    doc.addEventListener('touchcancel', finishTouch, { passive: false });
+    doc.addEventListener('touchend', finishTouch, { passive: false, capture: true });
+    doc.addEventListener('touchcancel', finishTouch, { passive: false, capture: true });
     doc.addEventListener('keydown', function(event) {
       var el = nativeSelectionElement(event.target);
       if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && event.key === 'Tab') {

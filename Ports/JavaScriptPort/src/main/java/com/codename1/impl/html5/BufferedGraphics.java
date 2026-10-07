@@ -1247,7 +1247,7 @@ public class BufferedGraphics extends HTML5Graphics {
     // Shared by text runs and persistent editors: DOM rectangles cannot represent
     // a transformed paint context or a nonrectangular clip.
     boolean supportsNativeTextOverlay() {
-        return !isClipShape && (transform == null || transform.isIdentity());
+        return !clipEmpty && !isClipShape && (transform == null || transform.isIdentity());
     }
 
     /**
@@ -1268,7 +1268,7 @@ public class BufferedGraphics extends HTML5Graphics {
      */
     private boolean promoteToTextLayer(String str, int x, int y) {
         JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
-        if (layer == null || clipEmpty || promotionSuspended || !supportsNativeTextOverlay()) {
+        if (layer == null || promotionSuspended || !supportsNativeTextOverlay()) {
             return false;
         }
         return layer.promote(str, x, y,
