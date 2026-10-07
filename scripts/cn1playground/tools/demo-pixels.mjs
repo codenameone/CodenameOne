@@ -47,3 +47,17 @@ export function sceneChecks(frames, region, kind) {
     animation: frames.every(f => f.foreground > 150) && frames.slice(1).some(f => changedPixels(frames[0], f) > 100)
   };
 }
+
+// Software WebGL can hold its initial frame while shaders/startup work finishes.
+// Keep the pixel oracle strict, but observe movement within a bounded interval.
+export async function sampleSceneFrames(takeFrame, wait, region, kind,
+  {now = Date.now, timeoutMs = 5000, intervalMs = 220} = {}) {
+  const frames = [];
+  const deadline = now() + timeoutMs;
+  do {
+    frames.push(await takeFrame(frames.length));
+    if (frames.length >= 3 && (sceneChecks(frames, region, kind).animation || now() >= deadline)) break;
+    await wait(intervalMs);
+  } while (true);
+  return frames;
+}

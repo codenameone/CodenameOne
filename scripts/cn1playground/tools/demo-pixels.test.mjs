@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {scenePixels, sceneChecks, changedPixels} from './demo-pixels.mjs';
+import {scenePixels, sceneChecks, changedPixels, sampleSceneFrames} from './demo-pixels.mjs';
 
 const region = {x: 120, y: 40, width: 160, height: 240};
 function fixture({blank = false, small = false, outside = false, offset = 0, kind = 'balls'} = {}) {
@@ -52,3 +52,16 @@ test('a disappearing cube is not successful animation', () => {
   const frames = [fixture({kind: 'cube'}), fixture({kind: 'cube', blank: true})];
   assert.equal(sceneChecks(frames, region, 'cube').animation, false);
 });
+
+for (const moving of [true, false]) {
+  test('bounded sampling ' + (moving ? 'accepts delayed startup movement' : 'rejects a permanently frozen cube'), async () => {
+    let elapsed = 0;
+    const frames = await sampleSceneFrames(
+      () => fixture({kind: 'cube', offset: moving && elapsed >= 1100 ? 8 : 0}),
+      async ms => { elapsed += ms; }, region, 'cube', {now: () => elapsed});
+    assert.equal(sceneChecks(frames, region, 'cube').animation, moving);
+    assert.ok(frames.length > 3, 'must observe beyond the old three-frame window');
+    assert.ok(elapsed <= 5220, 'must stop at the bounded deadline');
+    if (!moving) assert.ok(elapsed >= 5000);
+  });
+}

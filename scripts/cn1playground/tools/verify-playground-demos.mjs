@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {scenePixels, changedPixels, sceneChecks} from './demo-pixels.mjs';
+import {scenePixels, changedPixels, sceneChecks, sampleSceneFrames} from './demo-pixels.mjs';
 let chromium, firefox;
 try { ({chromium, firefox} = await import('playwright')); }
 catch { ({chromium, firefox} = await import('@playwright/test')); }
@@ -147,11 +147,9 @@ async function run(slug, title, width, exercise, caseName = slug) {
 async function animatedScene(page, region, name, kind) {
   // Start sampling promptly, while the balls still bounce. Compare only scene
   // foreground pixels so editor carets, status text and other UI cannot pass this.
-  const frames = [];
-  for (let i = 0; i < 3; i++) {
-    frames.push(await measure(page, region, kind, path.join(artifacts, name + '-frame-' + i + '.png')));
-    await page.waitForTimeout(220);
-  }
+  const frames = await sampleSceneFrames(
+    i => measure(page, region, kind, path.join(artifacts, name + '-frame-' + i + '.png')),
+    ms => page.waitForTimeout(ms), region, kind);
   for (const [behavior, ok] of Object.entries(sceneChecks(frames, region, kind))) {
     await check(name + ' ' + behavior, () => assert.ok(ok,
       JSON.stringify(frames.map(({mask, ...metrics}) => metrics))));
