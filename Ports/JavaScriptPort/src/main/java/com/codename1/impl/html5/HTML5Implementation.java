@@ -1236,6 +1236,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final FocusListener focus;
         boolean browserEdit;
         boolean focused;
+        boolean editingSession;
         boolean visible;
         final boolean singleLine;
         String lastValue;
@@ -1353,6 +1354,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         public void run() {
                             focused = true;
                             if (ta.isEditable() && ta.isEnabled()) {
+                                editingSession = true;
                                 currentEditingField = ta;
                                 currentInputField = el;
                                 isEditing = true;
@@ -1384,11 +1386,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         private void completeBlur(String value) {
-            boolean wasEditing = focused || currentInputField == el;
+            boolean wasEditing = editingSession;
+            editingSession = false;
             focused = false;
             releaseEditingOwnership();
-            if (wasEditing && ta.isEditable() && ta.isEnabled()) {
-                commit(value);
+            if (wasEditing) {
+                commit(value, true);
                 Display.getInstance().onEditingComplete(ta, ta.getText());
             }
             ta.repaint();
@@ -1428,7 +1431,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         private boolean acceptsInput(String value) {
-            if (!ta.isEditable() || !ta.isEnabled()) return false;
             // A text input preserves arbitrary programmatic NUMERIC values, unlike
             // type=number. Validate both DOM edits and canvas initiating characters.
             if ((ta.getConstraint() & 0xffff) == TextArea.NUMERIC && !value.equals(ta.getText())) {
@@ -1442,11 +1444,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         private void appendInitiatingText(String suffix) {
             String value = ta.getText() + suffix;
-            if (acceptsInput(value)) ta.setText(value);
+            if (ta.isEditable() && ta.isEnabled() && acceptsInput(value)) ta.setText(value);
         }
 
         private void commit(String value) {
-            if (!ta.isEditable() || !ta.isEnabled()) return;
+            commit(value, false);
+        }
+
+        private void commit(String value, boolean completingSession) {
+            if (!completingSession && (!ta.isEditable() || !ta.isEnabled())) return;
             if (!acceptsInput(value)) {
                 el.setValue(ta.getText());
                 return;
@@ -7171,6 +7177,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private String text;
     private DataChangedListener dataChangedListener;
     private Runnable editingCompleteCallback;
+    private final Map<Form, HTMLInputElement> legacyEditorPaddingOwners = new HashMap<Form, HTMLInputElement>();
+
+    private void restoreLegacyEditorPadding(Form form, HTMLInputElement owner) {
+        if (form != null && legacyEditorPaddingOwners.get(form) == owner) {
+            legacyEditorPaddingOwners.remove(form);
+            form.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+            form.forceRevalidate();
+        }
+    }
     private boolean nextEditPending, prevEditPending;
     
     
@@ -7715,6 +7730,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             tabPrev = false;
             
             final HTMLInputElement finalInputEl = inputEl;
+            final Form editingForm = ta.getComponentForm();
             // We need to resize the canvas whenever the soft keyboard is shown
             
             //inputEl.blur();
@@ -7733,26 +7749,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // We detect the scroll position and then add appropriate
                     // padding to the bottom of the form... then scroll up to the
                     // top again to compensate.
+                    if (inputEl != finalInputEl || editingForm == null
+                            || editingForm != Display.getInstance().getCurrent()) return;
                     vkbHeight = getScrollY_();
-                    Form current = Display.getInstance().getCurrent();
+                    Form current = editingForm;
                     if (!current.isFormBottomPaddingEditingMode()) {
                         //We only re-layout the form if form bottom padding is enabled
                         return;
                     }
                     current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
                     current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, unscaleCoord(vkbHeight));
-
+                    legacyEditorPaddingOwners.put(editingForm, finalInputEl);
 
                     Display.getInstance().callSerially(new Runnable() {
 
                         @Override
                         public void run() {
-                            Display.getInstance().getCurrent().forceRevalidate();
+                            if (inputEl != finalInputEl || editingForm != Display.getInstance().getCurrent()) return;
+                            editingForm.forceRevalidate();
                             finalInputEl.getStyle().setProperty("top", scaleCoord(cmp.getAbsoluteY()+cmp.getScrollY())+"px");
                             finalInputEl.getStyle().setProperty("left", scaleCoord(cmp.getAbsoluteX()+cmp.getScrollX())+"px");
                             //safeSleep(100);
                             scrollToY(0);
-                            Display.getInstance().getCurrent().forceRevalidate();
+                            editingForm.forceRevalidate();
                         }
 
                     });
@@ -7855,6 +7874,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             ((TextField)ta).removeDataChangeListener(dataChangedListener);
                         }
 
+                        // Release only this session's padding on its original form.
+                        // A newer layout on the same form owns its padding independently.
+                        restoreLegacyEditorPadding(editingForm, finalInputEl);
+
                         // A delayed completion belongs to this session, even if a new
                         // editor has already replaced the shared inputEl reference.
                         if (inputEl != finalInputEl) {
@@ -7882,12 +7905,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         //} else {
                         //    text = ta.getText();
                         //}
-
-
-                        Form current = Display.getInstance().getCurrent();
-                        current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                        current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
-                        current.forceRevalidate();
 
 
                         if (pendingTextChanges != null && !pendingTextChanges.equals(ta.getText())) {

@@ -94,7 +94,42 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=ignorepointer") >= 0) {
+        if (query.indexOf("review=completionstate") >= 0) {
+            TextField field = new TextField("Before completion"); field.setName("stateCompletion");
+            boolean initiallyReadonly = query.indexOf("readonly=true") >= 0;
+            field.setEditable(!initiallyReadonly);
+            final int[] completions = new int[1];
+            field.bindProperty("text", (source, property, oldValue, newValue) -> {
+                completions[0]++;
+                status.setText("Completed " + completions[0] + " value " + newValue);
+            });
+            Button readonly = new Button("End as readonly"), disable = new Button("End as disabled");
+            readonly.addActionListener(e -> field.setEditable(false));
+            disable.addActionListener(e -> field.setEnabled(false));
+            Button check = new Button("Check completions");
+            check.addActionListener(e -> status.setText("Completion count " + completions[0]));
+            form.addAll(new Button("Initial focus"), field, readonly, disable, check, status);
+        } else if (query.indexOf("review=legacypadding") >= 0) {
+            form.setFormBottomPaddingEditingMode(true);
+            TextField field = new TextField("Old padded session"); field.setName("oldPaddedSession");
+            Button start = new Button("Start padded editor"); start.addActionListener(e -> field.startEditingAsync());
+            Form next = new Form("Replacement form", BoxLayout.y());
+            TextField replacement = new TextField("Replacement value", "", 80, TextArea.PASSWORD);
+            replacement.setName("paddingReplacement");
+            Label result = new Label("Replacement ready");
+            Button check = new Button("Check original padding");
+            check.addActionListener(e -> result.setText("Original padding "
+                + form.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM)));
+            next.addAll(replacement, check, result);
+            Button swap = new Button("Replace padded session");
+            swap.addActionListener(e -> {
+                next.show();
+                Display.getInstance().callSerially(() -> replacement.startEditingAsync());
+            });
+            com.codename1.ui.util.UITimer.timer(100, true, form, () -> status.setText("Old padding "
+                + form.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM)));
+            form.addAll(new Button("Initial focus"), field, start, swap, status);
+        } else if (query.indexOf("review=ignorepointer") >= 0) {
             Label label = new Label("Ignore pointer label");
             TextArea area = new TextArea("Ignore pointer area", 2, 24); area.setName("ignorePointerArea");
             Button toggle = new Button("Toggle ignored pointers");

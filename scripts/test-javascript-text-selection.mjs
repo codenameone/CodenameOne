@@ -10,11 +10,17 @@ const root = path.resolve(process.argv[2]);
 const artifacts = path.resolve(process.argv[3] || 'artifacts/javascript-text-selection');
 fs.mkdirSync(artifacts, { recursive: true });
 const types = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css' };
+let simulateKeyboardScroll = false;
 const server = http.createServer((req, res) => {
   const file = path.resolve(root, '.' + (req.url.split('?')[0] === '/' ? '/index.html' : req.url.split('?')[0]));
   if (!file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
   fs.readFile(file, (error, data) => {
     res.writeHead(error ? 404 : 200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
+    if (!error && simulateKeyboardScroll && path.basename(file) === 'port.js') {
+      const original = 'scrollTop: function(v) { return v === undefined ? 0 : stub; }';
+      assert.ok(data.toString().includes(original), 'worker scroll shim is present');
+      data = data.toString().replace(original, 'scrollTop: function(v) { return v === undefined ? 140 : stub; }');
+    }
     res.end(error ? 'Not found' : data);
   });
 });
@@ -67,6 +73,46 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    for (const action of ['End as readonly', 'End as disabled']) {
+      await openReview('completionstate');
+      const completing = page.locator('.cn1-selection-editor[name="stateCompletion"]');
+      await completing.click();
+      await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'stateCompletion');
+      // The final native value must be reconciled even if its input event is still pending.
+      await completing.evaluate(el => { el.value = 'Final native value'; });
+      await clickButton(action);
+      await completing.evaluate(el => el.blur());
+      await page.waitForFunction(() => document.body.innerText.includes('Completed 1 value Final native value'));
+      await clickButton('Check completions');
+      await page.waitForFunction(() => document.body.innerText.includes('Completion count 1'));
+    }
+    await openReview('completionstate&readonly=true');
+    const neverEditing = page.locator('.cn1-selection-editor[name="stateCompletion"]');
+    await neverEditing.click();
+    await neverEditing.evaluate(el => el.blur());
+    await clickButton('Check completions');
+    await page.waitForFunction(() => document.body.innerText.includes('Completion count 0'));
+    console.log('PASS', name, 'editing sessions complete once after readonly/disabled changes; readonly focus never completes');
+
+    // The worker jQuery shim has no window scroll and normally reports zero.
+    // Supply the keyboard scroll offset at that platform boundary so the real
+    // legacy layout and completion callbacks exercise nonzero keyboard padding.
+    simulateKeyboardScroll = true;
+    await openReview('legacypadding');
+    await clickButton('Start padded editor');
+    const padded = page.locator('.cn1-edit-string:visible');
+    await padded.waitFor({state: 'visible'});
+    await page.waitForFunction(() => document.activeElement?.value === 'Old padded session');
+    await page.waitForFunction(() => /Old padding [1-9]/.test(document.body.innerText));
+    await page.waitForTimeout(3200); // Let the legacy startup latch settle before switching forms.
+    await clickButton('Replace padded session');
+    await page.waitForFunction(() => document.body.innerText.includes('Replacement form'));
+    await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'paddingReplacement');
+    await clickButton('Check original padding');
+    await page.waitForFunction(() => document.body.innerText.includes('Original padding 0'));
+    console.log('PASS', name, 'legacy keyboard padding is cleared on its original form after replacement');
+    simulateKeyboardScroll = false;
+
     await openReview('ignorepointer');
     const ignoredArea = page.locator('.cn1-selection-editor[name="ignorePointerArea"]');
     for (const ignored of [false, true, false]) {

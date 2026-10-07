@@ -68,7 +68,7 @@ for (const [key, modifiers, owns] of [['s', { ctrlKey: true }, false], ['c', { m
     ['c', {ctrlKey: true, altKey: true, getModifierState: () => false}, false],
     ['@', {ctrlKey: true, altKey: true, getModifierState: key => key === 'AltGraph'}, true],
     ['k', {ctrlKey: true, altKey: true}, false],
-    ['ArrowLeft', { ctrlKey: true }, true], ['a', {}, true], ['Dead', { isComposing: true }, true]]) {
+    ['ArrowLeft', { ctrlKey: true }, true], ['a', {}, true], ['Dead', { isComposing: true }, true], ['Dead', {keyCode: 222}, true]]) {
   callback(Object.assign(event('keydown', text), { key }, modifiers));
   assert.equal(messages.length, owns ? 0 : 1, key + ' keeps the appropriate keyboard owner');
   messages.length = 0;
@@ -76,7 +76,7 @@ for (const [key, modifiers, owns] of [['s', { ctrlKey: true }, false], ['c', { m
 for (const state of ['readOnly', 'disabled']) {
   text[state] = true;
   for (const [key, modifiers, owns] of [['k', {}, false], ['Enter', {}, false], ['Backspace', {}, false],
-      ['Delete', {}, false], ['ArrowLeft', {}, true], ['Tab', {}, true], ['c', {ctrlKey: true}, true],
+      ['Dead', {keyCode: 222}, false], ['Delete', {}, false], ['ArrowLeft', {}, true], ['Tab', {}, true], ['c', {ctrlKey: true}, true],
       ['a', {metaKey: true}, true], ['v', {ctrlKey: true}, false], ['z', {metaKey: true}, false],
       ['@', {ctrlKey: true, altKey: true, getModifierState: () => true}, false]]) {
     for (const type of ['keydown', 'keyup', 'keypress']) {
@@ -104,6 +104,12 @@ for (const readOnly of [false, true]) {
   }
 }
 text.readOnly = false;
+for (const type of ['keydown', 'keyup', 'keypress']) {
+  const dead = Object.assign(event(type, text), {key: 'Dead', keyCode: 222, isComposing: false});
+  callback(dead);
+  assert.equal(messages.length, 0, 'non-composing dead keys remain native-owned');
+  assert.equal(dead.defaultPrevented, false, 'dead-key composition keeps its browser default');
+}
 const listeners = {}, relayed = [];
 const doc = { addEventListener(type, listener) { listeners[type] = listener; },
   getElementById() { return canvas; }, activeElement: null };

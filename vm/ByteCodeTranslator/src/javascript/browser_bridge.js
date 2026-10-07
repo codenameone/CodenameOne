@@ -2020,7 +2020,7 @@
     var key = event.key || '';
     var editable = /^(INPUT|TEXTAREA)$/.test(nativeText.tagName) && !nativeText.readOnly
         && !nativeText.disabled && nativeText.getAttribute('aria-disabled') !== 'true';
-    if (event.isComposing || code === 229) return editable;
+    if (event.isComposing || code === 229 || key === 'Dead') return editable;
     // Selection, navigation and copy remain native even in readonly controls.
     // Editing keys belong to the app unless the native control can edit.
     if (/^(Tab|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(key)
