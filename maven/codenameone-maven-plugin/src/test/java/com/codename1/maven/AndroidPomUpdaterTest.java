@@ -68,6 +68,28 @@ public class AndroidPomUpdaterTest {
     }
 
     @Test
+    public void neverWiresTheGoalIntoALaterPlugin() {
+        String pom = "<project><build><plugins>\n"
+                + "    <plugin>\n"
+                + "        <groupId>com.codenameone</groupId>\n"
+                + "        <artifactId>codenameone-maven-plugin</artifactId>\n"
+                + "    </plugin>\n"
+                + "    <plugin>\n"
+                + "        <artifactId>maven-antrun-plugin</artifactId>\n"
+                + "        <executions>\n"
+                + "        </executions>\n"
+                + "    </plugin>\n"
+                + "</plugins></build></project>\n";
+        AndroidPomUpdater u = new AndroidPomUpdater(pom, false);
+        assertFalse(u.pom.contains("<goal>compile-android-res</goal>"), u.pom);
+        boolean named = false;
+        for (String m : u.manual) {
+            named |= m.contains("compile-android-res");
+        }
+        assertTrue(named, u.manual.toString());
+    }
+
+    @Test
     public void namesWhatAPomWithoutTheAnchorsNeeds() {
         AndroidPomUpdater u = new AndroidPomUpdater("<project><build/></project>", true);
         assertFalse(u.changed);

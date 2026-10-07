@@ -474,6 +474,7 @@ public class View implements Drawable.Callback {
         resolvePaddingStartEnd();
         if (mForeground != null) {
             mForeground.setCallback(this);
+            mForeground.setLayoutDirection(getLayoutDirection());
         }
         if (mBackgroundTint != null && mBackground != null) {
             mBackground.setTintList(mBackgroundTint);
@@ -1742,9 +1743,16 @@ public class View implements Drawable.Callback {
     /// `relayout` is false when the caller lays the subtree out anyway.
     void dispatchLayoutDirectionChanged(boolean relayout) {
         resolvePaddingStartEnd();
-        onRtlPropertiesChanged(getLayoutDirection());
+        int direction = getLayoutDirection();
+        // The background and foreground resolve start/end gravity and
+        // auto-mirroring against their own direction, as on Android.
+        boolean redraw = mBackground != null && mBackground.setLayoutDirection(direction);
+        redraw |= mForeground != null && mForeground.setLayoutDirection(direction);
+        onRtlPropertiesChanged(direction);
         if (relayout) {
             requestLayout();
+            invalidate();
+        } else if (redraw) {
             invalidate();
         }
     }
@@ -1869,6 +1877,7 @@ public class View implements Drawable.Callback {
                 internalSetPadding(padding.left, padding.top, padding.right, padding.bottom);
             }
             background.setCallback(this);
+            background.setLayoutDirection(getLayoutDirection());
             if (background.isStateful()) {
                 background.setState(getDrawableState());
             }
@@ -1937,6 +1946,7 @@ public class View implements Drawable.Callback {
         mForeground = foreground;
         if (foreground != null) {
             foreground.setCallback(this);
+            foreground.setLayoutDirection(getLayoutDirection());
             if (foreground.isStateful()) {
                 foreground.setState(getDrawableState());
             }

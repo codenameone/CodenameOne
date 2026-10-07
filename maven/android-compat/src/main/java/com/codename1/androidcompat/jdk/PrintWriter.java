@@ -86,6 +86,10 @@ public class PrintWriter extends Writer {
 
     @Override
     public void flush() {
+        if (out == null) {
+            trouble = true;
+            return;
+        }
         try {
             out.flush();
         } catch (IOException e) {
@@ -93,17 +97,30 @@ public class PrintWriter extends Writer {
         }
     }
 
+    /// Closes the delegate and drops it, as the JDK does: a later write or
+    /// flush is then suppressed and recorded as an error for `checkError`,
+    /// even when the delegate's own close is a no-op (a `StringWriter`). A
+    /// second close does nothing.
     @Override
     public void close() {
+        if (out == null) {
+            return;
+        }
         try {
             out.close();
         } catch (IOException e) {
             trouble = true;
+        } finally {
+            out = null;
         }
     }
 
     @Override
     public void write(int c) {
+        if (out == null) {
+            trouble = true;
+            return;
+        }
         try {
             out.write(c);
         } catch (IOException e) {
@@ -113,6 +130,10 @@ public class PrintWriter extends Writer {
 
     @Override
     public void write(char[] buf, int off, int len) {
+        if (out == null) {
+            trouble = true;
+            return;
+        }
         try {
             out.write(buf, off, len);
         } catch (IOException e) {
@@ -127,6 +148,10 @@ public class PrintWriter extends Writer {
 
     @Override
     public void write(String s, int off, int len) {
+        if (out == null) {
+            trouble = true;
+            return;
+        }
         try {
             out.write(s, off, len);
         } catch (IOException e) {

@@ -85,7 +85,13 @@ final class AndroidPomUpdater {
         }
         if (p.indexOf("<goal>compile-android-res</goal>") < 0) {
             int plugin = p.indexOf(PLUGIN);
-            int executions = plugin < 0 ? -1 : p.indexOf("<executions>", plugin);
+            // Only this plugin's own executions block: a later plugin's would
+            // otherwise receive a goal it does not have.
+            int pluginEnd = plugin < 0 ? -1 : p.indexOf("</plugin>", plugin);
+            int executions = pluginEnd < 0 ? -1 : p.indexOf("<executions>", plugin);
+            if (executions > pluginEnd) {
+                executions = -1;
+            }
             if (executions < 0) {
                 manual.add("an execution of compile-android-res in the codenameone-maven-plugin:\n" + EXECUTION);
             } else {

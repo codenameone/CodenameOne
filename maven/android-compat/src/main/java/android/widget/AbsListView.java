@@ -107,6 +107,10 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
     private int mChoiceMode = CHOICE_MODE_NONE;
     private SparseBooleanArray mCheckStates;
     private int mCheckedItemCount;
+    /// The row id of every checked position, kept only while the adapter has
+    /// stable ids. Positions alone cannot survive a reorder or removal, so
+    /// [#handleDataChanged()] re-derives the positional checks from these.
+    private final HashMap<Long, Boolean> mCheckedIds = new HashMap<Long, Boolean>();
     private int mTranscriptMode;
     private boolean mStackFromBottom;
     private boolean mTextFilterEnabled;
@@ -197,6 +201,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
             mCheckStates.clear();
             mCheckedItemCount = 0;
         }
+        mCheckedIds.clear();
         mDataChanged = true;
         updateEmptyStatus();
         requestLayout();
@@ -222,6 +227,42 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
         if (mTranscriptMode == TRANSCRIPT_MODE_ALWAYS_SCROLL && mItemCount > 0) {
             mSyncPosition = mItemCount - 1;
             mSyncTop = Integer.MIN_VALUE;
+        }
+        reconcileCheckStates();
+    }
+
+    /// Moves the checks to where their rows are now. With stable ids every
+    /// checked id is looked up in the new data and a removed one is dropped;
+    /// without them a position past the end is dropped, since it names no row
+    /// and would send [#getCheckedItemIds()] past the adapter.
+    private void reconcileCheckStates() {
+        if (mCheckStates == null || mCheckStates.size() == 0) {
+            return;
+        }
+        ListAdapter adapter = mAdapter;
+        if (adapter != null && adapter.hasStableIds()) {
+            mCheckStates.clear();
+            mCheckedItemCount = 0;
+            HashMap<Long, Boolean> found = new HashMap<Long, Boolean>();
+            for (int pos = 0; pos < mItemCount && found.size() < mCheckedIds.size(); pos++) {
+                Long id = Long.valueOf(adapter.getItemId(pos));
+                if (mCheckedIds.containsKey(id) && !found.containsKey(id)) {
+                    found.put(id, Boolean.TRUE);
+                    mCheckStates.put(pos, true);
+                    mCheckedItemCount++;
+                }
+            }
+            mCheckedIds.clear();
+            mCheckedIds.putAll(found);
+            return;
+        }
+        for (int i = mCheckStates.size() - 1; i >= 0; i--) {
+            if (mCheckStates.keyAt(i) >= mItemCount) {
+                if (mCheckStates.valueAt(i)) {
+                    mCheckedItemCount--;
+                }
+                mCheckStates.removeAt(i);
+            }
         }
     }
 
@@ -917,10 +958,13 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
         if (mChoiceMode == CHOICE_MODE_SINGLE) {
             if (value) {
                 mCheckStates.clear();
+                mCheckedIds.clear();
                 mCheckStates.put(position, true);
                 mCheckedItemCount = 1;
+                recordCheckedId(position, true);
             } else if (mCheckStates.get(position)) {
                 mCheckStates.clear();
+                mCheckedIds.clear();
                 mCheckedItemCount = 0;
             }
         } else {
@@ -929,11 +973,24 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
             if (old != value) {
                 mCheckedItemCount += value ? 1 : -1;
             }
+            recordCheckedId(position, value);
         }
         for (int i = 0; i < getChildCount(); i++) {
             applyCheckState(getChildAt(i), mFirstPosition + i);
         }
         invalidate();
+    }
+
+    private void recordCheckedId(int position, boolean checked) {
+        if (mAdapter == null || !mAdapter.hasStableIds() || position < 0 || position >= mItemCount) {
+            return;
+        }
+        Long id = Long.valueOf(mAdapter.getItemId(position));
+        if (checked) {
+            mCheckedIds.put(id, Boolean.TRUE);
+        } else {
+            mCheckedIds.remove(id);
+        }
     }
 
     public boolean isItemChecked(int position) {
@@ -976,6 +1033,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
         if (mCheckStates != null) {
             mCheckStates.clear();
         }
+        mCheckedIds.clear();
         mCheckedItemCount = 0;
         for (int i = 0; i < getChildCount(); i++) {
             applyCheckState(getChildAt(i), mFirstPosition + i);
