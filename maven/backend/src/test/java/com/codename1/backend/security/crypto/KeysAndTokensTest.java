@@ -255,7 +255,7 @@ class KeysAndTokensTest {
         assertThrows(IOException.class, () -> Der.ecdsaDerToJose(new byte[] {1, 2, 3}, 32));
         // Trailing bytes after the two numbers are not a signature.
         byte[] trailing = Der.ecdsaJoseToDer(rs);
-        trailing[1] += 2;
+        trailing[1] = (byte) (trailing[1] + 2);
         byte[] longer = new byte[trailing.length + 2];
         System.arraycopy(trailing, 0, longer, 0, trailing.length);
         longer[trailing.length] = 0x05;

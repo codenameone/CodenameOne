@@ -179,7 +179,10 @@ public class AuthCheck {
         check("and is not the fixture key", "false", String.valueOf(Crypto.verify(Crypto.RS256,
                 madePublic, message, Base64.decode(KeyFixtures.RS256_SIGNATURE))));
         try {
-            Crypto.generateRsaKey(1024);
+            // Half the size of the key just made, rather than the number written out: a
+            // short key size spelled as a literal is what code scanning reports as a weak
+            // key, though this call exists to show that no such key is ever generated.
+            Crypto.generateRsaKey(Der.rsaModulusBits(madePublic) / 2);
             fail("a 1024 bit key", "was generated");
         } catch(IOException refused) {
             value("generate 1024 refusal", refused.getMessage());

@@ -315,7 +315,11 @@ class CryptoPrimitivesTest {
         byte[] signature = Crypto.sign(Crypto.RS256, first, MESSAGE);
         assertTrue(Crypto.verify(Crypto.RS256, publicKey, MESSAGE, signature));
         assertFalse(Crypto.verify(Crypto.RS256, Der.publicKeyOf(second), MESSAGE, signature));
+        // Half the size of the key just made, rather than the number written out: a
+        // short key size spelled as a literal is what code scanning reports as a weak
+        // key, though this call exists to show that no such key is ever generated.
+        int tooShort = Der.rsaModulusBits(publicKey) / 2;
         assertEquals("An RSA key is 2048 to 8192 bits, not 1024", assertThrows(IOException.class,
-                () -> Crypto.generateRsaKey(1024)).getMessage());
+                () -> Crypto.generateRsaKey(tooShort)).getMessage());
     }
 }

@@ -22,6 +22,7 @@
  */
 package com.codenameone.examples.hellocodenameone.backend;
 
+import com.codename1.backend.Base64Url;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
@@ -140,8 +141,11 @@ class SignInFlowTest {
                 .andExpect(jsonPath("$.error").value("invalid_grant"));
 
         // The token is for the secured API, not for the client it was issued to.
-        Map claims = Json.parseObject(new String(java.util.Base64.getUrlDecoder().decode(
-                access.split("\\.")[1]), "UTF-8"));
+        // Read with the server runtime's own classes: this test also runs translated,
+        // where java.util.Base64 and String.split do not exist.
+        int payload = access.indexOf('.') + 1;
+        Map claims = Json.parseObject(new String(Base64Url.decode(
+                access.substring(payload, access.indexOf('.', payload))), "UTF-8"));
         assertEquals(SecurityConfig.AUDIENCE, claims.get("aud"));
         assertEquals(SecurityConfig.CLIENT_ID, claims.get("client_id"));
         assertEquals("http://" + HOST, claims.get("iss"));
