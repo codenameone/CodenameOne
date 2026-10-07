@@ -135,6 +135,8 @@ dependency-reduced-pom.xml
 /.playwright-cli
 package-lock.json
 package.json
+!/scripts/package.json
+!/scripts/package-lock.json
 .claude/
 
 # Local screenshot/perf bench output

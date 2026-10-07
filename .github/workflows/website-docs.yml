@@ -365,7 +365,7 @@ jobs:
         run: |
           set -euo pipefail
           cd scripts
-          npm install playwright
+          npm ci
           bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
           npx playwright install-deps chromium firefox
           npx playwright install chromium firefox
