@@ -1146,7 +1146,7 @@ is an address.
 The authorization endpoint returns `login_required` for `prompt=login`,
 `max_age=0`, or a session whose last credential check is older than `max_age`.
 It also refuses a bounded-age request when the session has no recorded sign-in
-time. The relying party must arrange a fresh sign-in before retrying. The
+time. The client must arrange a fresh sign-in before retrying. The
 server issues no code when fresh authentication is required. A completed sign-in
 updates `auth_time`, including a sign-in completed with a second factor.
 
