@@ -303,7 +303,11 @@ class HTML5GLSurface extends HTML5Peer {
         // 0 size so initialized stays false, so this never synced the real size).
         if (!contextLost) {
             syncSize();
-            requestRender();
+            // A continuous frame may have fired before attachment and parked
+            // because the form was not current yet. requestRender() skips
+            // continuous surfaces, so a resize must explicitly paint once;
+            // paint() then restarts the loop when the surface is live.
+            repaint();
         }
     }
 

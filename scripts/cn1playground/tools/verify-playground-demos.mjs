@@ -33,6 +33,13 @@ const gpuReattachCode = sampleSource.match(/static final String GPU_SCRIPT = """
     });
     form.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(detach, attach));
     form.show();`);
+const gpuEarlyAttachCode = gpuReattachCode.replace('form.show();', `
+    form.show();
+    // Force a continuous frame while detached. Its callback must park before
+    // the first on-screen layout and the later attach must wake the surface.
+    form.removeComponent(view);
+    view.setContinuous(true);
+    form.revalidate();`);
 
 async function measure(page, region, kind, screenshotPath) {
   const clip = {x: Math.floor(region.x), y: Math.floor(region.y),
@@ -294,6 +301,26 @@ try {
         const width = viewport.width;
         await run('bouncing-balls', 'Bouncing Balls', width, (p, r, n) => animatedScene(p, r, n, 'balls'));
         await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'));
+        if (browserName === 'chromium' && deviceScaleFactor === 2 && width === 1280) {
+          await run('3d-gpu', '3D / GPU', width, async (p, r, n) => {
+            await p.waitForTimeout(1000);
+            r = await preview(p, '3D / GPU');
+            const controls = await appFrame.getByRole('button', {name: 'Attach GPU', exact: true}).boundingBox();
+            r.height = controls.y - r.y - 12;
+            await clickControl(p, 'Attach GPU');
+            // Attachment paints asynchronously. The first screenshot may still
+            // show the detached form, so establish a visible first frame before
+            // checking that the restarted loop keeps drawing.
+            const deadline = Date.now() + 10000;
+            let attached;
+            do {
+              await p.waitForTimeout(100);
+              attached = await measure(p, r, 'cube');
+            } while (attached.foreground <= 150 && Date.now() < deadline);
+            assert.ok(attached.foreground > 150, 'Early-attached GPU scene did not become visible');
+            await animatedScene(p, r, n, 'cube');
+          }, '3d-gpu-early-attach', gpuEarlyAttachCode);
+        }
         await run('3d-gpu', '3D / GPU', width, async (p, r, n) => {
           await p.waitForTimeout(500);
           r = await preview(p, '3D / GPU');
