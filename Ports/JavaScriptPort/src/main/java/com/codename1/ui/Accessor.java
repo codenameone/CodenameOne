@@ -31,7 +31,7 @@ public class Accessor {
         // subclasses: only the known built-in editors are safe to promote.
         if (c == null) return false;
         for (Container parent = c.getParent(); parent != null; parent = parent.getParent()) {
-            if (parent.isFocusable() || parent.isGrabsPointerEvents()) return false;
+            if (parent.isFocusable() || parent.isGrabsPointerEvents() || parent.isDraggable()) return false;
         }
         return (!(c instanceof Label) || c.getClass() == Label.class && !c.isFocusable())
                 && (!(c instanceof TextArea) || c.getClass() == TextArea.class || c.getClass() == TextField.class)

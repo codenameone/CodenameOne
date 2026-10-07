@@ -94,7 +94,24 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=dynamicdrag") >= 0) {
+        if (query.indexOf("review=accessiblelabels") >= 0) {
+            TextArea area = new TextArea("Field content"); area.setName("internalFieldName"); area.setHint("Fallback hint");
+            area.setAccessibilityText("Configured accessible label");
+            Button semantics = new Button("Set semantic label"), associated = new Button("Use associated label"), clear = new Button("Clear accessible label");
+            semantics.addActionListener(e -> area.getSemantics().setLabel("Updated semantic label"));
+            associated.addActionListener(e -> { area.setAccessibilityText(null); area.setLabelForComponent(new Label("Associated label")); });
+            clear.addActionListener(e -> { area.setAccessibilityText(null); area.setLabelForComponent(null); });
+            form.addAll(area, semantics, associated, clear);
+        } else if (query.indexOf("review=defaultselection") >= 0) {
+            Label defaultLabel = new Label("Default selection label");
+            Label explicitOn = new Label("Explicit selection on"); explicitOn.setTextSelectionEnabled(true);
+            Label explicitOff = new Label("Explicit selection off"); explicitOff.setTextSelectionEnabled(false);
+            TextArea area = new TextArea("Default readonly selection"); area.setEditable(false); area.setName("defaultSelectionArea");
+            Button enable = new Button("Enable default selection"), disable = new Button("Disable default selection");
+            enable.addActionListener(e -> TextSelection.setDefaultSelectable(true));
+            disable.addActionListener(e -> TextSelection.setDefaultSelectable(false));
+            form.addAll(enable, defaultLabel, explicitOn, explicitOff, area, disable);
+        } else if (query.indexOf("review=dynamicdrag") >= 0) {
             Label label = new Label("Dynamic drag label");
             TextArea area = new TextArea("Dynamic drag area"); area.setName("dynamicDragArea");
             Button enable = new Button("Enable dragging"), disable = new Button("Disable dragging");
@@ -146,11 +163,13 @@ public class JavaScriptSelectionApp extends Lifecycle {
             Label label = new Label("Ancestor owned label");
             Container parent = BoxLayout.encloseY(label);
             parent.addPointerPressedListener(e -> status.setText("Parent pressed"));
-            Button grab = new Button("Grab pointer"), focus = new Button("Focusable parent"), reset = new Button("Release pointer");
+            TextArea area = new TextArea("Ancestor owned area"); area.setName("ancestorOwnedArea"); parent.add(area);
+            Button grab = new Button("Grab pointer"), focus = new Button("Focusable parent"), drag = new Button("Draggable parent"), reset = new Button("Release pointer");
             grab.addActionListener(e -> parent.setGrabsPointerEvents(true));
             focus.addActionListener(e -> parent.setFocusable(true));
-            reset.addActionListener(e -> { parent.setGrabsPointerEvents(false); parent.setFocusable(false); });
-            form.addAll(parent, grab, focus, reset, status);
+            drag.addActionListener(e -> parent.setDraggable(true));
+            reset.addActionListener(e -> { parent.setGrabsPointerEvents(false); parent.setFocusable(false); parent.setDraggable(false); });
+            form.addAll(parent, grab, focus, drag, reset, status);
         } else if (query.indexOf("review=keyboardpadding") >= 0) {
             TextArea area = new TextArea("Keyboard layout"); area.setName("paddingArea");
             Button enable = new Button("Enable keyboard padding"), disable = new Button("Disable keyboard padding");
@@ -466,7 +485,25 @@ public class JavaScriptSelectionApp extends Lifecycle {
             area.addScrollListener((x, y, oldX, oldY) -> position.setText("Scroll Y " + y));
             Button reset = new Button("Reset scroll");
             reset.addActionListener(e -> com.codename1.ui.Accessor.setNativeTextScrollY(area, 0));
+            if (query.indexOf("interactive=true") >= 0) form.add(new Button("Initial focus"));
             form.addAll(area, position, reset);
+            if (query.indexOf("interactive=true") >= 0) {
+                area.setRTL(query.indexOf("rtl=true") >= 0);
+                Button configure = new Button("Configure scrollbar");
+                configure.addActionListener(e -> {
+                    java.util.Hashtable props = new java.util.Hashtable();
+                    props.put("@interactiveScrollBool", "true");
+                    props.put("DesktopScroll.padding", "0,0,8,8");
+                    props.put("DesktopScroll.padUnit", new byte[] {0, 0, 0, 0});
+                    com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(props);
+                    com.codename1.ui.plaf.UIManager.getInstance().getLookAndFeel().setFadeScrollBar(false);
+                    form.refreshTheme(); form.revalidate();
+                    com.codename1.ui.util.UITimer.timer(25, true, form, () -> {
+                        if (area.isVScrollThumbGrabbed()) status.setText("Thumb grabbed");
+                    });
+                });
+                form.addAll(configure, status);
+            }
         } else {
             Label normal = new Label("Plain selectable label");
             Label custom = new Label("Custom pointer label") {

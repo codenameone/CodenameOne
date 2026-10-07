@@ -1256,7 +1256,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             el.setAttribute("class", "cn1-native-selection cn1-selection-editor");
             el.setAttribute("data-cn1-native-selection", "true");
             el.setAttribute("data-cn1-single-line", ta.isSingleLineTextArea() ? "true" : "false");
-            el.setAttribute("aria-label", ta.getName() == null ? ta.getHint() : ta.getName());
             el.setTabIndex(-1); // updated with visibility and CN1 focusability
             updateConstraints();
             el.getStyle().setProperty("display", "none");
@@ -1352,14 +1351,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
             });
         }
 
-        private void updateConstraints() {
-            String accessibleName = ta.getName();
+        private void updateAccessibleName() {
+            String accessibleName = ta.getSemantics().getLabel();
+            if ((accessibleName == null || accessibleName.length() == 0) && ta.getLabelForComponent() != null) {
+                accessibleName = ta.getLabelForComponent().getText();
+            }
+            if (accessibleName == null || accessibleName.length() == 0) accessibleName = ta.getName();
             if (accessibleName == null || accessibleName.length() == 0) accessibleName = ta.getHint();
             if (accessibleName == null) accessibleName = "";
             if (!accessibleName.equals(lastAccessibleName)) {
                 el.setAttribute("aria-label", accessibleName);
                 lastAccessibleName = accessibleName;
             }
+        }
+
+        private void updateConstraints() {
+            updateAccessibleName();
             Object autocomplete = ta.getClientProperty("cn1$autocomplete");
             String override = autocomplete == null ? null : autocomplete.toString();
             String name = ta.getName() == null ? "" : ta.getName();
@@ -1413,6 +1420,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // The DOM viewport stays fixed; scrollTop moves its contents.
             int x = ta.getAbsoluteX() + ta.getScrollX(), y = ta.getAbsoluteY() + ta.getScrollY();
             int left = x, top = y, right = x + ta.getWidth(), bottom = y + ta.getHeight();
+            // CN1 paints and handles its own interactive scrollbar. Keep that
+            // strip on the canvas, without changing native text layout or wrapping.
+            if (!singleLine && ta.getUIManager().getLookAndFeel().isInteractiveScroll() && ta.getSideGap() > 0) {
+                int border = ta.getStyle().getBorder() == null ? 0 : ta.getStyle().getBorder().getThickness();
+                if (ta.isRTL()) left += ta.getSideGap() + border;
+                else right -= ta.getSideGap() + border;
+            }
             for (Container parent = ta.getParent(); parent != null; parent = parent.getParent()) {
                 left = Math.max(left, parent.getAbsoluteX() + parent.getScrollX());
                 top = Math.max(top, parent.getAbsoluteY() + parent.getScrollY());
@@ -4809,6 +4823,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void accessibilityTreeChanged(int changeType) {
+        // Semantic label setters need not repaint the component. Refresh the
+        // visible editor as well as the hidden semantic tree on these mutations.
+        for (SelectionTextOverlay overlay : selectionTextOverlays) overlay.updateAccessibleName();
         if (accessibilityContainer == null || !semanticOverlayEnabled) {
             return;
         }

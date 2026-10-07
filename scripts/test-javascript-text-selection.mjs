@@ -67,6 +67,59 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('accessiblelabels');
+    const namedEditor = page.locator('.cn1-selection-editor[name="internalFieldName"]');
+    for (const [action, label] of [[null, 'Configured accessible label'], ['Set semantic label', 'Updated semantic label'],
+      ['Use associated label', 'Associated label'], ['Clear accessible label', 'internalFieldName']]) {
+      if (action) await clickButton(action);
+      await page.waitForFunction(label => document.querySelector('.cn1-selection-editor[name="internalFieldName"]')?.getAttribute('aria-label') === label, label);
+      assert.equal(await namedEditor.inputValue(), 'Field content');
+    }
+    console.log('PASS', name, 'native editor accessible names follow explicit and semantic labels and associated labels');
+
+    await openReview('defaultselection');
+    for (const enabled of [false, true, false, true]) {
+      await clickButton(enabled ? 'Enable default selection' : 'Disable default selection');
+      await page.waitForFunction(enabled => [...document.querySelectorAll('#cn1-text-layer span')]
+        .some(el => el.textContent === 'Default selection label' && (getComputedStyle(el).pointerEvents === 'auto') === enabled), enabled);
+      await page.locator('.cn1-selection-editor[name="defaultSelectionArea"]').waitFor({state: enabled ? 'visible' : 'hidden'});
+      for (const [text, expected] of [['Explicit selection on', 'auto'], ['Explicit selection off', 'none']]) {
+        assert.equal(await page.locator('#cn1-text-layer span').filter({hasText: new RegExp('^' + text + '$')})
+          .evaluate(el => getComputedStyle(el).pointerEvents), expected);
+      }
+    }
+    console.log('PASS', name, 'default selection policy refreshes static labels and readonly editors while preserving overrides');
+
+    if (!mobile) for (const rtl of [false, true]) for (const drag of [true, false]) {
+      await openReview('scroll&interactive=true&rtl=' + rtl);
+      await clickButton('Configure scrollbar');
+      const scrolling = page.locator('.cn1-selection-editor[name="reviewScroll"]');
+      await scrolling.waitFor({state: 'visible'});
+      await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[name="reviewScroll"]').scrollTop === 0);
+      await page.waitForFunction(rtl => {
+        const css = getComputedStyle(document.querySelector('.cn1-selection-editor[name="reviewScroll"]'));
+        const inset = css.clipPath.match(/[\d.]+/g)?.map(Number);
+        return inset && (rtl ? inset[3] : inset[1]) > 0;
+      }, rtl);
+      const gutter = await scrolling.evaluate((el, rtl) => {
+        const box = el.getBoundingClientRect(), inset = getComputedStyle(el).clipPath.match(/[\d.]+/g).map(Number);
+        return {x: rtl ? box.left + inset[3] / 2 : box.right - inset[1] / 2, top: box.top, bottom: box.bottom};
+      }, rtl);
+      assert.equal(await page.evaluate(g => document.elementFromPoint(g.x, g.top + 10).tagName, gutter), 'CANVAS');
+      if (drag) {
+        await page.mouse.move(gutter.x, gutter.top + 10);
+        await page.mouse.down();
+        await page.waitForFunction(() => document.body.innerText.includes('Thumb grabbed'));
+        await page.mouse.move(gutter.x, gutter.bottom - 25, {steps: 10});
+        await page.mouse.up();
+      } else {
+        await page.mouse.click(gutter.x, gutter.bottom - 10);
+      }
+      await page.waitForFunction(() => /Scroll Y [1-9]/.test(document.body.innerText));
+      await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[name="reviewScroll"]').scrollTop > 0);
+    }
+    console.log('PASS', name, 'interactive scrollbar thumb and track stay reachable in LTR and RTL');
+
     await openReview('dynamicdrag');
     const dragArea = page.locator('.cn1-selection-editor[aria-label="dynamicDragArea"]');
     await dragArea.waitFor({state: 'visible'});
@@ -147,11 +200,12 @@ async function exercise(context, name, host, mobileDevice = null) {
     await dynamic.waitFor({state: 'visible'});
     console.log('PASS', name, 'password and done listener changes immediately re-evaluate editor eligibility');
 
-    for (const action of ['Grab pointer', 'Focusable parent']) {
+    for (const action of ['Grab pointer', 'Focusable parent', 'Draggable parent']) {
       await openReview('ancestorownership');
       const ownedLabel = page.locator('#cn1-text-layer span').filter({hasText: /^Ancestor owned label$/});
       for (const ownsPointer of [true, false, true]) {
         await clickButton(ownsPointer ? action : 'Release pointer');
+        await page.locator('.cn1-selection-editor[name="ancestorOwnedArea"]').waitFor({state: ownsPointer ? 'hidden' : 'visible'});
         await page.waitForFunction(owns => [...document.querySelectorAll('#cn1-text-layer span')]
           .some(el => el.textContent === 'Ancestor owned label' && (getComputedStyle(el).pointerEvents === 'none') === owns), ownsPointer);
       }

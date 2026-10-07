@@ -481,7 +481,15 @@ public class TextSelection {
     ///
     /// - `selectable`: true to make read-only text selectable by default
     public static void setDefaultSelectable(boolean selectable) {
+        boolean changed = defaultSelectable != selectable;
         defaultSelectable = selectable;
+        if (changed && Display.isInitialized()) {
+            Form current = Display.getInstance().getCurrent();
+            if (current != null) {
+                current.repaint();
+            }
+            Desktop.getInstance().repaintWindows();
+        }
     }
 
     /// Whether read-only text is selectable by default. See `#setDefaultSelectable(boolean)`.
