@@ -1,0 +1,27 @@
+{
+ "pr": 5961,
+ "rebaseline": {
+  "linux-x64@intel-xeon-platinum-8370c": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.504,
+      "time": 3.142,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.504,
+     "reason": "Correct the stale Linux Xeon Platinum 8370C allocation time baseline using two independent hosted runs: PR 5952 run 37587913086 (1.213581x) and PR 5961 run 37676523616 (1.201540x). The benchmark, allocator runtime, and measurement harness are unchanged between them; this is not a security-feature speedup. Preserve the existing 50% time tolerance and the memory baseline.",
+     "runs": 2,
+     "time": 1.208,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
+  }
+ }
+}
