@@ -9698,6 +9698,11 @@ public class Component implements Animation, StyleListener, Editable {
         return "Unknown: " + name;
     }
 
+    // Port accessors use this to keep live native controls out of cached snapshots.
+    final boolean isPaintLocked() {
+        return paintLockImage != null;
+    }
+
     /// Releases the paint lock image to allow paint to work as usual, see paintLock(boolean)
     /// for details
     public void paintLockRelease() {

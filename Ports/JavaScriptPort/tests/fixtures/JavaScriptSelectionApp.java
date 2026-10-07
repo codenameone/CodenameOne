@@ -43,6 +43,7 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 || font.charWidth('M') <= 0 || font.charsWidth(new char[] {'M'}, 0, 1) <= 0) {
             throw new IllegalStateException("Default font metrics failed");
         }
+        if (query.indexOf("review=paintlock") >= 0) Display.getInstance().setProperty("paintLockEnabled", "true");
         super.init(context);
     }
 
@@ -84,11 +85,11 @@ public class JavaScriptSelectionApp extends Lifecycle {
 
     private void showReviewFixture(String query) {
         final Label status = new Label("Shortcut ready");
-        Form form = new Form("Review regressions", BoxLayout.y()) {
-            public void pointerDragged(int[] x, int[] y) {
-                if (query.indexOf("review=multitouch") >= 0 && x.length > 1) status.setText("Multitouch received " + x.length);
-                super.pointerDragged(x, y);
-            }
+        Form form = query.indexOf("review=pointeroverride") >= 0 ? new Form("Pointer overrides", BoxLayout.y()) {
+            public void pointerPressed(int x, int y) { status.setText("Override pressed"); super.pointerPressed(x, y); }
+            public void pointerReleased(int x, int y) { status.setText("Override released"); super.pointerReleased(x, y); }
+            public void pointerDragged(int[] x, int[] y) { status.setText("Override dragged"); super.pointerDragged(x, y); }
+        } : new Form("Review regressions", BoxLayout.y()) {
             public void keyReleased(int keyCode) {
                 // Application-level shortcuts can consume the key before it is
                 // interpreted as input by the focused TextField.
@@ -98,7 +99,31 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=ancestorglass") >= 0) {
+        if (query.indexOf("review=pointeroverride") >= 0) {
+            Label label = new Label("Overridden pointer label");
+            TextArea area = new TextArea("Overridden pointer editor", 2, 24); area.setName("overrideEditor");
+            form.addAll(new Button("Initial focus"), label, area, status);
+        } else if (query.indexOf("review=inputdevice") >= 0) {
+            final int[] closed = new int[3];
+            try { form.setCurrentInputDevice(() -> closed[0]++); } catch (Exception ex) { throw new RuntimeException(ex); }
+            TextField first = new TextField("Device first"); first.setName("deviceFirst");
+            TextField second = new TextField("Device second"); second.setName("deviceSecond");
+            first.addCloseListener(e -> closed[1]++); second.addCloseListener(e -> closed[2]++);
+            Button check = new Button("Check closed devices");
+            check.addActionListener(e -> status.setText("Devices closed " + closed[0] + "," + closed[1] + "," + closed[2]));
+            Button replace = new Button("Replace input device");
+            replace.addActionListener(e -> { try { form.setCurrentInputDevice(() -> {}); } catch (Exception ex) { throw new RuntimeException(ex); } });
+            form.addAll(new Button("Initial focus"), first, second, check, replace, status);
+        } else if (query.indexOf("review=paintlock") >= 0) {
+            Container parent = new Container(BoxLayout.y());
+            parent.getAllStyles().setBgTransparency(255);
+            TextArea area = new TextArea("Locked snapshot editor", 2, 24); area.setName("lockedEditor");
+            parent.add(area);
+            Button lock = new Button("Lock snapshot"), release = new Button("Release snapshot");
+            lock.addActionListener(e -> { parent.paintLock(true); parent.repaint(); });
+            release.addActionListener(e -> { parent.paintLockRelease(); parent.repaint(); });
+            form.addAll(new Button("Initial focus"), parent, lock, release);
+        } else if (query.indexOf("review=ancestorglass") >= 0) {
             final boolean[] covered = new boolean[1];
             TextArea area = new TextArea("Ancestor glass text", 2, 24); area.setName("glassEditor");
             Container parent = new Container(BoxLayout.y()) {
@@ -158,6 +183,7 @@ public class JavaScriptSelectionApp extends Lifecycle {
             Container painter = new Container(BoxLayout.y()) {
                 public void paint(Graphics g) {
                     Transform saved = g.getTransform();
+                    int alpha = g.getAlpha();
                     g.pushClip();
                     try {
                         if (mode[0] == 1) {
@@ -172,16 +198,18 @@ public class JavaScriptSelectionApp extends Lifecycle {
                         } else if (mode[0] == 4) {
                             g.clipRect(getX(), getY(), getWidth() / 2, getHeight());
                         }
+                        if (mode[0] == 5) g.setAlpha(0);
+                        if (mode[0] == 6) g.setAlpha(100);
                         super.paint(g);
                     } finally {
-                        g.setTransform(saved); g.popClip();
+                        g.setAlpha(alpha); g.setTransform(saved); g.popClip();
                     }
                 }
             };
             TextArea area = new TextArea("Context painted value", 2, 24); area.setName("paintContextArea");
             painter.add(area); painter.setPreferredH(120);
             form.addAll(new Button("Initial focus"), painter);
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < 7; i++) {
                 final int value = i;
                 Button change = new Button("Paint mode " + i);
                 change.addActionListener(e -> { mode[0] = value; form.repaint(); });
@@ -239,6 +267,22 @@ public class JavaScriptSelectionApp extends Lifecycle {
             Button check = new Button("Check completions");
             check.addActionListener(e -> status.setText("Completion count " + completions[0]));
             form.addAll(new Button("Initial focus"), field, readonly, disable, check, status);
+        } else if (query.indexOf("review=legacysuperseded") >= 0) {
+            TextField first = new TextField("Retired session", "", 80, TextArea.PASSWORD);
+            TextArea second = new TextArea("Replacement session", 2, 24, TextArea.PASSWORD);
+            first.setName("retiredLegacy"); second.setName("replacementLegacy");
+            Button start = new Button("Start retired session"); start.addActionListener(e -> first.startEditingAsync());
+            Button swap = new Button("Supersede legacy session");
+            // Two stop requests queue completion and release the editing guard,
+            // allowing a replacement before the queued callback drains.
+            swap.addActionListener(e -> {
+                com.codename1.impl.html5.HTML5Implementation impl = com.codename1.impl.html5.HTML5Implementation.getInstance();
+                impl.stopTextEditing(); impl.stopTextEditing();
+                impl.editString(second, second.getMaxSize(), second.getConstraint(), second.getText(), 0);
+            });
+            Button mutate = new Button("Mutate superseded model");
+            mutate.addActionListener(e -> { first.setText("Changed after completion"); status.setText("Superseded model changed"); });
+            form.addAll(new Button("Initial focus"), first, second, start, swap, mutate, status);
         } else if (query.indexOf("review=legacypadding") >= 0) {
             form.setFormBottomPaddingEditingMode(true);
             TextField field = new TextField("Old padded session"); field.setName("oldPaddedSession");
@@ -250,7 +294,9 @@ public class JavaScriptSelectionApp extends Lifecycle {
             Button check = new Button("Check original padding");
             check.addActionListener(e -> result.setText("Original padding "
                 + form.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM)));
-            next.addAll(replacement, check, result);
+            Button mutate = new Button("Mutate retired editor");
+            mutate.addActionListener(e -> { field.setText("Retired model changed"); result.setText("Retired model mutated"); });
+            next.addAll(replacement, check, mutate, result);
             Button swap = new Button("Replace padded session");
             swap.addActionListener(e -> {
                 next.show();
@@ -496,9 +542,9 @@ public class JavaScriptSelectionApp extends Lifecycle {
             TextArea area = new TextArea("Fading field"); area.setName("opacityArea");
             Container parent = BoxLayout.encloseY(area);
             Button fade = new Button("Fade field"), ancestor = new Button("Fade ancestor"), reset = new Button("Reset opacity");
-            fade.addActionListener(e -> area.getAllStyles().setOpacity(100));
-            ancestor.addActionListener(e -> parent.getAllStyles().setOpacity(100));
-            reset.addActionListener(e -> { area.getAllStyles().setOpacity(255); parent.getAllStyles().setOpacity(255); });
+            fade.addActionListener(e -> { area.getAllStyles().setOpacity(100); form.repaint(); });
+            ancestor.addActionListener(e -> { parent.getAllStyles().setOpacity(100); form.repaint(); });
+            reset.addActionListener(e -> { area.getAllStyles().setOpacity(255); parent.getAllStyles().setOpacity(255); form.repaint(); });
             form.addAll(parent, fade, ancestor, reset);
         } else if (query.indexOf("review=uniqueeditor") >= 0) {
             TextArea area = new TextArea("Single accessible field"); area.setName("uniqueEditor");

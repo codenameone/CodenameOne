@@ -1035,6 +1035,33 @@ bindNative([
   return null;
 });
 
+// Native text must not swallow pointer overrides on a custom top-level container.
+// Cache by runtime class: virtual implementations are fixed after registration.
+const nativeTextPointerOverrides = new Map();
+bindNative([
+  "cn1_com_codename1_ui_Accessor_hasCustomPointerHandlers_com_codename1_ui_Component_int_R_boolean"
+], function(owner, baseKind) {
+  const className = owner && owner.__class;
+  if (!className) return 1;
+  if (nativeTextPointerOverrides.has(className)) return nativeTextPointerOverrides.get(className);
+  const base = ["com_codename1_ui_Form", "com_codename1_ui_Dialog", "com_codename1_ui_Window"][baseKind];
+  let custom = 0;
+  try {
+    for (const name of ["pointerPressed", "pointerReleased", "pointerDragged", "longPointerPress"]) {
+      const signatures = name === "longPointerPress" ? ["int_int"] : ["int_int", "int_1ARRAY_int_1ARRAY"];
+      for (const signature of signatures) {
+        const method = "cn1_s_" + name + "_" + signature;
+        if (jvm.resolveVirtual(className, method) !== jvm.resolveVirtual(base, method)) custom = 1;
+      }
+    }
+  } catch (_err) {
+    // If a runtime cannot establish ownership, keep the framework gesture path.
+    custom = 1;
+  }
+  nativeTextPointerOverrides.set(className, custom);
+  return custom;
+});
+
 // Bulk RGBA -> ARGB pixel-buffer conversion. Backs
 // ``JavaScriptImageDataAdapter.readRgbaToArgbBulk`` which is the
 // fast-path for ``screenshot()`` and ``getRGB()``. The legacy

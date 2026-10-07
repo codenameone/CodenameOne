@@ -1392,6 +1392,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             if (!installed) return;
                             focused = true;
                             if (ta.isEditable() && ta.isEnabled()) {
+                                // Close the previous virtual input device before acquiring
+                                // ownership, just as editStringImpl() does.
+                                ta.registerAsInputDevice();
+                                if (!installed) return;
                                 editingSession = true;
                                 currentEditingField = ta;
                                 currentInputField = el;
@@ -1528,7 +1532,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         void recordPaintContext() {
-            paintContextSupported = graphics.supportsNativeTextOverlay() && !coveredByCanvas;
+            // Sample inherited alpha before the component applies its own foreground
+            // alpha; that foreground alpha already has a CSS representation below.
+            paintContextSupported = graphics.supportsNativeTextOverlay() && graphics.getAlpha() == 255 && !coveredByCanvas;
             int x = ta.getAbsoluteX(), y = ta.getAbsoluteY();
             int cx = graphics.getClipX(), cy = graphics.getClipY();
             int cw = graphics.getClipWidth(), ch = graphics.getClipHeight();
@@ -7276,7 +7282,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     private HTMLInputElement inputEl;
     private String text;
-    private DataChangedListener dataChangedListener;
     private Runnable editingCompleteCallback;
     private final Map<Form, HTMLInputElement> legacyEditorPaddingOwners = new HashMap<Form, HTMLInputElement>();
 
@@ -7801,11 +7806,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
             
             
-            dataChangedListener = null;
-            
-            
             final HTMLInputElement el = inputEl;
-            dataChangedListener = new DataChangedListener() {
+            final DataChangedListener sessionDataChangedListener = new DataChangedListener() {
 
                 @Override
                 public void dataChanged(int i, int i1) {
@@ -7817,7 +7819,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
                 }
             };
-            ta.addDataChangedListener(dataChangedListener);
+            ta.addDataChangedListener(sessionDataChangedListener);
             
             
             ta.addFocusListener(focusListener);
@@ -7971,9 +7973,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
 
                         ta.removeFocusListener(focusListener);
-                        if (dataChangedListener != null && ta instanceof TextField) {
-                            ((TextField)ta).removeDataChangeListener(dataChangedListener);
-                        }
+                        ta.removeDataChangedListener(sessionDataChangedListener);
 
                         // Release only this session's padding on its original form.
                         // A newer layout on the same form owns its padding independently.

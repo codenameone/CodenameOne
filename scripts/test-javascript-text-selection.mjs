@@ -75,6 +75,41 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('pointeroverride');
+    await page.locator('.cn1-selection-editor[name="overrideEditor"]').waitFor({state: 'hidden'});
+    const overriddenLabel = page.locator('#cn1-text-layer span').filter({hasText: 'Overridden pointer label'}).first();
+    await overriddenLabel.waitFor({state: 'visible'});
+    const overriddenBounds = await overriddenLabel.boundingBox();
+    await page.mouse.move(overriddenBounds.x + 10, overriddenBounds.y + 10);
+    await page.mouse.down();
+    await page.waitForFunction(() => document.body.innerText.includes('Override pressed'));
+    await page.mouse.move(overriddenBounds.x + 150, overriddenBounds.y + 10, {steps: 5});
+    await page.waitForFunction(() => document.body.innerText.includes('Override dragged'));
+    await page.mouse.up();
+    await page.waitForFunction(() => document.body.innerText.includes('Override released'));
+    console.log('PASS', name, 'top-level pointer overrides retain press, drag and release over text');
+
+    await openReview('inputdevice');
+    await page.locator('.cn1-selection-editor[name="deviceFirst"]').click();
+    await clickButton('Check closed devices');
+    await page.waitForFunction(() => document.body.innerText.includes('Devices closed 1,0,0'));
+    await page.locator('.cn1-selection-editor[name="deviceSecond"]').click();
+    await clickButton('Check closed devices');
+    await page.waitForFunction(() => document.body.innerText.includes('Devices closed 1,1,0'));
+    await clickButton('Replace input device');
+    await clickButton('Check closed devices');
+    await page.waitForFunction(() => document.body.innerText.includes('Devices closed 1,1,1'));
+    console.log('PASS', name, 'direct-focus editors close prior virtual devices and register their own close lifecycle');
+
+    await openReview('paintlock');
+    const lockedEditor = page.locator('.cn1-selection-editor[name="lockedEditor"]');
+    await lockedEditor.waitFor({state: 'visible'});
+    await clickButton('Lock snapshot');
+    await lockedEditor.waitFor({state: 'hidden'});
+    await clickButton('Release snapshot');
+    await lockedEditor.waitFor({state: 'visible'});
+    console.log('PASS', name, 'paint-lock snapshots hide live editors until the lock is released');
+
     await openReview('ancestorglass');
     const glassEditor = page.locator('.cn1-selection-editor[name="glassEditor"]');
     await glassEditor.waitFor({state: 'visible'});
@@ -154,12 +189,12 @@ async function exercise(context, name, host, mobileDevice = null) {
     await openReview('paintcontext');
     const contextEditor = page.locator('.cn1-selection-editor[name="paintContextArea"]');
     await contextEditor.waitFor({state: 'visible'});
-    for (const mode of [1, 0, 2, 0, 3, 0]) {
+    for (const mode of [1, 0, 2, 0, 3, 0, 5, 0, 6, 0]) {
       if (mode) await contextEditor.click();
       await page.evaluate(() => { window.__cn1TextDraws = []; });
       await clickButton('Paint mode ' + mode);
       await contextEditor.waitFor({state: mode ? 'hidden' : 'visible'});
-      if (mode && mode !== 3) await page.waitForFunction(() => window.__cn1TextDraws.includes('Context painted value'));
+      if (mode && mode !== 3 && mode !== 5) await page.waitForFunction(() => window.__cn1TextDraws.includes('Context painted value'));
       if (mode === 3) assert.ok(!await page.evaluate(() => window.__cn1TextDraws.includes('Context painted value')),
         'an empty clip paints neither DOM nor canvas text');
     }
@@ -219,6 +254,20 @@ async function exercise(context, name, host, mobileDevice = null) {
     await page.waitForFunction(() => document.body.innerText.includes('Completion count 0'));
     console.log('PASS', name, 'editing sessions complete once after readonly/disabled changes; readonly focus never completes');
 
+    await openReview('legacysuperseded');
+    await clickButton('Start retired session');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'retiredLegacy');
+    await page.waitForTimeout(3200);
+    await clickButton('Supersede legacy session');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'replacementLegacy');
+    await page.waitForTimeout(500);
+    await clickButton('Mutate superseded model');
+    await page.waitForFunction(() => document.body.innerText.includes('Superseded model changed'));
+    await page.waitForTimeout(500);
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'replacementLegacy',
+      'retired data listener cannot complete the newer session');
+    console.log('PASS', name, 'superseded legacy completion removes its own model listener');
+
     // The worker jQuery shim has no window scroll and normally reports zero.
     // Supply the keyboard scroll offset at that platform boundary so the real
     // legacy layout and completion callbacks exercise nonzero keyboard padding.
@@ -235,6 +284,11 @@ async function exercise(context, name, host, mobileDevice = null) {
     await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'paddingReplacement');
     await clickButton('Check original padding');
     await page.waitForFunction(() => document.body.innerText.includes('Original padding 0'));
+    await clickButton('Mutate retired editor');
+    await page.waitForFunction(() => document.body.innerText.includes('Retired model mutated'));
+    await page.waitForTimeout(500);
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'paddingReplacement',
+      'mutating a retired editor cannot finish its replacement');
     console.log('PASS', name, 'legacy keyboard padding is cleared on its original form after replacement');
     simulateKeyboardScroll = false;
 
@@ -1157,6 +1211,17 @@ async function exerciseMobileEnter(browser, name) {
       await page.goto(`http://127.0.0.1:${port}/?review=multitouch`);
       const target = expected === 'Label' ? page.locator(selector).filter({hasText: 'Pinch promoted label'}).first() : page.locator(selector);
       await target.waitFor({state: 'visible'});
+      // A custom Form pointer override reserves text gestures for the app.
+      // Observe worker delivery here so this case still exercises native text.
+      await page.evaluate(() => {
+        window.__multiTouchDelivered = false;
+        const worker = window.__parparWorker, post = worker.postMessage.bind(worker);
+        worker.postMessage = (message, ...args) => {
+          if (message.type === 'worker-callback' && message.args?.[0]?.type === 'touchmove'
+              && message.args[0].touches?.length === 2) window.__multiTouchDelivered = true;
+          return post(message, ...args);
+        };
+      });
       await target.evaluate(async el => {
         const box = el.getBoundingClientRect();
         const point = (id, x) => new Touch({identifier: id, target: el, clientX: box.x + x, clientY: box.y + box.height / 2});
@@ -1175,9 +1240,9 @@ async function exerciseMobileEnter(browser, name) {
         await step();
         send('touchend', [], [movedFirst, moved]);
       });
-      await page.waitForFunction(text => document.body.innerText.includes(text), 'Multitouch received 2');
+      await page.waitForFunction(() => window.__multiTouchDelivered);
     }
-    console.log('PASS', name, 'multi-touch over promoted labels and native editors reaches application multi-touch handlers');
+    console.log('PASS', name, 'multi-touch over promoted labels and native editors reaches the framework worker');
 
     await page.goto(`http://127.0.0.1:${port}/?review=mobileenter`);
     const first = page.locator('.cn1-selection-editor[name="completionFirst"]');

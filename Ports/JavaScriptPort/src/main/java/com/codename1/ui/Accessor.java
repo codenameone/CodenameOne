@@ -30,6 +30,15 @@ public class Accessor {
         // (Slider is one example). The same applies to custom TextArea/TextField
         // subclasses: only the known built-in editors are safe to promote.
         if (c == null || c.isIgnorePointerEvents()) return false;
+        for (Component current = c; current != null; current = current.getParent()) {
+            if (current.isPaintLocked()) return false;
+        }
+        TopLevelContainer top = c.getTopLevelContainer();
+        if (top != null) {
+            Component owner = top.asContainer();
+            if (owner.getClass() != Form.class && owner.getClass() != Dialog.class && owner.getClass() != Window.class
+                    && hasCustomPointerHandlers(owner, owner instanceof Dialog ? 1 : owner instanceof Window ? 2 : 0)) return false;
+        }
         for (Container parent = c.getParent(); parent != null; parent = parent.getParent()) {
             if (parent.isFocusable() || parent.isGrabsPointerEvents() || parent.isDraggable()) return false;
         }
@@ -39,6 +48,11 @@ public class Accessor {
                 && c.getLeadComponent() == null && !c.hasPointerInteractionListeners()
                 && (!(c instanceof TextArea) || !((TextArea) c).hasActionListeners());
     }
+
+    // The worker checks actual virtual methods, allowing subclasses that only
+    // customize keys or layout. Legacy runtimes conservatively reserve gestures.
+    @com.codename1.html5.js.JSBody(params={"owner", "baseKind"}, script="return true;")
+    private static native boolean hasCustomPointerHandlers(Component owner, int baseKind);
 
     /** Use the same traversal order and wrapping as the desktop key handler. */
     public static void moveFocusByTab(Form form, boolean backwards) {
