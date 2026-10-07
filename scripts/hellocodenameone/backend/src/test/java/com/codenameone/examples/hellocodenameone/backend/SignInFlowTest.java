@@ -27,6 +27,8 @@ import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
+import com.codename1.backend.test.MockRequestBuilder;
+import com.codename1.backend.security.oauth2.core.OAuth2Parameters;
 import com.codename1.backend.test.MockResponse;
 import com.codename1.security.Base32;
 import com.codename1.security.Hash;
@@ -76,6 +78,18 @@ class SignInFlowTest {
         return url.substring(at + name.length() + 1, end < 0 ? url.length() : end);
     }
 
+    private static MockRequestBuilder formPost(String path, String... pairs) {
+        StringBuilder body = new StringBuilder();
+        for (int i = 0; i < pairs.length; i += 2) {
+            if (body.length() > 0) {
+                body.append('&');
+            }
+            body.append(OAuth2Parameters.encode(pairs[i])).append('=')
+                    .append(OAuth2Parameters.encode(pairs[i + 1]));
+        }
+        return post(path).contentType("application/x-www-form-urlencoded").content(body.toString());
+    }
+
     private String signIn() throws Exception {
         String session = mvc.perform(post("/login").param("username", SecurityConfig.USER)
                         .param("password", SecurityConfig.USER_PASSWORD))
@@ -86,13 +100,26 @@ class SignInFlowTest {
     }
 
     private Map tokens(String code, String redirect) throws Exception {
-        String body = mvc.perform(post("/oauth2/token").header("Host", HOST)
-                        .param("grant_type", "authorization_code").param("code", code)
-                        .param("redirect_uri", redirect).param("code_verifier", VERIFIER)
-                        .param("client_id", SecurityConfig.CLIENT_ID))
+        String body = mvc.perform(formPost("/oauth2/token",
+                        "grant_type", "authorization_code",
+                        "code", code,
+                        "redirect_uri", redirect,
+                        "code_verifier", VERIFIER,
+                        "client_id", SecurityConfig.CLIENT_ID).header("Host", HOST))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return Json.parseObject(body);
+    }
+
+    @Test
+    void oauthCredentialsInTheQueryAreRejected() throws Exception {
+        mvc.perform(formPost("/oauth2/device_authorization?tenant=public&client%5Fid=query-copy",
+                        "client_id", SecurityConfig.CLIENT_ID, "scope", "openid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"));
+        mvc.perform(formPost("/oauth2/device_authorization?tenant=public",
+                        "client_id", SecurityConfig.CLIENT_ID, "scope", "openid"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -142,10 +169,12 @@ class SignInFlowTest {
         assertNotNull(refresh);
 
         // A code is good once.
-        mvc.perform(post("/oauth2/token").param("grant_type", "authorization_code")
-                        .param("code", code).param("redirect_uri", redirect)
-                        .param("code_verifier", VERIFIER)
-                        .param("client_id", SecurityConfig.CLIENT_ID))
+        mvc.perform(formPost("/oauth2/token",
+                        "grant_type", "authorization_code",
+                        "code", code,
+                        "redirect_uri", redirect,
+                        "code_verifier", VERIFIER,
+                        "client_id", SecurityConfig.CLIENT_ID))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_grant"));
 
@@ -203,10 +232,10 @@ class SignInFlowTest {
         assertTrue(refused.startsWith("Bearer error=\"invalid_token\""), refused);
 
         // The refresh token is replaced when it is used.
-        String refreshed = mvc.perform(post("/oauth2/token").header("Host", HOST)
-                        .param("grant_type", "refresh_token")
-                        .param("refresh_token", refresh)
-                        .param("client_id", SecurityConfig.CLIENT_ID))
+        String refreshed = mvc.perform(formPost("/oauth2/token",
+                        "grant_type", "refresh_token",
+                        "refresh_token", refresh,
+                        "client_id", SecurityConfig.CLIENT_ID).header("Host", HOST))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         Map second = Json.parseObject(refreshed);
@@ -327,9 +356,9 @@ class SignInFlowTest {
 
     @Test
     void aDeviceIsApprovedByTheSignedInUserAndThenHoldsTokens() throws Exception {
-        String started = mvc.perform(post("/oauth2/device_authorization").header("Host", HOST)
-                        .param("client_id", SecurityConfig.CLIENT_ID)
-                        .param("scope", "openid notes:read"))
+        String started = mvc.perform(formPost("/oauth2/device_authorization",
+                        "client_id", SecurityConfig.CLIENT_ID,
+                        "scope", "openid notes:read").header("Host", HOST))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.interval").value(Long.valueOf(5)))
                 .andExpect(jsonPath("$.expires_in").value(Long.valueOf(300)))
@@ -363,9 +392,10 @@ class SignInFlowTest {
         assertTrue(approved.indexOf("Device approved") > 0, approved);
 
         // The device's first poll: nothing to slow down yet.
-        String polled = mvc.perform(post("/oauth2/token").param("grant_type", DEVICE_GRANT)
-                        .param("device_code", deviceCode)
-                        .param("client_id", SecurityConfig.CLIENT_ID))
+        String polled = mvc.perform(formPost("/oauth2/token",
+                        "grant_type", DEVICE_GRANT,
+                        "device_code", deviceCode,
+                        "client_id", SecurityConfig.CLIENT_ID))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         Map issued = Json.parseObject(polled);
@@ -378,20 +408,23 @@ class SignInFlowTest {
 
     @Test
     void aDeviceIsToldToWaitThenToSlowDownAndThenThatItWasRefused() throws Exception {
-        Map device = Json.parseObject(mvc.perform(post("/oauth2/device_authorization")
-                        .param("client_id", SecurityConfig.CLIENT_ID).param("scope", "openid"))
+        Map device = Json.parseObject(mvc.perform(formPost("/oauth2/device_authorization",
+                        "client_id", SecurityConfig.CLIENT_ID,
+                        "scope", "openid"))
                 .andReturn().getResponse().getContentAsString());
         String deviceCode = (String) device.get("device_code");
         String userCode = (String) device.get("user_code");
-        mvc.perform(post("/oauth2/token").param("grant_type", DEVICE_GRANT)
-                        .param("device_code", deviceCode)
-                        .param("client_id", SecurityConfig.CLIENT_ID))
+        mvc.perform(formPost("/oauth2/token",
+                        "grant_type", DEVICE_GRANT,
+                        "device_code", deviceCode,
+                        "client_id", SecurityConfig.CLIENT_ID))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("authorization_pending"));
         // Again at once, well inside the five seconds it was told to leave.
-        mvc.perform(post("/oauth2/token").param("grant_type", DEVICE_GRANT)
-                        .param("device_code", deviceCode)
-                        .param("client_id", SecurityConfig.CLIENT_ID))
+        mvc.perform(formPost("/oauth2/token",
+                        "grant_type", DEVICE_GRANT,
+                        "device_code", deviceCode,
+                        "client_id", SecurityConfig.CLIENT_ID))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("slow_down"));
 

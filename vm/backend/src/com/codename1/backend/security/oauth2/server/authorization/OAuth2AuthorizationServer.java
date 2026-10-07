@@ -877,15 +877,21 @@ public final class OAuth2AuthorizationServer {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST,
                     "This endpoint requires an application/x-www-form-urlencoded body");
         }
-        for (String field : query(request).split("&")) {
-            int equals = field.indexOf('=');
-            String name = OAuth2Parameters.decode(equals < 0 ? field : field.substring(0, equals));
+        String query = query(request);
+        int start = 0;
+        while (start < query.length()) {
+            int amp = query.indexOf('&', start);
+            int end = amp < 0 ? query.length() : amp;
+            int equals = query.indexOf('=', start);
+            String name = OAuth2Parameters.decode(query.substring(start,
+                    equals < 0 || equals > end ? end : equals));
             for (String reserved : FORM_PARAMETERS) {
                 if (reserved.equals(name)) {
                     throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST,
                             "OAuth parameters must be sent in the form body");
                 }
             }
+            start = end + 1;
         }
     }
 
