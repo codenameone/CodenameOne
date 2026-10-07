@@ -1969,7 +1969,8 @@
       var selected = global.getSelection && global.getSelection();
       if (/^(INPUT|TEXTAREA)$/.test(el.tagName)) {
         if (doc.activeElement === el && el.selectionStart !== el.selectionEnd) return;
-      } else if (selected && !selected.isCollapsed && nativeSelectionElement(selected.anchorNode) === el) return;
+      } else if (selected && !selected.isCollapsed
+          && (nativeSelectionElement(selected.anchorNode) === el || nativeSelectionElement(selected.focusNode) === el)) return;
       var t = event.touches[0];
       touch = { x: t.clientX, y: t.clientY, at: Date.now(), start: event, scrolling: false };
     }, { passive: true });
@@ -2005,7 +2006,11 @@
       if (el && el.getAttribute('data-cn1-single-line') === 'true' && event.key === 'Enter'
           && !event.isComposing && nativeTextOwnsKey(event, el)) {
         event.preventDefault();
-        el.blur();
+        if (el.getAttribute('data-cn1-enter-next') === 'true') {
+          el.dispatchEvent(new global.Event('cn1-next'));
+        } else {
+          el.blur();
+        }
       }
     }, true);
   }

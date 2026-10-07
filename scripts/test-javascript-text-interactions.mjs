@@ -119,6 +119,29 @@ function touch(type, y, touches = true, x = 20) {
   listeners[type](e);
   return e;
 }
+const mobileLine = node({'data-cn1-native-selection': 'true', 'data-cn1-single-line': 'true', 'data-cn1-enter-next': 'true'});
+mobileLine.tagName = 'INPUT';
+const nextEvents = [];
+context.global.Event = function(type) { this.type = type; };
+mobileLine.dispatchEvent = e => nextEvents.push(e.type);
+mobileLine.blur = () => assert.fail('mobile completion must wait for worker traversal');
+listeners.keydown(Object.assign(event('keydown', mobileLine), {key: 'Enter'}));
+assert.deepEqual(nextEvents, ['cn1-next']);
+listeners.keydown(Object.assign(event('keydown', mobileLine), {key: 'Enter', isComposing: true}));
+assert.deepEqual(nextEvents, ['cn1-next'], 'IME confirmation cannot advance focus');
+
+const otherRun = node({'data-cn1-native-selection': 'true'});
+text.tagName = 'SPAN';
+for (const focusEnd of [false, true]) {
+  context.global.getSelection = () => ({isCollapsed: false,
+    anchorNode: {parentNode: focusEnd ? otherRun : text}, focusNode: {parentNode: focusEnd ? text : otherRun}});
+  touch('touchstart', 100);
+  assert.equal(touch('touchmove', 70).defaultPrevented, false);
+  touch('touchend', 70, false);
+  assert.deepEqual(relayed, [], 'either endpoint of a cross-run selection keeps its touch handle');
+}
+context.global.getSelection = () => null;
+text.tagName = 'TEXTAREA';
 touch('touchstart', 100);
 assert.equal(touch('touchmove', 80).defaultPrevented, true);
 touch('touchend', 80, false);

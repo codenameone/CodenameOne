@@ -94,7 +94,35 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=actionmutations") >= 0) {
+        if (query.indexOf("review=autocompletemutation") >= 0) {
+            TextField area = new TextField("Autofill value"); area.setName("autocompleteMutation");
+            form.add(area);
+            for (final String token : new String[] {"off", "one-time-code", "clear"}) {
+                Button change = new Button("Autocomplete " + token);
+                change.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form,
+                    () -> area.putClientProperty("cn1$autocomplete", "clear".equals(token) ? null : token)));
+                form.add(change);
+            }
+        } else if (query.indexOf("review=blocklead") >= 0) {
+            Label label = new Label("Block lead text"); label.setBlockLead(true);
+            Button lead = new Button("Lead action"); lead.addActionListener(e -> status.setText("Lead fired"));
+            Container parent = BoxLayout.encloseY(label, lead); parent.setLeadComponent(lead);
+            Button configure = new Button("Configure lead"); configure.addActionListener(e -> parent.setFocusable(false));
+            Button block = new Button("Block lead"), unblock = new Button("Unblock lead");
+            block.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> label.setBlockLead(true)));
+            unblock.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> label.setBlockLead(false)));
+            form.addAll(configure, block, parent, unblock, status);
+        } else if (query.indexOf("review=stopcallback") >= 0 || query.indexOf("review=mobileenter") >= 0) {
+            TextField first = new TextField("First value"); first.setName("completionFirst");
+            TextField second = new TextField("Second value"); second.setName("completionSecond");
+            first.addDataChangedListener((type, index) -> status.setText("First committed " + first.getText()));
+            Button stop = new Button("Stop and continue");
+            stop.addActionListener(e -> first.stopEditing(() -> {
+                status.setText("Stopped " + first.getText() + " editing=" + first.isEditing());
+                second.startEditingAsync();
+            }));
+            form.addAll(new Button("Initial focus"), first, second, stop, status);
+        } else if (query.indexOf("review=actionmutations") >= 0) {
             TextArea area = new TextArea("Action listener field"); area.setName("actionMutationArea");
             com.codename1.ui.events.ActionListener listener = event -> {};
             Button add = new Button("Add action listener"), remove = new Button("Remove action listener");
@@ -161,11 +189,12 @@ public class JavaScriptSelectionApp extends Lifecycle {
             TextArea area = new TextArea("Original model", 3, 24); area.setName("legacySessionArea");
             Button cover = new Button("Cover edge");
             layers.addAll(area, cover); layout.setInsets(area, "0"); layout.setInsets(cover, "0 0 auto auto");
-            Button edit = new Button("Start legacy"), uncover = new Button("Remove cover"), stop = new Button("Finish legacy");
+            Button edit = new Button("Start legacy"), uncover = new Button("Remove cover"), stop = new Button("Finish legacy"), repaint = new Button("Repaint legacy");
             edit.addActionListener(e -> area.startEditingAsync());
             uncover.addActionListener(e -> { layers.removeComponent(cover); layers.revalidate(); status.setText("Cover removed"); });
             stop.addActionListener(e -> Display.getInstance().stopEditing(area, () -> status.setText("Committed " + area.getText())));
-            form.addAll(edit, layers, uncover, stop, status);
+            repaint.addActionListener(e -> { form.repaint(); status.setText("Legacy repaint completed"); });
+            form.addAll(edit, layers, uncover, stop, repaint, status);
         } else if (query.indexOf("review=readonlykeys") >= 0) {
             TextArea area = new TextArea("Readonly shortcut text"); area.setName("readonlyKeys"); area.setEditable(false);
             if (query.indexOf("disabled=true") >= 0) area.setEnabled(false);

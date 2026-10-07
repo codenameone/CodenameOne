@@ -1247,6 +1247,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String lastName;
         String lastAccessibleName;
         int lastScrollY = Integer.MIN_VALUE;
+        List<Runnable> stopCallbacks;
 
         SelectionTextOverlay(final TextArea ta) {
             super(ta);
@@ -1256,6 +1257,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             el.setAttribute("class", "cn1-native-selection cn1-selection-editor");
             el.setAttribute("data-cn1-native-selection", "true");
             el.setAttribute("data-cn1-single-line", ta.isSingleLineTextArea() ? "true" : "false");
+            el.setAttribute("data-cn1-enter-next", isPhoneOrTablet_() ? "true" : "false");
             el.setTabIndex(-1); // updated with visibility and CN1 focusability
             updateConstraints();
             el.getStyle().setProperty("display", "none");
@@ -1276,6 +1278,34 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             };
             ta.addFocusListener(focus);
+            el.addEventListener("cn1-next", new EventListener() {
+                public void handleEvent(Event event) {
+                    callSerially(new Runnable() {
+                        public void run() {
+                            stopAfterBlur(new Runnable() {
+                                public void run() {
+                                    Form form = ta.getComponentForm();
+                                    if (form == null || form != getCurrentForm()) return;
+                                    final Component next = form.getNextComponent(ta);
+                                    if (next == null) return;
+                                    if (next instanceof TextArea) {
+                                        next.requestFocus();
+                                        next.startEditingAsync();
+                                    } else {
+                                        UITimer.timer(300, false, new Runnable() {
+                                            public void run() {
+                                                next.requestFocus();
+                                                next.startEditingAsync();
+                                                outputCanvas.focus();
+                                            }
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
             el.addEventListener("keydown", new EventListener() {
                 public void handleEvent(Event event) {
                     final KeyEvent key = (KeyEvent) event;
@@ -1338,17 +1368,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     final String value = el.getValue();
                     callSerially(new Runnable() {
                         public void run() {
-                            focused = false;
-                            releaseEditingOwnership();
-                            if (ta.isEditable() && ta.isEnabled()) {
-                                commit(value);
-                                Display.getInstance().onEditingComplete(ta, value);
-                            }
-                            ta.repaint();
+                            completeBlur(value);
                         }
                     });
                 }
             });
+        }
+
+        private void stopAfterBlur(Runnable onFinish) {
+            if (onFinish != null) {
+                if (stopCallbacks == null) stopCallbacks = new ArrayList<Runnable>();
+                stopCallbacks.add(onFinish);
+            }
+            el.blur();
+        }
+
+        private void completeBlur(String value) {
+            boolean wasEditing = focused || currentInputField == el;
+            focused = false;
+            releaseEditingOwnership();
+            if (wasEditing && ta.isEditable() && ta.isEnabled()) {
+                commit(value);
+                Display.getInstance().onEditingComplete(ta, value);
+            }
+            ta.repaint();
+            List<Runnable> callbacks = stopCallbacks;
+            stopCallbacks = null;
+            if (callbacks != null) {
+                for (Runnable callback : callbacks) callback.run();
+            }
         }
 
         private void updateAccessibleName() {
@@ -1518,8 +1566,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         void uninstall() {
             if (visible) com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidateAll();
             visible = false;
-            focused = false;
-            releaseEditingOwnership();
+            completeBlur(el.getValue());
             el.blur();
             ta.removeDataChangedListener(changes);
             ta.removeFocusListener(focus);
@@ -6628,7 +6675,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public boolean isNativeEditorVisible(Component c) {
         NativeOverlay overlay = (NativeOverlay)c.getNativeOverlay();
-        if (overlay instanceof SelectionTextOverlay) return ((SelectionTextOverlay) overlay).visible;
+        if (overlay instanceof SelectionTextOverlay && ((SelectionTextOverlay) overlay).visible) return true;
         if (overlay != null && jQuery_is_(overlay.el, ":focus")) {
             return true;
         }
@@ -7029,7 +7076,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void stopTextEditing(Runnable onFinish) {
+        SelectionTextOverlay editor = currentSelectionEditor();
+        if (editor != null && isEditing) {
+            editor.stopAfterBlur(onFinish);
+        } else {
+            super.stopTextEditing(onFinish);
+        }
+    }
+
+    @Override
     public void stopTextEditing() {
+        SelectionTextOverlay editor = currentSelectionEditor();
+        if (editor != null && isEditing) {
+            editor.stopAfterBlur(null);
+            return;
+        }
         if (isEditing){
             if (currentEditingField != null) {
                 pendingTextChanges = currentEditingField.getText();

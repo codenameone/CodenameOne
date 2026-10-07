@@ -1440,6 +1440,9 @@ public class Component implements Animation, StyleListener, Editable {
         } else {
             clientProperties.put(key, value);
         }
+        if ("cn1$autocomplete".equals(key)) {
+            repaintTextSelection();
+        }
     }
 
     /// gets the Component dirty region,  this method is for internal use only and SHOULD NOT be invoked by user code.
@@ -4794,6 +4797,7 @@ public class Component implements Animation, StyleListener, Editable {
         HoverTracker tracker = HoverTracker.prepareLeadChange(this);
         this.blockLead = blockLead;
         hasLead = !blockLead && getLeadComponent() != null;
+        repaintTextSelection();
         if (tracker != null) {
             tracker.finishLeadChange(this);
         }

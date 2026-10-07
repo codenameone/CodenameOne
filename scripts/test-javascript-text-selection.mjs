@@ -67,6 +67,40 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('autocompletemutation');
+    for (const token of ['off', 'one-time-code', 'clear']) {
+      await clickButton('Autocomplete ' + token);
+      await page.waitForFunction(expected => document.querySelector('.cn1-selection-editor[name="autocompleteMutation"]').getAttribute('autocomplete') === expected,
+        token === 'clear' ? 'on' : token);
+    }
+    console.log('PASS', name, 'autocomplete client-property changes refresh a static native editor');
+
+    await openReview('blocklead');
+    // Lead initialization makes the container focusable by default. Exercise a
+    // non-focusable lead container so blockLead is the deciding eligibility flag.
+    await clickButton('Configure lead');
+    for (const blocked of [true, false, true, false]) {
+      await clickButton(blocked ? 'Block lead' : 'Unblock lead');
+      await page.waitForFunction(blocked => [...document.querySelectorAll('#cn1-text-layer span')].some(el =>
+        el.textContent === 'Block lead text' && (getComputedStyle(el).pointerEvents === 'auto') === blocked), blocked);
+    }
+    await page.locator('#cn1-text-layer span').filter({hasText: /^Block lead text$/}).click({force: true});
+    await page.waitForFunction(() => document.body.innerText.includes('Lead fired'));
+    console.log('PASS', name, 'block-lead mutations restore the lead action gesture');
+
+    await openReview('stopcallback');
+    const completionFirst = page.locator('.cn1-selection-editor[name="completionFirst"]');
+    await completionFirst.click();
+    await page.waitForTimeout(300);
+    // The final value deliberately has no input event: stop must capture it from
+    // the DOM before invoking a callback that reads the model and edits a new field.
+    await completionFirst.evaluate(el => { el.value = 'Pending final value'; });
+    await clickButton('Stop and continue');
+    await page.waitForFunction(() => document.body.innerText.includes('Stopped Pending final value editing=false'));
+    await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'completionSecond');
+    assert.equal(await completionFirst.inputValue(), 'Pending final value');
+    console.log('PASS', name, 'stop callbacks observe committed text and released ownership before starting another editor');
+
     await openReview('actionmutations');
     const actionArea = page.locator('.cn1-selection-editor[name="actionMutationArea"]');
     await actionArea.waitFor({state: 'visible'});
@@ -169,6 +203,8 @@ async function exercise(context, name, host, mobileDevice = null) {
       await clickButton('Edit selected style');
       const legacy = page.locator('.cn1-edit-string:visible');
       await legacy.waitFor();
+      await page.waitForFunction(() => document.activeElement?.classList.contains('cn1-edit-string')
+        && document.activeElement.value === 'ABBA');
       await legacy.fill('ABAB');
       await page.waitForTimeout(350);
       assert.equal(await legacy.evaluate(el => document.activeElement === el), true, 'selected ' + style + ' retains editor focus');
@@ -183,7 +219,16 @@ async function exercise(context, name, host, mobileDevice = null) {
     await clickButton('Start legacy');
     const legacySession = page.locator('.cn1-edit-string:visible');
     await legacySession.waitFor();
+    await page.waitForFunction(() => document.activeElement?.classList.contains('cn1-edit-string')
+      && document.activeElement.value === 'Original model');
     await legacySession.fill('Legacy preserved');
+    await page.evaluate(() => { window.__cn1TextDraws = []; });
+    await clickButton('Repaint legacy');
+    await page.waitForFunction(() => document.body.innerText.includes('Legacy repaint completed'));
+    await page.waitForTimeout(300);
+    assert.equal(await page.evaluate(() => window.__cn1TextDraws.some(text => /Original model|Legacy preserved/.test(text))
+      || [...document.querySelectorAll('#cn1-text-layer span')].some(el => /Original model|Legacy preserved/.test(el.textContent))), false,
+      'the canvas must not paint a second copy underneath the active legacy editor');
     await clickButton('Remove cover');
     await page.waitForFunction(() => document.body.innerText.includes('Cover removed'));
     // Exercise periodic layout updates and let the legacy startup latch expire.
@@ -857,6 +902,28 @@ async function exercise(context, name, host, mobileDevice = null) {
   }
 }
 
+async function exerciseMobileEnter(browser, name) {
+  const context = await browser.newContext({viewport: {width: 900, height: 800}, hasTouch: true,
+    userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36'});
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', e => errors.push(String(e)));
+    await page.goto(`http://127.0.0.1:${port}/?review=mobileenter`);
+    const first = page.locator('.cn1-selection-editor[name="completionFirst"]');
+    await first.waitFor({timeout: 60000});
+    assert.equal(await first.getAttribute('data-cn1-enter-next'), 'true');
+    await first.click();
+    await first.fill('Mobile committed value');
+    await first.press('Enter');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'completionSecond');
+    await page.waitForFunction(() => document.body.innerText.includes('First committed Mobile committed value'));
+    assert.equal(await first.inputValue(), 'Mobile committed value');
+    assert.deepEqual(errors, []);
+    console.log('PASS', name, 'Android browser profile Enter commits and advances to the next native editor');
+  } finally { await context.close(); }
+}
+
 try {
   if (process.argv.includes('--android')) {
     const devices = await _android.devices();
@@ -874,8 +941,11 @@ try {
         ? await firefox.launch(process.env.CN1_JS_FIREFOX_EXECUTABLE ? { executablePath: process.env.CN1_JS_FIREFOX_EXECUTABLE } : {})
         : await chromium.launch(process.env.CN1_JS_CHROME_CHANNEL ? { channel: process.env.CN1_JS_CHROME_CHANNEL } : {});
       try {
-        const context = await browser.newContext({ viewport: { width: 900, height: 800 } });
-        try { await exercise(context, name, '127.0.0.1'); } finally { await context.close(); }
+        if (process.env.CN1_JS_MOBILE_NEXT_ONLY !== 'true') {
+          const context = await browser.newContext({ viewport: { width: 900, height: 800 } });
+          try { await exercise(context, name, '127.0.0.1'); } finally { await context.close(); }
+        }
+        await exerciseMobileEnter(browser, name);
       } finally { await browser.close(); }
     }
   }
