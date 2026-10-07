@@ -22,6 +22,28 @@
      }
     }
    }
+  },
+  "macos-arm64": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.708,
+      "time": 1.106,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.814,
+     "reason": "Recalibrate allocation RSS on Apple M1 Virtual from eight independent hosted runs: seven master controls and this PR. Benchmark, Java API, native C/H runtime and measurement harness sources match across all controls; master run 37586646660 also fails the old 0.708x baseline. Median RAM ratio is 0.814x. Retain the existing 30% RAM tolerance and all time settings; every recorded run fits it. Evidence runs: 37422669276, 37430992716, 37454493102, 37493436861, 37555415882, 37583673252, 37586646660, 37684764992.",
+     "runs": 8,
+     "time": 1.106,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
   }
  }
 }
