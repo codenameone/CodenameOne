@@ -63,7 +63,7 @@ public final class JdbcRateLimiter implements RateLimiter {
         if (dataSource == null || name == null || name.length() == 0) {
             throw new IllegalArgumentException("A data source and a name are required");
         }
-        if (permits < 1 || periodSeconds < 1) {
+        if (permits < 1 || periodSeconds < 1 || periodSeconds > Long.MAX_VALUE / 1000L) {
             throw new IllegalArgumentException("A rate limit needs at least one permit and a "
                     + "period of at least a second");
         }
@@ -129,8 +129,9 @@ public final class JdbcRateLimiter implements RateLimiter {
             // The window has passed: start the next one. Only one of several
             // callers at this moment changes the row; the rest count in the
             // window it started.
-            if (dataSource.execute("UPDATE cn1_rate_limit SET window_start = ?, hits = 1 WHERE "
-                    + "limit_key = ? AND window_start <= ?", new Object[] {Long.valueOf(now), row,
+            if (dataSource.execute("UPDATE cn1_rate_limit SET window_start = ?, window_end = ?, hits = 1 WHERE "
+                    + "limit_key = ? AND window_start <= ?", new Object[] {Long.valueOf(now),
+                        Long.valueOf(windowEnd(now)), row,
                         windowFloor}) == 1) {
                 return true;
             }
@@ -141,8 +142,8 @@ public final class JdbcRateLimiter implements RateLimiter {
                 return count(row, windowFloor);
             }
             try {
-                dataSource.execute("INSERT INTO cn1_rate_limit (limit_key, window_start, hits) "
-                        + "VALUES (?, ?, 1)", new Object[] {row, Long.valueOf(now)});
+                dataSource.execute("INSERT INTO cn1_rate_limit (limit_key, window_start, window_end, hits) "
+                        + "VALUES (?, ?, ?, 1)", new Object[] {row, Long.valueOf(now), Long.valueOf(windowEnd(now))});
                 return true;
             } catch (IOException raced) {
                 // Another caller inserted the row first; count in its window.
@@ -205,7 +206,17 @@ public final class JdbcRateLimiter implements RateLimiter {
     ///
     /// @return how many rows were deleted
     public int deleteExpired(long olderThanSeconds) throws IOException {
-        return dataSource.execute("DELETE FROM cn1_rate_limit WHERE window_start < ?",
-                new Object[] {Long.valueOf(clock.currentTimeMillis() - olderThanSeconds * 1000L)});
+        if (olderThanSeconds < 0 || olderThanSeconds > Long.MAX_VALUE / 1000L) {
+            throw new IllegalArgumentException("Retention must be a nonnegative number of seconds");
+        }
+        long retention = olderThanSeconds * 1000L;
+        long now = clock.currentTimeMillis();
+        long cutoff = now < Long.MIN_VALUE + retention ? Long.MIN_VALUE : now - retention;
+        return dataSource.execute("DELETE FROM cn1_rate_limit WHERE window_end < ?",
+                new Object[] {Long.valueOf(cutoff)});
+    }
+
+    private long windowEnd(long start) {
+        return start > Long.MAX_VALUE - periodMillis ? Long.MAX_VALUE : start + periodMillis;
     }
 }

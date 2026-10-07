@@ -148,7 +148,7 @@ class SecurityStoresTest {
             }
         }
         MigrationInfo[] info = Migrations.of(pool, SecuritySchema.migrations()).info();
-        assertEquals(9, info.length);
+        assertEquals(10, info.length);
         for (int i = 0; i < info.length; i++) {
             assertEquals(String.valueOf(i + 1), info[i].getVersion());
             assertEquals(MigrationState.SUCCESS, info[i].getState());
@@ -159,13 +159,14 @@ class SecurityStoresTest {
         assertEquals("oauth2 registered clients", info[6].getDescription());
         assertEquals("oauth2 authorizations", info[7].getDescription());
         assertEquals("passkeys", info[8].getDescription());
+        assertEquals("rate limit expiry", info[9].getDescription());
         // Its own history, not the application's.
-        assertEquals(9L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM "
+        assertEquals(10L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM "
                 + "cn1_security_schema_history", null).get("n")).longValue());
         // And a second run finds nothing to do.
         MigrateResult again = Migrations.of(pool, SecuritySchema.migrations()).migrate();
         assertEquals(0, again.getMigrationsExecuted());
-        assertEquals("9", again.getTargetVersion());
+        assertEquals("10", again.getTargetVersion());
         assertEquals("security", SecuritySchema.migrations().getName());
         assertEquals("cn1_security_schema_history", SecuritySchema.migrations().getTable());
     }
@@ -491,6 +492,29 @@ class SecurityStoresTest {
             caller.join(30000);
         }
         assertEquals(5, allowed.get());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void rateLimitCleanupPreservesActiveWindows(String engine) throws Exception {
+        DataSource pool = open(engine);
+        Ticking clock = new Ticking();
+        JdbcRateLimiter daily = new JdbcRateLimiter(pool, "daily", 1, 86400);
+        JdbcRateLimiter minute = new JdbcRateLimiter(pool, "minute", 1, 60);
+        daily.setClock(clock);
+        minute.setClock(clock);
+        assertTrue(daily.tryAcquire("client"));
+        assertTrue(minute.tryAcquire("client"));
+        clock.now += 3601000;
+        assertEquals(0, daily.deleteExpired(3600));
+        assertEquals(0, minute.deleteExpired(3600));
+        assertFalse(daily.tryAcquire("client"));
+        clock.now += 60000;
+        assertEquals(1, minute.deleteExpired(3600));
+        assertFalse(daily.tryAcquire("client"));
+        clock.now += 86400000;
+        assertEquals(1, daily.deleteExpired(3600));
+        assertThrows(IllegalArgumentException.class, () -> daily.deleteExpired(-1));
     }
 
     @org.junit.jupiter.api.Test

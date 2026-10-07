@@ -73,6 +73,7 @@ import java.io.IOException;
 /// | 7 | `cn1_oauth2_registered_client` | [com.codename1.backend.security.oauth2.server.authorization.JdbcRegisteredClientRepository] |
 /// | 8 | `cn1_oauth2_authorization`, `cn1_oauth2_token` | [com.codename1.backend.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService] |
 /// | 9 | `cn1_webauthn_user`, `cn1_webauthn_credential` | [com.codename1.backend.security.webauthn.JdbcPublicKeyCredentialUserEntityRepository], [com.codename1.backend.security.webauthn.JdbcUserCredentialRepository] |
+/// | 10 | `cn1_rate_limit.window_end` | Expiry-aware cleanup for limiters with different periods |
 ///
 /// A user name is kept twice: as it was given, and folded to lower case in the
 /// `username_key` column every table is keyed by, which is what makes a lookup
@@ -89,7 +90,7 @@ public final class SecuritySchema {
 
     // The versions of this set. A version is never edited once released: a new
     // table, or a change to one, is a new version appended in migrations().
-    // The next takes 10. Each version is one method below that returns the
+    // The next takes 11. Each version is one method below that returns the
     // statements for an engine, a case in Tables.migrate, and a line in
     // migrations().
 
@@ -100,7 +101,7 @@ public final class SecuritySchema {
     private static final String[] DESCRIPTIONS = {
         "users and authorities", "api keys", "persistent logins", "second factors",
         "rate limits", "federated identities", "oauth2 registered clients",
-        "oauth2 authorizations", "passkeys"
+        "oauth2 authorizations", "passkeys", "rate limit expiry"
     };
 
     /// The set, for `Migrations.register`.
@@ -155,6 +156,7 @@ public final class SecuritySchema {
                 case 7: statements = registeredClients(d); break;
                 case 8: statements = authorizations(d); break;
                 case 9: statements = passkeys(d); break;
+                case 10: statements = rateLimitExpiry(d); break;
                 default: throw new IOException("The security schema has no version " + version);
             }
             for (String statement : statements) {
@@ -248,6 +250,12 @@ public final class SecuritySchema {
             "CREATE TABLE cn1_rate_limit (limit_key " + key(d) + " NOT NULL PRIMARY KEY, "
                 + "window_start " + moment(d) + ", hits " + d.columnType(Dialect.INTEGER)
                 + " NOT NULL)"};
+    }
+
+    private static String[] rateLimitExpiry(Dialect d) {
+        // Old rows have no known period. Keep them until their next window starts;
+        // guessing their expiry could reset an active limiter during an upgrade.
+        return new String[] {"ALTER TABLE cn1_rate_limit ADD COLUMN window_end " + d.columnType(Dialect.BIGINT)};
     }
 
     private static String[] federatedIdentities(Dialect d) {
