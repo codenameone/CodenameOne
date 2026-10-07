@@ -385,6 +385,10 @@ the gallery and automated tests cover a subset of those behaviors.
   classes (view transforms, colors, progress, drawable alpha and level), because
   there is no reflection. Animate a property of your own class through an
   `android.util.Property` instead.
+* XML `android:onClick` handlers must be declared in application output classes.
+  The dispatcher doesn't discover methods inherited only from dependency JARs.
+  Add a public forwarding method in the application activity, or register an
+  explicit click listener in code. Dependency-wide handler discovery is deferred.
 * A subclass of `Animation` or `Animator` that the application wrote must
   override `clone()` to be copied, for the same reason.
 * `MotionLayout` isn't available. A `ConstraintSet` custom attribute sets

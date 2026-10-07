@@ -160,11 +160,23 @@ for (const status of [400, 429, 503]) {
 // as not sent -- before the Initializr bridge's own (longer) wait runs out, so
 // the panel never says "not sent" for a request still in flight.
 {
-  const hanging = loadBeacon({ fetchImpl: (url, init) => new Promise((resolve, reject) => {
-    init.signal.addEventListener("abort", () => reject(new Error("AbortError")));
-  }) });
+  let finishDigest, requestStarted;
+  const digest = new Promise(resolve => { finishDigest = resolve; });
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  const hanging = loadBeacon({
+    subtle: { digest: () => digest },
+    fetchImpl: (url, init) => new Promise((resolve, reject) => {
+      init.signal.addEventListener("abort", () => reject(new Error("AbortError")));
+      requestStarted();
+    }),
+  });
   const pending = hanging.beacon.sendSteps("dev@example.org", "com.example.app", "", "", "maven");
-  await new Promise((r) => setTimeout(r, 0));
+  // WebCrypto completes independently of timers. Control that boundary instead
+  // of assuming a zero-delay timer means the digest and request have started.
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(hanging.timers.length, 0, "hashing has not started a request deadline");
+  finishDigest(new Uint8Array(32).buffer);
+  await started;
   assert.equal(hanging.timers.length, 1, "a deadline is armed for the confirmed request");
   assert.ok(hanging.timers[0].ms < 20000, "shorter than the bridge's 20 s wait");
   hanging.timers[0].fn();

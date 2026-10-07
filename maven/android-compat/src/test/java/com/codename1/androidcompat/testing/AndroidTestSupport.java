@@ -54,6 +54,8 @@ public final class AndroidTestSupport {
 
         /// The result code of the last result delivered.
         public int resultCode;
+        public android.content.Intent resultData;
+        public int permissionResults;
 
         /// How many `onStart` calls preceded the last result delivered, or -1.
         public int startsBeforeResult = -1;
@@ -118,6 +120,12 @@ public final class AndroidTestSupport {
             }
             resultRequestCode = requestCode;
             this.resultCode = resultCode;
+            this.resultData = data;
+        }
+
+        @Override
+        public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grants) {
+            permissionResults++;
         }
 
         @Override
@@ -246,6 +254,18 @@ public final class AndroidTestSupport {
             if ("pause".equals(getIntent().getStringExtra("finishAt"))) {
                 event("pause");
             }
+        }
+        @Override protected void onSaveInstanceState(android.os.Bundle state) {
+            super.onSaveInstanceState(state);
+            if (stopScenario()) event("save");
+        }
+        @Override protected void onStop() {
+            super.onStop();
+            if (stopScenario()) event("stop");
+        }
+        private boolean stopScenario() {
+            String at = getIntent().getStringExtra("finishAt");
+            return at != null && (at.startsWith("save") || at.startsWith("stop"));
         }
         @Override protected void onDestroy() { super.onDestroy(); event("destroy"); }
     }

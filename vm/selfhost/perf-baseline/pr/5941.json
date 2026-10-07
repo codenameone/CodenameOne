@@ -67,6 +67,28 @@
     }
    }
   },
+  "linux-x64@intel-xeon-6973p-c": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.769,
+      "time": 0.982,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.932,
+     "reason": "The hello translation workload now includes this PR's Android compatibility gallery, relocated runtime and Kotlin stdlib. Existing AMD rows were recalibrated for this larger input; the Intel Xeon 6973P-C row still used the pre-gallery baseline. This complete five-round run measures a 0.932 median RAM ratio (0.847-0.945 range). Update only hello RAM for this CPU; preserve its time baseline and tolerances.",
+     "runs": 1,
+     "time": 0.982,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
    "hello": {
     "all": {
@@ -81,6 +103,18 @@
      "tolerance": {
       "memory": 0.35
      }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.451,
+      "time": 0.751
+     },
+     "memory": 0.451,
+     "reason": "Recalibrate the single-run Windows ARM D49 translator timing baseline using two complete five-round runs with unchanged VM/translator sources (37599357580 at 378d5ba07b and 37623218091 at 82d33bce77). Their median ratios were 0.804 and 0.871; pooled run-median baseline is 0.838. The original 0.751 calibration and both new medians remain inside the unchanged 15% tolerance. Memory is unchanged; this records measured timing variation, not a claimed performance improvement.",
+     "runs": 2,
+     "time": 0.838
     }
    }
   },

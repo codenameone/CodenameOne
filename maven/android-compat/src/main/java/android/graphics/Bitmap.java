@@ -103,11 +103,19 @@ public final class Bitmap {
         return b;
     }
 
+    private static void checkSource(Bitmap source) {
+        if (source.recycled) {
+            throw new IllegalArgumentException("Cannot create a bitmap from a recycled source");
+        }
+    }
+
     public static Bitmap createBitmap(Bitmap src) {
+        checkSource(src);
         return derived(src, src.snapshot(), false, src.config);
     }
 
     public static Bitmap createBitmap(Bitmap source, int x, int y, int width, int height) {
+        checkSource(source);
         if (x == 0 && y == 0 && width == source.width && height == source.height) {
             // As on Android, only an immutable source is handed back as is;
             // a mutable one is copied so later drawing does not reach it.
@@ -211,6 +219,7 @@ public final class Bitmap {
     }
 
     public static Bitmap createScaledBitmap(Bitmap src, int dstWidth, int dstHeight, boolean filter) {
+        checkSource(src);
         if (dstWidth == src.width && dstHeight == src.height) {
             return src;
         }

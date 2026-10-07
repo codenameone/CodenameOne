@@ -259,11 +259,7 @@ public final class ActivityThread {
         // never shares the caller's object: a caller that reuses or mutates
         // its Intent after startActivity() must not change getIntent() or
         // what onNewIntent() was given.
-        intent = new Intent(intent);
-        Bundle extras = intent.getExtras();
-        if (extras != null) {
-            intent.replaceExtras(extras.deepCopy());
-        }
+        intent = snapshotIntent(intent);
         // Activities start on the EDT, which is the main looper's thread.
         android.os.Looper.prepareMainLooper();
         // A component's package, and an implicit intent's setPackage(), are
@@ -646,6 +642,9 @@ public final class ActivityThread {
         if (!r.started) {
             return;
         }
+        // Save/stop callbacks may finish the activity and reenter destroy().
+        r.started = false;
+        r.restartable = true;
         Activity a = r.activity;
         // A finishing activity is never restored, so Android does not ask it
         // to save its state; only one that may come back (stopped under
@@ -654,15 +653,25 @@ public final class ActivityThread {
             Bundle out = new Bundle();
             a.onSaveInstanceState(out);
             for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
+                if (a.mDestroyed) {
+                    return;
+                }
                 cb.onActivitySaveInstanceState(a, out);
+            }
+            if (a.mDestroyed) {
+                return;
             }
             r.savedState = out;
         }
         a.hostsDispatchStop();
+        if (a.mDestroyed) {
+            return;
+        }
         a.onStop();
-        r.started = false;
-        r.restartable = true;
         for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
+            if (a.mDestroyed) {
+                return;
+            }
             cb.onActivityStopped(a);
         }
     }
@@ -750,8 +759,20 @@ public final class ActivityThread {
             }
             Activity a = r.activity;
             caller.pendingResults.add(new Object[] {Integer.valueOf(r.requestCode),
-                Integer.valueOf(a.mResultCode), a.mResultData});
+                Integer.valueOf(a.mResultCode), snapshotIntent(a.mResultData)});
         }
+    }
+
+    private static Intent snapshotIntent(Intent source) {
+        if (source == null) {
+            return null;
+        }
+        Intent copy = new Intent(source);
+        Bundle extras = source.getExtras();
+        if (extras != null) {
+            copy.replaceExtras(extras.deepCopy());
+        }
+        return copy;
     }
 
     /// Delivers the results queued on `r` while it was not resumed.
@@ -1010,8 +1031,11 @@ public final class ActivityThread {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                int[] grants = new int[permissions.length];
-                a.onRequestPermissionsResult(requestCode, permissions, grants);
+                Activity target = currentInstance(a);
+                if (target != null) {
+                    int[] grants = new int[permissions.length];
+                    target.onRequestPermissionsResult(requestCode, permissions, grants);
+                }
             }
         });
     }
