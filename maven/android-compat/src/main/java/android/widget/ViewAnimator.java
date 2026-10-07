@@ -156,14 +156,19 @@ public class ViewAnimator extends FrameLayout {
     @Override
     public void removeViewAt(int index) {
         super.removeViewAt(index);
+        adjustAfterRemoval(index, 1);
+    }
+
+    private void adjustAfterRemoval(int start, int count) {
         int childCount = getChildCount();
         if (childCount == 0) {
             mWhichChild = 0;
             mFirstTime = true;
-        } else if (mWhichChild >= childCount) {
-            setDisplayedChild(childCount - 1);
-        } else if (mWhichChild == index) {
-            setDisplayedChild(mWhichChild);
+        } else if (mWhichChild >= start + count) {
+            // The same visible view survived, only its index changed.
+            mWhichChild -= count;
+        } else if (mWhichChild >= start) {
+            setDisplayedChild(Math.min(start, childCount - 1));
         }
     }
 
@@ -175,12 +180,7 @@ public class ViewAnimator extends FrameLayout {
     @Override
     public void removeViews(int start, int count) {
         super.removeViews(start, count);
-        if (getChildCount() == 0) {
-            mWhichChild = 0;
-            mFirstTime = true;
-        } else if (mWhichChild >= start && mWhichChild < start + count) {
-            setDisplayedChild(mWhichChild);
-        }
+        adjustAfterRemoval(start, count);
     }
 
     @Override

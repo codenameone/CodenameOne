@@ -33,6 +33,7 @@ public abstract class AbsSpinner extends AdapterView<SpinnerAdapter> {
 
     SpinnerAdapter mAdapter;
     private AdapterDataSetObserver mDataSetObserver;
+    private int mRestorePosition = INVALID_POSITION;
 
     public AbsSpinner(Context context) {
         super(context);
@@ -80,10 +81,61 @@ public abstract class AbsSpinner extends AdapterView<SpinnerAdapter> {
         }
         int position = mItemCount > 0 ? 0 : INVALID_POSITION;
         setSelectedPositionInt(position);
+        restoreSelectionIfReady();
         mDataChanged = true;
         updateEmptyStatus();
         requestLayout();
         checkSelectionChanged();
+    }
+
+    @Override
+    protected android.os.Parcelable onSaveInstanceState() {
+        int position = mRestorePosition >= 0 ? mRestorePosition : mSelectedPosition;
+        return new SavedState(super.onSaveInstanceState(), position);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(android.os.Parcelable state) {
+        if (!(state instanceof SavedState)) {
+            super.onRestoreInstanceState(state);
+            return;
+        }
+        SavedState saved = (SavedState) state;
+        super.onRestoreInstanceState(saved.superState);
+        mRestorePosition = saved.position;
+        if (restoreSelectionIfReady()) {
+            mDataChanged = true;
+            requestLayout();
+            invalidate();
+            checkSelectionChanged();
+        }
+    }
+
+    private boolean restoreSelectionIfReady() {
+        if (mRestorePosition < 0 || mItemCount == 0 || mAdapter == null) {
+            return false;
+        }
+        // Selection follows position, matching handleDataChanged().
+        setSelectedPositionInt(Math.min(mRestorePosition, mItemCount - 1));
+        mRestorePosition = INVALID_POSITION;
+        return true;
+    }
+
+    /// In-memory state for view recreation, matching the other widgets.
+    private static final class SavedState implements android.os.Parcelable {
+        final android.os.Parcelable superState;
+        final int position;
+
+        SavedState(android.os.Parcelable superState, int position) {
+            this.superState = superState;
+            this.position = position;
+        }
+
+        @Override
+        public int describeContents() { return 0; }
+
+        @Override
+        public void writeToParcel(android.os.Parcel dest, int flags) { }
     }
 
     void setSelectedPositionInt(int position) {
@@ -93,6 +145,10 @@ public abstract class AbsSpinner extends AdapterView<SpinnerAdapter> {
 
     @Override
     void handleDataChanged() {
+        if (restoreSelectionIfReady()) {
+            checkSelectionChanged();
+            return;
+        }
         if (mSelectedPosition >= mItemCount) {
             setSelectedPositionInt(mItemCount > 0 ? mItemCount - 1 : INVALID_POSITION);
             checkSelectionChanged();

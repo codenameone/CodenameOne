@@ -112,6 +112,46 @@ public class TimePicker extends FrameLayout {
         updateSpinners();
     }
 
+    @Override
+    protected android.os.Parcelable onSaveInstanceState() {
+        return new SavedState(super.onSaveInstanceState(), mHour, mMinute, mIs24HourView);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(android.os.Parcelable state) {
+        if (!(state instanceof SavedState)) {
+            super.onRestoreInstanceState(state);
+            return;
+        }
+        SavedState saved = (SavedState) state;
+        super.onRestoreInstanceState(saved.superState);
+        mHour = saved.hour;
+        mMinute = saved.minute;
+        mIs24HourView = saved.is24Hour;
+        updateSpinners();
+    }
+
+    /// In-memory state for view recreation, matching the other widgets.
+    private static final class SavedState implements android.os.Parcelable {
+        final android.os.Parcelable superState;
+        final int hour;
+        final int minute;
+        final boolean is24Hour;
+
+        SavedState(android.os.Parcelable superState, int hour, int minute, boolean is24Hour) {
+            this.superState = superState;
+            this.hour = hour;
+            this.minute = minute;
+            this.is24Hour = is24Hour;
+        }
+
+        @Override
+        public int describeContents() { return 0; }
+
+        @Override
+        public void writeToParcel(android.os.Parcel dest, int flags) { }
+    }
+
     private static String[] amPm() {
         try {
             String[] s = new com.codename1.l10n.DateFormatSymbols().getAmPmStrings();

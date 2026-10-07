@@ -353,6 +353,12 @@ the gallery and automated tests cover a subset of those behaviors.
   with `@OnLifecycleEvent` aren't called, because there's no reflection.
 * System insets are always zero: Codename One lays an application out inside
   the safe area itself, so edge-to-edge drawing has no effect.
+* Drawable selectors keep the window-focused appearance when a window loses
+  focus. Applications needing a different appearance can update their
+  drawables in `onWindowFocusChanged()`.
+* Apply menu icon tint with `setIconTintList()` after assigning the icon, and
+  repeat after replacing it. A tint set before the icon, or on a previous
+  icon, isn't retained for the new drawable.
 * `ObjectAnimator` finds a property by name only on the framework's own
   classes (view transforms, colors, progress, drawable alpha and level), because
   there is no reflection. Animate a property of your own class through an

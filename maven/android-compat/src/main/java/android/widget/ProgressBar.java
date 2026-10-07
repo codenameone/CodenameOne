@@ -124,6 +124,42 @@ public class ProgressBar extends View {
         }
     }
 
+    @Override
+    protected android.os.Parcelable onSaveInstanceState() {
+        return new SavedState(super.onSaveInstanceState(), mProgress, mSecondaryProgress);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(android.os.Parcelable state) {
+        if (!(state instanceof SavedState)) {
+            super.onRestoreInstanceState(state);
+            return;
+        }
+        SavedState saved = (SavedState) state;
+        super.onRestoreInstanceState(saved.superState);
+        setProgress(saved.progress);
+        setSecondaryProgress(saved.secondaryProgress);
+    }
+
+    /// In-memory state for view recreation, matching the other widgets.
+    private static final class SavedState implements android.os.Parcelable {
+        final android.os.Parcelable superState;
+        final int progress;
+        final int secondaryProgress;
+
+        SavedState(android.os.Parcelable superState, int progress, int secondaryProgress) {
+            this.superState = superState;
+            this.progress = progress;
+            this.secondaryProgress = secondaryProgress;
+        }
+
+        @Override
+        public int describeContents() { return 0; }
+
+        @Override
+        public void writeToParcel(android.os.Parcel dest, int flags) { }
+    }
+
     /// True for the circular spinner styles.
     boolean isCircular() {
         return mOnlyIndeterminate;
@@ -269,6 +305,9 @@ public class ProgressBar extends View {
     }
 
     public void setProgressDrawable(Drawable d) {
+        if (mProgressDrawable != null && mProgressDrawable != d && mProgressDrawable != mIndeterminateDrawable) {
+            mProgressDrawable.setCallback(null);
+        }
         mProgressDrawable = d;
         if (d != null) {
             d.setCallback(this);
@@ -281,6 +320,9 @@ public class ProgressBar extends View {
     }
 
     public void setIndeterminateDrawable(Drawable d) {
+        if (mIndeterminateDrawable != null && mIndeterminateDrawable != d && mIndeterminateDrawable != mProgressDrawable) {
+            mIndeterminateDrawable.setCallback(null);
+        }
         mIndeterminateDrawable = d;
         if (d != null) {
             d.setCallback(this);
