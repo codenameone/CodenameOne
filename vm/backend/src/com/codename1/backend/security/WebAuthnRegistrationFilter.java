@@ -73,17 +73,17 @@ public final class WebAuthnRegistrationFilter implements SecurityFilter {
         String path = SecurityExchange.path(request);
         if ("POST".equals(method) && optionsUrl.equals(path)) {
             PublicKeyCredentialCreationOptions options =
-                    operations.createPublicKeyCredentialCreationOptions(user());
+                    operations.createPublicKeyCredentialCreationOptions(user(request));
             WebAuthnAuthenticationFilter.keep(request, PENDING, options.toMap(),
                     clock.currentTimeMillis() + validityMillis);
             return WebAuthnAuthenticationFilter.json(200, options.toMap());
         }
         if ("POST".equals(method) && registerUrl.equals(path)) {
-            return register(request, user());
+            return register(request, user(request));
         }
         if ("DELETE".equals(method) && path.startsWith(registerUrl + "/")
                 && path.indexOf('/', registerUrl.length() + 1) < 0) {
-            return delete(user(), path.substring(registerUrl.length() + 1));
+            return delete(user(request), path.substring(registerUrl.length() + 1));
         }
         return chain.doFilter(request);
     }
@@ -91,11 +91,14 @@ public final class WebAuthnRegistrationFilter implements SecurityFilter {
     /// The name of the user this request is from, who must have signed in
     /// during this session. Anybody else is refused the way the rules refuse:
     /// the chain then asks them to sign in.
-    private static String user() {
+    private static String user(HttpServer.Request request) {
         Authentication who = SecurityContextHolder.getContext().getAuthentication();
+        SecurityExchange exchange = SecurityExchange.of(request);
+        Object session = exchange == null ? null
+                : exchange.getAttribute(SecurityExchange.SESSION_AUTHENTICATION);
         if (who == null || !who.isAuthenticated() || who instanceof AnonymousAuthenticationToken
                 || who instanceof RememberMeAuthenticationToken || who.getName() == null
-                || who.getName().length() == 0) {
+                || who.getName().length() == 0 || who != session) { //NOPMD CompareObjectsWithEquals - provenance, not equal usernames
             throw new AccessDeniedException("Managing passkeys takes a sign-in made in this "
                     + "session");
         }

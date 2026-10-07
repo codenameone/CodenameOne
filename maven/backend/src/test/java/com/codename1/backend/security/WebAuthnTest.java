@@ -546,6 +546,45 @@ class WebAuthnTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void bearerCredentialsCannotManagePasskeys(boolean useApiKey) throws Exception {
+        com.codename1.backend.security.apikey.GeneratedApiKey key =
+                new com.codename1.backend.security.apikey.ApiKeyGenerator().generate("ada");
+        com.codename1.backend.security.apikey.InMemoryApiKeyRepository keys =
+                new com.codename1.backend.security.apikey.InMemoryApiKeyRepository(key.getApiKey());
+        try (SecuredServer server = SecuredServer.start(SecuredServer.settings(), "dev",
+                new Object[] {users}, APP, http -> http
+                        .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable()).formLogin(Customizer.withDefaults())
+                        .apiKey(api -> api.repository(keys))
+                        .oauth2ResourceServer(o -> o.jwt(jwt -> jwt.decoder(token ->
+                                new com.codename1.backend.security.oauth2.jwt.Jwt(token,
+                                        java.util.Collections.<String, Object>singletonMap("alg", "RS256"),
+                                        java.util.Collections.<String, Object>singletonMap("sub", "ada")))))
+                        .webAuthn(passkeys(w -> { })).build())) {
+            server.post("/login", "username=ada&password=ada-pw");
+            Passkeys phone = new Passkeys(false, RP, ORIGIN);
+            assertEquals(Boolean.TRUE, register(server, phone, null).get("success"));
+            String bearer = "Bearer " + (useApiKey ? key.getPlaintext() : "verified-token");
+            // Even a valid session for the same user must not bless a bearer override.
+            for (boolean withSession : new boolean[] {true, false}) {
+                if (!withSession) {
+                    server.cookies.clear();
+                }
+                assertEquals(200, server.get("/me", "Authorization", bearer).status);
+                assertEquals(403, server.call("POST", "/webauthn/register/options", "", JSON,
+                        "Authorization", bearer).status);
+                assertEquals(403, server.call("POST", "/webauthn/register", "{}", JSON,
+                        "Authorization", bearer).status);
+                assertEquals(403, server.call("DELETE", "/webauthn/register/"
+                        + Base64Url.encode(phone.credentialId()), null, null,
+                        "Authorization", bearer).status);
+                assertNotNull(credentials.findByCredentialId(phone.credentialId()));
+            }
+        }
+    }
+
     @Test
     @DisplayName("somebody a remember-me cookie brought back signs in again before touching passkeys")
     void rememberedIsNotEnough() throws Exception {

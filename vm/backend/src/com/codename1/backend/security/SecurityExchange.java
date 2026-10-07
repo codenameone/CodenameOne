@@ -45,6 +45,8 @@ public final class SecurityExchange {
     /// credential it has judged, so the filter that verifies tokens leaves it
     /// alone. Here, where neither filter has to name the other.
     static final String BEARER_CLAIMED = "com.codename1.backend.security.bearer.claimed";
+    /// The exact authentication loaded from the HTTP session, before request credentials.
+    static final String SESSION_AUTHENTICATION = "com.codename1.backend.security.session.authentication";
     private static final ThreadLocal<SecurityExchange> CURRENT = new ThreadLocal<SecurityExchange>();
 
     private final HttpServer.Request request;

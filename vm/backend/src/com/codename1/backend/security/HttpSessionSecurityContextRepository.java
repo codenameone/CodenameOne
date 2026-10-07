@@ -88,6 +88,10 @@ public class HttpSessionSecurityContextRepository implements SecurityContextRepo
         Object stored = session.getAttribute(SPRING_SECURITY_CONTEXT_KEY);
         if (stored instanceof Map) {
             context.setAuthentication(fromMap((Map) stored));
+            SecurityExchange exchange = SecurityExchange.of(request);
+            if (exchange != null) {
+                exchange.setAttribute(SecurityExchange.SESSION_AUTHENTICATION, context.getAuthentication());
+            }
         }
         return context;
     }
