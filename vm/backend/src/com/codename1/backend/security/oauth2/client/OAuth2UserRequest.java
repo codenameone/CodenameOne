@@ -22,16 +22,36 @@
  */
 package com.codename1.backend.security.oauth2.client;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 /// What an [OAuth2UserService] is asked with: the provider the user signed in
 /// through, and the tokens it issued.
 public class OAuth2UserRequest {
     private final ClientRegistration clientRegistration;
     private final OAuth2AccessTokenResponse tokenResponse;
+    private final Set<String> requestedScopes;
 
     public OAuth2UserRequest(ClientRegistration clientRegistration,
                              OAuth2AccessTokenResponse tokenResponse) {
+        this(clientRegistration, tokenResponse, clientRegistration.getScopes());
+    }
+
+    /// The scopes actually sent in this authorization request, after customization.
+    public OAuth2UserRequest(ClientRegistration clientRegistration,
+                             OAuth2AccessTokenResponse tokenResponse,
+                             Collection<String> requestedScopes) {
+        this.requestedScopes = Collections.unmodifiableSet(
+                new LinkedHashSet<String>(requestedScopes));
         this.clientRegistration = clientRegistration;
         this.tokenResponse = tokenResponse;
+    }
+
+    /// Used when the provider omits scope, meaning the scopes that were requested.
+    public Set<String> getRequestedScopes() {
+        return requestedScopes;
     }
 
     public ClientRegistration getClientRegistration() {

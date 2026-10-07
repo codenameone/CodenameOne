@@ -23,6 +23,7 @@
 package com.codename1.backend.security.oauth2.client;
 
 import com.codename1.backend.security.oauth2.jwt.Jwt;
+import java.util.Collection;
 
 /// An [OAuth2UserRequest] for a provider that also issued an ID token, which
 /// has been verified by the time a service sees it.
@@ -31,7 +32,14 @@ public class OidcUserRequest extends OAuth2UserRequest {
 
     public OidcUserRequest(ClientRegistration clientRegistration,
                            OAuth2AccessTokenResponse tokenResponse, Jwt idToken) {
-        super(clientRegistration, tokenResponse);
+        this(clientRegistration, tokenResponse, idToken, clientRegistration.getScopes());
+    }
+
+    /// Includes the scopes actually sent, after authorization request customization.
+    public OidcUserRequest(ClientRegistration clientRegistration,
+                           OAuth2AccessTokenResponse tokenResponse, Jwt idToken,
+                           Collection<String> requestedScopes) {
+        super(clientRegistration, tokenResponse, requestedScopes);
         this.idToken = idToken;
     }
 

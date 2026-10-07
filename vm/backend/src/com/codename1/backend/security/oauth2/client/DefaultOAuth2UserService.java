@@ -73,7 +73,7 @@ public final class DefaultOAuth2UserService
     /// when it said nothing.
     static Set<String> granted(OAuth2UserRequest request) {
         Set<String> scopes = request.getTokenResponse().getScopes();
-        return scopes.isEmpty() ? request.getClientRegistration().getScopes() : scopes;
+        return scopes.isEmpty() ? request.getRequestedScopes() : scopes;
     }
 
     static List<GrantedAuthority> authorities(String kind, Set<String> scopes) {

@@ -148,11 +148,11 @@ public final class OAuth2LoginAuthenticationFilter implements SecurityFilter {
         }
         OAuth2AccessTokenResponse tokens = tokenClient.getTokenResponse(registration, sent, code);
         OAuth2User user;
-        if (registration.getScopes().contains("openid")) {
+        if (sent.getScopes().contains("openid")) {
             user = oidcUserService.loadUser(new OidcUserRequest(registration, tokens,
-                    idToken(registration, sent, tokens)));
+                    idToken(registration, sent, tokens), sent.getScopes()));
         } else {
-            user = userService.loadUser(new OAuth2UserRequest(registration, tokens));
+            user = userService.loadUser(new OAuth2UserRequest(registration, tokens, sent.getScopes()));
         }
         if (user == null) {
             throw refused(OAuth2ErrorCodes.INVALID_USER_INFO_RESPONSE, "No user was made");

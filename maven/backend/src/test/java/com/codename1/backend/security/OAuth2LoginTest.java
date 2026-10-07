@@ -716,6 +716,44 @@ class OAuth2LoginTest {
     }
 
     @Test
+    void omittedResponseScopesUseTheCustomizedAuthorizationRequest() throws Exception {
+        try (Stub provider = stubServer()) {
+            for (boolean oidc : new boolean[] {false, true}) {
+                ClientRegistration registration = stubRegistration("narrow")
+                        .issuerUri("https://stub.example").userInfoUri(stubUrl + "/user")
+                        .userNameAttributeName("id")
+                        .scope(oidc ? "openid" : "read:user", "admin").build();
+                InMemoryClientRegistrationRepository registrations =
+                        new InMemoryClientRegistrationRepository(registration);
+                DefaultOAuth2AuthorizationRequestResolver resolver =
+                        new DefaultOAuth2AuthorizationRequestResolver(registrations);
+                resolver.setAuthorizationRequestCustomizer(builder -> builder.scopes(
+                        Arrays.asList(oidc ? "openid" : "read:user")));
+                try (SecuredServer app = app(new Object[0], http -> http
+                        .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .oauth2Login(o -> o.clientRegistrationRepository(registrations)
+                                .authorizationRequestResolver(resolver).failureHandler(recording))
+                        .build())) {
+                    Map<String, String> sent = begin(app, "narrow");
+                    assertEquals(oidc ? "openid" : "read:user", sent.get("scope"));
+                    if (oidc) {
+                        answerWith(sign(idClaims(sent.get("nonce")).build()));
+                        stub.userAnswer = "{\"sub\":\"user-1\"}";
+                    } else {
+                        stub.tokenAnswer = "access_token=stub-access&token_type=bearer";
+                        stub.userAnswer = "{\"id\":\"user-1\"}";
+                    }
+                    Reply done = app.get("/login/oauth2/code/narrow?code=c&state=" + sent.get("state"));
+                    assertEquals("/", done.header("Location"), done.toString() + failures);
+                    assertEquals(oidc ? "/who user-1 [OIDC_USER, SCOPE_openid] via narrow"
+                            : "/who user-1 [OAUTH2_USER, SCOPE_read:user] via narrow",
+                            app.get("/who").body);
+                }
+            }
+        }
+    }
+
+    @Test
     @DisplayName("a provider without OpenID Connect: the user is read from its API")
     void gitHubStyle() throws Exception {
         try (Stub provider = stubServer() ; SecuredServer app = stubApp(
