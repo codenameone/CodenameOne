@@ -51,6 +51,9 @@ public final class MigrationEntry {
     /// Creates an entry. Exactly one of text, source and java is set.
     public MigrationEntry(String version, String description, String scriptName, String dialect, String text,
             MigrationSource source, int sourceId, Integer checksum, JavaMigration java) {
+        if (description != null && description.length() > 200) {
+            throw new IllegalArgumentException("A migration description cannot exceed 200 characters");
+        }
         this.version = version == null ? null : MigrationVersion.normalize(version);
         this.description = description;
         this.scriptName = scriptName;

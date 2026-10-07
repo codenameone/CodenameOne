@@ -59,6 +59,24 @@ class MigrationEngineTest {
     }
 
     @Test
+    void descriptionsMustFitHistoryBeforeAnyMigrationRuns() throws IOException {
+        String limit = new String(new char[200]).replace('\0', 'a');
+        String tooLong = limit + "b";
+        assertThrows(IllegalArgumentException.class,
+                () -> MigrationSet.builder("default").sql("1", tooLong, "S1"));
+        assertThrows(IllegalArgumentException.class,
+                () -> MigrationSet.builder("default").repeatable(tooLong, "R1"));
+        assertThrows(IllegalArgumentException.class,
+                () -> MigrationSet.builder("default").java("1", tooLong, context -> { }));
+        FakeMigrationTarget target = new FakeMigrationTarget();
+        MigrationSet set = MigrationSet.builder("default").sql("1", limit, "S1")
+                .repeatable(limit, "R1").build();
+        assertEquals(2, migrator(target, set).migrate().getMigrationsExecuted());
+        migrator(target, set).validate();
+        assertEquals(0, migrator(target, set).migrate().getMigrationsExecuted());
+    }
+
+    @Test
     void appliesEveryPendingMigrationInVersionOrderAndRecordsIt() throws IOException {
         FakeMigrationTarget target = new FakeMigrationTarget();
         // Registered out of order on purpose: order comes from the version, not the registration.
