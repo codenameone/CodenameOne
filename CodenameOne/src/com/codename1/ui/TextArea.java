@@ -1472,6 +1472,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             actionListeners = new EventDispatcher();
         }
         actionListeners.addListener(a);
+        repaintTextSelection();
     }
 
     /// Removes an action listener
@@ -1488,6 +1489,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         if (!actionListeners.hasListeners()) {
             actionListeners = null;
         }
+        repaintTextSelection();
     }
 
     /// Checks to see if the action event is suppressed.

@@ -2047,6 +2047,9 @@
       }
       if (nativeText && event && /^(mouse|pointer|touch|key|contextmenu|copy|cut|paste)/.test(event.type)
           && event.currentTarget !== nativeText
+          // An unpressed move updates framework hover styles and tooltips. Active
+          // native-selection moves were rejected by the gesture marker above.
+          && !(/^(mouse|pointer)move$/.test(event.type) && !event.buttons)
           && (!/^key/.test(event.type) || nativeTextOwnsKey(event, nativeText))) return;
       // Programmatic scroll replay must not feed the model its browser-clamped
       // value, especially while a paint or keyboard viewport change is pending.

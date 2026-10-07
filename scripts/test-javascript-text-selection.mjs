@@ -67,6 +67,36 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('actionmutations');
+    const actionArea = page.locator('.cn1-selection-editor[name="actionMutationArea"]');
+    await actionArea.waitFor({state: 'visible'});
+    for (const add of [true, false, true, false]) {
+      await clickButton(add ? 'Add action listener' : 'Remove action listener');
+      await actionArea.waitFor({state: add ? 'hidden' : 'visible'});
+    }
+    console.log('PASS', name, 'action-listener mutations refresh native eligibility on a static form');
+
+    await openReview('associatedlabels');
+    for (const associated of [true, false, true, false]) {
+      await clickButton(associated ? 'Associate label' : 'Disassociate label');
+      await page.waitForFunction(label => document.querySelector('.cn1-selection-editor[name="associatedField"]')?.getAttribute('aria-label') === label,
+        associated ? 'Associated field label' : 'associatedField');
+    }
+    console.log('PASS', name, 'label association alone refreshes native accessible names');
+
+    if (!mobile) {
+      for (const editor of [false, true]) {
+        await openReview('nativehover');
+        const target = editor ? page.locator('.cn1-selection-editor[name="hoverNativeArea"]')
+          : page.locator('#cn1-text-layer span').filter({hasText: /^Hover native label$/});
+        assert.equal(await target.evaluate(el => getComputedStyle(el).pointerEvents), 'auto');
+        await page.mouse.move(0, 0);
+        await target.hover();
+        await page.waitForFunction(tip => document.body.innerText.includes(tip), editor ? 'Native editor tooltip' : 'Native label tooltip');
+      }
+      console.log('PASS', name, 'unpressed native label and editor hover opens framework tooltips');
+    }
+
     await openReview('accessiblelabels');
     const namedEditor = page.locator('.cn1-selection-editor[name="internalFieldName"]');
     for (const [action, label] of [[null, 'Configured accessible label'], ['Set semantic label', 'Updated semantic label'],

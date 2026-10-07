@@ -94,7 +94,28 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=accessiblelabels") >= 0) {
+        if (query.indexOf("review=actionmutations") >= 0) {
+            TextArea area = new TextArea("Action listener field"); area.setName("actionMutationArea");
+            com.codename1.ui.events.ActionListener listener = event -> {};
+            Button add = new Button("Add action listener"), remove = new Button("Remove action listener");
+            // Mutate after the button's own repaint has settled: only the setter
+            // should schedule the frame that updates native eligibility.
+            add.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> area.addActionListener(listener)));
+            remove.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> area.removeActionListener(listener)));
+            form.addAll(add, area, remove);
+        } else if (query.indexOf("review=associatedlabels") >= 0) {
+            TextArea area = new TextArea("Field content"); area.setName("associatedField");
+            Label label = new Label("Associated field label");
+            Button associate = new Button("Associate label"), clear = new Button("Disassociate label");
+            associate.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> area.setLabelForComponent(label)));
+            clear.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> area.setLabelForComponent(null)));
+            form.addAll(area, associate, clear);
+        } else if (query.indexOf("review=nativehover") >= 0) {
+            TooltipManager.enableTooltips();
+            Label label = new Label("Hover native label"); label.setTooltip("Native label tooltip");
+            TextArea area = new TextArea("Hover native editor"); area.setName("hoverNativeArea"); area.setTooltip("Native editor tooltip");
+            form.addAll(new Button("Initial focus"), label, area);
+        } else if (query.indexOf("review=accessiblelabels") >= 0) {
             TextArea area = new TextArea("Field content"); area.setName("internalFieldName"); area.setHint("Fallback hint");
             area.setAccessibilityText("Configured accessible label");
             Button semantics = new Button("Set semantic label"), associated = new Button("Use associated label"), clear = new Button("Clear accessible label");

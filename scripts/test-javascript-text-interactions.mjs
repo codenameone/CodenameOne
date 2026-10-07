@@ -34,6 +34,14 @@ callback(event('contextmenu', plainCanvas));
 assert.equal(messages.pop().args[0].defaultPrevented, false, 'no selection: preserve the browser menu');
 const text = node({ 'data-cn1-native-selection': 'true' });
 text.tagName = 'TEXTAREA';
+for (const type of ['mousemove', 'pointermove']) {
+  callback(Object.assign(event(type, text), {buttons: 0}));
+  assert.equal(messages.pop().args[0].type, type, type + ' reaches framework hover without a pressed button');
+  for (const state of [{buttons: 1}, {buttons: 0, __cn1NativeTextGesture: true}]) {
+    callback(Object.assign(event(type, text), state));
+    assert.equal(messages.length, 0, type + ' stays browser-owned during a selection gesture');
+  }
+}
 for (const type of ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'keyup', 'keypress', 'contextmenu', 'copy', 'cut', 'paste']) {
   const e = event(type, text);
   callback(e);

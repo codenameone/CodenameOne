@@ -2480,7 +2480,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `componentLabel`: a label associated with this component
     public void setLabelForComponent(Label componentLabel) {
-        this.componentLabel = componentLabel;
+        if (this.componentLabel != componentLabel) { // NOPMD CompareObjectsWithEquals
+            this.componentLabel = componentLabel;
+            accessibilityChanged(AccessibilityManager.CHANGE_CONTENT);
+            repaintTextSelection();
+        }
     }
 
     /// This method is useful since it is not a part of the public API yet
