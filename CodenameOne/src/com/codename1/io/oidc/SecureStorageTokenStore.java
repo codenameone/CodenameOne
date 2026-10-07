@@ -23,6 +23,7 @@
  */
 package com.codename1.io.oidc;
 
+import com.codename1.io.Preferences;
 import com.codename1.security.BiometricError;
 import com.codename1.security.BiometricException;
 import com.codename1.security.SecureStorage;
@@ -48,6 +49,8 @@ import com.codename1.util.SuccessCallback;
 /// every request needs. [#requireBiometrics(String)] switches to the gated half, where reading
 /// (and on Android writing) shows a biometric prompt. An application that does this should load
 /// its tokens once, when it starts, and keep them in memory -- [OidcRequestAuthorizer] does.
+/// Loading prompts only when this store saved something to read: before the first sign-in, and
+/// after [#clear(String)], it completes with null without asking the user anything.
 ///
 /// #### A platform with no secure storage
 ///
@@ -62,6 +65,8 @@ import com.codename1.util.SuccessCallback;
 public final class SecureStorageTokenStore implements TokenStore {
 
     private static final String PREFIX = "cn1.oidc.";
+    /// The preference under which the store notes that it holds a gated entry for a key.
+    private static final String HELD = "cn1.oidc.held.";
 
     private final SecureStorage fixedStorage;
     private final TokenStore plain = new TokenStore.DefaultStorageTokenStore();
@@ -125,6 +130,17 @@ public final class SecureStorageTokenStore implements TokenStore {
         final SecureStorage storage = storage();
         final String account = PREFIX + key;
         if (biometricReason != null) {
+            // Nothing was ever saved here: signed out, and no prompt to find that out.
+            // The gated half of SecureStorage cannot be asked whether an entry exists.
+            // Reading one that does not is a failure on every port, and the same failure
+            // as a keychain that could not answer -- so the first launch of an application
+            // that asked for biometrics failed with "storage unavailable" before anyone
+            // had signed in. The store therefore notes for itself, in the application's
+            // preferences, that it saved an entry; the note says that and nothing else.
+            if (!Preferences.get(HELD + key, false)) {
+                out.complete(null);
+                return out;
+            }
             storage.get(biometricReason, account)
                     .ready(new SuccessCallback<String>() {
                         @Override
@@ -139,6 +155,7 @@ public final class SecureStorageTokenStore implements TokenStore {
                                 // The entry was bound to biometrics that have since changed.
                                 // It cannot be read again by anyone, which for the caller is
                                 // the same as not being signed in.
+                                Preferences.delete(HELD + key);
                                 out.complete(null);
                             } else if (isUnavailable(err) && plainFallback) {
                                 forward(plain.load(key), out);
@@ -186,6 +203,7 @@ public final class SecureStorageTokenStore implements TokenStore {
                     .ready(new SuccessCallback<Boolean>() {
                         @Override
                         public void onSucess(Boolean stored) {
+                            noteHeld(key, stored);
                             out.complete(stored);
                         }
                     })
@@ -193,7 +211,18 @@ public final class SecureStorageTokenStore implements TokenStore {
                         @Override
                         public void onSucess(Throwable err) {
                             if (isUnavailable(err) && plainFallback) {
-                                forward(plain.save(key, toSave), out);
+                                plain.save(key, toSave).ready(new SuccessCallback<Boolean>() {
+                                    @Override
+                                    public void onSucess(Boolean stored) {
+                                        noteHeld(key, stored);
+                                        out.complete(stored);
+                                    }
+                                }).except(new SuccessCallback<Throwable>() {
+                                    @Override
+                                    public void onSucess(Throwable failed) {
+                                        out.error(failed);
+                                    }
+                                });
                             } else {
                                 out.error(failure(err, "write"));
                             }
@@ -227,6 +256,9 @@ public final class SecureStorageTokenStore implements TokenStore {
         final SecureStorage storage = storage();
         final String account = PREFIX + key;
         if (biometricReason != null) {
+            // Forgotten first: whatever the removal answers, the caller asked to be
+            // signed out, and the next load must not prompt for an entry it gave up.
+            Preferences.delete(HELD + key);
             storage.remove(biometricReason, account)
                     .ready(new SuccessCallback<Boolean>() {
                         @Override
@@ -261,6 +293,13 @@ public final class SecureStorageTokenStore implements TokenStore {
             out.error(failure(err, "remove"));
         }
         return out;
+    }
+
+    /// Notes that a gated entry was saved for `key`; see [#load(String)].
+    private static void noteHeld(String key, Boolean stored) {
+        if (Boolean.TRUE.equals(stored)) {
+            Preferences.set(HELD + key, true);
+        }
     }
 
     private SecureStorage storage() {

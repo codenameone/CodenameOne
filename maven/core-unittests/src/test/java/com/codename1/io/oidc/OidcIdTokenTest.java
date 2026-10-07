@@ -450,6 +450,26 @@ public class OidcIdTokenTest extends UITestBase {
     }
 
     @Test
+    void aTokenThatNamesNoSubjectIsNotASignIn() throws Exception {
+        Map<String, Object> anonymous = claims();
+        anonymous.remove("sub");
+        OidcException refused = IdTokenVerifier.checkClaims(Jwt.parse(sign("RS256", "k", rsa, anonymous)),
+                ISSUER, CLIENT, null, null, 300, System.currentTimeMillis());
+        assertNotNull(refused);
+        assertEquals(OidcException.INVALID_ID_TOKEN, refused.getError());
+        assertEquals("The ID token names no subject", refused.getMessage());
+        // An empty one names nobody either, and neither does one that is not text.
+        assertNotNull(IdTokenVerifier.checkClaims(Jwt.parse(sign("RS256", "k", rsa,
+                with(claims(), "sub", ""))), ISSUER, CLIENT, null, null, 300, System.currentTimeMillis()));
+        Map<String, Object> numbered = claims();
+        numbered.put("sub", Long.valueOf(7));
+        assertNotNull(IdTokenVerifier.checkClaims(Jwt.parse(sign("RS256", "k", rsa, numbered)),
+                ISSUER, CLIENT, null, null, 300, System.currentTimeMillis()));
+        assertNull(IdTokenVerifier.checkClaims(Jwt.parse(sign("RS256", "k", rsa, claims())),
+                ISSUER, CLIENT, null, null, 300, System.currentTimeMillis()));
+    }
+
+    @Test
     void anIssuerWrittenTheProvidersOwnWayIsStillThatIssuer() throws Exception {
         // Microsoft's multi-tenant discovery document names its issuer with a placeholder.
         Jwt token = Jwt.parse(sign("RS256", "k", rsa, with(claims(), "iss",

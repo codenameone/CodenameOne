@@ -107,6 +107,13 @@ final class IdTokenVerifier {
         if ((audiences > 1 || azp != null) && (azp == null || !azp.equals(clientId))) {
             return invalid("The ID token was issued to another party: azp is " + azp);
         }
+        // Who the token is about is the one thing every ID token must say (OpenID Connect
+        // Core section 2), and it is what OidcTokens.getSubject() hands the application.
+        // A token without it used to pass, and a sign-in completed for nobody in particular.
+        Object sub = claims.get("sub");
+        if (!(sub instanceof String) || ((String) sub).length() == 0) {
+            return invalid("The ID token names no subject");
+        }
         Object exp = claims.get("exp");
         if (!(exp instanceof Number)) {
             return invalid("The ID token has no expiry");

@@ -53,6 +53,8 @@ public class SecureStorageTokenStoreTest extends UITestBase {
         final Map<String, String> gated = new HashMap<String, String>();
         BiometricError gatedFailure;
         boolean refuseWrites;
+        /** How often the gated half was read: each one is a prompt on a device. */
+        int prompts;
 
         public boolean set(String account, String value) {
             if (refuseWrites) {
@@ -76,8 +78,15 @@ public class SecureStorageTokenStoreTest extends UITestBase {
 
         public AsyncResource<String> get(String reason, String account) {
             AsyncResource<String> r = new AsyncResource<String>();
+            prompts++;
             if (gatedFailure != null) {
                 r.error(new BiometricException(gatedFailure, "simulated"));
+            } else if (!gated.containsKey(account)) {
+                // As the ports answer for an entry that is not there: Android, iOS and the
+                // simulator all report it with the code they use for a failure they cannot
+                // name. This used to complete with null, which no port does.
+                r.error(new BiometricException(BiometricError.UNKNOWN,
+                        "No secure storage entry for account: " + account));
             } else {
                 r.complete(gated.get(account));
             }
@@ -109,6 +118,7 @@ public class SecureStorageTokenStoreTest extends UITestBase {
     @AfterEach
     void clearPlainStorage() {
         Storage.getInstance().deleteStorageFile("cn1.oidc." + KEY);
+        com.codename1.io.Preferences.delete("cn1.oidc.held." + KEY);
     }
 
     private static void assertUnavailable(Throwable error) {
@@ -236,16 +246,61 @@ public class SecureStorageTokenStoreTest extends UITestBase {
     }
 
     @Test
+    void beforeAnyoneSignedInABiometricStoreIsSignedOutAndDoesNotPrompt() {
+        FakeSecureStorage storage = new FakeSecureStorage();
+        SecureStorageTokenStore store = new SecureStorageTokenStore(storage)
+                .requireBiometrics("Unlock your session");
+
+        // The first launch: nothing was ever saved, and the platform reports reading
+        // nothing as a failure it has no name for.
+        OidcTestSupport.Outcome<OidcTokens> first = await(store.load(KEY));
+        assertNull(first.error, String.valueOf(first.error));
+        assertNull(first.value);
+        assertEquals(0, storage.prompts, "the user was prompted to read an entry that was never saved");
+
+        // Signed in: now there is something to read, and reading it prompts.
+        await(store.save(KEY, tokens("AT", "RT")));
+        assertEquals("AT", await(store.load(KEY)).value.getAccessToken());
+        assertEquals(1, storage.prompts);
+
+        // Signed out again: as on the first launch.
+        await(store.clear(KEY));
+        OidcTestSupport.Outcome<OidcTokens> after = await(store.load(KEY));
+        assertNull(after.error, String.valueOf(after.error));
+        assertNull(after.value);
+        assertEquals(1, storage.prompts);
+    }
+
+    @Test
+    void anEntryThatWasSavedAndCannotBeReadIsStillAnError() {
+        FakeSecureStorage storage = new FakeSecureStorage();
+        SecureStorageTokenStore store = new SecureStorageTokenStore(storage)
+                .requireBiometrics("Unlock your session");
+        await(store.save(KEY, tokens("AT", "RT")));
+        // Gone from under the store, by something that was not this store.
+        storage.gated.clear();
+
+        OidcTestSupport.Outcome<OidcTokens> r = await(store.load(KEY));
+
+        assertUnavailable(r.error);
+    }
+
+    @Test
     void anEntryRevokedByNewBiometricsReadsAsSignedOut() {
         FakeSecureStorage storage = new FakeSecureStorage();
         SecureStorageTokenStore store = new SecureStorageTokenStore(storage)
                 .requireBiometrics("Unlock your session");
+        await(store.save(KEY, tokens("AT", "RT")));
         storage.gatedFailure = BiometricError.KEY_REVOKED;
 
         OidcTestSupport.Outcome<OidcTokens> r = await(store.load(KEY));
 
         assertNull(r.error);
         assertNull(r.value);
+        // And it is not asked for again: the entry is gone for good.
+        int prompts = storage.prompts;
+        assertNull(await(store.load(KEY)).value);
+        assertEquals(prompts, storage.prompts);
     }
 
     @Test
@@ -253,6 +308,7 @@ public class SecureStorageTokenStoreTest extends UITestBase {
         FakeSecureStorage storage = new FakeSecureStorage();
         SecureStorageTokenStore store = new SecureStorageTokenStore(storage)
                 .requireBiometrics("Unlock your session");
+        await(store.save(KEY, tokens("AT", "RT")));
         storage.gatedFailure = BiometricError.USER_CANCELED;
 
         OidcTestSupport.Outcome<OidcTokens> r = await(store.load(KEY));
