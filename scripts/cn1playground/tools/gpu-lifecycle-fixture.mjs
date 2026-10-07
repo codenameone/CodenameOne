@@ -33,5 +33,6 @@ form.show();
 UITimer.timer(1500, false, Display.getInstance().getCurrent(), () -> {
     form.add(BorderLayout.CENTER, view);
     form.revalidate();
+    System.out.println("[gpu-lifecycle] attached");
 });
 `;

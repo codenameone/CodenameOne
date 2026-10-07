@@ -119,6 +119,14 @@ async function run(slug, title, width, exercise, caseName = slug, script = null)
         await page.waitForTimeout(100);
       }
       assert.ok(log.some(m => m.text.startsWith('[playground] preview updated')), 'Sample did not initialize');
+      if (script === gpuLifecycleScript) {
+        // This fixture intentionally attaches after preview initialization. Its
+        // timer must finish before the rendering/animation observation window.
+        while (!log.some(m => m.text.includes('[gpu-lifecycle] attached')) && Date.now() < deadline) {
+          await page.waitForTimeout(100);
+        }
+        assert.ok(log.some(m => m.text.includes('[gpu-lifecycle] attached')), 'GPU fixture did not attach');
+      }
       const consent = page.getByRole('button', {name: 'Keep Crisp Disabled', exact: true});
       if (await consent.count()) await consent.click();
       const region = await preview(page, title);
