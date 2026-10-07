@@ -553,6 +553,9 @@ public final class NetworkManager {
         }
         final String origin = originOf(baseUrl);
         String path = pathOf(baseUrl);
+        if (path == null) {
+            throw new IllegalArgumentException("baseUrl has an ambiguous path");
+        }
         int end = path.length();
         for (int i = 0; i < path.length(); i++) {
             char c = path.charAt(i);
@@ -662,6 +665,9 @@ public final class NetworkManager {
             return false;
         }
         String path = pathOf(base);
+        if (path == null) {
+            return false;
+        }
         while (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
         }
@@ -672,7 +678,7 @@ public final class NetworkManager {
     /// it. `base` has no trailing slash. The comparison is exact, and `base` must end where
     /// a segment of `rest` ends: `/api` is not a prefix of `/apiary`.
     static boolean pathCovers(String base, String rest) {
-        if (!rest.startsWith(base)) {
+        if (rest == null || !rest.startsWith(base)) {
             return false;
         }
         if (rest.length() == base.length()) {
@@ -693,14 +699,72 @@ public final class NetworkManager {
         return url.length();
     }
 
-    /// What follows the authority of `url`: its path, query and fragment. Empty when it has
-    /// none, and when `url` is not absolute.
+    /// The normalized path, followed by the query and fragment. Literal and encoded dot
+    /// segments are removed before authorization scope is compared. Ambiguous separators,
+    /// nested encoding and control characters fail closed across differing HTTP transports.
+    /// Empty when the URL has no path; null when the path is ambiguous.
     static String pathOf(String url) {
         int scheme = url == null ? -1 : url.indexOf("://");
         if (scheme < 0) {
             return "";
         }
-        return url.substring(authorityEnd(url, scheme + 3));
+        String rest = url.substring(authorityEnd(url, scheme + 3));
+        int end = rest.length();
+        for (int i = 0; i < rest.length(); i++) {
+            if (rest.charAt(i) == '?' || rest.charAt(i) == '#') {
+                end = i;
+                break;
+            }
+        }
+        StringBuilder decoded = new StringBuilder(end);
+        for (int i = 0; i < end; i++) {
+            char c = rest.charAt(i);
+            if (c == '\\' || c <= ' ' || c == 127) {
+                return null;
+            }
+            if (c == '%') {
+                if (i + 2 >= end) {
+                    return null;
+                }
+                int high = Character.digit(rest.charAt(i + 1), 16);
+                int low = Character.digit(rest.charAt(i + 2), 16);
+                if (high < 0 || low < 0) {
+                    return null;
+                }
+                int value = high * 16 + low;
+                if (value == 46) {
+                    c = '.';
+                    i += 2;
+                } else if (value == 47 || value == 92 || value == 37 || value >= 0 && value <= 32
+                        || value == 127) {
+                    return null;
+                }
+            }
+            decoded.append(c);
+        }
+        String rawPath = decoded.toString();
+        if (rawPath.indexOf("//") >= 0) {
+            return null;
+        }
+        ArrayList<String> segments = new ArrayList<String>();
+        for (String segment : Util.split(rawPath, "/")) {
+            if ("..".equals(segment)) {
+                if (!segments.isEmpty()) {
+                    segments.remove(segments.size() - 1);
+                }
+            } else if (segment.length() > 0 && !".".equals(segment)) {
+                segments.add(segment);
+            }
+        }
+        StringBuilder normalized = new StringBuilder(rest.length());
+        for (String segment : segments) {
+            normalized.append('/').append(segment);
+        }
+        if (rawPath.length() > 0 && (normalized.length() == 0 || rawPath.endsWith("/")
+                || rawPath.endsWith("/.") || rawPath.endsWith("/.."))) {
+            normalized.append('/');
+        }
+        return normalized.append(rest.substring(end)).toString();
     }
 
     /// The origin of a URL in one spelling, so that two URLs of one origin compare equal as

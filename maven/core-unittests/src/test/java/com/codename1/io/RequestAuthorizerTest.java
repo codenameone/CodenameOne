@@ -167,6 +167,30 @@ public class RequestAuthorizerTest extends UITestBase {
     // ---- which requests get the header --------------------------------
 
     @Test
+    void authorizationCoverageUsesNormalizedPaths() {
+        NetworkManager nm = NetworkManager.getInstance();
+        String base = API + "/api";
+        nm.setAuthorizer(base, authorizer);
+        try {
+            for (String path : new String[] {"/api/../public/upload", "/api/%2e%2e/public/upload",
+                    "/api/.%2E/public/upload", "/api/%2E./public/upload", "/api/a/../../public",
+                    "/api/%2e%2e%2fpublic", "/api/..\\public", "/api//../public",
+                    "/api/%252e%252e/public"}) {
+                assertNull(nm.getAuthorizer(API + path), path);
+                assertFalse(NetworkManager.covers(base, API + path), path);
+                seenByApi.clear();
+                send(new Probe(API + path));
+                assertEquals(Collections.singletonList("null"), seenByApi, path);
+            }
+            assertSame(authorizer, nm.getAuthorizer(API + "/api/a/../pets"));
+            assertSame(authorizer, nm.getAuthorizer(API + "/public/../api/pets"));
+            assertSame(authorizer, nm.getAuthorizer(API + "/api/./pets?next=/../public"));
+        } finally {
+            nm.setAuthorizer(base, null);
+        }
+    }
+
+    @Test
     void theDefaultAuthorizerCoversItsBaseUrlAndNothingElse() {
         accepted = "Bearer T1";
         NetworkManager.getInstance().setAuthorizer(API, authorizer);
