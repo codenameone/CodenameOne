@@ -61,6 +61,17 @@ test('sampling waits for delayed visible animation without changing pixel requir
   assert.ok(Object.values(sceneChecks(frames, region, 'cube')).every(Boolean));
 });
 
+test('slow screenshots get an animation window after the first visible frame', async () => {
+  let time = 0;
+  const frames = await sampleScene(async i => {
+    time += 3000;
+    return fixture({kind: 'cube', blank: i === 0, offset: i % 2 ? 8 : 0});
+  }, async ms => { time += ms; }, region, 'cube', () => time);
+  assert.equal(frames.length, 3);
+  assert.ok(Object.values(sceneChecks(frames, region, 'cube')).every(Boolean));
+  assert.ok(time < 16000);
+});
+
 for (const condition of ['blank', 'frozen', 'wrong-size']) {
   test('sampling still rejects ' + condition + ' scenes at its deadline', async () => {
     let time = 0;
