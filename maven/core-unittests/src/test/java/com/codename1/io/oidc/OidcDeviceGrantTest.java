@@ -299,16 +299,31 @@ public class OidcDeviceGrantTest extends UITestBase {
     }
 
     @Test
+    void deviceAuthorizationRequiresABoundedNumericExpiry() {
+        Map<String, Object> json = new HashMap<String, Object>();
+        json.put("device_code", "DC");
+        json.put("user_code", "AAAA-BBBB");
+        json.put("verification_uri", ISSUER + "/activate");
+        for (Object invalid : new Object[] {null, "later", Long.valueOf(-1),
+                Long.valueOf(Long.MAX_VALUE), Double.valueOf(Double.NaN), Double.valueOf(1.5)}) {
+            json.put("expires_in", invalid);
+            assertThrows(IllegalArgumentException.class, () -> OidcDeviceAuthorization.fromJson(json),
+                    String.valueOf(invalid));
+        }
+    }
+
+    @Test
     void theIntervalDefaultsToFiveSecondsAndTheOldUriNameIsRead() {
         Map<String, Object> json = new HashMap<String, Object>();
         json.put("device_code", "DC");
         json.put("user_code", "AAAA-BBBB");
         json.put("verification_url", "https://example.com/device");
+        json.put("expires_in", Integer.valueOf(600));
         OidcDeviceAuthorization d = OidcDeviceAuthorization.fromJson(json);
 
         assertEquals(5, d.getInterval());
         assertEquals("https://example.com/device", d.getVerificationUri());
-        assertNull(d.getExpiresAt());
+        assertNotNull(d.getExpiresAt());
         assertFalse(d.isExpired());
     }
 

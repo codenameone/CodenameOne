@@ -68,7 +68,8 @@ public final class OidcDeviceAuthorization {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: when the response has no `device_code`, no `user_code`
-    ///   or no verification address
+    ///   or no verification address, or `expires_in` is not a nonnegative integer
+    ///   that can be represented as an expiry time
     public static OidcDeviceAuthorization fromJson(Map<String, Object> json) {
         if (json == null) {
             throw new IllegalArgumentException("json must not be null");
@@ -90,9 +91,14 @@ public final class OidcDeviceAuthorization {
             throw new IllegalArgumentException(
                     "A device authorization response needs verification_uri");
         }
-        long expiresIn = number(json.get("expires_in"), -1);
-        Date expiresAt = expiresIn < 0 ? null
-                : new Date(System.currentTimeMillis() + expiresIn * 1000L);
+        Object expiry = json.get("expires_in");
+        long expiresIn = number(expiry, -1);
+        long now = System.currentTimeMillis();
+        if (expiresIn < 0 || expiresIn > (Long.MAX_VALUE - now) / 1000L
+                || (expiry instanceof Number && ((Number) expiry).doubleValue() != (double) expiresIn)) {
+            throw new IllegalArgumentException("A device authorization response needs a valid expires_in");
+        }
+        Date expiresAt = new Date(now + expiresIn * 1000L);
         long interval = number(json.get("interval"), DEFAULT_INTERVAL);
         if (interval < 1) {
             interval = DEFAULT_INTERVAL;
@@ -129,7 +135,7 @@ public final class OidcDeviceAuthorization {
     ///
     /// #### Returns
     ///
-    /// the moment, or null when the server did not say
+    /// the moment computed from the required `expires_in` response value
     public Date getExpiresAt() {
         return expiresAt == null ? null : new Date(expiresAt.getTime());
     }
