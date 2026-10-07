@@ -53,4 +53,53 @@ public class ObjectAnimatorSetPropertyTest {
         assertEquals(25f, ((Float) a.getAnimatedValue("value")).floatValue(), 1e-3f);
         assertNull(a.getAnimatedValue("other"));
     }
+
+    @Test
+    public void cancelFromStartListenerDoesNotStartChildrenOrLaterListeners() {
+        final int[] starts = {0};
+        final int[] childStarts = {0};
+        ValueAnimator child = ValueAnimator.ofFloat(0f, 1f);
+        child.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationStart(Animator animation) {
+                childStarts[0]++;
+            }
+        });
+        AnimatorSet set = new AnimatorSet();
+        set.playTogether(child);
+        set.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationStart(Animator animation) {
+                animation.cancel();
+            }
+        });
+        set.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationStart(Animator animation) {
+                starts[0]++;
+            }
+        });
+        set.start();
+        assertEquals(0, starts[0]);
+        assertEquals(0, childStarts[0]);
+    }
+
+    @Test
+    public void cancelFromFirstChildStartDoesNotStartAnotherReadyChild() {
+        com.codename1.androidcompat.testing.AndroidTestSupport.context();
+        final int[] secondStarts = {0};
+        final AnimatorSet set = new AnimatorSet();
+        ValueAnimator first = ValueAnimator.ofFloat(0f, 1f);
+        first.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationStart(Animator animation) {
+                set.cancel();
+            }
+        });
+        ValueAnimator second = ValueAnimator.ofFloat(0f, 1f);
+        second.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationStart(Animator animation) {
+                secondStarts[0]++;
+            }
+        });
+        set.playTogether(first, second);
+        set.start();
+        assertEquals(0, secondStarts[0]);
+    }
 }

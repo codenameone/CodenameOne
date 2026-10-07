@@ -243,8 +243,16 @@ public class ComponentActivity extends Activity
                 new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
                     @Override
                     public void run() {
-                        if (mRegistrations.get(Integer.valueOf(requestCode)) == Registration.this) {
-                            callback.onActivityResult(value);
+                        Activity current = ActivityThread.currentInstance(ComponentActivity.this);
+                        if (current instanceof ComponentActivity) {
+                            Registration<?, ?> r = ((ComponentActivity) current)
+                                    .mRegistrations.get(Integer.valueOf(requestCode));
+                            if (r != null) {
+                                @SuppressWarnings("unchecked")
+                                ActivityResultCallback<O> currentCallback =
+                                        (ActivityResultCallback<O>) r.callback;
+                                currentCallback.onActivityResult(value);
+                            }
                         }
                     }
                 });

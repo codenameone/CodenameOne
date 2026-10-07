@@ -207,6 +207,8 @@ public final class AndroidTestSupport {
 
         /// The results this instance's callback received.
         public final java.util.List<android.net.Uri> results = new java.util.ArrayList<android.net.Uri>();
+        public androidx.activity.result.ActivityResultLauncher<String> immediateLauncher;
+        public final java.util.List<String> immediateResults = new java.util.ArrayList<String>();
 
         @Override
         protected void onCreate(android.os.Bundle savedInstanceState) {
@@ -216,6 +218,22 @@ public final class AndroidTestSupport {
                         @Override
                         public void onActivityResult(android.net.Uri result) {
                             results.add(result);
+                        }
+                    });
+            immediateLauncher = registerForActivityResult(
+                    new androidx.activity.result.contract.ActivityResultContract<String, String>() {
+                        @Override public android.content.Intent createIntent(Context context, String input) {
+                            throw new AssertionError("synchronous contract does not create an intent");
+                        }
+                        @Override public String parseResult(int resultCode, android.content.Intent intent) {
+                            throw new AssertionError("synchronous contract does not parse a result");
+                        }
+                        @Override public SynchronousResult<String> getSynchronousResult(Context context, String input) {
+                            return new SynchronousResult<String>(input);
+                        }
+                    }, new androidx.activity.result.ActivityResultCallback<String>() {
+                        @Override public void onActivityResult(String result) {
+                            immediateResults.add(result);
                         }
                     });
         }

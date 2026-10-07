@@ -354,6 +354,10 @@ public final class ActivityThread {
                         // A configuration change it missed while covered,
                         // as when it comes back through finish().
                         target = relaunch(target, target.relaunchPending, false);
+                        if (target == null) {
+                            resumeRecord(current, false);
+                            return;
+                        }
                     }
                     STACK.remove(i);
                     STACK.add(target);
@@ -507,8 +511,14 @@ public final class ActivityThread {
             return;
         }
         a.hostsDispatchActivityCreated();
+        if (!isLive(r)) {
+            return;
+        }
         for (Application.ActivityLifecycleCallbacks cb : app.callbacks()) {
             cb.onActivityCreated(a, saved);
+            if (!isLive(r)) {
+                return;
+            }
         }
         // Android restores the instance state and calls onPostCreate after
         // onStart, so they run in the first start(): a relaunched activity
@@ -537,8 +547,14 @@ public final class ActivityThread {
             return;
         }
         a.hostsDispatchStart();
+        if (!isLive(r)) {
+            return;
+        }
         for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
             cb.onActivityStarted(a);
+            if (!isLive(r)) {
+                return;
+            }
         }
         if (isLive(r) && r.postCreatePending) {
             r.postCreatePending = false;
@@ -602,6 +618,9 @@ public final class ActivityThread {
         }
         for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
             cb.onActivityResumed(a);
+            if (!isLive(r) || top() != r) {
+                return;
+            }
         }
         if (!isLive(r) || top() != r) {
             return;
@@ -714,6 +733,7 @@ public final class ActivityThread {
                 pause(r);
             }
             Record below = top();
+            boolean wasLast = below == null;
             if (below != null) {
                 if (below.relaunchPending != 0) {
                     Activity replaced = below.activity;
@@ -722,18 +742,20 @@ public final class ActivityThread {
                     // the stack to the new instance, but this one was just
                     // taken off it: without this its result went to the
                     // destroyed caller and was dropped.
-                    if (r.caller == replaced) {
+                    if (below != null && r.caller == replaced) {
                         r.caller = below.activity;
                     }
                 }
                 // Queued rather than delivered now: resumeRecord restarts the
                 // stopped caller (onRestart, onStart) and only then hands it
                 // its pending results, before onResume, as Android does.
-                queueResult(r);
-                resumeRecord(below, true);
+                if (below != null) {
+                    queueResult(r);
+                    resumeRecord(below, true);
+                }
             }
             destroy(r, false);
-            if (below == null) {
+            if (wasLast && STACK.isEmpty()) {
                 AndroidRuntime.getInstance().onLastActivityFinished();
             }
         } else {
@@ -844,18 +866,33 @@ public final class ActivityThread {
         a.mConfigChangeFlags = changes;
         if (r.resumed) {
             pause(r);
+            if (!isLive(r)) {
+                return null;
+            }
         }
         if (r.started) {
             stop(r);
+            if (!isLive(r)) {
+                return null;
+            }
         }
         Bundle saved = r.savedState;
         if (saved == null) {
             saved = new Bundle();
             a.onSaveInstanceState(saved);
+            if (!isLive(r)) {
+                return null;
+            }
         }
         int[] requests = a.snapshotFragmentRequests();
         Object nonConfig = a.onRetainNonConfigurationInstance();
+        if (!isLive(r)) {
+            return null;
+        }
         java.util.HashMap<String, ArrayList<Fragment>> retained = a.hostsRetainNonConfig();
+        if (!isLive(r)) {
+            return null;
+        }
         destroy(r, true);
         Activity fresh = AndroidRuntime.getInstance().getApp().createActivity(r.info.type);
         fresh.mLastNonConfigurationInstance = nonConfig;
@@ -921,7 +958,9 @@ public final class ActivityThread {
             if (t.relaunchPending != 0) {
                 t = relaunch(t, t.relaunchPending, false);
             }
-            resumeRecord(t, false);
+            if (t != null) {
+                resumeRecord(t, false);
+            }
         }
     }
 

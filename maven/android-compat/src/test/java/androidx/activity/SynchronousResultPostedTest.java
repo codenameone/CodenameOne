@@ -23,7 +23,9 @@
 package androidx.activity;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
 
+import android.app.ActivityThread;
 import android.content.Context;
 import android.content.Intent;
 
@@ -91,5 +93,32 @@ public class SynchronousResultPostedTest {
         launcher.unregister();
         MainThreadRule.drain();
         assertEquals("returned;result:x;", events.toString());
+    }
+
+    @Test
+    public void aPostedResultReachesTheRecreatedRegistrationAndNotTheOldInstance() {
+        Context app = AndroidTestSupport.context().getApplicationContext();
+        app.startActivity(new Intent(app, AndroidTestSupport.GalleryActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        AndroidTestSupport.GalleryActivity old =
+                (AndroidTestSupport.GalleryActivity) ActivityThread.getTopActivity();
+        try {
+            old.immediateLauncher.launch("before-recreate");
+            old.recreate();
+            AndroidTestSupport.GalleryActivity fresh =
+                    (AndroidTestSupport.GalleryActivity) ActivityThread.getTopActivity();
+            assertNotSame(old, fresh);
+            MainThreadRule.drain();
+            assertEquals(0, old.immediateResults.size());
+            assertEquals(1, fresh.immediateResults.size());
+            assertEquals("before-recreate", fresh.immediateResults.get(0));
+
+            fresh.immediateLauncher.launch("after-finish");
+            fresh.finish();
+            MainThreadRule.drain();
+            assertEquals(1, fresh.immediateResults.size());
+        } finally {
+            ActivityThread.finishAllActivities();
+        }
     }
 }

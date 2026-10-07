@@ -23,6 +23,7 @@
 package android.content;
 
 import android.net.Uri;
+import android.os.Bundle;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
 import com.codename1.androidcompat.testing.MainThreadRule;
@@ -108,6 +109,33 @@ public class BroadcastFilterMatchTest {
             assertEquals("myapp://first", ping.seen.get(0));
         } finally {
             c.unregisterReceiver(ping);
+        }
+    }
+
+    @Test
+    public void mutableExtrasAreCapturedWhenTheBroadcastIsSent() {
+        Context c = AndroidTestSupport.context();
+        final int[] received = {-1, -1};
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                received[0] = intent.getIntArrayExtra("numbers")[0];
+                received[1] = intent.getBundleExtra("nested").getInt("value");
+            }
+        };
+        c.registerReceiver(receiver, new IntentFilter("com.codename1.test.EXTRA"));
+        try {
+            int[] numbers = {7};
+            Bundle nested = new Bundle();
+            nested.putInt("value", 11);
+            c.sendBroadcast(new Intent("com.codename1.test.EXTRA")
+                    .putExtra("numbers", numbers).putExtra("nested", nested));
+            numbers[0] = 9;
+            nested.putInt("value", 13);
+            MainThreadRule.drain();
+            assertEquals(7, received[0]);
+            assertEquals(11, received[1]);
+        } finally {
+            c.unregisterReceiver(receiver);
         }
     }
 

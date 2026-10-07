@@ -40,6 +40,72 @@ public class ActivityBoundaryTest {
     @Test public void finishFromSaveCallback() { finishWhileStopping("saveCallback"); }
     @Test public void finishFromStopCallback() { finishWhileStopping("stopCallback"); }
 
+    @Test public void recreateStopsWhenPauseOrStopFinishesTheActivity() {
+        for (String boundary : new String[] {"pause", "stop"}) {
+            Context c = AndroidTestSupport.context().getApplicationContext();
+            c.startActivity(new Intent(c, AndroidTestSupport.FinishingActivity.class)
+                    .putExtra("finishAt", boundary).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            AndroidTestSupport.FinishingActivity old = AndroidTestSupport.FinishingActivity.last;
+            old.recreate();
+            assertEquals(old.events.toString(), 1,
+                    java.util.Collections.frequency(old.events, "destroy"));
+            assertEquals("a finished activity must not be replaced", null,
+                    ActivityThread.currentInstance(old));
+            ActivityThread.finishAllActivities();
+        }
+    }
+
+    @Test public void laterLifecycleCallbacksDoNotRunAfterFinish() {
+        for (final String boundary : new String[] {"created", "started", "resumed"}) {
+            final Context c = AndroidTestSupport.context().getApplicationContext();
+            final Application app = (Application) c;
+            final int[] late = {0};
+            Application.ActivityLifecycleCallbacks finishing = new LifecycleCallbackAdapter() {
+                @Override public void onActivityCreated(Activity a, Bundle b) {
+                    if ("created".equals(boundary)) a.finish();
+                }
+                @Override public void onActivityStarted(Activity a) {
+                    if ("started".equals(boundary)) a.finish();
+                }
+                @Override public void onActivityResumed(Activity a) {
+                    if ("resumed".equals(boundary)) a.finish();
+                }
+            };
+            Application.ActivityLifecycleCallbacks later = new LifecycleCallbackAdapter() {
+                @Override public void onActivityCreated(Activity a, Bundle b) {
+                    if ("created".equals(boundary)) late[0]++;
+                }
+                @Override public void onActivityStarted(Activity a) {
+                    if ("started".equals(boundary)) late[0]++;
+                }
+                @Override public void onActivityResumed(Activity a) {
+                    if ("resumed".equals(boundary)) late[0]++;
+                }
+            };
+            app.registerActivityLifecycleCallbacks(finishing);
+            app.registerActivityLifecycleCallbacks(later);
+            try {
+                c.startActivity(new Intent(c, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                assertEquals(boundary, 0, late[0]);
+            } finally {
+                app.unregisterActivityLifecycleCallbacks(finishing);
+                app.unregisterActivityLifecycleCallbacks(later);
+                ActivityThread.finishAllActivities();
+            }
+        }
+    }
+
+    private abstract static class LifecycleCallbackAdapter implements Application.ActivityLifecycleCallbacks {
+        public void onActivityCreated(Activity a, Bundle b) { }
+        public void onActivityStarted(Activity a) { }
+        public void onActivityResumed(Activity a) { }
+        public void onActivityPaused(Activity a) { }
+        public void onActivityStopped(Activity a) { }
+        public void onActivitySaveInstanceState(Activity a, Bundle b) { }
+        public void onActivityDestroyed(Activity a) { }
+    }
+
     private void finishWhileStopping(final String at) {
         Context c = AndroidTestSupport.context().getApplicationContext();
         c.startActivity(new Intent(c, AndroidTestSupport.FinishingActivity.class)

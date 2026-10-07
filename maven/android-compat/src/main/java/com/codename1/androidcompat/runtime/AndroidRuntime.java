@@ -32,6 +32,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.net.Uri;
+import android.os.Bundle;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -458,7 +459,12 @@ public final class AndroidRuntime {
     /// intent afterwards, as on Android, which hands it to the system
     /// before `sendBroadcast` returns.
     public void sendBroadcast(final Context from, final Intent intent) {
-        CN.callSerially(new Broadcast(new ArrayList<Object[]>(receivers), from, new Intent(intent)));
+        Intent snapshot = new Intent(intent);
+        Bundle extras = intent.getExtras();
+        if (extras != null) {
+            snapshot.replaceExtras(extras.deepCopy());
+        }
+        CN.callSerially(new Broadcast(new ArrayList<Object[]>(receivers), from, snapshot));
     }
 
     /// Delivers one broadcast to the receivers registered when it was sent.

@@ -274,7 +274,13 @@ public final class AnimatorSet extends Animator {
         if (l != null) {
             for (AnimatorListener a : l) {
                 a.onAnimationStart(this);
+                if (!mStarted || mTerminating) {
+                    return;
+                }
             }
+        }
+        if (!mStarted || mTerminating) {
+            return;
         }
         if (mNodes.isEmpty()) {
             finish(false);
@@ -311,6 +317,9 @@ public final class AnimatorSet extends Animator {
         while (progress && mStarted && !mTerminating) {
             progress = false;
             for (Node node : new ArrayList<Node>(mNodes)) {
+                if (!mStarted || mTerminating) {
+                    return;
+                }
                 if (!node.started && node.ready()) {
                     node.started = true;
                     node.animation.start();
