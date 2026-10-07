@@ -26,7 +26,8 @@ package com.codename1.impl.migration;
 /// and compared as numbers, so `1.10` is newer than `1.9` and `1.0` equals `1`.
 ///
 /// Written by hand because the code runs where there is no regular expression engine and no
-/// `String.split`. A part holds up to 18 digits.
+/// `String.split`. A part holds up to 18 digits; the complete version fits the
+/// history table's 50-character column.
 ///
 /// Internal migration runtime; not an application API.
 /// @hidden
@@ -37,7 +38,7 @@ public final class MigrationVersion {
 
     /// Whether the text is a version: digit runs separated by single dots or underscores.
     public static boolean isValid(String version) {
-        if (version == null || version.length() == 0) {
+        if (version == null || version.length() == 0 || version.length() > 50) {
             return false;
         }
         int digits = 0;

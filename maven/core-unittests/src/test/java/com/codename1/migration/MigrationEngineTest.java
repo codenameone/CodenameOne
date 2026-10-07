@@ -59,6 +59,22 @@ class MigrationEngineTest {
     }
 
     @Test
+    void versionsMustFitTheHistoryColumn() throws IOException {
+        String limit = "123456789012345678_123456789012345678_123456789012";
+        assertEquals(50, limit.length());
+        String tooLong = limit + "3";
+        assertThrows(IllegalArgumentException.class,
+                () -> MigrationSet.builder("default").sql(tooLong, "too long", "S1"));
+        assertThrows(IllegalArgumentException.class,
+                () -> MigrationSet.builder("default").java(tooLong, "too long", context -> { }));
+        MigrationSet set = MigrationSet.builder("default").sql(limit, "boundary", "S1").build();
+        FakeMigrationTarget target = new FakeMigrationTarget();
+        assertEquals(limit.replace('_', '.'), migrator(target, set).migrate().getTargetVersion());
+        migrator(target, set).validate();
+        assertEquals(0, migrator(target, set).migrate().getMigrationsExecuted());
+    }
+
+    @Test
     void descriptionsMustFitHistoryBeforeAnyMigrationRuns() throws IOException {
         String limit = new String(new char[200]).replace('\0', 'a');
         String tooLong = limit + "b";
