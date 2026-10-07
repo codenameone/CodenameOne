@@ -478,7 +478,7 @@ public final class NetworkManager {
     /// comes here -- it is handed the header with the request, see
     /// [ConnectionRequest#captureAuthorization(boolean)].
     private AuthorizerEntry[] authorizers = new AuthorizerEntry[0];
-    /// Whether a default authorizer was ever registered. Set once and never cleared, and
+    /// Whether a default authorizer is registered. Cleared when the last one is removed, and
     /// the one thing about authorizers a thread other than the EDT looks at: it decides
     /// only whether a request queued from that thread has to pass through the EDT first.
     /// It is not what protects anything -- the registrations themselves are never read
@@ -588,6 +588,7 @@ public final class NetworkManager {
                     next.add(new AuthorizerEntry(origin, basePath, authorizer));
                 }
                 authorizers = next.toArray(new AuthorizerEntry[next.size()]);
+                authorizerRegistered = authorizers.length != 0;
             }
         });
     }
@@ -910,7 +911,9 @@ public final class NetworkManager {
     /// - `request`: network request for execution
     public void addToQueue(final ConnectionRequest request) {
         if (Display.isInitialized() && !Display.getInstance().isEdt()) {
-            if (!authorizerRegistered && request.getAuthorizer() == null) {
+            if ((!authorizerRegistered && request.getAuthorizer() == null)
+                    || request.getAuthorizer() == RequestAuthorizer.NONE
+                    || request.getRequestHeader("Authorization") != null) {
                 // No authorizer can have a header for it: queued from here as it always
                 // was, without a look at anything the EDT owns.
                 addToQueue(request, false);
