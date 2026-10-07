@@ -85,6 +85,19 @@ public final class RequestMatchers {
             public String toString() {
                 return "And " + java.util.Arrays.asList(matchers);
             }
+
+            @Override
+            public MatchResult matcher(HttpServer.Request request) {
+                java.util.Map<String, String> variables = new java.util.LinkedHashMap<String, String>();
+                for (RequestMatcher matcher : matchers) {
+                    MatchResult result = matcher.matcher(request);
+                    if (!result.isMatch()) {
+                        return MatchResult.notMatch();
+                    }
+                    variables.putAll(result.getVariables());
+                }
+                return MatchResult.match(variables);
+            }
         };
     }
 
