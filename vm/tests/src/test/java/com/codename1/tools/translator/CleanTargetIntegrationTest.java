@@ -1329,6 +1329,11 @@ class CleanTargetIntegrationTest {
                 Files.createDirectories(performanceBinary.getParent());
             }
             Files.copy(exe, performanceBinary, StandardCopyOption.REPLACE_EXISTING);
+            Path symbols = exe.resolveSibling("WinHelloMain.pdb");
+            if (Files.exists(symbols)) {
+                Files.copy(symbols, performanceBinary.resolveSibling("WinHelloMain.pdb"),
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
             System.out.println("Performance binary copied to " + performanceBinary.toAbsolutePath()
                     + " (" + Files.size(performanceBinary) + " bytes)");
         }
