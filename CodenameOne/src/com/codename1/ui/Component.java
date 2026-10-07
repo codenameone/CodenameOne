@@ -764,9 +764,9 @@ public class Component implements Animation, StyleListener, Editable {
         TopLevelContainer top = getTopLevelContainer();
         if (top != null) {
             top.asContainer().repaint();
-        } else {
-            repaint();
         }
+        // Unattached components have no overlay. Avoid virtual repaint calls
+        // from setters invoked before a subclass constructor has finished.
     }
 
     // Port accessors use this before giving pointer gestures to a native text control.
@@ -9930,7 +9930,10 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `grabsPointerEvents`: the grabsPointerEvents to set
     public void setGrabsPointerEvents(boolean grabsPointerEvents) {
-        this.grabsPointerEvents = grabsPointerEvents;
+        if (this.grabsPointerEvents != grabsPointerEvents) {
+            this.grabsPointerEvents = grabsPointerEvents;
+            repaintTextSelection();
+        }
     }
 
     /// Indicates the decrement units for the scroll opacity

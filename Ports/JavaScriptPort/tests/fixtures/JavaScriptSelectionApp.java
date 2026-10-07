@@ -93,7 +93,37 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=elevated") >= 0) {
+        if (query.indexOf("review=dynamicconstraints") >= 0) {
+            TextArea area = new TextArea("Secret value"); area.setSingleLineTextArea(true); area.setName("dynamicArea");
+            Button password = new Button("Enable password"), done = new Button("Add done listener"), reset = new Button("Reset constraints");
+            password.addActionListener(e -> area.setConstraint(TextArea.PASSWORD));
+            done.addActionListener(e -> area.setDoneListener(event -> status.setText("Done received")));
+            reset.addActionListener(e -> { area.setConstraint(TextArea.ANY); area.setDoneListener(null); });
+            form.addAll(area, password, done, reset, status);
+        } else if (query.indexOf("review=ancestorownership") >= 0) {
+            Label label = new Label("Ancestor owned label");
+            Container parent = BoxLayout.encloseY(label);
+            parent.addPointerPressedListener(e -> status.setText("Parent pressed"));
+            Button grab = new Button("Grab pointer"), focus = new Button("Focusable parent"), reset = new Button("Release pointer");
+            grab.addActionListener(e -> parent.setGrabsPointerEvents(true));
+            focus.addActionListener(e -> parent.setFocusable(true));
+            reset.addActionListener(e -> { parent.setGrabsPointerEvents(false); parent.setFocusable(false); });
+            form.addAll(parent, grab, focus, reset, status);
+        } else if (query.indexOf("review=keyboardpadding") >= 0) {
+            TextArea area = new TextArea("Keyboard layout"); area.setName("paddingArea");
+            Button enable = new Button("Enable keyboard padding"), disable = new Button("Disable keyboard padding");
+            enable.addActionListener(e -> form.setFormBottomPaddingEditingMode(true));
+            disable.addActionListener(e -> form.setFormBottomPaddingEditingMode(false));
+            form.addAll(area, enable, disable);
+        } else if (query.indexOf("review=initiatingkeys") >= 0) {
+            TextArea area = new TextArea(""); area.setName("initiatingArea"); area.setMaxSize(3);
+            Button type = new Button("Type queued keys");
+            type.addActionListener(e -> {
+                area.keyReleased('A'); area.keyReleased('B'); area.keyReleased('C'); area.keyReleased('D');
+                status.setText("Typed " + area.getText());
+            });
+            form.addAll(type, area, status);
+        } else if (query.indexOf("review=elevated") >= 0) {
             com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
             Container layers = new Container(layout); layers.setPreferredH(160);
             layers.getAllStyles().setSurface(true);

@@ -2017,9 +2017,11 @@
     // cursor movement. Escape, function keys and other app shortcuts still bubble.
     if (/^(Tab|Enter|Backspace|Delete|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(key)
         || [8, 9, 13, 33, 34, 35, 36, 37, 38, 39, 40, 46].indexOf(code) >= 0) return true;
+    if (event.ctrlKey && event.altKey) {
+      return !!(event.getModifierState && event.getModifierState('AltGraph') && key.length === 1);
+    }
     if (event.ctrlKey || event.metaKey) {
-      return /^[acvxyz]$/i.test(key) || [65, 67, 86, 88, 89, 90].indexOf(code) >= 0
-          || (event.ctrlKey && event.altKey && key.length === 1); // AltGr text
+      return /^[acvxyz]$/i.test(key) || [65, 67, 86, 88, 89, 90].indexOf(code) >= 0;
     }
     return key.length === 1 || (!key && (code === 0 || code >= 48 && code <= 90));
   }

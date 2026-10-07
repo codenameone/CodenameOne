@@ -55,6 +55,10 @@ for (const key of ['Escape', 'F2']) {
   }
 }
 for (const [key, modifiers, owns] of [['s', { ctrlKey: true }, false], ['c', { metaKey: true }, true],
+    ['k', {ctrlKey: true, altKey: true, getModifierState: () => false}, false],
+    ['c', {ctrlKey: true, altKey: true, getModifierState: () => false}, false],
+    ['@', {ctrlKey: true, altKey: true, getModifierState: key => key === 'AltGraph'}, true],
+    ['k', {ctrlKey: true, altKey: true}, false],
     ['ArrowLeft', { ctrlKey: true }, true], ['a', {}, true], ['Dead', { isComposing: true }, true]]) {
   callback(Object.assign(event('keydown', text), { key }, modifiers));
   assert.equal(messages.length, owns ? 0 : 1, key + ' keeps the appropriate keyboard owner');

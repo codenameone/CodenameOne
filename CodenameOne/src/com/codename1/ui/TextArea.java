@@ -580,7 +580,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
     /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
     public void setConstraint(int constraint) {
-        this.constraint = constraint;
+        if (this.constraint != constraint) {
+            this.constraint = constraint;
+            repaintTextSelection();
+        }
     }
 
     /// {@inheritDoc}
@@ -2307,7 +2310,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `l`: the listener
     public void setDoneListener(ActionListener l) {
-        doneListener = l;
+        if (doneListener != l) {
+            doneListener = l;
+            repaintTextSelection();
+        }
     }
 
     /// Fire the done event to done listener

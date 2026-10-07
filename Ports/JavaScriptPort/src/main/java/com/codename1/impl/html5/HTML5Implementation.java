@@ -1142,6 +1142,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return nativeSelectionRequested() && Accessor.allowsNativeTextSelection(ta) && hasOpaqueAncestors(ta)
                 && (!(ta instanceof TextField) || TextField.isUseNativeTextInput())
                 && ta.getDoneListener() == null
+                // The legacy editor owns virtual-keyboard resize/scroll compensation.
+                && (!ta.isEditable() || ta.getComponentForm() == null
+                    || !ta.getComponentForm().isFormBottomPaddingEditingMode())
                 && !ta.isEndsWith3Points()
                 && !Accessor.isBitmapFont(ta.getStyle().getFont())
                 && ta.getStyle().getTextDecoration() == Style.TEXT_DECORATION_NONE
@@ -6555,6 +6558,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public boolean isEditingText(Component c) {
         NativeOverlay overlay = (NativeOverlay)c.getNativeOverlay();
+        if (overlay instanceof SelectionTextOverlay) {
+            // Canvas keys already queued before native focus still need editString.
+            // A synchronous DOM focus query would discard them before its callback.
+            return ((SelectionTextOverlay) overlay).focused && currentEditingField == c && isEditing;
+        }
         if (overlay != null && jQuery_is_(overlay.el, ":focus")) {
             return true;
             
@@ -7175,12 +7183,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return resolvedType;
     }
 
+    private static boolean isEditingInitiatingCharacter(int keycode) {
+        return keycode > 47 && keycode < 58 || keycode == 32 || keycode == 13
+                || keycode > 64 && keycode < 91 || keycode > 95 && keycode < 112
+                || keycode > 185 && keycode < 193 || keycode > 218 && keycode < 223;
+    }
+
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, final String origText, int initiatingKeycode) {
         if (cmp.getNativeOverlay() != null && (!(cmp.getNativeOverlay() instanceof SelectionTextOverlay)
                 || ((SelectionTextOverlay) cmp.getNativeOverlay()).visible)) {
             // If a native overlay exists then just use that native overlay
             NativeOverlay overlayEl = (NativeOverlay)cmp.getNativeOverlay();
+            if (overlayEl instanceof SelectionTextOverlay) {
+                TextArea ta = (TextArea) cmp;
+                // Canvas key events can arrive before the asynchronous DOM focus
+                // callback. Accumulate against the model, not the original snapshot.
+                if (initiatingKeycode == 10 || initiatingKeycode == 13) {
+                    if (ta.isSingleLineTextArea()) {
+                        Display.getInstance().onEditingComplete(cmp, ta.getText());
+                        return;
+                    }
+                    if (ta.getText().length() < maxSize) ta.setText(ta.getText() + "\n");
+                } else if (isEditingInitiatingCharacter(initiatingKeycode) && ta.getText().length() < maxSize) {
+                    ta.setText(ta.getText() + (char) initiatingKeycode);
+                }
+                overlayEl.updateNativeEditorText(ta.getText());
+            }
             overlayEl.el.focus();
             return;
         }
@@ -7454,14 +7483,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
 
 
-            boolean valid = 
-                (initiatingKeycode > 47 && initiatingKeycode < 58)   || // number keys
-                initiatingKeycode == 32 || initiatingKeycode == 13   || // spacebar & return key(s) (if you want to allow carriage returns)
-                (initiatingKeycode > 64 && initiatingKeycode < 91)   || // letter keys
-                (initiatingKeycode > 95 && initiatingKeycode < 112)  || // numpad keys
-                (initiatingKeycode > 185 && initiatingKeycode < 193) || // ;=,-./` (in order)
-                (initiatingKeycode > 218 && initiatingKeycode < 223);   // [\]' (in order)
-            
+            boolean valid = isEditingInitiatingCharacter(initiatingKeycode);
+
             switch (initiatingKeycode) {
                 case 8 : { // backspace 
                     if (valid && text.length() > 0) {

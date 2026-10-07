@@ -67,6 +67,53 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('dynamicconstraints');
+    const dynamic = page.locator('.cn1-selection-editor[aria-label="dynamicArea"]');
+    await dynamic.waitFor({state: 'visible'});
+    await clickButton('Enable password');
+    await dynamic.waitFor({state: 'hidden'});
+    await clickButton('Reset constraints');
+    await dynamic.waitFor({state: 'visible'});
+    await clickButton('Add done listener');
+    await dynamic.waitFor({state: 'hidden'});
+    await clickButton('Reset constraints');
+    await dynamic.waitFor({state: 'visible'});
+    console.log('PASS', name, 'password and done listener changes immediately re-evaluate editor eligibility');
+
+    for (const action of ['Grab pointer', 'Focusable parent']) {
+      await openReview('ancestorownership');
+      const ownedLabel = page.locator('#cn1-text-layer span').filter({hasText: /^Ancestor owned label$/});
+      for (const ownsPointer of [true, false, true]) {
+        await clickButton(ownsPointer ? action : 'Release pointer');
+        await page.waitForFunction(owns => [...document.querySelectorAll('#cn1-text-layer span')]
+          .some(el => el.textContent === 'Ancestor owned label' && (getComputedStyle(el).pointerEvents === 'none') === owns), ownsPointer);
+      }
+      // Click after testing the setter transitions: canvas selection itself may
+      // keep the text on the canvas until that selection has been dismissed.
+      await page.evaluate(() => { window.__cn1PointerEvents.length = 0; });
+      await ownedLabel.click({force: true});
+      assert.ok(await page.evaluate(() => window.__cn1PointerEvents.some(e => e.type === 'mousedown' && e.target === 'CANVAS')),
+        'pointer-owning ancestor leaves glyph hits on the canvas');
+    }
+    console.log('PASS', name, 'intermediate ancestors retain pointer ownership after dynamic changes');
+
+    await openReview('keyboardpadding');
+    const padding = page.locator('.cn1-selection-editor[aria-label="paddingArea"]');
+    await padding.waitFor({state: 'visible'});
+    await clickButton('Enable keyboard padding');
+    await padding.waitFor({state: 'hidden'});
+    await clickButton('Disable keyboard padding');
+    await padding.waitFor({state: 'visible'});
+    console.log('PASS', name, 'keyboard padding mode selects the established layout-aware editor');
+
+    await openReview('initiatingkeys');
+    const initiating = page.locator('.cn1-selection-editor[aria-label="initiatingArea"]');
+    await initiating.waitFor({state: 'visible'});
+    await clickButton('Type queued keys');
+    await page.waitForFunction(() => document.body.innerText.includes('Typed ABC'));
+    assert.equal(await initiating.inputValue(), 'ABC', 'queued canvas keys survive asynchronous focus and respect max size');
+    console.log('PASS', name, 'initiating keys accumulate before native focus');
+
     await openReview('elevated');
     assert.equal(await page.locator('.cn1-selection-editor[aria-label="elevatedArea"]:visible').count(), 0);
     console.log('PASS', name, 'elevated descendants in earlier branches exclude native editor coverage');
