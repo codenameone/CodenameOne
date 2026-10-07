@@ -360,6 +360,9 @@ public final class Crypto {
             case 2: return Signature.getInstance("SHA384withRSA");
             case 3: return Signature.getInstance("SHA512withRSA");
             case 4:
+                // Stock Java 8 has RSASSA-PSS since 8u251 (JDK-8146293).
+                // CryptoPrimitivesTest verifies OpenSSL PS256 vectors on our Java 8
+                // toolchain; no external provider or newer Java API is required.
                 Signature pss = Signature.getInstance("RSASSA-PSS");
                 pss.setParameter(new PSSParameterSpec("SHA-256", "MGF1",
                         MGF1ParameterSpec.SHA256, 32, 1));
