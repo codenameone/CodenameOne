@@ -23,6 +23,8 @@
 package com.codename1.backend.security.mfa;
 
 import com.codename1.backend.Crypto;
+import com.codename1.backend.security.crypto.Pbkdf2Sha256PasswordEncoder;
+import com.codename1.backend.security.crypto.PasswordEncoder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +32,7 @@ import java.util.List;
 /// Recovery codes: what signs a user in when their authenticator app is gone.
 ///
 /// [#generate] makes ten, to be shown to the user once and never again -- the
-/// server keeps a SHA-256 of each and cannot show them a second time. Each
+/// server keeps a salted PBKDF2 password hash of each and cannot show them a second time. Each
 /// works once, in place of a one-time code at sign-in. Generating again
 /// replaces whatever was left.
 public final class RecoveryCodeService {
@@ -39,6 +41,7 @@ public final class RecoveryCodeService {
     private static final char[] ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789".toCharArray();
 
     private final RecoveryCodeRepository repository;
+    private final PasswordEncoder encoder = new Pbkdf2Sha256PasswordEncoder();
 
     public RecoveryCodeService(RecoveryCodeRepository repository) {
         if (repository == null) {
@@ -86,7 +89,7 @@ public final class RecoveryCodeService {
                 }
             }
             codes.add(text.toString());
-            hashes.add(hash(text.toString()));
+            hashes.add(encoder.encode(normalize(text.toString())));
         }
         repository.replace(username, hashes);
         return codes;
@@ -96,8 +99,18 @@ public final class RecoveryCodeService {
     ///
     /// @return whether `code` was one of `username`'s unused codes
     public boolean consume(String username, String code) {
-        String hash = hash(code);
-        return hash != null && repository.consume(username, hash);
+        String plain = normalize(code);
+        if (username == null || plain == null) {
+            return false;
+        }
+        for (String hash : repository.findHashes(username)) {
+            if (encoder.matches(plain, hash)) {
+                // Only the atomic removal decides success: another request may
+                // have verified the same snapshot while this one was hashing.
+                return repository.consume(username, hash);
+            }
+        }
+        return false;
     }
 
     /// Whether `code` is written as a recovery code is: ten letters and digits,
@@ -105,7 +118,7 @@ public final class RecoveryCodeService {
     /// code -- only that it is not something else, such as the digits of a
     /// one-time code.
     public static boolean isCodeShaped(String code) {
-        return hash(code) != null;
+        return normalize(code) != null;
     }
 
     /// How many codes `username` has left.
@@ -113,14 +126,12 @@ public final class RecoveryCodeService {
         return repository.count(username);
     }
 
-    /// The hash a code is stored as: of its ten characters, without the dash
-    /// or spaces and whatever case it was typed in. Null for what cannot be a
-    /// code.
-    static String hash(String code) {
+    /// Its ten characters without separators, in lowercase, or null when malformed.
+    private static String normalize(String code) {
         if (code == null) {
             return null;
         }
-        byte[] plain = new byte[10];
+        char[] plain = new char[10];
         int length = 0;
         for (int iter = 0 ; iter < code.length() ; iter++) {
             char c = code.charAt(iter);
@@ -133,17 +144,11 @@ public final class RecoveryCodeService {
             if (length == plain.length || !((c >= 'a' && c <= 'z') || (c >= '2' && c <= '9'))) {
                 return null;
             }
-            plain[length++] = (byte) c;
+            plain[length++] = c;
         }
         if (length != plain.length) {
             return null;
         }
-        byte[] digest = Crypto.sha256(plain);
-        StringBuilder hex = new StringBuilder(digest.length * 2);
-        for (byte b : digest) {
-            hex.append("0123456789abcdef".charAt((b >> 4) & 15))
-                    .append("0123456789abcdef".charAt(b & 15));
-        }
-        return hex.toString();
+        return new String(plain);
     }
 }

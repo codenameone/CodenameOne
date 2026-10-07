@@ -1513,9 +1513,12 @@ chapter do. A feature whose store you don't declare keeps its state in memory
 where it has an in-memory default, and the sections above say which do.
 
 Secrets aren't stored as they are. Passwords are stored as their encoder wrote
-them. API keys, remembered sign-in tokens, recovery codes, authorization codes,
-refresh tokens and device codes are stored as SHA-256 hashes. Authenticator
-secrets are sealed under `cn1.security.mfa.encryptionKey`.
+them. Recovery codes use salted PBKDF2 password hashes; checking one still ends
+with an atomic removal, so concurrent requests cannot use it twice. Recovery
+codes from earlier builds that stored plain SHA-256 digests must be regenerated.
+API keys, remembered sign-in tokens, authorization codes, refresh tokens and
+device codes are stored as SHA-256 hashes. Authenticator secrets are sealed under
+`cn1.security.mfa.encryptionKey`.
 
 Anything that must happen once is one conditional statement and the count of
 rows it changed. Two instances that present the same code at the same moment

@@ -161,6 +161,33 @@ class MfaTest {
     }
 
     @Test
+    void recoveryCodesUseSaltedPasswordHashesAndStillConsumeAtomically() throws Exception {
+        InMemoryRecoveryCodeRepository repository = new InMemoryRecoveryCodeRepository();
+        RecoveryCodeService service = new RecoveryCodeService(repository);
+        List<String> codes = service.generate("ada");
+        List<String> hashes = repository.findHashes("ADA");
+        assertEquals(10, hashes.size());
+        java.util.Set<String> salts = new java.util.HashSet<String>();
+        for (String hash : hashes) {
+            assertTrue(hash.startsWith("pbkdf2$"), hash);
+            salts.add(hash.split("\\$")[2]);
+        }
+        assertEquals(10, salts.size());
+        String first = codes.get(0);
+        java.util.concurrent.ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Future<Boolean> a = workers.submit(() -> service.consume("ada", first));
+            java.util.concurrent.Future<Boolean> b = workers.submit(() -> service.consume("ada", first));
+            assertEquals(1, (a.get() ? 1 : 0) + (b.get() ? 1 : 0));
+        } finally {
+            workers.shutdownNow();
+        }
+        assertEquals(9, service.remaining("ada"));
+        assertTrue(new RecoveryCodeService(repository).consume("ada", codes.get(1)),
+                "salted codes survive a service restart");
+    }
+
+    @Test
     @DisplayName("ten recovery codes, each good once")
     void recoveryCodes() {
         List<String> codes = recovery.generate("ada");

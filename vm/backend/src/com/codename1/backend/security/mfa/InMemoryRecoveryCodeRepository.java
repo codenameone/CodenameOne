@@ -24,6 +24,7 @@ package com.codename1.backend.security.mfa;
 
 import com.codename1.backend.security.SecuritySchema;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,13 @@ public final class InMemoryRecoveryCodeRepository implements RecoveryCodeReposit
     @Override
     public synchronized void replace(String username, List<String> codeHashes) {
         byUser.put(SecuritySchema.usernameKey(username), new HashSet<String>(codeHashes));
+    }
+
+    @Override
+    public synchronized List<String> findHashes(String username) {
+        Set<String> codes = username == null ? null
+                : byUser.get(SecuritySchema.usernameKey(username));
+        return codes == null ? new ArrayList<String>() : new ArrayList<String>(codes);
     }
 
     @Override

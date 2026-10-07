@@ -29,6 +29,10 @@ public interface RecoveryCodeRepository {
     /// Replaces every code of `username` with these hashes.
     void replace(String username, List<String> codeHashes);
 
+    /// A snapshot of the user's salted password hashes, for checking a presented code.
+    /// An unknown user has an empty list. Consumption still goes through [#consume].
+    List<String> findHashes(String username);
+
     /// Uses one code up.
     ///
     /// The test and the removal are one step: a code is good once, however

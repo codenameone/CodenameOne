@@ -27,6 +27,7 @@ import com.codename1.backend.Database;
 import com.codename1.backend.security.AuthenticationServiceException;
 import com.codename1.backend.security.SecuritySchema;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -81,6 +82,23 @@ public final class JdbcRecoveryCodeRepository implements RecoveryCodeRepository 
                         + "VALUES (?, ?)", new Object[] {user, hash});
             }
             return null;
+        }
+    }
+
+    @Override
+    public List<String> findHashes(String username) {
+        List<String> hashes = new ArrayList<String>();
+        if (username == null) {
+            return hashes;
+        }
+        try {
+            for (Object row : dataSource.query("SELECT code_hash FROM cn1_mfa_recovery_code "
+                    + "WHERE username_key = ?", new Object[] {SecuritySchema.usernameKey(username)})) {
+                hashes.add((String) ((Map) row).get("code_hash"));
+            }
+            return hashes;
+        } catch (IOException err) {
+            throw failed(err);
         }
     }
 
