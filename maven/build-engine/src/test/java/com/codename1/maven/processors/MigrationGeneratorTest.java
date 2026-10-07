@@ -338,7 +338,7 @@ public class MigrationGeneratorTest {
         try {
             assertEquals(Long.valueOf(0), pool.queryOne("SELECT COUNT(*) AS n FROM cn1_users", null)
                     .get("n"));
-            assertEquals(Long.valueOf(9), pool.queryOne(
+            assertEquals(Long.valueOf(11), pool.queryOne(
                     "SELECT COUNT(*) AS n FROM cn1_security_schema_history", null).get("n"));
             assertEquals(Long.valueOf(1), pool.queryOne("SELECT COUNT(*) AS n FROM profiles", null)
                     .get("n"));
@@ -385,7 +385,7 @@ public class MigrationGeneratorTest {
         assertFalse(errors(ctx), ctx.hasErrors());
         File cli = new File(classes, "cn1app/BackendMigrationsCli.class");
         assertTrue("cn1:migrate would answer \"This module has no migrations\" for a module "
-                + "whose server applies nine at start", cli.isFile());
+                + "whose server applies eleven at start", cli.isFile());
         assertFalse("there are no scripts of the module's own to compile",
                 new File(classes, "cn1app/BackendMigrations.class").exists());
         assertFalse(new File(classes, "cn1app/BackendDaoBootstrap.class").exists());
@@ -393,20 +393,22 @@ public class MigrationGeneratorTest {
 
         File database = new File(tmp.newFolder(), "cli-library-only.db");
         String migrated = goal(database, "migrate");
-        // Each of the nine under a name of its own.
+        // Each of the eleven under a name of its own.
         java.util.Set<String> names = new java.util.TreeSet<String>();
         for (String line : migrated.split("\n")) {
             if (line.startsWith("cn1: security: applied ")) {
                 names.add(line.substring("cn1: security: applied ".length()).trim());
             }
         }
-        assertEquals(migrated, 9, names.size());
+        assertEquals(migrated, 11, names.size());
         assertTrue(migrated, names.contains(
                 "com.codename1.backend.security.SecuritySchema.V5__rate_limits"));
-        assertTrue(migrated, migrated.contains("cn1: security: 9 applied, schema at version 9"));
+        assertTrue(migrated, names.contains(
+                "com.codename1.backend.security.SecuritySchema.V11__remember_me_rotation_grace"));
+        assertTrue(migrated, migrated.contains("cn1: security: 11 applied, schema at version 11"));
 
         String info = goal(database, "info");
-        assertTrue(info, info.contains("cn1: security: 9 migration(s) in cn1_security_schema_history"));
+        assertTrue(info, info.contains("cn1: security: 11 migration(s) in cn1_security_schema_history"));
         assertTrue(goal(database, "validate"), goal(database, "validate").contains(
                 "cn1: security: the schema history matches this build's migrations"));
         assertTrue(goal(database, "migrate").contains("cn1: security: nothing to apply"));

@@ -50,7 +50,7 @@ public final class InMemoryTokenRepositoryImpl implements PersistentTokenReposit
             return false;
         }
         bySeries.put(series, new PersistentRememberMeToken(current.getUsername(), series,
-                newTokenHash, lastUsed));
+                newTokenHash, lastUsed, expectedTokenHash));
         return true;
     }
 

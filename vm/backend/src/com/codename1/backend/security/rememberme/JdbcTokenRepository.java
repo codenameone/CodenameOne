@@ -57,10 +57,10 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
     public void createNewToken(PersistentRememberMeToken token) {
         try {
             dataSource.execute("INSERT INTO cn1_persistent_logins (series, username_key, "
-                    + "username, token_hash, last_used) VALUES (?, ?, ?, ?, ?)", new Object[] {
+                    + "username, token_hash, last_used, previous_token_hash) VALUES (?, ?, ?, ?, ?, ?)", new Object[] {
                         token.getSeries(), SecuritySchema.usernameKey(token.getUsername()),
                         token.getUsername(), token.getTokenHash(),
-                        Long.valueOf(token.getLastUsed())});
+                        Long.valueOf(token.getLastUsed()), token.getPreviousTokenHash()});
         } catch (IOException err) {
             throw failed(err);
         }
@@ -70,9 +70,9 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
     public boolean updateToken(String series, String expectedTokenHash, String newTokenHash,
                                long lastUsed) {
         try {
-            return dataSource.execute("UPDATE cn1_persistent_logins SET token_hash = ?, "
-                    + "last_used = ? WHERE series = ? AND token_hash = ?", new Object[] {
-                        newTokenHash, Long.valueOf(lastUsed), series, expectedTokenHash}) == 1;
+            return dataSource.execute("UPDATE cn1_persistent_logins SET previous_token_hash = ?, "
+                    + "token_hash = ?, last_used = ? WHERE series = ? AND token_hash = ?", new Object[] {
+                        expectedTokenHash, newTokenHash, Long.valueOf(lastUsed), series, expectedTokenHash}) == 1;
         } catch (IOException err) {
             throw failed(err);
         }
@@ -84,7 +84,7 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
             return null;
         }
         try {
-            Map row = dataSource.queryOne("SELECT username, token_hash, last_used FROM "
+            Map row = dataSource.queryOne("SELECT username, token_hash, last_used, previous_token_hash FROM "
                     + "cn1_persistent_logins WHERE series = ?", new Object[] {series});
             if (row == null) {
                 return null;
@@ -92,7 +92,8 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
             Object used = row.get("last_used");
             return new PersistentRememberMeToken(String.valueOf(row.get("username")), series,
                     String.valueOf(row.get("token_hash")),
-                    used instanceof Number ? ((Number) used).longValue() : 0L);
+                    used instanceof Number ? ((Number) used).longValue() : 0L,
+                    (String) row.get("previous_token_hash"));
         } catch (IOException err) {
             throw failed(err);
         }

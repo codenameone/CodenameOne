@@ -34,14 +34,15 @@ import com.codename1.backend.security.core.userdetails.UserDetailsService;
 import com.codename1.backend.security.core.userdetails.UsernameNotFoundException;
 import java.io.IOException;
 
-/// Remember-me with a series and a token that is replaced on every use.
+/// Remember-me with a series and a rotating token.
 ///
 /// The cookie is `series:token`, both random. The server keeps the series and
 /// a SHA-256 of the token. Presenting the cookie signs the user in and replaces
-/// the token, so a cookie works once: when a series arrives with a token that
-/// is not the current one, somebody else has used it -- the cookie was copied
-/// -- and every remembered sign-in of that user is deleted, which is the
-/// warning Spring Security raises as a cookie theft.
+/// the token. For ten seconds after rotation, parallel requests can still use
+/// the immediately preceding token without rotating again or overwriting the
+/// winning response's cookie. The grace is stored with the token, so it also
+/// works across servers sharing a repository. An older or unrelated token
+/// deletes every remembered sign-in of that user as a possible cookie theft.
 ///
 /// A cookie issued by a sign-in that passed a second factor is recorded as
 /// such, and only such a cookie signs in a user who has one; see
@@ -63,6 +64,7 @@ public final class PersistentTokenBasedRememberMeServices
     /// [PersistentTokenRepository] keeps it without knowing. A `.` is in no
     /// series otherwise.
     private static final String AFTER_SECOND_FACTOR = "2f.";
+    private static final long ROTATION_GRACE_MILLIS = 10000L;
 
     private final String key;
     private final UserDetailsService userDetailsService;
@@ -173,7 +175,7 @@ public final class PersistentTokenBasedRememberMeServices
             return null;
         }
         long now = clock.currentTimeMillis();
-        if (!sameHash(presented, stored.getTokenHash())) {
+        if (!sameHash(presented, stored.getTokenHash()) && !previousWithinGrace(stored, presented, now)) {
             return stolen(stored);
         }
         if (stored.getLastUsed() + tokenValiditySeconds * 1000L < now) {
@@ -194,15 +196,35 @@ public final class PersistentTokenBasedRememberMeServices
             cancelCookie();
             return null;
         }
-        String next = random();
-        if (!tokenRepository.updateToken(series, stored.getTokenHash(), hash(next), now)) {
-            // Somebody replaced it between the read and the write: the same
-            // cookie, presented twice.
-            return stolen(stored);
+        if (!withinGrace(stored, now)) {
+            String next = random();
+            if (!tokenRepository.updateToken(series, stored.getTokenHash(), hash(next), now)) {
+                PersistentRememberMeToken winner = tokenRepository.getTokenForSeries(series);
+                if (winner == null) {
+                    cancelCookie();
+                    return null;
+                }
+                if (!stored.getUsername().equals(winner.getUsername())
+                        || !previousWithinGrace(winner, presented, clock.currentTimeMillis())) {
+                    return stolen(stored);
+                }
+                // The other response sends the new cookie. Sending this request's
+                // old cookie (or cancelling it) would race with that response.
+            } else {
+                setCookie(series + ":" + next);
+            }
         }
-        setCookie(series + ":" + next);
         return new RememberMeAuthenticationToken(key, user, user.getAuthorities(),
                 series.startsWith(AFTER_SECOND_FACTOR));
+    }
+
+    private static boolean withinGrace(PersistentRememberMeToken stored, long now) {
+        return stored.getPreviousTokenHash() != null && now >= stored.getLastUsed()
+                && now - stored.getLastUsed() < ROTATION_GRACE_MILLIS;
+    }
+
+    private static boolean previousWithinGrace(PersistentRememberMeToken stored, String presented, long now) {
+        return withinGrace(stored, now) && sameHash(presented, stored.getPreviousTokenHash());
     }
 
     private Authentication stolen(PersistentRememberMeToken stored) {

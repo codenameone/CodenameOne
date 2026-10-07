@@ -148,7 +148,7 @@ class SecurityStoresTest {
             }
         }
         MigrationInfo[] info = Migrations.of(pool, SecuritySchema.migrations()).info();
-        assertEquals(10, info.length);
+        assertEquals(11, info.length);
         for (int i = 0; i < info.length; i++) {
             assertEquals(String.valueOf(i + 1), info[i].getVersion());
             assertEquals(MigrationState.SUCCESS, info[i].getState());
@@ -161,12 +161,12 @@ class SecurityStoresTest {
         assertEquals("passkeys", info[8].getDescription());
         assertEquals("rate limit expiry", info[9].getDescription());
         // Its own history, not the application's.
-        assertEquals(10L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM "
+        assertEquals(11L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM "
                 + "cn1_security_schema_history", null).get("n")).longValue());
         // And a second run finds nothing to do.
         MigrateResult again = Migrations.of(pool, SecuritySchema.migrations()).migrate();
         assertEquals(0, again.getMigrationsExecuted());
-        assertEquals("10", again.getTargetVersion());
+        assertEquals("11", again.getTargetVersion());
         assertEquals("security", SecuritySchema.migrations().getName());
         assertEquals("cn1_security_schema_history", SecuritySchema.migrations().getTable());
     }
@@ -260,7 +260,8 @@ class SecurityStoresTest {
 
     private void seedCredentials(DataSource pool, String name) throws Exception {
         String key = SecuritySchema.usernameKey(name);
-        pool.execute("INSERT INTO cn1_persistent_logins VALUES (?, ?, ?, 'hash', 1)",
+        pool.execute("INSERT INTO cn1_persistent_logins (series, username_key, username, token_hash, last_used) "
+                + "VALUES (?, ?, ?, 'hash', 1)",
                 new Object[] {name, key, name});
         pool.execute("INSERT INTO cn1_mfa_totp VALUES (?, 'secret', 'nonce', 1, 1, 1)",
                 new Object[] {key});
@@ -357,6 +358,8 @@ class SecurityStoresTest {
         assertFalse(tokens.updateToken("series-1", "hash-a", "hash-a3", 6000L));
         one = tokens.getTokenForSeries("series-1");
         assertEquals("hash-a2 5000", one.getTokenHash() + " " + one.getLastUsed());
+        assertEquals("hash-a", one.getPreviousTokenHash());
+        assertNull(tokens.getTokenForSeries("series-2").getPreviousTokenHash());
 
         assertEquals(1, tokens.deleteExpired(10000L, 9));
         assertNull(tokens.getTokenForSeries("series-3"));

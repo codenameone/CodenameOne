@@ -32,6 +32,8 @@ public interface PersistentTokenRepository {
     /// The test and the change are one step: of two requests presenting the
     /// same cookie at the same moment, one replaces the token and the other is
     /// told it did not.
+    /// Store `expectedTokenHash` as the previous hash of the replacement token,
+    /// so concurrent requests can recognize the rotation for a bounded grace period.
     ///
     /// @return whether this call replaced it
     boolean updateToken(String series, String expectedTokenHash, String newTokenHash,

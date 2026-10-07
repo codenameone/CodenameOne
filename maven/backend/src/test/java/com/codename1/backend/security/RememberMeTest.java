@@ -35,6 +35,8 @@ import com.codename1.backend.security.core.userdetails.InMemoryUserDetailsManage
 import com.codename1.backend.security.core.userdetails.User;
 import com.codename1.backend.security.rememberme.InMemoryTokenRepositoryImpl;
 import com.codename1.backend.security.rememberme.PersistentTokenBasedRememberMeServices;
+import com.codename1.backend.security.rememberme.PersistentTokenRepository;
+import com.codename1.backend.security.rememberme.PersistentRememberMeToken;
 import com.codename1.impl.backend.security.SecuritySupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -68,8 +70,12 @@ class RememberMeTest {
     private final Ticking clock = new Ticking();
 
     private SecuredServer start() throws Exception {
+        return start(tokens);
+    }
+
+    private SecuredServer start(PersistentTokenRepository repository) throws Exception {
         final PersistentTokenBasedRememberMeServices services =
-                new PersistentTokenBasedRememberMeServices("key", users, tokens);
+                new PersistentTokenBasedRememberMeServices("key", users, repository);
         services.setClock(clock);
         return SecuredServer.start(SecuredServer.settings(), "dev", new Object[] {users}, APP,
                 http -> http.authorizeHttpRequests(auth -> auth
@@ -157,7 +163,49 @@ class RememberMeTest {
     }
 
     @Test
-    @DisplayName("a cookie presented twice is taken as stolen, and the user forgotten everywhere")
+    void concurrentRotationDoesNotEraseRememberedSignIns() throws Exception {
+        PersistentTokenRepository racing = new PersistentTokenRepository() {
+            public void createNewToken(PersistentRememberMeToken token) {
+                tokens.createNewToken(token);
+            }
+            public PersistentRememberMeToken getTokenForSeries(String series) {
+                return tokens.getTokenForSeries(series);
+            }
+            public boolean updateToken(String series, String expected, String next, long now) {
+                // Another request rotates after this request's read, before its CAS.
+                assertTrue(tokens.updateToken(series, expected,
+                        PersistentTokenBasedRememberMeServices.hash("winning-token"), now));
+                return tokens.updateToken(series, expected, next, now);
+            }
+            public void removeToken(String series) { tokens.removeToken(series); }
+            public void removeUserTokens(String username) { tokens.removeUserTokens(username); }
+        };
+        try (SecuredServer server = start(racing)) {
+            server.post("/login", "username=ada&password=ada-pw&remember-me=true");
+            String original = server.cookies.get("remember-me");
+            String series = original.substring(0, original.indexOf(':'));
+            server.cookies.remove("CN1SESSION");
+            Reply lostRace = server.get("/me");
+            assertEquals("/me ada [ROLE_USER] RememberMeAuthenticationToken", lostRace.body);
+            assertNull(rememberCookie(lostRace), "loser must not overwrite the winner's cookie");
+            assertEquals(1, tokens.size());
+            // A request arriving just after the winning write also shares the grace.
+            clock.now += 9999;
+            server.cookies.remove("CN1SESSION");
+            assertEquals(200, server.get("/me").status);
+            assertEquals(1, tokens.size());
+            assertEquals(PersistentTokenBasedRememberMeServices.hash("winning-token"),
+                    tokens.getTokenForSeries(series).getTokenHash());
+            // Grace cannot be extended by presenting the old cookie repeatedly.
+            clock.now++;
+            server.cookies.remove("CN1SESSION");
+            assertEquals(302, server.get("/me", "Accept", "text/html").status);
+            assertEquals(0, tokens.size());
+        }
+    }
+
+    @Test
+    @DisplayName("a cookie replayed after the rotation grace forgets the user everywhere")
     void theft() throws Exception {
         try (SecuredServer server = start()) {
             server.post("/login", "username=ada&password=ada-pw&remember-me=true");
@@ -177,7 +225,8 @@ class RememberMeTest {
             assertEquals("/me ada [ROLE_USER] RememberMeAuthenticationToken", server.get("/me").body);
             String rotated = server.cookies.get("remember-me");
             server.cookies.clear();
-            // ...and then the copy somebody took of it is presented.
+            // ...and then the copy somebody took is presented after the grace.
+            clock.now += 10000;
             server.cookies.put("remember-me", phone);
             Reply stolen = server.get("/me", "Accept", "text/html");
             assertEquals("302 /login", stolen.status + " " + stolen.header("Location"));

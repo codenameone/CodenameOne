@@ -57,7 +57,7 @@ class SecuritySchemaHistoryTest {
             final long[] now = {1700000000000L};
             pool.execute("INSERT INTO cn1_rate_limit (limit_key, window_start, hits) VALUES (?, ?, 1)",
                     new Object[] {"daily|client", Long.valueOf(now[0])});
-            assertEquals(1, Migrations.of(pool, SecuritySchema.migrations()).migrate().getMigrationsExecuted());
+            assertEquals(1, Migrations.of(pool, SecuritySchema.migrations()).target("10").migrate().getMigrationsExecuted());
             com.codename1.backend.security.ratelimit.JdbcRateLimiter limiter =
                     new com.codename1.backend.security.ratelimit.JdbcRateLimiter(pool, "daily", 1, 86400);
             limiter.setClock(new Clock() {
@@ -88,14 +88,33 @@ class SecuritySchemaHistoryTest {
     }
 
     @Test
+    void upgradingRememberMeKeepsExistingTokens() throws Exception {
+        DataSource pool = DataSource.open(new File(dir, "remember-upgrade.db").getPath(), 2, 5000, 10000);
+        try {
+            Migrations.of(pool, SecuritySchema.migrations()).target("10").migrate();
+            pool.execute("INSERT INTO cn1_persistent_logins (series, username_key, username, token_hash, last_used) "
+                    + "VALUES ('browser', 'ada', 'Ada', 'old-hash', 1000)", null);
+            assertEquals(1, Migrations.of(pool, SecuritySchema.migrations()).migrate().getMigrationsExecuted());
+            com.codename1.backend.security.rememberme.JdbcTokenRepository repository =
+                    new com.codename1.backend.security.rememberme.JdbcTokenRepository(pool);
+            assertEquals("old-hash", repository.getTokenForSeries("browser").getTokenHash());
+            assertEquals(null, repository.getTokenForSeries("browser").getPreviousTokenHash());
+            assertTrue(repository.updateToken("browser", "old-hash", "new-hash", 2000));
+            assertEquals("old-hash", repository.getTokenForSeries("browser").getPreviousTokenHash());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
     @DisplayName("each version is recorded, and reported, under a name that says which it is")
     void everyVersionHasItsOwnName() throws Exception {
         DataSource pool = DataSource.open(new File(dir, "named.db").getPath(), 2, 5000, 10000);
         try {
             MigrateResult result = Migrations.of(pool, SecuritySchema.migrations()).migrate();
-            assertEquals(10, result.getMigrationsExecuted());
-            assertEquals(10, new TreeSet<String>(result.getApplied()).size(),
-                    "ten versions reported under fewer names: " + result.getApplied());
+            assertEquals(11, result.getMigrationsExecuted());
+            assertEquals(11, new TreeSet<String>(result.getApplied()).size(),
+                    "eleven versions reported under fewer names: " + result.getApplied());
             assertEquals("com.codename1.backend.security.SecuritySchema.V1__users_and_authorities",
                     result.getApplied().get(0));
             assertEquals("com.codename1.backend.security.SecuritySchema.V9__passkeys",
@@ -120,9 +139,9 @@ class SecuritySchemaHistoryTest {
             Migrations.of(pool, SecuritySchema.migrations()).validate();
             MigrateResult again = Migrations.of(pool, SecuritySchema.migrations()).migrate();
             assertEquals(0, again.getMigrationsExecuted());
-            assertEquals("10", again.getTargetVersion());
+            assertEquals("11", again.getTargetVersion());
             MigrationInfo[] info = Migrations.of(pool, SecuritySchema.migrations()).info();
-            assertEquals(10, info.length);
+            assertEquals(11, info.length);
             for (MigrationInfo row : info) {
                 assertEquals(MigrationState.SUCCESS, row.getState(), "version " + row.getVersion());
             }

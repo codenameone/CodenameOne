@@ -30,12 +30,19 @@ public final class PersistentRememberMeToken {
     private final String series;
     private final String tokenHash;
     private final long lastUsed;
+    private final String previousTokenHash;
 
     /// @param tokenHash the SHA-256 of the token, in hex: the token itself is
     /// only ever in the cookie
     /// @param lastUsed epoch milliseconds
     public PersistentRememberMeToken(String username, String series, String tokenHash,
                                      long lastUsed) {
+        this(username, series, tokenHash, lastUsed, null);
+    }
+
+    /// Includes the token replaced at `lastUsed`, for a bounded concurrent-use grace.
+    public PersistentRememberMeToken(String username, String series, String tokenHash,
+                                     long lastUsed, String previousTokenHash) {
         if (username == null || series == null || tokenHash == null) {
             throw new IllegalArgumentException("A token needs a user, a series and a hash");
         }
@@ -43,6 +50,7 @@ public final class PersistentRememberMeToken {
         this.series = series;
         this.tokenHash = tokenHash;
         this.lastUsed = lastUsed;
+        this.previousTokenHash = previousTokenHash;
     }
 
     public String getUsername() {
@@ -59,5 +67,10 @@ public final class PersistentRememberMeToken {
 
     public long getLastUsed() {
         return lastUsed;
+    }
+
+    /// The hash replaced at [#getLastUsed()], or null before the first rotation.
+    public String getPreviousTokenHash() {
+        return previousTokenHash;
     }
 }

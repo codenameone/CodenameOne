@@ -1388,11 +1388,13 @@ signs them in on a later visit:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-remember,indent=0]
 ----
 
-The cookie holds a series and a token, and the server keeps only a hash of the
-token. The token is replaced every time the cookie is used. A cookie whose
-series is known but whose token isn't the current one has been copied, so
-every remembered sign-in of that user is deleted. The cookie lasts two weeks
-unless you set `tokenValiditySeconds`.
+The cookie holds a series and a token, and the server keeps token hashes.
+Using the cookie replaces the token. For ten seconds after that replacement,
+parallel requests may use either the current token or its immediate predecessor
+without replacing it again. The database keeps the preceding hash, so this grace
+also works across servers. An older or unrelated token is treated as a possible
+copy, and every remembered sign-in of that user is deleted. The cookie lasts two
+weeks unless you set `tokenValiditySeconds`.
 
 A remembered user is authenticated, but not fully. `fullyAuthenticated()` in
 the rules and `isFullyAuthenticated()` in a `@PreAuthorize` refuse them until
@@ -1499,6 +1501,10 @@ are the same on SQLite, PostgreSQL, and MySQL.
 | 10
 | `cn1_rate_limit.window_end`
 | Cleanup retains active windows even when limiters use different periods.
+
+| 11
+| `cn1_persistent_logins.previous_token_hash`
+| A brief grace period for parallel uses of a remembered sign-in after token rotation.
 |===
 
 The key creates the tables. It doesn't choose the stores. Each store is still
