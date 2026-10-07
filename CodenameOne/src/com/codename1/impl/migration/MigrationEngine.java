@@ -285,7 +285,8 @@ public final class MigrationEngine {
                         + ") is " + checksum + " and the database recorded " + row.checksum
                         + "; an applied migration was edited");
             }
-            if (!entry.type().equals(row.type)) {
+            if (!entry.type().equals(row.type)
+                    && !(entry.java() != null && "JAVA".equals(row.type))) {
                 problem(problems, "version " + row.version + " was applied as " + row.type + " and is now "
                         + entry.type());
             }

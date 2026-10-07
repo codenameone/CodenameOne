@@ -39,7 +39,7 @@ public final class MigrationInfo {
     /// Creates a row. Built by the engine; an application reads these.
     /// @param version the version, or null for a repeatable migration
     /// @param description the description
-    /// @param type `SQL`, `JAVA` or `BASELINE`
+    /// @param type `SQL`, `JDBC` (Java), legacy `JAVA`, or `BASELINE`
     /// @param script the script or class name
     /// @param checksum the checksum, or null where there is none
     /// @param state where the migration stands
@@ -72,7 +72,7 @@ public final class MigrationInfo {
     }
 
     /// The kind of migration.
-    /// @return `SQL`, `JAVA` or `BASELINE`
+    /// @return `SQL`, `JDBC` (Java), legacy `JAVA`, or `BASELINE`
     public String getType() {
         return type;
     }

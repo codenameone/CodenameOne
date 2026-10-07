@@ -303,7 +303,7 @@ class MigrationsTest {
         // named cn1_..., and those do not make the schema somebody else's.
         assertEquals(2, Migrations.of(pool, notes().build()).migrate().getMigrationsExecuted());
         assertEquals(2, count(pool, "flyway_schema_history"));
-        assertEquals("JAVA", pool.queryOne("SELECT type FROM cn1_library_schema_history "
+        assertEquals("JDBC", pool.queryOne("SELECT type FROM cn1_library_schema_history "
                 + "WHERE installed_rank = 2", null).get("type"));
     }
 

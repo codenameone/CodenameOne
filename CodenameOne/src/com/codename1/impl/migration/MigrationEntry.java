@@ -33,7 +33,7 @@ public final class MigrationEntry {
     /// History type of a script.
     public static final String SQL = "SQL";
     /// History type of a Java migration.
-    public static final String JAVA = "JAVA";
+    public static final String JAVA = "JDBC";
     /// History type of the baseline marker.
     public static final String BASELINE = "BASELINE";
 

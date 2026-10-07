@@ -45,7 +45,7 @@ public final class HistoryTable {
         public String version;
         /// The description; never null.
         public String description = "";
-        /// `SQL`, `JAVA` or `BASELINE`.
+        /// `SQL`, `JDBC` (Java), legacy `JAVA`, or `BASELINE`.
         public String type;
         /// The script or class name.
         public String script;

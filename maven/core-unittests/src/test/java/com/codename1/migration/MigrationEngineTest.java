@@ -542,6 +542,22 @@ class MigrationEngineTest {
     }
 
     @Test
+    void javaMigrationsAdoptFlywayJdbcHistoryAndLegacyJavaRows() throws IOException {
+        FakeMigrationTarget target = new FakeMigrationTarget();
+        MigrationSet set = MigrationSet.builder("default")
+                .java("1", "recompute", "app.V1__recompute", new Step("J1")).build();
+        migrator(target, set).migrate();
+        assertEquals("JDBC", target.history.get(0).type);
+        for (String type : new String[] {"JDBC", "JAVA"}) {
+            target.history.get(0).type = type;
+            migrator(target, set).validate();
+            assertTrue(migrator(target, set).migrate().getApplied().isEmpty());
+        }
+        target.history.get(0).type = "SQL";
+        assertThrows(MigrationException.class, () -> migrator(target, set).validate());
+    }
+
+    @Test
     void aJavaMigrationRunsInOrderAndIsRecordedWithoutAChecksum() throws IOException {
         FakeMigrationTarget target = new FakeMigrationTarget();
         final String[] seen = new String[1];
@@ -560,7 +576,7 @@ class MigrationEngineTest {
         migrator(target, set).migrate();
         assertEquals("sqlite", seen[0]);
         assertEquals("[S1, J2, S3]", target.statements.toString());
-        assertEquals("JAVA", target.history.get(1).type);
+        assertEquals("JDBC", target.history.get(1).type);
         assertNull(target.history.get(1).checksum);
     }
 
