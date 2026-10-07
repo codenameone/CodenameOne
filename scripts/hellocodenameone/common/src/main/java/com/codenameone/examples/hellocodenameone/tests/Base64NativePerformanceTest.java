@@ -538,7 +538,7 @@ public class Base64NativePerformanceTest extends BaseTest {
             return;
         }
         for (StackTraceElement element : stack) {
-            System.out.println("CN1SS:ERR:Stack:" + element);
+            logFrame("CN1SS:ERR:Stack:", element);
         }
         Throwable cause = t.getCause();
         if (cause != null && cause != t) {
@@ -546,10 +546,17 @@ public class Base64NativePerformanceTest extends BaseTest {
             StackTraceElement[] causeStack = cause.getStackTrace();
             if (causeStack != null) {
                 for (StackTraceElement element : causeStack) {
-                    System.out.println("CN1SS:ERR:CauseStack:" + element);
+                    logFrame("CN1SS:ERR:CauseStack:", element);
                 }
             }
         }
+    }
+
+    private static void logFrame(String prefix, StackTraceElement element) {
+        // ParparVM's StackTraceElement inherits Object.toString(), which loses
+        // the method and line needed to diagnose a device-only benchmark error.
+        System.out.println(prefix + element.getClassName() + "." + element.getMethodName()
+                + "(" + element.getFileName() + ":" + element.getLineNumber() + ")");
     }
 
     private static void emitStat(String metric, String value) {
