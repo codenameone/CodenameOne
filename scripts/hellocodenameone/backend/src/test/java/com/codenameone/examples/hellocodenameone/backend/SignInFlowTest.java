@@ -76,6 +76,15 @@ class SignInFlowTest {
         return url.substring(at + name.length() + 1, end < 0 ? url.length() : end);
     }
 
+    private String signIn() throws Exception {
+        String session = mvc.perform(post("/login").param("username", SecurityConfig.USER)
+                        .param("password", SecurityConfig.USER_PASSWORD))
+                .andExpect(redirectedUrl("/account/me"))
+                .andReturn().getResponse().getCookie("CN1SESSION");
+        assertNotNull(session);
+        return session;
+    }
+
     private Map tokens(String code, String redirect) throws Exception {
         String body = mvc.perform(post("/oauth2/token").header("Host", HOST)
                         .param("grant_type", "authorization_code").param("code", code)
@@ -115,7 +124,7 @@ class SignInFlowTest {
         String redirect = "http://127.0.0.1:53124/callback";
         String location = mvc.perform(get(authorize("openid%20profile%20notes:read", redirect))
                         .header("Host", HOST)
-                        .with(httpBasic(SecurityConfig.USER, SecurityConfig.USER_PASSWORD)))
+                        .cookie("CN1SESSION", signIn()))
                 .andExpect(status().isFound())
                 .andReturn().getResponse().getRedirectedUrl();
         assertTrue(location.startsWith(redirect + "?code="), location);
@@ -234,7 +243,7 @@ class SignInFlowTest {
         String redirect = SecurityConfig.APP_REDIRECT;
         String location = mvc.perform(get(authorize("openid%20notes:write",
                         "com.codenameone.examples.hellocodenameone%3A%2Foauth2redirect"))
-                        .with(httpBasic(SecurityConfig.USER, SecurityConfig.USER_PASSWORD)))
+                        .cookie("CN1SESSION", signIn()))
                 .andExpect(status().isFound())
                 .andReturn().getResponse().getRedirectedUrl();
         assertTrue(location.startsWith(redirect + "?code="), location);
@@ -244,7 +253,7 @@ class SignInFlowTest {
                 .andExpect(status().isOk());
         // An address the client never registered is refused outright, not redirected to.
         mvc.perform(get(authorize("openid", "http://example.com/callback"))
-                        .with(httpBasic(SecurityConfig.USER, SecurityConfig.USER_PASSWORD)))
+                        .cookie("CN1SESSION", signIn()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -332,10 +341,10 @@ class SignInFlowTest {
         String userCode = (String) device.get("user_code");
         assertEquals(9, userCode.length(), userCode);
 
-        // The user, signed in with Basic on each request; the session is only
-        // where the question's one-use ticket is kept.
+        // The session identifies the signed-in user and holds the question's ticket.
+        String session = signIn();
         MockResponse asked = mvc.perform(post("/oauth2/device_verification")
-                        .with(httpBasic(SecurityConfig.USER, SecurityConfig.USER_PASSWORD))
+                        .cookie("CN1SESSION", session)
                         .param("user_code", userCode))
                 .andExpect(status().isOk())
                 .andReturn().getResponse();
@@ -346,10 +355,7 @@ class SignInFlowTest {
         assertTrue(at > 0, page);
         String ticket = page.substring(at + marker.length(),
                 page.indexOf('"', at + marker.length()));
-        String session = asked.getCookie("CN1SESSION");
-        assertNotNull(session);
         String approved = mvc.perform(post("/oauth2/device_verification")
-                        .with(httpBasic(SecurityConfig.USER, SecurityConfig.USER_PASSWORD))
                         .cookie("CN1SESSION", session).param("user_code", userCode)
                         .param("ticket", ticket).param("decision", "approve"))
                 .andExpect(status().isOk())
@@ -390,8 +396,9 @@ class SignInFlowTest {
                 .andExpect(jsonPath("$.error").value("slow_down"));
 
         // An answer that does not carry the ticket of a question is not an answer.
+        String session = signIn();
         MockResponse asked = mvc.perform(post("/oauth2/device_verification")
-                        .with(httpBasic(SecurityConfig.USER, SecurityConfig.USER_PASSWORD))
+                        .cookie("CN1SESSION", session)
                         .param("user_code", userCode).param("decision", "approve"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse();
@@ -402,8 +409,7 @@ class SignInFlowTest {
         String ticket = page.substring(at + marker.length(),
                 page.indexOf('"', at + marker.length()));
         String refused = mvc.perform(post("/oauth2/device_verification")
-                        .with(httpBasic(SecurityConfig.USER, SecurityConfig.USER_PASSWORD))
-                        .cookie("CN1SESSION", asked.getCookie("CN1SESSION"))
+                        .cookie("CN1SESSION", session)
                         .param("user_code", userCode).param("ticket", ticket)
                         .param("decision", "deny"))
                 .andExpect(status().isOk())

@@ -54,9 +54,9 @@ import java.util.Map;
 /// what the server believes its own name to be.
 ///
 /// The sign-in is the authorization code flow with PKCE, driven by plain requests:
-/// the authorization request carries HTTP Basic credentials, which the server's
-/// sign-in chain accepts, is not allowed to follow its redirect, and the code is
-/// read out of the `Location` it answers with. That is every step of what
+/// a form sign-in establishes a session, then the authorization request carries
+/// that session's cookie. Its redirect is not followed, and the code is read
+/// out of the `Location` it answers with. That is every step of what
 /// `OidcClient.authorize()` does except the system browser, which a test cannot
 /// operate.
 public abstract class BackendAuthTestBase extends BackendClientTest {
@@ -285,6 +285,17 @@ public abstract class BackendAuthTestBase extends BackendClientTest {
         }
     }
 
+    /// Establishes the browser session required to authorize a user grant.
+    protected final void signInSession(final Answer then) {
+        new Call("POST", "/login").unfollowed()
+                .form("username", USER).form("password", USER_PASSWORD).send(call -> {
+                    if (expect(call.code == 302 && call.session != null,
+                            "form sign-in answered " + call.code + " " + call.text())) {
+                        then.got(call);
+                    }
+                });
+    }
+
     /// Signs [#USER] in for `scope` with an authorization code and PKCE, and hands
     /// the tokens over. Fails the step itself when any part of it goes wrong.
     protected final void signIn(final String scope, final SignedIn then) {
@@ -298,7 +309,7 @@ public abstract class BackendAuthTestBase extends BackendClientTest {
                 + "&nonce=n" + state
                 + "&code_challenge=" + Util.encodeUrl(pkce.getChallenge())
                 + "&code_challenge_method=" + pkce.getMethod();
-        new Call("GET", authorize).basic(USER, USER_PASSWORD).unfollowed()
+        signInSession(signedIn -> new Call("GET", authorize).cookie(signedIn.session).unfollowed()
                 .send(new Answer() {
                     public void got(Call asked) {
                         if (!expect(asked.code == 302, "authorize answered " + asked.code + " "
@@ -330,7 +341,7 @@ public abstract class BackendAuthTestBase extends BackendClientTest {
                                     }
                                 });
                     }
-                });
+                }));
     }
 
     /// A query parameter of a redirect, percent-decoded, or null.

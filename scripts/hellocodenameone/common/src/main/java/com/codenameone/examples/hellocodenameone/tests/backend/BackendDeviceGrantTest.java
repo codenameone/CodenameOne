@@ -150,13 +150,13 @@ public class BackendDeviceGrantTest extends BackendAuthTestBase {
 
     /// The user's side, as an app with a screen of its own would do it: look the
     /// code up through the verification endpoint's JSON form, read who is asking,
-    /// and answer. The server binds its question to the session with a ticket, so
-    /// the second request carries the first one's cookie and the ticket it gave.
+    /// and answer. Form sign-in establishes the session, and both verification
+    /// requests carry its cookie. The answer also carries the question's ticket.
     ///
     /// @param expected the `status` the answer must report
     private void decide(final String userCode, final String decision, final String expected,
             final Runnable then) {
-        new Call("POST", "/oauth2/device_verification").basic(USER, USER_PASSWORD)
+        signInSession(signedIn -> new Call("POST", "/oauth2/device_verification").cookie(signedIn.session)
                 .json("{\"user_code\":\"" + userCode + "\"}").send(asked -> {
                     Map<String, Object> question = asked.json();
                     Object ticket = field(question, "ticket");
@@ -166,12 +166,10 @@ public class BackendDeviceGrantTest extends BackendAuthTestBase {
                             && CLIENT_ID.equals(field(question, "client_id"))
                             && USER.equals(field(question, "principal"))
                             && ("openid " + SCOPE_READ).equals(field(question, "scope")),
-                            "the question was " + asked.text())
-                            || !expect(asked.session != null, "the lookup set no session")) {
+                            "the question was " + asked.text())) {
                         return;
                     }
-                    new Call("POST", "/oauth2/device_verification").basic(USER, USER_PASSWORD)
-                            .cookie(asked.session)
+                    new Call("POST", "/oauth2/device_verification").cookie(signedIn.session)
                             .json("{\"user_code\":\"" + userCode + "\",\"ticket\":\"" + ticket
                                     + "\",\"decision\":\"" + decision + "\"}").send(decided -> {
                                 if (expect(decided.code == 200 && expected.equals(
@@ -180,6 +178,6 @@ public class BackendDeviceGrantTest extends BackendAuthTestBase {
                                     then.run();
                                 }
                             });
-                });
+                }));
     }
 }
