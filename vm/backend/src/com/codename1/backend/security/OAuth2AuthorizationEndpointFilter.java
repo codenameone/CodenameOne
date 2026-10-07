@@ -47,8 +47,13 @@ public final class OAuth2AuthorizationEndpointFilter implements SecurityFilter {
             return chain.doFilter(request);
         }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        SecurityExchange exchange = SecurityExchange.of(request);
+        Object sessionAuthentication = exchange == null ? null
+                : exchange.getAttribute(SecurityExchange.SESSION_AUTHENTICATION);
         if (authentication == null || authentication instanceof AnonymousAuthenticationToken
-                || !authentication.isAuthenticated()) {
+                || authentication instanceof RememberMeAuthenticationToken
+                || !authentication.isAuthenticated()
+                || authentication != sessionAuthentication) { //NOPMD CompareObjectsWithEquals - session provenance
             authentication = null;
         }
         if (path.equals(server.getSettings().getAuthorizationEndpoint())) {

@@ -454,7 +454,8 @@ class OAuth2StoresTest {
                                                final JwkSource keys, final Clock clock) {
         return http -> http.securityMatcher(prefix + "/**")
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
+                .formLogin(form -> form.loginPage(prefix + "/login"))
                 .authorizationServer(as -> as
                         .settings(AuthorizationServerSettings.builder()
                                 .authorizationEndpoint(prefix + "/oauth2/authorize")
@@ -510,7 +511,7 @@ class OAuth2StoresTest {
                 User.withUsername("ada").password("{noop}ada-pw").roles("USER").build())};
         try (SecuredServer server = SecuredServer.start(settings, "test", beans, APP,
                 process("/a", one, keys, clock), process("/b", two, keys, clock))) {
-            String basic = OAuth2Testing.basic("ada", "ada-pw");
+            assertEquals(302, server.post("/a/login", "username=ada&password=ada-pw").status);
             Set<String> refreshTokens = new HashSet<String>();
             for (int round = 0 ; round < 6 ; round++) {
                 final String verifier = OAuth2Parameters.random(32);
@@ -519,7 +520,7 @@ class OAuth2StoresTest {
                         + form("response_type", "code", "client_id", "app", "redirect_uri",
                                 "com.acme.app:/cb", "scope", "openid", "state", "s",
                                 "code_challenge", OAuth2Parameters.sha256(verifier),
-                                "code_challenge_method", "S256"), "Authorization", basic);
+                                "code_challenge_method", "S256"));
                 assertEquals(302, back.status, back.toString());
                 final String code = OAuth2Testing.query(back.header("Location")).get("code");
                 assertNotNull(code, back.toString());

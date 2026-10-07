@@ -93,6 +93,44 @@ class AuthorizationServerTest {
     private final InMemoryOAuth2AuthorizationService grants = new InMemoryOAuth2AuthorizationService();
     private String issuer;
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void statelessCredentialsCannotAuthorizeUserGrants(boolean apiKey) throws Exception {
+        com.codename1.backend.security.apikey.GeneratedApiKey key =
+                new com.codename1.backend.security.apikey.ApiKeyGenerator().generate("ada");
+        com.codename1.backend.security.apikey.InMemoryApiKeyRepository keys =
+                new com.codename1.backend.security.apikey.InMemoryApiKeyRepository(key.getApiKey());
+        Properties settings = SecuredServer.settings();
+        settings.setProperty(AuthorizationServerSettings.ISSUER, "https://issuer.example.com");
+        try (SecuredServer server = SecuredServer.start(settings, "test", users(), APP,
+                http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable()).formLogin(Customizer.withDefaults())
+                        .apiKey(api -> api.repository(keys))
+                        .oauth2ResourceServer(o -> o.jwt(jwt -> jwt.decoder(token ->
+                                new com.codename1.backend.security.oauth2.jwt.Jwt(token,
+                                        java.util.Collections.<String, Object>singletonMap("alg", "RS256"),
+                                        java.util.Collections.<String, Object>singletonMap("sub", "ada")))))
+                        .authorizationServer(as -> as.registeredClientRepository(clients())
+                                .authorizationService(grants).clientSecretEncoder(OAuth2Testing.PLAIN))
+                        .build())) {
+            String url = authorizeUrl("app", APP_REDIRECT, "openid orders:read",
+                    OAuth2Parameters.random(32), "state", "nonce") + "&prompt=none";
+            server.post("/login", "username=ada&password=ada-pw");
+            String bearer = "Bearer " + (apiKey ? key.getPlaintext() : "verified-token");
+            for (boolean withSession : new boolean[] {true, false}) {
+                if (!withSession) {
+                    server.cookies.clear();
+                }
+                assertEquals(200, server.get("/me", "Authorization", bearer).status);
+                Reply refused = server.get(url, "Authorization", bearer);
+                assertEquals("login_required", query(refused.header("Location")).get("error"));
+                Reply device = server.call("POST", "/oauth2/device_verification", "{}",
+                        "application/json", "Authorization", bearer);
+                refused(device, 401, "login_required");
+            }
+        }
+    }
+
     @Test
     void registeredScopesCannotChangeWhenSerialized() {
         for (String scope : new String[] {"read,admin", "read\tadmin"}) {

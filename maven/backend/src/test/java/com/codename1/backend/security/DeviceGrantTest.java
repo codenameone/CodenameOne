@@ -425,7 +425,7 @@ class DeviceGrantTest {
     }
 
     @Test
-    @DisplayName("an answer that arrives with no session is asked the question, not answered 500")
+    @DisplayName("device approval requires a session and a ticket from the question")
     void anAnswerWithNoSession() throws Exception {
         int port = OAuth2Testing.freePort();
         Properties settings = new Properties();
@@ -433,11 +433,12 @@ class DeviceGrantTest {
         settings.setProperty(AuthorizationServerSettings.ISSUER, "http://127.0.0.1:" + port);
         Object[] beans = {new InMemoryUserDetailsManager(
                 User.withUsername("ada").password("{noop}ada-pw").roles("USER").build())};
-        // HTTP Basic keeps no session, so the user below is signed in on every
-        // request and has none until the page itself starts one.
+        // HTTP Basic authenticates a request, but does not establish the
+        // browser session required to approve a durable user grant.
         try (SecuredServer server = SecuredServer.start(settings, "test", beans, APP,
                 http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                         .httpBasic(Customizer.withDefaults())
+                        .formLogin(Customizer.withDefaults())
                         .csrf(csrf -> csrf.disable())
                         .authorizationServer(as -> as
                                 .registeredClientRepository(AuthorizationServerTest.clients())
@@ -447,20 +448,26 @@ class DeviceGrantTest {
             String ada = OAuth2Testing.basic("ada", "ada-pw");
             Map device = begin(server, "openid");
             String userCode = (String) device.get("user_code");
-            // An answer nobody was asked for, with a ticket nobody issued. It
-            // decides nothing -- and the session it has no ticket in did not
-            // exist, which used to be a NullPointerException where the question
-            // is put again.
+            // A stateless sign-in cannot approve the code or start a question.
             Reply early = server.post(PAGE, form("user_code", userCode, "decision", "approve",
-                    "ticket", OAuth2Parameters.random(32)), "Authorization", ada);
+                    "ticket", OAuth2Parameters.random(32)), "Authorization", ada,
+                    "Accept", "application/json");
+            assertEquals(401, early.status, early.toString());
+            refused(poll(server, device.get("device_code")), "authorization_pending");
+            clock.now += 5000;
+
+            // A real session with a ticket nobody issued is asked the question
+            // again; it still cannot approve an unseen request.
+            assertEquals(302, server.post("/login", "username=ada&password=ada-pw").status);
+            early = server.post(PAGE, form("user_code", userCode, "decision", "approve",
+                    "ticket", OAuth2Parameters.random(32)));
             assertEquals(200, early.status, early.toString());
             assertTrue(early.body.contains("is asking to act as"), early.body);
             refused(poll(server, device.get("device_code")), "authorization_pending");
 
             // The question it was asked instead is a real one: its ticket answers.
             Reply approved = server.post(PAGE, form("user_code", field(early.body, "user_code"),
-                    "decision", "approve", "ticket", field(early.body, "ticket")),
-                    "Authorization", ada);
+                    "decision", "approve", "ticket", field(early.body, "ticket")));
             assertEquals(200, approved.status, approved.toString());
             assertTrue(approved.body.contains("Device approved"), approved.body);
             clock.now += 5000;

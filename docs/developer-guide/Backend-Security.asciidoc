@@ -1143,6 +1143,11 @@ It also carries `nonce`, `auth_time`, `azp` and `at_hash`. Without a
 `email` scope yields nothing, because the server doesn't know that a username
 is an address.
 
+Authorizing a client or approving a device requires a sign-in stored in the
+current HTTP session. API keys, bearer tokens, HTTP Basic credentials and
+authentication restored from a remembered sign-in don't satisfy this check. Sign in through the
+chain's form, OAuth2 login or passkey flow first.
+
 The authorization endpoint returns `login_required` for `prompt=login`,
 `max_age=0`, or a session whose last credential check is older than `max_age`.
 It also refuses a bounded-age request when the session has no recorded sign-in
