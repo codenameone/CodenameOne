@@ -1364,6 +1364,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                 currentEditingField = ta;
                                 currentInputField = el;
                                 isEditing = true;
+                                // Browser focus bypasses editStringImpl(), which normally
+                                // registers the session for form-level editing APIs.
+                                setFocusedEditingText(ta);
                             }
                             if (ta.isFocusable() && ta.isEnabled()) ta.requestFocus();
                             ta.repaint();
@@ -1612,6 +1615,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         private void releaseEditingOwnership() {
             // A removed control may deliver blur after its replacement gains focus.
             if (currentInputField == el) {
+                if (HTML5Implementation.super.isEditingText(ta)) setFocusedEditingText(null);
                 currentEditingField = null;
                 currentInputField = null;
                 isEditing = false;

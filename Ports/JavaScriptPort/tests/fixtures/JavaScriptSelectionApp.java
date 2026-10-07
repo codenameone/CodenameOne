@@ -98,7 +98,21 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=multitouch") >= 0) {
+        if (query.indexOf("review=formediting") >= 0) {
+            TextField first = new TextField("First value"); first.setName("formEditingFirst");
+            TextField second = new TextField("Second value"); second.setName("formEditingSecond");
+            first.setEditable(query.indexOf("readonly=true") < 0);
+            Button check = new Button("Check form editing");
+            check.addActionListener(e -> status.setText("Form editing=" + form.isEditing()
+                    + " first=" + first.isEditing() + " second=" + second.isEditing()));
+            Button stop = new Button("Stop form editing");
+            stop.addActionListener(e -> form.stopEditing(() -> {
+                status.setText("Form stopped " + first.getText() + " editing=" + form.isEditing()
+                        + " field=" + first.isEditing());
+                if (query.indexOf("handoff=true") >= 0) second.startEditingAsync();
+            }));
+            form.addAll(new Button("Initial focus"), first, second, check, stop, status);
+        } else if (query.indexOf("review=multitouch") >= 0) {
             Label label = new Label("Pinch promoted label");
             TextArea area = new TextArea("Pinch native editor", 2, 24);
             area.setName("pinchEditor");

@@ -73,6 +73,34 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    for (const handoff of [false, true]) {
+      await openReview('formediting&handoff=' + handoff);
+      const first = page.locator('.cn1-selection-editor[name="formEditingFirst"]');
+      await first.click();
+      await clickButton('Check form editing');
+      await page.waitForFunction(() => document.body.innerText.includes('Form editing=true first=true second=false'));
+      // Completion must reconcile DOM text even before its input callback arrives.
+      await first.evaluate(el => { el.value = 'Pending form value'; });
+      await clickButton('Stop form editing');
+      await page.waitForFunction(() => document.body.innerText.includes('Form stopped Pending form value editing=false field=false'));
+      await page.waitForFunction(() => document.activeElement?.getAttribute('name') !== 'formEditingFirst');
+      if (handoff) {
+        await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'formEditingSecond');
+        // A duplicate late blur from the previous editor cannot clear its successor.
+        await first.evaluate(el => el.dispatchEvent(new Event('blur')));
+        await clickButton('Check form editing');
+        await page.waitForFunction(() => document.body.innerText.includes('Form editing=true first=false second=true'));
+      } else {
+        await clickButton('Check form editing');
+        await page.waitForFunction(() => document.body.innerText.includes('Form editing=false first=false second=false'));
+      }
+    }
+    await openReview('formediting&readonly=true');
+    await page.locator('.cn1-selection-editor[name="formEditingFirst"]').click();
+    await clickButton('Check form editing');
+    await page.waitForFunction(() => document.body.innerText.includes('Form editing=false first=false second=false'));
+    console.log('PASS', name, 'form editing tracks direct native focus, committed stop callbacks, handoff and readonly focus');
+
     await openReview('stalefocus');
     const removedEditor = page.locator('.cn1-selection-editor[name="removedEditor"]');
     await removedEditor.waitFor({state: 'visible'});
