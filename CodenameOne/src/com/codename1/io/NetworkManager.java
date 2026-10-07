@@ -1084,29 +1084,47 @@ public final class NetworkManager {
             return false;
         }
         request.heldBeforeSending = true;
+        final HeldAuthorization held = new HeldAuthorization(request);
+        request.heldAuthorization = held;
         // The context of whoever asked, captured now: by the time the request is queued
         // this thread has moved on.
         captureHeldTracer(request);
         preparing.ready(new SuccessCallback<Boolean>() {
             @Override
             public void onSucess(Boolean ready) {
-                releaseHeld(request);
+                releaseHeld(held);
             }
         }).except(new SuccessCallback<Throwable>() {
             @Override
             public void onSucess(Throwable err) {
-                releaseHeld(request);
+                releaseHeld(held);
             }
         });
+        if (request.isKilled()) {
+            releaseHeld(held);
+        }
         return true;
     }
 
+    /// The renewal callbacks hold this detachable reference, so a renewal that
+    /// never finishes cannot retain a cancelled request and its listeners.
+    static final class HeldAuthorization {
+        private ConnectionRequest request;
+
+        HeldAuthorization(ConnectionRequest request) {
+            this.request = request;
+        }
+    }
+
     /// Queues a request [#holdForAuthorizer(ConnectionRequest)] took, once.
-    private void releaseHeld(ConnectionRequest request) {
-        if (!request.heldBeforeSending) {
+    private void releaseHeld(HeldAuthorization held) {
+        ConnectionRequest request = held.request;
+        if (request == null) {
             // Answered twice: a resource can complete and then fail in a listener of its own.
             return;
         }
+        held.request = null;
+        request.heldAuthorization = null;
         request.heldBeforeSending = false;
         if (abandonIfKilled(request)) {
             return;
@@ -1147,8 +1165,21 @@ public final class NetworkManager {
 
     void kill9(final ConnectionRequest request) {
         if (request.isKilled()) {
-            for (int iter = 0; iter < threadCount; iter++) {
-                if (networkThreads[iter].currentRequest == request) {
+            Runnable abandonHeld = new Runnable() {
+                @Override
+                public void run() {
+                    if (request.isKilled() && request.heldAuthorization != null) {
+                        releaseHeld(request.heldAuthorization);
+                    }
+                }
+            };
+            if (!Display.isInitialized() || Display.getInstance().isEdt()) {
+                abandonHeld.run();
+            } else {
+                Display.getInstance().callSerially(abandonHeld);
+            }
+            for (int iter = 0; networkThreads != null && iter < threadCount; iter++) {
+                if (networkThreads[iter] != null && networkThreads[iter].currentRequest == request) {
                     synchronized (LOCK) {
                         if (networkThreads[iter].currentRequest == request) {
                             networkThreads[iter].interrupt();

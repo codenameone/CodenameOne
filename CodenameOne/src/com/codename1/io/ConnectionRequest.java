@@ -128,7 +128,8 @@ public class ConnectionRequest implements IOProgressListener {
     /// Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
     /// customize the name of the cookie header to Cookie
     private static String cookieHeader = "cookie";
-    boolean complete;
+    @SuppressWarnings("PMD.AvoidUsingVolatile") // Publishes completion to synchronous waiting threads.
+    volatile boolean complete;
     boolean retrying;
     /// Connection ID.  Can be used for callbacks from native layer.
     private int id;
@@ -158,7 +159,8 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean writeRequest;
     private boolean readRequest = true;
     private boolean paused;
-    private boolean killed = false;
+    @SuppressWarnings("PMD.AvoidUsingVolatile") // Cancellation is observed by the EDT and network threads.
+    private volatile boolean killed = false;
     private boolean followRedirects = defaultFollowRedirects;
     private int timeout = -1;
     private int readTimeout = -1;
@@ -201,6 +203,7 @@ public class ConnectionRequest implements IOProgressListener {
     /// Whether the request is being kept out of the queue while its authorizer renews a
     /// credential that is about to expire; see [RequestAuthorizer.Proactive].
     boolean heldBeforeSending;
+    NetworkManager.HeldAuthorization heldAuthorization;
     /// What the network tracer answered when a held request was first asked to be queued,
     /// kept for when it really is: the thread that queues it then is not the one that asked.
     Object heldTracerParent;

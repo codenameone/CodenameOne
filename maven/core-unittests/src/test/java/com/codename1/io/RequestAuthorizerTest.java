@@ -602,6 +602,48 @@ public class RequestAuthorizerTest extends UITestBase {
         assertEquals(Collections.singletonList("Bearer T1"), seenByApi, "a killed request is not sent");
         assertTrue(p.delivered.isEmpty());
     }
+    @Test
+    void cancellationCompletesAProactivelyHeldRequestWithoutWaitingForRenewal() throws Exception {
+        NetworkManager.getInstance().start();
+        final AsyncResource<Boolean> renewal = new AsyncResource<Boolean>();
+        final java.util.concurrent.CountDownLatch held = new java.util.concurrent.CountDownLatch(2);
+        RequestAuthorizer.Proactive pending = new RequestAuthorizer.Proactive() {
+            public AsyncResource<Boolean> prepareAuthorization(ConnectionRequest request) {
+                held.countDown();
+                return renewal;
+            }
+            public String getAuthorization(ConnectionRequest request) { return "Bearer T2"; }
+            public AsyncResource<Boolean> refreshAuthorization(ConnectionRequest request, String rejected) {
+                return renewal;
+            }
+        };
+        final Probe synchronous = new Probe(API + "/sync");
+        synchronous.setAuthorizer(pending);
+        Probe asynchronous = new Probe(API + "/async");
+        asynchronous.setAuthorizer(pending);
+        Thread waiter = new Thread(() -> NetworkManager.getInstance().addToQueueAndWait(synchronous));
+        waiter.setDaemon(true);
+        waiter.start();
+        AsyncResource<ConnectionRequest> done = NetworkManager.getInstance().addToQueueAsync(asynchronous);
+        try {
+            assertTrue(held.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            DisplayTest.flushEdt();
+            asynchronous.kill();
+            synchronous.kill();
+            DisplayTest.flushEdt();
+            waiter.join(2000);
+            assertFalse(waiter.isAlive(), "cancelled synchronous request is still waiting for renewal");
+            assertTrue(done.isDone(), "cancelled async request is still waiting for renewal");
+            assertFalse(renewal.isDone(), "cancelling a request must not cancel a shared renewal");
+            assertTrue(seenByApi.isEmpty());
+        } finally {
+            renewal.complete(Boolean.TRUE);
+            DisplayTest.flushEdt();
+            waiter.join(2000);
+        }
+        assertTrue(seenByApi.isEmpty(), "late renewal must not send a cancelled request");
+    }
+
     // ---- threads -------------------------------------------------------
 
     /** Renews ahead of time once, then on a 401, and notes the thread of every call it gets. */
