@@ -209,7 +209,10 @@ public class MigrationGeneratorTest {
             for (java.lang.reflect.Method declared : load("cn1app.BackendMigrations").getDeclaredMethods()) {
                 assertFalse("the scripts' class must not be an entry point", "main".equals(declared.getName()));
             }
-            java.lang.reflect.Method main = load("cn1app.BackendMigrationsCli").getMethod("main", String[].class);
+            // By the name both build plugins launch, not one spelled here: the Gradle tasks
+            // once named the scripts' class, which the lines above require to have no main.
+            java.lang.reflect.Method main = load(com.codename1.maven.BackendMigrateEntryPoint.CLASS_NAME)
+                    .getMethod("main", String[].class);
             main.invoke(null, (Object) new String[] {"info"});
             main.invoke(null, (Object) new String[] {"migrate"});
             main.invoke(null, (Object) new String[] {"validate"});

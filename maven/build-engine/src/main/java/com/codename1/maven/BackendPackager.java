@@ -771,9 +771,9 @@ public class BackendPackager {
 
         // One main per translation, and it is the server's (or the test runner's).
         // The migrate goals' entry point is a main too, generated beside the
-        // scripts for the JVM to launch (MigrationGenerator.BACKEND_CLI_BINARY);
+        // scripts for the JVM to launch (BackendMigrateEntryPoint.CLASS_NAME);
         // left in, the translator stops with "Multiple main classes".
-        File migrateCli = new File(classes, "cn1app/BackendMigrationsCli.class");
+        File migrateCli = BackendMigrateEntryPoint.classFile(classes);
         if (migrateCli.isFile() && !migrateCli.delete()) {
             throw new BuildExecutionException("Could not remove " + migrateCli
                     + " from the translation");

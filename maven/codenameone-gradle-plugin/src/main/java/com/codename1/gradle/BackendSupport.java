@@ -25,6 +25,7 @@ package com.codename1.gradle;
 import com.codename1.gradle.tasks.ProcessAnnotationsAction;
 import com.codename1.gradle.tasks.ProcessTestAnnotationsAction;
 import com.codename1.gradle.tasks.RunBackendTask;
+import com.codename1.maven.BackendMigrateEntryPoint;
 import com.codename1.maven.GradleProjectTemplate;
 import com.codename1.project.ProjectLayout;
 import org.gradle.api.DefaultTask;
@@ -142,9 +143,13 @@ final class BackendSupport {
     }
 
     /// One migration command, as the Maven `cn1:migrate` goals run it: the entry point the
-    /// build generates into `cn1app.BackendMigrations`, on this JVM, with every `cn1.*`
+    /// build generates beside `cn1app.BackendMigrations`, on this JVM, with every `cn1.*`
     /// project property passed through and the processed `application.properties` as the
     /// configuration.
+    ///
+    /// The class is [BackendMigrateEntryPoint#CLASS_NAME], which the Maven goals read too.
+    /// These tasks used to name `cn1app.BackendMigrations` themselves -- the class that
+    /// holds the scripts and has no `main` -- and every one of them failed at start-up.
     private static void registerMigrate(Project project, ProjectLayout layout, SourceSet main, String name,
             String command, String description) {
         project.getTasks().register(name, RunBackendTask.class, t -> {
@@ -153,7 +158,8 @@ final class BackendSupport {
             t.dependsOn(main.getClassesTaskName());
             t.getClasspath().from(main.getRuntimeClasspath());
             t.getClassesDirectories().from(main.getOutput().getClassesDirs());
-            t.getMainClass().set("cn1app.BackendMigrations");
+            t.getMainClass().set(BackendMigrateEntryPoint.CLASS_NAME);
+            t.getMissingMainClassMessage().set(BackendMigrateEntryPoint.missingMessage());
             t.getArgs().set(Collections.singletonList(command));
             // Read now, not inside the provider: a lambda that held the source set would
             // drag the whole project model into the configuration cache.

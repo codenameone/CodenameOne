@@ -36,7 +36,7 @@ import java.util.List;
 /// The migration commands behind the build's `migrate` goals: the same engine start-up
 /// uses, run by hand against the configured database.
 ///
-/// Reached from the `main` the build generates into `cn1app.BackendMigrations`, which
+/// Reached from the `main` the build generates into `cn1app.BackendMigrationsCli`, which
 /// registers the project's scripts first. Nothing here is looked up by name, so a server that
 /// never runs a command does not carry this class.
 ///

@@ -55,10 +55,9 @@ import java.util.zip.CRC32;
 final class MigrationGenerator {
     static final String CLIENT_BINARY = "cn1app.ClientMigrations";
     static final String BACKEND_BINARY = "cn1app.BackendMigrations";
-    /// The entry point of the migrate goals, for a server; see [#cliSource]. The packager
-    /// (BackendPackager.translate) and the goals (AbstractMigrateMojo.ENTRY_POINT)
-    /// name the same class.
-    static final String BACKEND_CLI_BINARY = "cn1app.BackendMigrationsCli";
+    /// The entry point of the migrate goals, for a server; see [#cliSource]. The packager,
+    /// the Maven goals and the Gradle tasks read the same name from the same place.
+    static final String BACKEND_CLI_BINARY = com.codename1.maven.BackendMigrateEntryPoint.CLASS_NAME;
     /// Where a server keeps its scripts: Flyway's default location.
     static final String BACKEND_LOCATION = "src/main/resources/db/migration";
     /// Where an application keeps its scripts. Deliberately not a resource root: resources
