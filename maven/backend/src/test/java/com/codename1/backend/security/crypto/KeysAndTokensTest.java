@@ -227,6 +227,24 @@ class KeysAndTokensTest {
     }
 
     @Test
+    void keyPairsMustMatchEvenWhenTheirTypesAndCurvesMatch() throws Exception {
+        for (String kind : new String[] {"RSA", "EC"}) {
+            java.security.KeyPairGenerator generator = java.security.KeyPairGenerator.getInstance(kind);
+            if ("EC".equals(kind)) {
+                generator.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"));
+            } else {
+                generator.initialize(2048);
+            }
+            java.security.KeyPair first = generator.generateKeyPair();
+            java.security.KeyPair other = generator.generateKeyPair();
+            assertThrows(IOException.class, () -> Jwk.ofKeyPair(first.getPrivate().getEncoded(),
+                    other.getPublic().getEncoded()));
+            Jwk matched = Jwk.ofKeyPair(first.getPrivate().getEncoded(), first.getPublic().getEncoded());
+            assertArrayEquals(first.getPublic().getEncoded(), matched.getPublicKey());
+        }
+    }
+
+    @Test
     @DisplayName("ECDSA signatures between DER and the r||s of a JSON Web Signature")
     void ecdsaForms() throws Exception {
         byte[] theirs = der(KeyFixtures.ES256_SIGNATURE);

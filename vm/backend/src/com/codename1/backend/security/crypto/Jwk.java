@@ -92,6 +92,13 @@ public final class Jwk {
         if (!verifying.keyType.equals(Der.privateKeyType(privateKey))) {
             throw new IOException("The private key and the public key are of different kinds");
         }
+        String algorithm = Der.RSA.equals(verifying.keyType) ? Crypto.RS256
+                : (Der.P384.equals(verifying.curve) ? Crypto.ES384 : Crypto.ES256);
+        byte[] challenge = Crypto.randomBytes(32);
+        if (!Crypto.verify(algorithm, verifying.publicKey, challenge,
+                Crypto.sign(algorithm, privateKey, challenge))) {
+            throw new IOException("The private key and the public key do not form a key pair");
+        }
         return new Jwk(verifying.keyType, verifying.curve, verifying.publicKey,
                 privateKey.clone(), null, null, null);
     }
