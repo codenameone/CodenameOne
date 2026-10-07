@@ -153,6 +153,18 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
         if (row == null) {
             return null;
         }
+        try {
+            return decode(row);
+        } catch (IOException malformed) {
+            System.err.println("cn1: the registered client settings cannot be read; the client is refused");
+            return null;
+        } catch (IllegalArgumentException malformed) {
+            System.err.println("cn1: the registered client is invalid; the client is refused");
+            return null;
+        }
+    }
+
+    private static RegisteredClient decode(Map row) throws IOException {
         RegisteredClient.Builder b = RegisteredClient.withId(String.valueOf(row.get("id")))
                 .clientId(String.valueOf(row.get("client_id")))
                 .clientSecret(String.valueOf(row.get("client_secret")))
@@ -177,36 +189,52 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
         for (String scope : OAuth2Parameters.scopes(String.valueOf(row.get("scopes")))) {
             b.scope(scope);
         }
-        try {
-            Map settings = Json.parseObject(String.valueOf(row.get("settings")));
-            b.clientSettings(ClientSettings.builder().requireProofKey(
-                    Boolean.TRUE.equals(settings.get("requireProofKey"))).build());
-            TokenSettings.Builder t = TokenSettings.builder();
-            t.authorizationCodeTimeToLive(seconds(settings, "authorizationCodeTimeToLive", 300));
-            t.accessTokenTimeToLive(seconds(settings, "accessTokenTimeToLive", 300));
-            t.idTokenTimeToLive(seconds(settings, "idTokenTimeToLive", 1800));
-            t.refreshTokenTimeToLive(seconds(settings, "refreshTokenTimeToLive", 3600));
-            t.deviceCodeTimeToLive(seconds(settings, "deviceCodeTimeToLive", 300));
-            t.reuseRefreshTokens(Boolean.TRUE.equals(settings.get("reuseRefreshTokens")));
-            b.tokenSettings(t.build());
+        Map settings = Json.parseObject(String.valueOf(row.get("settings")));
+        b.clientSettings(ClientSettings.builder().requireProofKey(flag(settings, "requireProofKey")).build());
+        TokenSettings.Builder t = TokenSettings.builder();
+        t.authorizationCodeTimeToLive(seconds(settings, "authorizationCodeTimeToLive", 300));
+        t.accessTokenTimeToLive(seconds(settings, "accessTokenTimeToLive", 300));
+        t.idTokenTimeToLive(seconds(settings, "idTokenTimeToLive", 1800));
+        t.refreshTokenTimeToLive(seconds(settings, "refreshTokenTimeToLive", 3600));
+        t.deviceCodeTimeToLive(seconds(settings, "deviceCodeTimeToLive", 300));
+        t.reuseRefreshTokens(flag(settings, "reuseRefreshTokens"));
+        b.tokenSettings(t.build());
+        if (settings.containsKey("resources")) {
             Object resources = settings.get("resources");
-            if (resources instanceof List) {
-                for (Object resource : (List) resources) {
-                    if (resource instanceof String) {
-                        b.resource((String) resource);
-                    }
-                }
+            if (!(resources instanceof List)) {
+                throw new IllegalArgumentException("resources must be an array");
             }
-        } catch (IOException malformed) {
-            System.err.println("cn1: the settings of the registered client " + row.get("client_id")
-                    + " cannot be read; the defaults are used");
+            for (Object resource : (List) resources) {
+                if (!(resource instanceof String)) {
+                    throw new IllegalArgumentException("resources must contain strings");
+                }
+                b.resource((String) resource);
+            }
         }
         return b.build();
     }
 
-    private static long seconds(Map settings, String name, long fallback) {
+    private static boolean flag(Map settings, String name) {
         Object value = settings.get(name);
-        long seconds = value instanceof Number ? ((Number) value).longValue() : fallback;
-        return seconds > 0 ? seconds : fallback;
+        if (!(value instanceof Boolean)) {
+            throw new IllegalArgumentException(name + " must be a boolean");
+        }
+        return ((Boolean) value).booleanValue();
+    }
+
+    private static long seconds(Map settings, String name, long fallback) {
+        if (!settings.containsKey(name)) {
+            return fallback;
+        }
+        Object value = settings.get(name);
+        if (!(value instanceof Number)) {
+            throw new IllegalArgumentException(name + " must be a positive integer");
+        }
+        Number number = (Number) value;
+        long seconds = number.longValue();
+        if (seconds <= 0 || number.doubleValue() != (double) seconds) {
+            throw new IllegalArgumentException(name + " must be a positive integer");
+        }
+        return seconds;
     }
 }

@@ -23,6 +23,7 @@
 package com.codename1.backend.security.oauth2.client;
 
 import com.codename1.backend.security.GrantedAuthority;
+import com.codename1.backend.security.crypto.Pbkdf2Sha256PasswordEncoder;
 import com.codename1.backend.security.SimpleGrantedAuthority;
 import com.codename1.backend.security.core.userdetails.User;
 import com.codename1.backend.security.core.userdetails.UserDetails;
@@ -228,7 +229,8 @@ public final class LinkingOAuth2UserService
                 throw refused(ACCOUNT_NOT_FOUND, "No local user has the provider's address");
             }
             ((UserDetailsManager) users).createUser(new User(address,
-                    "{federated}" + OAuth2Parameters.random(32), newUserAuthorities));
+                    "{pbkdf2-sha256}" + new Pbkdf2Sha256PasswordEncoder().encode(
+                            OAuth2Parameters.random(32)), newUserAuthorities));
             local = load(address);
             if (local == null) {
                 throw refused(ACCOUNT_NOT_FOUND, "The new user could not be read back");

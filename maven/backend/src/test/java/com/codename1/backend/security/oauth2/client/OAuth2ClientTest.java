@@ -150,6 +150,21 @@ class OAuth2ClientTest {
     }
 
     @Test
+    void generatedFederatedUsersRejectPasswordAuthenticationNormally() {
+        LinkingOAuth2UserService service = new LinkingOAuth2UserService(identities, users);
+        service.setCreateUsers(true);
+        service.resolve("google", "federated-sub", attributes("federated@example.com", Boolean.TRUE));
+        com.codename1.backend.security.DaoAuthenticationProvider provider =
+                new com.codename1.backend.security.DaoAuthenticationProvider(users);
+        for (String name : new String[] {"federated@example.com", "missing@example.com"}) {
+            assertThrows(com.codename1.backend.security.BadCredentialsException.class,
+                    () -> provider.authenticate(
+                            com.codename1.backend.security.UsernamePasswordAuthenticationToken.unauthenticated(
+                                    name, "guess")));
+        }
+    }
+
+    @Test
     @DisplayName("a verified address nobody has makes a new user only when the application allows it")
     void newUsers() {
         LinkingOAuth2UserService service = new LinkingOAuth2UserService(identities, users);
@@ -166,9 +181,9 @@ class OAuth2ClientTest {
         assertEquals("new@example.com", made.getUsername());
         assertEquals("[ROLE_MEMBER]", made.getAuthorities().toString());
         assertEquals("new@example.com", identities.findUsername("google", "sub-6"));
-        // A password nobody knows, under an id no encoder has.
+        // A password nobody knows, in a format the default encoder can reject normally.
         String password = users.loadUserByUsername("new@example.com").getPassword();
-        assertTrue(password.startsWith("{federated}") && password.length() == 11 + 43, password);
+        assertTrue(password.startsWith("{pbkdf2-sha256}"), password);
         // The next sign-in is the first rule's.
         assertEquals("new@example.com", service.resolve("google", "sub-6",
                 attributes(null, null)).getUsername());

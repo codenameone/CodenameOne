@@ -436,6 +436,34 @@ class OAuth2LoginTest {
         }
     }
 
+    @Test
+    void generatedFederatedUsersGetNormalPasswordLoginFailures() throws Exception {
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager();
+        LinkingOAuth2UserService service = new LinkingOAuth2UserService(
+                new InMemoryFederatedIdentityRepository(), users);
+        service.setCreateUsers(true);
+        try (SecuredServer server = start(new Object[0], http -> http
+                .authenticationProvider(new DaoAuthenticationProvider(users))
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .csrf(csrf -> csrf.disable())
+                .formLogin(Customizer.withDefaults()).httpBasic(Customizer.withDefaults())
+                .oauth2Login(o -> o.clientRegistrationRepository(new InMemoryClientRegistrationRepository(own()))
+                        .userService(service).oidcUserService(service.oidc())).build())) {
+            Side application = new Side(server);
+            Side provider = new Side(server);
+            assertEquals(302, application.get(throughProvider(application, provider, "ada")).status);
+            assertTrue(users.userExists("ada@example.com"));
+            for (String name : new String[] {"ada@example.com", "absent@example.com"}) {
+                Side passwordClient = new Side(server);
+                Reply basic = passwordClient.get("/private", "Authorization", OAuth2Testing.basic(name, "wrong"));
+                assertEquals(401, basic.status, basic.toString());
+                Reply formReply = passwordClient.post("/login", form("username", name, "password", "wrong"));
+                assertEquals(302, formReply.status, formReply.toString());
+                assertEquals("/login?error", formReply.header("Location"));
+            }
+        }
+    }
+
     // ------------------------------------------------------- a second factor
 
     @Test

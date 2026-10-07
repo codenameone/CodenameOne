@@ -53,11 +53,11 @@ import java.util.ArrayList;
 /// requests were refused together; they all wait for the same exchange. Each is then sent again
 /// with the new access token. See [RequestAuthorizer] for what the caller of a request sees.
 ///
-/// When the authorization server refuses the refresh token, the session is over: the tokens
+/// When the authorization server returns a permanent refresh error, the session is over: the tokens
 /// are dropped from memory and from the [TokenStore], the held requests deliver their `401`,
 /// and every [SignInRequiredListener] is told so the application can show its sign-in screen.
-/// A renewal that fails without an answer from the server -- no network -- keeps the tokens:
-/// nothing has said they are bad.
+/// Transport failures, malformed responses, and the provider's `server_error` or
+/// `temporarily_unavailable` errors keep the tokens: nothing has said they are bad.
 ///
 /// #### Before the token expires
 ///
@@ -437,9 +437,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
                 exchanging = null;
                 exchangeAbandoned = null;
                 renewal = null;
-                boolean refused = err instanceof OidcException
-                        && OidcException.INVALID_GRANT.equals(((OidcException) err).getError());
-                if (refused) {
+                if (permanentRefreshError(err)) {
                     endSession(err);
                 } else if (ahead) {
                     // Nothing said the token is bad; it is sent as it is, and the next
@@ -450,6 +448,24 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
             }
         });
         return out;
+    }
+
+    /// Local delivery/validation failures and explicitly temporary provider errors
+    /// do not invalidate the saved session. Other OAuth refusals require sign-in,
+    /// rather than an endless exchange of the same unusable refresh token.
+    private static boolean permanentRefreshError(Throwable failure) {
+        if (!(failure instanceof OidcException)) {
+            return false;
+        }
+        String error = ((OidcException) failure).getError();
+        return error != null && error.length() > 0
+                && !OidcException.TRANSPORT_ERROR.equals(error)
+                && !OidcException.INVALID_RESPONSE.equals(error)
+                && !OidcException.INVALID_ID_TOKEN.equals(error)
+                && !OidcException.DISCOVERY_FAILED.equals(error)
+                && !OidcException.STORAGE_UNAVAILABLE.equals(error)
+                && !"server_error".equals(error)
+                && !"temporarily_unavailable".equals(error);
     }
 
     /// Called by the client for every token set it obtains, and with null when it clears

@@ -277,6 +277,35 @@ class OAuth2StoresTest {
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS).build()));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void malformedClientSettingsNeverRestorePermissiveDefaults(String engine) throws Exception {
+        DataSource pool = open(engine);
+        JdbcRegisteredClientRepository clients = new JdbcRegisteredClientRepository(pool);
+        clients.save(RegisteredClient.withId("restricted").clientId("restricted")
+                .clientSecret("{noop}secret")
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .clientSettings(ClientSettings.builder().requireProofKey(true).build())
+                .resource("https://only.example/api").build());
+        String valid = (String) pool.queryOne("SELECT settings FROM cn1_oauth2_registered_client "
+                + "WHERE id = ?", new Object[] {"restricted"}).get("settings");
+        for (String malformed : new String[] {"{", "null", "[]", "{}",
+            valid.replace("true", "\"true\""),
+            valid.replace("[\"https://only.example/api\"]", "\"https://only.example/api\""),
+            valid.replace("[\"https://only.example/api\"]", "[123]"),
+            valid.replace("300", "\"300\"")}) {
+            pool.execute("UPDATE cn1_oauth2_registered_client SET settings = ? WHERE id = ?",
+                    new Object[] {malformed, "restricted"});
+            assertNull(clients.findByClientId("restricted"), malformed);
+            assertNull(clients.findById("restricted"), malformed);
+        }
+        pool.execute("UPDATE cn1_oauth2_registered_client SET settings = ? WHERE id = ?",
+                new Object[] {valid, "restricted"});
+        assertTrue(clients.findById("restricted").getClientSettings().isRequireProofKey());
+        assertEquals(Collections.singleton("https://only.example/api"),
+                clients.findById("restricted").getResources());
+    }
+
     // ------------------------------------------------------- authorizations
 
     private static OAuth2Authorization grant(String id, String status, long expiresAt) {

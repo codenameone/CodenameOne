@@ -616,6 +616,35 @@ public class OidcRequestAuthorizerTest extends UITestBase {
         assertEquals(Collections.singletonList(Integer.valueOf(200)), c.delivered);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"invalid_client", "unauthorized_client",
+        "invalid_scope", "invalid_request", "unsupported_grant_type", "access_denied"})
+    void permanentRefreshErrorsEndTheSessionOnce(String error) {
+        for (boolean ahead : new boolean[] {false, true}) {
+            authorizer.setTokens(ahead ? expiring("AT-1", "RT-1", 30) : tokens("AT-1", "RT-1"));
+            store.saved = authorizer.getTokens();
+            tokenStatus = 400;
+            tokenBody = "{\"error\":\"" + error + "\"}";
+            final List<Throwable> told = new ArrayList<Throwable>();
+            OidcRequestAuthorizer.SignInRequiredListener listener = (source, reason) -> told.add(reason);
+            authorizer.addSignInRequiredListener(listener);
+            int before = tokenRequests.size();
+            Probe first = new Probe(API + "/pets");
+            NetworkManager.getInstance().addToQueue(first);
+            settle(first);
+            assertEquals(1, told.size(), error + " ahead=" + ahead);
+            assertEquals(error, ((OidcException) told.get(0)).getError());
+            assertNull(authorizer.getTokens());
+            assertNull(store.saved);
+            Probe next = new Probe(API + "/owners");
+            NetworkManager.getInstance().addToQueue(next);
+            settle(next);
+            assertEquals(before + 1, tokenRequests.size(), "permanent errors must not loop");
+            assertEquals(1, told.size());
+            authorizer.removeSignInRequiredListener(listener);
+        }
+    }
+
     @Test
     void aRefusedRefreshTokenEndsTheSession() {
         authorizer.setTokens(tokens("AT-1", "RT-1"));
