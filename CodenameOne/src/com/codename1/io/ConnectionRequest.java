@@ -2589,8 +2589,15 @@ public class ConnectionRequest implements IOProgressListener {
             if (shouldWriteUTFAsGetBytes()) {
                 os.write(val.toString().getBytes("UTF-8"));
             } else {
-                OutputStreamWriter w = new OutputStreamWriter(os, "UTF-8");
+                // Flushed, and not closed: the stream is the caller's. A writer may hold
+                // what it was given until it is flushed -- the JDK's does, and the one of
+                // the ports built on ParparVM has since it began buffering -- and this one
+                // is dropped as the method returns. Without the flush a POST with
+                // arguments went out with an empty body on every port that takes this
+                // branch (Windows, Linux and Mac): a sign-in form with no name in it.
+                OutputStreamWriter w = new OutputStreamWriter(os, "UTF-8"); //NOPMD CloseResource
                 w.write(val.toString());
+                w.flush();
             }
         }
     }
