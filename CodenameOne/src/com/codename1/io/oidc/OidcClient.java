@@ -598,7 +598,7 @@ public final class OidcClient {
                     parsed = null;
                 }
                 if (parsed == null || parsed.isEmpty()) {
-                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                    out.error(new OidcException(OidcException.INVALID_RESPONSE,
                             "Device authorization endpoint returned no JSON (HTTP "
                                     + getResponseCode() + ")"));
                     return;
@@ -612,7 +612,7 @@ public final class OidcClient {
                 try {
                     out.complete(OidcDeviceAuthorization.fromJson(parsed));
                 } catch (IllegalArgumentException incomplete) {
-                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                    out.error(new OidcException(OidcException.INVALID_RESPONSE,
                             incomplete.getMessage(), incomplete));
                 }
             }
@@ -984,7 +984,7 @@ public final class OidcClient {
         }
         String code = params.get("code");
         if (code == null) {
-            out.error(new OidcException(OidcException.INVALID_GRANT,
+            out.error(new OidcException(OidcException.INVALID_RESPONSE,
                     "Authorization redirect was missing the 'code' parameter"));
             return;
         }
@@ -996,7 +996,7 @@ public final class OidcClient {
                               PkceChallenge pkce,
                               final AsyncResource<OidcTokens> out) {
         if (configuration.getTokenEndpoint() == null) {
-            out.error(new OidcException(OidcException.INVALID_GRANT,
+            out.error(new OidcException(OidcException.INVALID_RESPONSE,
                     "OIDC configuration is missing tokenEndpoint"));
             return;
         }
@@ -1078,12 +1078,12 @@ public final class OidcClient {
                     return;
                 }
                 if (malformed != null) {
-                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                    out.error(new OidcException(OidcException.INVALID_RESPONSE,
                             "Token endpoint returned malformed JSON: " + json, malformed));
                     return;
                 }
                 if (parsed == null) {
-                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                    out.error(new OidcException(OidcException.INVALID_RESPONSE,
                             "Token endpoint returned no body"));
                     return;
                 }
@@ -1092,7 +1092,7 @@ public final class OidcClient {
                 // refresh it replaced tokens that still worked.
                 Object access = parsed.get("access_token");
                 if (!(access instanceof String) || ((String) access).length() == 0) {
-                    out.error(new OidcException(OidcException.INVALID_GRANT,
+                    out.error(new OidcException(OidcException.INVALID_RESPONSE,
                             "Token endpoint response has no access_token"));
                     return;
                 }

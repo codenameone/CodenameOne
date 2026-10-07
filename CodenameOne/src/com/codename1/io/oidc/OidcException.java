@@ -31,7 +31,7 @@ import java.io.IOException;
 /// and uses Codename One-specific values for transport or client-side problems
 /// (`"transport_error"`, `"state_mismatch"`, `"nonce_mismatch"`, `"user_cancelled"`,
 /// `"discovery_failed"`, `"invalid_id_token"`, `"issuer_mismatch"`,
-/// `"storage_unavailable"`).
+/// `"storage_unavailable"`, `"invalid_response"`).
 ///
 public class OidcException extends IOException {
 
@@ -50,8 +50,11 @@ public class OidcException extends IOException {
     /// The discovery document could not be fetched or parsed.
     public static final String DISCOVERY_FAILED = "discovery_failed";
 
-    /// Token-endpoint response was missing or malformed.
+    /// The authorization grant or refresh token was rejected.
     public static final String INVALID_GRANT = "invalid_grant";
+
+    /// The endpoint returned a missing, malformed or incomplete protocol response.
+    public static final String INVALID_RESPONSE = "invalid_response";
 
     /// The ID token was not accepted: it is malformed, it is for another client or from
     /// another issuer, it has expired, it does not belong to the access token it came

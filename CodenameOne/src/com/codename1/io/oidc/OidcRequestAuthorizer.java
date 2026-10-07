@@ -437,7 +437,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
                 exchangeAbandoned = null;
                 renewal = null;
                 boolean refused = err instanceof OidcException
-                        && !OidcException.TRANSPORT_ERROR.equals(((OidcException) err).getError());
+                        && OidcException.INVALID_GRANT.equals(((OidcException) err).getError());
                 if (refused) {
                     endSession(err);
                 } else if (ahead) {

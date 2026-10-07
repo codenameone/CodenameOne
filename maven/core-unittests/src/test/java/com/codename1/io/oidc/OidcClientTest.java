@@ -316,7 +316,7 @@ public class OidcClientTest extends UITestBase {
         Outcome<OidcTokens> r = await(c.refresh("RT"));
         assertNull(r.value);
         assertInstanceOf(OidcException.class, r.error);
-        assertEquals(OidcException.INVALID_GRANT, ((OidcException) r.error).getError());
+        assertEquals(OidcException.INVALID_RESPONSE, ((OidcException) r.error).getError());
         assertEquals("Token endpoint response has no access_token", r.error.getMessage());
         assertNull(store.saved, "a token set with no access token was stored");
     }

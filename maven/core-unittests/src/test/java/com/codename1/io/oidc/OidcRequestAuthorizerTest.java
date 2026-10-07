@@ -368,6 +368,36 @@ public class OidcRequestAuthorizerTest extends UITestBase {
         assertNull(store.saved);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"{\"error\":\"temporarily_unavailable\"}",
+        "{\"error\":\"server_error\"}", "{", "{}", ""})
+    void temporaryAndProtocolRefreshFailuresKeepTheSession(String response) {
+        final List<Throwable> told = new ArrayList<Throwable>();
+        authorizer.addSignInRequiredListener(new OidcRequestAuthorizer.SignInRequiredListener() {
+            public void signInRequired(OidcRequestAuthorizer source, Throwable reason) {
+                told.add(reason);
+            }
+        });
+        authorizer.setTokens(expiring("AT-1", "RT-1", 30));
+        store.saved = authorizer.getTokens();
+        accepted = "Bearer AT-1";
+        tokenStatus = 200;
+        tokenBody = response;
+        int before = tokenRequests.size();
+        Probe p = new Probe(API + "/pets");
+        NetworkManager.getInstance().addToQueue(p);
+        settle(p);
+        assertEquals(before + 1, tokenRequests.size(), response);
+        assertEquals(Collections.singletonList(Integer.valueOf(200)), p.delivered, response);
+        assertNotNull(authorizer.getTokens(), response);
+        assertEquals("RT-1", store.saved.getRefreshToken(), response);
+        assertTrue(told.isEmpty(), response);
+        Probe next = new Probe(API + "/owners");
+        NetworkManager.getInstance().addToQueue(next);
+        settle(next);
+        assertEquals(before + 1, tokenRequests.size(), "back off after " + response);
+    }
+
     @Test
     void aRenewalAheadThatCannotReachTheServerSendsTheTokenItHas() {
         authorizer.setTokens(expiring("AT-1", "RT-1", 30));
