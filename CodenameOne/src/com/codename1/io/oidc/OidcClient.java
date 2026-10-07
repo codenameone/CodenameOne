@@ -367,11 +367,51 @@ public final class OidcClient {
 
     /// Exchanges a stored refresh token for a fresh access token. Pass the
     /// value returned from [OidcTokens#getRefreshToken()] on a previous flow.
-    /// The new tokens are persisted via the current [TokenStore].
+    /// The stored session supplies the original subject for any refreshed ID token.
+    /// A refresh response cannot change that subject. The new tokens are persisted
+    /// via the current [TokenStore].
     ///
     /// Cancelling the returned resource before it completes drops the answer: nothing is
     /// stored and no [OidcRequestAuthorizer] is given the new tokens.
     public AsyncResource<OidcTokens> refresh(final String refreshToken) {
+        requireRefresh(refreshToken);
+        final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
+        try {
+            loadStoredTokens().ready(new SuccessCallback<OidcTokens>() {
+                @Override
+                public void onSucess(OidcTokens stored) {
+                    if (out.isCancelled()) {
+                        return;
+                    }
+                    if (stored != null && !refreshToken.equals(stored.getRefreshToken())) {
+                        out.error(new OidcException(OidcException.INVALID_GRANT,
+                                "The refresh token does not belong to the stored session"));
+                        return;
+                    }
+                    refreshTokens(refreshToken, stored, out);
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable error) {
+                    out.error(error);
+                }
+            });
+        } catch (Throwable error) {
+            out.error(error);
+        }
+        return out;
+    }
+
+    /// Refreshes a session already loaded by the authorizer without reading storage again.
+    AsyncResource<OidcTokens> refreshTokens(OidcTokens previous) {
+        String refreshToken = previous == null ? null : previous.getRefreshToken();
+        requireRefresh(refreshToken);
+        AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
+        refreshTokens(refreshToken, previous, out);
+        return out;
+    }
+
+    private void requireRefresh(String refreshToken) {
         // Only what the exchange itself uses. A client that signed in with the device grant
         // has no redirect URI, and asking for one here would leave it unable to refresh.
         if (clientId == null) {
@@ -383,7 +423,9 @@ public final class OidcClient {
         if (configuration.getTokenEndpoint() == null) {
             throw new IllegalStateException("OIDC configuration is missing tokenEndpoint");
         }
-        final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
+    }
+
+    private void refreshTokens(String refreshToken, OidcTokens previous, AsyncResource<OidcTokens> out) {
         Map<String, String> args = new HashMap<String, String>();
         args.put("grant_type", "refresh_token");
         args.put("refresh_token", refreshToken);
@@ -391,8 +433,7 @@ public final class OidcClient {
             args.put("scope", join(scopes));
         }
         appendBaseTokenArgs(args);
-        postToTokenEndpoint(args, refreshToken, null, out);
-        return out;
+        postToTokenEndpoint(args, refreshToken, null, out, out, previous);
     }
 
     /// Returns previously-saved tokens for this client (or `null`). Combine
@@ -425,7 +466,7 @@ public final class OidcClient {
                             out.complete(null);
                             return;
                         }
-                        refresh(rt)
+                        refreshTokens(stored)
                                 .ready(new SuccessCallback<OidcTokens>() {
                                     @Override
                                     public void onSucess(OidcTokens fresh) {
@@ -917,6 +958,15 @@ public final class OidcClient {
                                      final String expectedNonce,
                                      final AsyncResource<OidcTokens> out,
                                      final AsyncResource<OidcTokens> waiting) {
+        postToTokenEndpoint(args, refreshTokenFallback, expectedNonce, out, waiting, null);
+    }
+
+    private void postToTokenEndpoint(final Map<String, String> args,
+                                     final String refreshTokenFallback,
+                                     final String expectedNonce,
+                                     final AsyncResource<OidcTokens> out,
+                                     final AsyncResource<OidcTokens> waiting,
+                                     final OidcTokens previous) {
         final boolean[] completed = new boolean[1];
         ConnectionRequest req = new ConnectionRequest() {
             @Override
@@ -971,7 +1021,9 @@ public final class OidcClient {
                             "Token endpoint response has no access_token"));
                     return;
                 }
-                final OidcTokens tokens = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);
+                OidcTokens received = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);
+                final OidcTokens tokens = received.getIdToken() == null && previous != null
+                        ? received.withIdentityFrom(previous) : received;
                 if (refreshTokenFallback == null && requestsOpenId() && tokens.getIdToken() == null) {
                     out.error(new OidcException(OidcException.INVALID_ID_TOKEN,
                             "An initial OpenID Connect response must contain an ID token"));
@@ -982,6 +1034,13 @@ public final class OidcClient {
                 checkIdToken(tokens, enforceNonce ? expectedNonce : null, new Runnable() {
                     @Override
                     public void run() {
+                        if (refreshTokenFallback != null && tokens.getIdToken() != null
+                                && (previous == null || previous.getSubject() == null
+                                || !previous.getSubject().equals(tokens.getSubject()))) {
+                            out.error(new OidcException(OidcException.INVALID_ID_TOKEN,
+                                    "The refreshed ID token must match the previous subject"));
+                            return;
+                        }
                         accept(tokens, waiting, out);
                     }
                 }, out);

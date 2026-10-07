@@ -254,7 +254,8 @@ public class OidcIdTokenTest extends UITestBase {
     }
 
     private OidcTestSupport.Outcome<OidcTokens> refresh() {
-        return await(client.refresh("RT-1"));
+        return await(client.refreshTokens(new OidcTokens("previous-access", null, "RT-1", "Bearer",
+                "openid", null, claims(), Collections.<String, Object>emptyMap())));
     }
 
     private void refused(String code, String because) {
@@ -406,6 +407,66 @@ public class OidcIdTokenTest extends UITestBase {
     }
 
     // ---- the claims ---------------------------------------------------------
+
+    @Test
+    void refreshCannotChangeTheStoredSubjectEvenAfterAnIdTokenIsOmitted() throws Exception {
+        String initialId = sign("RS256", "k-rsa", rsa, claims());
+        Map<String, Object> initial = new LinkedHashMap<String, Object>();
+        initial.put("access_token", "original-access");
+        initial.put("refresh_token", "RT-1");
+        initial.put("id_token", initialId);
+        OidcTokens original = OidcTokens.fromTokenResponse(initial, null);
+        store.saved = original;
+        OidcRequestAuthorizer authorizer = new OidcRequestAuthorizer(client);
+        authorizer.setTokens(original);
+        Map<String, Object> other = claims();
+        other.put("sub", "another-user");
+        idToken = sign("RS256", "k-rsa", rsa, other);
+        OidcTestSupport.Outcome<OidcTokens> rejected = await(client.refresh("RT-1"));
+        assertNull(rejected.value);
+        assertEquals(OidcException.INVALID_ID_TOKEN, ((OidcException) rejected.error).getError());
+        assertSame(original, store.saved);
+        assertSame(original, authorizer.getTokens());
+
+        idToken = initialId;
+        OidcTestSupport.Outcome<OidcTokens> matching = await(client.refresh("RT-1"));
+        assertNull(matching.error, String.valueOf(matching.error));
+        assertEquals(original.getSubject(), matching.value.getSubject());
+        idToken = null;
+        OidcTestSupport.Outcome<OidcTokens> omitted = await(client.refresh("RT-2"));
+        assertNull(omitted.error);
+        assertEquals(original.getSubject(), omitted.value.getSubject());
+        assertNull(omitted.value.getIdToken(), "do not report the old ID token as newly issued");
+
+        // Restoring after an application restart retains the identity binding.
+        store.saved = TokenJson.fromJson(TokenJson.toJson(omitted.value));
+        client = newClient(true, false);
+        idToken = sign("RS256", "k-rsa", rsa, other);
+        rejected = await(client.refresh("RT-2"));
+        assertNull(rejected.value);
+        assertEquals(OidcException.INVALID_ID_TOKEN, ((OidcException) rejected.error).getError());
+        assertEquals(original.getSubject(), store.saved.getSubject());
+    }
+
+    @Test
+    void idTokensRequireAnExpectedIssuer() throws Exception {
+        client = OidcClient.create(OidcConfiguration.newBuilder().authorizationEndpoint(ISSUER + "/auth").tokenEndpoint(TOKEN_EP)
+                .jwksUri(JWKS).build()).setClientId(CLIENT).setScopes("openid").setTokenStore(store);
+        idToken = sign("RS256", "k-rsa", rsa, claims());
+        refused(OidcException.INVALID_ID_TOKEN, "expected issuer");
+        client.setVerifyIdTokenSignature(false);
+        refused(OidcException.INVALID_ID_TOKEN, "expected issuer");
+    }
+
+    @Test
+    void aRefreshedIdTokenNeedsTheOriginalSubject() throws Exception {
+        idToken = sign("RS256", "k-rsa", rsa, claims());
+        OidcTestSupport.Outcome<OidcTokens> result = await(client.refresh("RT-1"));
+        assertNull(result.value);
+        assertEquals(OidcException.INVALID_ID_TOKEN, ((OidcException) result.error).getError());
+        assertTrue(result.error.getMessage().contains("previous subject"));
+        assertNull(store.saved);
+    }
 
     @Test
     void theClaimsAreHeldToThisClientThisIssuerAndNow() throws Exception {

@@ -202,13 +202,19 @@ public final class OidcTokens {
                 expiresAt.getTime() - System.currentTimeMillis() < leewaySeconds * 1000L;
     }
 
-    /// Read-only view of the ID token claims (empty if no ID token was returned).
+    /// Read-only view of the latest accepted ID token claims. A refresh that omits
+    /// its ID token retains the prior identity; [#getIdToken()] still returns null.
     public Map<String, Object> getIdTokenClaims() {
         return idTokenClaims;
     }
 
-    /// Convenience accessor for a single ID-token claim. Returns `null` when
-    /// the claim is absent or the ID token is missing.
+    OidcTokens withIdentityFrom(OidcTokens previous) {
+        return new OidcTokens(accessToken, idToken, refreshToken, tokenType, scope,
+                expiresAt, previous.getIdTokenClaims(), raw);
+    }
+
+    /// Convenience accessor for a claim in the latest accepted identity. Returns
+    /// `null` when the claim is absent or no identity has been accepted.
     public Object getClaim(String name) {
         return idTokenClaims.get(name);
     }

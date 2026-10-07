@@ -401,7 +401,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
         renewal = out;
         final AsyncResource<OidcTokens> exchange;
         try {
-            exchange = client.refresh(current.getRefreshToken());
+            exchange = client.refreshTokens(current);
         } catch (RuntimeException misconfigured) {
             renewal = null;
             out.complete(Boolean.FALSE);

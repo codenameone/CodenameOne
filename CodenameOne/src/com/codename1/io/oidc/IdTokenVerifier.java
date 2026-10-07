@@ -65,7 +65,7 @@ final class IdTokenVerifier {
     ///
     /// - `jwt`: the parsed ID token
     ///
-    /// - `issuer`: the provider's issuer, or null when the client was configured without one
+    /// - `issuer`: the provider's expected issuer; required to accept an ID token
     ///
     /// - `clientId`: this client
     ///
@@ -85,7 +85,10 @@ final class IdTokenVerifier {
             String accessToken, int skewSeconds, long nowMillis) {
         Map<String, Object> claims = jwt.getClaims();
         Object iss = claims.get("iss");
-        if (issuer != null && !sameIssuer(issuer, iss, claims.get("tid"))) {
+        if (issuer == null || issuer.length() == 0) {
+            return invalid("An expected issuer is required to accept an ID token");
+        }
+        if (!sameIssuer(issuer, iss, claims.get("tid"))) {
             return invalid("The ID token was issued by " + iss + ", not by " + issuer);
         }
         Object aud = claims.get("aud");

@@ -405,6 +405,22 @@ class OAuth2ClientTest {
     }
 
     @Test
+    void authorizedPartyMustNameThisClientEvenForOneAudience() {
+        ClientRegistration registration = CommonOAuth2Provider.GOOGLE.getBuilder("google")
+                .clientId("123").clientSecret("secret").build();
+        OidcIdTokenDecoderFactory.IdTokenValidator validator =
+                new OidcIdTokenDecoderFactory.IdTokenValidator(registration);
+        Map<String, Object> tokenClaims = claims(registration.getProviderDetails().getIssuerUri(), "123");
+        assertFalse(validator.validate(token(tokenClaims)).hasErrors());
+        tokenClaims.put("azp", "other-client");
+        assertTrue(validator.validate(token(tokenClaims)).hasErrors());
+        tokenClaims.put("azp", "123");
+        assertFalse(validator.validate(token(tokenClaims)).hasErrors());
+        tokenClaims.put("azp", Integer.valueOf(123));
+        assertTrue(validator.validate(token(tokenClaims)).hasErrors());
+    }
+
+    @Test
     @DisplayName("Apple's client secret is signed once an hour, not once a sign-in")
     void appleSecretIsCached() throws Exception {
         final long[] now = {1700000000000L};

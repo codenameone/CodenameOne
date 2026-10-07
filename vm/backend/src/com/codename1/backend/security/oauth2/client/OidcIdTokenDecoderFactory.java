@@ -128,11 +128,12 @@ public final class OidcIdTokenDecoderFactory {
             }
             String clientId = registration.getClientId();
             List<String> audience = token.getAudience();
+            Object authorizedParty = token.getClaims().get("azp");
             if (!audience.contains(clientId)) {
                 errors.add(invalid("The aud claim does not name this client"));
-            } else if (audience.size() > 1 && !clientId.equals(token.getClaimAsString("azp"))) {
-                errors.add(invalid("The token has several audiences and its azp claim is not "
-                        + "this client"));
+            } else if ((audience.size() > 1 || authorizedParty != null)
+                    && !clientId.equals(authorizedParty)) {
+                errors.add(invalid("The token's azp claim does not name this client"));
             }
             if (token.getExpiresAt() == null) {
                 errors.add(invalid("The exp claim is missing"));

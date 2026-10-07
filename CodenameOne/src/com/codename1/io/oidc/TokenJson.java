@@ -37,7 +37,8 @@ import java.util.Map;
 /// to [SecureStorageTokenStore] can copy its entry across unchanged.
 ///
 /// The document has three members: `token`, the token endpoint's own response; `claims`, the
-/// decoded ID token; and `expiresAt`, the absolute expiry in milliseconds, because the
+/// latest accepted ID-token claims (retained when a refresh omits its ID token); and
+/// `expiresAt`, the absolute expiry in milliseconds, because the
 /// response's `expires_in` is relative to a moment that is gone by the time the entry is read.
 final class TokenJson {
 
