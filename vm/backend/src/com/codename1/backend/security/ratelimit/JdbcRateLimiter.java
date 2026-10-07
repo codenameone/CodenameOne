@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.ratelimit;
 
+import com.codename1.backend.Base64Url;
+import com.codename1.backend.Crypto;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.security.Clock;
 import java.io.IOException;
@@ -46,6 +48,9 @@ import java.io.IOException;
 /// the limit is a courtesy to the server, and a store that is down must not
 /// take the application with it.
 public final class JdbcRateLimiter implements RateLimiter {
+    /// The longest `limit_key` written; the column holds at least this on every engine.
+    static final int MAX_KEY = 200;
+
     private final DataSource dataSource;
     private final String name;
     private final int permits;
@@ -83,10 +88,30 @@ public final class JdbcRateLimiter implements RateLimiter {
         this.clock = clock;
     }
 
-    private String row(String key) {
-        // Bounded: the column is, and a client chooses part of some keys.
+    /// The value of `limit_key` for `key`: the limiter's name and the key, or, when that is
+    /// longer than the column, as much of it as fits ahead of a digest of all of it.
+    ///
+    /// The column is bounded and a client chooses part of some keys, so a long one has to
+    /// be shortened. Cutting it off is what this used to do, and that made every key with
+    /// the same first 200 characters one row: a limiter with a long name counted all its
+    /// callers together, and somebody who chose a long user name could spend another
+    /// user's permits. The digest keeps keys that differ anywhere apart.
+    static String row(String name, String key) {
         String full = name + "|" + key;
-        return full.length() <= 200 ? full : full.substring(0, 200);
+        if (full.length() <= MAX_KEY) {
+            return full;
+        }
+        String digest;
+        try {
+            digest = Base64Url.encode(Crypto.sha256(full.getBytes("UTF-8")));
+        } catch (IOException err) {
+            throw new IllegalStateException("UTF-8 is not available", err);
+        }
+        return full.substring(0, MAX_KEY - 1 - digest.length()) + "#" + digest;
+    }
+
+    private String row(String key) {
+        return row(name, key);
     }
 
     @Override

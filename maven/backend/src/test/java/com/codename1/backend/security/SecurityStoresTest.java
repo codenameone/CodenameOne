@@ -440,6 +440,29 @@ class SecurityStoresTest {
         assertFalse(login.tryAcquire("ip:9"));
         assertFalse(api.tryAcquire("ip:9"), "another limiter's count went with it");
 
+        // Keys longer than the column: told apart by all of their text, not by as much of
+        // it as fits. Cut off, two users with a long name in common were one row, and so
+        // was every caller of a limiter whose own name was long.
+        StringBuilder common = new StringBuilder();
+        for (int i = 0; i < 300; i++) {
+            common.append('u');
+        }
+        JdbcRateLimiter byUser = new JdbcRateLimiter(pool, "byUser", 1, 60);
+        byUser.setClock(clock);
+        assertTrue(byUser.tryAcquire(common + "-ada"));
+        assertTrue(byUser.tryAcquire(common + "-grace"), "another user's permit was taken");
+        assertFalse(byUser.tryAcquire(common + "-ada"));
+        byUser.reset(common + "-ada");
+        assertTrue(byUser.tryAcquire(common + "-ada"));
+        assertFalse(byUser.tryAcquire(common + "-grace"), "reset reached another user's row");
+        JdbcRateLimiter longName = new JdbcRateLimiter(pool, common.toString(), 1, 60);
+        longName.setClock(clock);
+        assertTrue(longName.tryAcquire("ip:1"));
+        assertTrue(longName.tryAcquire("ip:2"), "every caller of a long-named limiter was one row");
+        assertFalse(longName.tryAcquire("ip:1"));
+        assertEquals(0L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM cn1_rate_limit WHERE "
+                + "LENGTH(limit_key) > 200", null).get("n")).longValue());
+
         // Atomic: many callers at one moment, as several processes would be,
         // and exactly the permits are taken -- for a key that has no row yet,
         // where the callers race to insert it.

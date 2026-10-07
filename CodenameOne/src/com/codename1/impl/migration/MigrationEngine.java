@@ -516,6 +516,20 @@ public final class MigrationEngine {
             // repeatable migration has none, and is found by the checksum of its newest
             // run. Without that half a repeatable ran once per process: a duplicate row,
             // and its inserts twice.
+            //
+            // A migration marked as running outside a transaction gets this look and no
+            // more, and on SQLite that is not serialization: the script opens its own
+            // transactions, so the engine holds no write lock across it, and SQLite has
+            // no lock that outlasts a transaction to take in its place. Two processes
+            // starting together on one SQLite file can both run such a script. That is
+            // left as it is, deliberately: holding other processes off would take a lock
+            // file beside the database or a lock row that a crashed process leaves
+            // behind, for a combination -- several processes, one SQLite file, a script
+            // that manages its own transaction -- that Flyway, whose behaviour this
+            // follows, does not serialize for any SQLite migration at all. PostgreSQL
+            // and MySQL hold the engine's session lock around the whole run, so there
+            // the mark changes nothing. The guide says to apply such a script from one
+            // process.
             if (entry.version() != null ? history.applied(entry.version())
                     : upToDate(history.read(), entry)) {
                 rollbackQuietly();

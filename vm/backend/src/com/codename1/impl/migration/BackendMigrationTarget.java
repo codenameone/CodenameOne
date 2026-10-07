@@ -216,8 +216,11 @@ public final class BackendMigrationTarget implements MigrationTarget {
     /// `pg_sleep` between attempts -- which parks a virtual thread on its socket instead of
     /// sleeping a host thread.
     ///
-    /// SQLite takes none here: every migration there runs in a transaction that begins by
-    /// taking the write lock, and the engine re-reads the history under it.
+    /// SQLite takes none here: a migration there runs in a transaction that begins by
+    /// taking the write lock, and the engine re-reads the history under it. The exception is
+    /// a migration marked as running outside a transaction, which opens its own: SQLite has
+    /// no lock that outlasts a transaction, so nothing holds a second process off such a
+    /// script. See the note where MigrationEngine re-reads the history.
     @Override
     public boolean lock(String name, int waitSeconds) throws IOException {
         int attempts = waitSeconds < 1 ? 1 : waitSeconds;

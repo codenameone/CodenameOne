@@ -258,7 +258,11 @@ for it.
 A script must not open or end a transaction, since the server already runs it
 in one. The rare script that has to manage its own, such as a SQLite table
 rebuild that switches foreign keys off, says so in a file beside it with the
-same name plus `.conf`, containing `executeInTransaction=false`.
+same name plus `.conf`, containing `executeInTransaction=false`. On SQLite,
+nothing keeps two server processes that start together from both running such a
+script, because SQLite has no lock that lasts beyond a transaction. Apply it
+from one process: `cn1:migrate` before the servers start, or one server ahead
+of the rest.
 
 ==== Adopting an existing database
 
