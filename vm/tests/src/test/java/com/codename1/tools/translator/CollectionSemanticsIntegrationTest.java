@@ -86,6 +86,38 @@ class CollectionSemanticsIntegrationTest {
         assertEquals(0, CompilerHelper.compile(config.jdkHome, compileArgs),
                 "CollectionSemanticsApp should compile against the JavaAPI");
 
+        // Both owners are legal for this Object method. Some compilers emit
+        // Collection.toString, as in the Windows ARM64 migration-test crash.
+        // Exercise that form on the JVM and translated runtime regardless of
+        // which javac compiled this fixture.
+        Path appClass = classesDir.resolve("CollectionSemanticsApp.class");
+        org.objectweb.asm.ClassWriter writer = new org.objectweb.asm.ClassWriter(0);
+        new org.objectweb.asm.ClassReader(Files.readAllBytes(appClass)).accept(
+                new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9, writer) {
+                    @Override
+                    public org.objectweb.asm.MethodVisitor visitMethod(int access, String name,
+                            String descriptor, String signature, String[] exceptions) {
+                        org.objectweb.asm.MethodVisitor method = super.visitMethod(access, name,
+                                descriptor, signature, exceptions);
+                        if (!"stringFromCollection".equals(name)) {
+                            return method;
+                        }
+                        return new org.objectweb.asm.MethodVisitor(org.objectweb.asm.Opcodes.ASM9, method) {
+                            @Override
+                            public void visitMethodInsn(int opcode, String owner, String called,
+                                    String desc, boolean isInterface) {
+                                if ("toString".equals(called)) {
+                                    super.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKEINTERFACE,
+                                            "java/util/Collection", called, desc, true);
+                                } else {
+                                    super.visitMethodInsn(opcode, owner, called, desc, isInterface);
+                                }
+                            }
+                        };
+                    }
+                }, 0);
+        Files.write(appClass, writer.toByteArray());
+
         Map<String, String> expected = parseCases(runJavaMain(config, classesDir, javaApiDir));
         assertFalse(expected.isEmpty(), "JVM run should emit cases");
 
