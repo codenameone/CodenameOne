@@ -6305,6 +6305,21 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     private static boolean needsPcPin(List<Instruction> instructions, int blockStart) {
         for (int j = blockStart; j < instructions.size(); j++) {
             Instruction instr = instructions.get(j);
+            // ATHROW ends a block, and it is also the one terminating
+            // instruction whose pc is read: the handler for what it throws
+            // is chosen by where it is. It used to be answered "no pin" with
+            // the returns, so a rethrow reached through a bare label kept
+            // that label's pc. The finally javac compiles with JSR -- every
+            // class built for Java 5, which is all of the core framework --
+            // ends its catch-any range at the label the subroutine returns
+            // to, and the inlined return lands on a label of its own just
+            // before it: one index inside the range the rethrow has left.
+            // The rethrow was caught by the handler it came from, which ran
+            // the finally and rethrew, for ever. Any exception through
+            // MigrationEngine.migrate() hung the application that way.
+            if (instr instanceof BasicInstruction && instr.getOpcode() == Opcodes.ATHROW) {
+                return true;
+            }
             if (instr instanceof Jump || instr instanceof SwitchInstruction
                     || isTerminatingInstruction(instr)) {
                 return false;

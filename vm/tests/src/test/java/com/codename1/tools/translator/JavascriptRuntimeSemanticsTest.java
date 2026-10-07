@@ -148,6 +148,86 @@ class JavascriptRuntimeSemanticsTest {
         assertTrue(interpreted.errorMessage == null || interpreted.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 
+    @Test
+    void anExceptionLeavesAFinallyCompiledWithJsrOnce() throws Exception {
+        // javac compiles a finally for Java 5 as a subroutine entered with JSR, and the
+        // whole core framework is built that way. The catch-any range of such a finally
+        // ends at the label the subroutine returns to; inlined, the return lands on a
+        // label of its own just before that one. The pc-switch emitter left a rethrow
+        // reached through that label with the label's pc, one index inside the range it
+        // had already left, so the handler caught its own rethrow, ran the finally and
+        // rethrew, without end. Any exception out of MigrationEngine.migrate() hung the
+        // JavaScript port that way: the device suite stopped at DatabaseMigrationTest.
+        //
+        // Only a javac that still targets Java 5 produces the shape, which is JDK 8.
+        CompilerHelper.CompilerConfig jdk8 = null;
+        for (CompilerHelper.CompilerConfig config : CompilerHelper.getAvailableCompilers("1.8")) {
+            if (CompilerHelper.getJdkMajor(config) == 8) {
+                jdk8 = config;
+                break;
+            }
+        }
+        if (jdk8 == null) {
+            // CI always has one: it is what the framework itself is built with. Skipping
+            // there would leave this guarding nothing.
+            assertTrue(System.getenv("GITHUB_ACTIONS") == null,
+                    "no JDK 8 is available to compile a JSR finally with");
+            org.junit.jupiter.api.Assumptions.assumeTrue(false, "needs a JDK 8 to compile for Java 5");
+        }
+        String appName = "JsJsrFinallyRethrowApp";
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("js-jsr-src");
+        Path classesDir = Files.createTempDirectory("js-jsr-classes");
+        Path javaApiDir = Files.createTempDirectory("js-jsr-javaapi");
+        Path source = sourceDir.resolve(appName + ".java");
+        Files.write(source, JavascriptTargetIntegrationTest.loadFixture(appName + ".java")
+                .getBytes(StandardCharsets.UTF_8));
+        CompilerHelper.compileJavaAPI(javaApiDir, jdk8);
+        // jsrlimit=0 asks for the subroutine whatever the size of the finally. Left to
+        // itself javac inlines a small one, and switches to JSR for the rest of a
+        // compilation at the first large one it meets -- which is how a finally as small
+        // as these came to be a subroutine in the framework's build.
+        java.util.List<String> compileArgs = new java.util.ArrayList<String>(java.util.Arrays.asList(
+                "-source", "1.5", "-target", "1.5", "-XDjsrlimit=0", "-bootclasspath", javaApiDir.toString(),
+                "-Xlint:-options", "-d", classesDir.toString(), source.toString()));
+        assertEquals(0, CompilerHelper.compile(jdk8.jdkHome, compileArgs), "compiling the fixture for Java 5");
+        // 0xa8 is JSR. Without one the fixture is an ordinary finally and proves nothing.
+        byte[] compiled = Files.readAllBytes(classesDir.resolve(appName + ".class"));
+        boolean jsr = false;
+        for (int i = 0; i < compiled.length && !jsr; i++) {
+            jsr = (compiled[i] & 0xff) == 0xa8;
+        }
+        assertTrue(jsr, "javac did not compile the fixture's finally blocks with JSR");
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+
+        // Both emitters: the methods as they are emitted by default, and forced onto the
+        // pc-switch emitter, where a method that can suspend -- migrate() -- always is.
+        for (int pass = 0; pass < 2; pass++) {
+            String prevSkip = System.getProperty("parparvm.js.structured.skip");
+            if (pass == 1) {
+                System.setProperty("parparvm.js.structured.skip", appName + ".");
+            }
+            WorkerRunResult result;
+            try {
+                Parser.cleanup();
+                Path outputDir = Files.createTempDirectory("js-jsr-output");
+                JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, appName);
+                result = runWorkerBundle(outputDir.resolve("dist").resolve(appName + "-js"), appName);
+            } finally {
+                if (prevSkip == null) {
+                    System.clearProperty("parparvm.js.structured.skip");
+                } else {
+                    System.setProperty("parparvm.js.structured.skip", prevSkip);
+                }
+            }
+            assertEquals(31, result.result, (pass == 0 ? "default emitter" : "pc-switch emitter")
+                    + ": an exception must run each JSR finally once and reach the caller. raw="
+                    + result.rawMessage + " err=" + result.errorMessage);
+            assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(),
+                    "Worker should not emit an error message");
+        }
+    }
+
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void latin1StringsAndUtf8BytesKeepJavaSemantics(CompilerHelper.CompilerConfig config) throws Exception {
