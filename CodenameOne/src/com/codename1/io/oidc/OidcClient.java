@@ -1007,8 +1007,8 @@ public final class OidcClient {
 
     private boolean requestsOpenId() {
         if (scopes != null) {
-            for (int i = 0; i < scopes.length; i++) {
-                if ("openid".equals(scopes[i])) {
+            for (String scope : scopes) {
+                if ("openid".equals(scope)) {
                     return true;
                 }
             }

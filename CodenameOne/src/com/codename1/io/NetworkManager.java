@@ -912,7 +912,7 @@ public final class NetworkManager {
     public void addToQueue(final ConnectionRequest request) {
         if (Display.isInitialized() && !Display.getInstance().isEdt()) {
             if ((!authorizerRegistered && request.getAuthorizer() == null)
-                    || request.getAuthorizer() == RequestAuthorizer.NONE
+                    || request.getAuthorizer() == RequestAuthorizer.NONE //NOPMD CompareObjectsWithEquals - opt-out singleton
                     || request.getRequestHeader("Authorization") != null) {
                 // No authorizer can have a header for it: queued from here as it always
                 // was, without a look at anything the EDT owns.
