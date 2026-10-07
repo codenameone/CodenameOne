@@ -300,8 +300,9 @@ public final class RegisteredClient {
             }
             for (String scope : scopes) {
                 if (scope == null || scope.length() == 0 || scope.indexOf(' ') >= 0
+                        || scope.indexOf(',') >= 0 || scope.indexOf('\t') >= 0
                         || scope.indexOf('"') >= 0 || scope.indexOf('\\') >= 0) {
-                    throw new IllegalArgumentException("A scope is a word without spaces, "
+                    throw new IllegalArgumentException("A scope is a word without spaces, tabs, commas, "
                             + "quotes or backslashes: " + scope);
                 }
             }

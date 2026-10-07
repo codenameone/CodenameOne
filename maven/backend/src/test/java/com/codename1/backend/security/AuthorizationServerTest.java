@@ -93,6 +93,20 @@ class AuthorizationServerTest {
     private final InMemoryOAuth2AuthorizationService grants = new InMemoryOAuth2AuthorizationService();
     private String issuer;
 
+    @Test
+    void registeredScopesCannotChangeWhenSerialized() {
+        for (String scope : new String[] {"read,admin", "read\tadmin"}) {
+            assertThrows(IllegalArgumentException.class, () -> RegisteredClient.withId("bad")
+                    .clientId("bad").authorizationGrantType(AuthorizationGrantType.DEVICE_CODE)
+                    .scope(scope).build(), scope);
+        }
+        RegisteredClient client = RegisteredClient.withId("good").clientId("good")
+                .authorizationGrantType(AuthorizationGrantType.DEVICE_CODE)
+                .scope("orders:read").scope("orders:write").build();
+        assertEquals(client.getScopes(), OAuth2Parameters.scopes(
+                OAuth2Parameters.scopes(client.getScopes())));
+    }
+
     static RegisteredClientRepository clients() {
         return new InMemoryRegisteredClientRepository(
                 RegisteredClient.withId("1").clientId("app").clientName("Acme App")
