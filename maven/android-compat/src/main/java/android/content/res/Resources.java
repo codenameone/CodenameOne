@@ -219,19 +219,13 @@ public class Resources {
             throw new NotFoundException("Plurals resource ID #0x" + Integer.toHexString(id));
         }
         ResTable.Bag b = (ResTable.Bag) it;
-        int cat = PluralRules.select(manager.device().language, quantity);
+        int cat = PluralRules.select(manager.device().language, manager.device().region, quantity);
         ResValue v = b.get(cat);
-        if (v == null && quantity == 0) {
-            v = b.get(PluralRules.ZERO);
-        }
         if (v == null) {
             v = b.get(PluralRules.OTHER);
         }
-        if (v == null && b.values.length > 0) {
-            v = b.values[0];
-        }
         if (v == null) {
-            throw new NotFoundException("Plurals resource ID #0x" + Integer.toHexString(id) + " is empty");
+            throw new NotFoundException("Plurals resource ID #0x" + Integer.toHexString(id) + " has no matching quantity or other entry");
         }
         TypedValue tv = new TypedValue();
         resolve(v, tv, null, true);

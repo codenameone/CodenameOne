@@ -39,7 +39,7 @@ public final class ViewStub extends View {
     private int mInflatedId;
     private LayoutInflater mInflater;
     private OnInflateListener mInflateListener;
-    private View mInflated;
+    private java.lang.ref.WeakReference<View> mInflated;
 
     public ViewStub(Context context) {
         this(context, 0);
@@ -111,7 +111,11 @@ public final class ViewStub extends View {
     @Override
     public void setVisibility(int visibility) {
         if (mInflated != null) {
-            mInflated.setVisibility(visibility);
+            View inflated = mInflated.get();
+            if (inflated == null) {
+                throw new IllegalStateException("ViewStub inflated view is no longer available");
+            }
+            inflated.setVisibility(visibility);
             return;
         }
         super.setVisibility(visibility);
@@ -144,7 +148,7 @@ public final class ViewStub extends View {
         } else {
             parent.addView(view, index);
         }
-        mInflated = view;
+        mInflated = new java.lang.ref.WeakReference<View>(view);
         if (mInflateListener != null) {
             mInflateListener.onInflate(this, view);
         }

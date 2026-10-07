@@ -94,7 +94,7 @@ final class SpanSet {
 
     @SuppressWarnings("unchecked")
     <T> T[] get(int start, int end, Class<T> type) {
-        ArrayList<Object> out = new ArrayList<Object>();
+        ArrayList<Entry> out = new ArrayList<Entry>();
         for (Entry e : entries) {
             if (e.start > end || e.end < start) {
                 continue;
@@ -103,13 +103,21 @@ final class SpanSet {
                 continue;
             }
             if (type == null || type == Object.class || type.isInstance(e.what)) {
-                out.add(e.what);
+                int index = out.size();
+                int priority = e.flags & Spanned.SPAN_PRIORITY;
+                while (index > 0 && (out.get(index - 1).flags & Spanned.SPAN_PRIORITY) < priority) {
+                    index--;
+                }
+                out.add(index, e);
             }
         }
         // A typed array, so callers can assign it to Foo[]; Object[] would
         // fail that cast on the JVM.
         T[] arr = (T[]) java.lang.reflect.Array.newInstance(type == null ? Object.class : type, out.size());
-        return out.toArray(arr);
+        for (int i = 0; i < out.size(); i++) {
+            arr[i] = (T) out.get(i).what;
+        }
+        return arr;
     }
 
     int nextTransition(int start, int limit, Class type) {

@@ -47,6 +47,24 @@ public class Window {
     private int statusBarColor;
     private int navigationBarColor;
     private Runnable onChange;
+    private boolean active;
+    private boolean holdingScreenOn;
+
+    /// Runtime use: only the foreground activity may hold a window screen lock.
+    public void setActive(boolean active) {
+        this.active = active;
+        updateKeepScreenOn();
+    }
+
+    private void updateKeepScreenOn() {
+        boolean hold = active && (attributes.flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0;
+        if (hold != holdingScreenOn) {
+            holdingScreenOn = hold;
+            // Share the view request count so clearing a window flag cannot
+            // release a lock still held by an attached view.
+            View.updateKeepScreenOn(hold ? 1 : -1);
+        }
+    }
 
     public Window(Context context) {
         this.context = context;
@@ -119,9 +137,7 @@ public class Window {
     }
 
     private void changed() {
-        if ((attributes.flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0) {
-            com.codename1.ui.Display.getInstance().setScreenSaverEnabled(false);
-        }
+        updateKeepScreenOn();
         if (onChange != null) {
             onChange.run();
         }

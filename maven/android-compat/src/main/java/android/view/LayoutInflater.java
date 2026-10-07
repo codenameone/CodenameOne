@@ -119,7 +119,10 @@ public abstract class LayoutInflater {
     }
 
     public void setFilter(Filter filter) {
-        mFilter = filter;
+        if (filter != null) {
+            throw new UnsupportedOperationException("LayoutInflater.Filter is not supported by compiled layout factories");
+        }
+        mFilter = null;
     }
 
     public View inflate(int resource, ViewGroup root) {

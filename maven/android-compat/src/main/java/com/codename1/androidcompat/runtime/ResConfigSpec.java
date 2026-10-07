@@ -211,10 +211,11 @@ public final class ResConfigSpec {
             return smallestWidthDp > o.smallestWidthDp;
         }
         if (widthDp != o.widthDp || heightDp != o.heightDp) {
-            if (widthDp != o.widthDp) {
-                return widthDp > o.widthDp;
+            int distance = (d.widthDp - widthDp) + (d.heightDp - heightDp);
+            int otherDistance = (d.widthDp - o.widthDp) + (d.heightDp - o.heightDp);
+            if (distance != otherDistance) {
+                return distance < otherDistance;
             }
-            return heightDp > o.heightDp;
         }
         if (orientation != o.orientation) {
             return orientation != 0;
@@ -241,8 +242,8 @@ public final class ResConfigSpec {
         if (theirs == DENSITY_ANY) {
             return false;
         }
-        int h = mine == 0 ? 160 : (mine == DENSITY_NONE ? requested : mine);
-        int l = theirs == 0 ? 160 : (theirs == DENSITY_NONE ? requested : theirs);
+        int h = mine == 0 ? 160 : mine;
+        int l = theirs == 0 ? 160 : theirs;
         boolean imBigger = true;
         if (l > h) {
             int t = h;

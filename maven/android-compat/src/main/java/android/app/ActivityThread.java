@@ -590,6 +590,7 @@ public final class ActivityThread {
         }
         r.decor.dispatchAttachedToWindow(true);
         r.resumed = true;
+        a.mWindow.setActive(true);
         a.onResume();
         if (!isLive(r) || top() != r) {
             return;
@@ -615,6 +616,7 @@ public final class ActivityThread {
 
     private static void pause(Record r) {
         Activity a = r.activity;
+        a.mWindow.setActive(false);
         // The activity first, then its views, as Android's decor view does;
         // without the views, hasWindowFocus() stayed true under a covering
         // activity and focus-guarded work kept running.

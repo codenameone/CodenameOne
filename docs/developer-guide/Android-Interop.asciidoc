@@ -341,6 +341,16 @@ the gallery and automated tests cover a subset of those behaviors.
   runtime would launch. It doesn't enumerate every matching handler and uses
   the default-category restriction even without `MATCH_DEFAULT_ONLY`. Apps
   that present their own handler chooser need an explicit application registry.
+* Locale resources use exact region matches and language-only fallbacks.
+  They don't rank translations from other regions. Ship a language-only
+  directory, such as `values-fr`, for text shared across regions.
+* `LayoutInflater.Filter` isn't supported by compiled layout factories.
+  Installing a non-null filter throws `UnsupportedOperationException` before
+  inflation. Applications needing a class restriction must control their
+  compiled layouts and factories.
+* `DigitsKeyListener` selects the keyboard input type but doesn't enforce a
+  custom accepted-character set. Use an explicit `InputFilter` and validate
+  submitted text when the application requires a restricted alphabet.
 * Gradle recompiles all Java sources in an imported Android project after a
   source edit, because relocation rewrites the compiler output. Unchanged
   builds still use Gradle's up-to-date checks.

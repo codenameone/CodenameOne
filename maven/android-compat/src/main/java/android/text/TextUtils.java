@@ -159,6 +159,12 @@ public class TextUtils {
     }
 
     public static CharSequence concat(CharSequence... text) {
+        if (text.length == 0) {
+            return "";
+        }
+        if (text.length == 1) {
+            return text[0];
+        }
         SpannableStringBuilder sb = new SpannableStringBuilder();
         for (CharSequence t : text) {
             sb.append(t);

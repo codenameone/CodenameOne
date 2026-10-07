@@ -39,6 +39,13 @@ public final class PluralRules {
     }
 
     public static int select(String lang, int n) {
+        return select(lang, null, n);
+    }
+
+    public static int select(String lang, String region, int n) {
+        if ("pt".equals(lang) && "PT".equalsIgnoreCase(region)) {
+            return n == 1 || n == -1 ? ONE : (n != 0 && n % 1000000 == 0 ? MANY : OTHER);
+        }
         int abs = n < 0 ? -n : n;
         int mod10 = abs % 10;
         int mod100 = abs % 100;

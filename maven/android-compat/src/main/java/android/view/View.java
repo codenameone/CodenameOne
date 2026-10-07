@@ -3063,7 +3063,7 @@ public class View implements Drawable.Callback {
         return mKeepScreenOn;
     }
 
-    private static void updateKeepScreenOn(int delta) {
+    static void updateKeepScreenOn(int delta) {
         int before = sKeepScreenOnViews;
         sKeepScreenOnViews = Math.max(0, before + delta);
         if ((before == 0) != (sKeepScreenOnViews == 0)) {
