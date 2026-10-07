@@ -232,10 +232,10 @@ public final class JavaScriptSemanticOverlay {
             HTMLElement target = control == null ? pendingFocus.element : control;
             AccessibilityNodeSnapshot focusedNode = nodes.get(pendingFocus.id);
             Component focusedOwner = focusedNode == null ? null : focusedNode.getComponent();
-            // A pointer-focused native editor already owns the caret/selection. Moving
-            // focus to the hidden accessibility input would discard the first gesture.
-            boolean nativeEditing = focusedOwner instanceof TextArea
-                    && focusedOwner.getNativeOverlay() != null && ((TextArea) focusedOwner).isEditing();
+            // Both persistent and legacy editors own their caret/selection. A field
+            // using legacy editing may have no native overlay object; moving focus
+            // to its hidden accessibility input would end that editing session.
+            boolean nativeEditing = focusedOwner instanceof TextArea && ((TextArea) focusedOwner).isEditing();
             pendingFocus = null;
             HTMLElement nativeEditor = HTML5Implementation.visibleSelectionEditor(focusedOwner);
             if (nativeEditor != null) nativeEditor.focus();

@@ -67,6 +67,73 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('dynamicdrag');
+    const dragArea = page.locator('.cn1-selection-editor[aria-label="dynamicDragArea"]');
+    await dragArea.waitFor({state: 'visible'});
+    for (const enabled of [true, false]) {
+      await clickButton(enabled ? 'Enable dragging' : 'Disable dragging');
+      await dragArea.waitFor({state: enabled ? 'hidden' : 'visible'});
+      await page.waitForFunction(enabled => [...document.querySelectorAll('#cn1-text-layer span')]
+        .some(el => el.textContent === 'Dynamic drag label' && (getComputedStyle(el).pointerEvents === 'none') === enabled), enabled);
+    }
+    console.log('PASS', name, 'draggable mutations refresh native labels and editors on a static form');
+
+    for (const style of ['font', 'decoration', 'opacity']) {
+      await openReview('selectedstyles&style=' + style);
+      // Deferred theme initialization can reset decoration before the first frame.
+      await clickButton('Apply selected style');
+      await page.locator('.cn1-selection-editor:visible').waitFor({state: 'hidden'});
+      await clickButton('Edit selected style');
+      const legacy = page.locator('.cn1-edit-string:visible');
+      await legacy.waitFor();
+      await legacy.fill('ABAB');
+      await page.waitForTimeout(350);
+      assert.equal(await legacy.evaluate(el => document.activeElement === el), true, 'selected ' + style + ' retains editor focus');
+      assert.equal(await legacy.inputValue(), 'ABAB');
+      assert.equal(await page.locator('.cn1-selection-editor:visible').count(), 0);
+    }
+    console.log('PASS', name, 'unsupported selected fonts, decorations and opacity keep stable legacy editing');
+
+    await openReview('legacysession');
+    const persistentSession = page.locator('.cn1-selection-editor[aria-label="legacySessionArea"]');
+    assert.equal(await persistentSession.isVisible(), false);
+    await clickButton('Start legacy');
+    const legacySession = page.locator('.cn1-edit-string:visible');
+    await legacySession.waitFor();
+    await legacySession.fill('Legacy preserved');
+    await clickButton('Remove cover');
+    await page.waitForFunction(() => document.body.innerText.includes('Cover removed'));
+    // Exercise periodic layout updates and let the legacy startup latch expire.
+    await page.waitForTimeout(3200);
+    assert.equal(await persistentSession.isVisible(), false, 'uncovering the field cannot promote a competing editor');
+    assert.equal(await legacySession.evaluate(el => document.activeElement === el), true);
+    await legacySession.fill('Legacy preserved tail');
+    const completedLegacyValue = await legacySession.inputValue();
+    assert.equal(completedLegacyValue, 'Legacy preserved tail');
+    await clickButton('Finish legacy');
+    await persistentSession.waitFor({state: 'visible'});
+    await page.waitForFunction(value => document.querySelector('.cn1-selection-editor[aria-label="legacySessionArea"]').value === value, completedLegacyValue);
+    console.log('PASS', name, 'legacy editing retains ownership through uncovering and commits before persistent promotion');
+
+    for (const disabled of [false, true]) {
+      await openReview('readonlykeys&disabled=' + disabled);
+      const readonlyKeys = page.locator('.cn1-selection-editor[aria-label="readonlyKeys"]');
+      await readonlyKeys.click({force: disabled});
+      await readonlyKeys.press('k');
+      await page.waitForFunction(() => document.body.innerText.includes('K received'));
+      assert.equal(await readonlyKeys.inputValue(), 'Readonly shortcut text');
+      await readonlyKeys.press('ControlOrMeta+a');
+      assert.deepEqual(await readonlyKeys.evaluate(el => [el.selectionStart, el.selectionEnd]), [0, 'Readonly shortcut text'.length]);
+    }
+    console.log('PASS', name, 'readonly and disabled native controls forward printable shortcuts and retain select-all');
+
+    for (const enabled of [false, true]) {
+      await openReview('optingate&selection=' + (enabled ? 'on' : 'off'));
+      const explicit = page.locator('#cn1-text-layer span').filter({hasText: /^Explicit framework selection$/});
+      assert.equal(await explicit.evaluate(el => getComputedStyle(el).pointerEvents), enabled ? 'auto' : 'none');
+    }
+    console.log('PASS', name, 'framework label selection only becomes browser-native with the build hint');
+
     await openReview('dynamicconstraints');
     const dynamic = page.locator('.cn1-selection-editor[aria-label="dynamicArea"]');
     await dynamic.waitFor({state: 'visible'});
@@ -434,6 +501,9 @@ async function exercise(context, name, host, mobileDevice = null) {
     if (!mobile) {
       for (const [text, status] of [['Context listener label', 'Context received'],
         ['Inherited context label', 'Inherited context received']]) {
+        // The preceding context-menu gesture can leave a selection menu open.
+        // Exercise each pointer target on a fresh form without that occlusion.
+        await openReview('exclusions');
         const span = page.locator('#cn1-text-layer span').filter({ hasText: text }).first();
         await span.waitFor({ state: 'attached' });
         await page.waitForFunction(text => [...document.querySelectorAll('#cn1-text-layer span')]
@@ -562,16 +632,17 @@ async function exercise(context, name, host, mobileDevice = null) {
     assert.equal(await notes.inputValue(), accents);
     await notes.click();
     await page.waitForTimeout(300);
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'selectionNotes');
     assert.equal(await notes.evaluate(el => document.activeElement === el), true, 'semantic focus must not steal the native editor');
     assert.equal(await notes.inputValue(), accents);
     console.log('PASS', name, 'Unicode and editing survive focus changes');
     if (!mobile) {
       await title.click();
       await page.keyboard.press('Tab');
-      await page.waitForTimeout(500);
+      await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'selectionNotes');
       assert.equal(await notes.evaluate(el => document.activeElement === el), true, 'Tab moves to the next CN1 field');
       await page.keyboard.press('Shift+Tab');
-      await page.waitForTimeout(300);
+      await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'selectionTitle');
       assert.equal(await title.evaluate(el => document.activeElement === el), true, 'Shift+Tab moves to the previous CN1 field');
       console.log('PASS', name, 'keyboard field traversal');
       await notes.click();
@@ -690,7 +761,7 @@ async function exercise(context, name, host, mobileDevice = null) {
   } finally {
     if (mobile) await mobileDevice.screenshot({ path: path.join(artifacts, name + '-device.png') }).catch(() => {});
     await page.screenshot({ path: path.join(artifacts, name + '-last.png') }).catch(() => {});
-    logs.push(JSON.stringify(await page.evaluate(() => ({ active: document.activeElement && document.activeElement.outerHTML,
+    logs.push(JSON.stringify(await page.evaluate(() => ({ url: location.href, active: document.activeElement && document.activeElement.outerHTML,
       editors: [...document.querySelectorAll('.cn1-selection-editor')].map(el => ({ label: el.getAttribute('aria-label'),
         start: el.selectionStart, end: el.selectionEnd, rect: el.getBoundingClientRect().toJSON() })),
       textRuns: [...document.querySelectorAll('#cn1-text-layer span')].map(el => ({ text: el.textContent, css: el.style.cssText })),

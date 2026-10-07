@@ -2002,28 +2002,33 @@
         // unrelated tab order before the asynchronous callback reaches it.
         event.preventDefault();
       }
-      if (el && el.getAttribute('data-cn1-single-line') === 'true' && event.key === 'Enter' && !event.isComposing) {
+      if (el && el.getAttribute('data-cn1-single-line') === 'true' && event.key === 'Enter'
+          && !event.isComposing && nativeTextOwnsKey(event, el)) {
         event.preventDefault();
         el.blur();
       }
     }, true);
   }
 
-  function nativeTextOwnsKey(event) {
+  function nativeTextOwnsKey(event, nativeText) {
     var code = event.keyCode || event.which || 0;
     var key = event.key || '';
-    if (event.isComposing || code === 229) return true;
-    // Keep editing, selection, clipboard and undo native, including modified
-    // cursor movement. Escape, function keys and other app shortcuts still bubble.
-    if (/^(Tab|Enter|Backspace|Delete|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(key)
-        || [8, 9, 13, 33, 34, 35, 36, 37, 38, 39, 40, 46].indexOf(code) >= 0) return true;
+    var editable = /^(INPUT|TEXTAREA)$/.test(nativeText.tagName) && !nativeText.readOnly
+        && !nativeText.disabled && nativeText.getAttribute('aria-disabled') !== 'true';
+    if (event.isComposing || code === 229) return editable;
+    // Selection, navigation and copy remain native even in readonly controls.
+    // Editing keys belong to the app unless the native control can edit.
+    if (/^(Tab|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(key)
+        || [9, 33, 34, 35, 36, 37, 38, 39, 40].indexOf(code) >= 0) return true;
+    if (/^(Enter|Backspace|Delete)$/.test(key) || [8, 13, 46].indexOf(code) >= 0) return editable;
     if (event.ctrlKey && event.altKey) {
-      return !!(event.getModifierState && event.getModifierState('AltGraph') && key.length === 1);
+      return !!(editable && event.getModifierState && event.getModifierState('AltGraph') && key.length === 1);
     }
     if (event.ctrlKey || event.metaKey) {
-      return /^[acvxyz]$/i.test(key) || [65, 67, 86, 88, 89, 90].indexOf(code) >= 0;
+      return /^[ac]$/i.test(key) || [65, 67].indexOf(code) >= 0
+          || (editable && (/^[vxyz]$/i.test(key) || [86, 88, 89, 90].indexOf(code) >= 0));
     }
-    return key.length === 1 || (!key && (code === 0 || code >= 48 && code <= 90));
+    return editable && (key.length === 1 || (!key && (code === 0 || code >= 48 && code <= 90)));
   }
 
   function makeWorkerCallback(callbackId) {
@@ -2042,7 +2047,7 @@
       }
       if (nativeText && event && /^(mouse|pointer|touch|key|contextmenu|copy|cut|paste)/.test(event.type)
           && event.currentTarget !== nativeText
-          && (!/^key/.test(event.type) || nativeTextOwnsKey(event))) return;
+          && (!/^key/.test(event.type) || nativeTextOwnsKey(event, nativeText))) return;
       // Programmatic scroll replay must not feed the model its browser-clamped
       // value, especially while a paint or keyboard viewport change is pending.
       if (nativeText && event.type === 'scroll'

@@ -90,10 +90,52 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 // interpreted as input by the focused TextField.
                 if (keyCode == 27) { status.setText("Escape received"); return; }
                 if (keyCode == 113) { status.setText("F2 received"); return; }
+                if (keyCode == 75 || keyCode == 107) { status.setText("K received"); return; }
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=dynamicconstraints") >= 0) {
+        if (query.indexOf("review=dynamicdrag") >= 0) {
+            Label label = new Label("Dynamic drag label");
+            TextArea area = new TextArea("Dynamic drag area"); area.setName("dynamicDragArea");
+            Button enable = new Button("Enable dragging"), disable = new Button("Disable dragging");
+            enable.addActionListener(e -> { label.setDraggable(true); area.setDraggable(true); });
+            disable.addActionListener(e -> { label.setDraggable(false); area.setDraggable(false); });
+            form.addAll(enable, label, area, disable);
+        } else if (query.indexOf("review=selectedstyles") >= 0) {
+            TextArea area = new TextArea("ABBA"); area.setName("selectedStyleArea");
+            Runnable applyStyle = () -> {
+                if (query.indexOf("style=font") >= 0) {
+                    Image glyphs = Image.createImage(24, 12, 0xffffffff);
+                    area.getSelectedStyle().setFont(Font.createBitmapFont(glyphs, new int[] {0, 12}, new int[] {12, 12}, "AB"));
+                } else if (query.indexOf("style=opacity") >= 0) {
+                    area.getSelectedStyle().setOpacity(100);
+                } else {
+                    area.getSelectedStyle().setTextDecoration(com.codename1.ui.plaf.Style.TEXT_DECORATION_UNDERLINE);
+                }
+            };
+            applyStyle.run();
+            Button apply = new Button("Apply selected style"); apply.addActionListener(e -> applyStyle.run());
+            Button edit = new Button("Edit selected style"); edit.addActionListener(e -> area.startEditingAsync());
+            form.addAll(apply, area, edit);
+        } else if (query.indexOf("review=legacysession") >= 0) {
+            com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
+            Container layers = new Container(layout); layers.setPreferredH(160);
+            TextArea area = new TextArea("Original model", 3, 24); area.setName("legacySessionArea");
+            Button cover = new Button("Cover edge");
+            layers.addAll(area, cover); layout.setInsets(area, "0"); layout.setInsets(cover, "0 0 auto auto");
+            Button edit = new Button("Start legacy"), uncover = new Button("Remove cover"), stop = new Button("Finish legacy");
+            edit.addActionListener(e -> area.startEditingAsync());
+            uncover.addActionListener(e -> { layers.removeComponent(cover); layers.revalidate(); status.setText("Cover removed"); });
+            stop.addActionListener(e -> Display.getInstance().stopEditing(area, () -> status.setText("Committed " + area.getText())));
+            form.addAll(edit, layers, uncover, stop, status);
+        } else if (query.indexOf("review=readonlykeys") >= 0) {
+            TextArea area = new TextArea("Readonly shortcut text"); area.setName("readonlyKeys"); area.setEditable(false);
+            if (query.indexOf("disabled=true") >= 0) area.setEnabled(false);
+            form.addAll(new Button("Initial focus"), area, status);
+        } else if (query.indexOf("review=optingate") >= 0) {
+            Label label = new Label("Explicit framework selection"); label.setTextSelectionEnabled(true);
+            form.add(label); form.getTextSelection().setEnabled(true);
+        } else if (query.indexOf("review=dynamicconstraints") >= 0) {
             TextArea area = new TextArea("Secret value"); area.setSingleLineTextArea(true); area.setName("dynamicArea");
             Button password = new Button("Enable password"), done = new Button("Add done listener"), reset = new Button("Reset constraints");
             password.addActionListener(e -> area.setConstraint(TextArea.PASSWORD));

@@ -491,7 +491,8 @@ public final class JavaScriptTextLayer {
 
         // The run is positioned relative to its clip element, so the two move together and a
         // scroll only has to rewrite coordinates rather than restructure anything.
-        boolean selectable = frame.component instanceof com.codename1.ui.Label
+        boolean selectable = HTML5Implementation.nativeSelectionRequested()
+                && frame.component instanceof com.codename1.ui.Label
                 && com.codename1.ui.Accessor.allowsNativeTextSelection(frame.component)
                 && ((com.codename1.ui.Label) frame.component).isTextSelectionEnabled()
                 && frame.component.getComponentForm().getTextSelection().isEnabled();

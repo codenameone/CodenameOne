@@ -10024,7 +10024,10 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `draggable`: the draggable to set
     public void setDraggable(boolean draggable) {
-        this.draggable = draggable;
+        if (this.draggable != draggable) {
+            this.draggable = draggable;
+            repaintTextSelection();
+        }
     }
 
     /// Indicates whether this component can receive dropped components into it, notice that when dropping on a component

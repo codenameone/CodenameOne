@@ -33,6 +33,7 @@ const plainCanvas = node({ id: 'codenameone-canvas' });
 callback(event('contextmenu', plainCanvas));
 assert.equal(messages.pop().args[0].defaultPrevented, false, 'no selection: preserve the browser menu');
 const text = node({ 'data-cn1-native-selection': 'true' });
+text.tagName = 'TEXTAREA';
 for (const type of ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'keyup', 'keypress', 'contextmenu', 'copy', 'cut', 'paste']) {
   const e = event(type, text);
   callback(e);
@@ -64,6 +65,20 @@ for (const [key, modifiers, owns] of [['s', { ctrlKey: true }, false], ['c', { m
   assert.equal(messages.length, owns ? 0 : 1, key + ' keeps the appropriate keyboard owner');
   messages.length = 0;
 }
+for (const state of ['readOnly', 'disabled']) {
+  text[state] = true;
+  for (const [key, modifiers, owns] of [['k', {}, false], ['Enter', {}, false], ['Backspace', {}, false],
+      ['Delete', {}, false], ['ArrowLeft', {}, true], ['Tab', {}, true], ['c', {ctrlKey: true}, true],
+      ['a', {metaKey: true}, true], ['v', {ctrlKey: true}, false], ['z', {metaKey: true}, false],
+      ['@', {ctrlKey: true, altKey: true, getModifierState: () => true}, false]]) {
+    for (const type of ['keydown', 'keyup', 'keypress']) {
+      callback(Object.assign(event(type, text), {key}, modifiers));
+      assert.equal(messages.length, owns ? 0 : 1, state + ' ' + key + ' retains the appropriate keyboard owner');
+      messages.length = 0;
+    }
+  }
+  text[state] = false;
+}
 const listeners = {}, relayed = [];
 const doc = { addEventListener(type, listener) { listeners[type] = listener; },
   getElementById() { return canvas; }, activeElement: null };
@@ -78,6 +93,18 @@ text.tagName = 'TEXTAREA';
 const tab = Object.assign(event('keydown', text), { key: 'Tab' });
 listeners.keydown(tab);
 assert.equal(tab.defaultPrevented, true, 'cancel native Tab synchronously so CN1 chooses the next field');
+const singleLine = node({'data-cn1-native-selection': 'true', 'data-cn1-single-line': 'true'});
+singleLine.tagName = 'INPUT';
+let enterBlurCount = 0;
+singleLine.blur = () => enterBlurCount++;
+for (const readOnly of [true, false]) {
+  singleLine.readOnly = readOnly;
+  const enter = Object.assign(event('keydown', singleLine), {key: 'Enter'});
+  listeners.keydown(enter);
+  assert.equal(enter.defaultPrevented, !readOnly, 'only an editable single-line input consumes Enter');
+  assert.equal(enterBlurCount, readOnly ? 0 : 1, 'readonly Enter keeps browser focus for the app handler');
+}
+
 function touch(type, y, touches = true, x = 20) {
   const point = { identifier: 1, clientX: x, clientY: y };
   const e = Object.assign(event(type, text), { touches: touches ? [point] : [], changedTouches: [point] });

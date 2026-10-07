@@ -1134,7 +1134,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // the first drag, right click and mobile long press.
     private final Set<SelectionTextOverlay> selectionTextOverlays = new HashSet<SelectionTextOverlay>();
 
-    private boolean nativeSelectionRequested() {
+    static boolean nativeSelectionRequested() {
         return "true".equals(asciiLower(Display.getInstance().getProperty("javascript.textSelection", null)));
     }
 
@@ -1146,11 +1146,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 && (!ta.isEditable() || ta.getComponentForm() == null
                     || !ta.getComponentForm().isFormBottomPaddingEditingMode())
                 && !ta.isEndsWith3Points()
-                && !Accessor.isBitmapFont(ta.getStyle().getFont())
-                && ta.getStyle().getTextDecoration() == Style.TEXT_DECORATION_NONE
+                && supportsSelectionStyle(ta.getStyle())
+                // Editing switches TextArea.getStyle() to the selected style.
+                // Reject unsupported states before focus can start an editor session.
+                && supportsSelectionStyle(ta.getUnselectedStyle())
+                && supportsSelectionStyle(ta.getSelectedStyle())
                 && (ta.getConstraint() & TextArea.PASSWORD) == 0
                 && (ta.isEditable() || ta.isTextSelectionEnabled() && ta.getComponentForm() != null
                     && ta.getComponentForm().getTextSelection().isEnabled());
+    }
+
+    private boolean supportsSelectionStyle(Style style) {
+        return !Accessor.isBitmapFont(style.getFont())
+                && style.getTextDecoration() == Style.TEXT_DECORATION_NONE
+                && style.getOpacity() == 255;
     }
 
     // Canvas opacity is applied by the component paint stack, including animations.
@@ -1395,6 +1404,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             Form form = ta.getComponentForm();
             boolean wasVisible = visible;
             visible = singleLine == ta.isSingleLineTextArea() && allowsSelectionOverlay(ta)
+                    // A legacy session keeps ownership until its final value is committed.
+                    && !(isEditing && currentEditingField == ta && currentInputField != el)
                     && form != null && form == getCurrentForm()
                     && Accessor.isDisplayable(ta) && !Display.getInstance().isInTransition()
                     && !Accessor.paintsOverChildren(form) && Accessor.getActivePeerCount() == 0;
@@ -3525,7 +3536,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                     //}
                                     return;
                                 }
-                                Display.getInstance().editString(cmp, ta.getMaxSize(), ta.getConstraint(), ta.getText(), charCode);
+                                if (ta.isEditable() && ta.isEnabled()) {
+                                    Display.getInstance().editString(cmp, ta.getMaxSize(), ta.getConstraint(), ta.getText(), charCode);
+                                }
                                 
                             } 
                             
@@ -6542,10 +6555,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
         });
     }
     
+    private SelectionTextOverlay currentSelectionEditor() {
+        Object overlay = currentEditingField == null ? null : currentEditingField.getNativeOverlay();
+        if (overlay instanceof SelectionTextOverlay && currentInputField == ((SelectionTextOverlay) overlay).el) {
+            return (SelectionTextOverlay) overlay;
+        }
+        return null;
+    }
+
     private void focusInputElement() {
         // Persistent native editors already receive focus in the browser's own
         // gesture. Refocusing the old editor after a canvas press races its blur.
-        if (currentEditingField != null && currentEditingField.getNativeOverlay() instanceof SelectionTextOverlay) return;
+        if (currentSelectionEditor() != null) return;
         if (isEditing && currentInputField != null && !jQuery_is_(currentInputField, ":focus")) {
             currentInputField.focus();
         }
@@ -6561,7 +6582,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (overlay instanceof SelectionTextOverlay) {
             // Canvas keys already queued before native focus still need editString.
             // A synchronous DOM focus query would discard them before its callback.
-            return ((SelectionTextOverlay) overlay).focused && currentEditingField == c && isEditing;
+            return currentEditingField == c && isEditing
+                    && (currentInputField != overlay.el || ((SelectionTextOverlay) overlay).focused);
         }
         if (overlay != null && jQuery_is_(overlay.el, ":focus")) {
             return true;
@@ -6626,7 +6648,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private void resizeNativeEditor() {
         // Persistent editors own their clipped bounds and alignment in the paint batch.
         // The legacy editor's content-box sizing would overwrite that CSS after focus.
-        if (currentEditingField != null && currentEditingField.getNativeOverlay() instanceof SelectionTextOverlay) return;
+        if (currentSelectionEditor() != null) return;
         if (isEditing && currentInputField != null && currentEditingField != null) {
             HTMLInputElement inputEl = currentInputField;
             TextArea ta = currentEditingField;
@@ -7438,7 +7460,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             inputEl.getStyle().setProperty("display", "block");
             
             inputEl.setAttribute("maxlength", maxSize+"");
-            inputEl.getStyle().setProperty("font", ((NativeFont)cmp.getStyle().getFont().getNativeFont()).getScaledCSS());
+            inputEl.getStyle().setProperty("font", resolveNativeFont(cmp.getStyle().getFont().getNativeFont()).getScaledCSS());
             inputEl.getStyle().setProperty("color", HTML5Graphics.color(cmp.getStyle().getFgColor()));
 
             final Style taStyle = ta.getStyle();
@@ -7898,8 +7920,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void finishTextEditing(){
-        if (currentEditingField != null && currentEditingField.getNativeOverlay() instanceof SelectionTextOverlay) {
-            ((SelectionTextOverlay) currentEditingField.getNativeOverlay()).el.blur();
+        SelectionTextOverlay selectionEditor = currentSelectionEditor();
+        if (selectionEditor != null) {
+            selectionEditor.el.blur();
             return;
         }
         if (!useNativeOverlaysForTextFields()) {
