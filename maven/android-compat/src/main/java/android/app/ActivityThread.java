@@ -260,6 +260,10 @@ public final class ActivityThread {
         // its Intent after startActivity() must not change getIntent() or
         // what onNewIntent() was given.
         intent = new Intent(intent);
+        Bundle extras = intent.getExtras();
+        if (extras != null) {
+            intent.replaceExtras(extras.deepCopy());
+        }
         // Activities start on the EDT, which is the main looper's thread.
         android.os.Looper.prepareMainLooper();
         // A component's package, and an implicit intent's setPackage(), are
@@ -294,6 +298,8 @@ public final class ActivityThread {
         // singleTop behaves as FLAG_ACTIVITY_SINGLE_TOP, and singleTask /
         // singleInstance as CLEAR_TOP onto the existing instance (no separate
         // task, no task affinity).
+        boolean clearTask = (intent.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TASK) != 0
+                && (intent.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0;
         boolean clearTopFlag = (intent.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0;
         boolean reuseInStack = info.launchMode >= android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK;
         boolean singleTop = (intent.getFlags() & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0
@@ -302,7 +308,7 @@ public final class ActivityThread {
         // instance created in its place, as Android does; onCreate then sees
         // the new intent. Only a single-top or single-task target is reused.
         Record recreated = null;
-        if (clearTopFlag || reuseInStack) {
+        if (!clearTask && (clearTopFlag || reuseInStack)) {
             for (int i = STACK.size() - 1; i >= 0; i--) {
                 if (STACK.get(i).activity.getClass() == info.type) {
                     Record target = STACK.get(i);
@@ -335,7 +341,7 @@ public final class ActivityThread {
                 }
             }
         }
-        if (!clearTopFlag && (intent.getFlags() & Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) != 0) {
+        if (!clearTask && !clearTopFlag && (intent.getFlags() & Intent.FLAG_ACTIVITY_REORDER_TO_FRONT) != 0) {
             // The existing instance moves to the top with the activities
             // above it left in place, and sees the new intent through
             // onNewIntent(). Android ignores the flag under CLEAR_TOP, which
@@ -370,7 +376,7 @@ public final class ActivityThread {
                 singleTop = true;
             }
         }
-        if (singleTop) {
+        if (!clearTask && singleTop) {
             Record t = top();
             if (t != null && t.activity.getClass() == info.type) {
                 // Paused around onNewIntent() and resumed after it, as
@@ -384,8 +390,6 @@ public final class ActivityThread {
                 return;
             }
         }
-        boolean clearTask = (intent.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TASK) != 0
-                && (intent.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0;
         Activity callerActivity = caller instanceof Activity ? (Activity) caller : null;
         Activity a = rt.getApp().createActivity(info.type);
         if (a == null) {
@@ -409,10 +413,18 @@ public final class ActivityThread {
             AndroidRuntime.getInstance().noteHostForm(com.codename1.ui.Display.getInstance().getCurrent());
         }
         STACK.add(r);
+        if (clearTask) {
+            // Keep the new record on the stack while disposing the old task,
+            // before any launch callbacks can finish or redirect this launch.
+            while (STACK.indexOf(r) > 0) {
+                destroy(STACK.remove(0), false);
+            }
+            prev = null;
+        }
         create(r, null);
         start(r);
         resumeRecord(r, false);
-        if (prev != null) {
+        if (prev != null && isLive(prev) && top() != prev) {
             if (prev.noHistory && STACK.remove(prev)) {
                 // Never returned to, as on Android: finishing the new
                 // activity resumes the one beneath. A result it asked for
@@ -427,11 +439,6 @@ public final class ActivityThread {
         }
         if (recreated != null) {
             destroy(recreated, false);
-        }
-        if (clearTask) {
-            for (int i = STACK.size() - 2; i >= 0; i--) {
-                destroy(STACK.remove(i), false);
-            }
         }
     }
 
@@ -487,6 +494,10 @@ public final class ActivityThread {
         updateToolbar(r);
     }
 
+    private static boolean isLive(Record r) {
+        return !r.activity.mFinished && !r.activity.mDestroyed && STACK.contains(r);
+    }
+
     private static void create(Record r, Bundle saved) {
         Activity a = r.activity;
         Application app = a.mApplication;
@@ -496,6 +507,9 @@ public final class ActivityThread {
             throw new IllegalStateException("Activity " + a.getClass().getName()
                     + " did not call through to super.onCreate()");
         }
+        if (!isLive(r)) {
+            return;
+        }
         a.hostsDispatchActivityCreated();
         for (Application.ActivityLifecycleCallbacks cb : app.callbacks()) {
             cb.onActivityCreated(a, saved);
@@ -504,32 +518,49 @@ public final class ActivityThread {
         // onStart, so they run in the first start(): a relaunched activity
         // further down the stack stays created and gets them when it comes
         // back.
+        if (!isLive(r)) {
+            return;
+        }
         r.postCreatePending = true;
         r.restoreState = saved;
     }
 
     private static void start(Record r) {
+        if (!isLive(r)) {
+            return;
+        }
         Activity a = r.activity;
         a.hostsNoteStateNotSaved();
         a.hostsExecPendingActions();
-        a.onStart();
-        a.hostsDispatchStart();
+        if (!isLive(r)) {
+            return;
+        }
         r.started = true;
+        a.onStart();
+        if (!isLive(r)) {
+            return;
+        }
+        a.hostsDispatchStart();
         for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
             cb.onActivityStarted(a);
         }
-        if (r.postCreatePending) {
+        if (isLive(r) && r.postCreatePending) {
             r.postCreatePending = false;
             Bundle saved = r.restoreState;
             r.restoreState = null;
             if (saved != null) {
                 a.onRestoreInstanceState(saved);
             }
-            a.onPostCreate(saved);
+            if (isLive(r)) {
+                a.onPostCreate(saved);
+            }
         }
     }
 
     private static void resumeRecord(Record r, boolean back) {
+        if (!isLive(r) || top() != r) {
+            return;
+        }
         Activity a = r.activity;
         if (!r.started) {
             if (r.restartable) {
@@ -537,10 +568,19 @@ public final class ActivityThread {
             }
             start(r);
         }
+        if (!isLive(r) || top() != r) {
+            return;
+        }
         deliverPendingResults(r);
+        if (!isLive(r) || top() != r) {
+            return;
+        }
         if (!r.menuCreated) {
             r.menuCreated = true;
             buildOptionsMenu(r);
+        }
+        if (!isLive(r) || top() != r) {
+            return;
         }
         applyOrientation(a);
         if (back) {
@@ -549,13 +589,25 @@ public final class ActivityThread {
             r.form.show();
         }
         r.decor.dispatchAttachedToWindow(true);
-        a.onResume();
         r.resumed = true;
+        a.onResume();
+        if (!isLive(r) || top() != r) {
+            return;
+        }
         a.hostsDispatchResume();
         a.hostsExecPendingActions();
+        if (!isLive(r) || top() != r) {
+            return;
+        }
         a.onPostResume();
+        if (!isLive(r) || top() != r) {
+            return;
+        }
         for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
             cb.onActivityResumed(a);
+        }
+        if (!isLive(r) || top() != r) {
+            return;
         }
         a.onWindowFocusChanged(true);
         r.decor.dispatchWindowFocusChanged(true);

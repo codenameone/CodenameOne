@@ -489,8 +489,9 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             }
         }
         mChildren.remove(index);
-        if (child.isFocused()) {
-            child.clearFocus();
+        View focused = child.findFocus();
+        if (focused != null) {
+            focused.clearFocus();
         }
         if (child.hasPeer()) {
             groupPeer().removeChildPeer(child.getPeer());

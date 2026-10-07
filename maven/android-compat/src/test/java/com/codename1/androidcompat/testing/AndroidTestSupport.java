@@ -223,9 +223,32 @@ public final class AndroidTestSupport {
         void fill(android.view.Menu menu);
     }
 
+    /// Finishes at a launch callback selected by an intent extra.
+    public static final class FinishingActivity extends Activity {
+        public static FinishingActivity last;
+        public final java.util.List<String> events = new java.util.ArrayList<String>();
+        private void event(String name) {
+            events.add(name);
+            if (name.equals(getIntent().getStringExtra("finishAt"))) {
+                finish();
+            }
+        }
+        @Override protected void onCreate(android.os.Bundle state) {
+            super.onCreate(state);
+            last = this;
+            event("create");
+        }
+        @Override protected void onStart() { super.onStart(); event("start"); }
+        @Override protected void onResume() { super.onResume(); event("resume"); }
+        @Override protected void onPostResume() { super.onPostResume(); event("postResume"); }
+        @Override protected void onDestroy() { super.onDestroy(); event("destroy"); }
+    }
+
     private static final class TestApp extends AndroidApp {
         TestApp() {
             super(null, "com.codename1.androidcompat.test");
+            activity(FinishingActivity.class, FinishingActivity.class.getName(),
+                    android.R.style.Theme_Material_Light_DarkActionBar, 0, "Finishing", null, null, false);
             activity(TestActivity.class, TestActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "Test", null, null, false);
             activity(UiModeHandlingActivity.class, UiModeHandlingActivity.class.getName(),
@@ -262,6 +285,9 @@ public final class AndroidTestSupport {
 
         @Override
         public Activity createActivity(Class<?> type) {
+            if (type == FinishingActivity.class) {
+                return new FinishingActivity();
+            }
             if (type == TestActivity.class) {
                 return new TestActivity();
             }

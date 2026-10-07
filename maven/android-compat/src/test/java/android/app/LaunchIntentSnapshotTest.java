@@ -55,12 +55,23 @@ public class LaunchIntentSnapshotTest {
                     Context app = AndroidTestSupport.context().getApplicationContext();
                     Intent i = new Intent(app, AndroidTestSupport.TestActivity.class)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("n", 1);
+                    android.os.Bundle nested = new android.os.Bundle();
+                    int[] values = {1, 2};
+                    java.util.ArrayList<String> names = new java.util.ArrayList<String>();
+                    names.add("original");
+                    nested.putIntArray("values", values);
+                    i.putExtra("nested", nested);
+                    i.putStringArrayListExtra("names", names);
                     app.startActivity(i);
+                    values[0] = 99;
+                    names.set(0, "changed");
                     Activity a = ActivityThread.getTopActivity();
                     i.putExtra("n", 2);
                     i.setAction("changed");
                     assertEquals(1, a.getIntent().getIntExtra("n", 0));
                     assertNull(a.getIntent().getAction());
+                    assertEquals(1, a.getIntent().getBundleExtra("nested").getIntArray("values")[0]);
+                    assertEquals("original", a.getIntent().getStringArrayListExtra("names").get(0));
                 } catch (Throwable t) {
                     failure[0] = t;
                 } finally {

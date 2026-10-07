@@ -28,6 +28,33 @@ class SimpleDateFormatTest extends UITestBase {
     }
 
     @Test
+    void localizedMonthNamesRoundTripWithPunctuationAndUnicode() throws Exception {
+        for (String month : new String[]{"avr.", "März", "四月", "四"}) {
+            final String localizedMonth = month;
+            implementation.setLocalizationManager(new L10NManager("fr", "FR") {
+                @Override public String getShortMonthName(Date date) {
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime(date);
+                    return cal.get(Calendar.MONTH) == Calendar.APRIL ? localizedMonth
+                            : DateFormatSymbols.MONTHS[cal.get(Calendar.MONTH)].substring(0, 3);
+                }
+                @Override public String getLongMonthName(Date date) {
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime(date);
+                    return DateFormatSymbols.MONTHS[cal.get(Calendar.MONTH)];
+                }
+            });
+            SimpleDateFormat format = new SimpleDateFormat("dd MMM yyyy HH:mm:ss");
+            Calendar date = Calendar.getInstance();
+            date.clear();
+            date.set(2026, Calendar.APRIL, 7);
+            String rendered = format.format(date.getTime());
+            assertEquals("07 " + month + " 2026 00:00:00", rendered);
+            assertEquals(date.getTime(), format.parse(rendered));
+        }
+    }
+
+    @Test
     void applyPatternClearsCachedTokens() {
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM");
         List<String> initialTokens = format.getPatternTokens();

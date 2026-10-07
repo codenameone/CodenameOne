@@ -267,4 +267,56 @@ public class LaunchModeTest {
             }
         });
     }
+    @Test
+    public void clearTaskOverridesReuseModesAndFlags() {
+        onEdt(new Runnable() {
+            @Override public void run() {
+                Context app = AndroidTestSupport.context().getApplicationContext();
+                Class<?>[] targets = {AndroidTestSupport.SingleTaskActivity.class,
+                        AndroidTestSupport.SingleTopActivity.class, AndroidTestSupport.TestActivity.class};
+                for (Class<?> targetClass : targets) {
+                    app.startActivity(new Intent(app, targetClass).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    Activity old = ActivityThread.getTopActivity();
+                    if (targetClass == AndroidTestSupport.TestActivity.class) {
+                        old.startActivity(new Intent(old, AndroidTestSupport.UiModeHandlingActivity.class));
+                    }
+                    app.startActivity(new Intent(app, targetClass).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                    Activity fresh = ActivityThread.getTopActivity();
+                    assertTrue("CLEAR_TASK must create a new instance", fresh != old);
+                    assertTrue(old.isDestroyed());
+                    assertEquals(1, ActivityThread.getActivityCount());
+                    fresh.finish();
+                }
+            }
+        });
+    }
+
+    @Test
+    public void finishingDuringLaunchStopsFurtherCallbacksAndRestoresCaller() {
+        onEdt(new Runnable() {
+            @Override public void run() {
+                Context app = AndroidTestSupport.context().getApplicationContext();
+                app.startActivity(new Intent(app, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                Activity caller = ActivityThread.getTopActivity();
+                for (String stage : new String[]{"create", "start", "resume"}) {
+                    caller.startActivity(new Intent(caller, AndroidTestSupport.FinishingActivity.class)
+                            .putExtra("finishAt", stage));
+                    AndroidTestSupport.FinishingActivity finished = AndroidTestSupport.FinishingActivity.last;
+                    assertTrue(finished.isDestroyed());
+                    assertEquals("no callback after destruction: " + finished.events,
+                            "destroy", finished.events.get(finished.events.size() - 1));
+                    assertSame(caller, ActivityThread.getTopActivity());
+                    assertTrue(caller.mRecord.resumed);
+                    assertTrue(caller.mRecord.started);
+                    assertSame(caller.mRecord.form, Display.getInstance().getCurrent());
+                    assertTrue(!((Activity) finished).mRecord.resumed);
+                    assertTrue(!((Activity) finished).mRecord.started);
+                }
+            }
+        });
+    }
+
 }

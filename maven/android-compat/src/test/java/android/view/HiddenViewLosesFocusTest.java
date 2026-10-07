@@ -71,4 +71,17 @@ public class HiddenViewLosesFocusTest {
         assertFalse(child.isFocused());
         assertNull(outer.findFocus());
     }
+    @Test
+    public void removingAGroupClearsTheFocusOfItsDescendant() {
+        FrameLayout outer = new FrameLayout(AndroidTestSupport.context());
+        FrameLayout inner = new FrameLayout(AndroidTestSupport.context());
+        outer.addView(inner);
+        View child = focusableChild(inner);
+        child.requestFocus();
+        outer.removeView(inner);
+        assertFalse(child.isFocused());
+        assertNull(inner.findFocus());
+        assertNull(com.codename1.androidcompat.runtime.AndroidRuntime.getInstance().getFocusedView());
+    }
+
 }

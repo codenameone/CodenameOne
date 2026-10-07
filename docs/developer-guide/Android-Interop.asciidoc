@@ -353,6 +353,11 @@ the gallery and automated tests cover a subset of those behaviors.
   with `@OnLifecycleEvent` aren't called, because there's no reflection.
 * System insets are always zero: Codename One lays an application out inside
   the safe area itself, so edge-to-edge drawing has no effect.
+* `ListView` and `GridView` don't automatically restore scroll position or
+  checked items after activity recreation. Save the first visible position
+  and checked item keys in the activity state, then restore selection and
+  checks after attaching and populating the adapter. Stable item keys belong
+  to the application; positions alone may change when its data changes.
 * Drawable selectors keep the window-focused appearance when a window loses
   focus. Applications needing a different appearance can update their
   drawables in `onWindowFocusChanged()`.
