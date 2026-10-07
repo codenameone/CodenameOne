@@ -1358,32 +1358,8 @@ public final class OAuth2AuthorizationServer {
             String typed, String decision, String ticket, boolean reask) {
         typed = normalizeUserCode(typed);
         String who = authentication.getName();
-        // Counted before the code is looked at, wrong or right: what is being
-        // bounded is how many codes one user may try.
-        boolean allowed = verificationLimiter != null
-                ? verificationLimiter.tryAcquire("device-verification:" + who)
-                : attempts.tryAcquire(who, clock.currentTimeMillis());
-        if (!allowed) {
-            Verification limited = new Verification(Verification.LIMITED);
-            long wait = verificationLimiter != null
-                    ? verificationLimiter.retryAfterSeconds("device-verification:" + who)
-                    : attempts.windowMillis / 1000L;
-            limited.retryAfter = wait < 1 ? 1 : wait;
-            return limited;
-        }
-        long now = clock.currentTimeMillis();
         String hash = OAuth2Parameters.sha256(typed);
-        OAuth2AuthorizationService.StoredToken stored = typed.length() == USER_CODE_LENGTH
-                ? authorizations.findToken(OAuth2AuthorizationService.USER_CODE, hash) : null;
-        OAuth2Authorization authorization = stored == null || stored.isUsed()
-                || stored.getExpiresAt() <= now ? null
-                : authorizations.findById(stored.getAuthorizationId());
-        RegisteredClient client = authorization == null ? null
-                : clients.findById(authorization.getRegisteredClientId());
-        if (client == null || !OAuth2Authorization.PENDING.equals(authorization.getStatus())) {
-            return new Verification(Verification.INVALID);
-        }
-        HttpSession session = request.getSession(decision == null);
+        HttpSession session = request.getSession(false);
         if (decision != null) {
             // An answer counts only from the question this server put to this
             // session: the ticket that went out with it comes back, once. The
@@ -1401,6 +1377,30 @@ public final class OAuth2AuthorizationServer {
                 }
                 decision = null;
             }
+        }
+        // Counted before the code is looked at, wrong or right: what is being
+        // bounded is how many codes one user may try.
+        boolean allowed = decision != null || (verificationLimiter != null
+                ? verificationLimiter.tryAcquire("device-verification:" + who)
+                : attempts.tryAcquire(who, clock.currentTimeMillis()));
+        if (!allowed) {
+            Verification limited = new Verification(Verification.LIMITED);
+            long wait = verificationLimiter != null
+                    ? verificationLimiter.retryAfterSeconds("device-verification:" + who)
+                    : attempts.windowMillis / 1000L;
+            limited.retryAfter = wait < 1 ? 1 : wait;
+            return limited;
+        }
+        long now = clock.currentTimeMillis();
+        OAuth2AuthorizationService.StoredToken stored = typed.length() == USER_CODE_LENGTH
+                ? authorizations.findToken(OAuth2AuthorizationService.USER_CODE, hash) : null;
+        OAuth2Authorization authorization = stored == null || stored.isUsed()
+                || stored.getExpiresAt() <= now ? null
+                : authorizations.findById(stored.getAuthorizationId());
+        RegisteredClient client = authorization == null ? null
+                : clients.findById(authorization.getRegisteredClientId());
+        if (client == null || !OAuth2Authorization.PENDING.equals(authorization.getStatus())) {
+            return new Verification(Verification.INVALID);
         }
         if (decision == null) {
             if (session == null) {

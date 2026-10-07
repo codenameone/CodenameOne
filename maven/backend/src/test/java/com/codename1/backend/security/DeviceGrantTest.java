@@ -586,6 +586,28 @@ class DeviceGrantTest {
                         }).build());
     }
 
+    @Test
+    void aSingleVerificationPermitAllowsTheTicketBackedApproval() throws Exception {
+        for (boolean custom : new boolean[] {false, true}) {
+            try (SecuredServer server = startConfigured(custom ? null : "1", custom ? null : "300", null, as -> {
+                if (custom) {
+                    as.deviceVerificationRateLimiter(new InMemoryRateLimiter(1, 300));
+                }
+            })) {
+                Map device = begin(server, "openid");
+                assertEquals(302, OAuth2Testing.signIn(server, "ada", "ada-pw").status);
+                String csrf = field(server.get(PAGE).body, "_csrf");
+                String ticket = (String) json(postJson(server, csrf,
+                        "user_code", (String) device.get("user_code"))).get("ticket");
+                Reply approved = postJson(server, csrf, "user_code", (String) device.get("user_code"),
+                        "decision", "approve", "ticket", ticket);
+                assertEquals(200, approved.status, approved.toString());
+                assertEquals(200, poll(server, device.get("device_code")).status);
+                assertEquals(429, postJson(server, csrf, "user_code", "CCCCCCCC").status);
+            }
+        }
+    }
+
     /// How many wrong user codes are looked at before a 429, and what the 429
     /// says to wait.
     private static String triesAllowed(SecuredServer server) throws Exception {
