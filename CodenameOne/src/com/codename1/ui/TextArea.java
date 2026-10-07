@@ -2310,10 +2310,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `l`: the listener
     public void setDoneListener(ActionListener l) {
-        if (doneListener != l) {
-            doneListener = l;
-            repaintTextSelection();
-        }
+        doneListener = l;
+        repaintTextSelection();
     }
 
     /// Fire the done event to done listener
