@@ -87,9 +87,9 @@
  },
  "translator": {
   "all": {
-   "memory": 0.542,
-   "runs": 7,
-   "time": 0.625
+   "memory": 0.447,
+   "runs": 4,
+   "time": 0.698
   }
  },
  "valueEscape": {

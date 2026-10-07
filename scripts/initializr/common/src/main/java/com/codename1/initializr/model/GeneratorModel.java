@@ -258,7 +258,11 @@ public class GeneratorModel {
         return new GeneratorModel(ide, template, appName, packageName, options);
     }
 
-    public void generate() {
+    /// Builds the project zip and hands it to the browser (or, off the web, to the
+    /// platform). Returns true once the download was handed over, which is when
+    /// the Initializr shows its next-steps panel; false after an error, which has
+    /// already been reported to the user.
+    public boolean generate() {
         cleanupGeneratedZips();
         String fileName = toLowerCaseInvariant(appName) + ".zip";
 
@@ -269,7 +273,7 @@ public class GeneratorModel {
         } catch (IOException ex) {
             Log.e(ex);
             ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
-            return;
+            return false;
         }
 
         // Build the project zip in memory. This runs on every platform,
@@ -286,13 +290,13 @@ public class GeneratorModel {
         } catch (IOException ex) {
             Log.e(ex);
             ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
-            return;
+            return false;
         }
         if (downloadWebsiteProject(fileName, bytes, packageName, templateId())) {
-            return;
+            return true;
         }
         if (downloadBytesAsFile(fileName, bytes)) {
-            return;
+            return true;
         }
 
         // Fallback (non-JS platforms): write the bytes to storage and hand the
@@ -312,10 +316,11 @@ public class GeneratorModel {
                         "Couldn't generate the project: " + describeError(retryErr)
                                 + ". If your browser storage is full, clear site data for "
                                 + "this page and try again.");
-                return;
+                return false;
             }
         }
         execute(filePath);
+        return true;
     }
 
     /** Use the website bridge so the metric is emitted only after its download handler succeeds. */
@@ -337,8 +342,179 @@ public class GeneratorModel {
 
     /// The template identifier the website download beacon reports, e.g.
     /// "barebones" or "kotlin": the enum constant, lower-cased.
-    private String templateId() {
+    public String templateId() {
         return template == null ? "" : toLowerCaseInvariant(template.name());
+    }
+
+    /// The IDE identifier the "email me these steps" request reports, e.g.
+    /// "intellij" or "vs_code": the enum constant, lower-cased.
+    /// The IDE as BuildCloud's "email me these steps" endpoint names it. It
+    /// accepts a closed set (intellij, netbeans, eclipse, vscode) and treats
+    /// anything else as "no IDE", so VS_CODE must not become "vs_code".
+    public String ideId() {
+        if (ide == null) {
+            return "";
+        }
+        return ide == IDE.VS_CODE ? "vscode" : toLowerCaseInvariant(ide.name());
+    }
+
+    public String getPackageName() {
+        return packageName;
+    }
+
+    // ---------- launcher build-progress reporting ----------
+
+    /// Where the generated launchers report a build's start and end. The
+    /// launchers let CN1_EVENTS_URL override it (for tests); the README names it.
+    static final String LAUNCHER_EVENTS_URL = "https://cloud.codenameone.com/api/v2/funnel/initializr-event";
+    // The reporting code the launchers gain. Kept as resources rather than Java
+    // strings so the bash and cmd read as what they are; flat at the root of
+    // src/main/resources because the Codename One classloader rejects nested
+    // resource directories.
+    private static final String LAUNCHER_TELEMETRY_SH = "/launcher-telemetry-sh.txt";
+    private static final String LAUNCHER_TELEMETRY_BAT_START = "/launcher-telemetry-bat-start.txt";
+    private static final String LAUNCHER_TELEMETRY_BAT_FINISH = "/launcher-telemetry-bat-finish.txt";
+    // The archetype launcher lines the reporting hooks onto. common.zip's
+    // build.sh/build.bat are the archetype's (scripts/sync-initializr-launchers.py
+    // holds them byte-identical), so a change there that moves these lines turns
+    // the reporting off rather than shipping a broken launcher; the matrix test
+    // fails on that, so it does not go unnoticed.
+    private static final String SH_MVNW_LINE = "MVNW=\"./mvnw\"\n";
+    private static final String BAT_GOTO_LINE = "\ngoto %CMD%\n";
+    private static final String BAT_FINISH_BLOCK = ":finish\nset \"CN1_EXIT_CODE=%errorlevel%\"\npopd\n"
+            + "exit /b %CN1_EXIT_CODE%\n";
+
+    /// The anonymous id the launchers report: the lower-case hex SHA-256 of the
+    /// lower-cased package name. The website's download beacon sends the same
+    /// hash and BuildCloud computes it for every cloud build, which is how a
+    /// download, its launcher runs and its first cloud build are joined without
+    /// the package name leaving the machine.
+    String projectId() {
+        return Sha256.hex(toLowerCaseInvariant(packageName == null ? "" : packageName));
+    }
+
+    /// Initializr downloads -- and only those; the archetype's launchers are not
+    /// touched -- get build.sh/build.bat that report each build's start and how it
+    /// ended (see launcher-telemetry-sh.txt for exactly what is sent and the
+    /// opt-out). Without it the funnel goes dark between "downloaded a project"
+    /// and "first cloud build", which is exactly where new developers stall.
+    private void addLauncherTelemetry(Map<String, byte[]> entries) throws IOException {
+        byte[] sh = entries.get("build.sh");
+        if (sh != null) {
+            entries.put("build.sh", withShellTelemetry(StringUtil.newString(sh)).getBytes("UTF-8"));
+        }
+        byte[] bat = entries.get("build.bat");
+        if (bat != null) {
+            entries.put("build.bat", withBatchTelemetry(StringUtil.newString(bat)).getBytes("UTF-8"));
+        }
+    }
+
+    /// build.sh with every Maven run routed through cn1_mvnw, which runs ./mvnw
+    /// unchanged and reports around it. Every target calls "$MVNW", so swapping
+    /// that one variable covers them all.
+    String withShellTelemetry(String script) throws IOException {
+        int at = script.indexOf(SH_MVNW_LINE);
+        if (at < 0) {
+            return script;
+        }
+        return script.substring(0, at) + "MVNW=\"cn1_mvnw\"\n"
+                + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_SH))
+                + script.substring(at + SH_MVNW_LINE.length());
+    }
+
+    /// build.bat with the launch report just before it jumps to the target, and
+    /// the exit report in its :finish block, which every target falls through to.
+    String withBatchTelemetry(String script) throws IOException {
+        int jump = script.indexOf(BAT_GOTO_LINE);
+        int finish = script.lastIndexOf(BAT_FINISH_BLOCK);
+        if (jump < 0 || finish < jump || finish + BAT_FINISH_BLOCK.length() != script.length()) {
+            return script;
+        }
+        return script.substring(0, jump + 1)
+                + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_BAT_START))
+                + script.substring(jump + 1, finish)
+                + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_BAT_FINISH));
+    }
+
+    private String fillTelemetryTokens(String text) {
+        text = StringUtil.replaceAll(text, "__CN1_PROJECT_ID__", projectId());
+        // The oldest JDK this project builds with: a Java 8 project still builds
+        // on JDK 8, so only an older one is "too old" for it.
+        return StringUtil.replaceAll(text, "__CN1_MIN_JAVA__",
+                options.javaVersion == ProjectOptions.JavaVersion.JAVA_17 ? "17" : "8");
+    }
+
+    // ---------- next steps shown after the download ----------
+
+    /// What the Initializr's post-download panel tells the developer to do next,
+    /// worded per IDE and build tool. Kept here, beside the README that says the
+    /// same thing at more length, so the two give the same commands.
+    public static final class NextSteps {
+        /// Short numbered steps: extract, open in the IDE, run the first build.
+        public final String[] steps;
+        /// The commands for the last step on macOS/Linux and on Windows, one per line.
+        public final String unixCommands;
+        public final String windowsCommands;
+        /// Whether that first build is a cloud build, which asks for an account.
+        /// False for a backend-only project, which has no client to build.
+        public final boolean cloudBuild;
+
+        NextSteps(String[] steps, String unixCommands, String windowsCommands, boolean cloudBuild) {
+            this.steps = steps;
+            this.unixCommands = unixCommands;
+            this.windowsCommands = windowsCommands;
+            this.cloudBuild = cloudBuild;
+        }
+    }
+
+    /// Which of nextSteps()' four sets of steps this project gets, as BuildCloud's
+    /// "email me these steps" endpoint names them: maven, gradle, maven-backend or
+    /// gradle-backend. Sent with the request so the email carries the same
+    /// commands -- and the same account line, absent for a backend-only project
+    /// -- as the panel; BuildCloud picks from a fixed set, never from text sent here.
+    public String buildKind() {
+        boolean gradle = options.isGradle();
+        boolean backendOnly = gradle ? options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY
+                : isMavenBackendOnly();
+        return (gradle ? "gradle" : "maven") + (backendOnly ? "-backend" : "");
+    }
+
+    public NextSteps nextSteps() {
+        boolean gradle = options.isGradle();
+        boolean backendOnly = gradle ? options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY
+                : isMavenBackendOnly();
+        String extract = "Extract the whole " + toLowerCaseInvariant(appName) + ".zip into a folder.";
+        String open = openInIdeStep(gradle);
+        if (backendOnly) {
+            return new NextSteps(new String[] {extract, open, "Start the server from a terminal in that folder:"},
+                    gradle ? "./gradlew runBackend" : "./mvnw cn1:backend",
+                    gradle ? ".\\gradlew.bat runBackend" : ".\\mvnw.cmd cn1:backend", false);
+        }
+        if (gradle) {
+            return new NextSteps(new String[] {extract, open,
+                    "Run your first cloud build from a terminal in that folder:"},
+                    "./gradlew buildJavascript", ".\\gradlew.bat buildJavascript", true);
+        }
+        // The same commands as the generated README's Getting Started section.
+        return new NextSteps(new String[] {extract, open,
+                "From a terminal in that folder, check Maven sees your JDK, then run your first cloud build:"},
+                "./mvnw -v\n./build.sh javascript_cloud", ".\\mvnw.cmd -v\n.\\build.bat javascript_cloud", true);
+    }
+
+    private String openInIdeStep(boolean gradle) {
+        String kind = gradle ? "Gradle" : "Maven";
+        if (ide == IDE.INTELLIJ) {
+            return "In IntelliJ IDEA, choose File > Open and pick the folder; it imports the " + kind + " build.";
+        }
+        if (ide == IDE.ECLIPSE) {
+            return "In Eclipse, choose File > Import > " + kind + " > Existing " + kind
+                    + (gradle ? " Project" : " Projects") + " and pick the folder.";
+        }
+        if (ide == IDE.NETBEANS) {
+            return "In NetBeans, choose File > Open Project and pick the folder.";
+        }
+        return "In VS Code, choose File > Open Folder and install the Java and " + kind
+                + " extensions it suggests.";
     }
 
     private static String describeError(Throwable ex) {
@@ -402,6 +578,7 @@ public class GeneratorModel {
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
+        addLauncherTelemetry(mergedEntries);
         validateGeneratedPomCoordinates(mergedEntries);
         return mergedEntries;
     }
@@ -1420,7 +1597,9 @@ public class GeneratorModel {
                 .append("Use a terminal so errors remain visible.\n\n")
                 .append("Windows PowerShell or Command Prompt:\n\n```\n.\\mvnw.cmd -v\n.\\build.bat javascript_cloud\n```\n\n")
                 .append("macOS/Linux:\n\n```\n./mvnw -v\n./build.sh javascript_cloud\n```\n\n")
-                .append("Check that Maven reports the required JDK. Complete browser login when prompted. ")
+                .append("Check that Maven reports the required JDK. ")
+                .append("The first cloud build opens your browser and asks you to sign in or create a free ")
+                .append("Codename One account; local builds need no account. ")
                 .append("The first build downloads dependencies and can take several minutes. ")
                 .append("If a download fails, check your connection or Maven proxy settings and retry.\n\n")
                 .append("The javascript command builds locally; javascript_cloud submits a hosted build. ")
@@ -1428,6 +1607,7 @@ public class GeneratorModel {
                 .append("These local operations do not create a cloud build.\n\n");
 
         appendIdeSection(out);
+        appendBuildProgressReportingSection(out);
 
         if (!includesPlatformModules()) {
             out.append("## Native Code\n\n")
@@ -1461,6 +1641,22 @@ public class GeneratorModel {
                 .append("- Codename One website: https://www.codenameone.com\n")
                 .append("- Codename One GitHub: https://github.com/codenameone/CodenameOne\n");
         return out.toString();
+    }
+
+    /// Says what the launchers' build-progress reporting sends and how to turn it
+    /// off, where a developer reads before running anything. Only Maven app
+    /// downloads have the reporting launchers (see [addLauncherTelemetry(Map)]).
+    private void appendBuildProgressReportingSection(StringBuilder out) {
+        out.append("## Build progress reporting\n\n")
+                .append("`build.sh` and `build.bat` tell Codename One when a build starts and how it ended, ")
+                .append("so we can see where first builds get stuck. They send only a one-way hash of the ")
+                .append("package name (never the name itself), the build target, the OS family, the Java ")
+                .append("version, the exit code, a one-word failure reason and the duration, to ")
+                .append(LAUNCHER_EVENTS_URL).append(". Never your code, paths, user name or build output.\n\n")
+                .append("To opt out, set `CN1_TELEMETRY` to `0` in the environment the build runs in:\n\n")
+                .append("- macOS/Linux: `export CN1_TELEMETRY=0`\n")
+                .append("- Windows PowerShell: `$Env:CN1_TELEMETRY = \"0\"`\n")
+                .append("- Windows Command Prompt: `set CN1_TELEMETRY=0`\n\n");
     }
 
     private void appendIdeSection(StringBuilder out) {

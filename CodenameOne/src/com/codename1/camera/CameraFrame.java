@@ -29,7 +29,8 @@ package com.codename1.camera;
 /// framework may reuse or release the underlying buffers. Clone any data you
 /// need to keep.
 public final class CameraFrame {
-    private final byte[] jpegBytes;
+    private byte[] jpegBytes;
+    private JpegEncoder jpegEncoder;
     private final byte[] rawBytes;
     private final int width;
     private final int height;
@@ -37,12 +38,30 @@ public final class CameraFrame {
     private final long timestampNanos;
     private final FrameFormat format;
 
+    /// Encodes a frame on demand. Implementations must own the input bytes;
+    /// they must not retain a native image that is closed after frame delivery.
+    public interface JpegEncoder {
+        byte[] encode();
+    }
+
     /// Used by platform implementations.
     public CameraFrame(byte[] jpegBytes, byte[] rawBytes,
                        int width, int height,
                        int rotationDegrees, long timestampNanos,
                        FrameFormat format) {
+        this(jpegBytes, rawBytes, width, height, rotationDegrees,
+                timestampNanos, format, null);
+    }
+
+    /// Used by ports that can supply raw frames without eagerly encoding JPEG.
+    /// The encoder is invoked at most once after a successful encoding, when
+    /// `#getJpegBytes()` is first called. Existing eager callers need no encoder.
+    public CameraFrame(byte[] jpegBytes, byte[] rawBytes,
+                       int width, int height, int rotationDegrees,
+                       long timestampNanos, FrameFormat format,
+                       JpegEncoder jpegEncoder) {
         this.jpegBytes = jpegBytes;
+        this.jpegEncoder = jpegEncoder;
         this.rawBytes = rawBytes;
         this.width = width;
         this.height = height;
@@ -54,8 +73,17 @@ public final class CameraFrame {
     /// JPEG-encoded bytes for this frame. Always non-null regardless of the
     /// requested `FrameFormat`; use this when encoded image data is needed.
     /// `VisionImage#fromCameraFrame(CameraFrame)` instead selects the raw
-    /// buffer for NV21 and RGBA8888 frames.
-    public byte[] getJpegBytes() {
+    /// buffer for NV21 and RGBA8888 frames. A raw frame may encode its JPEG
+    /// lazily on the first call; subsequent calls return the cached bytes.
+    public synchronized byte[] getJpegBytes() {
+        if (jpegBytes == null && jpegEncoder != null) {
+            byte[] encoded = jpegEncoder.encode();
+            if (encoded == null) {
+                throw new IllegalStateException("Camera frame JPEG encoding failed");
+            }
+            jpegBytes = encoded;
+            jpegEncoder = null;
+        }
         return jpegBytes;
     }
 

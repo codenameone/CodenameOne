@@ -249,6 +249,32 @@ body.cn1-initializr-page-body .main {
         if (window.cn1CrispEvents && window.cn1CrispEvents.initializrProjectDownloaded) {
           window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
         }
+      } else if (evt.data.type === "cn1-initializr-steps-request") {
+        // "Email me these steps" from the post-download panel: the visitor
+        // typed the address and pressed the button, so this one is theirs to
+        // send. The package name is hashed by the beacon before it leaves.
+        // Always answer, with whether the request really went out: the panel
+        // only says "Check your inbox" on a true answer.
+        var source = evt.source;
+        var id = evt.data.id;
+        var answer = function (ok) {
+          try {
+            source.postMessage({ type: "cn1-initializr-steps-result", id: id, ok: ok === true },
+              evt.origin && evt.origin !== "null" ? evt.origin : "*");
+          } catch (e) {
+            // The frame went away; nothing to tell.
+          }
+        };
+        try {
+          if (window.cn1InitializrBeacon && window.cn1InitializrBeacon.sendSteps) {
+            window.cn1InitializrBeacon.sendSteps(evt.data.email, evt.data.packageName,
+              evt.data.template, evt.data.ide, evt.data.build).then(answer, function () { answer(false); });
+          } else {
+            answer(false);
+          }
+        } catch (e) {
+          answer(false);
+        }
       }
     });
   }

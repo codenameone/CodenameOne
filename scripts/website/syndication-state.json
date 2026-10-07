@@ -2577,6 +2577,18 @@
         "url": "https://medium.com/@Codename_One/websocket-support-for-your-java-backend-17f52100e05e?postPublishedType=initial",
         "syndicated_at": "2026-10-06T01:01:32+00:00"
       }
+    },
+    "push-feedback-retire-dead-tokens": {
+      "hashnode": {
+        "url": "https://debugagent.com/your-push-request-succeeded-the-device-key-is-dead",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac58b9165381f4bf2cc26c8",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-07T00:01:13+00:00"
+      }
     }
   }
 }

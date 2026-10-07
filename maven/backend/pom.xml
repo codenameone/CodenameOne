@@ -313,7 +313,8 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- Attach only after antrun has created the ParparVM sources jar. -->
+<!-- Keep this after antrun so the package-phase source jar exists
+                 before attach-artifact runs. Maven requires one block per plugin. -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>

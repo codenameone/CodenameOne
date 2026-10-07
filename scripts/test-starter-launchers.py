@@ -4,12 +4,16 @@ Only the downloaded Maven executable is replaced with a recorder; launcher and
 wrapper files, including the PowerShell download/cache discovery, stay untouched.
 """
 import hashlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
+from urllib.parse import parse_qs
 
 source = Path(sys.argv[1]).resolve()
 windows = os.name == 'nt'
@@ -44,7 +48,34 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         executable.write_text('#!/bin/sh\npwd > "$CN1_TEST_RECORD"\nprintf "%s\\n" "$@" >> "$CN1_TEST_RECORD"\nexit "$CN1_TEST_EXIT"\n')
         executable.chmod(0o755)
     record = parent / 'record.txt'
-    env = dict(os.environ, MAVEN_USER_HOME=str(cache), CN1_TEST_RECORD=str(record), CN1_TEST_EXIT='0')
+    # Initializr launchers report build progress (see launcher-telemetry-sh.txt in
+    # scripts/initializr). Point them at a local recorder that answers 204 at
+    # once, so no test run lands in the production funnel and the reports can
+    # be checked. Not a closed port: on Windows a refused localhost connection
+    # is retried for about two seconds, which with two reports per build pushed
+    # the windows-latest fixture step past its ten-minute limit.
+    events = []
+
+    class Recorder(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get('Content-Length') or 0)).decode()
+            events.append({k: v[0] for k, v in parse_qs(body, keep_blank_values=True).items()})
+            self.send_response(204)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    class QuietServer(ThreadingHTTPServer):
+        # A launcher's curl gives up after 3 s by design; a connection it drops
+        # mid-request is not a test failure, so do not print a traceback for it.
+        def handle_error(self, request, client_address):
+            pass
+
+    recorder = QuietServer(('127.0.0.1', 0), Recorder)
+    threading.Thread(target=recorder.serve_forever, daemon=True).start()
+    env = dict(os.environ, MAVEN_USER_HOME=str(cache), CN1_TEST_RECORD=str(record), CN1_TEST_EXIT='0',
+               CN1_EVENTS_URL='http://127.0.0.1:%d/cn1-launcher-test' % recorder.server_address[1])
     if windows:
         env.update(MVNW_USERNAME='wrapper-test-user', MVNW_PASSWORD='wrapper-test-password')
     env.pop('MVNW_REPOURL', None)
@@ -79,4 +110,74 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     run('run', '', '-Psimulator')
     run('build', 'javascript_cloud', '-Dcodename1.buildTarget=javascript', 37)
     run('run', 'simulator', '-Psimulator', 37)
-    print('PASS: targets, local defaults, parent cwd, spaces/apostrophes, failure exit codes' + (', Windows credential isolation' if windows else ''))
+    reporting = 'CN1_PROJECT_ID' in (project / ('build.bat' if windows else 'build.sh')).read_text()
+    if reporting:
+        # An Initializr launcher: every build reports launch then exit, keyed by
+        # the 64-hex package hash and nothing that names the package.
+        steps = [e.get('step') for e in events]
+        assert 'launch' in steps and 'exit' in steps, events
+        assert all(len(e.get('pkg', '')) == 64 for e in events), events
+        assert any(e.get('step') == 'exit' and e.get('exit') == '37' for e in events), events
+        if not windows:
+            # Reporting must never change the build itself. A TMPDIR that does
+            # not exist leaves no room for the reason log: the build still
+            # returns Maven's own status. And Maven's stderr stays on stderr.
+            missing_tmp = dict(env, TMPDIR=str(parent / 'no-such-tmp'), CN1_TEST_EXIT='0')
+            result = subprocess.run([str(project / 'build.sh'), 'javascript_cloud'], cwd=parent, env=missing_tmp,
+                                    text=True, capture_output=True, timeout=30)
+            assert result.returncode == 0, ('missing TMPDIR failed the build', result.returncode, result.stderr)
+            noisy = project / 'mvnw-stderr-probe.sh'
+            noisy.write_text('#!/bin/sh\necho to-stdout\necho to-stderr >&2\nexit 0\n')
+            noisy.chmod(0o755)
+            probe = (project / 'build.sh').read_text().replace('( ./mvnw "$@" 2>', '( ./mvnw-stderr-probe.sh "$@" 2>')
+            assert probe != (project / 'build.sh').read_text(), 'probe hook not found in build.sh'
+            (project / 'build-probe.sh').write_text(probe)
+            (project / 'build-probe.sh').chmod(0o755)
+            result = subprocess.run([str(project / 'build-probe.sh'), 'javascript_cloud'], cwd=parent, env=env,
+                                    text=True, capture_output=True, timeout=30)
+            assert result.returncode == 0, result
+            assert 'to-stdout' in result.stdout and 'to-stderr' not in result.stdout, result.stdout
+            assert 'to-stderr' in result.stderr, result.stderr
+            # Maven (and its plugins) can prompt: the launcher's stdin must reach it,
+            # not the /dev/null bash gives a background command by default.
+            noisy.write_text('#!/bin/sh\nread line\necho "got:$line"\nexit 0\n')
+            result = subprocess.run([str(project / 'build-probe.sh'), 'javascript_cloud'], cwd=parent, env=env,
+                                    input='typed-answer\n', text=True, capture_output=True, timeout=30)
+            assert result.returncode == 0 and 'got:typed-answer' in result.stdout, (result.stdout, result.stderr)
+            if os.path.isdir('/proc'):
+                # Cancelling must stop Maven even on a Linux without pgrep (a slim
+                # container without procps): the launcher then finds Maven's pid
+                # through /proc. PATH here has every tool except pgrep.
+                nopgrep = parent / 'bin-without-pgrep'
+                nopgrep.mkdir(exist_ok=True)
+                for folder in os.environ.get('PATH', '').split(os.pathsep):
+                    if not os.path.isdir(folder):
+                        continue
+                    for name in os.listdir(folder):
+                        link = nopgrep / name
+                        if name != 'pgrep' and not link.exists():
+                            try:
+                                link.symlink_to(Path(folder) / name)
+                            except OSError:
+                                pass
+                pidfile = parent / 'hung-maven.pid'
+                noisy.write_text('#!/bin/sh\necho $$ > "%s"\nexec sleep 60\n' % pidfile)
+                proc = subprocess.Popen([str(project / 'build-probe.sh'), 'javascript_cloud'], cwd=parent,
+                                        env=dict(env, PATH=str(nopgrep)), stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL)
+                for _ in range(100):
+                    if pidfile.exists() and pidfile.read_text().strip():
+                        break
+                    time.sleep(0.1)
+                maven_pid = int(pidfile.read_text().strip())
+                proc.terminate()
+                assert proc.wait(timeout=30) == 143, 'SIGTERM must exit 143'
+                time.sleep(0.5)
+                assert not Path('/proc/%d' % maven_pid).exists(), 'Maven survived the cancel without pgrep'
+
+    else:
+        assert not events, ('the archetype launchers report nothing', events)
+    recorder.shutdown()
+    print('PASS: targets, local defaults, parent cwd, spaces/apostrophes, failure exit codes'
+          + (', Windows credential isolation' if windows else '')
+          + (', build progress reports' if reporting else ''))

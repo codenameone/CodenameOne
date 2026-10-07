@@ -68,20 +68,12 @@
           <classifier>tests</classifier>
           <scope>test</scope>
       </dependency>
-      <dependency>
-          <groupId>com.codenameone</groupId>
-          <artifactId>codenameone-core</artifactId>
-          <scope>test</scope>
-      </dependency>
+      <!-- Provided dependencies are available to compilation and tests. Declare
+           each once; simulator and desktop run profiles override the scope. -->
       <dependency>
           <groupId>com.codenameone</groupId>
           <artifactId>codenameone-core</artifactId>
           <scope>provided</scope>
-      </dependency>
-      <dependency>
-          <groupId>com.codenameone</groupId>
-          <artifactId>codenameone-javase</artifactId>
-          <scope>test</scope>
       </dependency>
       <dependency>
           <groupId>com.codenameone</groupId>
