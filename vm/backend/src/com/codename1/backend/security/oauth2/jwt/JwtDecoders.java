@@ -26,8 +26,6 @@ import com.codename1.backend.Json;
 import com.codename1.backend.security.oauth2.jose.jws.JwsAlgorithm;
 import com.codename1.backend.security.oauth2.jose.jws.SignatureAlgorithm;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 /// Makes a decoder for an issuer from what the issuer says about itself.
@@ -71,8 +69,8 @@ public final class JwtDecoders {
 
     /// [#fromIssuerLocation(String, RemoteJwkSet.Fetcher)] accepting the algorithms named
     /// here and no others, whatever the issuer's metadata lists. A deployment that allows
-    /// only ES256 says so with this; the metadata's list is what the issuer can sign with,
-    /// not what this server agreed to accept.
+    /// only ES256 says so with this. ID-token signing metadata does not describe
+    /// the access-token algorithms this resource server accepts.
     ///
     /// #### Parameters
     ///
@@ -80,8 +78,7 @@ public final class JwtDecoders {
     ///
     /// - `fetcher`: what reads the metadata and the keys
     ///
-    /// - `accepted`: the algorithms to accept; null or empty for the ones the metadata
-    ///   lists
+    /// - `accepted`: the access-token algorithms to accept; null or empty for RS256
     public static JwtDecoder fromIssuerLocation(String issuer, RemoteJwkSet.Fetcher fetcher,
             JwsAlgorithm[] accepted) {
         Map metadata = metadata(issuer, fetcher);
@@ -91,7 +88,8 @@ public final class JwtDecoders {
         }
         DefaultJwtDecoder decoder = DefaultJwtDecoder.withJwkSource(
                 new RemoteJwkSet((String) jwks, fetcher)).jwsAlgorithms(
-                        accepted == null || accepted.length == 0 ? algorithms(metadata) : accepted).build();
+                        accepted == null || accepted.length == 0
+                                ? new JwsAlgorithm[] {SignatureAlgorithm.RS256} : accepted).build();
         decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
         return decoder;
     }
@@ -139,25 +137,4 @@ public final class JwtDecoders {
                 + "Issuer of \"" + issuer + "\": " + last);
     }
 
-    /// The public key algorithms the issuer says it signs with that this runtime
-    /// verifies; RS256 when it does not say. The key still has to be of the
-    /// algorithm's kind, so a list read from the issuer widens nothing a key
-    /// does not back.
-    private static JwsAlgorithm[] algorithms(Map metadata) {
-        List<JwsAlgorithm> found = new ArrayList<JwsAlgorithm>();
-        Object listed = metadata.get("id_token_signing_alg_values_supported");
-        if (listed instanceof List) {
-            for (Object name : (List) listed) {
-                SignatureAlgorithm algorithm = name instanceof String
-                        ? SignatureAlgorithm.from((String) name) : null;
-                if (algorithm != null && !found.contains(algorithm)) {
-                    found.add(algorithm);
-                }
-            }
-        }
-        if (found.isEmpty()) {
-            found.add(SignatureAlgorithm.RS256);
-        }
-        return found.toArray(new JwsAlgorithm[found.size()]);
-    }
 }

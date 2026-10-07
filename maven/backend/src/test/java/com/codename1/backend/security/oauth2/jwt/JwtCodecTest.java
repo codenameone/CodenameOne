@@ -741,6 +741,20 @@ class JwtCodecTest {
     }
 
     @Test
+    void accessTokenAlgorithmsDoNotComeFromIdTokenMetadata() throws Exception {
+        String issuer = "https://id.example.com";
+        Endpoint endpoint = new Endpoint();
+        endpoint.documents.put(issuer + "/.well-known/openid-configuration", "{\"issuer\":\"" + issuer
+                + "\",\"jwks_uri\":\"" + issuer + "/jwks\",\"id_token_signing_alg_values_supported\":[\"ES256\"]}");
+        Jwk key = rsa();
+        endpoint.documents.put(issuer + "/jwks", JwkSet.of(key).toJson());
+        String token = new DefaultJwtEncoder(JwkSet.of(key)).encode(JwtEncoderParameters.from(
+                JwtClaimsSet.builder().issuer(issuer).subject("ada")
+                        .expiresAt(System.currentTimeMillis() / 1000L + 300).build())).getTokenValue();
+        assertEquals("ada", JwtDecoders.fromIssuerLocation(issuer, endpoint).decode(token).getSubject());
+    }
+
+    @Test
     @DisplayName("Discovery: a decoder from an issuer's metadata, which must be its own")
     void discovery() throws Exception {
         Moving time = new Moving();
@@ -752,7 +766,8 @@ class JwtCodecTest {
         endpoint.documents.put("https://id.example.com/.well-known/oauth-authorization-server/tenant-a",
                 "{\"issuer\":\"" + issuer + "\",\"jwks_uri\":\"https://id.example.com/jwks/a\","
                 + "\"id_token_signing_alg_values_supported\":[\"RS256\",\"ES256\",\"EdDSA\",\"none\"]}");
-        JwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer, endpoint);
+        JwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer, endpoint,
+                new JwsAlgorithm[] {SignatureAlgorithm.ES256});
         assertEquals(Arrays.asList(issuer + "/.well-known/openid-configuration",
                 "https://id.example.com/.well-known/openid-configuration/tenant-a",
                 "https://id.example.com/.well-known/oauth-authorization-server/tenant-a"),
@@ -777,9 +792,9 @@ class JwtCodecTest {
                 new JwsAlgorithm[] {SignatureAlgorithm.RS256});
         assertEquals("The token's algorithm, ES256, is not one this decoder accepts",
                 refusal(narrowed, token));
-        // And none named is the metadata's list, as before.
-        assertEquals("ada", JwtDecoders.fromIssuerLocation(issuer, endpoint, new JwsAlgorithm[0])
-                .decode(token).getSubject());
+        // An empty allowlist uses the access-token default, RS256.
+        assertEquals("The token's algorithm, ES256, is not one this decoder accepts",
+                refusal(JwtDecoders.fromIssuerLocation(issuer, endpoint, new JwsAlgorithm[0]), token));
 
         // Metadata that names another issuer: a tenant served another's.
         Endpoint confused = new Endpoint();

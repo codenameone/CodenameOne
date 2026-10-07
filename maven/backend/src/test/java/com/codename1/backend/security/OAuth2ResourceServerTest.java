@@ -475,6 +475,7 @@ class OAuth2ResourceServerTest {
             issuer[0] = "http://127.0.0.1:" + provider.getAddress().getPort();
             Properties settings = SecuredServer.settings();
             settings.setProperty(OAuth2ResourceServerConfigurer.ISSUER_URI, issuer[0]);
+            settings.setProperty(OAuth2ResourceServerConfigurer.JWS_ALGORITHMS, "ES256");
             settings.setProperty(OAuth2ResourceServerConfigurer.AUDIENCES, "billing-api, orders-api");
             try (SecuredServer server = SecuredServer.start(settings, "test", new Object[0], APP,
                     api(o -> o.jwt(Customizer.<OAuth2ResourceServerConfigurer.JwtConfigurer>
