@@ -24,14 +24,19 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.router.Navigation;
 import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -217,6 +222,70 @@ public class DisplayTest extends UITestBase {
 
         display.setProperty("Component.revalidateOnStyleChange", "TRUE");
         assertTrue(Component.isRevalidateOnStyleChange());
+    }
+
+    @FormTest
+    void appArgDeliveryDoesNotWaitForBusyEdt() throws Exception {
+        final List<String> routed = new ArrayList<String>();
+        final AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+        Navigation.setDispatcher(url -> {
+            assertTrue(display.isEdt(), "Routes must execute on the EDT");
+            routed.add(url);
+            return null;
+        });
+        Thread platformThread = new Thread(() -> {
+            try {
+                display.setProperty("AppArg", "https://example.com/first");
+                display.setProperty("AppArg", "myapp://second");
+                display.setProperty("AppArg", "launch data");
+                assertEquals("launch data", display.getProperty("AppArg", null));
+            } catch (Throwable t) {
+                failure.set(t);
+            }
+        }, "deep-link-platform-callback");
+        try {
+            assertTrue(display.isEdt());
+            platformThread.start();
+            // Hold the EDT as startup/rendering can. The platform callback must return
+            // without needing this thread, or it can deadlock the native main thread.
+            platformThread.join(1000);
+            assertFalse(platformThread.isAlive(), "AppArg delivery must not wait for the EDT");
+            assertNull(failure.get());
+            assertTrue(routed.isEmpty(), "Navigation must wait until the EDT is available");
+            flushEdt();
+            assertEquals(Arrays.asList("https://example.com/first", "myapp://second"), routed,
+                    "Each queued link must retain its URL and delivery order");
+        } finally {
+            // Release a synchronous waiter too, so the pre-fix failure cannot hang the suite.
+            for (int i = 0; i < 100 && platformThread.isAlive(); i++) {
+                flushEdt();
+                platformThread.join(10);
+            }
+            flushEdt();
+            Navigation.setDispatcher(null);
+            display.setProperty("AppArg", null);
+        }
+    }
+
+    @FormTest
+    void appArgRoutesImmediatelyOnEdtAndIgnoresNonUrls() {
+        final List<String> routed = new ArrayList<String>();
+        Navigation.setDispatcher(url -> {
+            routed.add(url);
+            return null;
+        });
+        try {
+            display.setProperty("AppArg", "https://example.com/deep");
+            assertEquals(Arrays.asList("https://example.com/deep"), routed);
+            display.setProperty("AppArg", "launch data");
+            assertEquals("launch data", display.getProperty("AppArg", null));
+            display.setProperty("AppArg", "");
+            display.setProperty("AppArg", null);
+            assertEquals(1, routed.size());
+        } finally {
+            Navigation.setDispatcher(null);
+            display.setProperty("AppArg", null);
+        }
     }
 
     @Test

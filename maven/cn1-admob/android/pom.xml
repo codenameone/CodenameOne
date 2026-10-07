@@ -208,11 +208,6 @@
                             </target>
                         </configuration>
                     </execution>
-                    <!--
-                         One declaration per plugin: Maven 3.10 refuses a POM that
-                         declares the same plugin twice, where 3.9 only warned and
-                         merged them, so every execution of it belongs here.
-                    -->
                     <execution>
                         <phase>package</phase>
                         <configuration>
