@@ -511,6 +511,25 @@ public class OidcIdTokenTest extends UITestBase {
     }
 
     @Test
+    void issuanceTimeIsRequiredAndMustBeNumeric() throws Exception {
+        for (Object value : new Object[] {null, "123", Boolean.TRUE}) {
+            Map<String, Object> invalid = claims();
+            if (value == null) invalid.remove("iat");
+            else invalid.put("iat", value);
+            idToken = sign("RS256", "k-rsa", rsa, invalid);
+            refused(OidcException.INVALID_ID_TOKEN, "issuance time");
+        }
+    }
+
+    @Test
+    void ordinaryIssuersMustMatchTheirSchemeExactly() throws Exception {
+        Jwt token = Jwt.parse(sign("RS256", "k", rsa,
+                with(claims(), "iss", "login.example.com")));
+        assertNotNull(IdTokenVerifier.checkClaims(token, "https://login.example.com", CLIENT,
+                null, null, 300, System.currentTimeMillis()));
+    }
+
+    @Test
     void aTokenThatNamesNoSubjectIsNotASignIn() throws Exception {
         Map<String, Object> anonymous = claims();
         anonymous.remove("sub");

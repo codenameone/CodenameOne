@@ -125,6 +125,9 @@ final class IdTokenVerifier {
         if (((Number) exp).longValue() * 1000L + skew < nowMillis) {
             return invalid("The ID token has expired");
         }
+        if (!(claims.get("iat") instanceof Number)) {
+            return invalid("The ID token has no numeric issuance time");
+        }
         Object nbf = claims.get("nbf");
         if (nbf instanceof Number && ((Number) nbf).longValue() * 1000L - skew > nowMillis) {
             return invalid("The ID token is not valid yet");
@@ -156,7 +159,8 @@ final class IdTokenVerifier {
         if (!(iss instanceof String)) {
             return false;
         }
-        if (issuer.equals(iss) || issuer.equals("https://" + iss)) {
+        if (issuer.equals(iss) || ("https://accounts.google.com".equals(issuer)
+                && "accounts.google.com".equals(iss))) {
             return true;
         }
         int at = issuer.indexOf("{tenantid}");
