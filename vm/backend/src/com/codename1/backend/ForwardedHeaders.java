@@ -119,6 +119,7 @@ final class ForwardedHeaders {
         if (address == null) {
             return false;
         }
+        address = unmap(address);
         for (int iter = 0 ; iter < networks.length ; iter++) {
             byte[] network = networks[iter];
             if (network.length != address.length) {

@@ -80,6 +80,19 @@ class RemoteAddressTest {
     }
 
     @Test
+    void mappedNativePeersUseTheIpv4ProxyPolicy() throws Exception {
+        ForwardedHeaders policy = ForwardedHeaders.of("10.0.0.0/8");
+        byte[] proxy = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte) 255, (byte) 255, 10, 0, 0, 1};
+        assertTrue(policy.trusts(proxy));
+        assertTrue(policy.secure(proxy, "https"));
+        assertEquals("203.0.113.7", ForwardedHeaders.format(policy.client(proxy, "203.0.113.7")));
+        proxy[12] = 11;
+        assertFalse(policy.trusts(proxy));
+        assertFalse(policy.secure(proxy, "https"));
+        assertArrayEquals(proxy, policy.client(proxy, "203.0.113.7"));
+    }
+
+    @Test
     @DisplayName("Proxies: the private ranges unless listed, and exactly the list when it is")
     void trustedRanges() throws Exception {
         Properties settings = new Properties();
