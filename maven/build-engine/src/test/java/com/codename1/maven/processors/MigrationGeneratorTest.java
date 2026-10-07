@@ -283,7 +283,7 @@ public class MigrationGeneratorTest {
         try {
             assertEquals(2, com.codename1.backend.Migrations.of(pool, set).migrate().getMigrationsExecuted());
             assertEquals("seeded", pool.queryOne("SELECT body FROM notes", null).get("body"));
-            assertEquals("JAVA", pool.queryOne("SELECT type FROM flyway_schema_history WHERE version = '2'", null)
+            assertEquals("JDBC", pool.queryOne("SELECT type FROM flyway_schema_history WHERE version = '2'", null)
                     .get("type"));
         } finally {
             pool.close();
