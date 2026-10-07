@@ -264,6 +264,9 @@ public final class ResourceManager {
             device.generation++;
         }
 
+        // Live script-only locale changes are a documented compatibility
+        // limit: resource selection sees device.script, but activity
+        // configuration comparison currently retains language/region only.
         configuration.locale = new Locale(lang, region);
         configuration.orientation = orientation;
         configuration.uiMode = Configuration.UI_MODE_TYPE_NORMAL

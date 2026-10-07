@@ -70,9 +70,9 @@ public final class Bundle implements Parcelable, Cloneable {
     }
 
     /// A copy that shares no mutable container with this bundle: nested
-    /// bundles are deep copied, lists and arrays are copied (a list's bundle
-    /// elements deep copied too). Other values -- strings, boxed numbers,
-    /// parcelables -- are shared, as on Android.
+    /// bundles are deep copied, lists, sparse arrays and arrays are copied
+    /// (list and sparse-array bundle elements deep copied too). Other values
+    /// -- strings, boxed numbers, parcelables -- are shared, as on Android.
     public Bundle deepCopy() {
         Bundle out = new Bundle();
         for (Map.Entry<String, Object> e : map.entrySet()) {
@@ -90,6 +90,14 @@ public final class Bundle implements Parcelable, Cloneable {
             ArrayList<Object> copy = new ArrayList<Object>(src.size());
             for (int i = 0; i < src.size(); i++) {
                 copy.add(deepCopyValue(src.get(i)));
+            }
+            return copy;
+        }
+        if (v instanceof android.util.SparseArray) {
+            android.util.SparseArray<?> src = (android.util.SparseArray<?>) v;
+            android.util.SparseArray<Object> copy = new android.util.SparseArray<Object>(src.size());
+            for (int i = 0; i < src.size(); i++) {
+                copy.put(src.keyAt(i), deepCopyValue(src.valueAt(i)));
             }
             return copy;
         }

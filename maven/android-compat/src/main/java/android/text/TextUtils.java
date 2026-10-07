@@ -223,7 +223,30 @@ public class TextUtils {
         int mode = where == TruncateAt.START ? com.codename1.androidcompat.runtime.TextLayout.ELLIPSIZE_START
                 : where == TruncateAt.MIDDLE ? com.codename1.androidcompat.runtime.TextLayout.ELLIPSIZE_MIDDLE
                 : com.codename1.androidcompat.runtime.TextLayout.ELLIPSIZE_END;
-        return com.codename1.androidcompat.runtime.TextLayout.ellipsize(s, p, avail, mode);
+        String shortened = com.codename1.androidcompat.runtime.TextLayout.ellipsize(s, p, avail, mode);
+        if (!(text instanceof Spanned)) {
+            return shortened;
+        }
+        // TextLayout retains a prefix and/or suffix around one ellipsis.
+        // Derive their lengths from its result, not by searching for an
+        // ellipsis that may also have been present in the original text.
+        int kept = shortened.length() - 1;
+        int head = where == TruncateAt.START ? 0 : where == TruncateAt.MIDDLE ? (kept + 1) / 2 : kept;
+        int tailStart = s.length() - (kept - head);
+        Spanned source = (Spanned) text;
+        SpannableString result = new SpannableString(shortened);
+        for (Object span : source.getSpans(0, s.length(), Object.class)) {
+            int start = source.getSpanStart(span);
+            int end = source.getSpanEnd(span);
+            // Clip to retained characters and shift the suffix. A span
+            // crossing both pieces remains one span across the ellipsis.
+            int mappedStart = start < head ? start : Math.max(start, tailStart) - tailStart + head + 1;
+            int mappedEnd = end > tailStart ? end - tailStart + head + 1 : Math.min(end, head);
+            if (mappedStart < mappedEnd) {
+                result.setSpan(span, mappedStart, mappedEnd, source.getSpanFlags(span));
+            }
+        }
+        return result;
     }
 
     public static String substring(CharSequence source, int start, int end) {

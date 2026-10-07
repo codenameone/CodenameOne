@@ -22,6 +22,8 @@
  */
 package android.os;
 
+import android.util.SparseArray;
+
 import com.codename1.androidcompat.testing.MainThreadRule;
 
 import java.util.ArrayList;
@@ -31,6 +33,8 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
 /// `deepCopy()` shares no mutable container with the original; it used to
@@ -72,5 +76,38 @@ public class BundleDeepCopyTest {
         assertArrayEquals(new int[] {1, 2}, b.getIntArray("ints"));
         assertArrayEquals(new String[] {"orig"}, b.getStringArray("strings"));
         assertSame(b.getString("plain"), copy.getString("plain"));
+    }
+
+    @Test
+    public void sparseParcelableContainersAndNestedBundlesAreCopied() {
+        Bundle nested = new Bundle();
+        nested.putInt("value", 1);
+        Parcelable ordinary = new Parcelable() {
+            public int describeContents() { return 0; }
+            public void writeToParcel(Parcel dest, int flags) { }
+        };
+        SparseArray<Parcelable> values = new SparseArray<Parcelable>();
+        values.put(3, nested);
+        values.put(8, ordinary);
+        values.put(10, null);
+        Bundle original = new Bundle();
+        original.putSparseParcelableArray("values", values);
+
+        SparseArray<Parcelable> copy = original.deepCopy().getSparseParcelableArray("values");
+        assertNotSame(values, copy);
+        assertNotSame(nested, copy.get(3));
+        assertSame(ordinary, copy.get(8));
+        assertEquals(3, copy.size());
+        assertEquals(10, copy.keyAt(2));
+        assertNull(copy.get(10));
+        ((Bundle) copy.get(3)).putInt("value", 2);
+        copy.remove(8);
+        copy.put(20, ordinary);
+        copy.put(10, ordinary);
+        assertEquals(1, nested.getInt("value"));
+        assertSame(ordinary, values.get(8));
+        assertNull(values.get(20));
+        assertNull(values.get(10));
+        assertEquals(3, values.size());
     }
 }

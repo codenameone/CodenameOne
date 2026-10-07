@@ -309,6 +309,28 @@ image::img/android-interop-kotlin.png["An activity written in Kotlin, on Android
 
 === Limitations
 
+This is a compatibility layer for classic Android application code using the
+APIs described above. It does not promise complete Android framework behavior.
+Validate the screens and data flows your application uses on its target ports;
+the gallery and automated tests cover a subset of those behaviors.
+
+* `Parcel` is an in-process value container, not Android's serialization or
+  IPC format. Positions count values rather than bytes. `writeParcelable()`
+  and `readParcelable()` retain and return the same object; they do not invoke
+  `writeToParcel()` or `CREATOR`. Typed parcelable lists also retain their
+  elements. Code that depends on serialization making a snapshot, creator-side
+  validation, or restoring state after process death needs an explicit storage
+  or copy implementation.
+* SQLite uses one Codename One database connection. A competing thread's
+  operations can throw `SQLiteDatabaseLockedException` while a transaction is
+  open; Android's connection-pool waiting behavior is not implemented.
+  Serialize database work through one worker when sharing a database across
+  tasks. Full Android SQLite concurrency parity is outside this release's scope.
+* Switching only a locale's script, such as `zh-Hans` to `zh-Hant` with the
+  same region, updates resource selection but does not notify or recreate
+  existing activities. Already-inflated text and layouts can retain the old
+  script until the activity is recreated. Automatic handling of this live
+  configuration change is deferred.
 * The application's own code must avoid the JDK classes Codename One doesn't
   provide; the build's bytecode check reports them. The runtime provides the
   `java.io` classes Android code uses most (`File`, the file streams, readers

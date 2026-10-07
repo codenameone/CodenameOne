@@ -30,6 +30,11 @@ import java.util.List;
 /// with each other but not with Android's byte offsets. As on Android, reads
 /// and writes share one position: rewind with `setDataPosition(0)` before
 /// reading back what was written.
+///
+/// This is not a serialization or IPC implementation. Parcelable values
+/// (including typed-list elements) are retained by reference: writing and
+/// reading them does not call `writeToParcel()` or `CREATOR`, make a snapshot,
+/// or support restoration after process death.
 public final class Parcel {
 
     private final ArrayList<Object> values = new ArrayList<Object>();
