@@ -267,6 +267,10 @@ public final class RegisteredClient {
             }
             boolean secretMethod = methods.contains(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                     || methods.contains(ClientAuthenticationMethod.CLIENT_SECRET_POST);
+            if (secretMethod && methods.contains(ClientAuthenticationMethod.NONE)) {
+                throw new IllegalArgumentException("The client " + clientId
+                        + " cannot combine NONE with secret-based authentication");
+            }
             if (secretMethod && clientSecret == null) {
                 throw new IllegalArgumentException("The client " + clientId
                         + " authenticates with a secret and has none");

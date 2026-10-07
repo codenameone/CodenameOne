@@ -786,6 +786,18 @@ class AuthorizationServerTest {
 
 
     @Test
+    void publicAndSecretClientAuthenticationCannotBeCombined() {
+        for (ClientAuthenticationMethod secret : new ClientAuthenticationMethod[] {
+                ClientAuthenticationMethod.CLIENT_SECRET_BASIC, ClientAuthenticationMethod.CLIENT_SECRET_POST}) {
+            assertThrows(IllegalArgumentException.class, () -> RegisteredClient.withId("mixed")
+                    .clientId("service").clientSecret("{noop}secret")
+                    .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                    .clientAuthenticationMethod(secret)
+                    .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS).build());
+        }
+    }
+
+    @Test
     @DisplayName("an unknown client and a wrong secret are both invalid_client, with a 401")
     void clientAuthentication() throws Exception {
         try (SecuredServer server = start()) {
