@@ -483,7 +483,8 @@ public final class NetworkManager {
     /// only whether a request queued from that thread has to pass through the EDT first.
     /// It is not what protects anything -- the registrations themselves are never read
     /// off the EDT.
-    private boolean authorizerRegistered;
+    @SuppressWarnings("PMD.AvoidUsingVolatile") // Publishes the EDT's hint to background queuers.
+    private volatile boolean authorizerRegistered;
 
     /// Runs `work` on the event dispatch thread and returns when it has run: at once on
     /// the EDT itself, and before there is one. This is how the methods that touch
