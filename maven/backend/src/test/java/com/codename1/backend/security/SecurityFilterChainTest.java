@@ -344,6 +344,26 @@ class SecurityFilterChainTest {
     }
 
     @Test
+    void aSavedRequestCannotRedirectToABackslashAuthority() throws Exception {
+        for (String target : new String[] {"/\\attacker.example", "//attacker.example",
+                "/private\\report"}) {
+            HttpServer.Handler seed = request -> {
+                request.getSession(true).setAttribute(HttpSessionRequestCache.SAVED_REQUEST, target);
+                return HttpServer.Response.text(200, "seeded");
+            };
+            try (SecuredServer server = SecuredServer.start(dev(), "test", beans(), seed,
+                    http -> http.authorizeHttpRequests(auth -> auth.requestMatchers("/seed").permitAll()
+                                    .anyRequest().authenticated())
+                            .formLogin(Customizer.withDefaults()).build())) {
+                assertEquals(200, server.get("/seed").status);
+                String csrf = field(server.get("/login").body, "_csrf");
+                Reply signedIn = server.post("/login", "username=ada&password=ada-pw&_csrf=" + csrf);
+                assertEquals("/", signedIn.header("Location"), target);
+            }
+        }
+    }
+
+    @Test
     @DisplayName("form login, end to end: saved request, CSRF, session fixation, sign-out")
     void formLoginEndToEnd() throws Exception {
         try (SecuredServer server = SecuredServer.start(dev(), "test", beans(), APP,

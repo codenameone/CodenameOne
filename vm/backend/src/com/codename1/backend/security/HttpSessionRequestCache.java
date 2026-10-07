@@ -47,8 +47,7 @@ public final class HttpSessionRequestCache implements RequestCache {
             return;
         }
         String target = request.getTarget();
-        if (target == null || target.length() == 0 || target.charAt(0) != '/'
-                || target.startsWith("//")) {
+        if (!localTarget(target)) {
             return;
         }
         String path = SecurityExchange.path(request);
@@ -76,7 +75,20 @@ public final class HttpSessionRequestCache implements RequestCache {
         }
         String target = (String) saved;
         // What was stored is this server's own path; anything else is not ours.
-        return target.startsWith("/") && !target.startsWith("//") ? target : null;
+        return localTarget(target) ? target : null;
+    }
+
+    private static boolean localTarget(String target) {
+        if (target == null || !target.startsWith("/") || target.startsWith("//")) {
+            return false;
+        }
+        for (int i = 0; i < target.length(); i++) {
+            char c = target.charAt(i);
+            if (c == '\\' || c <= 32 || c == 127) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
