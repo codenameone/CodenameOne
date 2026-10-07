@@ -746,6 +746,53 @@ public class OidcRequestAuthorizerTest extends UITestBase {
     }
 
     @Test
+    void signOutWaitsForPendingPersistenceAndThenClearsIt() {
+        for (boolean failSave : new boolean[] {false, true}) {
+            final com.codename1.util.AsyncResource<Boolean> pending =
+                    new com.codename1.util.AsyncResource<Boolean>();
+            final OidcTokens[] disk = new OidcTokens[1];
+            final OidcTokens[] queued = new OidcTokens[1];
+            final int[] clears = new int[1];
+            client.setTokenStore(new TokenStore() {
+                public com.codename1.util.AsyncResource<OidcTokens> load(String key) {
+                    com.codename1.util.AsyncResource<OidcTokens> out =
+                            new com.codename1.util.AsyncResource<OidcTokens>();
+                    out.complete(disk[0]);
+                    return out;
+                }
+                public com.codename1.util.AsyncResource<Boolean> save(String key, OidcTokens value) {
+                    queued[0] = value;
+                    return pending;
+                }
+                public com.codename1.util.AsyncResource<Boolean> clear(String key) {
+                    clears[0]++;
+                    disk[0] = null;
+                    com.codename1.util.AsyncResource<Boolean> out =
+                            new com.codename1.util.AsyncResource<Boolean>();
+                    out.complete(Boolean.TRUE);
+                    return out;
+                }
+            });
+            assertEquals("AT-2", await(client.refresh("RT-1")).value.getAccessToken());
+            assertNotNull(queued[0]);
+            com.codename1.util.AsyncResource<Boolean> signedOut = authorizer.signOut();
+            assertFalse(authorizer.isSignedIn());
+            assertFalse(signedOut.isDone(), "sign-out completed ahead of the pending write");
+            assertEquals(0, clears[0]);
+            disk[0] = queued[0];
+            if (failSave) {
+                pending.error(new RuntimeException("save failed after writing"));
+            } else {
+                pending.complete(Boolean.TRUE);
+            }
+            assertNull(await(signedOut).error);
+            assertEquals(1, clears[0]);
+            assertNull(await(client.loadStoredTokens()).value);
+            assertFalse(authorizer.isSignedIn());
+        }
+    }
+
+    @Test
     void signOutDropsTheTokensEverywhere() {
         authorizer.setTokens(tokens("AT-2", "RT-1"));
         store.saved = authorizer.getTokens();

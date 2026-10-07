@@ -124,6 +124,7 @@ public final class OidcClient {
     private String[] additionalTokenParams = new String[0];
     private TokenStore tokenStore = new TokenStore.DefaultStorageTokenStore();
     private String storeKey;
+    private final List<StoreWrite> storeWrites = new ArrayList<StoreWrite>();
     private String responseMode;
     private boolean enforceNonce = true;
     private boolean verifyIdTokenSignature = true;
@@ -556,10 +557,11 @@ public final class OidcClient {
 
     /// Clears any stored tokens for this client. Does not call the issuer's
     /// revocation endpoint -- combine with [#revoke(String)] if you want a
-    /// proper sign-out.
+    /// proper sign-out. The returned resource completes after earlier saves and
+    /// this clear finish, so a delayed save cannot restore the cleared session.
     public AsyncResource<Boolean> clearStoredTokens() {
         tokensChanged(null);
-        return tokenStore.clear(storageKey());
+        return queueStoreWrite(null);
     }
 
     /// Starts the device authorization grant (RFC 8628), for a device with no browser or no
@@ -768,7 +770,7 @@ public final class OidcClient {
                 if (waiting.isCancelled() || out.isCancelled()) {
                     return;
                 }
-                tokenStore.save(storageKey(), tokens)
+                queueStoreWrite(tokens)
                         .except(new SuccessCallback<Throwable>() {
                             @Override
                             public void onSucess(Throwable t) {
@@ -783,6 +785,79 @@ public final class OidcClient {
             CN.callSerially(take);
         } else {
             take.run();
+        }
+    }
+
+    /// Serialize writes, including clears, so an asynchronous save cannot restore a
+    /// signed-out session after clear has completed. Cancellation of a resource does
+    /// not prove a custom store stopped writing, so clear waits for prior writes.
+    private AsyncResource<Boolean> queueStoreWrite(OidcTokens tokens) {
+        StoreWrite write = new StoreWrite(tokenStore, storageKey(), tokens);
+        boolean start;
+        synchronized (storeWrites) {
+            start = storeWrites.isEmpty();
+            storeWrites.add(write);
+        }
+        if (start) {
+            write.start();
+        }
+        return write.result;
+    }
+
+    private final class StoreWrite {
+        private final TokenStore store;
+        private final String key;
+        private final OidcTokens tokens;
+        private final AsyncResource<Boolean> result = new AsyncResource<Boolean>();
+
+        StoreWrite(TokenStore store, String key, OidcTokens tokens) {
+            this.store = store;
+            this.key = key;
+            this.tokens = tokens;
+        }
+
+        void start() {
+            try {
+                AsyncResource<Boolean> operation = tokens == null ? store.clear(key) : store.save(key, tokens);
+                operation.ready(new SuccessCallback<Boolean>() {
+                    @Override
+                    public void onSucess(Boolean value) {
+                        finish(value, null);
+                    }
+                }).except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable error) {
+                        finish(null, error);
+                    }
+                });
+            } catch (Throwable error) {
+                finish(null, error);
+            }
+        }
+
+        @SuppressWarnings("PMD.CompareObjectsWithEquals") // Only this queued operation may remove itself.
+        void finish(Boolean value, Throwable error) {
+            StoreWrite next;
+            synchronized (storeWrites) {
+                // A synchronous callback can throw back through start(). It must not
+                // remove the next operation or complete this one a second time.
+                if (storeWrites.isEmpty() || storeWrites.get(0) != this) {
+                    return;
+                }
+                storeWrites.remove(0);
+                next = storeWrites.isEmpty() ? null : storeWrites.get(0);
+            }
+            try {
+                if (error == null) {
+                    result.complete(value);
+                } else {
+                    result.error(error);
+                }
+            } finally {
+                if (next != null) {
+                    next.start();
+                }
+            }
         }
     }
 
