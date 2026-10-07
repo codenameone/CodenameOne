@@ -99,7 +99,49 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=pointeroverride") >= 0) {
+        if (query.indexOf("review=transparentcover") >= 0) {
+            Container layers = new Container(new com.codename1.ui.layouts.Layout() {
+                public boolean isOverlapSupported() { return true; }
+                public void layoutContainer(Container parent) {
+                    Component text = parent.getComponentAt(0), cover = parent.getComponentAt(1);
+                    text.setX(0); text.setY(0); text.setWidth(parent.getWidth()); text.setHeight(60);
+                    cover.setX(12); cover.setY(0); cover.setWidth(40); cover.setHeight(60);
+                }
+                public com.codename1.ui.geom.Dimension getPreferredSize(Container parent) {
+                    return new com.codename1.ui.geom.Dimension(400, 80);
+                }
+            });
+            Component target;
+            if (query.indexOf("kind=label") >= 0) {
+                target = new Label("Transparently covered label");
+            } else {
+                target = new TextArea("Transparently covered editor", 2, 24);
+                target.setName("transparentCoveredEditor");
+            }
+            Container cover = new Container();
+            cover.getAllStyles().setBgTransparency(0);
+            cover.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createEmpty());
+            cover.addPointerPressedListener(e -> status.setText("Transparent responder pressed"));
+            Runnable activate = () -> {
+                if (query.indexOf("mode=focus") >= 0) cover.setFocusable(true);
+                else if (query.indexOf("mode=scroll") >= 0) { cover.setScrollableY(true); cover.setAlwaysTensile(true); }
+                else if (query.indexOf("mode=drag") >= 0) cover.setDraggable(true);
+                else cover.setGrabsPointerEvents(true);
+                form.repaint();
+            };
+            layers.addAll(target, cover);
+            Button passive = new Button("Make responder passive"), active = new Button("Make responder active");
+            passive.addActionListener(e -> {
+                cover.setFocusable(false); cover.setGrabsPointerEvents(false); cover.setDraggable(false);
+                cover.setScrollableY(false); cover.setAlwaysTensile(false); form.repaint();
+            });
+            active.addActionListener(e -> activate.run());
+            Button bounds = new Button("Report cover bounds");
+            bounds.addActionListener(e -> status.setText("Cover bounds " + cover.getAbsoluteX() + ","
+                    + cover.getAbsoluteY() + "," + cover.getWidth() + "," + cover.getHeight()));
+            form.addAll(new Button("Initial focus"), layers, passive, active, bounds, status);
+            activate.run();
+        } else if (query.indexOf("review=pointeroverride") >= 0) {
             Label label = new Label("Overridden pointer label");
             TextArea area = new TextArea("Overridden pointer editor", 2, 24); area.setName("overrideEditor");
             form.addAll(new Button("Initial focus"), label, area, status);

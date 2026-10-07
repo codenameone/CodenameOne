@@ -75,6 +75,39 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    for (const kind of ['editor', 'label']) {
+      for (const mode of ['grab', 'focus', 'scroll', 'drag']) {
+        await openReview('transparentcover&kind=' + kind + '&mode=' + mode);
+        const editor = page.locator('.cn1-selection-editor[name="transparentCoveredEditor"]');
+        const label = page.locator('#cn1-text-layer span').filter({hasText: 'Transparently covered label'}).first();
+        async function checkOwnership(covered) {
+          if (kind === 'editor') await editor.waitFor({state: covered ? 'hidden' : 'visible'});
+          else {
+            await label.waitFor({state: 'visible'});
+            await page.waitForFunction(covered => {
+              const el = [...document.querySelectorAll('#cn1-text-layer span')]
+                .find(el => el.textContent === 'Transparently covered label');
+              return el && getComputedStyle(el).pointerEvents === (covered ? 'none' : 'auto');
+            }, covered);
+          }
+        }
+        await checkOwnership(true);
+        await clickButton('Make responder passive');
+        await checkOwnership(false);
+        await clickButton('Make responder active');
+        await checkOwnership(true);
+        await clickButton('Report cover bounds');
+        await page.waitForFunction(() => /Cover bounds [\d,]+/.test(document.body.innerText));
+        const [x, y, width, height] = await page.evaluate(() =>
+          document.body.innerText.match(/Cover bounds ([\d,]+)/)[1].split(',').map(Number));
+        assert.equal(await page.evaluate(p => document.elementFromPoint(p.x, p.y)?.tagName,
+          {x: x + width / 2, y: y + height / 2}), 'CANVAS', 'the transparent responder owns the overlapping edge');
+        await page.mouse.click(x + width / 2, y + height / 2);
+        await page.waitForFunction(() => document.body.innerText.includes('Transparent responder pressed'));
+      }
+      console.log('PASS', name, 'transparent grab/focus/scroll/drag siblings retain pointer ownership above ' + kind + ' text');
+    }
+
     await openReview('pointeroverride');
     await page.locator('.cn1-selection-editor[name="overrideEditor"]').waitFor({state: 'hidden'});
     const overriddenLabel = page.locator('#cn1-text-layer span').filter({hasText: 'Overridden pointer label'}).first();

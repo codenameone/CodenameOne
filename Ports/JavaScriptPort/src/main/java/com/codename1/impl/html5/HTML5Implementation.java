@@ -1179,9 +1179,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return null;
     }
 
-    private boolean elevatedDescendantOverlaps(Component c, int left, int top, int right, int bottom) {
+    private static boolean elevatedDescendantOverlaps(Component c, int left, int top, int right, int bottom) {
         if (!c.isVisible() || c.isHidden()) return false;
-        if (c.getStyle().getElevation() > 0 && overlapsNativeEditor(c, left, top, right, bottom)) return true;
+        if (c.getStyle().getElevation() > 0 && overlapsNativeText(c, left, top, right, bottom)) return true;
         if (c instanceof Container) {
             for (Component child : ((Container)c).getChildrenAsList(false)) {
                 if (elevatedDescendantOverlaps(child, left, top, right, bottom)) return true;
@@ -1190,9 +1190,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return false;
     }
 
-    private boolean hasNativeEditorOcclusion(Component target, int left, int top, int right, int bottom) {
-        // A rectangular native control cannot safely punch holes around covering siblings.
-        // Fall back to canvas editing if any later-painted sibling overlaps its viewport.
+    static boolean hasNativeTextOcclusion(Component target, int left, int top, int right, int bottom) {
+        // Native text cannot punch holes around later canvas content or pointer
+        // responders. Editors use their viewport; labels use the clipped glyph run.
+        if (right <= left || bottom <= top) return false;
         for (Component branch = target; branch.getParent() != null; branch = branch.getParent()) {
             Container parent = branch.getParent();
             // Form.getComponentIndex() redirects to its content pane; inspect the
@@ -1203,7 +1204,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 Component sibling = siblings.get(i);
                 if (i == index) continue;
                 if ((i > index || sibling.getStyle().getElevation() > branch.getStyle().getElevation())
-                        && overlapsNativeEditor(sibling, left, top, right, bottom)) return true;
+                        && overlapsNativeText(sibling, left, top, right, bottom)) return true;
                 // Elevated descendants can paint above later branches even when
                 // their transparent parent has no elevation of its own.
                 if (elevatedDescendantOverlaps(sibling, left, top, right, bottom)) return true;
@@ -1212,20 +1213,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return false;
     }
 
-    private boolean overlapsNativeEditor(Component c, int left, int top, int right, int bottom) {
+    private static boolean overlapsNativeText(Component c, int left, int top, int right, int bottom) {
         if (!c.isVisible() || c.isHidden()) return false;
         left = Math.max(left, c.getAbsoluteX() + c.getScrollX());
         top = Math.max(top, c.getAbsoluteY() + c.getScrollY());
         right = Math.min(right, c.getAbsoluteX() + c.getScrollX() + c.getWidth());
         bottom = Math.min(bottom, c.getAbsoluteY() + c.getScrollY() + c.getHeight());
         if (right <= left || bottom <= top) return false;
-        if (!(c instanceof Container)) return true;
+        // Hit testing includes transparent containers that scroll, focus, drag,
+        // or grab input. Their lack of canvas paint does not make them pass-through.
+        if (!(c instanceof Container) || c.respondsToPointerEvents()) return true;
         Style style = c.getStyle();
         if (Accessor.hasCustomBackgroundPainter(c) || style.getBgTransparency() != 0 || style.getBgImage() != null
                 || style.getBorder() != null && !style.getBorder().isEmptyBorder()) return true;
         Container container = (Container) c;
         for (int i = 0; i < container.getComponentCount(); i++) {
-            if (overlapsNativeEditor(container.getComponentAt(i), left, top, right, bottom)) return true;
+            if (overlapsNativeText(container.getComponentAt(i), left, top, right, bottom)) return true;
         }
         return false;
     }
@@ -1588,7 +1591,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             bottom = Math.min(bottom, paintClipY + paintClipH);
             coverLeft = left; coverTop = top; coverRight = right; coverBottom = bottom;
             visible &= right > left && bottom > top;
-            if (visible && hasNativeEditorOcclusion(ta, left, top, right, bottom)) visible = false;
+            if (visible && hasNativeTextOcclusion(ta, left, top, right, bottom)) visible = false;
             if (visible) {
                 Component hit = form.getComponentAt((left + right) / 2, (top + bottom) / 2);
                 visible = hit == ta;

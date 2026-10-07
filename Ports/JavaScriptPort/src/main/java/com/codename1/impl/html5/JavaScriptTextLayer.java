@@ -494,9 +494,20 @@ public final class JavaScriptTextLayer {
 
         // The run is positioned relative to its clip element, so the two move together and a
         // scroll only has to rewrite coordinates rather than restructure anything.
+        // The glyphs, not the clip: a component that draws text and then an image somewhere
+        // else inside the same clip would otherwise look like it had covered its own text, and
+        // the text would be dropped for nothing. The font measures worker-side from a cache, so
+        // asking costs nothing on the bridge.
+        int textWidth = font.stringWidth(str);
+        int textHeight = font.fontHeight();
+        int coverLeft = Math.max(x, useClipX);
+        int coverTop = Math.max(y, useClipY);
+        int coverRight = Math.min(x + textWidth, useClipX + useClipW);
+        int coverBottom = Math.min(y + textHeight, useClipY + useClipH);
         boolean selectable = HTML5Implementation.nativeSelectionRequested()
                 && frame.component instanceof com.codename1.ui.Label
                 && com.codename1.ui.Accessor.allowsNativeTextSelection(frame.component)
+                && !HTML5Implementation.hasNativeTextOcclusion(frame.component, coverLeft, coverTop, coverRight, coverBottom)
                 && ((com.codename1.ui.Label) frame.component).isTextSelectionEnabled()
                 && frame.component.getComponentForm().getTextSelection().isEnabled();
         StringBuilder textCss = new StringBuilder("position:absolute;white-space:pre;");
@@ -536,16 +547,6 @@ public final class JavaScriptTextLayer {
         }
         run.lastY = y;
         run.lastX = x;
-        // The glyphs, not the clip: a component that draws text and then an image somewhere
-        // else inside the same clip would otherwise look like it had covered its own text, and
-        // the text would be dropped for nothing. The font measures worker-side from a cache, so
-        // asking costs nothing on the bridge.
-        int textWidth = font.stringWidth(str);
-        int textHeight = font.fontHeight();
-        int coverLeft = Math.max(x, useClipX);
-        int coverTop = Math.max(y, useClipY);
-        int coverRight = Math.min(x + textWidth, useClipX + useClipW);
-        int coverBottom = Math.min(y + textHeight, useClipY + useClipH);
         run.coverX = coverLeft;
         run.coverY = coverTop;
         run.coverW = Math.max(0, coverRight - coverLeft);
