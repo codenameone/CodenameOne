@@ -723,6 +723,16 @@ class JwtCodecTest {
         assertEquals("The token's algorithm, none, is not one this decoder accepts", refusal(decoder,
                 part("{\"alg\":\"none\"}") + "." + part("{\"iss\":\"" + issuer + "\"}") + ".AAAA"));
 
+        // Told which algorithms to accept, the decoder accepts those: the metadata's list
+        // is what the issuer can sign with, and ES256 -- this token's -- is on it.
+        JwtDecoder narrowed = JwtDecoders.fromIssuerLocation(issuer, endpoint,
+                new JwsAlgorithm[] {SignatureAlgorithm.RS256});
+        assertEquals("The token's algorithm, ES256, is not one this decoder accepts",
+                refusal(narrowed, token));
+        // And none named is the metadata's list, as before.
+        assertEquals("ada", JwtDecoders.fromIssuerLocation(issuer, endpoint, new JwsAlgorithm[0])
+                .decode(token).getSubject());
+
         // Metadata that names another issuer: a tenant served another's.
         Endpoint confused = new Endpoint();
         confused.documents.put("https://id.example.com/tenant-b/.well-known/openid-configuration",

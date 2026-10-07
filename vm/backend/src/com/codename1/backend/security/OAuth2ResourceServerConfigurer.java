@@ -38,6 +38,7 @@ import com.codename1.backend.security.oauth2.jwt.JwtDecoders;
 import com.codename1.backend.security.oauth2.jwt.JwtIssuerValidator;
 import com.codename1.backend.security.oauth2.jwt.JwtTimestampValidator;
 import com.codename1.backend.security.oauth2.jwt.JwtValidators;
+import com.codename1.backend.security.oauth2.jwt.RemoteJwkSet;
 import com.codename1.backend.security.oauth2.jwt.SupplierJwtDecoder;
 import com.codename1.backend.security.oauth2.server.resource.BearerTokenAccessDeniedHandler;
 import com.codename1.backend.security.oauth2.server.resource.BearerTokenAuthenticationEntryPoint;
@@ -382,7 +383,11 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
             return new SupplierJwtDecoder(new Supplier<JwtDecoder>() {
                 @Override
                 public JwtDecoder get() {
-                    JwtDecoder made = JwtDecoders.fromIssuerLocation(from);
+                    // With the configured algorithms, as the two branches beside this
+                    // one have them. Discovery used to decide alone: a server set to
+                    // accept ES256 only went on accepting every algorithm its issuer's
+                    // metadata listed, as long as the issuer was all it was given.
+                    JwtDecoder made = JwtDecoders.fromIssuerLocation(from, RemoteJwkSet.WEB, algorithms);
                     if (made instanceof DefaultJwtDecoder) {
                         ((DefaultJwtDecoder) made).setJwtValidator(validators(from, audiences));
                     }

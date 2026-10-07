@@ -293,6 +293,56 @@ class AuthorizationServerTest {
     }
 
     @Test
+    @DisplayName("a token made for a resource server is not one the user info endpoint answers")
+    void userInfoIsForTokensMadeForThisServer() throws Exception {
+        try (SecuredServer server = start()) {
+            // For the orders service, with openid: what that service is handed, and could
+            // bring here to read who the user is.
+            String verifier = OAuth2Parameters.random(32);
+            Reply back = authorize(server, authorizeUrl("app", APP_REDIRECT, "openid profile",
+                    verifier, "s", "n") + "&" + form("resource", ORDERS));
+            String code = query(back.header("Location")).get("code");
+            assertNotNull(code, back.toString());
+            Reply issued = token(server, "grant_type", "authorization_code", "client_id", "app",
+                    "code", code, "redirect_uri", APP_REDIRECT, "code_verifier", verifier);
+            assertEquals(Arrays.asList(ORDERS), access(server, issued).getAudience());
+            Reply replayed = server.get("/userinfo", "Authorization", "Bearer "
+                    + json(issued).get("access_token"));
+            assertEquals(401, replayed.status, replayed.toString());
+            assertTrue(replayed.header("WWW-Authenticate").contains("error=\"invalid_token\""),
+                    replayed.header("WWW-Authenticate"));
+            assertNull(json(replayed).get("sub"));
+            // The ID token of the same grant still says who the user is: that one is the
+            // client's, and never leaves it.
+            assertEquals("ada", OAuth2Testing.verify((String) json(issued).get("id_token"),
+                    server.get("/oauth2/jwks").body).getSubject());
+
+            // A client that wants both names both.
+            verifier = OAuth2Parameters.random(32);
+            back = authorize(server, authorizeUrl("app", APP_REDIRECT, "openid profile", verifier,
+                    "s", "n") + "&" + form("resource", ORDERS, "resource", issuer + "/userinfo"));
+            code = query(back.header("Location")).get("code");
+            assertNotNull(code, back.toString());
+            issued = token(server, "grant_type", "authorization_code", "client_id", "app", "code",
+                    code, "redirect_uri", APP_REDIRECT, "code_verifier", verifier);
+            assertEquals(Arrays.asList(ORDERS, issuer + "/userinfo"),
+                    access(server, issued).getAudience());
+            Reply both = server.get("/userinfo", "Authorization", "Bearer "
+                    + json(issued).get("access_token"));
+            assertEquals(200, both.status, both.toString());
+            assertEquals("ada", json(both).get("sub"));
+
+            // And one that names none gets the default audience, which is this server.
+            verifier = OAuth2Parameters.random(32);
+            Reply plain = token(server, "grant_type", "authorization_code", "client_id", "app",
+                    "code", code(server, "app", APP_REDIRECT, "openid profile", verifier),
+                    "redirect_uri", APP_REDIRECT, "code_verifier", verifier);
+            assertEquals(200, server.get("/userinfo", "Authorization", "Bearer "
+                    + json(plain).get("access_token")).status);
+        }
+    }
+
+    @Test
     @DisplayName("a resource the client or the grant does not have is refused as invalid_target")
     void resourcesRefused() throws Exception {
         try (SecuredServer server = start()) {

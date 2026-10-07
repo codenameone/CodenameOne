@@ -239,7 +239,7 @@ its `;` parameters dropped and its empty and dot segments removed. If a chain
 matches any of those readings, the request is refused. With a chain on
 `/api/**`, both `//api/orders` and `/public/..%2Fapi/orders` get a 400.
 
-Matching is case sensitive, as routing is. `/API/orders` is a different route
+Matching is case-sensitive, as routing is. `/API/orders` is a different route
 from `/api/orders`, so it reaches nothing the chain guards.
 
 ==== The answers to a refused request
@@ -1129,6 +1129,12 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/s
 A client registered with `resource(...)` can ask for those resources and no
 others. Anything else is answered `invalid_target`. A client registered with
 none can name any resource, so give a client a list when it shouldn't choose.
+
+`/userinfo` answers a token that's for this server: one with the default
+audience, or one whose request named the address of `/userinfo` as a resource.
+A token made only for other resource servers gets a `401` there, so a service
+that's handed such a token can't use it to read the user's profile. A client
+that wants one token for a resource server and for `/userinfo` names both.
 
 An ID token is for the client, so its `aud` is the client's id.
 

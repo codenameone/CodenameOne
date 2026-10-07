@@ -66,13 +66,32 @@ public final class JwtDecoders {
 
     /// [#fromIssuerLocation(String)] reading through `fetcher`.
     public static JwtDecoder fromIssuerLocation(String issuer, RemoteJwkSet.Fetcher fetcher) {
+        return fromIssuerLocation(issuer, fetcher, null);
+    }
+
+    /// [#fromIssuerLocation(String, RemoteJwkSet.Fetcher)] accepting the algorithms named
+    /// here and no others, whatever the issuer's metadata lists. A deployment that allows
+    /// only ES256 says so with this; the metadata's list is what the issuer can sign with,
+    /// not what this server agreed to accept.
+    ///
+    /// #### Parameters
+    ///
+    /// - `issuer`: the issuer
+    ///
+    /// - `fetcher`: what reads the metadata and the keys
+    ///
+    /// - `accepted`: the algorithms to accept; null or empty for the ones the metadata
+    ///   lists
+    public static JwtDecoder fromIssuerLocation(String issuer, RemoteJwkSet.Fetcher fetcher,
+            JwsAlgorithm[] accepted) {
         Map metadata = metadata(issuer, fetcher);
         Object jwks = metadata.get("jwks_uri");
         if (!(jwks instanceof String) || ((String) jwks).length() == 0) {
             throw new IllegalArgumentException("The metadata of " + issuer + " has no jwks_uri");
         }
         DefaultJwtDecoder decoder = DefaultJwtDecoder.withJwkSource(
-                new RemoteJwkSet((String) jwks, fetcher)).jwsAlgorithms(algorithms(metadata)).build();
+                new RemoteJwkSet((String) jwks, fetcher)).jwsAlgorithms(
+                        accepted == null || accepted.length == 0 ? algorithms(metadata) : accepted).build();
         decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
         return decoder;
     }

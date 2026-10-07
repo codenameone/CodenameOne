@@ -502,6 +502,20 @@ class OAuth2ResourceServerTest {
                 assertEquals(401, server.get("/api/me", "Authorization", bearer(token(p256()
                         .withKeyId("stolen"), claims(null).issuer(issuer[0]).build()))).status);
             }
+            // The algorithms the properties name are the ones accepted, with an issuer
+            // as with a key set: not whatever the issuer's metadata lists. The same
+            // token, from the same issuer, signed the way its metadata says it signs.
+            settings.setProperty(OAuth2ResourceServerConfigurer.JWS_ALGORITHMS, "RS256");
+            try (SecuredServer server = SecuredServer.start(settings, "test", new Object[0], APP,
+                    api(o -> o.jwt(Customizer.<OAuth2ResourceServerConfigurer.JwtConfigurer>
+                            withDefaults())))) {
+                Reply refused = server.get("/api/me", "Authorization", bearer(token(signing,
+                        claims("orders:read").issuer(issuer[0]).build())));
+                assertEquals(401, refused.status, refused.toString());
+                assertTrue(refused.header("WWW-Authenticate").contains(
+                        "The token's algorithm, ES256, is not one this decoder accepts"),
+                        refused.header("WWW-Authenticate"));
+            }
         } finally {
             provider.stop(0);
         }

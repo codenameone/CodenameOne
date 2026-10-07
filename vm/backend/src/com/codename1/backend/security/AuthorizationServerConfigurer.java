@@ -123,7 +123,10 @@ import java.io.IOException;
 /// [AuthorizationServerSettings.Builder#defaultAudience] or
 /// `cn1.security.authorizationserver.audience` says otherwise. A client
 /// registered with resources may ask for those only; `invalid_target` answers
-/// anything else. The client the token was issued to is its `client_id`
+/// anything else. `/userinfo` answers a token that is for this server -- the
+/// default audience, or the address of `/userinfo` named as a resource -- and
+/// not one made only for other resource servers. The client the token was
+/// issued to is its `client_id`
 /// claim. An ID token is for the client, and its `aud` is the client id: it
 /// carries
 /// `nonce`, `auth_time`, `azp` and `at_hash`, and both are signed RS256 -- or

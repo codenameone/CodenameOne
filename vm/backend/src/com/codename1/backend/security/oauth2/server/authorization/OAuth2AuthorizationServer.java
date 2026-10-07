@@ -1033,12 +1033,34 @@ public final class OAuth2AuthorizationServer {
             // Another issuer's token, or one whose grant was revoked.
             throw bearer(401, OAuth2ErrorCodes.INVALID_TOKEN, "The access token is not valid");
         }
+        if (!forThisServer(token, issuer(request))) {
+            throw bearer(401, OAuth2ErrorCodes.INVALID_TOKEN, "The access token is not valid");
+        }
         Set<String> scopes = OAuth2Parameters.scopes(token.getClaimAsString("scope"));
         if (!scopes.contains("openid")) {
             throw bearer(403, OAuth2ErrorCodes.INSUFFICIENT_SCOPE,
                     "The access token was not granted openid");
         }
         return json(200, userClaims(token.getSubject(), scopes));
+    }
+
+    /// Whether an access token names this server among those it is for: the issuer, the
+    /// default audience -- what a token gets when its request named no `resource` -- or
+    /// the address of the user info endpoint, which a client that wants one token for a
+    /// resource server and for this endpoint names as a `resource` beside the other.
+    ///
+    /// A token whose request named resource servers is for those and nobody else; that is
+    /// the point of naming them (RFC 8707). This endpoint used to answer it all the same,
+    /// so any resource server handed a token that carried `openid` could bring it here
+    /// and read the user's profile and email with it. A token customizer that replaces
+    /// `aud` outright decides this too: it keeps one of the three in the claim, or its
+    /// tokens are not for this endpoint.
+    private boolean forThisServer(Jwt token, String issuer) {
+        // Never null: a token with no `aud` has an empty list, and is for nobody.
+        List<String> audience = token.getAudience();
+        return audience.contains(issuer)
+                || defaultAudience != null && audience.contains(defaultAudience)
+                || audience.contains(issuer + settings.getOidcUserInfoEndpoint());
     }
 
     private static Refusal bearer(int status, String code, String description) {
