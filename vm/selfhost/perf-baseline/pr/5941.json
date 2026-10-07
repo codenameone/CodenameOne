@@ -160,6 +160,28 @@
      }
     }
    }
+  },
+  "windows-x64@intel64-family-6-model-173-genuineintel": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.693,
+      "time": 1.212,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.94,
+     "reason": "WinHelloMain now translates the Android compatibility gallery, its relocated runtime and Kotlin stdlib. This Model 173 baseline was one pre-expansion run (0.693); the five paired rounds in Windows x64 run 37661853978/job 112931600523 on Intel64 Family 6 Model 173 measured RAM ratios 0.818, 0.940, 0.970, 0.955, 0.920 (median 0.940). Rebaseline only hello RAM for the larger translation input; time and the 20% RAM tolerance are unchanged.",
+     "runs": 1,
+     "time": 1.212,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
   }
  }
 }
