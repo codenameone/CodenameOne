@@ -467,6 +467,9 @@ public final class Navigation {
     /// Dispatch a URL delivered by the platform. Invoked by
     /// `com.codename1.ui.Display#setProperty(String, String)` for URL-shaped
     /// `AppArg` values; applications should call `#navigate(String)` instead.
+    /// This method waits for navigation to complete when called off the EDT.
+    /// Display queues platform URL delivery onto the EDT so native main threads
+    /// never have to wait here.
     public static boolean dispatchExternalUrl(String url) {
         if (url == null || url.length() == 0) {
             return false;
