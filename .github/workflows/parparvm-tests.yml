@@ -164,6 +164,15 @@ jobs:
         run: vm/benchmarks/check-ablation-arms.sh
         env:
           CN1_ABLATION_CFLAGS: -O1
+      - name: Preserve ablation failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ablation-failure-logs
+          path: |
+            vm/benchmarks/target/ablation/*.log
+            vm/benchmarks/target/ablation/*.run
+          if-no-files-found: warn
 
   vm-tests:
     runs-on: ubuntu-24.04
