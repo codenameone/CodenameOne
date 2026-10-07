@@ -332,7 +332,8 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
             }
             JwtDecoder use = decoder;
             if (use == null) {
-                use = http.getSharedObject(JwtDecoder.class);
+                use = http.uniqueSharedObject(JwtDecoder.class,
+                        "The JWT resource server", "oauth2ResourceServer().jwt().decoder(...)");
             }
             if (use == null) {
                 use = fromConfig(http.getConfig());

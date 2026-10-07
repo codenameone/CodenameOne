@@ -407,7 +407,8 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
                 encoder = new DefaultJwtEncoder(keys);
             }
             if (secrets == null) {
-                secrets = http.getSharedObject(PasswordEncoder.class);
+                secrets = http.uniqueSharedObject(PasswordEncoder.class,
+                        "The authorization server", "authorizationServer().clientSecretEncoder(...)");
             }
             if (secrets == null) {
                 requireNoSecrets(clients);

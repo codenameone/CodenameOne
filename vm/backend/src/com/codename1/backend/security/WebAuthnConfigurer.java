@@ -301,7 +301,8 @@ public final class WebAuthnConfigurer extends SecurityConfigurer {
             users = http.chosenUserDetailsService();
         }
         if (users == null) {
-            users = http.getSharedObject(UserDetailsService.class);
+            users = http.uniqueSharedObject(UserDetailsService.class,
+                    "Passkey authentication", "webAuthn().userDetailsService(...)");
         }
         if (users == null) {
             throw new IllegalStateException("webAuthn() signs in users of the application, and "

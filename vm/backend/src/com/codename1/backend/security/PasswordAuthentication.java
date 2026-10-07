@@ -57,12 +57,13 @@ final class PasswordAuthentication {
     }
 
     /// The users a part of `http` that needs them by name looks up: the chain's
-    /// own, the application's one [UserDetailsService] bean, or the user the
-    /// configuration describes. Null when there are none.
+    /// own, the application's unique or primary [UserDetailsService] bean, or
+    /// the user the configuration describes. Ambiguous beans are refused.
     static UserDetailsService users(HttpSecurity http) {
         UserDetailsService users = http.chosenUserDetailsService();
         if (users == null) {
-            users = http.getSharedObject(UserDetailsService.class);
+            users = http.uniqueSharedObject(UserDetailsService.class,
+                    "Password authentication", "userDetailsService(...)");
         }
         if (users == null) {
             users = configuredUser(http.getConfig());
@@ -103,9 +104,10 @@ final class PasswordAuthentication {
         }
         UserDetailsService users = http.chosenUserDetailsService();
         if (users == null && all.isEmpty() && parent == null) {
-            // The application's user store, when it has exactly one and no
-            // provider of its own: as Spring Boot wires it.
-            users = http.getSharedObject(UserDetailsService.class);
+            // The application's unique or primary user store when it has no
+            // provider of its own. Ambiguity must not enable a configured fallback.
+            users = http.uniqueSharedObject(UserDetailsService.class,
+                    "Password authentication", "userDetailsService(...)");
             if (users == null) {
                 users = configuredUser(http.getConfig());
             }
@@ -113,7 +115,8 @@ final class PasswordAuthentication {
         if (users != null) {
             DaoAuthenticationProvider dao = new DaoAuthenticationProvider(users);
             dao.setMaxConcurrentPasswordChecks(maxConcurrentPasswordChecks(http.getConfig()));
-            PasswordEncoder encoder = http.getSharedObject(PasswordEncoder.class);
+            PasswordEncoder encoder = http.uniqueSharedObject(PasswordEncoder.class,
+                    "Password authentication", "setSharedObject(PasswordEncoder.class, ...)");
             dao.setPasswordEncoder(encoder != null ? encoder
                     : PasswordEncoderFactories.createDelegatingPasswordEncoder());
             UserDetailsPasswordService passwords = http.getSharedObject(
