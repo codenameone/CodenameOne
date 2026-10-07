@@ -1497,8 +1497,9 @@ public final class HttpServer {
     /// met none of what guards the HTTP routes beside it. Package-private: only
     /// Backend's chain is one.
     interface UpgradeGuard {
-        /// Null to let the handshake reach its endpoint, otherwise the answer it
-        /// is refused with: a whole response -- its status, and the headers that
+        /// Null or a 101 response to let the handshake reach its endpoint; a 101
+        /// carries security and session headers. Otherwise the answer it is
+        /// refused with: a whole response -- its status, and the headers that
         /// tell the client what to do about it, a `WWW-Authenticate` challenge
         /// above all. The server writes it as the HTTP response it is and
         /// closes the connection; the response is the caller's to write into.
@@ -4546,10 +4547,11 @@ public final class HttpServer {
         // Before the route is chosen, so a handshake the guard refuses learns
         // nothing about which paths have an endpoint behind them -- an HTTP
         // request to a path that does not exist is refused the same way.
+        Response upgrade = null;
         if (handler instanceof UpgradeGuard) {
-            Response refused = ((UpgradeGuard) handler).checkUpgrade(request);
-            if (refused != null) {
-                writeRefusedUpgrade(conn, fd, session, refused);
+            upgrade = ((UpgradeGuard) handler).checkUpgrade(request);
+            if (upgrade != null && upgrade.status != 101) {
+                writeRefusedUpgrade(conn, fd, session, upgrade);
                 return false;
             }
         }
@@ -4559,11 +4561,13 @@ public final class HttpServer {
             endpoint = routeWebSocket(request, path);
         } catch (Exception err) {
             System.err.println("websocket router failed: " + err);
-            writeStatusOnly(conn, 500, "internal error");
+            writeRefusedUpgrade(conn, fd, session, Response.text(500, "internal error")
+                    .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
         if (endpoint == null) {
-            writeStatusOnly(conn, 404, "not found");
+            writeRefusedUpgrade(conn, fd, session, Response.text(404, "not found")
+                    .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
 
@@ -4577,7 +4581,8 @@ public final class HttpServer {
                     request.getHeader("sec-websocket-protocol"), endpoint.getSubprotocols());
         } catch (RuntimeException err) {
             System.err.println("websocket endpoint getSubprotocols failed: " + err);
-            writeStatusOnly(conn, 500, "internal error");
+            writeRefusedUpgrade(conn, fd, session, Response.text(500, "internal error")
+                    .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
 
@@ -4606,7 +4611,7 @@ public final class HttpServer {
         conn.releaseIdleMemory();
 
         try {
-            writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol);
+            writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol, upgrade);
         } catch (IOException err) {
             trace("fd=" + fd + " handshake write failed: " + err);
             // Handled here, not by the caller: this path reports the connection
@@ -5020,7 +5025,8 @@ public final class HttpServer {
     /// One write, for the same reason the response path combines its own: on a
     /// fresh connection two writes are two segments, and the client waits a round
     /// trip before it can send anything.
-    private void writeHandshakeResponse(Conn conn, String accept, String subprotocol)
+    private void writeHandshakeResponse(Conn conn, String accept, String subprotocol,
+                                        Response upgrade)
             throws IOException {
         conn.reset();
         conn.put("HTTP/1.1 101 Switching Protocols\r\n");
@@ -5037,6 +5043,31 @@ public final class HttpServer {
             conn.put("Sec-WebSocket-Protocol: ");
             conn.put(subprotocol);
             conn.put("\r\n");
+        }
+        if (upgrade != null && upgrade.extraHeaders != null) {
+            java.util.Iterator entries = upgrade.extraHeaders.entrySet().iterator();
+            while (entries.hasNext()) {
+                Map.Entry entry = (Map.Entry) entries.next();
+                String name = String.valueOf(entry.getKey());
+                Object raw = entry.getValue();
+                List values = raw instanceof List ? (List) raw : null;
+                int count = values == null ? 1 : values.size();
+                for (int i = 0 ; i < count ; i++) {
+                    Object value = values == null ? raw : values.get(i);
+                    String text = String.valueOf(value);
+                    if (entry.getKey() != null && value != null && isHeaderName(name)
+                            && isHeaderSafe(text) && !isServerOwnedHeader(name)
+                            && !name.equalsIgnoreCase("Upgrade")
+                            && !name.equalsIgnoreCase("Sec-WebSocket-Accept")
+                            && !name.equalsIgnoreCase("Sec-WebSocket-Protocol")
+                            && !name.equalsIgnoreCase("Sec-WebSocket-Extensions")) {
+                        conn.put(name);
+                        conn.put(": ");
+                        conn.put(text);
+                        conn.put("\r\n");
+                    }
+                }
+            }
         }
         conn.put("\r\n");
         writeTo(conn.fd, conn.session, conn.out, 0, conn.outLength);

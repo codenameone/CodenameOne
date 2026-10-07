@@ -24,6 +24,8 @@ package com.codename1.backend.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codename1.backend.Base64;
@@ -33,6 +35,9 @@ import com.codename1.backend.WebSocket;
 import com.codename1.backend.WebSocketSession;
 import com.codename1.backend.security.core.userdetails.InMemoryUserDetailsManager;
 import com.codename1.backend.security.core.userdetails.User;
+import com.codename1.backend.security.rememberme.InMemoryTokenRepositoryImpl;
+import com.codename1.backend.security.rememberme.PersistentRememberMeToken;
+import com.codename1.backend.security.rememberme.PersistentTokenBasedRememberMeServices;
 import com.codename1.backend.security.crypto.Jwk;
 import com.codename1.backend.security.crypto.JwkSet;
 import com.codename1.backend.security.oauth2.jwt.DefaultJwtDecoder;
@@ -94,6 +99,61 @@ class WebSocketRefusalTest {
     private void assertNothingOpened() {
         synchronized (opened) {
             assertTrue(opened.isEmpty(), "a refused handshake reached its endpoint: " + opened);
+        }
+    }
+
+    @Test
+    void acceptedUpgradeReturnsRotatedRememberAndSessionCookies() throws Exception {
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
+                User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
+        InMemoryTokenRepositoryImpl tokens = new InMemoryTokenRepositoryImpl();
+        PersistentTokenBasedRememberMeServices remember =
+                new PersistentTokenBasedRememberMeServices("key", users, tokens);
+        final long[] now = {System.currentTimeMillis()};
+        remember.setClock(() -> now[0]);
+        try (SecuredServer server = SecuredServer.start(SecuredServer.settings(), "dev",
+                new Object[] {users}, APP, endpoint, http -> http
+                        .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .csrf(csrf -> csrf.disable()).formLogin(Customizer.withDefaults())
+                        .rememberMe(config -> config.rememberMeServices(remember)).build())) {
+            for (String path : new String[] {"/ws", "/ws-routed", "/ws-nowhere"}) {
+                server.cookies.clear();
+                server.post("/login", "username=ada&password=ada-pw&remember-me=on");
+                String original = server.cookies.get("remember-me");
+                String series = original.substring(0, original.indexOf(':'));
+                PersistentRememberMeToken token = tokens.getTokenForSeries(series);
+                tokens.updateToken(series, token.getTokenHash(), token.getTokenHash(),
+                        now[0] - 11000L);
+                server.cookies.clear();
+                try (RawWebSocketClient socket = new RawWebSocketClient(server.port(), path,
+                        "Cookie: remember-me=" + original + "\r\n")) {
+                    boolean missing = "/ws-nowhere".equals(path);
+                    assertEquals(missing ? "HTTP/1.1 404 Not Found"
+                            : "HTTP/1.1 101 Switching Protocols", socket.getStatusLine());
+                    for (String cookie : socket.getResponseCookies()) {
+                        String pair = cookie.substring(0, cookie.indexOf(';'));
+                        int equals = pair.indexOf('=');
+                        server.cookies.put(pair.substring(0, equals), pair.substring(equals + 1));
+                    }
+                    assertNotNull(server.cookies.get("CN1SESSION"));
+                    assertEquals("nosniff", socket.getResponseHeader("X-Content-Type-Options"));
+                    assertNotNull(server.cookies.get("remember-me"));
+                    assertNotEquals(original, server.cookies.get("remember-me"));
+                    if (missing) {
+                        assertEquals("not found", socket.readRefusal());
+                    } else {
+                        socket.sendText("hi");
+                        assertTrue(socket.readFrame());
+                        assertEquals("echo hi", socket.getLastText());
+                    }
+                }
+                now[0] += 11000L;
+                String renewed = server.cookies.remove("remember-me");
+                assertEquals(200, server.get("/me").status, "the new session must be usable");
+                server.cookies.clear();
+                server.cookies.put("remember-me", renewed);
+                assertEquals(200, server.get("/me").status, "the rotated remember token must work");
+            }
         }
     }
 

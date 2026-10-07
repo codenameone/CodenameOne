@@ -680,14 +680,20 @@ public final class Backend {
     }
 
     /// Stores and releases what a websocket handshake did to sessions, as a
-    /// request's end does: a session it loaded is released, and one it changed,
-    /// ended or started is stored. The upgrade's response is the server's own,
-    /// so no cookie is set on it; a handshake authenticates an existing session.
+    /// request's end does. A fallback router has no response to carry a cookie,
+    /// so it may update an existing session but cannot announce a new session.
     static void finishHandshakeSessions(Sessions sessions, HttpServer.Request request) {
+        finishHandshakeSessions(sessions, request, null);
+    }
+
+    /// Also carries session cookies on an upgrade response when security creates
+    /// or rotates a session during authentication.
+    static HttpServer.Response finishHandshakeSessions(Sessions sessions,
+            HttpServer.Request request, HttpServer.Response response) {
         List ended = request.endedSessions();
         for (int e = 0 ; ended != null && e < ended.size() ; e++) {
             try {
-                sessions.finish(request, (HttpSession) ended.get(e), null);
+                response = sessions.finish(request, (HttpSession) ended.get(e), response);
             } catch (Exception err) {
                 System.err.println("Could not end a session a websocket handshake ended: "
                         + err);
@@ -696,12 +702,13 @@ public final class Backend {
         HttpSession session = request.resolvedSession();
         if (session != null) {
             try {
-                sessions.finish(request, session, null);
+                response = sessions.finish(request, session, response);
             } catch (Exception err) {
                 System.err.println("Could not store the session of a websocket handshake: "
                         + err);
             }
         }
+        return response;
     }
 
     /// An endpoint whose every callback runs carrying its server's executors and
@@ -913,25 +920,25 @@ public final class Backend {
             Object previousServing = HttpSession.enterRequest(request);
             Object previousSecurity = security.enter();
             try {
-                HttpServer.Response refused = security.upgrade(request);
-                if (refused == null) {
-                    return null;
+                HttpServer.Response response = security.upgrade(request);
+                if (response == null) {
+                    response = HttpServer.Response.empty(101, null, null);
                 }
                 // A copy, as for any response: an entry point may answer every
                 // request with one object, and the headers below are written
                 // into what is sent. Then what the chain writes on every
                 // answer -- the security headers, a cookie a filter recorded --
-                // so a refused handshake is answered as the same request over
+                // so every handshake is answered as the same request over
                 // plain HTTP would have been.
-                refused = refused.withHeaders(refused.extraHeaders);
-                security.decorate(request, refused);
-                return refused;
+                response = response.withHeaders(response.extraHeaders);
+                security.decorate(request, response);
+                return finishHandshakeSessions(sessions, request, response);
             } catch (Exception err) {
                 System.err.println("websocket security check failed: " + err);
+                finishHandshakeSessions(sessions, request);
                 return HttpServer.Response.text(500, "internal error");
             } finally {
                 try {
-                    finishHandshakeSessions(sessions, request);
                     sessions.leave(request);
                     request.forgetSession();
                 } finally {

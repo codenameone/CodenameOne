@@ -54,6 +54,7 @@ public final class RawWebSocketClient implements Closeable {
 
     private String statusLine;
     private Map responseHeaders;
+    private final java.util.List<String> responseCookies = new java.util.ArrayList<String>();
     private byte[] lastPayload;
     private int lastOpcode;
     private boolean lastFin;
@@ -91,6 +92,9 @@ public final class RawWebSocketClient implements Closeable {
         for(String line = readLine() ; line.length() > 0 ; line = readLine()) {
             int colon = line.indexOf(':');
             if(colon > 0) {
+                if ("set-cookie".equals(lower(line.substring(0, colon).trim()))) {
+                    responseCookies.add(line.substring(colon + 1).trim());
+                }
                 responseHeaders.put(lower(line.substring(0, colon).trim()),
                         line.substring(colon + 1).trim());
             }
@@ -102,6 +106,10 @@ public final class RawWebSocketClient implements Closeable {
                 throw new IOException("Sec-WebSocket-Accept was " + actual + ", expected " + expected);
             }
         }
+    }
+
+    public java.util.List<String> getResponseCookies() {
+        return new java.util.ArrayList<String>(responseCookies);
     }
 
     public String getStatusLine() {
