@@ -339,6 +339,12 @@ class OAuth2ResourceServerTest {
                     "application/x-www-form-urlencoded");
             assertEquals(403, bare.status, bare.toString());
             assertNull(bare.header("WWW-Authenticate"));
+            for (String malformed : new String[] {"Bearer two words", "Bearer bad!token"}) {
+                Reply denied = server.call("POST", "/api/open/form", "a=b",
+                        "application/x-www-form-urlencoded", "Authorization", malformed);
+                assertEquals(401, denied.status, denied.toString());
+                assertTrue(denied.header("WWW-Authenticate").contains("invalid_token"));
+            }
             // A bad bearer token does not buy the exemption a good one has.
             assertEquals(401, server.call("POST", "/api/open/form", "a=b",
                     "application/x-www-form-urlencoded", "Authorization", "Bearer bad.token.x")

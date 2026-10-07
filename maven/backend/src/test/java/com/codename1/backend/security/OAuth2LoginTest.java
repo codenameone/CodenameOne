@@ -483,6 +483,8 @@ class OAuth2LoginTest {
         volatile int emailsStatus = 200;
         final java.util.concurrent.atomic.AtomicInteger emailsRequests =
                 new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger userRequests =
+                new java.util.concurrent.atomic.AtomicInteger();
         final List<String> tokenRequests = new ArrayList<String>();
         final List<String> authorizations = new ArrayList<String>();
         final Jwk key;
@@ -519,6 +521,7 @@ class OAuth2LoginTest {
                     type = "application/json";
                     answer = JwkSet.of(key).toJson();
                 } else if ("/user".equals(path)) {
+                    userRequests.incrementAndGet();
                     boolean ours = "Bearer stub-access".equals(authorization);
                     status = ours ? 200 : 401;
                     type = "application/json";
@@ -712,6 +715,33 @@ class OAuth2LoginTest {
             stub.tokenStatus = 400;
             app.get("/login/oauth2/code/oidc?code=c&state=" + sent.get("state"));
             assertEquals(Arrays.asList("invalid_token_response", "invalid_client"), failures);
+        }
+    }
+
+    @Test
+    void tokenExchangeRequiresBearerBeforeCallingUserInfo() throws Exception {
+        try (Stub provider = stubServer(); SecuredServer app = stubApp(
+                stubRegistration("hub").userInfoUri(stubUrl + "/user")
+                        .userNameAttributeName("id").scope("read:user").build())) {
+            stub.userAnswer = "{\"id\":\"user-1\"}";
+            for (String response : new String[] {
+                    "{\"access_token\":\"stub-access\"}",
+                    "{\"access_token\":\"stub-access\",\"token_type\":\"DPoP\"}",
+                    "{\"access_token\":\"stub-access\",\"token_type\":true}",
+                    "access_token=stub-access&token_type=", "access_token=stub-access&token_type=MAC"}) {
+                failures.clear();
+                Map<String, String> sent = begin(app, "hub");
+                stub.tokenAnswer = response;
+                Reply reply = app.get("/login/oauth2/code/hub?code=c&state=" + sent.get("state"));
+                assertEquals("/login?error", reply.header("Location"), response);
+                assertEquals(Arrays.asList("invalid_token_response"), failures, response);
+                assertEquals(0, stub.userRequests.get(), response);
+            }
+            Map<String, String> sent = begin(app, "hub");
+            stub.tokenAnswer = "access_token=stub-access&token_type=bEaReR";
+            assertEquals("/", app.get("/login/oauth2/code/hub?code=c&state="
+                    + sent.get("state")).header("Location"));
+            assertEquals(1, stub.userRequests.get());
         }
     }
 

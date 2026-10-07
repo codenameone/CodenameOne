@@ -287,9 +287,10 @@ public final class RegisteredClient {
             }
             for (String uri : redirectUris) {
                 if (uri == null || uri.indexOf(':') <= 0 || uri.indexOf('#') >= 0
-                        || uri.indexOf('*') >= 0 || uri.indexOf(' ') >= 0) {
+                        || uri.indexOf('*') >= 0 || uri.indexOf(' ') >= 0
+                        || uri.indexOf('\r') >= 0 || uri.indexOf('\n') >= 0) {
                     throw new IllegalArgumentException("A redirect address is a whole address "
-                            + "with no fragment and no wildcard: " + uri);
+                            + "with no fragment, wildcard or line break: " + uri);
                 }
             }
             for (String resource : resources) {

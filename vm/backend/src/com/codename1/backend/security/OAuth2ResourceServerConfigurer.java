@@ -250,7 +250,9 @@ public final class OAuth2ResourceServerConfigurer extends SecurityConfigurer {
             try {
                 return resolver.resolve(request) != null;
             } catch (OAuth2AuthenticationException malformed) {
-                return false;
+                // Let the bearer filter report the malformed credential instead
+                // of having CSRF hide it behind a missing-token response.
+                return true;
             }
         }
 

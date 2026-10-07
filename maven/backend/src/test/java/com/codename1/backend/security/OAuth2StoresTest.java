@@ -225,6 +225,7 @@ class OAuth2StoresTest {
                 .authorizationGrantType(AuthorizationGrantType.DEVICE_CODE)
                 .redirectUri("com.acme.app:/oauth2redirect")
                 .redirectUri("https://app.example/cb?tenant=a%20b&x=1,2")
+                .redirectUri("https://app.example/cb?next=a%0Ab")
                 .scope("openid").scope("orders:read")
                 .resource("https://orders.example/api").resource("urn:acme:billing")
                 .clientSettings(ClientSettings.builder().requireProofKey(true).build())

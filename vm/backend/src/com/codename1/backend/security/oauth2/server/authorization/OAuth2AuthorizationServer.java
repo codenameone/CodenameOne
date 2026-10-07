@@ -77,6 +77,9 @@ public final class OAuth2AuthorizationServer {
     private static final String DEVICE_TICKET = "cn1.security.oauth2.deviceTicket";
     /// The attribute of a grant that holds the resource servers it is for.
     private static final String RESOURCE = "resource";
+    private static final String[] FORM_PARAMETERS = {"client_id", "client_secret", "grant_type",
+        "code", "redirect_uri", "code_verifier", "refresh_token", "device_code", "scope",
+        "resource", "token", "token_type_hint", "client_assertion", "client_assertion_type"};
 
     private final AuthorizationServerSettings settings;
     private final String fixedIssuer;
@@ -279,6 +282,7 @@ public final class OAuth2AuthorizationServer {
 
     /// Who a request to the token, revocation or device endpoint is from.
     private RegisteredClient authenticateClient(HttpServer.Request request) {
+        requireEndpointForm(request);
         String header = request.getHeader("Authorization");
         String id;
         String secret = null;
@@ -295,8 +299,8 @@ public final class OAuth2AuthorizationServer {
             }
             method = ClientAuthenticationMethod.CLIENT_SECRET_BASIC;
         } else {
-            id = param(request, "client_id");
-            secret = param(request, "client_secret");
+            id = formParam(request, "client_id");
+            secret = formParam(request, "client_secret");
             if (id == null || id.length() == 0) {
                 throw invalidClient(false);
             }
@@ -598,7 +602,7 @@ public final class OAuth2AuthorizationServer {
     private HttpServer.Response token(HttpServer.Request request) {
         requireMethod(request, "POST");
         RegisteredClient client = authenticateClient(request);
-        String grantType = param(request, "grant_type");
+        String grantType = formParam(request, "grant_type");
         if (grantType == null) {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST, "grant_type is required");
         }
@@ -650,7 +654,7 @@ public final class OAuth2AuthorizationServer {
     private Map<String, Object> redeemCode(HttpServer.Request request, RegisteredClient client,
                                            long now) {
         requireGrant(client, AuthorizationGrantType.AUTHORIZATION_CODE);
-        String code = param(request, "code");
+        String code = formParam(request, "code");
         if (code == null || code.length() == 0) {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST, "code is required");
         }
@@ -673,9 +677,9 @@ public final class OAuth2AuthorizationServer {
         if (authorization == null) {
             throw invalidGrant();
         }
-        String sentRedirect = param(request, "redirect_uri");
+        String sentRedirect = formParam(request, "redirect_uri");
         Object challenge = authorization.getAttribute("code_challenge");
-        String verifier = param(request, "code_verifier");
+        String verifier = formParam(request, "code_verifier");
         boolean good = authorization.getRegisteredClientId().equals(client.getId());
         // The address must be repeated exactly when the request named one.
         if (Boolean.TRUE.equals(authorization.getAttribute("redirect_uri_sent"))
@@ -715,7 +719,7 @@ public final class OAuth2AuthorizationServer {
     private Map<String, Object> refresh(HttpServer.Request request, RegisteredClient client,
                                         long now) {
         requireGrant(client, AuthorizationGrantType.REFRESH_TOKEN);
-        String presented = param(request, "refresh_token");
+        String presented = formParam(request, "refresh_token");
         if (presented == null || presented.length() == 0) {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST, "refresh_token is required");
         }
@@ -744,7 +748,7 @@ public final class OAuth2AuthorizationServer {
             throw invalidGrant();
         }
         Set<String> scopes = authorization.getScopes();
-        String asked = param(request, "scope");
+        String asked = formParam(request, "scope");
         if (asked != null) {
             Set<String> narrowed = OAuth2Parameters.scopes(asked);
             if (!scopes.containsAll(narrowed)) {
@@ -771,7 +775,7 @@ public final class OAuth2AuthorizationServer {
         if (client.getClientSecret() == null) {
             throw invalidClient(false);
         }
-        Set<String> scopes = OAuth2Parameters.scopes(param(request, "scope"));
+        Set<String> scopes = OAuth2Parameters.scopes(formParam(request, "scope"));
         if (!client.getScopes().containsAll(scopes)) {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_SCOPE,
                     "A scope asked for is not one the client was registered with");
@@ -849,12 +853,44 @@ public final class OAuth2AuthorizationServer {
     /// The request's form body; empty when it sent another kind.
     private static String form(HttpServer.Request request) {
         String type = request.getHeader("Content-Type");
-        if (type == null || !type.trim().regionMatches(true, 0,
-                "application/x-www-form-urlencoded", 0, 33)) {
+        if (!isForm(type)) {
             return "";
         }
         String body = request.getBody();
         return body == null ? "" : body;
+    }
+
+    private static boolean isForm(String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        int semicolon = contentType.indexOf(';');
+        String mediaType = semicolon < 0 ? contentType : contentType.substring(0, semicolon);
+        return "application/x-www-form-urlencoded".equalsIgnoreCase(mediaType.trim());
+    }
+
+    /// Token, revocation and device authorization parameters belong in the
+    /// form body. Query fields reserved by OAuth are refused even when a body
+    /// value or Basic authentication would otherwise take precedence.
+    private static void requireEndpointForm(HttpServer.Request request) {
+        if (!isForm(request.getHeader("Content-Type"))) {
+            throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST,
+                    "This endpoint requires an application/x-www-form-urlencoded body");
+        }
+        for (String field : query(request).split("&")) {
+            int equals = field.indexOf('=');
+            String name = OAuth2Parameters.decode(equals < 0 ? field : field.substring(0, equals));
+            for (String reserved : FORM_PARAMETERS) {
+                if (reserved.equals(name)) {
+                    throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST,
+                            "OAuth parameters must be sent in the form body");
+                }
+            }
+        }
+    }
+
+    private static String formParam(HttpServer.Request request, String name) {
+        return OAuth2Parameters.parse(form(request)).get(name);
     }
 
     /// @param resources the resource servers the access token is for; empty
@@ -999,7 +1035,7 @@ public final class OAuth2AuthorizationServer {
     private HttpServer.Response revoke(HttpServer.Request request) {
         requireMethod(request, "POST");
         RegisteredClient client = authenticateClient(request);
-        String token = param(request, "token");
+        String token = formParam(request, "token");
         if (token == null || token.length() == 0) {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST, "token is required");
         }
@@ -1101,7 +1137,7 @@ public final class OAuth2AuthorizationServer {
         requireMethod(request, "POST");
         RegisteredClient client = authenticateClient(request);
         requireGrant(client, AuthorizationGrantType.DEVICE_CODE);
-        Set<String> scopes = OAuth2Parameters.scopes(param(request, "scope"));
+        Set<String> scopes = OAuth2Parameters.scopes(formParam(request, "scope"));
         if (!client.getScopes().containsAll(scopes)) {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_SCOPE,
                     "A scope asked for is not one the client was registered with");
@@ -1182,7 +1218,7 @@ public final class OAuth2AuthorizationServer {
     private Map<String, Object> redeemDeviceCode(HttpServer.Request request,
                                                  RegisteredClient client, long now) {
         requireGrant(client, AuthorizationGrantType.DEVICE_CODE);
-        String deviceCode = param(request, "device_code");
+        String deviceCode = formParam(request, "device_code");
         if (deviceCode == null || deviceCode.length() == 0) {
             throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST, "device_code is required");
         }

@@ -98,6 +98,11 @@ public final class DefaultAuthorizationCodeTokenResponseClient
                     OAuth2ErrorCodes.INVALID_TOKEN_RESPONSE), "The token endpoint of "
                     + registration.getRegistrationId() + " answered without an access token");
         }
+        if (!"Bearer".equalsIgnoreCase(response.getTokenType())) {
+            throw new OAuth2AuthenticationException(new OAuth2Error(
+                    OAuth2ErrorCodes.INVALID_TOKEN_RESPONSE), "The token endpoint of "
+                    + registration.getRegistrationId() + " did not issue a Bearer token");
+        }
         return response;
     }
 

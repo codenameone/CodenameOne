@@ -145,6 +145,65 @@ class AuthorizationServerTest {
                 OAuth2Parameters.scopes(client.getScopes())));
     }
 
+    @Test
+    void registeredRedirectsRejectLineBreaks() {
+        for (String separator : new String[] {"\n", "\r", "\r\n"}) {
+            String uri = "https://good.example/cb" + separator + "https://evil.example/cb";
+            assertThrows(IllegalArgumentException.class, () -> RegisteredClient.withId("bad")
+                    .clientId("bad").authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                    .redirectUri(uri).build());
+        }
+        RegisteredClient client = RegisteredClient.withId("good").clientId("good")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("https://good.example/cb?next=a%0Ab").build();
+        assertTrue(client.getRedirectUris().contains("https://good.example/cb?next=a%0Ab"));
+    }
+
+    @Test
+    void endpointCredentialsMustStayInTheFormBody() throws Exception {
+        try (SecuredServer server = start()) {
+            String service = form("grant_type", "client_credentials", "scope", "api");
+            String basic = OAuth2Testing.basic("service", "service-secret");
+            for (String field : new String[] {"client_id", "client_secret", "grant_type", "code",
+                    "code_verifier", "refresh_token", "device_code", "token", "scope", "resource"}) {
+                for (String endpoint : new String[] {"/oauth2/token", "/oauth2/revoke",
+                        "/oauth2/device_authorization"}) {
+                    refused(server.call("POST", endpoint + "?" + form(field, "query-copy"),
+                            service, FORM, "Authorization", basic), 400, "invalid_request");
+                }
+            }
+            // Encoded parameter names cannot bypass the query check.
+            refused(server.call("POST", "/oauth2/token?client%5Fsecret=query-copy", service,
+                    FORM, "Authorization", basic), 400, "invalid_request");
+            for (String type : new String[] {"text/plain", "application/json",
+                    FORM + "junk"}) {
+                refused(server.call("POST", "/oauth2/token", service, type,
+                        "Authorization", basic), 400, "invalid_request");
+            }
+            assertEquals(200, server.call("POST", "/oauth2/token?tenant=public", service,
+                    FORM + "; charset=UTF-8", "Authorization", basic).status);
+
+            String verifier = OAuth2Parameters.random(32);
+            String code = code(server, "app", APP_REDIRECT, "openid", verifier);
+            String exchange = form("grant_type", "authorization_code", "client_id", "app",
+                    "code", code, "redirect_uri", APP_REDIRECT, "code_verifier", verifier);
+            refused(server.post("/oauth2/token?" + form("code", code), exchange),
+                    400, "invalid_request");
+            Map tokens = json(server.post("/oauth2/token", exchange));
+            String refresh = (String) tokens.get("refresh_token");
+            String access = (String) tokens.get("access_token");
+            assertNotNull(refresh);
+            refused(server.post("/oauth2/revoke?" + form("token", refresh),
+                    form("client_id", "app")), 400, "invalid_request");
+            assertEquals(200, server.get("/userinfo", "Authorization", "Bearer " + access).status);
+            String renewal = form("grant_type", "refresh_token", "client_id", "app",
+                    "refresh_token", refresh);
+            refused(server.post("/oauth2/token?" + form("refresh_token", refresh), renewal),
+                    400, "invalid_request");
+            assertEquals(200, server.post("/oauth2/token", renewal).status);
+        }
+    }
+
     static RegisteredClientRepository clients() {
         return new InMemoryRegisteredClientRepository(
                 RegisteredClient.withId("1").clientId("app").clientName("Acme App")
