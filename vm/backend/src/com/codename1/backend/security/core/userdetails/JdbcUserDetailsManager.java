@@ -203,9 +203,42 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
                 insertAuthorities(db, key, user);
                 return null;
             }
+            deleteCredentials(db, key);
             db.execute("DELETE FROM cn1_authorities WHERE username_key = ?", new Object[] {key});
             db.execute("DELETE FROM cn1_users WHERE username_key = ?", new Object[] {key});
             return null;
+        }
+
+        /// These rows must disappear in the same transaction as the account. Otherwise
+        /// reusing a username lets the old account's durable credentials sign in again.
+        private static void deleteCredentials(Database db, String key) throws java.io.IOException {
+            db.execute("DELETE FROM cn1_persistent_logins WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM cn1_mfa_totp WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM cn1_mfa_recovery_code WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM cn1_federated_identity WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM cn1_webauthn_credential WHERE user_id IN "
+                    + "(SELECT user_id FROM cn1_webauthn_user WHERE username_key = ?)", new Object[] {key});
+            db.execute("DELETE FROM cn1_webauthn_user WHERE username_key = ?", new Object[] {key});
+            // These two stores retain the principal's original spelling rather than
+            // username_key. Use the same ASCII-only fold as the user store, independent
+            // of the database's locale and collation. Client-credentials grants name a
+            // client rather than a user and must survive a user with the same name.
+            for (Object row : db.query("SELECT key_hash, owner FROM cn1_api_key", null)) {
+                Map values = (Map) row;
+                if (key.equals(SecuritySchema.usernameKey((String) values.get("owner")))) {
+                    db.execute("DELETE FROM cn1_api_key WHERE key_hash = ?",
+                            new Object[] {values.get("key_hash")});
+                }
+            }
+            for (Object row : db.query("SELECT id, principal_name FROM cn1_oauth2_authorization "
+                    + "WHERE grant_type <> 'client_credentials'", null)) {
+                Map values = (Map) row;
+                if (key.equals(SecuritySchema.usernameKey((String) values.get("principal_name")))) {
+                    Object[] id = {values.get("id")};
+                    db.execute("DELETE FROM cn1_oauth2_token WHERE authorization_id = ?", id);
+                    db.execute("DELETE FROM cn1_oauth2_authorization WHERE id = ?", id);
+                }
+            }
         }
     }
 

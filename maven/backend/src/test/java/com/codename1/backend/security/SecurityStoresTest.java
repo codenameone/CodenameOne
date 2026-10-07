@@ -234,6 +234,68 @@ class SecurityStoresTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void deletingAUserRemovesDurableCredentialsBeforeNameReuse(String engine) throws Exception {
+        DataSource pool = open(engine);
+        JdbcUserDetailsManager users = new JdbcUserDetailsManager(pool);
+        for (String name : new String[] {"Ada", "Eve"}) {
+            users.createUser(User.withUsername(name).password("old").roles("USER").build());
+            seedCredentials(pool, name);
+        }
+        users.deleteUser("ADA");
+        users.createUser(User.withUsername("ada").password("new").roles("USER").build());
+        assertEquals("new", users.loadUserByUsername("Ada").getPassword());
+        for (String table : CREDENTIAL_TABLES) {
+            List rows = pool.query("SELECT * FROM " + table, null);
+            assertEquals(1, rows.size(), table + " retained the deleted account's credentials");
+            assertTrue(rows.get(0).toString().contains("Eve") || rows.get(0).toString().contains("eve"),
+                    table + " deleted the wrong account: " + rows);
+        }
+        assertNull(new JdbcTokenRepository(pool).getTokenForSeries("Ada"));
+        assertNull(new JdbcApiKeyRepository(pool).findByHash("Ada"));
+    }
+
+    private static final String[] CREDENTIAL_TABLES = {"cn1_persistent_logins", "cn1_mfa_totp",
+        "cn1_mfa_recovery_code", "cn1_federated_identity", "cn1_webauthn_user",
+        "cn1_webauthn_credential", "cn1_api_key", "cn1_oauth2_authorization", "cn1_oauth2_token"};
+
+    private void seedCredentials(DataSource pool, String name) throws Exception {
+        String key = SecuritySchema.usernameKey(name);
+        pool.execute("INSERT INTO cn1_persistent_logins VALUES (?, ?, ?, 'hash', 1)",
+                new Object[] {name, key, name});
+        pool.execute("INSERT INTO cn1_mfa_totp VALUES (?, 'secret', 'nonce', 1, 1, 1)",
+                new Object[] {key});
+        pool.execute("INSERT INTO cn1_mfa_recovery_code VALUES (?, ?)", new Object[] {key, name});
+        pool.execute("INSERT INTO cn1_federated_identity VALUES ('provider', ?, ?, ?, 1)",
+                new Object[] {name, key, name});
+        pool.execute("INSERT INTO cn1_webauthn_user VALUES (?, ?, ?, ?, 1)",
+                new Object[] {key, name, name, name});
+        pool.execute("INSERT INTO cn1_webauthn_credential VALUES (?, ?, ?, -7, 'key', 1, 1, 0, 0, "
+                + "'[]', 'phone', 1, 1)", new Object[] {name, name, name});
+        pool.execute("INSERT INTO cn1_api_key VALUES (?, ?, ?, '[]', 'cn1_', 'last', 0, 1)",
+                new Object[] {name, name, name});
+        pool.execute("INSERT INTO cn1_oauth2_authorization VALUES (?, 'client', ?, 'authorization_code', "
+                + "'openid', 'active', '{}', 1, 9999999999999)", new Object[] {name, name});
+        pool.execute("INSERT INTO cn1_oauth2_token VALUES (?, ?, 'refresh', 0, 9999999999999, 0)",
+                new Object[] {name, name});
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void deletingCredentialsAndUserIsOneTransaction(String engine) throws Exception {
+        DataSource pool = open(engine);
+        JdbcUserDetailsManager users = new JdbcUserDetailsManager(pool);
+        users.createUser(User.withUsername("Ada").password("old").roles("USER").build());
+        seedCredentials(pool, "Ada");
+        pool.execute("DROP TABLE cn1_federated_identity", null);
+        assertThrows(RuntimeException.class, () -> users.deleteUser("Ada"));
+        assertTrue(users.userExists("Ada"));
+        assertEquals(1, pool.query("SELECT * FROM cn1_persistent_logins", null).size());
+        assertEquals(1, pool.query("SELECT * FROM cn1_mfa_totp", null).size());
+        assertEquals(1, pool.query("SELECT * FROM cn1_authorities", null).size());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
     void apiKeys(String engine) throws Exception {
         JdbcApiKeyRepository keys = new JdbcApiKeyRepository(open(engine));
         Ticking clock = new Ticking();
