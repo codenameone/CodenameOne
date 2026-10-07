@@ -1238,6 +1238,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         boolean focused;
         boolean editingSession;
         boolean visible;
+        boolean paintContextSupported;
         final boolean singleLine;
         String lastValue;
         String lastCss;
@@ -1486,7 +1487,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         void update() {
             Form form = ta.getComponentForm();
             boolean wasVisible = visible;
-            visible = singleLine == ta.isSingleLineTextArea() && allowsSelectionOverlay(ta)
+            visible = paintContextSupported && singleLine == ta.isSingleLineTextArea() && allowsSelectionOverlay(ta)
                     // A legacy session keeps ownership until its final value is committed.
                     && !(isEditing && currentEditingField == ta && currentInputField != el)
                     && form != null && form == getCurrentForm()
@@ -1504,10 +1505,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 else right -= ta.getSideGap() + border;
             }
             for (Container parent = ta.getParent(); parent != null; parent = parent.getParent()) {
-                left = Math.max(left, parent.getAbsoluteX() + parent.getScrollX());
+                // Match Component.paintComponent's ancestor content clip, including
+                // the strips reserved for the parent's scrollbars.
+                int parentLeft = parent.getAbsoluteX() + parent.getScrollX();
+                if (ta.isRTL()) parentLeft += parent.getSideGap();
+                left = Math.max(left, parentLeft);
                 top = Math.max(top, parent.getAbsoluteY() + parent.getScrollY());
-                right = Math.min(right, parent.getAbsoluteX() + parent.getScrollX() + parent.getWidth());
-                bottom = Math.min(bottom, parent.getAbsoluteY() + parent.getScrollY() + parent.getHeight());
+                right = Math.min(right, parentLeft + parent.getWidth() - parent.getSideGap());
+                bottom = Math.min(bottom, parent.getAbsoluteY() + parent.getScrollY()
+                        + parent.getHeight() - parent.getBottomGap());
             }
             visible &= right > left && bottom > top;
             if (visible && hasNativeEditorOcclusion(ta, left, top, right, bottom)) visible = false;
@@ -1963,7 +1969,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         Object overlay = c.getNativeOverlay();
         if (overlay != null) {
             NativeOverlay no = (NativeOverlay)overlay;
-            no.updateIfMovedAndFocused();
+            if (no instanceof SelectionTextOverlay) {
+                if (isDisplayGraphics(g)) {
+                    // Keep this decision until the next display paint. At flush time
+                    // the parent may already have restored its graphics state.
+                    ((SelectionTextOverlay) no).paintContextSupported = graphics.supportsNativeTextOverlay();
+                    no.updateIfMovedAndFocused();
+                }
+            } else {
+                no.updateIfMovedAndFocused();
+            }
         }
         if (textLayer != null && isDisplayGraphics(g)) {
             if (!textLayer.isPainting()) {
@@ -6707,7 +6722,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public boolean isNativeEditorVisible(Component c, Graphics g) {
-        if (textLayerDisabledByReadback && c.getNativeOverlay() instanceof SelectionTextOverlay
+        if (c.getNativeOverlay() instanceof SelectionTextOverlay) {
+            SelectionTextOverlay overlay = (SelectionTextOverlay)c.getNativeOverlay();
+            if (isDisplayGraphics(g) && !graphics.supportsNativeTextOverlay()) {
+                overlay.paintContextSupported = false;
+                overlay.update();
+            }
+        }
+        if (c.getNativeOverlay() instanceof SelectionTextOverlay
+                && (textLayerDisabledByReadback || !((SelectionTextOverlay)c.getNativeOverlay()).paintContextSupported)
                 && !(isEditing && currentEditingField == c && currentInputField != ((NativeOverlay)c.getNativeOverlay()).el)) {
             return false;
         }

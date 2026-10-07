@@ -1244,6 +1244,12 @@ public class BufferedGraphics extends HTML5Graphics {
         promotionSuspended = value;
     }
 
+    // Shared by text runs and persistent editors: DOM rectangles cannot represent
+    // a transformed paint context or a nonrectangular clip.
+    boolean supportsNativeTextOverlay() {
+        return !isClipShape && (transform == null || transform.isIdentity());
+    }
+
     /**
      * Offers a text run to the DOM text layer, which renders it as real text above the canvas.
      *
@@ -1262,10 +1268,7 @@ public class BufferedGraphics extends HTML5Graphics {
      */
     private boolean promoteToTextLayer(String str, int x, int y) {
         JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
-        if (layer == null || clipEmpty || isClipShape || promotionSuspended) {
-            return false;
-        }
-        if (transform != null && !transform.isIdentity()) {
+        if (layer == null || clipEmpty || promotionSuspended || !supportsNativeTextOverlay()) {
             return false;
         }
         return layer.promote(str, x, y,

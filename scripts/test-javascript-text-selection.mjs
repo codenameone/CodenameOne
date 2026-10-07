@@ -73,6 +73,39 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('paintcontext');
+    const contextEditor = page.locator('.cn1-selection-editor[name="paintContextArea"]');
+    await contextEditor.waitFor({state: 'visible'});
+    for (const mode of [1, 0, 2, 0]) {
+      if (mode) await contextEditor.click();
+      await page.evaluate(() => { window.__cn1TextDraws = []; });
+      await clickButton('Paint mode ' + mode);
+      await contextEditor.waitFor({state: mode ? 'hidden' : 'visible'});
+      if (mode) await page.waitForFunction(() => window.__cn1TextDraws.includes('Context painted value'));
+    }
+    console.log('PASS', name, 'transformed and shape-clipped editors rasterize and restore native promotion');
+
+    for (const rtl of [false, true]) {
+      await openReview('ancestorgutter&rtl=' + rtl);
+      await clickButton('Configure ancestor gutters');
+      await page.waitForFunction(() => /Viewport [\d,]+/.test(document.body.innerText));
+      const viewport = await page.evaluate(() => document.body.innerText.match(/Viewport ([\d,]+)/)[1].split(',').map(Number));
+      const [x, y, width, height, side, bottom] = viewport;
+      assert.ok(side > 0 && bottom > 0, 'both ancestor scrollbar gutters are present');
+      await page.locator('.cn1-selection-editor[name="ancestorGutterArea"]').waitFor({state: 'visible'});
+      const vertical = {x: rtl ? x + side / 2 : x + width - side / 2, y: y + height / 2};
+      const horizontal = {x: x + width / 2, y: y + height - bottom / 2};
+      for (const point of [vertical, horizontal]) {
+        assert.equal(await page.evaluate(p => document.elementFromPoint(p.x, p.y)?.tagName, point), 'CANVAS',
+          'ancestor scrollbar hit region belongs to canvas');
+        await page.evaluate(() => { window.__cn1PointerEvents.length = 0; });
+        await page.mouse.click(point.x, point.y);
+        assert.ok(await page.evaluate(() => window.__cn1PointerEvents.some(e => e.type === 'mousedown' && e.target === 'CANVAS')),
+          'ancestor scrollbar pointer input reaches canvas');
+      }
+    }
+    console.log('PASS', name, 'ancestor vertical and horizontal gutters retain canvas input in LTR and RTL');
+
     for (const action of ['End as readonly', 'End as disabled']) {
       await openReview('completionstate');
       const completing = page.locator('.cn1-selection-editor[name="stateCompletion"]');

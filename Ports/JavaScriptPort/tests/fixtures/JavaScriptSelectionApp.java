@@ -94,7 +94,70 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=completionstate") >= 0) {
+        if (query.indexOf("review=paintcontext") >= 0) {
+            final int[] mode = new int[1];
+            Container painter = new Container(BoxLayout.y()) {
+                public void paint(Graphics g) {
+                    Transform saved = g.getTransform();
+                    g.pushClip();
+                    try {
+                        if (mode[0] == 1) {
+                            Transform moved = saved.copy(); moved.translate(35, 20, 0); g.setTransform(moved);
+                        } else if (mode[0] == 2) {
+                            com.codename1.ui.geom.GeneralPath clip = new com.codename1.ui.geom.GeneralPath();
+                            clip.moveTo(getX(), getY()); clip.lineTo(getX() + getWidth(), getY());
+                            clip.lineTo(getX(), getY() + getHeight()); clip.closePath();
+                            g.setClip(clip);
+                        }
+                        super.paint(g);
+                    } finally {
+                        g.setTransform(saved); g.popClip();
+                    }
+                }
+            };
+            TextArea area = new TextArea("Context painted value", 2, 24); area.setName("paintContextArea");
+            painter.add(area); painter.setPreferredH(120);
+            form.addAll(new Button("Initial focus"), painter);
+            for (int i = 0; i < 3; i++) {
+                final int value = i;
+                Button change = new Button("Paint mode " + i);
+                change.addActionListener(e -> { mode[0] = value; form.repaint(); });
+                form.add(change);
+            }
+        } else if (query.indexOf("review=ancestorgutter") >= 0) {
+            Container viewport = new Container(new com.codename1.ui.layouts.Layout() {
+                public void layoutContainer(Container parent) {
+                    Component child = parent.getComponentAt(0);
+                    child.setX(0); child.setY(0);
+                    child.setWidth(parent.getWidth() + 100); child.setHeight(parent.getHeight() + 160);
+                }
+                public com.codename1.ui.geom.Dimension getPreferredSize(Container parent) {
+                    return new com.codename1.ui.geom.Dimension(1200, 320);
+                }
+            });
+            viewport.setPreferredH(160);
+            viewport.setScrollableX(true); viewport.setScrollableY(true); viewport.setSmoothScrolling(false);
+            viewport.setRTL(query.indexOf("rtl=true") >= 0);
+            TextArea area = new TextArea("Ancestor clipped text", 2, 24); area.setName("ancestorGutterArea");
+            area.setRTL(viewport.isRTL()); viewport.add(area);
+            Button configure = new Button("Configure ancestor gutters");
+            configure.addActionListener(e -> {
+                java.util.Hashtable props = new java.util.Hashtable();
+                props.put("@interactiveScrollBool", "true");
+                props.put("DesktopScroll.padding", "0,0,8,8");
+                props.put("DesktopScroll.padUnit", new byte[] {0, 0, 0, 0});
+                props.put("DesktopHorizontalScroll.padding", "8,8,0,0");
+                props.put("DesktopHorizontalScroll.padUnit", new byte[] {0, 0, 0, 0});
+                com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(props);
+                com.codename1.ui.plaf.UIManager.getInstance().getLookAndFeel().setFadeScrollBar(false);
+                form.refreshTheme(); form.revalidate();
+                status.setText("Viewport " + (viewport.getAbsoluteX() + viewport.getScrollX())
+                    + "," + (viewport.getAbsoluteY() + viewport.getScrollY())
+                    + "," + viewport.getWidth() + "," + viewport.getHeight() + ","
+                    + viewport.getSideGap() + "," + viewport.getBottomGap());
+            });
+            form.addAll(new Button("Initial focus"), viewport, configure, status);
+        } else if (query.indexOf("review=completionstate") >= 0) {
             TextField field = new TextField("Before completion"); field.setName("stateCompletion");
             boolean initiallyReadonly = query.indexOf("readonly=true") >= 0;
             field.setEditable(!initiallyReadonly);
