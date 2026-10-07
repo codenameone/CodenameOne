@@ -9003,11 +9003,15 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `cellRenderer`: @param cellRenderer indicate whether this component is currently being
     /// used as a cell renderer
     public void setCellRenderer(boolean cellRenderer) {
+        boolean changed = this.cellRenderer != cellRenderer;
         this.cellRenderer = cellRenderer;
         if (cellRenderer) {
             getUnselectedStyle().markAsRendererStyle();
             getSelectedStyle().markAsRendererStyle();
             getDisabledStyle().markAsRendererStyle();
+        }
+        if (changed) {
+            repaintTextSelection();
         }
     }
 

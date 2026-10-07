@@ -98,7 +98,35 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=formediting") >= 0) {
+        if (query.indexOf("review=ancestorglass") >= 0) {
+            final boolean[] covered = new boolean[1];
+            TextArea area = new TextArea("Ancestor glass text", 2, 24); area.setName("glassEditor");
+            Container parent = new Container(BoxLayout.y()) {
+                protected void paintGlass(Graphics g) {
+                    if (covered[0]) {
+                        int color = g.getColor(); g.setColor(0xff0000);
+                        g.fillRect(area.getAbsoluteX() + area.getWidth() / 2, area.getAbsoluteY(),
+                                area.getWidth() / 2, area.getHeight());
+                        g.setColor(color);
+                    }
+                }
+            };
+            parent.add(area);
+            Button cover = new Button("Paint ancestor glass");
+            cover.addActionListener(e -> { covered[0] = true; form.repaint(); });
+            form.addAll(new Button("Initial focus"), parent, cover);
+        } else if (query.indexOf("review=renderermutation") >= 0) {
+            Label label = new Label("Renderer mutation label");
+            TextArea area = new TextArea("Renderer mutation editor", 2, 24); area.setName("rendererEditor");
+            Button enable = new Button("Mark renderers"), disable = new Button("Unmark renderers");
+            enable.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> {
+                label.setCellRenderer(true); area.setCellRenderer(true);
+            }));
+            disable.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form, () -> {
+                label.setCellRenderer(false); area.setCellRenderer(false);
+            }));
+            form.addAll(new Button("Initial focus"), label, area, enable, disable);
+        } else if (query.indexOf("review=formediting") >= 0) {
             TextField first = new TextField("First value"); first.setName("formEditingFirst");
             TextField second = new TextField("Second value"); second.setName("formEditingSecond");
             first.setEditable(query.indexOf("readonly=true") < 0);
@@ -141,6 +169,8 @@ public class JavaScriptSelectionApp extends Lifecycle {
                             g.setClip(clip);
                         } else if (mode[0] == 3) {
                             g.setClip(0, 0, 0, 0);
+                        } else if (mode[0] == 4) {
+                            g.clipRect(getX(), getY(), getWidth() / 2, getHeight());
                         }
                         super.paint(g);
                     } finally {
@@ -151,12 +181,16 @@ public class JavaScriptSelectionApp extends Lifecycle {
             TextArea area = new TextArea("Context painted value", 2, 24); area.setName("paintContextArea");
             painter.add(area); painter.setPreferredH(120);
             form.addAll(new Button("Initial focus"), painter);
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 5; i++) {
                 final int value = i;
                 Button change = new Button("Paint mode " + i);
                 change.addActionListener(e -> { mode[0] = value; form.repaint(); });
                 form.add(change);
             }
+            Button partial = new Button("Partial editor repaint");
+            partial.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form,
+                    () -> area.repaint(area.getAbsoluteX() + 20, area.getAbsoluteY() + 5, 30, 15)));
+            form.add(partial);
         } else if (query.indexOf("review=ancestorgutter") >= 0) {
             Container viewport = new Container(new com.codename1.ui.layouts.Layout() {
                 public void layoutContainer(Container parent) {

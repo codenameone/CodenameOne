@@ -64,6 +64,8 @@ async function exercise(context, name, host, mobileDevice = null) {
       if (mobile) await hideAndroidKeyboard();
       // These controls mutate fixture state. Use their accessible actions so
       // Android IME viewport resizing cannot redirect a coordinate click.
+      await page.waitForFunction(name => [...document.querySelectorAll('#cn1-accessibility-tree [role="button"]')]
+        .some(el => el.getAttribute('aria-label')?.toLowerCase() === name.toLowerCase()), name);
       const activated = await page.evaluate(name => {
         const button = [...document.querySelectorAll('#cn1-accessibility-tree [role="button"]')]
           .find(el => el.getAttribute('aria-label')?.toLowerCase() === name.toLowerCase());
@@ -73,6 +75,28 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('ancestorglass');
+    const glassEditor = page.locator('.cn1-selection-editor[name="glassEditor"]');
+    await glassEditor.waitFor({state: 'visible'});
+    const glassBounds = await glassEditor.boundingBox();
+    await page.evaluate(() => { window.__cn1TextDraws = []; });
+    await clickButton('Paint ancestor glass');
+    await glassEditor.waitFor({state: 'hidden'});
+    await page.waitForFunction(() => window.__cn1TextDraws.includes('Ancestor glass text'));
+    assert.equal(await page.evaluate(b => document.elementFromPoint(b.x + b.width * 0.75, b.y + b.height / 2)?.tagName, glassBounds),
+      'CANVAS', 'ancestor glass coverage releases native pointer input');
+    console.log('PASS', name, 'ancestor glass painting demotes persistent editors and restores canvas glyphs');
+
+    await openReview('renderermutation');
+    const rendererEditor = page.locator('.cn1-selection-editor[name="rendererEditor"]');
+    const rendererLabel = page.locator('#cn1-text-layer span[data-cn1-native-selection="true"]').filter({hasText: 'Renderer mutation label'});
+    await rendererEditor.waitFor({state: 'visible'}); await rendererLabel.waitFor({state: 'visible'});
+    await clickButton('Mark renderers');
+    await rendererEditor.waitFor({state: 'hidden'}); await rendererLabel.waitFor({state: 'hidden'});
+    await clickButton('Unmark renderers');
+    await rendererEditor.waitFor({state: 'visible'}); await rendererLabel.waitFor({state: 'visible'});
+    console.log('PASS', name, 'cell-renderer mutations refresh native editors and labels on a static form');
+
     for (const handoff of [false, true]) {
       await openReview('formediting&handoff=' + handoff);
       const first = page.locator('.cn1-selection-editor[name="formEditingFirst"]');
@@ -140,6 +164,18 @@ async function exercise(context, name, host, mobileDevice = null) {
         'an empty clip paints neither DOM nor canvas text');
     }
     console.log('PASS', name, 'transforms and shape clips rasterize text; empty clips hide text; native promotion restores');
+    const contextBounds = await contextEditor.boundingBox();
+    const hit = fraction => page.evaluate(({b, fraction}) => document.elementFromPoint(b.x + b.width * fraction, b.y + b.height / 2)?.tagName,
+      {b: contextBounds, fraction});
+    await clickButton('Paint mode 4');
+    await page.waitForFunction(b => document.elementFromPoint(b.x + b.width * 0.75, b.y + b.height / 2)?.tagName === 'CANVAS', contextBounds);
+    assert.equal(await hit(0.25), 'TEXTAREA', 'the unclipped editor remains interactive');
+    await clickButton('Paint mode 0');
+    await page.waitForFunction(b => document.elementFromPoint(b.x + b.width * 0.75, b.y + b.height / 2)?.tagName === 'TEXTAREA', contextBounds);
+    await clickButton('Partial editor repaint');
+    await page.waitForTimeout(700);
+    assert.equal(await hit(0.75), 'TEXTAREA', 'a partial repaint preserves untouched native text');
+    console.log('PASS', name, 'rectangular paint clips constrain native text while dirty repaints preserve its viewport');
 
     for (const rtl of [false, true]) {
       await openReview('ancestorgutter&rtl=' + rtl);

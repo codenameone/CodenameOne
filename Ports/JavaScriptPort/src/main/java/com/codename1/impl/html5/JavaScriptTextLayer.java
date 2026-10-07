@@ -153,6 +153,9 @@ public final class JavaScriptTextLayer {
          * @param value the CSS declaration or text content, null for the other kinds
          */
         void record(int kind, Object target, Object child, String value);
+
+        /** Reports later canvas painting to persistent native editors too. */
+        default void canvasCover(Component painter, int pass, int x, int y, int w, int h, CoverTest test) { }
     }
 
     private final HTMLDocument document;
@@ -654,7 +657,7 @@ public final class JavaScriptTextLayer {
     }
 
     public void noteCanvasCover(int x, int y, int w, int h, CoverTest test) {
-        if (suspended || w <= 0 || h <= 0 || byComponent.isEmpty()) {
+        if (suspended || w <= 0 || h <= 0) {
             return;
         }
         // Who is drawing decides what the draw means for text already in the DOM. A component
@@ -664,6 +667,7 @@ public final class JavaScriptTextLayer {
         // on the form is, and that text has to go back to the canvas where it can be covered.
         Component painter = depth == 0 ? null : stack.get(depth - 1).component;
         int painterPass = depth == 0 ? -1 : stack.get(depth - 1).paintPass;
+        sink.canvasCover(painter, painterPass, x, y, w, h, test);
         List<Component> covered = null;
         for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
                 it.hasNext();) {
@@ -767,12 +771,23 @@ public final class JavaScriptTextLayer {
      * belongs to.</p>
      */
     private boolean isRegionNarrowing(Run run, int clipX, int clipY, int clipW, int clipH) {
-        int left = Math.max(run.clipX, frameDirtyX);
-        int top = Math.max(run.clipY, frameDirtyY);
-        long right = Math.min((long) run.clipX + run.clipW, (long) frameDirtyX + frameDirtyW);
-        long bottom = Math.min((long) run.clipY + run.clipH, (long) frameDirtyY + frameDirtyH);
+        return isRegionNarrowing(run.clipX, run.clipY, run.clipW, run.clipH, clipX, clipY, clipW, clipH);
+    }
+
+    boolean isRegionNarrowing(int oldX, int oldY, int oldW, int oldH, int clipX, int clipY, int clipW, int clipH) {
+        int left = Math.max(oldX, frameDirtyX);
+        int top = Math.max(oldY, frameDirtyY);
+        long right = Math.min((long) oldX + oldW, (long) frameDirtyX + frameDirtyW);
+        long bottom = Math.min((long) oldY + oldH, (long) frameDirtyY + frameDirtyH);
         return clipX == left && clipY == top
                 && (long) clipX + clipW == right && (long) clipY + clipH == bottom;
+    }
+
+    int currentPaintPass() { return depth == 0 ? -1 : stack.get(depth - 1).paintPass; }
+
+    void forceCanvas(Component component) {
+        canvasOnly.add(component);
+        reattachedThisFrame = true;
     }
 
     /**

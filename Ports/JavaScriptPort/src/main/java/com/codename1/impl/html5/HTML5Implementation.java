@@ -1230,6 +1230,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return false;
     }
 
+    private void noteNativeEditorCanvasCover(Component painter, int pass, int x, int y, int w, int h,
+            JavaScriptTextLayer.CoverTest test) {
+        // paintComponent() redraws ancestor backgrounds before opening a paint frame.
+        // Those prepare a repaint; only a known painter can establish later coverage.
+        if (painter == null) return;
+        for (SelectionTextOverlay overlay : selectionTextOverlays) {
+            if (!overlay.visible || painter == overlay.ta) continue;
+            boolean ancestorBackground = false;
+            if (pass >= 0 && overlay.paintedPass < pass) {
+                for (Container parent = overlay.ta.getParent(); parent != null; parent = parent.getParent()) {
+                    if (parent == painter) { ancestorBackground = true; break; }
+                }
+            }
+            if (ancestorBackground || overlay.coverRight <= x || x + w <= overlay.coverLeft
+                    || overlay.coverBottom <= y || y + h <= overlay.coverTop) continue;
+            int left = Math.max(x, overlay.coverLeft), top = Math.max(y, overlay.coverTop);
+            int right = Math.min(x + w, overlay.coverRight), bottom = Math.min(y + h, overlay.coverBottom);
+            if (test != null && !test.covers(left, top, right - left, bottom - top)) continue;
+            // Unlike a glyph run, an editor owns a whole pointer-active rectangle.
+            // Even partial coverage needs canvas fallback; it cannot punch holes.
+            textLayer.forceCanvas(overlay.ta);
+            overlay.coveredByCanvas = true;
+            overlay.paintContextSupported = false;
+            overlay.update();
+        }
+    }
+
     private class SelectionTextOverlay extends NativeOverlay {
         final TextArea ta;
         final DataChangedListener changes;
@@ -1240,6 +1267,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         boolean editingSession;
         boolean visible;
         boolean paintContextSupported;
+        boolean coveredByCanvas;
+        int paintClipX, paintClipY, paintClipW, paintClipH;
+        int paintX = Integer.MIN_VALUE, paintY;
+        int paintedPass = -1;
+        int coverLeft, coverTop, coverRight, coverBottom;
         final boolean singleLine;
         String lastValue;
         String lastCss;
@@ -1495,6 +1527,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
 
+        void recordPaintContext() {
+            paintContextSupported = graphics.supportsNativeTextOverlay() && !coveredByCanvas;
+            int x = ta.getAbsoluteX(), y = ta.getAbsoluteY();
+            int cx = graphics.getClipX(), cy = graphics.getClipY();
+            int cw = graphics.getClipWidth(), ch = graphics.getClipHeight();
+            // A dirty-region repaint cannot discard the editor's untouched pixels.
+            // Preserve the previous clip only when the dirty region explains all narrowing.
+            if (paintX != x || paintY != y || !textLayer.isRegionNarrowing(
+                    paintClipX, paintClipY, paintClipW, paintClipH, cx, cy, cw, ch)) {
+                paintClipX = cx; paintClipY = cy; paintClipW = cw; paintClipH = ch;
+            }
+            paintX = x; paintY = y;
+        }
+
         @Override
         void updateIfMovedAndFocused() { update(); }
 
@@ -1530,6 +1576,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 bottom = Math.min(bottom, parent.getAbsoluteY() + parent.getScrollY()
                         + parent.getHeight() - parent.getBottomGap());
             }
+            left = Math.max(left, paintClipX);
+            top = Math.max(top, paintClipY);
+            right = Math.min(right, paintClipX + paintClipW);
+            bottom = Math.min(bottom, paintClipY + paintClipH);
+            coverLeft = left; coverTop = top; coverRight = right; coverBottom = bottom;
             visible &= right > left && bottom > top;
             if (visible && hasNativeEditorOcclusion(ta, left, top, right, bottom)) visible = false;
             if (visible) {
@@ -1984,20 +2035,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 && isDisplayGraphics(g) && allowsSelectionOverlay((TextArea) c)) {
             Accessor.showNativeTextOverlay(c);
         }
-        Object overlay = c.getNativeOverlay();
-        if (overlay != null) {
-            NativeOverlay no = (NativeOverlay)overlay;
-            if (no instanceof SelectionTextOverlay) {
-                if (isDisplayGraphics(g)) {
-                    // Keep this decision until the next display paint. At flush time
-                    // the parent may already have restored its graphics state.
-                    ((SelectionTextOverlay) no).paintContextSupported = graphics.supportsNativeTextOverlay();
-                    no.updateIfMovedAndFocused();
-                }
-            } else {
-                no.updateIfMovedAndFocused();
-            }
-        }
         if (textLayer != null && isDisplayGraphics(g)) {
             if (!textLayer.isPainting()) {
                 updateTextLayerSuspension();
@@ -2011,6 +2048,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     graphics.getClipX(), graphics.getClipY(),
                     graphics.getClipWidth(), graphics.getClipHeight());
         }
+        Object overlay = c.getNativeOverlay();
+        if (overlay != null) {
+            NativeOverlay no = (NativeOverlay)overlay;
+            if (no instanceof SelectionTextOverlay) {
+                if (isDisplayGraphics(g)) {
+                    // Keep this decision until the next display paint. At flush time
+                    // the parent may already have restored its graphics state.
+                    ((SelectionTextOverlay) no).recordPaintContext();
+                    no.updateIfMovedAndFocused();
+                }
+            } else {
+                no.updateIfMovedAndFocused();
+            }
+        }
+
     }
 
     /**
@@ -2071,6 +2123,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // The display graphics reports its clip in absolute coordinates, which is the space
             // component bounds are in. Graphics.getClipX() subtracts the current translation, so
             // it would be component-local and the comparison would almost never hold.
+            if (c.getNativeOverlay() instanceof SelectionTextOverlay) {
+                ((SelectionTextOverlay)c.getNativeOverlay()).paintedPass = textLayer.currentPaintPass();
+            }
             textLayer.endComponent(c);
         }
     }
@@ -2392,6 +2447,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // graphics is built further down this method, after the layer exists.
             textLayer = new JavaScriptTextLayer(document, textLayerContainer,
                     new JavaScriptTextLayer.MutationSink() {
+                        @Override
+                        public void canvasCover(Component painter, int pass, int x, int y, int w, int h, JavaScriptTextLayer.CoverTest test) {
+                            noteNativeEditorCanvasCover(painter, pass, x, y, w, h, test);
+                        }
+
                         @Override
                         public void record(int kind, Object target, Object child, String value) {
                             if (graphics != null) {
