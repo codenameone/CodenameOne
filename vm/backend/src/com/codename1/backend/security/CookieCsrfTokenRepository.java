@@ -22,11 +22,14 @@
  */
 package com.codename1.backend.security;
 
+import com.codename1.backend.Crypto;
 import com.codename1.backend.HttpServer;
+import com.codename1.backend.HttpSession;
 
 /// Keeps the token in a cookie, `XSRF-TOKEN`, for a page whose script reads the
 /// cookie and sends its value back in the `X-XSRF-TOKEN` header -- the
-/// convention Angular and axios follow. No session is needed.
+/// convention Angular and axios follow. The token is also kept in the session
+/// so a sibling subdomain cannot inject a cookie and submit a matching value.
 ///
 /// ```java
 /// http.csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()));
@@ -35,9 +38,11 @@ import com.codename1.backend.HttpServer;
 /// A script can only read the cookie when it is not `HttpOnly`, which is what
 /// [#withHttpOnlyFalse] is for. Because the script has the token as the cookie
 /// holds it, a chain with this repository accepts the token unmasked in the
-/// header as well as masked; another site cannot read the cookie, which is the
-/// whole of the protection.
+/// header as well as masked. A cookie is trusted only when it matches the
+/// token issued to the current session. Tokens copied from other sessions
+/// are rejected.
 public final class CookieCsrfTokenRepository implements CsrfTokenRepository {
+    private static final String ATTRIBUTE = "CN1_COOKIE_CSRF_TOKEN:";
     private String cookieName = "XSRF-TOKEN";
     private String headerName = "X-XSRF-TOKEN";
     private String parameterName = "_csrf";
@@ -93,6 +98,14 @@ public final class CookieCsrfTokenRepository implements CsrfTokenRepository {
             throw new IllegalStateException("The CSRF cookie is written with the response of "
                     + "the request a chain is serving, and this thread serves none");
         }
+        HttpSession session = request.getSession(token != null);
+        if (session != null) {
+            if (token == null) {
+                session.removeAttribute(ATTRIBUTE + cookieName);
+            } else {
+                session.setAttribute(ATTRIBUTE + cookieName, token.getToken());
+            }
+        }
         StringBuilder cookie = new StringBuilder(cookieName).append('=')
                 .append(token == null ? "" : token.getToken()).append("; Path=").append(cookiePath);
         if (token == null) {
@@ -112,6 +125,12 @@ public final class CookieCsrfTokenRepository implements CsrfTokenRepository {
     public CsrfToken loadToken(HttpServer.Request request) {
         String value = request.getCookie(cookieName);
         if (value == null || value.length() == 0) {
+            return null;
+        }
+        HttpSession session = request.getSession(false);
+        Object expected = session == null ? null : session.getAttribute(ATTRIBUTE + cookieName);
+        if (!(expected instanceof String) || !Crypto.equalsConstantTime(
+                Responses.utf8((String) expected), Responses.utf8(value))) {
             return null;
         }
         return new DefaultCsrfToken(headerName, parameterName, value);

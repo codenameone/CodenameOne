@@ -130,9 +130,20 @@ public interface OAuth2AuthorizationService {
         throw new UnsupportedOperationException("Token expiry extension is not supported by this store");
     }
 
-    /// Records that a secret was presented at `now`: how a device code's
-    /// polling is paced.
+    /// Records that a secret was presented at `now`, without checking its
+    /// previous timestamp. Use [#pollToken] to enforce a polling interval.
     void touchToken(String kind, String tokenHash, long now);
+
+    /// Claims a polling interval on an unused, unexpired token. Checking the
+    /// previous poll and recording `now` must be one atomic operation, including
+    /// across processes sharing a database. Rejected polls do not claim an interval.
+    /// Custom stores must implement this before enabling the device grant.
+    ///
+    /// @param intervalMillis the minimum time between accepted polls, greater than zero
+    /// @return whether this call claimed the interval
+    default boolean pollToken(String kind, String tokenHash, long now, long intervalMillis) {
+        throw new UnsupportedOperationException("Atomic token polling is not supported by this store");
+    }
 
     /// Answers a device grant that is [OAuth2Authorization#PENDING]: makes it
     /// [OAuth2Authorization#ACTIVE] for `principalName`, or

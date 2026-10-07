@@ -800,6 +800,31 @@ class SecurityFilterChainTest {
     // -------------------------------------------------------------------- CSRF
 
     @Test
+    void csrfCookieCannotBeInjectedOrCopiedFromAnotherSession() throws Exception {
+        try (SecuredServer server = SecuredServer.start(dev(), "test", beans(), APP,
+                http -> http.csrf(csrf -> csrf.csrfTokenRepository(
+                        CookieCsrfTokenRepository.withHttpOnlyFalse())).build())) {
+            server.get("/csrf");
+            String otherToken = server.cookies.get("XSRF-TOKEN");
+            server.cookies.clear();
+            server.get("/csrf");
+            String ownToken = server.cookies.get("XSRF-TOKEN");
+            assertEquals(200, server.call("POST", "/save", null, null,
+                    "X-XSRF-TOKEN", ownToken).status);
+            for (String injected : new String[] {CsrfFilter.newTokenValue(), otherToken}) {
+                server.cookies.put("XSRF-TOKEN", injected);
+                assertEquals(403, server.post("/save", "_csrf=" + CsrfFilter.mask(injected)).status);
+                server.cookies.put("XSRF-TOKEN", injected);
+                assertEquals(403, server.call("POST", "/save", null, null,
+                        "X-XSRF-TOKEN", injected).status);
+            }
+            // A rejected injected cookie is replaced with a fresh session-bound token.
+            assertEquals(200, server.call("POST", "/save", null, null,
+                    "X-XSRF-TOKEN", server.cookies.get("XSRF-TOKEN")).status);
+        }
+    }
+
+    @Test
     @DisplayName("the cookie repository gives a script its token; ignored requests need none")
     void csrfVariants() throws Exception {
         try (SecuredServer server = SecuredServer.start(dev(), "test", beans(), APP,
@@ -812,9 +837,11 @@ class SecurityFilterChainTest {
                 http -> http.build())) {
             // The first answer hands the script its cookie, readable by it.
             Reply first = server.get("/spa/index");
-            String cookie = first.header("Set-Cookie");
+            String cookie = null;
+            for (String candidate : first.headers("Set-Cookie")) {
+                if (candidate.startsWith("XSRF-TOKEN=")) { cookie = candidate; }
+            }
             assertNotNull(cookie, first.toString());
-            assertTrue(cookie.startsWith("XSRF-TOKEN="), cookie);
             assertFalse(cookie.contains("HttpOnly"), cookie);
             assertTrue(cookie.contains("Path=/"), cookie);
             String token = server.cookies.get("XSRF-TOKEN");
@@ -833,8 +860,8 @@ class SecurityFilterChainTest {
             String masked = server.get("/spa/csrf").body.split("\\|")[2];
             assertNotEquals(token, masked);
             assertEquals("ok /spa/save", server.post("/spa/save", "_csrf=" + masked).body);
-            // No session was needed for any of it.
-            assertNull(server.cookies.get("CN1SESSION"));
+            // The readable cookie is bound to this session against cookie injection.
+            assertNotNull(server.cookies.get("CN1SESSION"));
 
             assertEquals("ok /spa/webhooks/stripe", server.post("/spa/webhooks/stripe", "").body);
             assertEquals("ok /open/save", server.post("/open/save", "").body);

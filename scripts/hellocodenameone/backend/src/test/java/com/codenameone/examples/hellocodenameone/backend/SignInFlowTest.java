@@ -384,6 +384,12 @@ class SignInFlowTest {
         assertTrue(at > 0, page);
         String ticket = page.substring(at + marker.length(),
                 page.indexOf('"', at + marker.length()));
+        // A typo must leave the same ticket and pending grant usable.
+        mvc.perform(post("/oauth2/device_verification")
+                        .cookie("CN1SESSION", session).param("user_code", userCode)
+                        .param("ticket", ticket).param("decision", "approved"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"));
         String approved = mvc.perform(post("/oauth2/device_verification")
                         .cookie("CN1SESSION", session).param("user_code", userCode)
                         .param("ticket", ticket).param("decision", "approve"))

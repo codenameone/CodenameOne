@@ -73,6 +73,11 @@ class DeviceGrantTest {
     private String issuer;
 
     private SecuredServer start(Customizer<AuthorizationServerConfigurer> more) throws Exception {
+        return start(more, grants);
+    }
+
+    private SecuredServer start(Customizer<AuthorizationServerConfigurer> more,
+            OAuth2AuthorizationService store) throws Exception {
         int port = OAuth2Testing.freePort();
         issuer = "http://127.0.0.1:" + port;
         Properties settings = new Properties();
@@ -85,7 +90,7 @@ class DeviceGrantTest {
                         .formLogin(Customizer.withDefaults())
                         .authorizationServer(as -> {
                             as.registeredClientRepository(AuthorizationServerTest.clients())
-                                    .authorizationService(grants)
+                                    .authorizationService(store)
                                     .clientSecretEncoder(OAuth2Testing.PLAIN).clock(clock);
                             more.customize(as);
                         }).build());
@@ -110,6 +115,65 @@ class DeviceGrantTest {
         String text = com.codename1.backend.Json.write(body);
         return csrf == null ? server.call("POST", PAGE, text, JSON, "Accept", JSON)
                 : server.call("POST", PAGE, text, JSON, "Accept", JSON, "X-CSRF-TOKEN", csrf);
+    }
+
+    @Test
+    void simultaneousDevicePollsOnlyAdmitOneRequest() throws Exception {
+        final int count = 8;
+        final java.util.concurrent.CountDownLatch read = new java.util.concurrent.CountDownLatch(count);
+        OAuth2AuthorizationService racing = (OAuth2AuthorizationService) java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[] {OAuth2AuthorizationService.class},
+                (proxy, method, args) -> {
+                    Object result = method.invoke(grants, args);
+                    if ("findToken".equals(method.getName())
+                            && OAuth2AuthorizationService.DEVICE_CODE.equals(args[0])) {
+                        read.countDown();
+                        assertTrue(read.await(10, java.util.concurrent.TimeUnit.SECONDS));
+                    }
+                    return result;
+                });
+        try (SecuredServer server = start(as -> { }, racing)) {
+            Map device = begin(server, "openid");
+            java.util.concurrent.ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(count);
+            try {
+                List<java.util.concurrent.Future<String>> replies = new ArrayList<java.util.concurrent.Future<String>>();
+                for (int i = 0; i < count; i++) {
+                    replies.add(workers.submit(() -> (String) json(poll(server, device.get("device_code"))).get("error")));
+                }
+                int pending = 0;
+                int slowed = 0;
+                for (java.util.concurrent.Future<String> reply : replies) {
+                    String error = reply.get(15, java.util.concurrent.TimeUnit.SECONDS);
+                    if ("authorization_pending".equals(error)) { pending++; }
+                    if ("slow_down".equals(error)) { slowed++; }
+                }
+                assertEquals(1, pending, "only one concurrent poll may claim the interval");
+                assertEquals(count - 1, slowed);
+            } finally {
+                workers.shutdownNow();
+            }
+        }
+    }
+
+    @Test
+    void invalidDecisionDoesNotSpendTheTicketOrDenyTheGrant() throws Exception {
+        try (SecuredServer server = start(as -> { })) {
+            Map device = begin(server, "openid");
+            String code = (String) device.get("user_code");
+            assertEquals(302, OAuth2Testing.signIn(server, "ada", "ada-pw").status);
+            String csrf = (String) ((Map) json(server.get(PAGE, "Accept", JSON)).get("csrf")).get("token");
+            String ticket = (String) json(postJson(server, csrf, "user_code", code)).get("ticket");
+            for (String invalid : new String[] {"approved", "", "DENY", " approve"}) {
+                Reply response = postJson(server, csrf, "user_code", code,
+                        "ticket", ticket, "decision", invalid);
+                assertEquals(400, response.status, response.toString());
+                assertEquals("invalid_request", json(response).get("error"));
+                refused(pollLater(server, device), "authorization_pending");
+            }
+            assertEquals(200, postJson(server, csrf, "user_code", code,
+                    "ticket", ticket, "decision", "approve").status);
+            assertEquals(200, pollLater(server, device).status);
+        }
     }
 
     @Test

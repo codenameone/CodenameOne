@@ -120,6 +120,23 @@ public final class InMemoryOAuth2AuthorizationService implements OAuth2Authoriza
     }
 
     @Override
+    public synchronized boolean pollToken(String kind, String tokenHash, long now, long intervalMillis) {
+        if (intervalMillis <= 0) {
+            throw new IllegalArgumentException("The polling interval must be positive");
+        }
+        Object[] row = tokenHash == null ? null : tokens.get(key(kind, tokenHash));
+        if (row == null || Boolean.TRUE.equals(row[1]) || ((Long) row[2]).longValue() <= now) {
+            return false;
+        }
+        long previous = ((Long) row[3]).longValue();
+        if (previous != 0 && (now < intervalMillis || previous > now - intervalMillis)) {
+            return false;
+        }
+        row[3] = Long.valueOf(now);
+        return true;
+    }
+
+    @Override
     public synchronized boolean extendToken(String kind, String tokenHash, long now, long expiresAt) {
         Object[] row = tokenHash == null ? null : tokens.get(key(kind, tokenHash));
         if (row == null || Boolean.TRUE.equals(row[1]) || ((Long) row[2]).longValue() <= now) {

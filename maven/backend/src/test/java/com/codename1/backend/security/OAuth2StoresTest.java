@@ -497,6 +497,45 @@ class OAuth2StoresTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void devicePollingClaimsOneIntervalAcrossProcesses(String engine) throws Exception {
+        DataSource one = open(engine);
+        DataSource two = again(engine);
+        JdbcOAuth2AuthorizationService first = new JdbcOAuth2AuthorizationService(one);
+        JdbcOAuth2AuthorizationService second = new JdbcOAuth2AuthorizationService(two);
+        first.save(grant("poll", OAuth2Authorization.PENDING, 100000L));
+        first.addToken("poll", OAuth2AuthorizationService.DEVICE_CODE, "hash", 100000L);
+        for (long now : new long[] {10000L, 15000L, 20000L}) {
+            final long instant = now;
+            CountDownLatch go = new CountDownLatch(1);
+            java.util.concurrent.ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(8);
+            try {
+                List<java.util.concurrent.Future<Boolean>> results = new ArrayList<java.util.concurrent.Future<Boolean>>();
+                for (int i = 0; i < 8; i++) {
+                    final JdbcOAuth2AuthorizationService process = i % 2 == 0 ? first : second;
+                    results.add(workers.submit(() -> {
+                        go.await();
+                        return process.pollToken(OAuth2AuthorizationService.DEVICE_CODE, "hash", instant, 5000L);
+                    }));
+                }
+                go.countDown();
+                int accepted = 0;
+                for (java.util.concurrent.Future<Boolean> result : results) {
+                    if (result.get(30, java.util.concurrent.TimeUnit.SECONDS)) { accepted++; }
+                }
+                assertEquals(1, accepted);
+                assertFalse(second.pollToken(OAuth2AuthorizationService.DEVICE_CODE, "hash", instant + 4999L, 5000L));
+            } finally {
+                workers.shutdownNow();
+            }
+        }
+        assertFalse(first.pollToken(OAuth2AuthorizationService.DEVICE_CODE, "hash", 100000L, 5000L));
+        assertFalse(first.pollToken(OAuth2AuthorizationService.DEVICE_CODE, "absent", 30000L, 5000L));
+        assertTrue(first.consumeToken(OAuth2AuthorizationService.DEVICE_CODE, "hash", 30000L));
+        assertFalse(first.pollToken(OAuth2AuthorizationService.DEVICE_CODE, "hash", 35000L, 5000L));
+    }
+
     // ------------------------------ two authorization servers, one database
 
     private static final HttpServer.Handler APP = new HttpServer.Handler() {

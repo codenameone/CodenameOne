@@ -323,6 +323,11 @@ reads and sends back in the `X-XSRF-TOKEN` header:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-csrf,indent=0]
 ----
 
+The cookie repository also stores the token in the HTTP session. It accepts
+the cookie only when it matches that session's token. A sibling subdomain
+can't gain access by injecting a known cookie or copying one from another
+session.
+
 `ignoringRequestMatchers` leaves out an endpoint that another server calls and
 that authenticates some other way. A request authenticated by a bearer token
 or an API key is never asked for the token, because a browser doesn't attach
@@ -1011,6 +1016,11 @@ grant is removed, a refresh request can't recreate it. Custom stores must
 implement `OAuth2AuthorizationService.issueTokens`: check the active grant,
 record or extend the refresh token, and extend the grant in one operation
 that's atomic with `remove`. The default implementation refuses issuance.
+
+Device polling uses `OAuth2AuthorizationService.pollToken` to check the last
+accepted poll and claim the next interval atomically. Custom stores must
+implement this operation before enabling the device grant; concurrent polls
+must not each claim the same interval.
 
 The grants are kept by the application's `OAuth2AuthorizationService` bean:
 

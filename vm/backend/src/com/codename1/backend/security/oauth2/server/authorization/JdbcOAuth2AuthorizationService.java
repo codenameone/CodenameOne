@@ -260,6 +260,23 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
     }
 
     @Override
+    public boolean pollToken(String kind, String tokenHash, long now, long intervalMillis) {
+        if (intervalMillis <= 0) {
+            throw new IllegalArgumentException("The polling interval must be positive");
+        }
+        long before = now < intervalMillis ? 0 : now - intervalMillis;
+        try {
+            return dataSource.execute("UPDATE cn1_oauth2_token SET polled_at = ? WHERE token_hash = ? "
+                    + "AND kind = ? AND used = 0 AND expires_at > ? "
+                    + "AND (polled_at = 0 OR polled_at <= ?)",
+                    new Object[] {Long.valueOf(now), tokenHash, kind, Long.valueOf(now),
+                        Long.valueOf(before)}) == 1;
+        } catch (IOException err) {
+            throw failed("claim a polling interval", err);
+        }
+    }
+
+    @Override
     public boolean extendToken(String kind, String tokenHash, long now, long expiresAt) {
         try {
             return dataSource.execute("UPDATE cn1_oauth2_token SET expires_at = CASE WHEN expires_at < ? "

@@ -1241,9 +1241,8 @@ public final class OAuth2AuthorizationServer {
             throw new Refusal(400, OAuth2ErrorCodes.EXPIRED_TOKEN,
                     "The device code has expired; start again");
         }
-        long sincePoll = now - stored.getPolledAt();
-        authorizations.touchToken(OAuth2AuthorizationService.DEVICE_CODE, hash, now);
-        if (stored.getPolledAt() > 0 && sincePoll < DEVICE_POLL_INTERVAL_SECONDS * 1000L) {
+        if (!authorizations.pollToken(OAuth2AuthorizationService.DEVICE_CODE, hash, now,
+                DEVICE_POLL_INTERVAL_SECONDS * 1000L)) {
             throw new Refusal(400, OAuth2ErrorCodes.SLOW_DOWN,
                     "Polling too often; wait five seconds longer between requests");
         }
@@ -1394,6 +1393,10 @@ public final class OAuth2AuthorizationServer {
     /// question again, as the page does, rather than refused
     private Verification verify(HttpServer.Request request, Authentication authentication,
             String typed, String decision, String ticket, boolean reask) {
+        if (decision != null && !"approve".equals(decision) && !"deny".equals(decision)) {
+            throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST,
+                    "The decision must be approve or deny");
+        }
         typed = normalizeUserCode(typed);
         String who = authentication.getName();
         String hash = OAuth2Parameters.sha256(typed);
