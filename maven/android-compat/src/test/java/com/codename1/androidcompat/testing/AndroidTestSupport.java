@@ -241,6 +241,12 @@ public final class AndroidTestSupport {
         @Override protected void onStart() { super.onStart(); event("start"); }
         @Override protected void onResume() { super.onResume(); event("resume"); }
         @Override protected void onPostResume() { super.onPostResume(); event("postResume"); }
+        @Override protected void onPause() {
+            super.onPause();
+            if ("pause".equals(getIntent().getStringExtra("finishAt"))) {
+                event("pause");
+            }
+        }
         @Override protected void onDestroy() { super.onDestroy(); event("destroy"); }
     }
 

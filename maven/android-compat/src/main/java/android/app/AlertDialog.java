@@ -461,6 +461,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
             d.mCheckedItems = checkedItems;
             d.mMultiListener = multiListener;
             d.setCancelable(cancelable);
+            d.setCanceledOnTouchOutside(cancelable);
             d.setOnCancelListener(cancelListener);
             d.setOnDismissListener(dismissListener);
             return d;

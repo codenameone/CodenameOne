@@ -989,7 +989,6 @@ public final class FragmentManagerImpl extends FragmentManager implements Layout
         if (mExecutingActions) {
             throw new IllegalStateException("FragmentManager is already executing transactions");
         }
-        execPendingActions();
         mExecutingActions = true;
         try {
             action.run();

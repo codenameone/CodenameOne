@@ -615,17 +615,29 @@ public final class ActivityThread {
     }
 
     private static void pause(Record r) {
+        r.resumed = false;
         Activity a = r.activity;
         a.mWindow.setActive(false);
         // The activity first, then its views, as Android's decor view does;
         // without the views, hasWindowFocus() stayed true under a covering
         // activity and focus-guarded work kept running.
         a.onWindowFocusChanged(false);
+        if (a.mDestroyed) {
+            return;
+        }
         r.decor.dispatchWindowFocusChanged(false);
+        if (a.mDestroyed) {
+            return;
+        }
         a.hostsDispatchPause();
+        if (a.mDestroyed) {
+            return;
+        }
         a.onPause();
-        r.resumed = false;
         for (Application.ActivityLifecycleCallbacks cb : a.mApplication.callbacks()) {
+            if (a.mDestroyed) {
+                return;
+            }
             cb.onActivityPaused(a);
         }
     }

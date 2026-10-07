@@ -1,4 +1,4 @@
-// Runs the unmodified bundled demos through user input and checks displayed pixels.
+// Runs bundled demos and a GPU attachment fixture through user input and checks displayed pixels.
 // No physical camera is used: Chromium supplies its deterministic moving test pattern.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,6 +17,22 @@ let browserName;
 let viewport;
 let deviceScaleFactor;
 let appFrame;
+const sampleSource = fs.readFileSync(new URL('../common/src/main/java/com/codenameone/playground/PlaygroundExamples.java', import.meta.url), 'utf8');
+const gpuReattachCode = sampleSource.match(/static final String GPU_SCRIPT = """([\s\S]*?)""";/)[1]
+  .replace('form.show();', `
+    Button detach = new Button("Detach GPU");
+    detach.addActionListener(e -> {
+        form.removeComponent(view);
+        view.setContinuous(true);
+        form.revalidate();
+    });
+    Button attach = new Button("Attach GPU");
+    attach.addActionListener(e -> {
+        form.add(BorderLayout.CENTER, view);
+        form.revalidate();
+    });
+    form.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(detach, attach));
+    form.show();`);
 
 async function measure(page, region, kind, screenshotPath) {
   const clip = {x: Math.floor(region.x), y: Math.floor(region.y),
@@ -73,7 +89,7 @@ async function check(name, fn) {
   try { await fn(); results.push({name, ok: true}); console.log('PASS ' + name); }
   catch (error) { results.push({name, ok: false, error: error.message}); console.error('FAIL ' + name + ': ' + error.message); }
 }
-async function run(slug, title, width, exercise, caseName = slug) {
+async function run(slug, title, width, exercise, caseName = slug, code = null) {
   const name = browserName + '-' + caseName + '-' + width + 'x' + viewport.height + '-dpr' + deviceScaleFactor;
   if (process.env.PLAYGROUND_DEMO_FILTER && !name.includes(process.env.PLAYGROUND_DEMO_FILTER)) return;
   console.log('RUN ' + name);
@@ -104,7 +120,9 @@ async function run(slug, title, width, exercise, caseName = slug) {
   page.on('pageerror', error => runtimeErrors.push(error.stack || error.message));
   try {
     await check(name + ' interaction', async () => {
-      const target = new URL(url); target.searchParams.set('sample', slug);
+      const target = new URL(url);
+      if (code) target.searchParams.set('code', Buffer.from(code).toString('base64url'));
+      else target.searchParams.set('sample', slug);
       await page.goto(target.href, {waitUntil: 'domcontentloaded', timeout: 90000});
       await page.waitForFunction(() => window.cn1Started === true || !!document.querySelector('iframe[title="Codename One Playground"]'));
       const embedded = await page.locator('iframe[title="Codename One Playground"]').elementHandles();
@@ -276,6 +294,27 @@ try {
         const width = viewport.width;
         await run('bouncing-balls', 'Bouncing Balls', width, (p, r, n) => animatedScene(p, r, n, 'balls'));
         await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'));
+        await run('3d-gpu', '3D / GPU', width, async (p, r, n) => {
+          await p.waitForTimeout(500);
+          r = await preview(p, '3D / GPU');
+          const controls = await appFrame.getByRole('button', {name: 'Detach GPU', exact: true}).boundingBox();
+          r.height = controls.y - r.y - 12;
+          await animatedScene(p, r, n + ' before detach', 'cube');
+          await clickControl(p, 'Detach GPU');
+          // Exercise a frame request while detached, then reattach the same peer.
+          await p.waitForTimeout(1000);
+          await clickControl(p, 'Attach GPU');
+          // Attachment paints asynchronously. Wait for visible content before
+          // sampling motion; a visible but frozen cube must still fail below.
+          const deadline = Date.now() + 10000;
+          let attached;
+          do {
+            await p.waitForTimeout(100);
+            attached = await measure(p, r, 'cube');
+          } while (attached.foreground <= 150 && Date.now() < deadline);
+          assert.ok(attached.foreground > 150, 'Reattached GPU scene did not become visible');
+          await animatedScene(p, r, n + ' after reattach', 'cube');
+        }, 'gpu-reattach', gpuReattachCode);
         await run('camera-capture', 'Camera', width, cameraDemo);
         await run('camera-capture', 'Camera', width, demoNavigation, 'demo-navigation');
       }

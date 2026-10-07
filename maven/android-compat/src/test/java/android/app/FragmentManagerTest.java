@@ -399,4 +399,13 @@ public class FragmentManagerTest {
         fm.executePendingTransactions();
         assertEquals("A:pause A:stop A:destroyView", join(log));
     }
+    @Test public void commitNowLeavesEarlierAsyncWorkQueued() {
+        Activity a = resumedActivity();
+        Fragment queued = new Fragment(), immediate = new Fragment();
+        a.getFragmentManager().beginTransaction().add(queued,"queued").commit();
+        a.getFragmentManager().beginTransaction().add(immediate,"immediate").commitNow();
+        assertTrue(immediate.isAdded()); assertFalse(queued.isAdded());
+        a.getFragmentManager().executePendingTransactions(); assertTrue(queued.isAdded());
+    }
+
 }

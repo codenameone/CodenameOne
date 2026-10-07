@@ -1415,6 +1415,9 @@ public class View implements Drawable.Callback {
         }
         boolean gone = mVisibility == GONE || visibility == GONE;
         mVisibility = visibility;
+        if (mBackground != null) {
+            mBackground.setVisible(visibility == VISIBLE, false);
+        }
         if (visibility != VISIBLE) {
             // A hidden view keeps no focus, as on Android: it, or a focused
             // descendant of a hidden group, would otherwise stay findFocus()

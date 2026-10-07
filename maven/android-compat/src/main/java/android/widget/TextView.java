@@ -578,10 +578,9 @@ public class TextView extends View {
 
     public void setInputType(int type) {
         mInputType = type;
-        if ((type & InputType.TYPE_TEXT_FLAG_MULTI_LINE) == 0 && (type & InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT
-                && this instanceof EditText) {
-            mSingleLine = true;
-            mMaxLines = 1;
+        if ((type & InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT && this instanceof EditText) {
+            mSingleLine = (type & InputType.TYPE_TEXT_FLAG_MULTI_LINE) == 0;
+            mMaxLines = mSingleLine ? 1 : Integer.MAX_VALUE;
         }
         textChanged();
     }
@@ -693,7 +692,9 @@ public class TextView extends View {
     }
 
     public boolean hasSelection() {
-        return false;
+        int start = getSelectionStart();
+        int end = getSelectionEnd();
+        return start >= 0 && end >= 0 && start != end;
     }
 
     // ------------------------------------------------------------ saved state
@@ -1055,6 +1056,8 @@ public class TextView extends View {
             if (mCompound[i] != null) {
                 mCompound[i].setCallback(null);
             }
+        }
+        for (int i = 0; i < 4; i++) {
             mCompound[i] = n[i];
             if (n[i] != null) {
                 n[i].setCallback(this);
