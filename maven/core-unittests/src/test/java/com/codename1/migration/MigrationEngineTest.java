@@ -96,6 +96,21 @@ class MigrationEngineTest {
     }
 
     @Test
+    void renamedAppliedMigrationRequiresRepair() throws IOException {
+        FakeMigrationTarget target = new FakeMigrationTarget();
+        migrator(target, MigrationSet.builder("default").sql("1", "old name", "S1").build()).migrate();
+        Migrator renamed = migrator(target,
+                MigrationSet.builder("default").sql("1", "new name", "S1").build());
+        MigrationException failure = assertThrows(MigrationException.class, renamed::validate);
+        assertEquals(MigrationException.VALIDATE_FAILED, failure.getCode());
+        assertTrue(failure.getMessage().contains("description of version 1"));
+        assertThrows(MigrationException.class, renamed::migrate);
+        renamed.repair();
+        renamed.validate();
+        assertEquals(0, renamed.migrate().getMigrationsExecuted());
+    }
+
+    @Test
     void onlyTheNewVersionRunsAfterAnUpgrade() throws IOException {
         FakeMigrationTarget target = new FakeMigrationTarget();
         migrator(target, two().build()).migrate();

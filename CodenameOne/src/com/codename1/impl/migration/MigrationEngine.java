@@ -289,6 +289,10 @@ public final class MigrationEngine {
                 problem(problems, "version " + row.version + " was applied as " + row.type + " and is now "
                         + entry.type());
             }
+            if (!entry.description().equals(row.description)) {
+                problem(problems, "description of version " + row.version + " was " + row.description
+                        + " and is now " + entry.description() + "; repair the history after confirming the rename");
+            }
         }
         if (drift) {
             for (MigrationEntry entry : resolved) {
