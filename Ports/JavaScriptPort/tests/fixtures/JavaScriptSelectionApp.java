@@ -94,7 +94,38 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 super.keyReleased(keyCode);
             }
         };
-        if (query.indexOf("review=autocompletemutation") >= 0) {
+        if (query.indexOf("review=nativepolicy") >= 0) {
+            TextField field = new TextField("Policy value"); field.setName("nativePolicy");
+            Button toggle = new Button("Toggle native input");
+            toggle.addActionListener(e -> com.codename1.ui.util.UITimer.timer(400, false, form,
+                () -> TextField.setUseNativeTextInput(!TextField.isUseNativeTextInput())));
+            form.addAll(field, toggle);
+        } else if (query.indexOf("review=custompainter") >= 0) {
+            com.codename1.ui.layouts.LayeredLayout layout = new com.codename1.ui.layouts.LayeredLayout();
+            Container layers = new Container(layout); layers.setPreferredH(160);
+            TextArea area = new TextArea("Painter covered value", 3, 24); area.setName("painterCovered");
+            Container cover = new Container();
+            cover.getAllStyles().setBgTransparency(0);
+            cover.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createEmpty());
+            Button configure = new Button("Configure painter");
+            configure.addActionListener(e -> {
+                cover.getAllStyles().setBgPainter((g, rect) -> {
+                    g.setColor(0xff0000); g.fillRect(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+                });
+                form.repaint();
+                status.setText("Painter configured " + cover.getWidth() + "x" + cover.getHeight());
+            });
+            layers.addAll(area, cover);
+            layout.setInsets(area, "0"); layout.setInsets(cover, "0 0 50% 80%");
+            form.addAll(layers, configure, status);
+        } else if (query.indexOf("review=readback") >= 0) {
+            TextField field = new TextField("Readback field value"); field.setName("readbackField");
+            TextArea area = new TextArea("Readback area value", 2, 24); area.setName("readbackArea");
+            area.setEditable(false);
+            Button capture = new Button("Capture display");
+            capture.addActionListener(e -> Display.getInstance().screenshot(img -> status.setText("Display captured")));
+            form.addAll(field, area, capture, status);
+        } else if (query.indexOf("review=autocompletemutation") >= 0) {
             TextField area = new TextField("Autofill value"); area.setName("autocompleteMutation");
             form.add(area);
             for (final String token : new String[] {"off", "one-time-code", "clear"}) {
@@ -374,7 +405,8 @@ public class JavaScriptSelectionApp extends Lifecycle {
             field.setName("numericModel");
             Button change = new Button("Change numeric model");
             change.addActionListener(e -> field.setText("Still not numeric"));
-            form.addAll(field, change);
+            field.addDataChangedListener((type, index) -> status.setText("Numeric model " + field.getText()));
+            form.addAll(field, change, status);
         } else if (query.indexOf("review=linemode") >= 0) {
             TextArea area = new TextArea("Changing line mode", 2, 24);
             area.setName("changingLineMode");

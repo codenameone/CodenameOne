@@ -45,6 +45,17 @@ public class Accessor {
         form.moveFocusByTab(backwards);
     }
 
+    /** Reserved width from the actual CN1 row layout. */
+    public static int getNativeTextWrappingGap(TextArea ta) {
+        ta.getLines(); // Ensure the cached row layout and its reserved width are current.
+        return ta.textWrappingGap;
+    }
+
+    /** Whether a component painter may draw beyond its style background. */
+    public static boolean hasCustomBackgroundPainter(Component c) {
+        return !c.isDefaultBackgroundPainter(c.getStyle());
+    }
+
     /** Reflect browser caret/selection scrolling in the CN1 text component. */
     public static void setNativeTextScrollY(TextArea ta, int scrollY) {
         if (ta.getScrollY() != scrollY) ta.setScrollY(scrollY);

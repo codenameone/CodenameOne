@@ -1,0 +1,25 @@
+{
+ "pr": 5952,
+ "rebaseline": {
+  "linux-x64@amd-epyc-9v45-96-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.539,
+      "time": 0.641,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.414,
+     "reason": "Linux x64 CI run 37581971584 completed successfully and measured lower translator self all-core RAM (0.41x versus 0.54x); record the measured improvement.",
+     "runs": 1,
+     "time": 0.641,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  }
+ }
+}

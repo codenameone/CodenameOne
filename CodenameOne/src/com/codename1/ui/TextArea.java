@@ -194,6 +194,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     // problematic  maxSize = 20; //maximum size (number of characters) that can be stored in this TextField.
     private int widthForRowCalculations = -1;
+    // Width reserved by row layout, also used by native text rendering.
+    int textWrappingGap;
     private int rowsGap = 2;
     private boolean triggerClose;
     private EventDispatcher actionListeners = null;
@@ -1121,6 +1123,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     private void initRowString() {
+        textWrappingGap = 0;
         if (!Display.getInstance().isEdt()) {
             if (rowStrings == null) {
                 rowStrings = new ArrayList();
@@ -1210,8 +1213,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         // if there is any possibility of a scrollbar we need to reduce the textArea
         // width to accommodate it
         if (textLength / minCharactersInRow > Math.max(2, rows)) {
-            textAreaWidth -= getUIManager().getLookAndFeel().getVerticalScrollWidth();
-            textAreaWidth -= charWidth / 2;
+            textWrappingGap = getUIManager().getLookAndFeel().getVerticalScrollWidth() + charWidth / 2;
+            textAreaWidth -= textWrappingGap;
         }
         String unsupported = getUnsupportedChars();
 

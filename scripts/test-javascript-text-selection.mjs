@@ -67,6 +67,34 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    await openReview('nativepolicy');
+    const policy = page.locator('.cn1-selection-editor[name="nativePolicy"]');
+    await policy.waitFor({state: 'visible'});
+    await clickButton('Toggle native input');
+    await policy.waitFor({state: 'hidden'});
+    await clickButton('Toggle native input');
+    await policy.waitFor({state: 'visible'});
+    console.log('PASS', name, 'native input policy refreshes static editors');
+
+    await openReview('custompainter');
+    await clickButton('Configure painter');
+    await page.waitForFunction(() => document.body.innerText.includes('Painter configured'));
+    await page.locator('.cn1-selection-editor[name="painterCovered"]').waitFor({state: 'hidden'});
+    console.log('PASS', name, 'custom background painter occludes native text');
+
+    await openReview('readback');
+    const readback = page.locator('.cn1-selection-editor[name="readbackField"]');
+    await readback.waitFor({state: 'visible'});
+    await page.evaluate(() => { window.__cn1TextDraws = []; });
+    await clickButton('Capture display');
+    await page.waitForFunction(() => document.body.innerText.includes('Display captured'));
+    const capturedDraws = await page.evaluate(() => window.__cn1TextDraws);
+    assert.ok(capturedDraws.includes('Readback field value'), 'display capture rasterizes field text');
+    assert.ok(capturedDraws.includes('Readback area value'), 'display capture rasterizes readonly area text');
+    await readback.fill('Edited after capture');
+    await page.waitForFunction(() => window.__cn1TextDraws.includes('Edited after capture'));
+    console.log('PASS', name, 'display screenshot rasterizes persistent editors and editing continues');
+
     await openReview('autocompletemutation');
     for (const token of ['off', 'one-time-code', 'clear']) {
       await clickButton('Autocomplete ' + token);
@@ -165,6 +193,10 @@ async function exercise(context, name, host, mobileDevice = null) {
         const inset = css.clipPath.match(/[\d.]+/g)?.map(Number);
         return inset && (rtl ? inset[3] : inset[1]) > 0;
       }, rtl);
+      assert.ok(await scrolling.evaluate((el, rtl) => {
+        const css = getComputedStyle(el), inset = css.clipPath.match(/[\d.]+/g).map(Number);
+        return parseFloat(rtl ? css.paddingLeft : css.paddingRight) > (rtl ? inset[3] : inset[1]);
+      }, rtl), 'native layout reserves the scrollbar plus half-character row gap');
       const gutter = await scrolling.evaluate((el, rtl) => {
         const box = el.getBoundingClientRect(), inset = getComputedStyle(el).clipPath.match(/[\d.]+/g).map(Number);
         return {x: rtl ? box.left + inset[3] / 2 : box.right - inset[1] / 2, top: box.top, bottom: box.bottom};
@@ -482,7 +514,18 @@ async function exercise(context, name, host, mobileDevice = null) {
     assert.equal(await numeric.getAttribute('inputmode'), 'numeric');
     await clickButton('Change numeric model');
     await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[aria-label="numericModel"]').value === 'Still not numeric');
-    console.log('PASS', name, 'numeric keyboard hints preserve arbitrary model values');
+    await numeric.fill('-123');
+    await page.waitForFunction(() => document.body.innerText.includes('Numeric model -123'));
+    await numeric.press('End');
+    await numeric.pressSequentially('a');
+    await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[name="numericModel"]').value === '-123');
+    await numeric.fill('12.3letters');
+    await page.waitForFunction(() => document.querySelector('.cn1-selection-editor[name="numericModel"]').value === '-123');
+    assert.ok((await page.locator('body').innerText()).includes('Numeric model -123'));
+    await numeric.fill('');
+    await numeric.pressSequentially('456');
+    await page.waitForFunction(() => document.body.innerText.includes('Numeric model 456'));
+    console.log('PASS', name, 'numeric user edits enforce integers while programmatic display values survive');
 
     await openReview('linemode');
     for (const tag of ['TEXTAREA', 'INPUT', 'TEXTAREA']) {

@@ -1221,7 +1221,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (right <= left || bottom <= top) return false;
         if (!(c instanceof Container)) return true;
         Style style = c.getStyle();
-        if (style.getBgTransparency() != 0 || style.getBgImage() != null
+        if (Accessor.hasCustomBackgroundPainter(c) || style.getBgTransparency() != 0 || style.getBgImage() != null
                 || style.getBorder() != null && !style.getBorder().isEmptyBorder()) return true;
         Container container = (Container) c;
         for (int i = 0; i < container.getComponentCount(); i++) {
@@ -1389,7 +1389,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             releaseEditingOwnership();
             if (wasEditing && ta.isEditable() && ta.isEnabled()) {
                 commit(value);
-                Display.getInstance().onEditingComplete(ta, value);
+                Display.getInstance().onEditingComplete(ta, ta.getText());
             }
             ta.repaint();
             List<Runnable> callbacks = stopCallbacks;
@@ -1429,6 +1429,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         private void commit(String value) {
             if (!ta.isEditable() || !ta.isEnabled()) return;
+            // A text input preserves arbitrary programmatic NUMERIC values, unlike
+            // type=number. Enforce the integer constraint on user edits before they
+            // reach the model, including paste and input methods.
+            if ((ta.getConstraint() & 0xffff) == TextArea.NUMERIC && !value.equals(ta.getText())) {
+                for (int i = 0; i < value.length(); i++) {
+                    char ch = value.charAt(i);
+                    if ((ch < '0' || ch > '9') && !(i == 0 && ch == '-')) {
+                        el.setValue(ta.getText());
+                        return;
+                    }
+                }
+            }
             browserEdit = true;
             try {
                 lastValue = value;
@@ -1469,7 +1481,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             int x = ta.getAbsoluteX() + ta.getScrollX(), y = ta.getAbsoluteY() + ta.getScrollY();
             int left = x, top = y, right = x + ta.getWidth(), bottom = y + ta.getHeight();
             // CN1 paints and handles its own interactive scrollbar. Keep that
-            // strip on the canvas, without changing native text layout or wrapping.
+            // strip on the canvas; content padding below also reserves the row-layout gap.
             if (!singleLine && ta.getUIManager().getLookAndFeel().isInteractiveScroll() && ta.getSideGap() > 0) {
                 int border = ta.getStyle().getBorder() == null ? 0 : ta.getStyle().getBorder().getThickness();
                 if (ta.isRTL()) left += ta.getSideGap() + border;
@@ -1515,15 +1527,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (lines > 0 && ta.getVerticalAlignment() == Component.CENTER) pt += remaining / 2;
                 else if (lines > 0 && ta.getVerticalAlignment() == Component.BOTTOM) pt += remaining;
             }
+            int paddingLeft = style.getPadding(ta.isRTL(), Component.LEFT);
+            int paddingRight = style.getPadding(ta.isRTL(), Component.RIGHT);
+            int wrappingGap = singleLine ? 0 : Accessor.getNativeTextWrappingGap(ta);
+            if (ta.isRTL()) paddingLeft += wrappingGap;
+            else paddingRight += wrappingGap;
             int alignment = DefaultLookAndFeel.reverseAlignForBidi(ta, style.getAlignment());
+            // Readback requires glyphs on the canvas. Keep the transparent control
+            // for browser selection, caret and editing without painting text twice.
+            String textColor = textLayerDisabledByReadback ? "transparent"
+                    : HTML5Graphics.colorWithAlpha((style.getFgAlpha() << 24) | (style.getFgColor() & 0xffffff));
             String css = "position:absolute;box-sizing:border-box;border:0;margin:0;outline:0;resize:none;"
                     + "background:transparent;overflow:hidden;pointer-events:auto;user-select:text;cursor:text;"
                     + "z-index:2147483644;display:block;left:" + scaleCoord(x) + "px;top:" + scaleCoord(y)
                     + "px;width:" + scaleCoord(ta.getWidth()) + "px;height:" + scaleCoord(ta.getHeight())
-                    + "px;padding:" + scaleCoord(pt) + "px " + scaleCoord(style.getPadding(ta.isRTL(), Component.RIGHT))
-                    + "px " + scaleCoord(pb) + "px " + scaleCoord(style.getPadding(ta.isRTL(), Component.LEFT))
+                    + "px;padding:" + scaleCoord(pt) + "px " + scaleCoord(paddingRight)
+                    + "px " + scaleCoord(pb) + "px " + scaleCoord(paddingLeft)
                     + "px;font:" + font.getScaledCSS() + ";line-height:" + scaleCoord(font.fontHeight() + ta.getRowsGap())
-                    + "px;color:" + HTML5Graphics.colorWithAlpha((style.getFgAlpha() << 24) | (style.getFgColor() & 0xffffff)) + ";direction:" + (ta.isRTL() ? "rtl" : "ltr")
+                    + "px;color:" + textColor + ";caret-color:" + HTML5Graphics.color(style.getFgColor())
+                    + ";direction:" + (ta.isRTL() ? "rtl" : "ltr")
                     + ";text-align:" + (alignment == Component.CENTER ? "center"
                         : alignment == Component.RIGHT ? "right" : "left")
                     + ";clip-path:inset(" + scaleCoord(top - y) + "px " + scaleCoord(x + ta.getWidth() - right)
@@ -6669,6 +6691,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public boolean isNativeEditorVisible(Component c, Graphics g) {
+        if (textLayerDisabledByReadback && c.getNativeOverlay() instanceof SelectionTextOverlay
+                && !(isEditing && currentEditingField == c && currentInputField != ((NativeOverlay)c.getNativeOverlay()).el)) {
+            return false;
+        }
         return isDisplayGraphics(g) && isNativeEditorVisible(c);
     }
 
@@ -7192,7 +7218,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             resolvedType = "email";
         } else if (base == TextArea.NUMERIC && !persistent) {
             // Persistent controls also render the model while unfocused. Constraints
-            // are keyboard hints; type=number would erase nonnumeric model text.
+            // are enforced on user input; type=number would erase nonnumeric model text.
             resolvedType = "number";
         } else if (base == TextArea.PHONENUMBER) {
             resolvedType = "tel";
@@ -8159,7 +8185,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             pendingReadbacks.add(callback);
             return;
         }
-        if (textLayer != null && !textLayer.isSuspended()) {
+        if (textLayer != null && !textLayerDisabledByReadback) {
             textLayer.setSuspended(true);
             textLayerDisabledByReadback = true;
             readbackRepaintPending = true;
