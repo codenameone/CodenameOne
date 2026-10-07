@@ -500,6 +500,18 @@ public class OidcIdTokenTest extends UITestBase {
 
     // ---- the authorization response -----------------------------------------
 
+    @Test
+    void anInitialOpenIdResponseRequiresAnIdTokenButRefreshDoesNot() {
+        OidcTestSupport.Outcome<OidcTokens> result = redirect("code=c&state=s", "s", "n");
+        assertNull(result.value);
+        assertEquals(OidcException.INVALID_ID_TOKEN, ((OidcException) result.error).getError());
+        assertNull(store.saved);
+        assertNull(refresh().error, "refresh may omit the ID token");
+        client.setScopes("profile");
+        assertNull(redirect("code=c&state=s", "s", "n").error,
+                "plain OAuth does not require an ID token");
+    }
+
     private OidcTestSupport.Outcome<OidcTokens> redirect(String query, String state, String nonce) {
         AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
         client.handleRedirect(REDIRECT + "?" + query, state, nonce, PkceChallenge.generate(), out);

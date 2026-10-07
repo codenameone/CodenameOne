@@ -485,6 +485,33 @@ class AuthorizationServerTest {
     }
 
     @Test
+    void reauthenticationParametersCannotReuseAnOldSession() throws Exception {
+        try (SecuredServer server = start()) {
+            assertEquals(302, OAuth2Testing.signIn(server, "ada", "ada-pw").status);
+            String url = authorizeUrl("app", APP_REDIRECT, "openid",
+                    OAuth2Parameters.random(32), "reauth", null);
+            for (String parameter : new String[] {"prompt=login", "prompt=consent%20login", "max_age=0"}) {
+                Reply reply = server.get(url + "&" + parameter, "Accept", "text/html");
+                Map<String, String> answer = query(reply.header("Location"));
+                assertEquals("login_required", answer.get("error"), parameter);
+                assertNull(answer.get("code"));
+                assertEquals("reauth", answer.get("state"));
+            }
+            assertNotNull(query(server.get(url + "&max_age=60").header("Location")).get("code"));
+            clock.now += 61000;
+            assertEquals("login_required", query(server.get(url + "&max_age=60&prompt=none")
+                    .header("Location")).get("error"));
+            for (String parameter : new String[] {"max_age=-1", "max_age=oops", "prompt=none%20login"}) {
+                assertEquals("invalid_request", query(server.get(url + "&" + parameter)
+                        .header("Location")).get("error"), parameter);
+            }
+            // A fresh credential check updates auth_time; the next request may use it.
+            assertEquals(302, OAuth2Testing.signIn(server, "ada", "ada-pw").status);
+            assertNotNull(query(server.get(url + "&max_age=60").header("Location")).get("code"));
+        }
+    }
+
+    @Test
     @DisplayName("a request whose client or redirect address is wrong is never redirected")
     void authorizeRefusedWithoutRedirect() throws Exception {
         try (SecuredServer server = start()) {

@@ -72,7 +72,8 @@ public final class OAuth2AuthorizationServer {
     private static final long PURGE_INTERVAL_MILLIS = 60000;
     private static final long PURGE_GRACE_MILLIS = 600000;
     private static final long REUSE_GRACE_MILLIS = 10000;
-    private static final String AUTH_TIME = "cn1.security.oauth2.authTime";
+    /// Session attribute holding the last completed credential check, in epoch seconds.
+    public static final String AUTH_TIME = "cn1.security.oauth2.authTime";
     private static final String DEVICE_TICKET = "cn1.security.oauth2.deviceTicket";
     /// The attribute of a grant that holds the resource servers it is for.
     private static final String RESOURCE = "resource";
@@ -410,8 +411,38 @@ public final class OAuth2AuthorizationServer {
             return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.INVALID_REQUEST,
                     "code_challenge_method must be S256, with a 43 character challenge");
         }
+        Set<String> prompts = OAuth2Parameters.scopes(request.queryParam("prompt"));
+        if (prompts.contains("none") && prompts.size() > 1) {
+            return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.INVALID_REQUEST,
+                    "prompt=none cannot be combined with another prompt");
+        }
+        long maxAge = -1;
+        String maxAgeParameter = request.queryParam("max_age");
+        if (maxAgeParameter != null) {
+            try {
+                maxAge = Long.parseLong(maxAgeParameter);
+                if (maxAge < 0) {
+                    throw new NumberFormatException("negative max_age");
+                }
+            } catch (NumberFormatException invalid) {
+                return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.INVALID_REQUEST,
+                        "max_age must be a nonnegative integer");
+            }
+        }
+        long now = clock.currentTimeMillis();
+        HttpSession session = request.getSession(false);
+        Object authenticatedAt = session == null ? null : session.getAttribute(AUTH_TIME);
+        boolean tooOld = maxAge >= 0 && (maxAge == 0 || !(authenticatedAt instanceof Number)
+                || now / 1000L - ((Number) authenticatedAt).longValue() > maxAge);
+        if (prompts.contains("login") || tooOld) {
+            // The endpoint cannot silently reuse the current authentication, nor
+            // redirect the same prompt=login request in an endless login loop.
+            // Tell the RP that it must arrange a fresh credential check.
+            return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.LOGIN_REQUIRED,
+                    "Fresh authentication is required");
+        }
         if (authentication == null) {
-            if ("none".equals(request.queryParam("prompt"))) {
+            if (prompts.contains("none")) {
                 return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.LOGIN_REQUIRED,
                         "Nobody is signed in");
             }
@@ -423,7 +454,6 @@ public final class OAuth2AuthorizationServer {
             throw new InsufficientAuthenticationException(
                     "Full authentication is required to authorize a client");
         }
-        long now = clock.currentTimeMillis();
         Map<String, Object> attributes = new LinkedHashMap<String, Object>();
         attributes.put("redirect_uri", redirectUri);
         attributes.put("redirect_uri_sent", Boolean.valueOf(asked != null));
@@ -456,9 +486,8 @@ public final class OAuth2AuthorizationServer {
         return redirect(OAuth2Parameters.append(redirectUri, answer));
     }
 
-    /// When the user of this session signed in, in epoch seconds: the first
-    /// time this endpoint saw them signed in, which is the request the sign-in
-    /// came back to.
+    /// When this session completed a credential check, in epoch seconds.
+    /// Authentication supplied without a session has no stored sign-in time.
     private static long authTime(HttpServer.Request request, long now) {
         HttpSession session = request.getSession(false);
         if (session == null) {
@@ -468,7 +497,6 @@ public final class OAuth2AuthorizationServer {
         if (known instanceof Number) {
             return ((Number) known).longValue();
         }
-        session.setAttribute(AUTH_TIME, Long.valueOf(now / 1000L));
         return now / 1000L;
     }
 

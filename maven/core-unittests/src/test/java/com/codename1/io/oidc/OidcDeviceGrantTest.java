@@ -83,7 +83,7 @@ public class OidcDeviceGrantTest extends UITestBase {
                         .deviceAuthorizationEndpoint(DEVICE_EP)
                         .build())
                 .setClientId("tv")
-                .setScopes("openid", "pets.read")
+                .setScopes("pets.read")
                 .setTokenStore(store);
         client.devicePollUnitMillis = UNIT;
         TestCodenameOneImplementation.getInstance().setNetworkMockHandler(
@@ -122,6 +122,7 @@ public class OidcDeviceGrantTest extends UITestBase {
 
     @Test
     void theAuthorizationRequestCarriesTheClientAndScopesAndIsParsed() {
+        client.setScopes("openid", "pets.read");
         OidcDeviceAuthorization d = start();
 
         assertEquals(1, deviceRequests.size());
@@ -134,6 +135,18 @@ public class OidcDeviceGrantTest extends UITestBase {
         assertEquals(1, d.getInterval());
         assertFalse(d.isExpired());
         assertNotNull(d.getExpiresAt());
+    }
+
+    @Test
+    void anOpenIdDeviceGrantCannotSignInWithoutAnIdToken() {
+        client.setScopes("openid", "pets.read");
+        script.add("tokens");
+        OidcRequestAuthorizer authorizer = new OidcRequestAuthorizer(client);
+        OidcTestSupport.Outcome<OidcTokens> result = await(client.pollDeviceToken(start()));
+        assertNull(result.value);
+        assertEquals(OidcException.INVALID_ID_TOKEN, ((OidcException) result.error).getError());
+        assertNull(store.saved);
+        assertFalse(authorizer.isSignedIn());
     }
 
     @Test

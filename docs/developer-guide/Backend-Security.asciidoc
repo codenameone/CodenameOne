@@ -1143,6 +1143,13 @@ It also carries `nonce`, `auth_time`, `azp` and `at_hash`. Without a
 `email` scope yields nothing, because the server doesn't know that a username
 is an address.
 
+The authorization endpoint returns `login_required` for `prompt=login`,
+`max_age=0`, or a session whose last credential check is older than `max_age`.
+It also refuses a bounded-age request when the session has no recorded sign-in
+time. The relying party must arrange a fresh sign-in before retrying. The
+server issues no code when fresh authentication is required. A completed sign-in
+updates `auth_time`, including a sign-in completed with a second factor.
+
 An access token is verified by its signature alone. Revoking a grant stops its
 refresh token and its answers at `/userinfo`, but an access token that's
 already issued stays good until it expires. Keep access tokens short.
@@ -1325,7 +1332,10 @@ as they are. The chain serves no page.
 "Signed in" means in this session. Somebody a `remember-me` cookie brought back
 is asked to sign in before they may add or remove a passkey. A ceremony's
 options wait in the session for five minutes, and a challenge is answered
-once.
+once. The memory and database session stores consume those options atomically,
+including across server instances sharing the database. A custom `SessionStore`
+must implement `consumeAttribute` with the same guarantee; the default refuses
+the ceremony instead of using a separate read and delete.
 
 A passkey whose authenticator verified the user, with a fingerprint, a face or
 a PIN, is two factors in one step. It signs the user in without `mfa` asking

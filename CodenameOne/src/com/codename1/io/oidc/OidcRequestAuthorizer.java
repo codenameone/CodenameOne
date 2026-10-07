@@ -113,6 +113,8 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     private final ArrayList<SignInRequiredListener> listeners =
             new ArrayList<SignInRequiredListener>();
     private OidcTokens tokens;
+    /// Changes when tokens are replaced or a newer load starts; EDT-owned.
+    private long tokenGeneration;
     /// The exchange in progress, shared by every request refused or held while it runs.
     private AsyncResource<Boolean> renewal;
     /// The client's exchange behind `renewal`, kept so that signing out can abandon it.
@@ -178,12 +180,24 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
     /// a resource that completes with the tokens, or with null when nothing was stored
     public AsyncResource<OidcTokens> load() {
         final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
+        final long[] generation = new long[1];
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                tokenGeneration++;
+                generation[0] = tokenGeneration;
+            }
+        });
         client.loadStoredTokens().ready(new SuccessCallback<OidcTokens>() {
             @Override
             public void onSucess(final OidcTokens stored) {
                 Runnable take = new Runnable() {
                     @Override
                     public void run() {
+                        if (generation[0] != tokenGeneration) {
+                            out.complete(null);
+                            return;
+                        }
                         if (stored != null) {
                             tokens = stored;
                         }
@@ -199,8 +213,22 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
             }
         }).except(new SuccessCallback<Throwable>() {
             @Override
-            public void onSucess(Throwable err) {
-                out.error(err);
+            public void onSucess(final Throwable err) {
+                Runnable fail = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (generation[0] == tokenGeneration) {
+                            out.error(err);
+                        } else {
+                            out.complete(null);
+                        }
+                    }
+                };
+                if (!Display.isInitialized() || CN.isEdt()) {
+                    fail.run();
+                } else {
+                    CN.callSerially(fail);
+                }
             }
         });
         return out;
@@ -233,6 +261,7 @@ public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive 
             @Override
             public void run() {
                 OidcRequestAuthorizer.this.tokens = tokens;
+                tokenGeneration++;
                 if (tokens == null) {
                     abandonRenewal();
                 }

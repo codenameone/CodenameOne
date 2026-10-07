@@ -177,6 +177,41 @@ public class OidcRequestAuthorizerTest extends UITestBase {
     }
 
     @Test
+    void aLoadCannotUndoSignOutOrReplaceANewerSignIn() {
+        for (boolean signInAgain : new boolean[] {false, true}) {
+            final com.codename1.util.AsyncResource<OidcTokens> pending =
+                    new com.codename1.util.AsyncResource<OidcTokens>();
+            client.setTokenStore(new TokenStore() {
+                public com.codename1.util.AsyncResource<OidcTokens> load(String key) {
+                    return pending;
+                }
+                public com.codename1.util.AsyncResource<Boolean> save(String key, OidcTokens value) {
+                    return store.save(key, value);
+                }
+                public com.codename1.util.AsyncResource<Boolean> clear(String key) {
+                    return store.clear(key);
+                }
+            });
+            com.codename1.util.AsyncResource<OidcTokens> loading = authorizer.load();
+            await(authorizer.signOut());
+            if (signInAgain) {
+                authorizer.setTokens(tokens("NEW", "NEW-RT"));
+            }
+            pending.complete(tokens("STALE", "OLD-RT"));
+            assertNull(await(loading).value, "an invalidated load must not return stale tokens");
+            if (signInAgain) {
+                assertEquals("NEW", authorizer.getTokens().getAccessToken());
+            } else {
+                assertFalse(authorizer.isSignedIn());
+                Probe request = new Probe(API + "/pets");
+                NetworkManager.getInstance().addToQueue(request);
+                settle(request);
+                assertEquals(Collections.singletonList("null"), seenByApi);
+            }
+        }
+    }
+
+    @Test
     void anExpiredAccessTokenIsRefreshedAndTheRequestSentAgain() {
         authorizer.setTokens(tokens("AT-1", "RT-1"));
 

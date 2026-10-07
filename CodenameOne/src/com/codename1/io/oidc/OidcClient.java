@@ -953,6 +953,11 @@ public final class OidcClient {
                     return;
                 }
                 final OidcTokens tokens = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);
+                if (refreshTokenFallback == null && requestsOpenId() && tokens.getIdToken() == null) {
+                    out.error(new OidcException(OidcException.INVALID_ID_TOKEN,
+                            "An initial OpenID Connect response must contain an ID token"));
+                    return;
+                }
                 // Nothing is stored, told or returned until the ID token has been held to
                 // its issuer, its audience and its signature.
                 checkIdToken(tokens, enforceNonce ? expectedNonce : null, new Runnable() {
@@ -999,6 +1004,17 @@ public final class OidcClient {
     /// does not hold has the set fetched again, but not more often than this. A test
     /// shortens it.
     long jwksRefetchMillis = 60000;
+
+    private boolean requestsOpenId() {
+        if (scopes != null) {
+            for (int i = 0; i < scopes.length; i++) {
+                if ("openid".equals(scopes[i])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     /// Holds the ID token of a token response to what [IdTokenVerifier] asks of one, then
     /// runs `accepted`; fails `out` otherwise. A response with no ID token has nothing to

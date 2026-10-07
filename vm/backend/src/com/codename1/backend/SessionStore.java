@@ -41,6 +41,16 @@ public interface SessionStore {
     /// Forgets a session.
     void delete(String id) throws IOException;
 
+    /// Atomically removes and returns an attribute from the stored session.
+    /// Concurrent callers, including callers in other server instances, must
+    /// receive a given value at most once. Used for single-use security challenges.
+    /// Custom stores must implement this before serving passkey ceremonies; the
+    /// default fails closed instead of emulating an unsafe load/save sequence.
+    /// @since 8.0
+    default Object consumeAttribute(String id, String name) throws IOException {
+        throw new IOException("This session store does not support atomic attribute consumption");
+    }
+
     /// Drops every session that has expired by `now`; answers how many.
     int purgeExpired(long now) throws IOException;
 

@@ -634,6 +634,18 @@ class JwtCodecTest {
         assertFalse(failed instanceof BadJwtException, failed.toString());
         assertEquals("Could not get the keys to verify the token with: GET " + uri
                 + " answered 503", failed.getMessage());
+        for (int i = 0; i < 20; i++) {
+            assertThrows(JwtException.class, () -> blind.decode(k1));
+            assertThrows(IOException.class, none::refresh);
+        }
+        assertEquals(1, dead.asked.size(), "failed initial fetches are throttled too");
+        time.seconds += 31;
+        assertThrows(JwtException.class, () -> blind.decode(k1));
+        assertEquals(2, dead.asked.size());
+        dead.down = false;
+        dead.documents.put(uri, JwkSet.of(first).toJson());
+        time.seconds += 31;
+        assertEquals("ada", blind.decode(k1).getSubject());
     }
 
     @Test
@@ -690,6 +702,42 @@ class JwtCodecTest {
         assertNotEquals(null, slow[0]);
         assertSame(slow[0], remote.getKeys());
         assertEquals(2, calls.get());
+    }
+
+    @Test
+    void initialFetchIsSingleFlightEvenWithoutCachedKeys() throws Exception {
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        String document = JwkSet.of(rsa().withKeyId("initial")).toJson();
+        RemoteJwkSet remote = new RemoteJwkSet("https://id.example.com/jwks", uri -> {
+            calls.incrementAndGet();
+            entered.countDown();
+            try {
+                if (!release.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    throw new IOException("test did not release initial fetch");
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IOException(interrupted);
+            }
+            return document;
+        });
+        java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            java.util.concurrent.Future<List<Jwk>> first = worker.submit(remote::getKeys);
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            for (int i = 0; i < 20; i++) {
+                assertThrows(IOException.class, remote::getKeys);
+                assertThrows(IOException.class, remote::refresh);
+            }
+            assertEquals(1, calls.get());
+            release.countDown();
+            assertSame(first.get(5, java.util.concurrent.TimeUnit.SECONDS), remote.getKeys());
+        } finally {
+            release.countDown();
+            worker.shutdownNow();
+        }
     }
 
     @Test

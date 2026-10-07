@@ -272,9 +272,38 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
         return settings;
     }
 
+    /// Records credential checks without retaining the configurer or its stores.
+    private static final class AuthenticationTime implements SessionSignIn.Listener {
+        private final Clock clock;
+
+        AuthenticationTime(Clock clock) {
+            this.clock = clock;
+        }
+
+        @Override
+        public boolean requested(com.codename1.backend.HttpServer.Request request) {
+            return false;
+        }
+
+        @Override
+        public void success(com.codename1.backend.HttpServer.Request request,
+                Authentication authentication, boolean requested, boolean secondFactor) {
+            com.codename1.backend.HttpSession session = request.getSession(false);
+            if (session != null) {
+                session.setAttribute(OAuth2AuthorizationServer.AUTH_TIME,
+                        Long.valueOf(clock.currentTimeMillis() / 1000L));
+            }
+        }
+
+        @Override
+        public void failure(com.codename1.backend.HttpServer.Request request) {
+        }
+    }
+
     @Override
     public void init(HttpSecurity http) {
         AuthorizationServerSettings s = settings();
+        http.addSignInListener(new AuthenticationTime(clock == null ? Clock.SYSTEM : clock));
         // What a client calls as itself carries no session to ride on: its
         // credentials, or a bearer token, are in the request.
         CsrfConfigurer csrf = http.getConfigurer(CsrfConfigurer.class);

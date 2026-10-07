@@ -29,7 +29,6 @@ import com.codename1.backend.security.crypto.JwkSet;
 import com.codename1.backend.security.crypto.JwkSource;
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /// The keys another server publishes at its `jwks_uri`, fetched when they are
 /// first needed and kept.
@@ -41,9 +40,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 ///   so tokens with invented key ids cannot turn this server into a stream of
 ///   requests at the issuer.
 /// - One request fetches at a time. The others carry on with the set they have,
-///   and only when there is none at all -- the very first tokens after a start
-///   -- does each fetch for itself. Nothing waits on a lock: a request's thread
-///   parks on its socket and on nothing else.
+///   or fail if the first fetch has not supplied any keys yet. Failed initial
+///   fetches observe the same retry interval. No request waits for another
+///   request's network operation.
 /// - When a fetch fails and there is a set, the set goes on being used and the
 ///   fetch is tried again later. An issuer that is briefly unreachable does not
 ///   sign everybody out.
@@ -75,7 +74,7 @@ public final class RemoteJwkSet implements JwkSource {
 
     private final String uri;
     private final Fetcher fetcher;
-    private final AtomicBoolean fetching = new AtomicBoolean();
+    private boolean fetching;
     private long cacheMillis = 5 * 60 * 1000L;
     private long refreshIntervalMillis = 30 * 1000L;
     private Clock clock = Clock.SYSTEM;
@@ -118,56 +117,38 @@ public final class RemoteJwkSet implements JwkSource {
 
     @Override
     public List<Jwk> getKeys() throws IOException {
-        long now;
-        List<Jwk> have;
-        synchronized (this) {
-            now = clock.currentTimeMillis();
-            have = cached;
-            if (have != null && now - fetchedAt < cacheMillis) {
-                return have;
-            }
-            // Out of date, and tried too recently to try again: what there is.
-            if (have != null && attempted && now - attemptedAt < refreshIntervalMillis) {
-                return have;
-            }
-        }
-        return fetch(have, now);
+        return keys(false);
     }
 
-    /// The keys, fetched again unless they were fetched within the refresh
-    /// interval: what a decoder asks for when a token names a key the set does
-    /// not have.
+    /// The keys, fetched again unless a fetch is in progress or the refresh
+    /// interval has not elapsed.
     public List<Jwk> refresh() throws IOException {
+        return keys(true);
+    }
+
+    private List<Jwk> keys(boolean refresh) throws IOException {
         long now;
         List<Jwk> have;
         synchronized (this) {
             now = clock.currentTimeMillis();
             have = cached;
-            if (attempted && now - attemptedAt < refreshIntervalMillis) {
+            if (!refresh && have != null && now - fetchedAt < cacheMillis) {
+                return have;
+            }
+            // Claim the attempt in the same critical section as the interval
+            // check. Even the first fetch and its failures are single-flight.
+            if (fetching || (attempted && now - attemptedAt < refreshIntervalMillis)) {
                 if (have != null) {
                     return have;
                 }
-                throw new IOException("The keys at " + uri + " could not be fetched, and "
-                        + "fetching is not tried again so soon");
+                throw new IOException("The keys at " + uri + " are unavailable; "
+                        + "a fetch is in progress or the retry interval has not elapsed");
             }
-        }
-        return fetch(have, now);
-    }
-
-    private List<Jwk> fetch(List<Jwk> have, long now) throws IOException {
-        if (!fetching.compareAndSet(false, true)) {
-            // Somebody is at it. With a set in hand that is the answer for now;
-            // with none there is nothing to wait on, so this request asks too.
-            if (have != null) {
-                return have;
-            }
-            return store(load(), now);
+            fetching = true;
+            attempted = true;
+            attemptedAt = now;
         }
         try {
-            synchronized (this) {
-                attempted = true;
-                attemptedAt = now;
-            }
             return store(load(), now);
         } catch (IOException err) {
             if (have != null) {
@@ -175,7 +156,9 @@ public final class RemoteJwkSet implements JwkSource {
             }
             throw err;
         } finally {
-            fetching.set(false);
+            synchronized (this) {
+                fetching = false;
+            }
         }
     }
 

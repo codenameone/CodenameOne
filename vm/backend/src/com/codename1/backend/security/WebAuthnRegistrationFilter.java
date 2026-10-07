@@ -102,7 +102,8 @@ public final class WebAuthnRegistrationFilter implements SecurityFilter {
         return who.getName();
     }
 
-    private HttpServer.Response register(HttpServer.Request request, String username) {
+    private HttpServer.Response register(HttpServer.Request request, String username)
+            throws java.io.IOException {
         Map<String, Object> answer = new LinkedHashMap<String, Object>();
         try {
             Map pending = WebAuthnAuthenticationFilter.take(request, PENDING, clock);

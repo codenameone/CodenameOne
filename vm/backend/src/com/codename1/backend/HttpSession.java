@@ -138,6 +138,40 @@ public final class HttpSession {
         }
     }
 
+    /// Removes and returns an attribute once across every request and server
+    /// sharing the session store. A stale request copy cannot consume it again.
+    /// @throws java.io.IOException if the store cannot perform the atomic operation
+    /// @since 8.0
+    public Object consumeAttribute(String name) throws java.io.IOException {
+        String sessionId;
+        Object before;
+        synchronized (this) {
+            checkValid();
+            if (owner == null || fresh) {
+                return consumeLocalAttribute(name);
+            }
+            sessionId = id;
+            before = attributes.get(name);
+        }
+        Object taken = owner.getStore().consumeAttribute(sessionId, name);
+        synchronized (this) {
+            // Forget this request's snapshot without scheduling another removal
+            // at save time: a later request may already have issued new options.
+            if (attributes.get(name) == before) { //NOPMD CompareObjectsWithEquals - same snapshot
+                attributes.remove(name);
+                changed.remove(name);
+            }
+        }
+        return taken;
+    }
+
+    synchronized Object consumeLocalAttribute(String name) {
+        checkValid();
+        Object taken = attributes.get(name);
+        removeAttribute(name);
+        return taken;
+    }
+
     /// The attribute names, as a copy.
     public synchronized List getAttributeNames() {
         return new ArrayList(attributes.keySet());

@@ -162,12 +162,9 @@ public final class WebAuthnAuthenticationFilter implements SecurityFilter {
     /// answered once.
     ///
     /// - [WebAuthnException]: when none were waiting, or they waited too long
-    static Map take(HttpServer.Request request, String attribute, Clock clock) {
+    static Map take(HttpServer.Request request, String attribute, Clock clock) throws IOException {
         HttpSession session = request.getSession(false);
-        Object stored = session == null ? null : session.getAttribute(attribute);
-        if (stored != null) {
-            session.removeAttribute(attribute);
-        }
+        Object stored = session == null ? null : session.consumeAttribute(attribute);
         if (!(stored instanceof Map)) {
             throw new WebAuthnException(WebAuthnException.NO_CHALLENGE, "No ceremony was "
                     + "waiting in this session: it was not started here, or its challenge has "
