@@ -123,6 +123,7 @@ for sample_dir in "$SAMPLES"/*/; do
       FAILED=1
     fi
   done
+  bash "$SCRIPTPATH/android-gradle-incremental-test.sh" "$GAPP"
 done
 
 [ $FAILED -eq 0 ] || exit 1

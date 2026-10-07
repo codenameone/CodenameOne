@@ -2486,6 +2486,10 @@ public class View implements Drawable.Callback {
                 }
             }
             onScrollChanged(x, y, oldX, oldY);
+            ViewTreeObserver observer = getRootView().peekViewTreeObserver();
+            if (observer != null) {
+                observer.dispatchOnScrollChanged();
+            }
             if (mOnScrollChangeListener != null) {
                 mOnScrollChangeListener.onScrollChange(this, x, y, oldX, oldY);
             }

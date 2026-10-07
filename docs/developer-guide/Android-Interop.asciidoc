@@ -337,6 +337,13 @@ the gallery and automated tests cover a subset of those behaviors.
   and writers, the buffered streams and `PrintWriter`).
 * Code that loads classes by name (`Class.forName`, reflection-based libraries)
   doesn't run on iOS, with or without this runtime.
+* `PackageManager.queryIntentActivities()` exposes at most the activity the
+  runtime would launch. It doesn't enumerate every matching handler and uses
+  the default-category restriction even without `MATCH_DEFAULT_ONLY`. Apps
+  that present their own handler chooser need an explicit application registry.
+* Gradle recompiles all Java sources in an imported Android project after a
+  source edit, because relocation rewrites the compiler output. Unchanged
+  builds still use Gradle's up-to-date checks.
 * Content providers, services, broadcast intents from the system and
   notifications through `NotificationManager` aren't available; use the
   corresponding Codename One APIs through native interfaces or directly.

@@ -69,4 +69,30 @@ public class TextUtilsEllipsizeSpansTest {
             assertSame(source, TextUtils.ellipsize(source, paint, 10, modes[i]));
         }
     }
+    @Test
+    public void everyModeKeepsSurrogatePairsWholeAtEveryCutoff() {
+        AndroidTestSupport.context();
+        TextPaint paint = new TextPaint() {
+            @Override public float measureText(String text) { return text.length(); }
+        };
+        for (String text : new String[]{"\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00", "ab\ud83d\ude00cd\ud83d\ude00ef"}) {
+            for (TextUtils.TruncateAt mode : new TextUtils.TruncateAt[]{TextUtils.TruncateAt.START,
+                    TextUtils.TruncateAt.MIDDLE, TextUtils.TruncateAt.END}) {
+                for (int width = 1; width < text.length(); width++) {
+                    String result = TextUtils.ellipsize(text, paint, width, mode).toString();
+                    assertTrue(result.length() <= width);
+                    for (int j = 0; j < result.length(); j++) {
+                        char c = result.charAt(j);
+                        if (Character.isHighSurrogate(c)) {
+                            assertTrue(mode + " width " + width, j + 1 < result.length()
+                                    && Character.isLowSurrogate(result.charAt(++j)));
+                        } else {
+                            assertFalse(mode + " width " + width, Character.isLowSurrogate(c));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }

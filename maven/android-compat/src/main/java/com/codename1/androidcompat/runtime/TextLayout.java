@@ -124,7 +124,7 @@ public final class TextLayout {
         if (where == ELLIPSIZE_START) {
             int start = 0;
             while (start < n && paint.measureText(ell + s.substring(start)) > width) {
-                start++;
+                start = Character.offsetByCodePoints(s, start, 1);
             }
             while (start < n && s.charAt(start) == ' ') {
                 start++;
@@ -132,9 +132,11 @@ public final class TextLayout {
             return ell + s.substring(start);
         }
         if (where == ELLIPSIZE_MIDDLE) {
-            for (int keep = n; keep > 0; keep--) {
-                int head = (keep + 1) / 2;
-                String candidate = s.substring(0, head) + ell + s.substring(n - (keep - head));
+            for (int keep = Character.codePointCount(s, 0, n); keep > 0; keep--) {
+                int headCount = (keep + 1) / 2;
+                int head = Character.offsetByCodePoints(s, 0, headCount);
+                int tail = Character.offsetByCodePoints(s, n, -(keep - headCount));
+                String candidate = s.substring(0, head) + ell + s.substring(tail);
                 if (paint.measureText(candidate) <= width) {
                     return candidate;
                 }
@@ -143,7 +145,7 @@ public final class TextLayout {
         }
         int end = n;
         while (end > 0 && paint.measureText(s.substring(0, end) + ell) > width) {
-            end--;
+            end = Character.offsetByCodePoints(s, end, -1);
         }
         while (end > 0 && s.charAt(end - 1) == ' ') {
             end--;

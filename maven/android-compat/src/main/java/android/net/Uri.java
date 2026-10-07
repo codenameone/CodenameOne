@@ -595,7 +595,7 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
                     sb.append("//").append(authority);
                 }
                 if (path != null) {
-                    if (authority != null && path.length() > 0 && !path.startsWith("/")) {
+                    if ((scheme != null || authority != null) && path.length() > 0 && !path.startsWith("/")) {
                         sb.append('/');
                     }
                     sb.append(path);

@@ -47,4 +47,17 @@ public class UriBuilderOpaqueResetTest {
     public void opaqueRoundTripIsUnchanged() {
         assertEquals("mailto:a@b#f", Uri.parse("mailto:a@b#f").buildUpon().build().toString());
     }
+    @Test
+    public void relativePathWithSchemeStaysHierarchical() {
+        Uri plain = new Uri.Builder().scheme("content").path("items")
+                .appendQueryParameter("q", "1").build();
+        assertEquals("content:/items?q=1", plain.toString());
+        assertEquals("/items", plain.getPath());
+        assertEquals("1", plain.getQueryParameter("q"));
+        Uri encoded = new Uri.Builder().scheme("content").encodedPath("a%2Fb").build();
+        assertEquals("content:/a%2Fb", encoded.toString());
+        assertEquals("/a/b", encoded.getPath());
+        assertEquals("items", new Uri.Builder().path("items").build().toString());
+    }
+
 }

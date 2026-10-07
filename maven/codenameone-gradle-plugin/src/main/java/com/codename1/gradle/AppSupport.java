@@ -87,7 +87,8 @@ final class AppSupport {
         // The framework is `provided`: compiled against, supplied by the build server
         // or the simulator, never part of the upload.
         addFramework(project, "compileOnly", version, "codenameone-core", "java-runtime");
-        if (com.codename1.maven.AndroidResourceRunner.isAndroidProject(layout.androidSourceDir())) {
+        final boolean androidProject = com.codename1.maven.AndroidResourceRunner.isAndroidProject(layout.androidSourceDir());
+        if (androidProject) {
             // The android.* API the application compiles against; the remap
             // step copies the runtime itself into the application's classes.
             addFramework(project, "compileOnly", version, "codenameone-android-compat");
@@ -202,6 +203,13 @@ final class AppSupport {
         // compileJava up to date and uploaded classes nobody had checked.
         final String skipInput = String.valueOf(skip);
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
+            if (androidProject) {
+                // Relocation rewrites this task's output descriptors. A source edit
+                // must compile all Java sources against the original Android API,
+                // never against unchanged, relocated classes from the last build.
+                // Unchanged builds still use Gradle's task up-to-date checks.
+                compile.getOptions().setIncremental(false);
+            }
             compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
             processingInputs(compile, layout, userProperties);
             Provider<List<String>> roots = project.provider(() -> sourceRoots(main, layout));
