@@ -22,7 +22,14 @@
  */
 package com.codename1.maven;
 
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.commons.ClassRemapper;
+import org.objectweb.asm.commons.Remapper;
+
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,6 +41,13 @@ import java.util.List;
 /// A layer is switched on by its runtime jar being on the compile classpath:
 /// the project templates add that dependency when the layer's source directory
 /// exists, so nothing else has to be configured.
+///
+/// The two desktop layers share one source directory (`src/main/desktop`), so
+/// the templates add both of their jars and cannot know which of them the
+/// sources need. For those the jar is necessary but not sufficient: the
+/// application's compiled classes must also name the layer's API
+/// ([#active(Iterable, Iterable)]). A Swing application therefore does not
+/// ship the JavaFX runtime, and nothing has to be declared for that.
 public final class CompatLayers {
 
     /// The Swing layer. `java.awt` and `javax.swing` belong to the JDK, so
@@ -74,6 +88,119 @@ public final class CompatLayers {
             }
         }
         return out;
+    }
+
+    /// Whether `layer` is switched on by its jar alone. The Android layer is:
+    /// its sources have a directory of their own, and the build compiles
+    /// resources and generates classes for it before any class exists to be
+    /// examined. The desktop layers also have to be used.
+    public static boolean activeByPresence(Relocation layer) {
+        return layer != SWING && layer != JAVAFX;
+    }
+
+    /// The layers an application ships: those whose runtime jar is among
+    /// `classpath` and which, unless the jar alone decides
+    /// ([#activeByPresence]), a class under one of `classDirs` refers to.
+    ///
+    /// A reference counts under the name the application was compiled against
+    /// (`javax/swing/JTable`) and under the name it has once relocated, so a
+    /// directory an earlier run already rewrote gives the same answer. The
+    /// runtimes a previous run extracted into a directory are not application
+    /// code and are not read.
+    public static List<Relocation> active(Iterable<File> classpath, Iterable<File> classDirs) throws IOException {
+        List<Relocation> present = active(classpath);
+        List<Relocation> undecided = new ArrayList<Relocation>();
+        for (Relocation r : present) {
+            if (!activeByPresence(r)) {
+                undecided.add(r);
+            }
+        }
+        if (undecided.isEmpty()) {
+            return present;
+        }
+        ReferenceScan scan = new ReferenceScan(undecided);
+        if (classDirs != null) {
+            for (File dir : classDirs) {
+                if (dir != null && dir.isDirectory()) {
+                    scan.directory(dir, "");
+                }
+            }
+        }
+        List<Relocation> out = new ArrayList<Relocation>();
+        for (Relocation r : present) {
+            if (activeByPresence(r) || scan.found.contains(r)) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    /// Finds which of a set of layers some class refers to, stopping as soon
+    /// as every one of them has been seen.
+    private static final class ReferenceScan extends Remapper {
+        private final List<Relocation> wanted;
+        private final List<Relocation> found = new ArrayList<Relocation>();
+
+        ReferenceScan(List<Relocation> wanted) {
+            this.wanted = wanted;
+        }
+
+        @Override
+        public String map(String internalName) {
+            if (internalName != null) {
+                for (Relocation r : wanted) {
+                    if (!found.contains(r) && (r.owns(internalName) || r.original(internalName) != null)) {
+                        found.add(r);
+                    }
+                }
+            }
+            return internalName;
+        }
+
+        private boolean done() {
+            return found.size() == wanted.size();
+        }
+
+        /// `rel` is the directory's path inside the classes directory, with
+        /// its trailing slash, or empty for the classes directory itself.
+        void directory(File dir, String rel) throws IOException {
+            File[] files = dir.listFiles();
+            if (files == null) {
+                return;
+            }
+            for (File f : files) {
+                if (done()) {
+                    return;
+                }
+                if (f.isDirectory()) {
+                    String child = rel + f.getName() + "/";
+                    if (!isExtractedRuntime(child)) {
+                        directory(f, child);
+                    }
+                } else if (f.getName().endsWith(".class")) {
+                    // Every name a class file holds goes through the remapper:
+                    // supertypes, descriptors, signatures, annotations and
+                    // the instructions' operands alike.
+                    new ClassReader(Files.readAllBytes(f.toPath())).accept(
+                            new ClassRemapper(new ClassWriter(0), this), ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                }
+            }
+        }
+    }
+
+    /// Whether `rel` (a directory inside a classes directory, with its
+    /// trailing slash) is where some layer's runtime, or the shared JDK
+    /// classes, are extracted.
+    static boolean isExtractedRuntime(String rel) {
+        if (rel.startsWith(Relocation.JDK_PACKAGE)) {
+            return true;
+        }
+        for (Relocation r : ALL) {
+            if (rel.startsWith(r.target())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// `layer`'s runtime jar among `classpath`, or null.

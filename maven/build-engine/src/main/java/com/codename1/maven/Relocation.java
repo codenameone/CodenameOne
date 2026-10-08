@@ -180,6 +180,17 @@ public final class Relocation {
         return false;
     }
 
+    /// Whether `source`, the text of a Java or Kotlin file, spells one of
+    /// this layer's packages (`javax.swing.`), in an import or anywhere else.
+    boolean namedInSource(String source) {
+        for (String p : prefixes) {
+            if (source.indexOf(p.replace('/', '.')) >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// The name the application was compiled against, when `relocated` is one
     /// this layer produced from a prefix, else null. Build messages use it:
     /// a developer knows `javax.swing.JTable`, not where it ships.

@@ -93,6 +93,17 @@ final class AppSupport {
             // step copies the runtime itself into the application's classes.
             addFramework(project, "compileOnly", version, "codenameone-android-compat");
         }
+        // Swing and JavaFX compatibility: src/main/desktop existing is what
+        // enables the layers. Both jars, because the directory does not say
+        // which toolkit its sources use; the remap step ships only the
+        // runtime the compiled classes refer to. Swing code compiles against
+        // the JDK's own java.awt and javax.swing, JavaFX code against the
+        // javafx.* API in codenameone-javafx-compat.
+        final File desktopDir = layout.desktopSourceDir();
+        final boolean desktopProject = com.codename1.maven.DesktopSources.isDesktopProject(desktopDir);
+        if (desktopProject) {
+            addFramework(project, "compileOnly", version, "codenameone-swing-compat", "codenameone-javafx-compat");
+        }
         addFramework(project, "testImplementation", version, "codenameone-core", "codenameone-javase");
         Configuration framework = resolvable(project, "cn1Framework", "codenameone-core and java-runtime, for local builds");
         framework.setTransitive(false);
@@ -161,6 +172,20 @@ final class AppSupport {
         main.getResources().srcDir(androidRes.flatMap(
                 com.codename1.gradle.tasks.CompileAndroidResTask::getResourcesDirectory));
 
+        // The desktop sources, laid out like a desktop project's src/main.
+        // Declared always, like the Android directories: Gradle is happy with
+        // a directory that does not exist.
+        //
+        // EXTENSION POINT: the build-time FXML and CSS compile step belongs
+        // here, as a task registered the way compileAndroidRes is above --
+        // inputs resourcesDir(desktopDir), outputs a generated-sources and a
+        // generated-resources directory added to `main` with srcDir(task.flatMap(...)).
+        // The Maven build's counterpart, with the full contract, is
+        // PrepareDesktopSourcesMojo.compileDesktopResources.
+        main.getJava().srcDir(com.codename1.maven.DesktopSources.javaDir(desktopDir));
+        main.getResources().srcDir(com.codename1.maven.DesktopSources.resourcesDir(desktopDir));
+        final File desktopEntry = com.codename1.maven.DesktopSources.entryRecord(desktopDir);
+
         TaskProvider<Cn1CssTask> css = project.getTasks().register("cn1Css", Cn1CssTask.class, t -> {
             common(t, project, layout, ext, userProperties);
             t.setDescription("Compiles src/main/css into theme.res");
@@ -203,12 +228,24 @@ final class AppSupport {
         // compileJava up to date and uploaded classes nobody had checked.
         final String skipInput = String.valueOf(skip);
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
-            if (androidProject) {
+            if (androidProject || desktopProject) {
                 // Relocation rewrites this task's output descriptors. A source edit
                 // must compile all Java sources against the original Android API,
                 // never against unchanged, relocated classes from the last build.
                 // Unchanged builds still use Gradle's task up-to-date checks.
                 compile.getOptions().setIncremental(false);
+            }
+            if (desktopProject) {
+                // Which desktop runtime ships is read from the compiled classes,
+                // Kotlin's included, by an action of this task -- and a Kotlin
+                // edit that leaves its ABI alone leaves this task up to date.
+                // The toolkits the sources name are therefore an input: the
+                // first Kotlin line to use JavaFX reruns this task, and the
+                // action ships the runtime. The entry record is one for the
+                // same reason: the entry point is generated from it.
+                compile.getInputs().property("cn1DesktopToolkits", project.provider(
+                        () -> com.codename1.maven.DesktopSources.toolkitsNamedIn(desktopDir)));
+                compile.getInputs().files(desktopEntry).withPropertyName("cn1DesktopEntry").optional();
             }
             compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
             processingInputs(compile, layout, userProperties);
@@ -218,12 +255,15 @@ final class AppSupport {
             // poms bind process-classes in.
             // Kotlin's classes (compiled first, into a directory of their own) are
             // the Java pass's siblings, so Java calling Kotlin resolves.
-            // Android code is relocated onto the compatibility runtime before
-            // the compliance check sees it, as remap-android precedes
-            // bytecode-compliance in the Maven build.
-            compile.doLast("cn1RemapAndroid", new com.codename1.gradle.tasks.RemapAndroidAction(
+            // Android, Swing and JavaFX code is relocated onto the
+            // compatibility runtimes before the compliance check sees it, as
+            // remap-compat precedes bytecode-compliance in the Maven build.
+            // For Swing no other order works: its names resolve against
+            // nothing until they are relocated.
+            compile.doLast("cn1RemapCompat", new com.codename1.gradle.tasks.RemapCompatAction(
                     compile.getDestinationDirectory().getAsFile().get(), main.getCompileClasspath(),
-                    onClickNamesFile(androidState), false, main.getOutput().getClassesDirs()));
+                    onClickNamesFile(androidState), false, main.getOutput().getClassesDirs())
+                    .withDesktopEntryRecord(desktopEntry));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
@@ -262,6 +302,8 @@ final class AppSupport {
             Object kotlinSources = ((org.gradle.api.plugins.ExtensionAware) main).getExtensions().findByName("kotlin");
             if (kotlinSources instanceof org.gradle.api.file.SourceDirectorySet) {
                 ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(new File(androidDir, "kotlin"));
+                ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(
+                        com.codename1.maven.DesktopSources.kotlinDir(desktopDir));
             }
             // Kotlin's classes are relocated after javac rather than right after
             // Kotlin compiles: they are javac's classpath, and Java calling a
@@ -275,9 +317,25 @@ final class AppSupport {
             // SourceSet, so the action must not reach the classpath through one.
             final org.gradle.api.file.FileCollection compileClasspath = main.getCompileClasspath();
             final File onClickNames = onClickNamesFile(androidState);
+            // A module with desktop sources may have no Java source at all,
+            // and then javac's pass, which ships the runtimes, never runs:
+            // Kotlin's directory ships them instead. An Android module always
+            // has Java (its generated R classes), so nothing changes for it.
+            final org.gradle.api.file.FileCollection javaSources = desktopProject ? main.getJava().getAsFileTree() : null;
+            // The Swing layer's classes exist only under their relocated
+            // names, so Kotlin's classes cannot be checked as Kotlin wrote
+            // them (see the compileKotlin actions below): for a module with
+            // desktop sources the check runs here instead, after relocation.
+            final com.codename1.gradle.tasks.ComplianceAction kotlinCompliance = !desktopProject ? null
+                    : new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(), layout.projectDir(),
+                            kotlinDir, project.getName(), compileClasspath, compileArtifacts, complianceProperties)
+                            .withBuildDirectory(project.getLayout().getBuildDirectory().getAsFile())
+                            .withSiblingClasses(main.getOutput().getClassesDirs());
             registerKotlinRelocation(project.getTasks(), main.getCompileJavaTaskName(), main.getClassesTaskName(),
-                    t -> new com.codename1.gradle.tasks.RemapAndroidAction(
-                            kotlinDir.get(), compileClasspath, onClickNames, true, null).execute(t));
+                    kotlinRelocation(t -> new com.codename1.gradle.tasks.RemapCompatAction(
+                            kotlinDir.get(), compileClasspath, onClickNames, true, null)
+                            .withDesktopEntryRecord(desktopEntry).shippingWhenEmpty(javaSources).execute(t),
+                            kotlinCompliance));
         });
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
@@ -287,12 +345,16 @@ final class AppSupport {
                     Provider<List<String>> roots = project.provider(() -> sourceRoots(main, layout));
                     // Kotlin's classes are relocated after javac (see below), not
                     // here; this check accepts their unrelocated names, which the
-                    // compatibility jar provides.
-                    compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(
-                            layout.rootDir(), layout.projectDir(), kotlinClasses, project.getName(),
-                            main.getCompileClasspath(), compileArtifacts, complianceProperties)
-                            .withBuildDirectory(project.getLayout().getBuildDirectory().getAsFile())
-                            .withPendingJavaSources(main.getJava().getSrcDirs()));
+                    // compatibility jar provides. The Swing jar provides none --
+                    // it is written under the relocated names -- so a module with
+                    // desktop sources is checked by the relocation task instead.
+                    if (!desktopProject) {
+                        compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(
+                                layout.rootDir(), layout.projectDir(), kotlinClasses, project.getName(),
+                                main.getCompileClasspath(), compileArtifacts, complianceProperties)
+                                .withBuildDirectory(project.getLayout().getBuildDirectory().getAsFile())
+                                .withPendingJavaSources(main.getJava().getSrcDirs()));
+                    }
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses,
                             stubsDir(layout),
                             layout.projectDir(), layout.settingsFile(), roots, "UTF-8", userProperties,
@@ -713,7 +775,7 @@ final class AppSupport {
     static TaskProvider<org.gradle.api.Task> registerKotlinRelocation(org.gradle.api.tasks.TaskContainer tasks,
             String compileJavaName, String classesName, org.gradle.api.Action<? super org.gradle.api.Task> remap) {
         TaskProvider<org.gradle.api.Task> relocate = tasks.register("cn1RemapAndroidKotlin", t -> {
-            t.setDescription("Relocates Android references in Kotlin's classes onto the compatibility runtime");
+            t.setDescription("Relocates Kotlin's classes onto the compatibility runtimes");
             t.dependsOn("compileKotlin");
             t.mustRunAfter(compileJavaName);
             t.doLast(remap);
@@ -721,6 +783,21 @@ final class AppSupport {
         tasks.named(compileJavaName).configure(javac -> javac.finalizedBy(relocate));
         tasks.named(classesName).configure(classes -> classes.dependsOn(relocate));
         return relocate;
+    }
+
+    /// What the Kotlin relocation task does: relocates Kotlin's classes, then,
+    /// when `compliance` is given, checks them. In that order, which is the
+    /// only one the Swing layer allows -- its API exists nowhere under the
+    /// names an application is compiled against.
+    static org.gradle.api.Action<org.gradle.api.Task> kotlinRelocation(
+            final org.gradle.api.Action<? super org.gradle.api.Task> remap,
+            final org.gradle.api.Action<? super org.gradle.api.Task> compliance) {
+        return t -> {
+            remap.execute(t);
+            if (compliance != null) {
+                compliance.execute(t);
+            }
+        };
     }
 
     static Provider<File> kotlinDestinationProvider(final org.gradle.api.Task compile, final ProjectLayout layout) {

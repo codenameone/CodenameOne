@@ -31,10 +31,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// cn1:import-android-project in a project generated before Android
-/// compatibility existed: its common pom has no runtime dependency and no
-/// goals, and the imported sources would not build.
-public class AndroidPomUpdaterTest {
+/// cn1:import-desktop-project in a project generated before the desktop
+/// layers existed: its common pom has neither runtime dependency and none of
+/// the goals, and the imported sources would not build.
+public class DesktopPomUpdaterTest {
 
     private static String read(String path) throws Exception {
         return new String(Files.readAllBytes(new File(path).toPath()), "UTF-8");
@@ -43,41 +43,50 @@ public class AndroidPomUpdaterTest {
     @Test
     public void wiresALegacyArchetypePom() throws Exception {
         String legacy = read("src/test/resources/android-pom/legacy-common-pom.xml");
-        AndroidPomUpdater u = new AndroidPomUpdater(legacy, false);
+        DesktopPomUpdater u = new DesktopPomUpdater(legacy, false);
         assertTrue(u.manual.isEmpty(), u.manual.toString());
         assertTrue(u.changed);
-        assertTrue(u.pom.contains("<artifactId>codenameone-android-compat</artifactId>"));
-        assertTrue(u.pom.contains("<goal>compile-android-res</goal>"));
-        int remap = u.pom.indexOf(AndroidPomUpdater.REMAP_GOAL);
+        assertTrue(u.pom.contains("<artifactId>codenameone-swing-compat</artifactId>"));
+        assertTrue(u.pom.contains("<artifactId>codenameone-javafx-compat</artifactId>"));
+        assertTrue(u.pom.contains("<exists>${basedir}/src/main/desktop</exists>"));
+        assertTrue(u.pom.contains("<goal>prepare-desktop-sources</goal>"));
+        int remap = u.pom.indexOf(PomWiring.REMAP_GOAL);
         int compliance = u.pom.indexOf("<goal>bytecode-compliance</goal>");
         assertTrue(remap > 0 && remap < compliance, "remap-compat must precede bytecode-compliance");
-        assertTrue(u.pom.indexOf("<profile>") >= 0 && u.pom.lastIndexOf("</profiles>") > u.pom.indexOf("<id>android-compat</id>"));
+        assertTrue(u.pom.lastIndexOf("</profiles>") > u.pom.indexOf("<id>desktop-compat</id>"));
         // Wired once: a second import changes nothing.
-        AndroidPomUpdater again = new AndroidPomUpdater(u.pom, false);
+        DesktopPomUpdater again = new DesktopPomUpdater(u.pom, false);
         assertFalse(again.changed);
         assertTrue(again.manual.isEmpty());
+        assertEquals(u.pom, again.pom);
     }
 
     @Test
     public void leavesTheCurrentArchetypeAlone() throws Exception {
         String current = read("../cn1app-archetype/src/main/resources/archetype-resources/common/pom.xml");
-        AndroidPomUpdater u = new AndroidPomUpdater(current, true);
+        DesktopPomUpdater u = new DesktopPomUpdater(current, true);
         assertFalse(u.changed);
         assertTrue(u.manual.isEmpty(), u.manual.toString());
         assertEquals(current, u.pom);
     }
 
-    /// A project generated while the goal was called remap-android is wired:
-    /// that goal relocates every layer, and its pom is not edited.
+    /// A project that already imported an Android application binds the
+    /// remap goal under its earlier name. That goal relocates every layer, so
+    /// it is kept, and only the desktop wiring is added.
     @Test
-    public void acceptsTheGoalUnderItsEarlierName() throws Exception {
-        String current = read("../cn1app-archetype/src/main/resources/archetype-resources/common/pom.xml");
-        String earlier = current.replace("<goal>remap-compat</goal>", "<goal>remap-android</goal>");
-        assertTrue(earlier.contains("<goal>remap-android</goal>"));
-        AndroidPomUpdater u = new AndroidPomUpdater(earlier, true);
-        assertFalse(u.changed);
+    public void addsTheDesktopLayersToAProjectWiredForAndroid() throws Exception {
+        String legacy = read("src/test/resources/android-pom/legacy-common-pom.xml");
+        String android = new AndroidPomUpdater(legacy, false).pom
+                .replace(PomWiring.REMAP_GOAL, PomWiring.LEGACY_REMAP_GOAL);
+        DesktopPomUpdater u = new DesktopPomUpdater(android, false);
         assertTrue(u.manual.isEmpty(), u.manual.toString());
-        assertEquals(earlier, u.pom);
+        assertTrue(u.changed);
+        assertFalse(u.pom.contains(PomWiring.REMAP_GOAL), "the goal is bound once, under the name it already has");
+        assertTrue(u.pom.contains(PomWiring.LEGACY_REMAP_GOAL));
+        assertTrue(u.pom.contains("<id>android-compat</id>"));
+        assertTrue(u.pom.contains("<id>desktop-compat</id>"));
+        assertTrue(u.pom.contains("<goal>compile-android-res</goal>"));
+        assertTrue(u.pom.contains("<goal>prepare-desktop-sources</goal>"));
     }
 
     @Test
@@ -93,19 +102,34 @@ public class AndroidPomUpdaterTest {
                 + "        </executions>\n"
                 + "    </plugin>\n"
                 + "</plugins></build></project>\n";
-        AndroidPomUpdater u = new AndroidPomUpdater(pom, false);
-        assertFalse(u.pom.contains("<goal>compile-android-res</goal>"), u.pom);
+        DesktopPomUpdater u = new DesktopPomUpdater(pom, false);
+        assertFalse(u.pom.contains("<goal>prepare-desktop-sources</goal>"), u.pom);
         boolean named = false;
         for (String m : u.manual) {
-            named |= m.contains("compile-android-res");
+            named |= m.contains("prepare-desktop-sources");
         }
         assertTrue(named, u.manual.toString());
     }
 
     @Test
     public void namesWhatAPomWithoutTheAnchorsNeeds() {
-        AndroidPomUpdater u = new AndroidPomUpdater("<project><build/></project>", true);
+        DesktopPomUpdater u = new DesktopPomUpdater("<project><build/></project>", true);
         assertFalse(u.changed);
         assertEquals(4, u.manual.size(), u.manual.toString());
+        assertTrue(u.manual.get(0).contains("codenameone-swing-compat"), u.manual.get(0));
+        assertTrue(u.manual.get(0).contains("codenameone-javafx-compat"), u.manual.get(0));
+        assertTrue(u.manual.get(3).contains("src/main/desktop/kotlin"), u.manual.get(3));
+    }
+
+    /// A Kotlin project wired before the desktop layers has the Android
+    /// source directories in its Kotlin execution and not the desktop ones.
+    @Test
+    public void asksForTheKotlinSourceDirectoriesOnlyWhenThereIsKotlin() throws Exception {
+        String current = read("../cn1app-archetype/src/main/resources/archetype-resources/common/pom.xml");
+        String earlier = current.replace("<sourceDir>${project.basedir}/src/main/desktop/java</sourceDir>", "");
+        assertTrue(new DesktopPomUpdater(earlier, false).manual.isEmpty());
+        DesktopPomUpdater u = new DesktopPomUpdater(earlier, true);
+        assertEquals(1, u.manual.size(), u.manual.toString());
+        assertFalse(u.changed);
     }
 }

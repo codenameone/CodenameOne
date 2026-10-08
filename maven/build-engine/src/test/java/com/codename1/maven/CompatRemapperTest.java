@@ -395,6 +395,107 @@ public class CompatRemapperTest {
         assertSameTree(snapshot(direct), snapshot(generic));
     }
 
+    /// An application class that uses Swing and nothing else.
+    private static byte[] swingOnlyClass(String name) {
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, name, null, "javax/swing/JFrame", null);
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    /// The templates put both desktop jars on the classpath of a project with
+    /// desktop sources. A Swing application must not pay for the JavaFX
+    /// runtime: a desktop layer ships only when the classes refer to it.
+    @Test
+    public void aDesktopLayerShipsOnlyWhenTheClassesUseIt() throws Exception {
+        File classes = tmp.newFolder("classes");
+        assertTrue(new File(classes, "com/x").mkdirs());
+        Files.write(new File(classes, "com/x/Main.class").toPath(), swingOnlyClass("com/x/Main"));
+        List<File> classpath = Arrays.asList(swingJar(), javafxJar(), jdkJar());
+
+        CompatRemapper remapper = new CompatRemapper(classes, classpath, null, LOG);
+        assertEquals(Collections.singletonList(CompatLayers.SWING), remapper.activeLayers());
+        assertTrue(remapper.run());
+        assertTrue(new File(classes, SWING + "javax/swing/JFrame.class").isFile());
+        assertFalse(new File(classes, FX).exists());
+
+        // Read back from the relocated classes, the answer is the same, and
+        // the extracted Swing runtime is not mistaken for application code.
+        Map<String, byte[]> first = snapshot(classes);
+        CompatRemapper again = new CompatRemapper(classes, classpath, null, LOG);
+        assertEquals(Collections.singletonList(CompatLayers.SWING), again.activeLayers());
+        assertTrue(again.run());
+        assertSameTree(first, snapshot(classes));
+    }
+
+    /// With both jars present and neither used, nothing is active and the
+    /// classes are left alone.
+    @Test
+    public void unusedDesktopJarsSwitchNothingOn() throws Exception {
+        File classes = tmp.newFolder("classes");
+        assertTrue(new File(classes, "com/x").mkdirs());
+        Files.write(new File(classes, "com/x/Plain.class").toPath(), emptyClass("com/x/Plain", "java/lang/Object"));
+        Map<String, byte[]> before = snapshot(classes);
+
+        CompatRemapper remapper = new CompatRemapper(classes, Arrays.asList(swingJar(), javafxJar(), jdkJar()),
+                null, LOG);
+        assertTrue(remapper.activeLayers().isEmpty());
+        assertFalse(remapper.run());
+        assertSameTree(before, snapshot(classes));
+    }
+
+    /// Kotlin's classes are a directory of their own, relocated separately;
+    /// a layer only they use still has to ship with the main pass.
+    @Test
+    public void aLayerUsedOnlyByAHandlerDirectoryStillShips() throws Exception {
+        File classes = tmp.newFolder("classes");
+        assertTrue(new File(classes, "com/x").mkdirs());
+        Files.write(new File(classes, "com/x/Main.class").toPath(), swingOnlyClass("com/x/Main"));
+        File kotlin = tmp.newFolder("kotlin");
+        assertTrue(new File(kotlin, "com/x").mkdirs());
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/x/View", null, "java/lang/Object", null);
+        cw.visitField(Opcodes.ACC_PRIVATE, "stage", "Ljavafx/stage/Stage;", null, null).visitEnd();
+        cw.visitEnd();
+        Files.write(new File(kotlin, "com/x/View.class").toPath(), cw.toByteArray());
+        List<File> classpath = Arrays.asList(swingJar(), javafxJar(), jdkJar());
+
+        CompatRemapper remapper = new CompatRemapper(classes, classpath, null, LOG)
+                .withHandlerDirectories(Collections.singletonList(kotlin));
+        assertEquals(Arrays.asList(CompatLayers.SWING, CompatLayers.JAVAFX), remapper.activeLayers());
+        assertTrue(remapper.run());
+        assertTrue(new File(classes, FX + "javafx/stage/Stage.class").isFile());
+
+        // The Kotlin directory, on its own, is relocated by what it uses.
+        CompatRemapper kotlinPass = new CompatRemapper(kotlin, classpath, null, LOG).relocateOnly();
+        assertEquals(Collections.singletonList(CompatLayers.JAVAFX), kotlinPass.activeLayers());
+        assertTrue(kotlinPass.run());
+        assertTrue(refs(Files.readAllBytes(new File(kotlin, "com/x/View.class").toPath()))
+                .contains("L" + FX + "javafx/stage/Stage;"));
+    }
+
+    /// The Android layer keeps its rule: its jar alone switches it on.
+    @Test
+    public void theAndroidLayerIsActiveByItsJarAlone() throws Exception {
+        File classes = tmp.newFolder("classes");
+        assertTrue(new File(classes, "com/x").mkdirs());
+        Files.write(new File(classes, "com/x/Plain.class").toPath(), emptyClass("com/x/Plain", "java/lang/Object"));
+        assertTrue(CompatLayers.activeByPresence(AndroidRemapper.RELOCATION));
+        assertFalse(CompatLayers.activeByPresence(CompatLayers.SWING));
+        assertFalse(CompatLayers.activeByPresence(CompatLayers.JAVAFX));
+        assertEquals(Collections.singletonList(AndroidRemapper.RELOCATION),
+                CompatLayers.active(Arrays.asList(androidJar(), swingJar(), javafxJar(), jdkJar()),
+                        Collections.singletonList(classes)));
+    }
+
+    @Test
+    public void theDesktopEntryRecordReachesTheGenerators() throws Exception {
+        File record = new File(tmp.getRoot(), DesktopSources.ENTRY_RECORD);
+        CompatRemapper remapper = new CompatRemapper(tmp.newFolder("classes"), null, null, LOG)
+                .withDesktopEntryRecord(record);
+        assertEquals(record, remapper.desktopEntryRecord());
+    }
+
     @Test
     public void relocateOnlyShipsNoRuntime() throws Exception {
         File classes = classesWithApp("classes");

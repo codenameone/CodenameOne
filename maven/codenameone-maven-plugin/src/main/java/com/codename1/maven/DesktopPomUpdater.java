@@ -24,28 +24,35 @@ package com.codename1.maven;
 
 import java.util.List;
 
-/// Wires Android compatibility into an existing application's common
-/// `pom.xml`, the way a new project from the archetype already is: the
-/// runtime dependency, `compile-android-res`, and the remap goal ahead of
-/// `bytecode-compliance` (which must see the relocated classes).
+/// Wires the desktop compatibility layers into an existing application's
+/// common `pom.xml`, the way a new project from the archetype already is: the
+/// two runtime dependencies, `prepare-desktop-sources`, and the remap goal
+/// ahead of `bytecode-compliance` (which must see the relocated classes).
 ///
-/// The pom is edited as text, at anchors every archetype-generated common pom
-/// has ([PomWiring]); a pom without them is reported with the snippets to add
-/// by hand rather than guessed at.
-final class AndroidPomUpdater {
+/// Edited as text at the anchors every archetype-generated common pom has,
+/// exactly as [AndroidPomUpdater] does and through the same code
+/// ([PomWiring]); a pom without them is reported with the snippets to add by
+/// hand rather than guessed at.
+final class DesktopPomUpdater {
 
-    static final String PROFILE = "        <!-- Android compatibility, added by cn1:import-android-project. -->\n"
+    static final String PROFILE = "        <!-- Swing and JavaFX compatibility, added by cn1:import-desktop-project. -->\n"
             + "        <profile>\n"
-            + "            <id>android-compat</id>\n"
+            + "            <id>desktop-compat</id>\n"
             + "            <activation>\n"
             + "                <file>\n"
-            + "                    <exists>${basedir}/src/main/android</exists>\n"
+            + "                    <exists>${basedir}/src/main/desktop</exists>\n"
             + "                </file>\n"
             + "            </activation>\n"
             + "            <dependencies>\n"
             + "                <dependency>\n"
             + "                    <groupId>com.codenameone</groupId>\n"
-            + "                    <artifactId>codenameone-android-compat</artifactId>\n"
+            + "                    <artifactId>codenameone-swing-compat</artifactId>\n"
+            + "                    <version>${cn1.version}</version>\n"
+            + "                    <scope>provided</scope>\n"
+            + "                </dependency>\n"
+            + "                <dependency>\n"
+            + "                    <groupId>com.codenameone</groupId>\n"
+            + "                    <artifactId>codenameone-javafx-compat</artifactId>\n"
             + "                    <version>${cn1.version}</version>\n"
             + "                    <scope>provided</scope>\n"
             + "                </dependency>\n"
@@ -53,16 +60,12 @@ final class AndroidPomUpdater {
             + "        </profile>\n";
 
     static final String EXECUTION = "                    <execution>\n"
-            + "                        <id>compile-android-res</id>\n"
+            + "                        <id>prepare-desktop-sources</id>\n"
             + "                        <phase>generate-sources</phase>\n"
             + "                        <goals>\n"
-            + "                            <goal>compile-android-res</goal>\n"
+            + "                            <goal>prepare-desktop-sources</goal>\n"
             + "                        </goals>\n"
             + "                    </execution>\n";
-
-    /// The goal a pom without one receives; one that binds the goal under its
-    /// earlier name, `remap-android`, is already wired.
-    static final String REMAP_GOAL = PomWiring.REMAP_GOAL;
 
     /// The updated pom, or the same text when it is already wired.
     final String pom;
@@ -70,20 +73,22 @@ final class AndroidPomUpdater {
     final List<String> manual;
     final boolean changed;
 
-    AndroidPomUpdater(String pom, boolean kotlin) {
+    DesktopPomUpdater(String pom, boolean kotlin) {
         PomWiring w = new PomWiring(pom);
-        if (!w.has("<artifactId>codenameone-android-compat</artifactId>")) {
-            w.addProfile("the codenameone-android-compat dependency (scope provided), e.g. as this profile:\n"
-                    + PROFILE, PROFILE);
+        // Either jar says the profile is there; a pom carrying only one was
+        // edited by hand and is left as its author wrote it.
+        if (!w.has("<artifactId>codenameone-swing-compat</artifactId>")
+                && !w.has("<artifactId>codenameone-javafx-compat</artifactId>")) {
+            w.addProfile("the codenameone-swing-compat and codenameone-javafx-compat dependencies (scope provided), "
+                    + "e.g. as this profile:\n" + PROFILE, PROFILE);
         }
-        w.addExecution("compile-android-res", EXECUTION);
+        w.addExecution("prepare-desktop-sources", EXECUTION);
         w.addRemapGoal();
-        if (kotlin && !w.has("src/main/android/java</sourceDir>")) {
-            w.manual.add("the Android source directories in the Kotlin profile's compile execution, which must also "
+        if (kotlin && !w.has("src/main/desktop/java</sourceDir>")) {
+            w.manual.add("the desktop source directories in the Kotlin profile's compile execution, which must also "
                     + "run in the process-resources phase so it precedes javac:\n"
-                    + "    <sourceDir>${project.basedir}/src/main/android/kotlin</sourceDir>\n"
-                    + "    <sourceDir>${project.basedir}/src/main/android/java</sourceDir>\n"
-                    + "    <sourceDir>${project.build.directory}/generated-sources/android</sourceDir>\n");
+                    + "    <sourceDir>${project.basedir}/src/main/desktop/kotlin</sourceDir>\n"
+                    + "    <sourceDir>${project.basedir}/src/main/desktop/java</sourceDir>\n");
         }
         this.pom = w.pom;
         this.manual = w.manual;
