@@ -1,0 +1,57 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::backend-security-passwords[]
+{pbkdf2-sha256}pbkdf2$210000$<salt>$<hash>
+{bcrypt}$2a$10$<22 characters of salt><31 characters of hash>
+{noop}secret
+// end::backend-security-passwords[]
+
+// tag::backend-security-headers[]
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: 0
+X-Frame-Options: DENY
+Strict-Transport-Security: max-age=31536000 ; includeSubDomains
+// end::backend-security-headers[]
+
+// tag::backend-security-build-errors[]
+@PreAuthorize("hasPermission(#id, 'read')") on Reports.read: hasPermission(...) is not
+supported: there is no PermissionEvaluator. Write the decision as a bean method and call
+it: @permissions.canRead(authentication, #id).
+
+@PreAuthorize("#order.owner.id == authentication.name") on Reports.open: #order.owner is a
+property chain, which is not supported: the build compiles expressions and does not read
+properties by name. Pass the parameter to a bean method and read it there:
+@bean.method(authentication, #order).
+
+Reports uses method security, and this module has no SecurityFilterChain bean: without a
+chain nobody ever signs in, so every guarded method would refuse every caller. Declare
+one -- a @Bean method that takes an HttpSecurity and returns http.build() -- or remove
+the annotations.
+// end::backend-security-build-errors[]
+
+// tag::backend-security-token-claims[]
+{
+  "iss": "https://id.example.com",
+  "sub": "ada",
+  "aud": "https://api.example.com",
+  "client_id": "acme-app",
+  "scope": "openid profile orders:read",
+  "iat": 1767225600,
+  "nbf": 1767225600,
+  "exp": 1767225900,
+  "jti": "..."
+}
+// end::backend-security-token-claims[]
+
+// tag::backend-security-bearer-challenge[]
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer scope="orders:read"
+
+HTTP/1.1 403 Forbidden
+WWW-Authenticate: Bearer error="insufficient_scope",
+    error_description="The request requires higher privileges than provided by the access token.",
+    error_uri="https://tools.ietf.org/html/rfc6750#section-3.1", scope="orders:read"
+// end::backend-security-bearer-challenge[]

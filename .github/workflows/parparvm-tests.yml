@@ -41,6 +41,14 @@ on:
       - 'CodenameOne/src/com/codename1/annotations/JsonIgnore.java'
       - 'CodenameOne/src/com/codename1/annotations/JsonProperty.java'
       - 'CodenameOne/src/com/codename1/io/gzip/**'
+      - 'CodenameOne/src/com/codename1/migration/**'
+      - 'CodenameOne/src/com/codename1/impl/migration/**'
+      - 'CodenameOne/src/com/codename1/security/Hash.java'
+      - 'CodenameOne/src/com/codename1/security/Hmac.java'
+      - 'CodenameOne/src/com/codename1/security/MessageDigestImpl.java'
+      - 'CodenameOne/src/com/codename1/security/Otp.java'
+      - 'CodenameOne/src/com/codename1/security/Base32.java'
+      - 'CodenameOne/src/com/codename1/security/CryptoException.java'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -85,6 +93,14 @@ on:
       - 'CodenameOne/src/com/codename1/annotations/JsonIgnore.java'
       - 'CodenameOne/src/com/codename1/annotations/JsonProperty.java'
       - 'CodenameOne/src/com/codename1/io/gzip/**'
+      - 'CodenameOne/src/com/codename1/migration/**'
+      - 'CodenameOne/src/com/codename1/impl/migration/**'
+      - 'CodenameOne/src/com/codename1/security/Hash.java'
+      - 'CodenameOne/src/com/codename1/security/Hmac.java'
+      - 'CodenameOne/src/com/codename1/security/MessageDigestImpl.java'
+      - 'CodenameOne/src/com/codename1/security/Otp.java'
+      - 'CodenameOne/src/com/codename1/security/Base32.java'
+      - 'CodenameOne/src/com/codename1/security/CryptoException.java'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -156,10 +172,22 @@ jobs:
         run: vm/benchmarks/check-ablation-arms.sh
         env:
           CN1_ABLATION_CFLAGS: -O1
+      - name: Preserve ablation failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ablation-failure-logs
+          path: |
+            vm/benchmarks/target/ablation/*.log
+            vm/benchmarks/target/ablation/*.run
+          if-no-files-found: warn
 
   vm-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # The full suite takes about an hour before the bounded GC benchmark arms.
+    # Android compatibility and Kotlin translation add time; leave room for
+    # both phases while each GC workload retains its own timeout.
+    timeout-minutes: 120
     # The two database engines the backend speaks a wire protocol to.
     #
     # BackendDatabaseTest and BackendOrmTest run one body of assertions against
@@ -394,7 +422,10 @@ jobs:
 
       - name: Run ParparVM Benchmark
         working-directory: vm
-        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B test -pl tests -am -Dgroups=benchmark -Djacoco.skip=true
+        # Each benchmark already creates its own mutator/collector threads. Run
+        # classes serially: competing benchmarks change GC sizing and timings as
+        # they start and finish, invalidating comparisons within a measured run.
+        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B test -pl tests -am -Dgroups=benchmark -Dparparvm.test.forkCount=1 -Djacoco.skip=true
         env:
           # Narrowed because this step RUNS TESTS: retry.sh retries every nonzero exit
           # without it, so a test that failed once and passed on a later attempt would take

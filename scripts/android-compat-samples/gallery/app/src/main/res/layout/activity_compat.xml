@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent">
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+        app:subtitle="Support action bar"/>
+    <LinearLayout android:orientation="vertical" android:padding="16dp"
+        android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:id="@+id/compat_status" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Ready" app:textAllCaps="true"/>
+        <ImageView android:layout_width="48dp" android:layout_height="48dp"
+            app:srcCompat="@drawable/ic_star" app:tint="?attr/colorPrimary"/>
+        <Button android:id="@+id/compat_dialog" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="AlertDialog"/>
+        <Button android:id="@+id/compat_result" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Start for result"
+            app:backgroundTint="?attr/colorAccent"/>
+        <Button android:id="@+id/compat_permission" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Ask camera permission"/>
+        <androidx.appcompat.widget.SwitchCompat android:id="@+id/compat_switch"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="SwitchCompat" android:checked="true"/>
+        <CheckBox android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Tinted box" android:checked="true" app:buttonTint="?attr/colorPrimary"/>
+    </LinearLayout>
+</LinearLayout>

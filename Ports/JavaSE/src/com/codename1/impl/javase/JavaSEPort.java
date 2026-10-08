@@ -13607,16 +13607,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void pushClip(Object graphics) {
         checkEDT();
         Graphics2D g2d = getGraphics(graphics);
+        // Graphics2D.getClip() answers in user space, under the current
+        // transform. The stack keeps the clip in device space, so popClip
+        // restores the same pixels even if the transform changed in between
+        // -- what canvas.save()/restore() does on Android. A screen graphics
+        // always carries the simulator zoom in its transform, so converting
+        // the user clip once more (as this used to) restored a clip scaled by
+        // the inverse zoom whenever the zoom was not 100%.
         Shape currentClip = g2d.getClip();
-        AffineTransform at = g2d.getTransform();
-        if (!at.isIdentity()) {
-            try {
-                at.invert();
-            } catch (Exception ex){}
+        if (currentClip != null) {
+            currentClip = g2d.getTransform().createTransformedShape(currentClip);
         }
-        
-        currentClip = at.createTransformedShape(currentClip);
-        
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
             g.clipStack.push(currentClip);  
@@ -13645,8 +13646,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         "This is detected only by the simulator; on devices the same mistake can " +
                         "manifest as drift or crashes after many frames (see issue #5058).");
             }
-            Shape oldClip = g.clipStack.pop();
-            g2d.setClip(oldClip);
+            restoreDeviceClip(g2d, g.clipStack.pop());
         } else {
             synchronized(clipStack) {
                 LinkedList<Shape> stack = clipStack.get(graphics);
@@ -13657,15 +13657,22 @@ public class JavaSEPort extends CodenameOneImplementation {
                             "This is detected only by the simulator; on devices the same mistake can " +
                             "manifest as drift or crashes after many frames (see issue #5058).");
                 }
-                Shape oldClip = stack.pop();
-                if (oldClip != null) {
-                    g2d.setClip(oldClip);
-                }
+                // A null entry is a graphics that had no clip when it was
+                // pushed; restoring it removes the clip set since.
+                restoreDeviceClip(g2d, stack.pop());
             }
         }
     }
 
     private final Map<Object,LinkedList<Shape>> clipStack = new HashMap<Object,LinkedList<Shape>>();
+
+    /// Sets a clip held in device space, whatever the current transform.
+    private static void restoreDeviceClip(Graphics2D g2d, Shape deviceClip) {
+        AffineTransform current = g2d.getTransform();
+        g2d.setTransform(new AffineTransform());
+        g2d.setClip(deviceClip);
+        g2d.setTransform(current);
+    }
 
     @Override
     public void disposeGraphics(Object graphics) {
@@ -13876,6 +13883,28 @@ public class JavaSEPort extends CodenameOneImplementation {
         return out;
     }
 
+    /// Java2D's multi-stop paints reject fractions that do not strictly
+    /// increase, but CSS and `Gradient` allow equal adjacent stops -- that is
+    /// how a hard color edge (stripes) is written. Nudge each repeat one ulp
+    /// past its predecessor; an edge one ulp wide renders identically.
+    static float[] awtFractions(float[] in) {
+        float[] out = new float[in.length];
+        for (int i = 0; i < in.length; i++) {
+            float f = Math.max(0f, Math.min(1f, in[i]));
+            out[i] = i > 0 && f <= out[i - 1] ? Math.nextUp(out[i - 1]) : f;
+        }
+        // A run of stops ending at 1 was pushed past it; pull it back below.
+        if (out.length > 0 && out[out.length - 1] > 1f) {
+            out[out.length - 1] = 1f;
+        }
+        for (int i = out.length - 2; i >= 0; i--) {
+            if (out[i] >= out[i + 1]) {
+                out[i] = Math.nextDown(out[i + 1]);
+            }
+        }
+        return out;
+    }
+
     private static MultipleGradientPaint.CycleMethod cycle(byte c) {
         switch (c) {
             case com.codename1.ui.Gradient.CYCLE_REPEAT:
@@ -13927,7 +13956,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             LinearGradientPaint paint = new LinearGradientPaint(
                     new java.awt.geom.Point2D.Float(x + ep[0], y + ep[1]),
                     new java.awt.geom.Point2D.Float(x + ep[2], y + ep[3]),
-                    g.getNormalizedPositions(), toAwtColors(g.getColors()),
+                    awtFractions(g.getNormalizedPositions()), toAwtColors(g.getColors()),
                     cycle(g.getCycleMethod()));
             ng.setPaint(paint);
             ng.fillRect(x, y, width, height);
@@ -13948,7 +13977,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     new java.awt.geom.Point2D.Float(x + cx, y + cy),
                     r <= 0 ? 1f : r,
                     new java.awt.geom.Point2D.Float(x + cx, y + cy),
-                    g.getNormalizedPositions(), toAwtColors(g.getColors()),
+                    awtFractions(g.getNormalizedPositions()), toAwtColors(g.getColors()),
                     cycle(g.getCycleMethod()));
             if (Math.abs(rx - ry) > 0.01f && rx > 0 && ry > 0) {
                 java.awt.geom.AffineTransform t = new java.awt.geom.AffineTransform();

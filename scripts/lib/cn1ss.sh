@@ -244,7 +244,9 @@ cn1ss_ws_selfcheck() {
       -H "Connection: Upgrade" -H "Upgrade: websocket" \
       -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Version: 13" \
       "http://127.0.0.1:$port/cn1ss" 2>/dev/null || true)"
-  if ! printf '%s' "$answer" | grep -q "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="; then
+  # Match the literal accept value in-process. With pipefail, grep -q can close
+  # its pipe before printf finishes and turn a successful match into a failure.
+  if [[ "$answer" != *"s3pPLMBiTxaQ9kYGzzhZRbK+xOo="* ]]; then
     cn1ss_log "Test server handshake probe FAILED; it answered:"
     printf '%s\n' "$answer" | head -n 10 | sed 's/^/[cn1ss-selfcheck] /' >&2
     return 1

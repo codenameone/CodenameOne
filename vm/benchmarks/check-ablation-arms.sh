@@ -134,9 +134,11 @@ for a in $ARMS; do
             printf '%-38s %s\n' "$a" "ok"
         else
             printf '%-38s %s\n' "$a" "RUNTIME FAIL -> $OUT/$a.run"; fail=1
+            tail -n 40 "$OUT/$a.run"
         fi
     else
         printf '%-38s %s\n' "$a" "BUILD FAILED -> $log"; fail=1
+        tail -n 40 "$log"
     fi
 done
 echo

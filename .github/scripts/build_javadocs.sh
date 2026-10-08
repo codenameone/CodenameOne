@@ -145,8 +145,9 @@ fi
 # declare nothing outside java.*, so the JDK resolves them here as it does the
 # rest.
 #
-# The shared classes keep their package-info.java, so a shared package has the
-# same description in both references. SharedWithBackend itself and the rest of
+# The shared classes keep their package-info.java, so a package shared whole has
+# the same description in both references; one shared in part is described for
+# the server in vm/backend/package-docs (see where it is staged, below). SharedWithBackend itself and the rest of
 # com.codename1.impl are staged for symbol resolution and filtered out of the
 # documented set, exactly as for the client API above.
 BACKEND_DIR="$ROOT_DIR/vm/backend"
@@ -162,6 +163,18 @@ cp -r "$BACKEND_DIR/impl/parparvm/." "$BACKEND_STAGE/"
 # document.
 cp -r "$BACKEND_DIR/test/src/." "$BACKEND_STAGE/"
 cp -r "$BACKEND_DIR/test/parparvm/." "$BACKEND_STAGE/"
+# A package the backend shares only PART of cannot take the core's description:
+# that one names every class of the package, and the ones a server does not have
+# are references this run cannot resolve -- which doclint fails, and which the
+# website's doclet would otherwise print as plain text where a link was meant.
+# vm/backend/package-docs holds the server's own description of such a package
+# (com.codename1.security: the digests and one-time passwords, without the
+# client's ciphers and key storage). Staged before the loop below, whose
+# "unless one is already there" then leaves it in place. It cannot live in
+# vm/backend/src: shared-sources.sh refuses any file there that has a core twin.
+if [ -d "$BACKEND_DIR/package-docs" ]; then
+  cp -r "$BACKEND_DIR/package-docs/." "$BACKEND_STAGE/"
+fi
 while IFS= read -r shared; do
   rel="${shared#"$CN1_DIR/src/"}"
   mkdir -p "$BACKEND_STAGE/$(dirname "$rel")"

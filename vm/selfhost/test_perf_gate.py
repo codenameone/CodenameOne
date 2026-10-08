@@ -684,15 +684,51 @@ class CheckTests(unittest.TestCase):
     """perf_baseline.py check --base: what a pull request may change."""
 
     def check(self, changed, number=31, migrating=False, merged=(), legacy=False):
-        originals = baselines.changed_files, baselines.exists_at, baselines.legacy_touched
+        originals = (baselines.changed_files, baselines.exists_at, baselines.legacy_touched,
+                     baselines.effective_base)
         baselines.changed_files = lambda base_ref, root=None: changed
         baselines.exists_at = lambda ref, path, root=None: (
             not migrating if path == 'base' else path in merged)
         baselines.legacy_touched = lambda base_ref: legacy
+        baselines.effective_base = lambda base_ref, repo=None: base_ref
         try:
             return baselines.check(baselines.ROOT, 'base-sha', number)
         finally:
-            baselines.changed_files, baselines.exists_at, baselines.legacy_touched = originals
+            (baselines.changed_files, baselines.exists_at, baselines.legacy_touched,
+             baselines.effective_base) = originals
+
+    def test_a_stale_base_sha_is_replaced_by_the_merged_base(self):
+        # CI checks out the pull request merged into today's master, while
+        # pull_request.base.sha can be days old: diffing against it reported an overlay
+        # master gained in between (pr-30.json) as this pull request writing it.
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            def run(*args):
+                return subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t',
+                                       '-c', 'commit.gpgsign=false'] + list(args), cwd=d,
+                                      check=True, capture_output=True,
+                                      text=True).stdout.strip()
+
+            def commit(name):
+                Path(d, name).write_text(name)
+                run('add', name)
+                run('commit', '-q', '-m', name)
+                return run('rev-parse', 'HEAD')
+
+            run('init', '-q')
+            run('checkout', '-q', '-b', 'main')
+            stale = commit('base.txt')
+            run('checkout', '-q', '-b', 'pr')
+            commit('pr-31.json')
+            run('checkout', '-q', 'main')
+            merged_base = commit('pr-30.json')
+            run('checkout', '-q', '--detach', 'main')
+            run('merge', '-q', '--no-ff', '-m', 'merge', 'pr')
+            self.assertEqual(baselines.effective_base(stale, Path(d)), merged_base)
+            # Not a merge commit: the given base stands.
+            run('checkout', '-q', 'pr')
+            self.assertEqual(baselines.effective_base(stale, Path(d)), stale)
 
     def test_a_merged_overlay_may_be_repaired(self):
         # Two merged pull requests that rebaselined one row leave master unresolvable;

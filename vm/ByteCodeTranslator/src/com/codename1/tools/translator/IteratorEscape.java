@@ -611,7 +611,7 @@ class IteratorEscape {
         if (t == null) {
             return null;
         }
-        return t.replace('/', '_').replace('.', '_').replace('$', '_');
+        return t.replace('/', '_').replace('.', '_').replace('$', '_').replace('-', '_');
     }
 
 

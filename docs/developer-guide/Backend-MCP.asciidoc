@@ -73,6 +73,8 @@ answered 405.
 | `cn1.mcp.enabled`
 | Whether the endpoint is served. On by default when the application has tools,
   or when the development tools are available; set `false` to turn it off.
+  Build-time: `true` in the module's properties files links the endpoint into a
+  packaged server that has no tools.
 
 | `cn1.mcp.token`
 | A bearer token every call must carry. Required outside a development profile;
@@ -98,7 +100,11 @@ a class with an `@McpTool` method, or `cn1.mcp.enabled`, `cn1.mcp.path` or
 entry point never names the endpoint and the translator leaves it out of the
 binary, development tools included; `cn1:backend` builds the development tools in
 for the development run only. A server built with the endpoint turns it off at
-start-up with `cn1.mcp.enabled=false`.
+start-up with `cn1.mcp.enabled=false`. A server built without it that finds
+`cn1.mcp.enabled=true` at run time doesn't start, and the error says that the key
+belongs in the module's `application.properties`; see
+<<backend-build-time-settings>>. `cn1.mcp.path` and `cn1.mcp.allowedOrigins` set
+only at run time configure an endpoint that's there and don't ask for one.
 
 === Tools for developing the server
 

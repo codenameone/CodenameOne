@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes">OK</string>
+    <string name="no">Cancel</string>
+    <string name="copy">Copy</string>
+    <string name="cut">Cut</string>
+    <string name="paste">Paste</string>
+    <string name="selectAll">Select all</string>
+    <string name="search_go">Search</string>
+    <string name="untitled">&lt;Untitled&gt;</string>
+    <string name="unknownName">Unknown</string>
+    <string name="emptyPhoneNumber">(No phone number)</string>
+    <string name="dialog_alert_title">Attention</string>
+    <string name="defaultMsisdnAlphaTag">MSISDN1</string>
+    <string name="defaultVoiceMailAlphaTag">Voicemail</string>
+    <string name="httpErrorBadUrl">Couldn\'t open the page because the URL is invalid.</string>
+    <string name="font_family_body_1_material">sans-serif</string>
+    <string name="font_family_button_material">sans-serif-medium</string>
+</resources>

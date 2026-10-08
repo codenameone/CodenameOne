@@ -77,6 +77,7 @@ public final class TestContexts {
         BackendAccess access = BackendAccess.get();
         Config config = access.testConfig(settings, context.profile());
         Backend.Builder builder = Backend.builder(config).quiet();
+        access.testApplication(builder);
         if (!defined) {
             builder.host("127.0.0.1"); //NOPMD AvoidUsingHardCodedIP - a test server listens on loopback only
         }
@@ -86,6 +87,7 @@ public final class TestContexts {
         access.compiledSettings(builder, concat(context.compiledSettings(), profileSettings));
         context.prepare();
         access.application(builder, context.createApplication());
+        context.configure(builder);
         Backend backend = builder.start();
         current = new TestEnvironment(context, backend);
         currentKey = context.key();

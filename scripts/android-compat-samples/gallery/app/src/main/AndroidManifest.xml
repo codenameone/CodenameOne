@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="@string/app_name" android:theme="@style/AppTheme">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity android:name=".DetailActivity" android:label="@string/detail_title"/>
+        <activity android:name=".WidgetsActivity" android:label="Widgets"/>
+        <activity android:name=".FruitListActivity" android:label="List"/>
+        <activity android:name=".FragmentsActivity" android:label="Fragments"/>
+        <activity android:name=".InputsActivity" android:label="Inputs"/>
+        <activity android:name=".DataActivity" android:label="Data"/>
+        <activity android:name=".KotlinActivity" android:label="Kotlin"/>
+        <activity android:name=".AnimActivity" android:label="Animation"/>
+        <activity android:name=".CompatActivity" android:label="AppCompat" android:theme="@style/AppTheme.Compat"/>
+        <activity android:name=".ConstraintActivity" android:label="Constraint"/>
+        <activity android:name=".JetpackActivity" android:label="Jetpack" android:theme="@style/AppTheme.Jetpack"/>
+        <activity android:name=".RecyclerActivity" android:label="Recycler"/>
+        <activity android:name=".MaterialActivity" android:label="Material" android:theme="@style/AppTheme.Material"/>
+    </application>
+</manifest>

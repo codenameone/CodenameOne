@@ -61,7 +61,9 @@ class HTML5GLSurface extends HTML5Peer {
             // keeps firing and flushing the display forever, degrading the whole
             // playground (and stacking up if several samples were run).
             if (!isLive()) {
-                continuous = false;
+                // A frame can arrive before the form becomes current or while
+                // the preview is reparented. Keep the requested mode; painting
+                // the attached surface will restart the parked loop.
                 return;
             }
             // Repaint; the actual GL render + blit happens in paint() so the 3D
@@ -268,6 +270,11 @@ class HTML5GLSurface extends HTML5Peer {
         // this blit to CSS pixels divides its position and size a second time
         // on Retina displays, moving it outside the component clip entirely.
         renderFrame();
+        if (continuous && isLive()) {
+            // Painting after attachment also wakes a loop parked by an early
+            // frame callback. Detached surfaces never schedule from here.
+            scheduleFrame();
+        }
         BufferedGraphics bg = HTML5Implementation.getInstance().displayGraphics();
         if (bg != null) {
             bg.drawCanvas(canvas,
@@ -296,7 +303,11 @@ class HTML5GLSurface extends HTML5Peer {
         // 0 size so initialized stays false, so this never synced the real size).
         if (!contextLost) {
             syncSize();
-            requestRender();
+            // A continuous frame may have fired before attachment and parked
+            // because the form was not current yet. requestRender() skips
+            // continuous surfaces, so a resize must explicitly paint once;
+            // paint() then restarts the loop when the surface is live.
+            repaint();
         }
     }
 

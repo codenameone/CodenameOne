@@ -32,6 +32,11 @@ session id the client held before signing in stays valid after, and an attacker
 who planted that id in the victim's browser beforehand -- a session fixation
 attack -- is signed in along with the victim.
 
+A handler that checks credentials itself is one way to sign a user in. The
+security layer in <<backend-security>> does it for you: its form login, its
+sign-in through another provider and its passkeys end in this same session,
+change its id, and protect it against CSRF.
+
 === Reading and ending a session
 
 Most requests want the session only if there is one:

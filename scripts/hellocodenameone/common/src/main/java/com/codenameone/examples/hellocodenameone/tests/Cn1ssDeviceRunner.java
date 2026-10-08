@@ -25,9 +25,26 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendClientTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendConnectionRequestTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendRestTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendAuthTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendDeviceGrantTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendTokenRefreshTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendTotpTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendTransferTest;
 import com.codenameone.examples.hellocodenameone.tests.backend.BackendTypedClientTest;
 import com.codename1.testing.DeviceRunner;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatMainScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatDetailScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatWidgetsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatListScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatFragmentsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatInputsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatDataScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatAppCompatScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatConstraintScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatJetpackScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatRecyclerScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatMaterialScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatKotlinScreenshotTest;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -503,6 +520,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DatabaseEncryptionTest(),
             new DatabaseStatementLegacyTest(),
             new DatabaseCursorLegacyTest(),
+            new DatabaseMigrationTest(),
             // Exercises com.codename1.camera.* end-to-end against the
             // JavaSE simulator's synthetic camera backend (no permission
             // prompts). Self-skips on iOS / Android / JS where the open
@@ -547,6 +565,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BackendTypedClientTest(),
             new BackendConnectionRequestTest(),
             new BackendTransferTest(),
+            // The backend's security layer from the app's side: signing in with
+            // an authorization code and PKCE, the request authorizer on a
+            // generated client, a refused token renewed behind a call, the device
+            // grant, and a one-time code computed here and verified there. One
+            // class per scenario, so a port that fails one names it.
+            new BackendAuthTest(),
+            new BackendTokenRefreshTest(),
+            new BackendDeviceGrantTest(),
+            new BackendTotpTest(),
             // The contact picker's request contract, and the only thing in
             // this suite that references com.codename1.contacts.ContactPicker
             // -- which is what makes the iOS build compile and link its
@@ -597,6 +624,27 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MutableImageReadbackTest(),
             new MutableImageClipReadbackTest(),
             new CalendarApiTest(),
+            // The Android compatibility gallery (scripts/android-compat-samples/gallery),
+            // compiled into this app from its unmodified Android Studio module: one
+            // capture per screen, each started as an Android activity and finished back
+            // to this app. After every other screenshot test, so the Android runtime it
+            // installs cannot shift an existing baseline, and before DesktopMode, which
+            // must stay the last ordinary capture. The gallery's animation screen is left
+            // out: its flipper and pulsing text never hold still for a capture (the
+            // animation framework has unit tests in maven/android-compat).
+            new AndroidCompatMainScreenshotTest(),
+            new AndroidCompatDetailScreenshotTest(),
+            new AndroidCompatWidgetsScreenshotTest(),
+            new AndroidCompatListScreenshotTest(),
+            new AndroidCompatFragmentsScreenshotTest(),
+            new AndroidCompatInputsScreenshotTest(),
+            new AndroidCompatDataScreenshotTest(),
+            new AndroidCompatAppCompatScreenshotTest(),
+            new AndroidCompatConstraintScreenshotTest(),
+            new AndroidCompatJetpackScreenshotTest(),
+            new AndroidCompatRecyclerScreenshotTest(),
+            new AndroidCompatMaterialScreenshotTest(),
+            new AndroidCompatKotlinScreenshotTest(),
             // Desktop integration demo. Placed LAST on purpose: it shows a Toolbar with text
             // and a populated list, which warms the font cache / shifts suite timing, and the
             // earlier graphics screenshot tests (DrawString, DrawStringDecorated, inscribed

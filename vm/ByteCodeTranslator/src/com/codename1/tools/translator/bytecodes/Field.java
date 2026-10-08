@@ -40,7 +40,7 @@ public class Field extends Instruction implements AssignableExpression {
     public Field(int opcode, String owner, String name, String desc) {
         super(opcode);
         this.owner = owner;
-        this.name = name.replace('$', '_');
+        this.name = name.replace('$', '_').replace('-', '_');
         this.desc = desc;
     }
 
@@ -63,7 +63,7 @@ public class Field extends Instruction implements AssignableExpression {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
-        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
+        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_').replace('-', '_');
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);

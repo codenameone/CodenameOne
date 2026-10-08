@@ -1,0 +1,4 @@
+<resources>
+    <dimen name="margin">16dp</dimen>
+    <dimen name="title_size">22sp</dimen>
+</resources>

@@ -12,6 +12,10 @@
     <artifactId>parparvm-tests</artifactId>
     <name>ParparVM Java Tests</name>
 
+    <properties>
+        <parparvm.test.forkCount>1C</parparvm.test.forkCount>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.codename1.parparvm</groupId>
@@ -150,8 +154,10 @@
                          unique createTempDirectory paths and the only shared path
                          (target/benchmark-dependencies) is populated by maven-dependency-plugin
                          before the test phase and only read here, so forks never collide.
-                         1C = one fork per available CPU core. -->
-                    <forkCount>1C</forkCount>
+                         1C = one fork per available CPU core. Timing and memory
+                         benchmarks override this to 1 so their measurements are not
+                         perturbed by other benchmark processes starting or finishing. -->
+                    <forkCount>${parparvm.test.forkCount}</forkCount>
                     <reuseForks>true</reuseForks>
                 </configuration>
             </plugin>
@@ -204,4 +210,17 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>isolated-benchmarks</id>
+            <activation>
+                <property><name>groups</name><value>benchmark</value></property>
+            </activation>
+            <properties>
+                <!-- Each benchmark already drives its own workers and collector.
+                     Competing benchmark JVMs distort GC pacing and working sets. -->
+                <parparvm.test.forkCount>1</parparvm.test.forkCount>
+            </properties>
+        </profile>
+    </profiles>
 </project>

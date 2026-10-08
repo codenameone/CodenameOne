@@ -220,6 +220,22 @@ public class BytecodeCompliance {
                 MethodRef.virtual("java/lang/String", "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"),
                 MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
         );
+        // Java 8's static wrapper hash and compare methods (Kotlin data classes
+        // call them), onto the helper's identical implementations.
+        String[][] wrappers = {
+            {"java/lang/Integer", "I"}, {"java/lang/Long", "J"}, {"java/lang/Double", "D"},
+            {"java/lang/Float", "F"}, {"java/lang/Boolean", "Z"}, {"java/lang/Character", "C"},
+            {"java/lang/Short", "S"}, {"java/lang/Byte", "B"},
+        };
+        for (String[] w : wrappers) {
+            rules.put(MethodRef.staticRef(w[0], "hashCode", "(" + w[1] + ")I"),
+                    MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "hashCode", "(" + w[1] + ")I"));
+        }
+        for (String[] w : new String[][] {{"java/lang/Boolean", "Z"}, {"java/lang/Character", "C"},
+                {"java/lang/Byte", "B"}}) {
+            rules.put(MethodRef.staticRef(w[0], "compare", "(" + w[1] + w[1] + ")I"),
+                    MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "compare", "(" + w[1] + w[1] + ")I"));
+        }
         return Collections.unmodifiableMap(rules);
     }
 
@@ -961,13 +977,23 @@ public class BytecodeCompliance {
     private void indexArchive(File archive, Map<String, ClassMetadata> index) throws IOException {
         InputStream fis = new BufferedInputStream(new FileInputStream(archive));
         try {
-            indexArchiveStream(fis, archive.getAbsolutePath(), index);
+            indexArchiveStream(fis, archive.getAbsolutePath(), index,
+                    archive.getName().startsWith(AndroidResourceRunner.COMPAT_ARTIFACT + "-"));
         } finally {
             fis.close();
         }
     }
 
     private void indexArchiveStream(InputStream archiveStream, String sourcePrefix, Map<String, ClassMetadata> index) throws IOException {
+        indexArchiveStream(archiveStream, sourcePrefix, index, false);
+    }
+
+    /// `relocated`: the Android compatibility runtime, which the remap step
+    /// ships relocated; its classes are indexed under those names too, so a
+    /// pass checked before the runtime is copied in (Gradle's Kotlin pass)
+    /// resolves the relocated references.
+    private void indexArchiveStream(InputStream archiveStream, String sourcePrefix, Map<String, ClassMetadata> index,
+                                    boolean relocated) throws IOException {
         ZipInputStream zip = new ZipInputStream(archiveStream);
         try {
             ZipEntry entry;
@@ -984,6 +1010,13 @@ public class BytecodeCompliance {
                     ClassMetadata metadata = readClassMetadata(new ByteArrayInputStream(bytes), sourcePrefix + "!" + entryName);
                     if (metadata != null) {
                         index.put(metadata.name, metadata);
+                    }
+                    if (relocated) {
+                        ClassMetadata moved = readClassMetadata(new ByteArrayInputStream(AndroidRemapper.remap(bytes)),
+                                sourcePrefix + "!" + entryName);
+                        if (moved != null) {
+                            index.put(moved.name, moved);
+                        }
                     }
                 } else if (isClassArchiveName(entryName)) {
                     indexArchiveStream(new ByteArrayInputStream(bytes), sourcePrefix + "!" + entryName, index);

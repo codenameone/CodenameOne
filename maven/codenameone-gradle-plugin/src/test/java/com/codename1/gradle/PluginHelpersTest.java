@@ -35,6 +35,19 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 class PluginHelpersTest {
     @Test
+    void remapReadsTheOnClickNamesWhereCompileAndroidResWritesThem() {
+        // compileAndroidRes passes its state directory to the runner as the build
+        // directory, and the runner nests its files under it; reading the names
+        // from the state directory itself left every android:onClick without a
+        // handler in a Gradle build.
+        File state = new File("build/android-res").getAbsoluteFile();
+        com.codename1.maven.AndroidResourceRunner runner = new com.codename1.maven.AndroidResourceRunner(
+                new File("src/main/android"), new File("out"), new File("res"), state, null, "x", null, null,
+                Collections.<File>emptyList(), null);
+        assertEquals(runner.onClickNamesFile(), AppSupport.onClickNamesFile(state));
+    }
+
+    @Test
     void cn1UpdateRewritesOnlyThePluginVersion() {
         String kts = "pluginManagement { repositories { gradlePluginPortal() } }\n"
                 + "plugins {\n    id(\"com.codenameone\") version \"8.0.1\"\n    kotlin(\"jvm\") version \"2.2.10\"\n}\n";

@@ -46,6 +46,19 @@ public final class MockMvc {
 
     /// Sends one request and returns what came back, to assert on.
     public ResultActions perform(MockRequestBuilder request) throws Exception {
+        // What the request was told with(...): applied now, and whatever a
+        // post-processor changes for the length of the request -- who the thread
+        // is acting as -- is undone when it has been sent, however it ends.
+        MockRequestBuilder prepared = request.prepare();
+        try {
+            prepared.runBefore();
+            return send(prepared);
+        } finally {
+            prepared.runAfter();
+        }
+    }
+
+    private ResultActions send(MockRequestBuilder request) throws Exception {
         MockRequestBuilder.Built built = request.build();
         BackendAccess access = BackendAccess.get();
         // Never null: Backend.dispatch answers a path nothing routes with the same

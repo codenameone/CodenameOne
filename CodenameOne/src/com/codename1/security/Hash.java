@@ -48,6 +48,7 @@ package com.codename1.security;
 /// The implementations are written entirely in portable Java so they are
 /// available on every supported platform. They produce identical output to
 /// the equivalent algorithm in the standard JDK.
+@com.codename1.impl.SharedWithBackend
 public final class Hash {
 
     /// MD5 algorithm identifier (128-bit digest). Provided for legacy interop --

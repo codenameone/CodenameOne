@@ -49,7 +49,8 @@ extern NSString*   toNSString(JAVA_OBJECT str);
 // Presentation-context provider that hands the OS sheet a window. iOS 13+
 // requires a non-nil provider before -[ASWebAuthenticationSession start]
 // succeeds.
-API_AVAILABLE(ios(12.0))
+#if !TARGET_OS_WATCH
+API_AVAILABLE(ios(13.0))
 @interface CN1OidcAuthContext : NSObject <ASWebAuthenticationPresentationContextProviding>
 @end
 
@@ -90,6 +91,8 @@ API_AVAILABLE(ios(12.0))
 
 @end
 
+#endif // !TARGET_OS_WATCH
+
 // Single static slot to keep the session strongly referenced for the
 // duration of a flow (ARC would otherwise deallocate it the moment the
 // dispatch_async block returned).
@@ -98,7 +101,7 @@ static id g_cn1OidcCurrentContext = nil;
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_oidcSystemBrowserSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    if (@available(iOS 12.0, *)) {
+    if (@available(iOS 12.0, watchOS 6.2, *)) {
         return JAVA_TRUE;
     }
     return JAVA_FALSE;
@@ -106,7 +109,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_oidcSystemBrowserSupported___R_boo
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_oidcStartAuthorization___java_lang_String_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT authUrlObj, JAVA_OBJECT redirectSchemeObj) {
-    if (@available(iOS 12.0, *)) {
+    if (@available(iOS 12.0, watchOS 6.2, *)) {
         // fall through
     } else {
         return JAVA_NULL;
@@ -140,12 +143,15 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_oidcStartAuthorization___java_lang_
                 dispatch_semaphore_signal(sem);
             }];
 
+        // watchOS presents the session itself and has no window provider.
+#if !TARGET_OS_WATCH
         if (@available(iOS 13.0, *)) {
             CN1OidcAuthContext *ctx = [[CN1OidcAuthContext alloc] init];
             g_cn1OidcCurrentContext = ctx;
             session.presentationContextProvider = ctx;
             session.prefersEphemeralWebBrowserSession = NO;
         }
+#endif
         g_cn1OidcCurrentSession = session;
         if (![session start]) {
             failure = [NSError errorWithDomain:@"com.codename1.io.oidc"

@@ -293,7 +293,15 @@ public class TextField extends TextArea {
     ///
     /// this API is no longer useful and should be avoided
     public static void setUseNativeTextInput(boolean aUseNativeTextInput) {
+        boolean changed = useNativeTextInput != aUseNativeTextInput;
         useNativeTextInput = aUseNativeTextInput;
+        if (changed && Display.isInitialized()) {
+            Form current = Display.getInstance().getCurrent();
+            if (current != null) {
+                current.repaint();
+            }
+            Desktop.getInstance().repaintWindows();
+        }
     }
 
     /// Set the text that should appear on the clear softkey
@@ -1710,7 +1718,7 @@ public class TextField extends TextArea {
     public void paint(Graphics g) {
 
         //the native input will show the string.
-        if (useNativeTextInput && Display.getInstance().isNativeEditorVisible(this)) {
+        if (useNativeTextInput && Display.impl.isNativeEditorVisible(this, g)) {
             if (!Display.impl.nativeEditorPaintsHint()) {
                 paintHint(g);
             }

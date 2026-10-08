@@ -430,8 +430,8 @@ class GcSteadyStateIntegrationTest {
                 describe("The SATB log is sized by the allocation rate, not by the live set",
                         good));
         assertTrue(good.secondHalfPageGrowth() <= MAX_SECOND_HALF_PAGE_GROWTH,
-                describe("The page heap is still compounding in the second half of the run",
-                        good));
+                () -> describe("The page heap is still compounding in the second half of the run",
+                        good) + "\n" + clean.output);
 
         // The per-cycle series above is blind to the shape this whole gate is really
         // about: a collector that completes its early cycles and then never finishes
@@ -447,10 +447,10 @@ class GcSteadyStateIntegrationTest {
                         + " run, so the stalled-collector check below measured nothing.");
         double wallGrowth = wallSecondHalfPageGrowth(clean.output);
         assertTrue(wallGrowth <= MAX_SECOND_HALF_PAGE_GROWTH,
-                "The page heap is still compounding on the WALL-CLOCK series (second-half"
+                () -> "The page heap is still compounding on the WALL-CLOCK series (second-half"
                         + " growth " + String.format("%.3f", wallGrowth) + " over " + wallRows
                         + " samples), which the per-cycle series cannot see if the collector"
-                        + " stopped completing cycles.");
+                        + " stopped completing cycles.\n" + clean.output);
 
         // ---- 2. (removed) proof that the gate can fail ------------------------
         // This used to rebuild with -DCN1_SATB_LOG_FRESH -- the issue-5537 barrier put back

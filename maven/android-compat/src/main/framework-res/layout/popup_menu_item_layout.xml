@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One row of a popup or overflow menu. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/title"
+    android:layout_width="match_parent"
+    android:layout_height="?android:attr/dropdownListPreferredItemHeight"
+    android:minWidth="196dp"
+    android:singleLine="true"
+    android:ellipsize="end"
+    android:gravity="center_vertical"
+    android:textAppearance="?android:attr/textAppearanceLargePopupMenu"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp" />

@@ -32,6 +32,7 @@ public interface HTMLElement extends Element {
     int getOffsetWidth();
     int getOffsetHeight();
     int getOffsetTop();
+    int getScrollTop();
     int getOffsetLeft();
     void click();
     void focus();

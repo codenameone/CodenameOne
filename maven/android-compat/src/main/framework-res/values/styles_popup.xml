@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Floating window styles, matching AOSP's Material values. -->
+<resources>
+    <style name="Widget.Material.PopupWindow">
+        <item name="popupBackground">@drawable/popup_background_material</item>
+        <item name="popupElevation">@dimen/floating_window_z</item>
+    </style>
+    <style name="Widget.Material.ListPopupWindow">
+        <item name="dropDownSelector">?attr/selectableItemBackground</item>
+        <item name="popupBackground">@drawable/popup_background_material</item>
+        <item name="popupElevation">@dimen/floating_window_z</item>
+        <item name="dropDownVerticalOffset">0dp</item>
+        <item name="dropDownHorizontalOffset">0dp</item>
+        <item name="dropDownWidth">wrap_content</item>
+    </style>
+    <style name="Widget.Material.PopupMenu" parent="Widget.Material.ListPopupWindow">
+        <item name="overlapAnchor">false</item>
+    </style>
+    <style name="Widget.Material.PopupMenu.Overflow">
+        <item name="overlapAnchor">true</item>
+        <item name="dropDownHorizontalOffset">-4dp</item>
+    </style>
+    <style name="TextAppearance.Material.Widget.PopupMenu.Large">
+        <item name="textSize">16sp</item>
+        <item name="textColor">?attr/textColorPrimary</item>
+    </style>
+    <style name="TextAppearance.Material.Widget.PopupMenu.Small">
+        <item name="textSize">14sp</item>
+        <item name="textColor">?attr/textColorSecondary</item>
+    </style>
+    <style name="Widget.PopupWindow" parent="Widget.Material.PopupWindow"/>
+    <style name="Widget.ListPopupWindow" parent="Widget.Material.ListPopupWindow"/>
+    <style name="Widget.PopupMenu" parent="Widget.Material.PopupMenu"/>
+    <style name="Widget.DeviceDefault.PopupWindow" parent="Widget.Material.PopupWindow"/>
+    <style name="Widget.DeviceDefault.ListPopupWindow" parent="Widget.Material.ListPopupWindow"/>
+    <style name="Widget.DeviceDefault.PopupMenu" parent="Widget.Material.PopupMenu"/>
+</resources>

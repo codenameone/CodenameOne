@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- androidx.viewpager2: the ViewPager2 attributes, as the library
+     declares them. -->
+<resources>
+    <declare-styleable name="ViewPager2">
+        <attr name="android:orientation"/>
+    </declare-styleable>
+</resources>

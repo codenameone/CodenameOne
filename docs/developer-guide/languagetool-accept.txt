@@ -472,6 +472,13 @@ Xvfb
 adb
 logcat
 pidof
+# Android resource vocabulary used in the Running Android applications chapter:
+# a "drawable" is Android's name for a graphic resource (res/drawable).
+[Dd]rawables?
+# Kotlin's coroutines and Android's overscroll effect, named in the same chapter.
+[Cc]oroutines?
+[Oo]verscroll
+
 # Identity-provider product names used in the Authentication & Identity chapter.
 Keycloak
 Cognito

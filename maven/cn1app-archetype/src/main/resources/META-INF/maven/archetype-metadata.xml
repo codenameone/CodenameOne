@@ -11,7 +11,10 @@
       <defaultValue>8.0-SNAPSHOT</defaultValue>
     </requiredProperty>
     <requiredProperty key="kotlinVersion">
-      <defaultValue>1.3.72</defaultValue>
+      <!-- The Kotlin the Gradle conversion applies (GradleConversion.KOTLIN_VERSION),
+           so both builds compile Kotlin alike. 1.3.72's compiler cannot run on
+           JDK 17 (it reads sun.nio.ch, which JDK 17 no longer exports). -->
+      <defaultValue>2.2.10</defaultValue>
     </requiredProperty>
     <requiredProperty key="javaVersion">
       <!-- Sets codename1.arg.java.version (build server) and the maven-compiler

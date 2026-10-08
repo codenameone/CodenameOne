@@ -67,6 +67,12 @@ public abstract class RunBackendTask extends DefaultTask {
     @Optional
     public abstract Property<String> getMainClass();
 
+    /// Set when the class to run is one the build generates only for some modules: what to
+    /// say, in place of the JVM's "could not find or load main class", when it is in none of
+    /// the classes directories.
+    @Internal
+    public abstract Property<String> getMissingMainClassMessage();
+
     /// Program arguments.
     @Input
     public abstract ListProperty<String> getArgs();
@@ -85,6 +91,10 @@ public abstract class RunBackendTask extends DefaultTask {
         BackendMainClass finder = new BackendMainClass(new GradleLog(getLogger()), "-Pcn1.backend.mainClass");
         String explicit = getMainClass().getOrNull();
         if (explicit != null && !explicit.isEmpty()) {
+            String absent = getMissingMainClassMessage().getOrNull();
+            if (absent != null && !generated(explicit)) {
+                throw new BuildFailureException(absent + " (" + explicit + " was not generated)");
+            }
             return explicit;
         }
         java.util.List<java.io.File> dirs = new java.util.ArrayList<java.io.File>();
@@ -102,6 +112,16 @@ public abstract class RunBackendTask extends DefaultTask {
         // Across every directory at once, so a main in each -- or several in one
         // -- is reported as ambiguous rather than one being picked.
         return finder.findMainClass(dirs);
+    }
+
+    private boolean generated(String className) {
+        String file = className.replace('.', java.io.File.separatorChar) + ".class";
+        for (java.io.File dir : getClassesDirectories().getFiles()) {
+            if (new java.io.File(dir, file).isFile()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @TaskAction

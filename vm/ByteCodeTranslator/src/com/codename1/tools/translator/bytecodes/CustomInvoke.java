@@ -119,13 +119,13 @@ public class CustomInvoke extends Instruction {
                 }
             }
         }
-        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
+        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_').replace('-', '_');
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);
         }
         if (!owner.equals(dependencyOwner)) {
-            String concreteDependency = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
+            String concreteDependency = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_').replace('-', '_');
             concreteDependency = unarray(concreteDependency);
             if (concreteDependency != null && !dependencyList.contains(concreteDependency)) {
                 dependencyList.add(concreteDependency);

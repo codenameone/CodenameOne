@@ -32,7 +32,7 @@ public class ByteCodeMethodArg {
     private PrimitiveType primitiveType;
 
     public ByteCodeMethodArg(String type, int dim) {
-        this.type = type.replace('/', '_').replace('$', '_');
+        this.type = type.replace('/', '_').replace('$', '_').replace('-', '_');
         arrayDimensions = dim;
     }
 

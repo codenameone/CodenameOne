@@ -1,6 +1,9 @@
 # Porting Android (XML + Kotlin/Java) to Codename One
 
-Codename One's component model is similar enough to Android's that you can usually translate screens one-to-one. As with the HTML conversion guide (`references/html-css-cheatsheet.md`), the layout system is the part that differs most — Android XML doesn't translate; build the same screen in Java + CN1 CSS.
+There are two ways to bring an Android app over. Pick by what the user has:
+
+1. **An existing classic Android app (Activities, XML layouts, `res/`)**: run it unchanged on the Android compatibility runtime. Put the module's `src/main` in `common/src/main/android` -- `mvn cn1:import-android-project -Dcn1.android.import=/path/to/project` does it -- and build as usual. The build compiles `res/` and the manifest, compiles the Java against `codenameone-android-compat` (the `android.*` API on Codename One components), and runs on every target. Then evolve screens with Codename One APIs as needed; Android views and Codename One components mix (`view.getPeer()` is a Codename One component). Supported scope and limits: the "Running Android applications" chapter of the developer guide. Jetpack Compose is not covered.
+2. **A new Codename One UI, or a rewrite**: translate screens with the tables below. The component model is close enough that screens usually map one-to-one; as with the HTML guide (`references/html-css-cheatsheet.md`), layout is the part that differs most, so build the screen in Java + CN1 CSS rather than keeping Android XML.
 
 ## Android view → CN1 component
 

@@ -1223,6 +1223,13 @@ static inline int cn1GcSweepReclaimsObj(JAVA_OBJECT o, int mark) {
     if(mark != -1) {
         return cn1GcSweepReclaims(mark);
     }
+    // The legacy sweep also frees unmarked fresh objects in a stopped cycle.
+    // Large arrays use this heap, so treating every fresh legacy referent as
+    // live leaves a weak cache pointing to freed (and soon reused) pixels.
+    if(cn1GcStwCycle && CN1_OBJ_CLASS(o) != 0
+       && CN1_OBJ_HEAPPOS(o) >= 0) {
+        return 1;
+    }
 #ifndef CN1_DISABLE_BIBOP
     if(cn1GcStwCycle && CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS
        && CN1_OBJ_CLASS(o) != 0) {

@@ -44,6 +44,20 @@ import static org.junit.jupiter.api.Assertions.*;
 class AccessibilitySemanticsTest extends UITestBase {
 
     @FormTest
+    void associatedLabelChangesInvalidateTheCachedSnapshot() {
+        Form form = form();
+        TextArea area = new TextArea("Field content");
+        place(form, area, 0, 0, 200, 80);
+        assertEquals("Field content", find(AccessibilityInspector.snapshot(form), area).getLabel());
+
+        area.setLabelForComponent(new Label("Associated field label"));
+        assertEquals("Associated field label", find(AccessibilityInspector.snapshot(form), area).getLabel());
+
+        area.setLabelForComponent(null);
+        assertEquals("Field content", find(AccessibilityInspector.snapshot(form), area).getLabel());
+    }
+
+    @FormTest
     void exposesPortableAccessibilityPreferencesWithSafeDefaults() {
         Display display = Display.getInstance();
         assertEquals(AccessibilityColorVisionDeficiency.UNKNOWN, display.getColorVisionDeficiency());

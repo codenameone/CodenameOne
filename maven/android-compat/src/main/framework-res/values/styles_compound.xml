@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default styles of the compound buttons and progress widgets, following
+     AOSP's Material styles. The button glyphs themselves (checkbox, radio,
+     switch, stars, spinner) are drawn in code from the theme's
+     colorControlNormal / colorControlActivated. -->
+<resources>
+    <style name="Widget.Material.CompoundButton">
+        <item name="focusable">true</item>
+        <item name="clickable">true</item>
+        <item name="textAppearance">?attr/textAppearance</item>
+        <item name="gravity">center_vertical|start</item>
+    </style>
+    <style name="Widget.Material.CompoundButton.CheckBox">
+        <item name="background">@drawable/item_background_material</item>
+    </style>
+    <style name="Widget.Material.CompoundButton.RadioButton">
+        <item name="background">@drawable/item_background_material</item>
+    </style>
+    <style name="Widget.Material.CompoundButton.Switch">
+        <item name="switchMinWidth">4dp</item>
+        <item name="switchPadding">16dp</item>
+        <item name="textOn">ON</item>
+        <item name="textOff">OFF</item>
+        <item name="showText">false</item>
+        <item name="background">@drawable/item_background_material</item>
+    </style>
+    <style name="Widget.Material.Button.Toggle">
+        <item name="textOn">ON</item>
+        <item name="textOff">OFF</item>
+        <item name="disabledAlpha">?attr/disabledAlpha</item>
+    </style>
+    <style name="Widget.Material.CheckedTextView">
+        <item name="textAlignment">viewStart</item>
+        <item name="gravity">center_vertical|start</item>
+    </style>
+    <style name="Widget.Material.ProgressBar">
+        <item name="indeterminateOnly">true</item>
+        <item name="indeterminate">true</item>
+        <item name="minWidth">48dp</item>
+        <item name="maxWidth">48dp</item>
+        <item name="minHeight">48dp</item>
+        <item name="maxHeight">48dp</item>
+    </style>
+    <style name="Widget.Material.ProgressBar.Small">
+        <item name="minWidth">16dp</item>
+        <item name="maxWidth">16dp</item>
+        <item name="minHeight">16dp</item>
+        <item name="maxHeight">16dp</item>
+    </style>
+    <style name="Widget.Material.ProgressBar.Large">
+        <item name="minWidth">76dp</item>
+        <item name="maxWidth">76dp</item>
+        <item name="minHeight">76dp</item>
+        <item name="maxHeight">76dp</item>
+    </style>
+    <style name="Widget.Material.ProgressBar.Horizontal">
+        <item name="indeterminateOnly">false</item>
+        <item name="indeterminate">false</item>
+        <item name="minHeight">16dp</item>
+        <item name="maxHeight">16dp</item>
+        <item name="max">100</item>
+        <item name="progress">0</item>
+    </style>
+    <style name="Widget.Material.SeekBar" parent="Widget.Material.ProgressBar.Horizontal">
+        <item name="focusable">true</item>
+        <item name="clickable">true</item>
+        <item name="splitTrack">false</item>
+        <item name="paddingStart">16dp</item>
+        <item name="paddingEnd">16dp</item>
+        <item name="paddingLeft">16dp</item>
+        <item name="paddingRight">16dp</item>
+        <item name="minHeight">32dp</item>
+        <item name="maxHeight">32dp</item>
+    </style>
+    <style name="Widget.Material.RatingBar" parent="Widget.Material.ProgressBar.Horizontal">
+        <item name="numStars">5</item>
+        <item name="stepSize">0.5</item>
+        <item name="isIndicator">false</item>
+        <item name="minHeight">48dp</item>
+        <item name="maxHeight">48dp</item>
+        <item name="focusable">true</item>
+        <item name="clickable">true</item>
+    </style>
+    <style name="Widget.Material.RatingBar.Indicator">
+        <item name="isIndicator">true</item>
+        <item name="minHeight">36dp</item>
+        <item name="maxHeight">36dp</item>
+    </style>
+    <style name="Widget.Material.RatingBar.Small">
+        <item name="isIndicator">true</item>
+        <item name="minHeight">16dp</item>
+        <item name="maxHeight">16dp</item>
+    </style>
+
+    <style name="Widget.CompoundButton" parent="Widget.Material.CompoundButton"/>
+    <style name="Widget.CompoundButton.CheckBox" parent="Widget.Material.CompoundButton.CheckBox"/>
+    <style name="Widget.CompoundButton.RadioButton" parent="Widget.Material.CompoundButton.RadioButton"/>
+    <style name="Widget.CompoundButton.Switch" parent="Widget.Material.CompoundButton.Switch"/>
+    <style name="Widget.Button.Toggle" parent="Widget.Material.Button.Toggle"/>
+    <style name="Widget.ProgressBar" parent="Widget.Material.ProgressBar"/>
+    <style name="Widget.ProgressBar.Small" parent="Widget.Material.ProgressBar.Small"/>
+    <style name="Widget.ProgressBar.Large" parent="Widget.Material.ProgressBar.Large"/>
+    <style name="Widget.ProgressBar.Horizontal" parent="Widget.Material.ProgressBar.Horizontal"/>
+    <style name="Widget.SeekBar" parent="Widget.Material.SeekBar"/>
+    <style name="Widget.RatingBar" parent="Widget.Material.RatingBar"/>
+    <style name="Widget.DeviceDefault.CompoundButton.CheckBox" parent="Widget.Material.CompoundButton.CheckBox"/>
+    <style name="Widget.DeviceDefault.ProgressBar.Horizontal" parent="Widget.Material.ProgressBar.Horizontal"/>
+</resources>

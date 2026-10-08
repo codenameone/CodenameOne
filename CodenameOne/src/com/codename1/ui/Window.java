@@ -2544,8 +2544,22 @@ public class Window extends Container implements TopLevelContainer {
             // Nothing leaks by keeping it: the blocker belongs to the window, and
             // hide(), dispose(), activationFailed() and setModalityType() all release
             // it when the window is really finished with.
-            if (isModalFinished()) {
-                releaseModal();
+            Runnable cleanup = new Runnable() {
+                @Override
+                public void run() {
+                    // Recheck on the EDT: a reusable window may have been shown
+                    // again before this queued cleanup reaches it.
+                    if (isModalFinished()) {
+                        releaseModal();
+                    }
+                }
+            };
+            if (Display.getInstance().isEdt()) {
+                cleanup.run();
+            } else {
+                // hide()/dispose() can wake this waiter before releasing the
+                // blocker. Never race their modal registry or native calls.
+                Display.getInstance().callSerially(cleanup);
             }
         }
     }

@@ -112,7 +112,8 @@ PR CI (`.github/workflows/pr.yml`, Java 8 leg) runs SpotBugs over
 `core-unittests`, `android`, `ios`, `ByteCodeTranslator`,
 `codenameone-maven-plugin`, `build-engine` (the Maven-free build logic both
 build plugins share), `project-model` (the project-layout API),
-`codenameone-gradle-plugin` and `javac` (the in-tree Java compiler,
+`android-res-compiler` and `android-compat` (the Android compatibility
+runtime), `codenameone-gradle-plugin` and `javac` (the in-tree Java compiler,
 `vm/JavaCompiler`), then enforces the result in
 `.github/scripts/generate-quality-report.py`.
 
@@ -124,6 +125,7 @@ build plugins share), `project-model` (the project-layout API),
   (`maven/core-unittests/`, `Ports/Android/`, `Ports/iOSPort/`,
   `vm/ByteCodeTranslator/`, `maven/codenameone-maven-plugin/`,
   `maven/build-engine/`, `maven/project-model/`,
+  `maven/android-res-compiler/`, `maven/android-compat/`,
   `maven/codenameone-gradle-plugin/`, `maven/javac/`), scoped to the
   class or method it applies to and with a comment explaining why. Keep the
   generated report at zero rather than tolerating known noise.
@@ -134,7 +136,7 @@ To reproduce the SpotBugs gate locally:
 ```bash
 source tools/env.sh   # JDK 8
 cd maven && mvn -B -DskipTests=true -Pcompile-android \
-  -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,javac -am verify
+  -pl android,ios,project-model,android-res-compiler,android-compat,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,javac -am verify
 mvn -B -DunitTests -DskipTests=true -pl core-unittests verify
 mvn -B -DskipTests=true -f ../vm/ByteCodeTranslator/pom.xml verify
 ```
@@ -303,8 +305,9 @@ recognized and never reported. Note the rule is about the *cast*: a
 `catch (ClassCastException)` with no cast under it is fine, because an
 *explicitly thrown* ClassCastException propagates normally.
 
-The scope is what a translation actually sees -- `maven/core`, `maven/ios` and
-`vm/JavaAPI`. **The Android port is not covered**, and adding it back would be a
+The scope is what a translation actually sees -- `maven/core`, `maven/ios`,
+`vm/JavaAPI` and `maven/android-compat`, whose runtime an application with
+Android sources ships relocated inside its own classes. **The Android port is not covered**, and adding it back would be a
 mistake: ART implements `CHECKCAST` to spec, so a `catch (Throwable)` around a
 `(NotificationManager) getSystemService(...)` there is live, correct code, and
 `Ports/Android` is never translated. That is the same reason `Ports/CLDC11` is
@@ -375,7 +378,13 @@ The backend is held to the client's gates:
   `package-info.java` per package; no since markers.
 - SpotBugs (zero findings, `maven/backend/spotbugs-exclude.xml`), PMD (the core's
   forbidden list) and Checkstyle (zero errors) run in `maven/backend`'s `verify`,
-  using the core's own `pmd.xml` and `checkstyle.xml`.
+  using the core's own `pmd.xml` and `checkstyle.xml`. Only two of the three
+  fail a local build: SpotBugs, and Checkstyle through its `check` execution
+  (`checkstyle-zero-errors`). **PMD writes `maven/backend/target/pmd.xml` and
+  judges nothing** -- its forbidden list lives in
+  `.github/scripts/generate-quality-report.py`, which PR CI runs afterwards. A
+  green `mvn verify` therefore says nothing about PMD: read the report. Both
+  reports once sat at seven and fifteen findings behind green local builds.
 - Error Prone's `BanClassForName`, because ParparVM translates the backend too.
 - `maven/backend` compiles only the `impl/javase` twins, so the production
   `impl/parparvm` tree gets its own analysis-only module, `maven/backend-parparvm`
@@ -390,6 +399,39 @@ The backend is held to the client's gates:
 
 `DM_CONVERT_CASE` is deliberately not excluded for the backend, as it is for the
 core: a server folds protocol tokens, and the next section is why that matters.
+
+#### A package shared only in part: `vm/backend/package-docs`
+
+A core package of which the backend takes only SOME classes cannot be described
+by the core's `package-info.java`. That file links every class of the package,
+and the ones a server does not have are references the backend run cannot
+resolve: doclint fails on them, and the website's doclet would print each as
+plain text where a link was meant. `com.codename1.security` is the case that
+exists -- the server shares the digests and the one-time passwords, not the
+client's ciphers and key storage.
+
+`vm/backend/package-docs/<package path>/package-info.java` is the server's own
+description of such a package. `build_javadocs.sh` copies that tree into the
+backend staging directory *before* it copies the shared classes, and the loop
+that follows takes a core `package-info.java` only for a package that has none
+yet, so the server's one stays. The website build renders the same staging
+directory, so it needs nothing of its own.
+
+- It cannot live in `vm/backend/src`: `shared-sources.sh` and
+  `maven/backend/pom.xml` fail the build on any file there with the same package
+  and name as a core source, and a `package-info.java` cannot be marked
+  `@SharedWithBackend` either.
+- It is documentation only. No build compiles it, so nothing but the javadoc
+  run tells you it is wrong: after touching one, run the backend half of
+  `build_javadocs.sh` under a JDK 25 `javadoc`.
+- A package the backend shares WHOLE needs no entry -- the core's description is
+  true of it and is taken as it is.
+- The directory is in the `paths` of `javadocs.yml` and `website-docs.yml`; a
+  new tree beside it would need adding there.
+
+`com.codename1.impl.*` is on the source path of that run but not among the
+documented sources, so doclint never reads its comments: a broken reference in
+an internal class passes the gate. Write those references fully qualified.
 
 ### No `@author`, `@version` or `@since` in documentation
 
@@ -697,6 +739,50 @@ scripts/check-ios-private-api.py --binary <Release-iphoneos/App.app>
 scripts/check-ios-private-api.py --sdk appletvos --project-dir <...-src>
 scripts/check-builder-define-toggles.py
 ```
+
+### Android compatibility: classic Android apps as Codename One apps
+
+An Android Studio module's `src/main` dropped into `common/src/main/android`
+(or imported with `cn1:import-android-project`) builds unmodified:
+
+- **`maven/android-res-compiler`** compiles the manifest and `res/` at build
+  time into `R`, a binary resource table (`cn1_android_res.bin`) and a generated
+  `com.codename1.generated.android.AndroidAppImpl` that `new`s every activity and
+  view class. Nothing on device parses XML or uses reflection.
+- **`maven/android-compat`** is the `android.*` API written over Codename One
+  (views are peers, layouts run Android's measure/layout). Apps compile against
+  it under the real names; its own framework resources live in
+  `src/main/framework-res`.
+- **The remap step** (`build-engine/.../AndroidRemapper`, goal `remap-android`)
+  relocates `android/`, `androidx/` and `com/google/android/material/` to
+  `com/codename1/androidcompat/...`, copies the relocated runtime into the app's
+  classes, maps the JDK classes CLDC lacks (`java.io.File`, the file streams,
+  `BufferedReader`, `PrintWriter`, `Closeable`) to `com.codename1.androidcompat.jdk`,
+  and generates the `android:onClick`, fragment-factory and WebView JS-bridge
+  dispatchers from the compiled classes.
+
+Traps that have already cost a fix:
+
+- **`Object.clone()` returns null on ParparVM** (and in `Ports/CLDC11`); only
+  array clones work. Runtime classes copy explicitly; never `super.clone()`.
+- **The runtime source names JDK classes the device lacks on purpose** -- they
+  are shimmed by the remap, so compiling `android-compat` against CLDC11 reports
+  `java.io.File`/`BufferedReader`; every other CLDC error is real.
+- **Kotlin compiles before javac and is relocated after it.** Java (and the
+  generated factory) refers to Kotlin classes, so the archetype's Kotlin
+  profile compiles in `process-resources` (after the `process-sources`
+  generators, before javac); javac must then see Kotlin's classes
+  *unrelocated*. Maven restores them from `target/kotlin-ic` in
+  `compile-android-res`, and copies that tree back only when newer
+  (`copyKotlinIncrementalCompileOutputToOutputDir`); Gradle relocates
+  Kotlin's directory in `cn1RemapAndroidKotlin`, a task that finalizes
+  `compileJava` and runs every build -- never an action of `compileJava`,
+  which an ABI-unchanged Kotlin edit leaves up to date. Kotlin's `@Metadata` strings
+  are remapped too.
+- **`maven/integration-tests/android-compat-test.sh`** imports
+  `scripts/android-compat-samples/*` and stages every target's upload jar
+  (`.github/workflows/android-compat.yml`); it fails if any shipped class still
+  names `android/`.
 
 ### Integration Tests
 

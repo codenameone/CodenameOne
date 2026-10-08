@@ -160,4 +160,15 @@
         <Class name="com.codename1.io.gzip.GZIPHeader" />
         <Bug pattern="NM_CONFUSING" />
     </Match>
+
+    <!--
+    A claim a token does not carry is not a claim that is false. Three answers
+    are the contract, as they are for the same method of Spring Security's Jwt,
+    and a caller that wants two writes Boolean.TRUE.equals(...).
+    -->
+    <Match>
+        <Class name="com.codename1.backend.security.oauth2.jwt.Jwt" />
+        <Method name="getClaimAsBoolean" />
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
+    </Match>
 </FindBugsFilter>

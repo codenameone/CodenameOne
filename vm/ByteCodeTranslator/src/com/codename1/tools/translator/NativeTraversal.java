@@ -46,9 +46,8 @@ final class NativeTraversal {
         @Override public void addDependencies(List<String> out) { out.addAll(dependencies); }
     }
     private enum Layout {
-        /* SET and HASH_SET are both java.util.HashSet and that is deliberate: they are
-         * two different RECEIVERS, and the distinction is which object the emitted field
-         * reads come from.
+        /* SET describes a HashMap-backed keySet()/values() view; HASH_SET describes
+         * a standalone HashSet. The distinction is which object owns the fields.
          *
          * SET is a map-backed view -- a HashMap's keySet() or values() -- where root is
          * assigned the MAP and every field read is a HashMap field. HASH_SET is a plain
@@ -61,7 +60,7 @@ final class NativeTraversal {
          * all. Until it did, the dispatch loop skipped SET for a direct receiver and
          * every for-each over a HashSet allocated a real iterator: 517,043 of them over
          * a translation of the 5,326-class corpus. */
-        ARRAY(1, "java_util_ArrayList"), SET(2, "java_util_HashSet"), ORDERED_SET(3, "java_util_LinkedHashSet"),
+        ARRAY(1, "java_util_ArrayList"), SET(2, "java_util_HashMap"), ORDERED_SET(3, "java_util_LinkedHashSet"),
         IDENTITY(4, "java_util_IdentityHashMap"), HASH_SET(5, "java_util_HashSet");
         final int id;
         final String type;
@@ -94,17 +93,23 @@ final class NativeTraversal {
                 && Parser.hasCallers("java_util_Collections", "newSetFromMap");
         for (Layout layout : Layout.values()) {
             if (listOnly && layout != Layout.ARRAY) continue;
+            // SET is a map-backed keySet()/values() view, not a standalone
+            // HashSet. The first cull may retain HashSet but remove HashMap;
+            // adding SET here would emit reads of the removed map's fields.
+            if (layout == Layout.SET) continue;
+            if (layout == Layout.ORDERED_SET
+                    && Parser.getClassObject("java_util_LinkedHashMap") == null) continue;
             if (Parser.getClassObject(layout.type) != null) layouts.add(layout);
-            // Not a direct HashSet receiver: see the dispatch loop in setup().
-            if (layout != Layout.SET && invoke.hasExactReceiver(layout.type)) proven = layout;
+            if (invoke.hasExactReceiver(layout.type)) proven = layout;
         }
         if (mapReceiver) proven = mapView.hasExactReceiver("java_util_IdentityHashMap") ? Layout.IDENTITY
                 : mapView.hasExactReceiver("java_util_LinkedHashMap") ? Layout.ORDERED_SET : Layout.SET;
         // An exact fact itself establishes reachability even in isolated IR tests.
         if (proven != null && !layouts.contains(proven)) layouts.add(proven);
         exact = proven;
-        keyView = !listOnly && Parser.getClassObject("java_util_HashMap_KeySet") != null;
-        valueView = !listOnly && Parser.getClassObject("java_util_HashMap_Values") != null;
+        boolean hasHashMap = Parser.getClassObject("java_util_HashMap") != null;
+        keyView = !listOnly && hasHashMap && Parser.getClassObject("java_util_HashMap_KeySet") != null;
+        valueView = !listOnly && hasHashMap && Parser.getClassObject("java_util_HashMap_Values") != null;
         if ((keyView || valueView) && !layouts.contains(Layout.SET)) layouts.add(Layout.SET);
         if ((keyView || valueView) && Parser.getClassObject("java_util_LinkedHashMap") != null
                 && !layouts.contains(Layout.ORDERED_SET)) layouts.add(Layout.ORDERED_SET);
@@ -126,8 +131,7 @@ final class NativeTraversal {
         for (Layout layout : layouts) {
             if (Parser.getClassObject(layout.type) != null) result.add(layout.type);
             if (layout == Layout.ARRAY) result.add("java_util_AbstractList");
-            else if (layout != Layout.IDENTITY) {
-                if (Parser.getClassObject("java_util_HashSet") != null) result.add("java_util_HashSet");
+            else if (layout == Layout.SET || layout == Layout.ORDERED_SET) {
                 result.add("java_util_HashMap");
             }
             if (layout == Layout.ORDERED_SET) result.add("java_util_LinkedHashMap");

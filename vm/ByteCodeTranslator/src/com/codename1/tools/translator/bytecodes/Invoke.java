@@ -127,7 +127,7 @@ public class Invoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
-        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
+        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_').replace('-', '_');
         t = unarray(t);
         if (t != null && !dependencyList.contains(t)) dependencyList.add(t);
         // The world is incomplete while ClassReader visits instructions. Resolve
@@ -753,9 +753,9 @@ public class Invoke extends Instruction {
                 // emission disagreeing, which would leave the caller's include list
                 // missing the field owner's header.
                 //
-                // Scoped to THIS branch on purpose. The instance-getter and
-                // static-forwarder folds above have the same order-dependence and
-                // predate this change; memoizing them too moves ~280 files of emitted
+                // Not applied to the instance-getter fold below on purpose. It has
+                // the same order-dependence and predates this change; memoizing it
+                // too moves ~280 files of emitted
                 // C and can only fold MORE getters, which is the case vm/CLAUDE.md
                 // warns about for the boxed types (a folded `return value;` on a
                 // tagged immediate reads off a pointer with no fields). That is its
@@ -779,16 +779,30 @@ public class Invoke extends Instruction {
             // (updateInlinableFieldDependencies) would disagree with emission.
             // Resolving through the chain here makes both phases deterministic:
             // the fold always lands on the final field, order-independent.
-            for (int depth = 0; target != null && depth < 4; depth++) {
-                Field f = trivialStaticFieldGetter(target);
-                if (f != null) {
-                    Field getstatic = new Field(Opcodes.GETSTATIC, f.getOwner(), f.getFieldName(), f.getDesc());
-                    getstatic.setMethod(getMethod());
-                    return getstatic;
+            //
+            // Following the chain is not enough on its own, so the verdict is
+            // memoized exactly as the one-argument branch above is. optimize()
+            // also DROPS instructions in place, CHECKCAST among them, and Kotlin
+            // compiles `fun <T> emptyList(): List<T> = EmptyList` to
+            // `GETSTATIC EmptyList.INSTANCE; CHECKCAST java/util/List; ARETURN`.
+            // The dependency scan saw three instructions and no fold; a caller
+            // emitted after that body was optimized saw two and folded to
+            // get_static_kotlin_collections_EmptyList_INSTANCE() in a file that
+            // never included EmptyList's header, which clang rejects as an
+            // undeclared function (CollectionsKt.toList on the Windows target).
+            if (!staticAccessorComputed) {
+                for (int depth = 0; target != null && depth < 4; depth++) {
+                    Field f = trivialStaticFieldGetter(target);
+                    if (f != null) {
+                        staticAccessorCache = new Field(Opcodes.GETSTATIC, f.getOwner(), f.getFieldName(), f.getDesc());
+                        staticAccessorCache.setMethod(getMethod());
+                        break;
+                    }
+                    target = trivialStaticForwarderTarget(target);
                 }
-                target = trivialStaticForwarderTarget(target);
+                staticAccessorComputed = true;
             }
-            return null;
+            return staticAccessorCache;
         }
         if (opcode != Opcodes.INVOKEVIRTUAL && opcode != Opcodes.INVOKESPECIAL) {
             return null;

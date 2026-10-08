@@ -27,6 +27,7 @@ import com.codename1.backend.orm.EntityDefinition;
 import com.codename1.backend.orm.EntityManager;
 import com.codename1.impl.backend.BackendApplication;
 import com.codename1.impl.backend.Management;
+import com.codename1.impl.backend.RequestSecurity;
 import com.codename1.impl.backend.WiringEnvironment;
 import com.codename1.impl.backend.mcp.McpServer;
 
@@ -679,14 +680,20 @@ public final class Backend {
     }
 
     /// Stores and releases what a websocket handshake did to sessions, as a
-    /// request's end does: a session it loaded is released, and one it changed,
-    /// ended or started is stored. The upgrade's response is the server's own,
-    /// so no cookie is set on it; a handshake authenticates an existing session.
+    /// request's end does. A fallback router has no response to carry a cookie,
+    /// so it may update an existing session but cannot announce a new session.
     static void finishHandshakeSessions(Sessions sessions, HttpServer.Request request) {
+        finishHandshakeSessions(sessions, request, null);
+    }
+
+    /// Also carries session cookies on an upgrade response when security creates
+    /// or rotates a session during authentication.
+    static HttpServer.Response finishHandshakeSessions(Sessions sessions,
+            HttpServer.Request request, HttpServer.Response response) {
         List ended = request.endedSessions();
         for (int e = 0 ; ended != null && e < ended.size() ; e++) {
             try {
-                sessions.finish(request, (HttpSession) ended.get(e), null);
+                response = sessions.finish(request, (HttpSession) ended.get(e), response);
             } catch (Exception err) {
                 System.err.println("Could not end a session a websocket handshake ended: "
                         + err);
@@ -695,12 +702,13 @@ public final class Backend {
         HttpSession session = request.resolvedSession();
         if (session != null) {
             try {
-                sessions.finish(request, session, null);
+                response = sessions.finish(request, session, response);
             } catch (Exception err) {
                 System.err.println("Could not store the session of a websocket handshake: "
                         + err);
             }
         }
+        return response;
     }
 
     /// An endpoint whose every callback runs carrying its server's executors and
@@ -836,8 +844,16 @@ public final class Backend {
     /// request -- runs the chain, finishes the session and records metrics and
     /// the log. Named and static rather than an anonymous class holding the
     /// builder.
-    private static final class Serving implements HttpServer.Handler, HttpServer.FallbackDecorator {
+    private static final class Serving implements HttpServer.Handler,
+            HttpServer.FallbackDecorator, HttpServer.UpgradeGuard, HttpServer.Forwarding,
+            RequestSecurity.Next {
+        /// The routes the server answers on its own behalf -- MCP, the OTLP relay,
+        /// management -- which keep their own token guards and are tried first.
+        private final HttpServer.Handler[] own;
+        /// The application's routers, and static files last.
         private final HttpServer.Handler[] chain;
+        /// The security layer between the two, or null when the build linked none.
+        private final RequestSecurity security;
         private final Sessions sessions;
         private final Tasks.Registry tasks;
         private final RequestLog requestLog;
@@ -853,6 +869,14 @@ public final class Backend {
         private final Cors cors;
         /// `cn1.server.compression.*`, or null when compression is off.
         private final Compression compression;
+        /// `cn1.server.forwardHeaders`: whose word is taken for where a request
+        /// came from, or null for nobody's. Set once, before the server starts.
+        ForwardedHeaders forwarded;
+
+        @Override
+        public ForwardedHeaders forwardedHeaders() {
+            return forwarded;
+        }
 
         /// The server's own 404 and 500 get the CORS headers a handler's answer
         /// gets, as Spring's filter puts them on every response.
@@ -861,12 +885,79 @@ public final class Backend {
             if (cors != null) {
                 cors.decorate(request, response);
             }
+            if (security != null) {
+                // After the request's thread state is gone, so the layer works
+                // out again which chain the request belonged to.
+                security.decorate(request, response);
+            }
         }
 
-        Serving(HttpServer.Handler[] chain, Sessions sessions, Tasks.Registry tasks,
+        /// The first of the application's routers to take `request`, or null.
+        /// What the security layer calls once it lets a request through.
+        @Override
+        public HttpServer.Response route(HttpServer.Request request) throws Exception {
+            HttpServer.Response response = null;
+            for (int i = 0 ; response == null && i < chain.length ; i++) {
+                response = chain[i].handle(request);
+            }
+            return response;
+        }
+
+        /// A WebSocket handshake, put to the chain that guards its path. It
+        /// carries what an HTTP request carries -- this server's sessions and
+        /// executors -- because the chain authenticates it the same way, and a
+        /// session it touched is stored and released before a fallback router
+        /// looks at the request again.
+        @Override
+        public HttpServer.Response checkUpgrade(HttpServer.Request request) {
+            if (security == null) {
+                return null;
+            }
+            request.sessions = sessions;
+            inFlight.enter();
+            Object previousTasks = Tasks.enter(tasks);
+            Object previousOwner = Tracing.own(tracer);
+            Object previousServing = HttpSession.enterRequest(request);
+            Object previousSecurity = security.enter();
+            try {
+                HttpServer.Response response = security.upgrade(request);
+                if (response == null) {
+                    response = HttpServer.Response.empty(101, null, null);
+                }
+                // A copy, as for any response: an entry point may answer every
+                // request with one object, and the headers below are written
+                // into what is sent. Then what the chain writes on every
+                // answer -- the security headers, a cookie a filter recorded --
+                // so every handshake is answered as the same request over
+                // plain HTTP would have been.
+                response = response.withHeaders(response.extraHeaders);
+                security.decorate(request, response);
+                return finishHandshakeSessions(sessions, request, response);
+            } catch (Exception err) {
+                System.err.println("websocket security check failed: " + err);
+                finishHandshakeSessions(sessions, request);
+                return HttpServer.Response.text(500, "internal error");
+            } finally {
+                try {
+                    sessions.leave(request);
+                    request.forgetSession();
+                } finally {
+                    security.leave(previousSecurity);
+                    HttpSession.leaveRequest(previousServing);
+                    Tracing.disown(previousOwner);
+                    Tasks.leave(previousTasks);
+                    inFlight.leave();
+                }
+            }
+        }
+
+        Serving(HttpServer.Handler[] own, HttpServer.Handler[] chain,
+                RequestSecurity security, Sessions sessions, Tasks.Registry tasks,
                 RequestLog requestLog, java.util.concurrent.atomic.AtomicBoolean instrumented,
                 BackendApplication app, boolean track, Tracer tracer, InFlight inFlight,
                 Cors cors, Compression compression) {
+            this.own = own;
+            this.security = security;
             this.cors = cors;
             this.compression = compression;
             this.tracer = tracer;
@@ -986,6 +1077,8 @@ public final class Backend {
             Object previousOwner = Tracing.own(tracer);
             // Who rotates a session: see HttpSession.rotatedFor.
             Object previousServing = HttpSession.enterRequest(request);
+            // What the thread holds about who it is serving, to go back to.
+            Object previousSecurity = security == null ? null : security.enter();
             if (track) {
                 previous = CURRENT_REQUEST.get();
                 CURRENT_REQUEST.set(request);
@@ -995,6 +1088,8 @@ public final class Backend {
             // What the metrics record; stays 500 when a
             // handler or the session store throws.
             int status = 500;
+            // Whether the request went through the security layer.
+            boolean secured = false;
             try {
                 HttpServer.Response response = null;
                 List attempted = new ArrayList(2);
@@ -1002,8 +1097,26 @@ public final class Backend {
                     // A cross-origin request the CORS policy does not admit never
                     // reaches a handler.
                     response = cors == null ? null : cors.reject(request);
-                    for (int i = 0 ; response == null && i < chain.length ; i++) {
-                        response = chain[i].handle(request);
+                    for (int i = 0 ; response == null && i < own.length ; i++) {
+                        response = own[i].handle(request);
+                    }
+                    if (response == null) {
+                        if (security == null) {
+                            response = route(request);
+                        } else if (cors != null && Cors.isPreflight(request)) {
+                            // A preflight carries no credentials -- a browser sends
+                            // none -- so with a CORS policy it goes round the chain.
+                            // It goes round the application too, straight to the
+                            // policy's own answer: routed, it would be a request
+                            // that reached a handler without meeting the chain,
+                            // for anyone who adds two headers to an OPTIONS.
+                            // Without a policy it is an ordinary OPTIONS request
+                            // and is guarded like any other.
+                            response = cors.preflight(request);
+                        } else {
+                            secured = true;
+                            response = security.serve(request, this);
+                        }
                     }
                     if (response == null && cors != null) {
                         // A preflight no handler took: the policy answers it.
@@ -1063,7 +1176,7 @@ public final class Backend {
                     failed(request, attempted, startedMillis, err);
                     throw err;
                 }
-                if (response != null && (cors != null || compression != null)) {
+                if (response != null && (cors != null || compression != null || secured)) {
                     // A copy first. The handler may return one Response for every
                     // request -- a static final constant -- and both policies write
                     // into the object they are handed: compression replaced its body
@@ -1074,6 +1187,10 @@ public final class Backend {
                 }
                 if (cors != null) {
                     cors.decorate(request, response);
+                }
+                if (secured && response != null) {
+                    // Into the copy made above, never the handler's own object.
+                    security.decorate(request, response);
                 }
                 if (compression != null) {
                     compression.apply(request, response);
@@ -1110,6 +1227,13 @@ public final class Backend {
                         // executors or tracer, or to the defaults.
                         sessions.leave(request);
                     } finally {
+                        if (security != null) {
+                            // After the request beans and the session beans, whose
+                            // destroy callbacks may still ask who the caller is, and
+                            // always: this thread serves the connection's next
+                            // request, which must not inherit this one's identity.
+                            security.leave(previousSecurity);
+                        }
                         if (track) {
                             CURRENT_REQUEST.set(previous);
                         }
@@ -1208,6 +1332,16 @@ public final class Backend {
         }
     }
 
+    /// The security layer, seen through a type that names none of it. Only
+    /// [Builder#securityRoute] installs one, so a server whose entry point never
+    /// links the layer has none of its code.
+    abstract static class SecurityRoute {
+        /// The layer for `chains` -- the application's `SecurityFilterChain` beans,
+        /// in the order they are asked -- on a server that does or does not
+        /// terminate TLS itself.
+        abstract RequestSecurity open(Config config, List chains, boolean tls) throws Exception;
+    }
+
     public static final class Builder {
         private Config config;
         private final List handlers = new ArrayList();
@@ -1234,6 +1368,8 @@ public final class Backend {
         /// The executors a start in progress opened, until a Backend owns them.
         private Tasks.Registry startingTasks;
         private boolean createTablesGiven;
+        private boolean migrations;
+        private boolean migrationsGiven;
         private boolean handlersNeedADatabase;
         private boolean quiet;
         private Tracer tracer;
@@ -1241,6 +1377,8 @@ public final class Backend {
         private MetricReader metricReader;
         private OwnRoute managementRoute;
         private OwnRoute mcpRoute;
+        private boolean testApplication;
+        private SecurityRoute securityRoute;
         private String[] compiledSettings;
         private String serviceName;
 
@@ -1396,6 +1534,14 @@ public final class Backend {
             return this;
         }
 
+        /// Whether to apply pending migrations at start-up. Otherwise
+        /// cn1.flyway.enabled, which defaults to true. See [Migrations].
+        public Builder migrations(boolean migrate) {
+            this.migrations = migrate;
+            this.migrationsGiven = true;
+            return this;
+        }
+
         /// Says that the handlers this server builds need a database, so one is
         /// opened even when nothing else asks for it.
         ///
@@ -1477,6 +1623,15 @@ public final class Backend {
             return this;
         }
 
+        /// Says this is the application of a `@BackendTest`, which is built without the
+        /// management endpoints, the MCP endpoint and the exporters whatever the module's
+        /// settings ask for; see
+        /// [com.codename1.impl.backend.BackendAccess#testApplication(Backend.Builder)].
+        Builder testApplication() {
+            this.testApplication = true;
+            return this;
+        }
+
         /// Serves the management endpoints -- health, metrics, jobs and managed
         /// beans -- when the configuration turns them on; see [Management]. Like
         /// [#mcp], this is the only code that names them, and the generated entry
@@ -1494,6 +1649,29 @@ public final class Backend {
                     ((Management) opened).attach(running);
                 }
             };
+            return this;
+        }
+
+        /// Puts the security layer in front of the application's routes; see
+        /// [com.codename1.backend.security.SecurityFilterChain]. Like [#mcp] and
+        /// [#management], this is the only code that names the layer, and the
+        /// generated entry point calls it only for a build that found a chain
+        /// bean -- so a server without one has none of the layer in its binary.
+        Builder security() {
+            return securityRoute(new SecurityRoute() {
+                @Override
+                RequestSecurity open(Config config, List chains, boolean tls) {
+                    return com.codename1.impl.backend.security.SecurityAccess.get()
+                            .runtime(config, chains, tls);
+                }
+            });
+        }
+
+        /// Puts `route`'s security layer between the server's own routes and the
+        /// application's, once the application's beans are built and when any of
+        /// them is a `SecurityFilterChain`.
+        Builder securityRoute(SecurityRoute route) {
+            this.securityRoute = route;
             return this;
         }
 
@@ -1556,10 +1734,18 @@ public final class Backend {
                 config = Config.load();
             }
             config = config.withCompiledDefaults(compiledSettings);
+            // Before anything is opened: a setting only the build could have
+            // acted on is refused here rather than silently doing nothing.
+            BuildTimeSettings.require(config, managementRoute != null || testApplication,
+                    mcpRoute != null || testApplication,
+                    tracer != null || metricReader != null || testApplication);
+            // And the other way: a server built to export that is told not to.
+            boolean telemetryOff = BuildTimeSettings.leftOut(config,
+                    BuildTimeSettings.TELEMETRY);
             // BEFORE the database, so the statements start-up runs -- the ORM's
             // CREATE TABLE -- are traced like any other, and before anything that
             // could fail, so a refused configuration is refused up front.
-            boolean tracing = tracer != null && tracer.open(config);
+            boolean tracing = tracer != null && !telemetryOff && tracer.open(config);
             // Installed without stopping whatever tracer was there before -- another
             // server's, or one the program installed -- which is retired only once
             // this start-up commits, and put back if it does not.
@@ -1674,6 +1860,11 @@ public final class Backend {
 
         /// [#start] once the database, if any, is open.
         private Backend startWith(DataSource pool, Tracer active) throws Exception {
+            // BEFORE the entity manager: createTables fills in what is missing and
+            // validateSchema reads what is there, so both have to see the schema the
+            // migrations leave. Before the session store too, which creates its own
+            // table on first use.
+            runMigrations(pool);
             EntityManager manager = openEntityManager(pool);
             List routers = new ArrayList();
             HttpServer.Handler relay = active != null ? active.relay() : null;
@@ -1712,7 +1903,13 @@ public final class Backend {
             WiringEnvironment environment = null;
             if (application != null) {
                 environment = new WiringEnvironment(config, pool, manager, tools, managedBeans);
+                // Before the beans are built, so one that is called while they
+                // are -- from a @PostConstruct -- finds what is registered so
+                // far; and again after, which is what publishes the finished map
+                // to the threads that serve.
+                tasks.namedBeans(environment.namedBeans());
                 HttpServer.Handler[] built = application.create(environment);
+                tasks.namedBeans(environment.namedBeans());
                 if (built != null) {
                     for (HttpServer.Handler element : built) {
                         if (element != null) {
@@ -1805,8 +2002,33 @@ public final class Backend {
                 // the upgrade path is consulted before this chain runs.
                 routers.add(new NotFound());
             }
-            final HttpServer.Handler[] chain =
-                    (HttpServer.Handler[]) routers.toArray(new HttpServer.Handler[routers.size()]);
+            // The server's own routes apart from the application's: the security
+            // layer stands between the two. They were put at the front above, so
+            // taking them out changes nobody's place in the order.
+            List ownRouters = new ArrayList();
+            List appRouters = new ArrayList();
+            for (Object element : routers) {
+                if (element == mcpServer || element == relay || element == management) { //NOPMD CompareObjectsWithEquals - the handlers themselves
+                    ownRouters.add(element);
+                } else {
+                    appRouters.add(element);
+                }
+            }
+            final HttpServer.Handler[] own = (HttpServer.Handler[]) ownRouters.toArray(
+                    new HttpServer.Handler[ownRouters.size()]);
+            final HttpServer.Handler[] chain = (HttpServer.Handler[]) appRouters.toArray(
+                    new HttpServer.Handler[appRouters.size()]);
+            final List securityChains = environment == null ? new ArrayList()
+                    : environment.securityFilterChains();
+            if (!securityChains.isEmpty() && securityRoute == null) {
+                // Refused rather than served open: the application declared what
+                // guards its routes, and a server that started without the layer
+                // would answer every one of them to anybody.
+                throw new IllegalStateException("This application has "
+                        + securityChains.size() + " SecurityFilterChain bean(s), and the "
+                        + "security layer was not linked into this server. The generated "
+                        + "entry point links it; a server assembled by hand must too.");
+            }
             int listenPort = port >= 0 ? port : config.getInt(Config.SERVER_PORT, 8080);
             int listenBacklog = backlog >= 0 ? backlog : config.getInt(Config.SERVER_BACKLOG, 512);
             int workerCount = workers >= 0 ? workers : config.getInt(Config.SERVER_WORKERS, 16);
@@ -1915,9 +2137,13 @@ public final class Backend {
                     // request from a cross-origin one: the scheme is part of an origin.
                     cors.servedOverTls(context != null);
                 }
-                serving = new Serving(chain, sessions, tasks, requestLog, instrumented, app,
+                RequestSecurity security = securityChains.isEmpty() ? null
+                        : securityRoute.open(config, securityChains, context != null);
+                serving = new Serving(own, chain, security, sessions, tasks, requestLog,
+                        instrumented, app,
                         track, active != null ? active : Tracing.NONE, inFlight,
                         cors, Compression.fromConfig(config));
+                serving.forwarded = ForwardedHeaders.fromConfig(config);
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         serving, context, routes, active != null ? active : Tracing.NONE);
                 bound = true;
@@ -1956,7 +2182,9 @@ public final class Backend {
             // down here stopped that server's exporter.
             boolean readerOpen = false;
             try {
-                if (metricReader != null) {
+                // Not for a server told at run time to leave the exporters out.
+                if (metricReader != null
+                        && !BuildTimeSettings.leftOut(config, BuildTimeSettings.TELEMETRY)) {
                     readerOpen = metricReader.open(config);
                     measuring |= readerOpen;
                 }
@@ -2134,10 +2362,27 @@ public final class Backend {
             // server that needs none starts. One that needs one fails below, in
             // fromConfig, with the message naming the variable.
             boolean configured = config.resolves(Config.DATASOURCE_URL);
-            if (!configured && !handlersNeedADatabase && EntityManager.registered().length == 0) {
+            if (!configured && !handlersNeedADatabase && EntityManager.registered().length == 0
+                    && !Migrations.isRegistered()) {
                 return null;
             }
             return DataSource.fromConfig(config);
+        }
+
+        /// Applies pending migrations, when there are any registered and they have not
+        /// been switched off.
+        ///
+        /// A failure here fails the start. A server that came up on a schema it could
+        /// not migrate would answer requests against tables that are not the ones its
+        /// code was written for.
+        private void runMigrations(DataSource pool) throws IOException {
+            if (pool == null || !Migrations.isRegistered()) {
+                return;
+            }
+            boolean run = migrationsGiven ? migrations : config.getBoolean(Config.FLYWAY_ENABLED, true);
+            if (run) {
+                Migrations.migrate(pool, config);
+            }
         }
 
         private EntityManager openEntityManager(DataSource pool) throws IOException {

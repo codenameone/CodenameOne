@@ -280,6 +280,22 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- remap-android ships this runtime inside every application with
+             Android sources, so a build of the plugin with -am must build it
+             too: the CI jobs that install "-pl codenameone-maven-plugin -am"
+             and then build hellocodenameone otherwise fail to resolve it.
+             Provided and optional: the plugin never loads these classes, and
+             unrelocated android.* classes on its runtime classpath could make
+             a library that probes for android.os.Build believe it runs on
+             Android. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-android-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-ios</artifactId>

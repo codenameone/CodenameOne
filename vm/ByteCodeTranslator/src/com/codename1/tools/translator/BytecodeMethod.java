@@ -891,7 +891,7 @@ public class BytecodeMethod implements SignatureSet {
                             // Object skip until ;
                             int idx = retType.indexOf(';');
                             String objectType = retType.substring(1, idx);
-                            objectType = objectType.replace('/', '_').replace('$', '_');
+                            objectType = objectType.replace('/', '_').replace('$', '_').replace('-', '_');
                             if(!dependentClasses.contains(objectType)) {
                                 dependentClasses.add(objectType);
                             }
@@ -941,7 +941,7 @@ public class BytecodeMethod implements SignatureSet {
                     // Object skip until ;
                     int idx = desc.indexOf(';', i);
                     String objectType = desc.substring(i + 1, idx);
-                    objectType = objectType.replace('/', '_').replace('$', '_');
+                    objectType = objectType.replace('/', '_').replace('$', '_').replace('-', '_');
                     if(!dependentClasses.contains(objectType)) {
                         dependentClasses.add(objectType);
                     }
@@ -1162,7 +1162,7 @@ public class BytecodeMethod implements SignatureSet {
                     // Object skip until ;
                     int idx = desc.indexOf(';', i);
                     String objectType = desc.substring(i + 1, idx);
-                    objectType = objectType.replace('/', '_').replace('$', '_');
+                    objectType = objectType.replace('/', '_').replace('$', '_').replace('-', '_');
                     i = idx;
                     b.append("_");
                     b.append(objectType);
@@ -1932,8 +1932,8 @@ public class BytecodeMethod implements SignatureSet {
                     // methods keep their class-init check; instance methods don't carry
                     // one (the receiver already forced the class to initialize). Then
                     // guard the native C stack since this frame does not bump call depth.
-                    if (staticMethod && !ByteCodeClass.eagerInit(clsName.replace('/', '_').replace('$', '_'))) {
-                        String framelessCls = clsName.replace('/', '_').replace('$', '_');
+                    if (staticMethod && !ByteCodeClass.eagerInit(clsName.replace('/', '_').replace('$', '_').replace('-', '_'))) {
+                        String framelessCls = clsName.replace('/', '_').replace('$', '_').replace('-', '_');
                         b.append("    if (!class__").append(framelessCls);
                         b.append(".initialized) __STATIC_INITIALIZER_").append(framelessCls);
                         b.append("(threadStateData);\n");
@@ -1970,11 +1970,11 @@ public class BytecodeMethod implements SignatureSet {
                     } else {
                         // Guard omitted for an eagerly initialized class (see
                         // ByteCodeClass.isEagerInitEligible).
-                        if (!ByteCodeClass.eagerInit(clsName.replace('/', '_').replace('$', '_'))) {
+                        if (!ByteCodeClass.eagerInit(clsName.replace('/', '_').replace('$', '_').replace('-', '_'))) {
                             b.append("    if (!class__");
-                            b.append(clsName.replace('/', '_').replace('$', '_'));
+                            b.append(clsName.replace('/', '_').replace('$', '_').replace('-', '_'));
                             b.append(".initialized) __STATIC_INITIALIZER_");
-                            b.append(clsName.replace('/', '_').replace('$', '_'));
+                            b.append(clsName.replace('/', '_').replace('$', '_').replace('-', '_'));
                             b.append("(threadStateData);\n");
                         }
                         if (useFastMethodStack) {
@@ -3049,7 +3049,7 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     private static String mangle(String t) {
-        return t.replace('/', '_').replace('.', '_').replace('$', '_');
+        return t.replace('/', '_').replace('.', '_').replace('$', '_').replace('-', '_');
     }
 
     public int getForEachIntrinsicCount() {
@@ -4389,7 +4389,7 @@ public class BytecodeMethod implements SignatureSet {
             "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_SCALAR_REPLACE", "false"));
 
     private static String srMangle(String s) {
-        return s.replace('.', '_').replace('/', '_').replace('$', '_');
+        return s.replace('.', '_').replace('/', '_').replace('$', '_').replace('-', '_');
     }
 
     /**

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.io.oidc;
 
 import com.codename1.junit.UITestBase;
@@ -16,6 +38,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// Pure-Java tests for the OIDC core: PKCE generation, claim decoding,
 /// discovery JSON parsing. No network or UI involvement.
 public class OidcCoreTest extends UITestBase {
+
+    @Test
+    void accessTokenExpiryMustBeAnIntegralRepresentableDuration() {
+        Map<String, Object> json = new HashMap<String, Object>();
+        json.put("access_token", "access");
+        for (Object invalid : new Object[] {-1L, Long.MAX_VALUE, Double.NaN,
+                Double.POSITIVE_INFINITY, 1.5, "-1", "9223372036854775807", "1.5", "bad", true}) {
+            json.put("expires_in", invalid);
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> OidcTokens.fromTokenResponse(json, null), String.valueOf(invalid));
+        }
+        for (Object valid : new Object[] {0L, 3600L, 10000000.0, "3600"}) {
+            json.put("expires_in", valid);
+            long before = System.currentTimeMillis();
+            long seconds = valid instanceof Number ? ((Number) valid).longValue()
+                    : Long.parseLong((String) valid);
+            long expiry = OidcTokens.fromTokenResponse(json, null).getExpiresAt().getTime();
+            assertTrue(expiry >= before + seconds * 1000L);
+            assertTrue(expiry <= System.currentTimeMillis() + seconds * 1000L);
+        }
+        json.remove("expires_in");
+        assertNull(OidcTokens.fromTokenResponse(json, null).getExpiresAt());
+    }
 
     @Test
     public void pkceVerifierAndChallengeAreDistinctAndUrlSafe() {
@@ -195,6 +240,34 @@ public class OidcCoreTest extends UITestBase {
         assertTrue(Boolean.TRUE.equals(cleared));
         OidcTokens afterClear = store.load(key).get(5000);
         assertNull(afterClear);
+    }
+
+    @Test
+    public void storedTokensKeepArraysAndObjectsAsWhatTheyWere() throws Exception {
+        Map<String, Object> json = new com.codename1.io.JSONParser().parseJSON(new java.io.StringReader(
+                "{\"access_token\":\"at-1\",\"token_type\":\"Bearer\","
+                + "\"authorization_details\":[{\"type\":\"payment\",\"actions\":[\"read\",\"wri\\\"te\"]}]}"));
+        json.put("id_token", base64Url("{\"alg\":\"none\"}") + "." + base64Url("{\"sub\":\"alice\","
+                + "\"aud\":[\"app\",\"api\"],\"address\":{\"country\":\"IL\",\"lines\":[\"1 Main\"]},"
+                + "\"groups\":[\"admin\",\"dev\"],\"empty\":[],\"none\":null}") + ".");
+        OidcTokens issued = OidcTokens.fromTokenResponse(json, null);
+        assertTrue(issued.getIdTokenClaims().get("aud") instanceof java.util.List, "the fixture has no array");
+
+        OidcTokens back = TokenJson.fromJson(TokenJson.toJson(issued));
+
+        Map<String, Object> claims = back.getIdTokenClaims();
+        assertEquals(java.util.Arrays.asList("app", "api"), claims.get("aud"));
+        assertEquals(java.util.Arrays.asList("admin", "dev"), claims.get("groups"));
+        assertTrue(claims.get("address") instanceof Map, String.valueOf(claims.get("address")));
+        assertEquals("IL", ((Map) claims.get("address")).get("country"));
+        assertEquals(java.util.Arrays.asList("1 Main"), ((Map) claims.get("address")).get("lines"));
+        assertEquals(java.util.Collections.emptyList(), claims.get("empty"));
+        assertEquals("alice", back.getSubject());
+        Object details = back.getRawResponse().get("authorization_details");
+        assertTrue(details instanceof java.util.List, String.valueOf(details));
+        Map detail = (Map) ((java.util.List) details).get(0);
+        assertEquals("payment", detail.get("type"));
+        assertEquals(java.util.Arrays.asList("read", "wri\"te"), detail.get("actions"));
     }
 
     // ------------------------------------------------------------------

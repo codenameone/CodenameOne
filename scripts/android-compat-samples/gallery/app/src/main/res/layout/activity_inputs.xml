@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:padding="16dp"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <AutoCompleteTextView android:id="@+id/fruit" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:hint="Fruit" android:completionThreshold="1"/>
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <Button android:id="@+id/pick_date" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:text="Date"/>
+        <Button android:id="@+id/pick_time" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:text="Time"/>
+        <Button android:id="@+id/progress" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:text="Wait"/>
+    </LinearLayout>
+    <NumberPicker android:id="@+id/number" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_gravity="center_horizontal"/>
+    <TextView android:id="@+id/inputs_status" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="Nothing yet"/>
+</LinearLayout>

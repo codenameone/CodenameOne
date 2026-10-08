@@ -247,7 +247,8 @@
             value,
             "cn1_s_onAnimationFrame_double",
             [+time],
-            "__cn1RafCallbackPending"
+            "__cn1RafCallbackPending",
+            true
           );
         } catch (err) {
           jvm.fail(err);
@@ -406,11 +407,21 @@ function aliasGlobalToImpl(symbol) {
   return true;
 }
 
-function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey) {
+function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey, queuePending) {
   if (!receiver || !receiver.__class) {
     return false;
   }
   if (pendingFlagKey && receiver[pendingFlagKey]) {
+    if (queuePending) {
+      // A one-shot rAF may arrive while the previous Java callback is suspended
+      // waiting for the host to acknowledge its next frame request. Dropping it
+      // strands that loop forever. Serialize these deliveries; repeating timers
+      // keep their existing coalescing behavior.
+      const queueKey = pendingFlagKey + "Queue";
+      const queue = receiver[queueKey] || (receiver[queueKey] = []);
+      queue.push(args || []);
+      return true;
+    }
     return false;
   }
   if (pendingFlagKey) {
@@ -427,10 +438,20 @@ function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey) {
   }
   function* run() {
     try {
-      return yield* cn1_ivAdapt(method.apply(null, [receiver].concat(args || [])));
+      let nextArgs = args || [];
+      let result;
+      do {
+        result = yield* cn1_ivAdapt(method.apply(null, [receiver].concat(nextArgs)));
+        const queue = queuePending && receiver[pendingFlagKey + "Queue"];
+        nextArgs = queue && queue.length ? queue.shift() : null;
+      } while (nextArgs !== null);
+      return result;
     } finally {
       if (pendingFlagKey) {
         receiver[pendingFlagKey] = false;
+        if (queuePending) {
+          receiver[pendingFlagKey + "Queue"] = null;
+        }
       }
     }
   }
@@ -1035,6 +1056,33 @@ bindNative([
   return null;
 });
 
+// Native text must not swallow pointer overrides on a custom top-level container.
+// Cache by runtime class: virtual implementations are fixed after registration.
+const nativeTextPointerOverrides = new Map();
+bindNative([
+  "cn1_com_codename1_ui_Accessor_hasCustomPointerHandlers_com_codename1_ui_Component_int_R_boolean"
+], function(owner, baseKind) {
+  const className = owner && owner.__class;
+  if (!className) return 1;
+  if (nativeTextPointerOverrides.has(className)) return nativeTextPointerOverrides.get(className);
+  const base = ["com_codename1_ui_Form", "com_codename1_ui_Dialog", "com_codename1_ui_Window"][baseKind];
+  let custom = 0;
+  try {
+    for (const name of ["pointerPressed", "pointerReleased", "pointerDragged", "longPointerPress"]) {
+      const signatures = name === "longPointerPress" ? ["int_int"] : ["int_int", "int_1ARRAY_int_1ARRAY"];
+      for (const signature of signatures) {
+        const method = "cn1_s_" + name + "_" + signature;
+        if (jvm.resolveVirtual(className, method) !== jvm.resolveVirtual(base, method)) custom = 1;
+      }
+    }
+  } catch (_err) {
+    // If a runtime cannot establish ownership, keep the framework gesture path.
+    custom = 1;
+  }
+  nativeTextPointerOverrides.set(className, custom);
+  return custom;
+});
+
 // Bulk RGBA -> ARGB pixel-buffer conversion. Backs
 // ``JavaScriptImageDataAdapter.readRgbaToArgbBulk`` which is the
 // fast-path for ``screenshot()`` and ``getRGB()``. The legacy
@@ -1510,6 +1558,66 @@ bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_
     arr[i] = null;
   }
   return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");
+});
+
+// The JS interop interfaces' static factories have Java bodies that return
+// null ("Native implementation"); the bridge only dispatches instance members,
+// so without a binding here the null IS the answer. JSString.valueOf was
+// unbound, so every LocalForage.setItem(String, String) stored null -- which
+// localStorage reads as a delete -- and FileSystemStorage.mkdir, whose marker
+// is an empty string, never created a directory.
+// scripts/test-javascript-native-stub-bindings.mjs fails on an unbound stub.
+function cn1Typed(ctor, cls, arg) {
+  const value = (typeof arg === "number") ? new ctor(arg | 0) : new ctor(jvm.unwrapJsValue(arg));
+  return jvm.wrapJsObject(value, cls);
+}
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSString_valueOf_java_lang_String_R_com_codename1_html5_js_core_JSString",
+  "cn1_com_codename1_html5_js_core_JSString_valueOf___java_lang_String_R_com_codename1_html5_js_core_JSString"
+], function(str) {
+  return str == null ? null : jvm.toNativeString(str);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf_int_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf___int_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf_double_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf___double_R_com_codename1_html5_js_core_JSNumber"
+], function(value) {
+  return Number(value);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSBoolean_valueOf_boolean_R_com_codename1_html5_js_core_JSBoolean",
+  "cn1_com_codename1_html5_js_core_JSBoolean_valueOf___boolean_R_com_codename1_html5_js_core_JSBoolean"
+], function(value) {
+  return !!value;
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_encodeURIComponent_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_html5_js_browser_Window_encodeURIComponent___java_lang_String_R_java_lang_String"
+], function(value) {
+  return value == null ? null : jvm.wrapJsResult(encodeURIComponent(jvm.toNativeString(value)), "java_lang_String");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create_int_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create___int_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int32Array"
+], function(arg) {
+  return cn1Typed(global.Int32Array, "com_codename1_html5_js_typedarrays_Int32Array", arg);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create_int_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create___int_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int16Array"
+], function(arg) {
+  return cn1Typed(global.Int16Array, "com_codename1_html5_js_typedarrays_Int16Array", arg);
 });
 
 bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_html5_js_browser_Window", "cn1_com_codename1_html5_js_browser_Window_current___R_com_codename1_html5_js_browser_Window"], function*() {
@@ -3109,7 +3217,8 @@ bindNative([
         handler,
         "cn1_s_onAnimationFrame_double",
         [+time],
-        "__cn1RafCallbackPending"
+        "__cn1RafCallbackPending",
+        true
       );
     } catch (err) {
       jvm.fail(err);

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Styles of the web view and the input widgets, matching AOSP's Material
+     values where they apply. -->
+<resources>
+    <style name="Widget.Material.WebView"/>
+    <style name="Widget.Material.AutoCompleteTextView" parent="Widget.Material.EditText">
+        <item name="completionThreshold">2</item>
+        <item name="dropDownSelector">?attr/selectableItemBackground</item>
+        <item name="popupBackground">@drawable/popup_background_material</item>
+        <item name="popupElevation">@dimen/floating_window_z</item>
+        <item name="dropDownWidth">wrap_content</item>
+        <item name="dropDownHeight">wrap_content</item>
+    </style>
+    <style name="Widget.Material.DatePicker">
+        <item name="datePickerMode">spinner</item>
+        <item name="startYear">1900</item>
+        <item name="endYear">2100</item>
+    </style>
+    <style name="Widget.Material.TimePicker">
+        <item name="timePickerMode">spinner</item>
+    </style>
+    <style name="Widget.Material.NumberPicker"/>
+    <style name="Widget.WebView" parent="Widget.Material.WebView"/>
+    <style name="Widget.AutoCompleteTextView" parent="Widget.Material.AutoCompleteTextView"/>
+    <style name="Widget.DatePicker" parent="Widget.Material.DatePicker"/>
+    <style name="Widget.TimePicker" parent="Widget.Material.TimePicker"/>
+    <style name="Widget.DeviceDefault.AutoCompleteTextView" parent="Widget.Material.AutoCompleteTextView"/>
+    <style name="Widget.DeviceDefault.DatePicker" parent="Widget.Material.DatePicker"/>
+    <style name="Widget.DeviceDefault.TimePicker" parent="Widget.Material.TimePicker"/>
+</resources>

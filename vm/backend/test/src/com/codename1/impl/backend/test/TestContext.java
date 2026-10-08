@@ -58,6 +58,17 @@ public interface TestContext {
     /// A new wiring of this test's beans.
     BackendApplication createApplication();
 
+    /// Links into `builder` what the application's own entry point links for
+    /// its beans -- the security layer, when one of them is a
+    /// `SecurityFilterChain`. Generated, so a test application without one names
+    /// none of it.
+    void configure(com.codename1.backend.Backend.Builder builder);
+
+    /// Who the test method called `method` runs as, from its `@WithMockUser` or
+    /// `@WithAnonymousUser` or its class's: a [TestSecurity#apply] argument, or
+    /// null when it carries neither.
+    String[] securityContext(String method);
+
     /// The names of the mock beans, reset after each test.
     String[] mockBeans();
 

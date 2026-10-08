@@ -51,8 +51,12 @@ extern NSString*   toNSString(JAVA_OBJECT str);
 // is the most accurate "signed in?" signal on iOS.
 static NSString * const kCN1AppleUserDefaultsKey = @"cn1.applesignin.userid";
 
-API_AVAILABLE(ios(13.0))
-@interface CN1AppleSignInDelegate : NSObject <ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding>
+API_AVAILABLE(ios(13.0), watchos(6.0))
+@interface CN1AppleSignInDelegate : NSObject <ASAuthorizationControllerDelegate
+#if !TARGET_OS_WATCH
+    , ASAuthorizationControllerPresentationContextProviding
+#endif
+    >
 @property (nonatomic, strong) NSString *resultString;
 @property (nonatomic, strong) NSError  *errorResult;
 @property (nonatomic, copy)   void(^completion)(void);
@@ -60,6 +64,7 @@ API_AVAILABLE(ios(13.0))
 
 @implementation CN1AppleSignInDelegate
 
+#if !TARGET_OS_WATCH
 - (ASPresentationAnchor)presentationAnchorForAuthorizationController:(ASAuthorizationController *)controller {
     UIWindow *anchor = nil;
     if (@available(iOS 13.0, *)) {
@@ -86,6 +91,7 @@ API_AVAILABLE(ios(13.0))
     }
     return anchor;
 }
+#endif
 
 - (void)authorizationController:(ASAuthorizationController *)controller
    didCompleteWithAuthorization:(ASAuthorization *)authorization {
@@ -135,7 +141,7 @@ static id g_cn1AppleCurrentController = nil;
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    if (@available(iOS 13.0, *)) {
+    if (@available(iOS 13.0, watchOS 6.0, *)) {
         return NSClassFromString(@"ASAuthorizationAppleIDProvider") != nil ? JAVA_TRUE : JAVA_FALSE;
     }
     return JAVA_FALSE;
@@ -143,7 +149,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInSupported___R_boolean(
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInIsLoggedIn___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    if (@available(iOS 13.0, *)) {
+    if (@available(iOS 13.0, watchOS 6.0, *)) {
         // fall through
     } else {
         return JAVA_FALSE;
@@ -173,7 +179,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_appleSignInSignOut__(
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT scopesObj, JAVA_OBJECT nonceObj) {
-    if (@available(iOS 13.0, *)) {
+    if (@available(iOS 13.0, watchOS 6.0, *)) {
         // fall through
     } else {
         return JAVA_NULL;
@@ -208,7 +214,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java
         ASAuthorizationController *controller =
             [[ASAuthorizationController alloc] initWithAuthorizationRequests:@[request]];
         controller.delegate = del;
+#if !TARGET_OS_WATCH
         controller.presentationContextProvider = del;
+#endif
 
         g_cn1AppleCurrentDelegate = del;
         g_cn1AppleCurrentController = controller;

@@ -32,6 +32,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -472,6 +473,391 @@ public final class NetworkManager {
         userHeaders.put(key, value);
     }
 
+    /// What [#setAuthorizer(String, RequestAuthorizer)] registered. Owned by the event
+    /// dispatch thread: read and replaced there and nowhere else. A network thread never
+    /// comes here -- it is handed the header with the request, see
+    /// [ConnectionRequest#captureAuthorization(boolean)].
+    private AuthorizerEntry[] authorizers = new AuthorizerEntry[0];
+    /// Whether a default authorizer is registered. Cleared when the last one is removed, and
+    /// the one thing about authorizers a thread other than the EDT looks at: it decides
+    /// only whether a request queued from that thread has to pass through the EDT first.
+    /// It is not what protects anything -- the registrations themselves are never read
+    /// off the EDT.
+    @SuppressWarnings("PMD.AvoidUsingVolatile") // Publishes the EDT's hint to background queuers.
+    private volatile boolean authorizerRegistered;
+
+    /// Runs `work` on the event dispatch thread and returns when it has run: at once on
+    /// the EDT itself, and before there is one. This is how the methods that touch
+    /// authorizer state take a call from another thread.
+    private static void onEdt(Runnable work) {
+        if (!Display.isInitialized() || Display.getInstance().isEdt()) {
+            work.run();
+        } else {
+            Display.getInstance().callSeriallyAndWait(work);
+        }
+    }
+
+    private static final class AuthorizerEntry {
+        /// The base URL's origin, as [#originOf(String)] writes it.
+        final String origin;
+        /// The base URL's path, without a trailing slash; empty for the whole origin.
+        final String path;
+        final RequestAuthorizer authorizer;
+
+        AuthorizerEntry(String origin, String path, RequestAuthorizer authorizer) {
+            this.origin = origin;
+            this.path = path;
+            this.authorizer = authorizer;
+        }
+    }
+
+    /// Makes `authorizer` the default for every request to `baseUrl` and below, so the
+    /// application's own service gets its `Authorization` header -- and a renewed one after a
+    /// `401` -- without each request being told. See [RequestAuthorizer].
+    ///
+    /// ```java
+    /// NetworkManager.getInstance().setAuthorizer("https://api.example.com/v1", authorizer);
+    /// ```
+    ///
+    /// A request is covered when its URL has the same origin as `baseUrl` and a path that is
+    /// `baseUrl`'s path or below it.
+    ///
+    /// The origin is the scheme, the host and the port. Scheme and host compare without
+    /// regard to case, and a port left out is the scheme's own, so `https://host`,
+    /// `HTTPS://Host` and `https://host:443` are one base URL, and so are `http://host` and
+    /// `http://host:80`. Anything else is another origin and never gets the header:
+    /// `https://api.example.com` covers neither `https://api.example.com.evil.test/` nor
+    /// `https://api.example.com@evil.test/`, nor the same host over `http` or on port 8443.
+    ///
+    /// The path compares exactly and stops at whole segments: `/api` covers `/api`,
+    /// `/api/pets` and `/api?x=1`, and does not cover `/apiary` or `/API`. When several
+    /// registrations cover a request the one with the longest path is used.
+    ///
+    /// The header is decided when the request is queued and follows a redirect only as far
+    /// as `baseUrl` reaches: a request redirected to another origin, or to a path outside
+    /// `baseUrl`, is sent there without it.
+    ///
+    /// A request with an authorizer of its own, or with an `Authorization` header already on
+    /// it, is left alone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `baseUrl`: an absolute URL; a trailing slash is ignored
+    ///
+    /// - `authorizer`: the authorizer, or null to remove the one registered for `baseUrl`
+    ///
+    /// The registrations belong to the event dispatch thread. Called from another thread
+    /// this waits for the EDT to make the change.
+    public void setAuthorizer(String baseUrl, final RequestAuthorizer authorizer) {
+        if (baseUrl == null || baseUrl.indexOf("://") < 0) {
+            throw new IllegalArgumentException("baseUrl must be an absolute URL");
+        }
+        final String origin = originOf(baseUrl);
+        String path = pathOf(baseUrl);
+        if (path == null) {
+            throw new IllegalArgumentException("baseUrl has an ambiguous path");
+        }
+        int end = path.length();
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        while (end > 0 && path.charAt(end - 1) == '/') {
+            end--;
+        }
+        final String basePath = path.substring(0, end);
+        if (authorizer != null) {
+            // Before the registration, so the thread that registers one sees the hint in
+            // what it queues next.
+            authorizerRegistered = true;
+        }
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                if (authorizer != null) {
+                    authorizerRegistered = true;
+                }
+                ArrayList<AuthorizerEntry> next = new ArrayList<AuthorizerEntry>();
+                for (AuthorizerEntry e : authorizers) {
+                    // The same base URL however it was spelled: https://host:443/ replaces,
+                    // and removes, what https://HOST registered.
+                    if (!(e.origin.equals(origin) && e.path.equals(basePath))) {
+                        next.add(e);
+                    }
+                }
+                if (authorizer != null) {
+                    next.add(new AuthorizerEntry(origin, basePath, authorizer));
+                }
+                authorizers = next.toArray(new AuthorizerEntry[next.size()]);
+                authorizerRegistered = authorizers.length != 0;
+            }
+        });
+    }
+
+    /// The default authorizer of a URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL of a request
+    ///
+    /// #### Returns
+    ///
+    /// the authorizer registered for the longest base URL that covers `url`, or null
+    ///
+    /// Called from a thread other than the event dispatch thread this waits for the EDT to
+    /// answer.
+    public RequestAuthorizer getAuthorizer(final String url) {
+        final RequestAuthorizer[] out = new RequestAuthorizer[1];
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                AuthorizerEntry e = authorizerEntry(url);
+                out[0] = e == null ? null : e.authorizer;
+            }
+        });
+        return out[0];
+    }
+
+    /// The default authorizer of a URL and the base URL it was registered for, with no
+    /// header value yet. Null when no registration covers `url`. Called on the EDT.
+    ConnectionRequest.CapturedAuthorization defaultAuthorization(String url) {
+        AuthorizerEntry e = authorizerEntry(url);
+        return e == null ? null
+                : new ConnectionRequest.CapturedAuthorization(e.authorizer, null, e.origin, e.path);
+    }
+
+    /// Whether [#addDefaultHeader(String, String)] set an `Authorization` header, which
+    /// then goes on every request and wins over any authorizer.
+    boolean hasDefaultAuthorizationHeader() {
+        if (userHeaders != null) {
+            Enumeration keys = userHeaders.keys();
+            while (keys.hasMoreElements()) {
+                if ("Authorization".equalsIgnoreCase((String) keys.nextElement())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// The registration with the longest base URL that covers `url`. Called on the EDT.
+    private AuthorizerEntry authorizerEntry(String url) {
+        AuthorizerEntry[] current = authorizers;
+        if (url == null || current.length == 0) {
+            return null;
+        }
+        String origin = null;
+        String path = null;
+        AuthorizerEntry best = null;
+        for (AuthorizerEntry e : current) {
+            if (best != null && e.path.length() <= best.path.length()) {
+                continue;
+            }
+            if (origin == null) {
+                origin = originOf(url);
+                path = pathOf(url);
+            }
+            if (e.origin.equals(origin) && pathCovers(e.path, path)) {
+                best = e;
+            }
+        }
+        return best;
+    }
+
+    /// Whether `url` is `base` or below it: the same origin, and a path at or under the
+    /// base's on a segment boundary. See [#setAuthorizer(String, RequestAuthorizer)].
+    static boolean covers(String base, String url) {
+        if (base == null || url == null || !originOf(base).equals(originOf(url))) {
+            return false;
+        }
+        String path = pathOf(base);
+        if (path == null) {
+            return false;
+        }
+        while (path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
+        return pathCovers(path, pathOf(url));
+    }
+
+    /// Whether `rest` -- what follows the authority of a URL -- is the path `base` or below
+    /// it. `base` has no trailing slash. The comparison is exact, and `base` must end where
+    /// a segment of `rest` ends: `/api` is not a prefix of `/apiary`.
+    static boolean pathCovers(String base, String rest) {
+        if (rest == null || !rest.startsWith(base)) {
+            return false;
+        }
+        if (rest.length() == base.length()) {
+            return true;
+        }
+        char next = rest.charAt(base.length());
+        return next == '/' || next == '?' || next == '#';
+    }
+
+    /// Where the authority of `url` ends: the first `/`, `?` or `#` after `://`, or the end.
+    private static int authorityEnd(String url, int from) {
+        for (int i = from; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                return i;
+            }
+        }
+        return url.length();
+    }
+
+    /// The normalized path, followed by the query and fragment. Literal and encoded dot
+    /// segments are removed before authorization scope is compared. Ambiguous separators,
+    /// nested encoding and control characters fail closed across differing HTTP transports.
+    /// Empty when the URL has no path; null when the path is ambiguous.
+    static String pathOf(String url) {
+        int scheme = url == null ? -1 : url.indexOf("://");
+        if (scheme < 0) {
+            return "";
+        }
+        String rest = url.substring(authorityEnd(url, scheme + 3));
+        int end = rest.length();
+        for (int i = 0; i < rest.length(); i++) {
+            if (rest.charAt(i) == '?' || rest.charAt(i) == '#') {
+                end = i;
+                break;
+            }
+        }
+        StringBuilder decoded = new StringBuilder(end);
+        for (int i = 0; i < end; i++) {
+            char c = rest.charAt(i);
+            if (c == '\\' || c <= ' ' || c == 127) {
+                return null;
+            }
+            if (c == '%') {
+                if (i + 2 >= end) {
+                    return null;
+                }
+                int high = Character.digit(rest.charAt(i + 1), 16);
+                int low = Character.digit(rest.charAt(i + 2), 16);
+                if (high < 0 || low < 0) {
+                    return null;
+                }
+                int value = high * 16 + low;
+                if (value == 46) {
+                    c = '.';
+                    i += 2;
+                } else if (value == 47 || value == 92 || value == 37 || value >= 0 && value <= 32
+                        || value == 127) {
+                    return null;
+                }
+            }
+            decoded.append(c);
+        }
+        String rawPath = decoded.toString();
+        if (rawPath.indexOf("//") >= 0) {
+            return null;
+        }
+        ArrayList<String> segments = new ArrayList<String>();
+        for (String segment : Util.split(rawPath, "/")) {
+            if ("..".equals(segment)) {
+                if (!segments.isEmpty()) {
+                    segments.remove(segments.size() - 1);
+                }
+            } else if (segment.length() > 0 && !".".equals(segment)) {
+                segments.add(segment);
+            }
+        }
+        StringBuilder normalized = new StringBuilder(rest.length());
+        for (String segment : segments) {
+            normalized.append('/').append(segment);
+        }
+        if (rawPath.length() > 0 && (normalized.length() == 0 || rawPath.endsWith("/")
+                || rawPath.endsWith("/.") || rawPath.endsWith("/.."))) {
+            normalized.append('/');
+        }
+        return normalized.append(rest.substring(end)).toString();
+    }
+
+    /// The origin of a URL in one spelling, so that two URLs of one origin compare equal as
+    /// text: the scheme and the host in lower case, and the port always written --
+    /// `https://Api.Example.com` and `https://api.example.com:443` are both
+    /// `https://api.example.com:443`. The port left out of an `http` or `ws` URL is 80, of an
+    /// `https` or `wss` one 443, and of any other scheme stays empty.
+    ///
+    /// User information is kept, as it was written, so that `https://host@evil.test` is not
+    /// the origin `https://evil.test` either: a URL that carries credentials is nobody's
+    /// base URL but its own. A URL with no `://` is returned as it is.
+    ///
+    /// Only `A` to `Z` are folded, by hand: a scheme and a host name are ASCII, and
+    /// `toLowerCase()` follows the device's locale.
+    static String originOf(String url) {
+        if (url == null) {
+            return "";
+        }
+        int scheme = url.indexOf("://");
+        if (scheme < 0) {
+            return url;
+        }
+        int end = authorityEnd(url, scheme + 3);
+        int at = url.lastIndexOf('@', end - 1);
+        int host = at >= scheme + 3 ? at + 1 : scheme + 3;
+        // The port follows the last colon outside an IPv6 literal's brackets.
+        int bracket = url.lastIndexOf(']', end - 1);
+        int colon = -1;
+        for (int i = end - 1; i >= host && i > bracket; i--) {
+            if (url.charAt(i) == ':') {
+                colon = i;
+                break;
+            }
+        }
+        int hostEnd = colon < 0 ? end : colon;
+        String port = colon < 0 ? "" : url.substring(colon + 1, end);
+        StringBuilder b = new StringBuilder(end + 6);
+        appendAsciiLower(b, url, 0, scheme);
+        String schemeName = b.toString();
+        if (port.length() == 0) {
+            if ("https".equals(schemeName) || "wss".equals(schemeName)) {
+                port = "443";
+            } else if ("http".equals(schemeName) || "ws".equals(schemeName)) {
+                port = "80";
+            }
+        } else {
+            // 0443 is 443: leading zeros are the same port.
+            int digits = 0;
+            while (digits < port.length() - 1 && port.charAt(digits) == '0') {
+                digits++;
+            }
+            port = port.substring(digits);
+        }
+        b.append("://");
+        b.append(url.substring(scheme + 3, host));
+        appendAsciiLower(b, url, host, hostEnd);
+        // A trailing dot names the same host.
+        if (b.length() > 0 && b.charAt(b.length() - 1) == '.' && hostEnd - host > 1) {
+            b.setLength(b.length() - 1);
+        }
+        b.append(':').append(port);
+        return b.toString();
+    }
+
+    private static void appendAsciiLower(StringBuilder b, String text, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char c = text.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                c = (char) (c + ('a' - 'A'));
+            }
+            b.append(c);
+        }
+    }
+
+    /// Tells whoever waits for a request that it will not be sent again: it was killed while
+    /// its authorizer was renewing, after the attempt that would have completed it was held.
+    void authorizationAbandoned(ConnectionRequest request) {
+        scheduleTracerClear(request, request.tracerRequeues);
+        EventDispatcher listeners = progressListeners;
+        if (listeners != null) {
+            listeners.fireActionEvent(new NetworkEvent(request, NetworkEvent.PROGRESS_TYPE_COMPLETED));
+        }
+    }
+
     /// Identical to add to queue but returns an AsyncResource object that will resolve to
     /// the ConnectionRequest.
     ///
@@ -582,6 +968,10 @@ public final class NetworkManager {
             addToQueue(request);
             Display.getInstance().invokeAndBlock(w);
         } else {
+            // The flag this thread is about to poll still says "complete" for a request that
+            // has run before, and stays so until a network thread picks the request up
+            // again -- long enough for the loop to return before anything was sent.
+            request.complete = false;
             addToQueue(request);
             w.run();
         }
@@ -592,8 +982,163 @@ public final class NetworkManager {
     /// #### Parameters
     ///
     /// - `request`: network request for execution
-    public void addToQueue(ConnectionRequest request) {
-        addToQueue(request, false);
+    public void addToQueue(final ConnectionRequest request) {
+        if (Display.isInitialized() && !Display.getInstance().isEdt()) {
+            if ((!authorizerRegistered && request.getAuthorizer() == null)
+                    || request.getAuthorizer() == RequestAuthorizer.NONE //NOPMD CompareObjectsWithEquals - opt-out singleton
+                    || request.getRequestHeader("Authorization") != null) {
+                // No authorizer can have a header for it: queued from here as it always
+                // was, without a look at anything the EDT owns.
+                addToQueue(request, false);
+                return;
+            }
+            // An authorizer may have a header for this request, and authorizers are only
+            // ever called on the event dispatch thread. The request is handed over to it
+            // here and queued from there; nothing waits on this thread.
+            captureHeldTracer(request);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    queueOnEdt(request);
+                }
+            });
+            return;
+        }
+        queueOnEdt(request);
+    }
+
+    /// Queues a request the application asked for: on the event dispatch thread, or on the
+    /// one thread there is before a display exists.
+    private void queueOnEdt(ConnectionRequest request) {
+        if (holdForAuthorizer(request)) {
+            return;
+        }
+        addToQueue(request, false, request.captureAuthorization(true), true);
+    }
+
+    /// Asks the network tracer, on the thread that asked for a request, what that thread
+    /// was doing, and keeps the answer for when the request is really queued: the thread
+    /// that queues it then is not the one that asked.
+    private void captureHeldTracer(ConnectionRequest request) {
+        if (request.heldTracerCaptured) {
+            // Already asked, by the thread that handed the request to the EDT.
+            return;
+        }
+        request.heldTracerParent = null;
+        request.heldTracerOwner = null;
+        NetworkTracer tracer = getNetworkTracer();
+        if (tracer != null) {
+            try {
+                request.heldTracerParent = tracer.requestQueued(request);
+                request.heldTracerOwner = tracer;
+                request.heldTracerCaptured = true;
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+    }
+
+    /// Gives up a held request that was killed while it waited: nobody will send it, so
+    /// whoever waits for it has to be told here.
+    ///
+    /// #### Returns
+    ///
+    /// true when the request was killed and has been given up
+    private boolean abandonIfKilled(ConnectionRequest request) {
+        if (!request.isKilled()) {
+            return false;
+        }
+        request.heldTracerCaptured = false;
+        request.heldTracerParent = null;
+        request.heldTracerOwner = null;
+        request.complete = true;
+        authorizationAbandoned(request);
+        return true;
+    }
+
+    /// Asks the request's authorizer, if it is a [RequestAuthorizer.Proactive], whether its
+    /// credential has to be renewed before this request is sent, and keeps the request out
+    /// of the queue until it has been.
+    ///
+    /// Nothing blocks here. The request is not handed to a network thread yet, so the
+    /// renewal -- a request of its own -- has the queue to itself even with one network
+    /// thread, and the held request is queued exactly once, from the renewal's completion.
+    /// Whoever waits for the request waits on its completion, which has not happened.
+    ///
+    /// #### Returns
+    ///
+    /// true when the request was taken and will be queued later
+    private boolean holdForAuthorizer(final ConnectionRequest request) {
+        if (request == null) {
+            return false;
+        }
+        if (request.heldBeforeSending) {
+            // Queued again while it waits: it will be queued, once, when the wait ends.
+            return true;
+        }
+        RequestAuthorizer.Proactive proactive = request.proactiveAuthorizer();
+        if (proactive == null) {
+            return false;
+        }
+        AsyncResource<Boolean> preparing;
+        try {
+            preparing = proactive.prepareAuthorization(request);
+        } catch (RuntimeException err) {
+            // An authorizer that throws must not take the request down with it.
+            Log.e(err);
+            preparing = null;
+        }
+        if (preparing == null || preparing.isDone()) {
+            return false;
+        }
+        request.heldBeforeSending = true;
+        final HeldAuthorization held = new HeldAuthorization(request);
+        request.heldAuthorization = held;
+        // The context of whoever asked, captured now: by the time the request is queued
+        // this thread has moved on.
+        captureHeldTracer(request);
+        preparing.ready(new SuccessCallback<Boolean>() {
+            @Override
+            public void onSucess(Boolean ready) {
+                releaseHeld(held);
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable err) {
+                releaseHeld(held);
+            }
+        });
+        if (request.isKilled()) {
+            releaseHeld(held);
+        }
+        return true;
+    }
+
+    /// The renewal callbacks hold this detachable reference, so a renewal that
+    /// never finishes cannot retain a cancelled request and its listeners.
+    static final class HeldAuthorization {
+        private ConnectionRequest request;
+
+        HeldAuthorization(ConnectionRequest request) {
+            this.request = request;
+        }
+    }
+
+    /// Queues a request [#holdForAuthorizer(ConnectionRequest)] took, once.
+    private void releaseHeld(HeldAuthorization held) {
+        ConnectionRequest request = held.request;
+        if (request == null) {
+            // Answered twice: a resource can complete and then fail in a listener of its own.
+            return;
+        }
+        held.request = null;
+        request.heldAuthorization = null;
+        request.heldBeforeSending = false;
+        if (abandonIfKilled(request)) {
+            return;
+        }
+        // The renewal is done, so this is the header it produced.
+        addToQueue(request, false, request.captureAuthorization(true), true);
     }
 
     /// Kills the given request and waits until the request is killed if it is
@@ -628,8 +1173,21 @@ public final class NetworkManager {
 
     void kill9(final ConnectionRequest request) {
         if (request.isKilled()) {
-            for (int iter = 0; iter < threadCount; iter++) {
-                if (networkThreads[iter].currentRequest == request) {
+            Runnable abandonHeld = new Runnable() {
+                @Override
+                public void run() {
+                    if (request.isKilled() && request.heldAuthorization != null) {
+                        releaseHeld(request.heldAuthorization);
+                    }
+                }
+            };
+            if (!Display.isInitialized() || Display.getInstance().isEdt()) {
+                abandonHeld.run();
+            } else {
+                Display.getInstance().callSerially(abandonHeld);
+            }
+            for (int iter = 0; networkThreads != null && iter < threadCount; iter++) {
+                if (networkThreads[iter] != null && networkThreads[iter].currentRequest == request) {
                     synchronized (LOCK) {
                         if (networkThreads[iter].currentRequest == request) {
                             networkThreads[iter].interrupt();
@@ -707,6 +1265,14 @@ public final class NetworkManager {
     ///
     /// - `request`: network request for execution
     void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry) {
+        addToQueue(request, retry, null, false);
+    }
+
+    /// Queues a request. `captured` is the header the event dispatch thread decided on for
+    /// a request the application queued, taken by the request only once the enqueue is
+    /// accepted; `withAuthorization` is false for a retry, which keeps what it has.
+    private void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry,
+            ConnectionRequest.CapturedAuthorization captured, boolean withAuthorization) {
         if (retry) {
             // A redirect or retry re-queues THIS request object while its current
             // attempt is still open on the worker that ran it. With more than one
@@ -754,13 +1320,22 @@ public final class NetworkManager {
         NetworkTracer queuedBy = null;
         Object queuedParent = null;
         if (!retry) {
-            NetworkTracer tracer = getNetworkTracer();
-            if (tracer != null) {
-                try {
-                    queuedParent = tracer.requestQueued(request);
-                    queuedBy = tracer;
-                } catch (Throwable t) {
-                    Log.e(t);
+            if (request.heldTracerCaptured) {
+                // Asked for when it was held for its authorizer, on the thread that asked.
+                queuedParent = request.heldTracerParent;
+                queuedBy = request.heldTracerOwner;
+                request.heldTracerCaptured = false;
+                request.heldTracerParent = null;
+                request.heldTracerOwner = null;
+            } else {
+                NetworkTracer tracer = getNetworkTracer();
+                if (tracer != null) {
+                    try {
+                        queuedParent = tracer.requestQueued(request);
+                        queuedBy = tracer;
+                    } catch (Throwable t) {
+                        Log.e(t);
+                    }
                 }
             }
         }
@@ -804,6 +1379,16 @@ public final class NetworkManager {
                 request.tracerParentChained = false;
                 request.tracerLastAttempt = null;
                 request.tracerLastOwner = null;
+                // And nothing of the last run's dealings with its authorizer: a request the
+                // application queues again gets its one renewal again. A retry mark the last
+                // run left unread goes too -- with nobody waiting on that run it was never
+                // consumed, and the first waiter of this one would take a completed request
+                // for one still being retried and wait for good.
+                request.resetAuthorization();
+                // The header the EDT captured, handed over with the request. Internal
+                // requests queued without one -- the access point probe -- carry none.
+                request.setCapturedAuthorization(withAuthorization ? captured : null);
+                request.retrying = false;
             } else {
                 i = ConnectionRequest.PRIORITY_HIGH;
             }
@@ -1332,7 +1917,7 @@ public final class NetworkManager {
                 // Any tracer field, the owners included: a request queued outside an
                 // action holds only tracerParentOwner, and that alone pins the whole
                 // telemetry installation.
-                if (req.tracerRequeues == requeuesBefore
+                if (req.tracerRequeues == requeuesBefore && !req.authorizationPending
                         && (req.tracerParent != null || req.tracerLastAttempt != null
                         || req.tracerParentOwner != null || req.tracerLastOwner != null)) {
                     // Nothing queued this request again YET. Its tracer state has
@@ -1366,7 +1951,28 @@ public final class NetworkManager {
                 if (completionListeners != null) {
                     completionListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_COMPLETED));
                 }
-                if (req.getDisposeOnCompletion() != null && !req.isRedirecting()) {
+                // Read once: a renewal that answers at once clears it again below.
+                boolean heldForAuthorizer = req.authorizationPending;
+                if (heldForAuthorizer) {
+                    // A 401 is being held for the request's authorizer. Queued here, behind
+                    // the completion event just fired, and not from the request itself: the
+                    // renewal may finish at once and queue the request again, and whoever
+                    // waits must have read this attempt's completion as "retrying" before
+                    // the next attempt can end.
+                    final ConnectionRequest held = req;
+                    if (Display.isInitialized()) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                held.renewAuthorization();
+                            }
+                        });
+                    } else {
+                        held.renewAuthorization();
+                    }
+                }
+                if (req.getDisposeOnCompletion() != null && !req.isRedirecting()
+                        && !heldForAuthorizer) {
                     // there may be a race condition where the dialog hasn't yet appeared but the
                     // network request completed
                     final ConnectionRequest finalReq = req;

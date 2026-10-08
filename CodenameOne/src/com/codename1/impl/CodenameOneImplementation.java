@@ -681,6 +681,21 @@ public abstract class CodenameOneImplementation {
         return this.isNativeInputSupported() && this.isEditingText(c);
     }
 
+    /// Checks whether the native editor supplies this component's text for a paint target.
+    /// Ports with persistent display overlays can return false for offscreen graphics.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the text component being painted
+    /// - `g`: the destination graphics
+    ///
+    /// #### Returns
+    ///
+    /// true if the native editor replaces text painting on this target
+    public boolean isNativeEditorVisible(Component c, Graphics g) {
+        return isNativeEditorVisible(c);
+    }
+
     /// Called when TextArea text is changed.  Can be used by the native
     /// implementation to trigger an update to the native editor if in async edit
     /// mode.

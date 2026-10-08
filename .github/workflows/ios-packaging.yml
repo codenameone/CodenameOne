@@ -40,7 +40,8 @@ jobs:
     # sequence. On a cold runner all tests passed after 119m44s, leaving only
     # 16s of the old two-hour budget for artifact upload and cache saves. Keep
     # the individual step limits below and allow 30m of finalization headroom.
-    timeout-minutes: 150
+    # The hello app now also translates the Android compatibility gallery, its runtime and the Kotlin stdlib; 150 no longer covers the three builds.
+    timeout-minutes: 210
     # Exercises both CocoaPods and SPM in a single Xcode project. Catches
     # regressions in either dependency manager (each pathway runs end to end)
     # and additionally validates that they coexist correctly. Also turns on
@@ -173,7 +174,8 @@ jobs:
           ./scripts/run-ios-device-release-build.sh \
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 45
+        # A cold Release compile of the hello app (now with the Android compatibility gallery, its runtime and the Kotlin stdlib) took 42.5 of 45 minutes.
+        timeout-minutes: 70
 
       # The binary half of scripts-ios.yml's private-API gate. App Store Connect scans the
       # linked executable, so this reads what it would read: every import of the Release
@@ -229,7 +231,8 @@ jobs:
             "${{ steps.build_ios_app.outputs.scheme }}"
         # run-ios-ui-tests.sh has a 12-minute no-progress watchdog and a
         # bounded 35-minute suite cap; include native build/cleanup headroom.
-        timeout-minutes: 65
+        # The cold -O1 compile alone reached 52 minutes once the hello app gained the Android compatibility gallery, its runtime and the Kotlin stdlib.
+        timeout-minutes: 100
 
       - name: Run native iOS notification tests
         env:
@@ -257,8 +260,8 @@ jobs:
         # So the higher of the two, not either alone: the watch build is added work on top of the
         # rebuild, not a re-description of it. The real fix is to inject before the UI-smoke step
         # so this build is genuinely incremental; until then the budget has to cover the build it
-        # actually does.
-        timeout-minutes: 45
+        # actually does. The hello app's growth (the Android compatibility gallery, its runtime and the Kotlin stdlib) added roughly half again to that build.
+        timeout-minutes: 60
 
       - name: Upload packaging artifacts
         if: ${{ !cancelled() }}
