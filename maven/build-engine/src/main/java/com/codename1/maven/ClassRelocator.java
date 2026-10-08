@@ -58,6 +58,12 @@ import java.util.zip.ZipFile;
 public final class ClassRelocator {
 
     private final List<Relocation> relocations;
+    /// Whether a desktop layer is among them, which is what switches on the
+    /// member rewrites of [CompatRewrites].
+    private final boolean desktop;
+    /// Entries of a runtime jar that are not copied, because the build
+    /// generates the class of that name itself.
+    private final Set<String> generated = new LinkedHashSet<String>();
     private final Remapper remapper = new Remapper() {
         @Override
         public String map(String internalName) {
@@ -67,6 +73,25 @@ public final class ClassRelocator {
 
     public ClassRelocator(List<Relocation> relocations) {
         this.relocations = Collections.unmodifiableList(new ArrayList<Relocation>(relocations));
+        boolean anyDesktop = false;
+        for (Relocation r : this.relocations) {
+            anyDesktop = anyDesktop || r.isDesktop();
+        }
+        this.desktop = anyDesktop;
+    }
+
+    /// Whether one of the layers is a desktop one (Swing, JavaFX).
+    public boolean hasDesktopLayer() {
+        return desktop;
+    }
+
+    /// Declares that the build generates the class `internalName` itself, so
+    /// [#extractRuntime] leaves the placeholder a runtime jar carries under
+    /// that name out. Without this the extraction and the generator would
+    /// each overwrite the other's file on every run.
+    ClassRelocator generating(String internalName) {
+        generated.add(internalName + ".class");
+        return this;
     }
 
     public ClassRelocator(Relocation... relocations) {
@@ -126,7 +151,13 @@ public final class ClassRelocator {
     public byte[] remap(byte[] in) {
         ClassReader cr = new ClassReader(in);
         ClassWriter cw = new ClassWriter(0);
-        cr.accept(new ClassRemapper(new PostRemapFixes(cw), remapper), 0);
+        ClassVisitor chain = new ClassRemapper(new PostRemapFixes(cw), remapper);
+        if (desktop) {
+            // Ahead of the relocation: the rules name what an application
+            // is compiled against.
+            chain = CompatRewrites.visitor(chain);
+        }
+        cr.accept(chain, 0);
         return cw.toByteArray();
     }
 
@@ -303,7 +334,7 @@ public final class ClassRelocator {
             while (en.hasMoreElements()) {
                 ZipEntry e = en.nextElement();
                 String name = e.getName();
-                if (e.isDirectory() || name.startsWith("META-INF/")) {
+                if (e.isDirectory() || name.startsWith("META-INF/") || generated.contains(name)) {
                     continue;
                 }
                 byte[] data = read(zip.getInputStream(e));

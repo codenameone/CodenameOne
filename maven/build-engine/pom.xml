@@ -112,6 +112,15 @@
             <artifactId>codenameone-lottie-transcoder</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- For ResourceNames alone: the one rule that turns a nested resource
+             path into the flat name it ships under. CompatResources applies it
+             when it flattens a desktop application's resources and the runtime
+             applies the same method when it looks one up. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-compat-jdk</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-android-res-compiler</artifactId>
