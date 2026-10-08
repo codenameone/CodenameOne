@@ -98,6 +98,8 @@ public class EdtAndGraphicsTest extends KernelTestBase {
                     });
                 } catch (InterruptedException e) {
                     return;
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    return;
                 }
                 done[0] = true;
             }
