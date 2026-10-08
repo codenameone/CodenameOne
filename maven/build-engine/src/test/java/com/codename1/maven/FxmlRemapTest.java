@@ -165,17 +165,23 @@ public class FxmlRemapTest {
         }
     }
 
+    /// The desktop resources of the last [#build()], and what the resource
+    /// compiler made of them.
+    private File resources;
+    private File resourcesOut;
+
     /// What `prepare-desktop-sources`, javac and `process-resources` leave
-    /// in a project's classes directory, before the remap.
+    /// in a project's classes directory, before the remap -- which compiles
+    /// the documents first.
     private File build() throws Exception {
-        File resources = tmp.newFolder();
+        resources = tmp.newFolder();
         write(new File(resources, "ui/shop.fxml"), SHOP_FXML);
         write(new File(resources, "ui/footer.fxml"), FOOTER_FXML);
         write(new File(resources, "ui/shop.css"), SHOP_CSS);
         File javaOut = tmp.newFolder();
-        File resourcesOut = tmp.newFolder();
+        resourcesOut = tmp.newFolder();
         final List<String> warnings = new ArrayList<String>();
-        List<String> errors = new DesktopResourceCompiler(Collections.singletonList(resources), classpath(), javaOut,
+        List<String> errors = new DesktopResourceCompiler(Collections.singletonList(resources), javaOut,
                 resourcesOut, new DesktopResourceCompiler.Log() {
                     @Override
                     public void info(String message) {
@@ -193,7 +199,7 @@ public class FxmlRemapTest {
                 "com/acme/fx/BaseController.java", BASE, "com/acme/fx/ShopController.java", CONTROLLER,
                 "com/acme/fx/FooterController.java", FOOTER));
         sources(javaOut, "", all);
-        assertEquals("Two documents were compiled to source", 8 + 4, all.size());
+        assertEquals("The documents are not sources yet; one source stands for them", 8 + 2, all.size());
         File classes = tmp.newFolder();
         CompatFixtures.compileAgainst(classpath(), tmp.newFolder(), classes, all.toArray(new String[0]));
         // The resource roots, as the build copies them beside the classes.
@@ -224,6 +230,7 @@ public class FxmlRemapTest {
         File record = DesktopSources.entryRecord(dir);
         Files.write(record.toPath(), "mainClass=com.acme.fx.Shop\nkind=javafx\n".getBytes("UTF-8"));
         return new CompatRemapper(classes, classpath(), null, CompatRemapperTest.LOG)
+                .withResourceDirectories(Arrays.asList(resources, resourcesOut))
                 .withDesktopEntryRecord(record).withApplicationMain("com.acme.MyApp");
     }
 

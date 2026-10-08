@@ -69,6 +69,7 @@ public final class CompatRemapper {
     /// Null until [#withResourceDirectories] is called; see
     /// [#resourceDirectories()].
     private List<File> resourceDirs;
+    private File fxmlSources;
     /// The shared JDK classes' jar of the run in progress, and whether that
     /// run has shipped the desktop resources yet: two layers ask for it.
     private File jdkJar;
@@ -243,9 +244,66 @@ public final class CompatRemapper {
         return relocator;
     }
 
+    /// Where the Java sources generated from the application's FXML
+    /// documents are kept for a reader (a stack trace names their lines).
+    /// Never a directory the application's own javac run compiles from.
+    /// Without one the sources are compiled from memory and kept nowhere.
+    public CompatRemapper withFxmlSourceDirectory(File dir) {
+        this.fxmlSources = dir;
+        return this;
+    }
+
+    /// Compiles the application's FXML documents into its classes directory:
+    /// [com.codename1.fxml.FxmlClassCompiler], which says why this is the
+    /// one moment for it -- after javac, so that a document can name a class
+    /// of the application (a custom control), and before anything here
+    /// relocates the classes its generated source is compiled against.
+    ///
+    /// Called first by a full [#run()], for an application with the JavaFX
+    /// layer's jar on its class path. A relocate-only run never compiles
+    /// documents: it is the second directory of an application whose main
+    /// pass did.
+    private void compileFxmlDocuments() throws BuildException {
+        if (CompatLayers.runtimeJar(CompatLayers.JAVAFX, classpath) == null) {
+            return;
+        }
+        com.codename1.fxml.FxmlClassCompiler compiler = new com.codename1.fxml.FxmlClassCompiler(
+                resourceDirectories(), classpath, handlerDirs, classesDir, fxmlSources,
+                new com.codename1.fxml.DesktopResourceCompiler.Log() {
+                    @Override
+                    public void info(String message) {
+                        log.info(message);
+                    }
+
+                    @Override
+                    public void warn(String message) {
+                        log.warn(message);
+                    }
+                });
+        List<String> errors;
+        try {
+            errors = compiler.run();
+        } catch (IOException e) {
+            throw new BuildException("Could not compile the application's FXML documents: " + e.getMessage(), e);
+        }
+        if (!errors.isEmpty()) {
+            StringBuilder all = new StringBuilder();
+            for (String error : errors) {
+                log.error(error);
+                all.append('\n').append(error);
+            }
+            throw new BuildException(errors.size() + " error(s) in the application's FXML documents:" + all);
+        }
+    }
+
     /// Relocates and ships. Answers false, having done nothing, when the
     /// application has no compatibility layer.
     public boolean run() throws BuildException {
+        if (shipRuntime) {
+            // Before the layers are worked out: that unpacks the libraries
+            // into the classes directory, and what follows relocates it.
+            compileFxmlDocuments();
+        }
         if (activeLayers().isEmpty()) {
             log.debug("No compatibility layer on the classpath; nothing to relocate");
             return false;

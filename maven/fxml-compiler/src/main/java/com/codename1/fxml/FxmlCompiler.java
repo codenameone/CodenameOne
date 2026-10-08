@@ -61,13 +61,14 @@ import com.codename1.fxml.css.CssValueParser;
 /// #### What decides the code
 ///
 /// Every class a document names is looked up in the class files of the
-/// application's class path ([ClassModel]); the compiler therefore knows
-/// the parameter type of each setter and converts an attribute's text to
-/// it while compiling. A class or a property that is not there is an error
-/// with the line of the element -- not something to find out on a device.
-/// The generated source is then compiled by javac with the application, so
-/// what the compiler could not check (the members of the controller, which
-/// is not compiled yet) javac does.
+/// application and of its class path ([ClassModel]); the compiler therefore
+/// knows the parameter type of each setter and converts an attribute's text
+/// to it while compiling. A class or a property that is not there is an
+/// error with the line of the element -- not something to find out on a
+/// device. The application's own classes are among them, because documents
+/// are compiled after it is ([FxmlClassCompiler]): a custom control is an
+/// element like any other. The generated source is then compiled by javac,
+/// which checks what this compiler does not.
 final class FxmlCompiler {
 
     /// The package of every generated class.
@@ -364,8 +365,9 @@ final class FxmlCompiler {
         ClassModel.Info info = resolve(name);
         if (info == null) {
             throw new Failure(at, "unknown class " + name + ": it is not imported by a <?import?> of this"
-                    + " document, or it is not on the application's class path. A class of the application's"
-                    + " own sources cannot be an element, because documents are compiled before those sources");
+                    + " document, or it is neither a class of the application nor on its class path. Import a"
+                    + " custom control by its full name (<?import com.example.MyControl?>) or its package"
+                    + " (<?import com.example.*?>)");
         }
         if (!info.isPublic()) {
             throw new Failure(at, "the class " + info.sourceName() + " is not public");

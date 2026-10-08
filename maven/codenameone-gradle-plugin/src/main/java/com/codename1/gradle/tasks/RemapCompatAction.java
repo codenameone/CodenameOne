@@ -56,6 +56,7 @@ public class RemapCompatAction implements Action<Task> {
     private String applicationMain;
     private FileCollection shipWhenEmpty;
     private FileCollection libraries;
+    private File fxmlSources;
 
     public RemapCompatAction(File classesDir, FileCollection compileClasspath, File onClickNames,
                              boolean relocateOnly, FileCollection handlerDirs) {
@@ -91,6 +92,17 @@ public class RemapCompatAction implements Action<Task> {
         return this;
     }
 
+    /// Where the Java generated from the application's FXML documents is
+    /// kept. The documents are compiled by this action, before it relocates
+    /// anything: javac has just compiled the application, so a document can
+    /// name one of its classes, and Kotlin's classes -- compiled earlier, into
+    /// a directory among the handler directories -- are still as Kotlin
+    /// wrote them. See [com.codename1.fxml.FxmlClassCompiler].
+    public RemapCompatAction withFxmlSourceDirectory(File dir) {
+        this.fxmlSources = dir;
+        return this;
+    }
+
     /// Makes a relocate-only action a full one when `javaSources` turns out
     /// to be empty. Kotlin's directory is relocated only, because javac's
     /// pass ships the runtimes and generates what has to be generated -- but
@@ -112,7 +124,8 @@ public class RemapCompatAction implements Action<Task> {
         Log log = new GradleLog(task.getLogger());
         CompatRemapper r = new CompatRemapper(classesDir, classpath, onClickNames, log)
                 .withDesktopEntryRecord(desktopEntry)
-                .withApplicationMain(applicationMain);
+                .withApplicationMain(applicationMain)
+                .withFxmlSourceDirectory(fxmlSources);
         if (libraries != null) {
             List<File> jars = new ArrayList<File>();
             for (File f : libraries.getFiles()) {

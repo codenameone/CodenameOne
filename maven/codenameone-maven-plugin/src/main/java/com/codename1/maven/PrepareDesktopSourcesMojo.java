@@ -105,8 +105,8 @@ public class PrepareDesktopSourcesMojo extends AbstractCN1Mojo {
         }
     }
 
-    /// The build-time FXML and style sheet compile step of the JavaFX
-    /// layer: [com.codename1.fxml.DesktopResourceCompiler].
+    /// The build-time style sheet compile step of the JavaFX layer, and the
+    /// first half of its FXML one: [com.codename1.fxml.DesktopResourceCompiler].
     ///
     /// A device has no XML parser to spare and no reflection, so what a
     /// desktop JavaFX runtime does when it loads an `.fxml` document or a
@@ -125,21 +125,35 @@ public class PrepareDesktopSourcesMojo extends AbstractCN1Mojo {
     ///   compile (`**/*.fxml`, `**/*.css`); it may not exist.
     /// - `classpath`: the module's resolved compile classpath, which holds
     ///   `codenameone-javafx-compat` when the JavaFX layer is available.
-    /// - `javaOut`: where the generated Java sources are written. The
+    /// - `javaOut`: where the generated Java source is written. The
     ///   directory is registered as a source root right after this returns,
     ///   if it exists.
     /// - `resourcesOut`: where the compiled style sheets are written;
     ///   registered as a resource root the same way.
     ///
-    /// Generated sources are compiled before the application is relocated, so
-    /// they name the JavaFX API as an application does (`javafx.scene...`),
-    /// and `remap-compat` relocates them with everything else. Neither
-    /// directory is touched when its inputs have not changed, so an unchanged
-    /// build recompiles nothing.
+    /// #### Where the FXML documents are compiled
     ///
-    /// A document or a sheet the compiler rejects fails the build with every
-    /// error it found, each as `file:line:column: message`; what it only
-    /// warns about -- a style property this layer does not have -- is logged.
+    /// Not here. A document may name a class of the application -- a custom
+    /// control is one -- and in `generate-sources` no such class exists. The
+    /// documents are compiled in `process-classes`, by `remap-compat` as the
+    /// first thing it does: after javac (and Kotlin, which this lifecycle
+    /// compiles earlier still), and before the relocation, because the Java
+    /// generated from a document names the JavaFX API as an application does
+    /// and is compiled, by a second in-process javac run, against the
+    /// application's classes as javac left them.
+    ///
+    /// This step writes the one source that keeps that sound,
+    /// `FxmlDocuments.java`: it holds a digest of the documents, so editing
+    /// only a document changes a source and the compiler plugin recompiles
+    /// the module instead of leaving last build's relocated classes in place.
+    ///
+    /// Neither directory is touched when its inputs have not changed, so an
+    /// unchanged build recompiles nothing.
+    ///
+    /// A document that is not well formed or a sheet the compiler rejects
+    /// fails the build with every error it found, each as
+    /// `file:line:column: message`; what it only warns about -- a style
+    /// property this layer does not have -- is logged.
     ///
     /// The Gradle build runs the same compiler as a task with declared inputs
     /// and outputs; see `CompileDesktopResourcesTask` in the Gradle plugin.
@@ -150,7 +164,7 @@ public class PrepareDesktopSourcesMojo extends AbstractCN1Mojo {
             return;
         }
         com.codename1.fxml.DesktopResourceCompiler compiler = new com.codename1.fxml.DesktopResourceCompiler(
-                java.util.Collections.singletonList(resourcesDir), classpath, javaOut, resourcesOut,
+                java.util.Collections.singletonList(resourcesDir), javaOut, resourcesOut,
                 new com.codename1.fxml.DesktopResourceCompiler.Log() {
                     @Override
                     public void info(String message) {

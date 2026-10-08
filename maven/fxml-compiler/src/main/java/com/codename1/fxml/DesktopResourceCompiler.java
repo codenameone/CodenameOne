@@ -40,22 +40,40 @@ import java.util.TreeMap;
 import com.codename1.compat.jdk.ResourceNames;
 import com.codename1.fxml.css.CssSheetData;
 
-/// Compiles the FXML documents and the style sheets among an application's
-/// desktop resources; the one entry point both build plugins call, before
-/// the application's sources are compiled.
+/// Compiles the style sheets among an application's desktop resources and
+/// prepares its FXML documents for [FxmlClassCompiler]; the entry point both
+/// build plugins call before the application's sources are compiled.
 ///
 /// #### What goes where
 ///
-/// - Every `*.fxml` under a resource directory becomes
-///   `com/codename1/generated/fxml/Fxml_<name>.java` under the Java output
-///   directory, which the build adds to the sources javac compiles
-///   ([FxmlCompiler]).
 /// - Every `*.css` becomes `<flat name>.cn1css` at the root of the resource
 ///   output directory, where `<flat name>` is what
 ///   `ResourceNames.flatName` gives the sheet's path: `styles/app.css` is
 ///   compiled to `styles__app.css.cn1css`. The build ships that directory
 ///   with the application's other resources, and a file at its root keeps
 ///   its name ([CssCompiler]).
+/// - Every `*.fxml` is parsed, so that a document that is not well formed
+///   fails the build before anything is compiled, and the documents together
+///   become one small source,
+///   `com/codename1/generated/fxml/FxmlDocuments.java`, under the Java output
+///   directory, which the build adds to the sources javac compiles.
+///
+/// #### Why the documents are not compiled here
+///
+/// A document names classes -- every element is one -- and a custom control
+/// is a class of the application, which does not exist until javac has
+/// compiled the application. So the documents are compiled after javac, by
+/// [FxmlClassCompiler]. Nothing the application wrote names a compiled
+/// document: it calls `FXMLLoader.load` with a location, and only the
+/// registry the build generates afterwards refers to the classes.
+///
+/// What is written here is what makes that later step safe. The source holds
+/// a digest of every document, so a build in which only a document changed
+/// changes a source and javac compiles the application again; and it names
+/// `javafx.fxml.FXMLLoader`, which the relocation that ends a build renames,
+/// so the class javac makes of it says whether the classes directory is as
+/// javac left it or as the last build's relocation did
+/// ([FxmlClassCompiler#relocated(File)]).
 ///
 /// The path of a file relative to its resource directory is its resource
 /// path, the one `getResource` finds it under on a desktop. With several
@@ -78,7 +96,6 @@ public final class DesktopResourceCompiler {
     }
 
     private final List<File> resourceDirs;
-    private final List<File> classpath;
     private final File javaOut;
     private final File resourcesOut;
     private final Log log;
@@ -92,24 +109,19 @@ public final class DesktopResourceCompiler {
     /// - `resourceDirs`: the directories of desktop resources; one that
     ///   does not exist is ignored
     ///
-    /// - `classpath`: the application's compile class path, where the
-    ///   classes the documents name are read from
-    ///
     /// - `javaOut`: the root of the generated Java sources
     ///
     /// - `resourcesOut`: the directory of the compiled style sheets
     ///
     /// - `log`: where to report
-    public DesktopResourceCompiler(List<File> resourceDirs, List<File> classpath, File javaOut, File resourcesOut,
-            Log log) {
+    public DesktopResourceCompiler(List<File> resourceDirs, File javaOut, File resourcesOut, Log log) {
         this.resourceDirs = new ArrayList<File>(resourceDirs);
-        this.classpath = new ArrayList<File>(classpath);
         this.javaOut = javaOut;
         this.resourcesOut = resourcesOut;
         this.log = log;
     }
 
-    /// How many documents the last run compiled.
+    /// How many documents the last run found.
     public int fxmlCount() {
         return fxmlCount;
     }
@@ -132,7 +144,7 @@ public final class DesktopResourceCompiler {
             }
         }
         Messages messages = new Messages();
-        compileFxml(fxml, messages);
+        prepareFxml(fxml, messages);
         compileCss(css, messages);
         for (String warning : messages.warnings()) {
             log.warn(warning);
@@ -140,10 +152,24 @@ public final class DesktopResourceCompiler {
         fxmlCount = fxml.size();
         cssCount = css.size();
         if (fxmlCount + cssCount > 0 && !messages.hasErrors()) {
-            log.info("Compiled " + fxmlCount + " FXML document" + (fxmlCount == 1 ? "" : "s") + " and " + cssCount
-                    + " style sheet" + (cssCount == 1 ? "" : "s"));
+            log.info("Compiled " + cssCount + " style sheet" + (cssCount == 1 ? "" : "s") + "; " + fxmlCount
+                    + " FXML document" + (fxmlCount == 1 ? " is" : "s are") + " compiled after the application's"
+                    + " classes");
         }
         return messages.errors();
+    }
+
+    /// The FXML documents under `resourceDirs` by resource path, in the
+    /// order of their paths.
+    static Map<String, File> documents(List<File> resourceDirs) {
+        Map<String, File> fxml = new TreeMap<String, File>();
+        Map<String, File> css = new TreeMap<String, File>();
+        for (File dir : resourceDirs) {
+            if (dir != null && dir.isDirectory()) {
+                collect(dir, "", fxml, css);
+            }
+        }
+        return fxml;
     }
 
     private static void collect(File dir, String prefix, Map<String, File> fxml, Map<String, File> css) {
@@ -164,7 +190,7 @@ public final class DesktopResourceCompiler {
         }
     }
 
-    private static byte[] read(File f) throws IOException {
+    static byte[] read(File f) throws IOException {
         InputStream in = new FileInputStream(f);
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -179,39 +205,41 @@ public final class DesktopResourceCompiler {
         }
     }
 
-    private void compileFxml(Map<String, File> files, Messages messages) throws IOException {
-        File dir = new File(javaOut, FxmlCompiler.PACKAGE.replace('.', '/'));
-        Set<String> written = new HashSet<String>();
-        if (!files.isEmpty()) {
-            Map<String, FxmlDocument> documents = new LinkedHashMap<String, FxmlDocument>();
-            for (Map.Entry<String, File> e : files.entrySet()) {
-                InputStream in = new FileInputStream(e.getValue());
-                try {
-                    FxmlDocument doc = FxmlDocument.parse(e.getValue().getPath(), e.getKey(), in, messages);
-                    if (doc != null) {
-                        documents.put(e.getKey(), doc);
-                    }
-                } finally {
-                    in.close();
-                }
+    /// Parses every document and writes the source that stands for them
+    /// all; see the class description.
+    private void prepareFxml(Map<String, File> files, Messages messages) throws IOException {
+        File marker = new File(new File(javaOut, FxmlCompiler.PACKAGE.replace('.', '/')),
+                FxmlClassCompiler.MARKER + ".java");
+        // A source an earlier form of this step wrote there, which javac must
+        // not find: it names classes javac has not compiled yet.
+        deleteStale(marker.getParentFile(), "Fxml_", ".java", new HashSet<String>());
+        if (files.isEmpty()) {
+            if (marker.isFile() && !marker.delete()) {
+                throw new IOException("Could not delete the stale " + marker);
             }
-            ClassModel model = new ClassModel(classpath);
+            return;
+        }
+        parse(files, messages);
+        FxmlDispatchGenerator.writeIfDifferent(marker,
+                FxmlClassCompiler.markerSource(files).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// The parsed form of every document, by resource path. One that is not
+    /// well formed is left out, with the reason among `messages`.
+    static Map<String, FxmlDocument> parse(Map<String, File> files, Messages messages) throws IOException {
+        Map<String, FxmlDocument> documents = new LinkedHashMap<String, FxmlDocument>();
+        for (Map.Entry<String, File> e : files.entrySet()) {
+            InputStream in = new FileInputStream(e.getValue());
             try {
-                FxmlCompiler compiler = new FxmlCompiler(model, documents, messages);
-                for (FxmlDocument doc : documents.values()) {
-                    String source = compiler.compile(doc);
-                    if (source != null) {
-                        String name = FxmlCompiler.className(doc.path) + ".java";
-                        FxmlDispatchGenerator.writeIfDifferent(new File(dir, name),
-                                source.getBytes(StandardCharsets.UTF_8));
-                        written.add(name);
-                    }
+                FxmlDocument doc = FxmlDocument.parse(e.getValue().getPath(), e.getKey(), in, messages);
+                if (doc != null) {
+                    documents.put(e.getKey(), doc);
                 }
             } finally {
-                model.close();
+                in.close();
             }
         }
-        deleteStale(dir, "Fxml_", ".java", written);
+        return documents;
     }
 
     private void compileCss(Map<String, File> files, Messages messages) throws IOException {
@@ -231,7 +259,7 @@ public final class DesktopResourceCompiler {
         deleteStale(resourcesOut, "", CssSheetData.SUFFIX, written);
     }
 
-    private static void deleteStale(File dir, String prefix, String suffix, Set<String> keep) throws IOException {
+    static void deleteStale(File dir, String prefix, String suffix, Set<String> keep) throws IOException {
         File[] files = dir.listFiles();
         if (files == null) {
             return;

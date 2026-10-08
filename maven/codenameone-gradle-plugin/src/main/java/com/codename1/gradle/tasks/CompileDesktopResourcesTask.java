@@ -43,11 +43,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/// Compiles the FXML documents and style sheets of `src/main/desktop/resources`
-/// for the JavaFX compatibility layer: each document into Java source that
-/// builds its tree, each sheet into the binary table the layer's style
-/// engine reads. The same [DesktopResourceCompiler] as the Maven plugin's
+/// Compiles the style sheets of `src/main/desktop/resources` for the JavaFX
+/// compatibility layer, each into the binary table the layer's style engine
+/// reads, and writes the one Java source that stands for its FXML documents.
+/// The same [DesktopResourceCompiler] as the Maven plugin's
 /// `prepare-desktop-sources` goal.
+///
+/// The documents themselves are compiled by an action of `compileJava`
+/// (`cn1RemapCompat`, see [RemapCompatAction]), once javac has compiled the
+/// application: a document may name one of its classes, a custom control.
+/// The source written here is an input of `compileJava` and holds a digest
+/// of the documents, so editing only a document reruns that task and its
+/// actions.
 ///
 /// A document or a sheet the compiler rejects fails the task with every
 /// error it found, each as `file:line:column: message`; what it only warns
@@ -89,7 +96,7 @@ public abstract class CompileDesktopResourcesTask extends Cn1Task {
             return;
         }
         File root = getResourcesRoot().get().getAsFile();
-        DesktopResourceCompiler compiler = new DesktopResourceCompiler(Collections.singletonList(root), classpath,
+        DesktopResourceCompiler compiler = new DesktopResourceCompiler(Collections.singletonList(root),
                 getOutputDirectory().get().getAsFile(), getResourcesDirectory().get().getAsFile(),
                 new DesktopResourceCompiler.Log() {
                     @Override

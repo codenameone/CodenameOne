@@ -65,6 +65,7 @@ final class FxmlHarness {
     private final File gen;
     private final File out;
     private final File classes;
+    private final File fxmlSources;
     private final List<String> sources = new ArrayList<String>();
     final List<String> warnings = new ArrayList<String>();
     final List<String> infos = new ArrayList<String>();
@@ -79,6 +80,7 @@ final class FxmlHarness {
         gen = new File(work, "gen");
         out = new File(work, "out");
         classes = new File(work, "classes");
+        fxmlSources = new File(work, "fxml");
         for (File dir : new File[] {res, src, gen, out, classes}) {
             if (!dir.mkdirs()) {
                 throw new IOException("Cannot create " + dir);
@@ -144,26 +146,60 @@ final class FxmlHarness {
         return path;
     }
 
-    /// Runs the resource compiler alone and answers its errors.
-    List<String> compile() throws IOException {
-        DesktopResourceCompiler compiler = new DesktopResourceCompiler(java.util.Collections.singletonList(res),
-                classpath(), gen, out, new DesktopResourceCompiler.Log() {
-                    @Override
-                    public void info(String message) {
-                        infos.add(message);
-                    }
+    private DesktopResourceCompiler.Log log() {
+        return new DesktopResourceCompiler.Log() {
+            @Override
+            public void info(String message) {
+                infos.add(message);
+            }
 
-                    @Override
-                    public void warn(String message) {
-                        warnings.add(message);
-                    }
-                });
-        return compiler.run();
+            @Override
+            public void warn(String message) {
+                warnings.add(message);
+            }
+        };
+    }
+
+    /// Runs the compilers in the order of a build and answers their errors:
+    /// the style sheets and the source that stands for the documents, javac
+    /// over that and the application's sources, then the documents.
+    List<String> compile() throws IOException {
+        List<String> errors = new DesktopResourceCompiler(java.util.Collections.singletonList(res), gen, out, log())
+                .run();
+        if (!errors.isEmpty()) {
+            return errors;
+        }
+        List<String> files = new ArrayList<String>(sources);
+        collect(gen, ".java", files);
+        if (!files.isEmpty()) {
+            StringBuilder cp = new StringBuilder();
+            for (File f : classpath()) {
+                cp.append(cp.length() == 0 ? "" : File.pathSeparator).append(f.getPath());
+            }
+            List<String> args = new ArrayList<String>();
+            args.add("-nowarn");
+            args.add("-encoding");
+            args.add("UTF-8");
+            args.add("-classpath");
+            args.add(cp.toString());
+            args.add("-d");
+            args.add(classes.getPath());
+            args.addAll(files);
+            JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
+            ByteArrayOutputStream err = new ByteArrayOutputStream();
+            int rc = javac.run(null, null, err, args.toArray(new String[0]));
+            if (rc != 0) {
+                throw new AssertionError("javac failed:\n" + new String(err.toByteArray(), StandardCharsets.UTF_8));
+            }
+        }
+        return new FxmlClassCompiler(java.util.Collections.singletonList(res), classpath(),
+                java.util.Collections.<File>emptyList(), classes, fxmlSources, log()).run();
     }
 
     /// The generated source of a document.
     String generated(String path) throws IOException {
-        File f = new File(gen, FxmlCompiler.PACKAGE.replace('.', '/') + "/" + FxmlCompiler.className(path) + ".java");
+        File f = new File(fxmlSources, FxmlCompiler.PACKAGE.replace('.', '/') + "/" + FxmlCompiler.className(path)
+                + ".java");
         return new String(read(f), StandardCharsets.UTF_8);
     }
 
@@ -222,37 +258,7 @@ final class FxmlHarness {
         if (!errors.isEmpty()) {
             throw new AssertionError("The resources do not compile: " + errors);
         }
-        List<String> files = new ArrayList<String>(sources);
-        collect(gen, ".java", files);
-        if (!files.isEmpty()) {
-            StringBuilder cp = new StringBuilder();
-            for (File f : classpath()) {
-                cp.append(cp.length() == 0 ? "" : File.pathSeparator).append(f.getPath());
-            }
-            List<String> args = new ArrayList<String>();
-            args.add("-nowarn");
-            args.add("-encoding");
-            args.add("UTF-8");
-            args.add("-classpath");
-            args.add(cp.toString());
-            args.add("-d");
-            args.add(classes.getPath());
-            args.addAll(files);
-            JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
-            ByteArrayOutputStream err = new ByteArrayOutputStream();
-            int rc = javac.run(null, null, err, args.toArray(new String[0]));
-            if (rc != 0) {
-                StringBuilder all = new StringBuilder(new String(err.toByteArray(), StandardCharsets.UTF_8));
-                List<String> generated = new ArrayList<String>();
-                collect(gen, ".java", generated);
-                for (String g : generated) {
-                    all.append("\n---- ").append(g).append("\n")
-                            .append(new String(read(new File(g)), StandardCharsets.UTF_8));
-                }
-                throw new AssertionError("javac failed:\n" + all);
-            }
-        }
-        generator = new FxmlDispatchGenerator(classes, FxmlDispatchGenerator.unrelocated(REGISTRY));
+        generator =new FxmlDispatchGenerator(classes, FxmlDispatchGenerator.unrelocated(REGISTRY));
         generator.run(FxmlDispatchGenerator.classesIn(classes));
         loader = new URLClassLoader(new URL[] {classes.toURI().toURL()}, FxmlHarness.class.getClassLoader());
         FxmlDispatch.install((FxmlDispatch) loader.loadClass(REGISTRY.replace('/', '.')).newInstance());

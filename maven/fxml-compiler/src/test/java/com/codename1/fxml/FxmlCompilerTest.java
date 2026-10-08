@@ -30,6 +30,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.ListResourceBundle;
@@ -598,6 +599,124 @@ public class FxmlCompilerTest {
                 .resource("c.fxml", HEAD + "<VBox" + NS + "/>\n").compile();
         assertEquals(errors.toString(), 2, errors.size());
         assertTrue(app.generated("c.fxml").contains("class Fxml_c"));
+    }
+
+    // ------------------------------------------------- custom controls
+
+    private static final String BADGE = "package shop;\n"
+            + "import javafx.fxml.FXML;\n"
+            + "import javafx.fxml.FXMLLoader;\n"
+            + "import javafx.scene.control.Label;\n"
+            + "import javafx.scene.layout.HBox;\n"
+            + "public class Badge extends HBox {\n"
+            + "    @FXML private Label caption;\n"
+            + "    private int level;\n"
+            + "    public Badge() {\n"
+            + "        try {\n"
+            // What Badge.class.getResource("badge.fxml") answers in a built
+            // application; this class loader has no resources of its own.
+            + "            FXMLLoader loader = new FXMLLoader(\n"
+            + "                    new java.net.URL(\"file:/work/app/target/classes/shop/badge.fxml\"));\n"
+            + "            loader.setRoot(this);\n"
+            + "            loader.setController(this);\n"
+            + "            loader.load();\n"
+            + "        } catch (java.io.IOException e) {\n"
+            + "            throw new RuntimeException(e);\n"
+            + "        }\n"
+            + "    }\n"
+            + "    public String getText() { return caption.getText(); }\n"
+            + "    public void setText(String text) { caption.setText(text); }\n"
+            + "    public int getLevel() { return level; }\n"
+            + "    public void setLevel(int level) { this.level = level; }\n"
+            + "}\n";
+
+    /// A class of the application as an element, itself built from a
+    /// document with `<fx:root>`: the documents are compiled after the
+    /// application, so the control's own setters are read like any other's.
+    @Test
+    public void aCustomControlOfTheApplicationIsAnElement() throws Exception {
+        app("custom").source("shop.Badge", BADGE)
+                .resource("shop/badge.fxml", HEAD + "<fx:root type=\"HBox\"" + NS + " spacing=\"3\">\n"
+                        + "  <Label fx:id=\"caption\" text=\"-\"/>\n"
+                        + "</fx:root>\n")
+                .resource("shop/main.fxml", HEAD + "<?import shop.Badge?>\n"
+                        + "<VBox" + NS + ">\n"
+                        + "  <Badge fx:id=\"first\" text=\"New\" level=\"7\" VBox.vgrow=\"ALWAYS\"/>\n"
+                        + "  <shop.Badge text=\"Sale\"/>\n"
+                        + "</VBox>\n").build();
+        VBox box = app.load("shop/main.fxml");
+        assertEquals(2, box.getChildren().size());
+        Node first = box.getChildren().get(0);
+        assertEquals("shop.Badge", first.getClass().getName());
+        assertEquals(3, ((HBox) first).getSpacing(), 0);
+        assertEquals(Priority.ALWAYS, VBox.getVgrow(first));
+        assertEquals("New", ((Label) ((HBox) first).getChildren().get(0)).getText());
+        assertEquals(Integer.valueOf(7), first.getClass().getMethod("getLevel").invoke(first));
+        assertEquals("Sale", ((Label) ((HBox) box.getChildren().get(1)).getChildren().get(0)).getText());
+    }
+
+    @Test
+    public void aPropertyACustomControlLacksIsAnErrorOfTheDocument() throws Exception {
+        List<String> errors = app("custom-bad").source("shop.Badge", BADGE)
+                .resource("shop/badge.fxml", HEAD + "<fx:root type=\"HBox\"" + NS + "><Label fx:id=\"caption\"/>"
+                        + "</fx:root>\n")
+                .resource("shop/main.fxml", HEAD + "<?import shop.*?>\n<VBox" + NS + "><Badge colour=\"red\"/></VBox>\n")
+                .compile();
+        assertEquals(errors.toString(), 1, errors.size());
+        assertTrue(errors.get(0), errors.get(0).contains("main.fxml:6:"));
+        assertTrue(errors.get(0), errors.get(0).contains("shop.Badge has no property colour"));
+    }
+
+    /// A build in which javac did not run finds the classes directory as
+    /// the last build's relocation left it, and must leave the documents'
+    /// classes alone: compiled again they would not fit the relocated
+    /// classes around them.
+    @Test
+    public void aRelocatedClassesDirectoryIsLeftAlone() throws Exception {
+        app("relocated").resource("main.fxml", HEAD + "<VBox" + NS + "/>\n").build();
+        File dir = new File(app.classes(), "com/codename1/generated/fxml");
+        File marker = new File(dir, "FxmlDocuments.class");
+        File document = new File(dir, "Fxml_main.class");
+        assertTrue(marker.isFile());
+        assertTrue(document.isFile());
+        assertFalse(FxmlClassCompiler.relocated(app.classes()));
+
+        // What the relocation does to the one name the class holds.
+        final org.objectweb.asm.ClassWriter moved = new org.objectweb.asm.ClassWriter(0);
+        new org.objectweb.asm.ClassReader(java.nio.file.Files.readAllBytes(marker.toPath())).accept(
+                new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9, moved) {
+                    @Override
+                    public org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String descriptor,
+                            String signature, String[] exceptions) {
+                        return new org.objectweb.asm.MethodVisitor(org.objectweb.asm.Opcodes.ASM9,
+                                super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                            @Override
+                            public void visitLdcInsn(Object value) {
+                                super.visitLdcInsn(value instanceof org.objectweb.asm.Type
+                                        ? org.objectweb.asm.Type.getObjectType("com/codename1/fxcompat/"
+                                                + ((org.objectweb.asm.Type) value).getInternalName()) : value);
+                            }
+                        };
+                    }
+                }, 0);
+        java.nio.file.Files.write(marker.toPath(), moved.toByteArray());
+        assertTrue(FxmlClassCompiler.relocated(app.classes()));
+
+        java.nio.file.Files.write(document.toPath(), new byte[] {1, 2, 3});
+        FxmlClassCompiler again = new FxmlClassCompiler(java.util.Collections.singletonList(
+                new File(app.file("main.fxml")).getParentFile()), FxmlHarness.classpath(),
+                java.util.Collections.<File>emptyList(), app.classes(), null, new DesktopResourceCompiler.Log() {
+                    @Override
+                    public void info(String message) {
+                    }
+
+                    @Override
+                    public void warn(String message) {
+                    }
+                });
+        assertTrue(again.run().isEmpty());
+        assertEquals(0, again.compiled());
+        assertEquals("The document's class was not compiled again", 3, document.length());
     }
 
     @Test

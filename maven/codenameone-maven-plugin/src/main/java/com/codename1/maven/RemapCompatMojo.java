@@ -96,6 +96,10 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
         try {
             new CompatRemapper(classes, classpath, onClick, MavenLog.of(getLog()))
                     .withResourceDirectories(desktopResources)
+                    // The documents are compiled here, after javac, so that
+                    // one can name a class of the application; see
+                    // PrepareDesktopSourcesMojo.compileDesktopResources.
+                    .withFxmlSourceDirectory(new File(project.getBuild().getDirectory(), "generated-fxml"))
                     .withDesktopEntryRecord(desktopSourceDir == null ? null
                             : DesktopSources.entryRecord(desktopSourceDir))
                     .withApplicationMain(applicationMain())

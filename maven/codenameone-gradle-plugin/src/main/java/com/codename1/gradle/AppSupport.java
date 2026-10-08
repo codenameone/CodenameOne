@@ -176,11 +176,15 @@ final class AppSupport {
         // Declared always, like the Android directories: Gradle is happy with
         // a directory that does not exist.
         //
-        // The build-time FXML and style sheet compile step of the JavaFX
-        // layer, registered the way compileAndroidRes is above. Its outputs
-        // are source and resource roots of `main`, so compileJava and
-        // processResources depend on it without being told. The Maven
-        // build's counterpart, with the full contract, is
+        // The build-time style sheet compile step of the JavaFX layer,
+        // registered the way compileAndroidRes is above. Its outputs are
+        // source and resource roots of `main`, so compileJava and
+        // processResources depend on it without being told. The FXML
+        // documents are not compiled by it but by compileJava's
+        // cn1RemapCompat action, once the application's classes exist; the
+        // one source this task writes holds their digest, so a changed
+        // document reruns compileJava. The Maven build's counterpart, with
+        // the full contract, is
         // PrepareDesktopSourcesMojo.compileDesktopResources.
         final File desktopResources = com.codename1.maven.DesktopSources.resourcesDir(desktopDir);
         TaskProvider<com.codename1.gradle.tasks.CompileDesktopResourcesTask> desktopRes = project.getTasks().register(
@@ -284,6 +288,10 @@ final class AppSupport {
                     compile.getDestinationDirectory().getAsFile().get(), main.getCompileClasspath(),
                     onClickNamesFile(androidState), false, main.getOutput().getClassesDirs())
                     .withDesktopEntryRecord(desktopEntry).withApplicationMain(desktopMain)
+                    // The FXML documents are compiled by this action, first:
+                    // after javac, so that a document can name a class of
+                    // the application, and before the relocation.
+                    .withFxmlSourceDirectory(new File(layout.buildDir(), "generated/cn1-fxml"))
                     .withApplicationLibraries(desktopProject ? main.getRuntimeClasspath().filter(
                             f -> f.getName().endsWith(".jar")) : null));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
