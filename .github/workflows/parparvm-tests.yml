@@ -388,7 +388,10 @@ jobs:
 
       - name: Run ParparVM Benchmark
         working-directory: vm
-        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B test -pl tests -am -Dgroups=benchmark -Djacoco.skip=true
+        # Each benchmark already creates its own mutator/collector threads. Run
+        # classes serially: competing benchmarks change GC sizing and timings as
+        # they start and finish, invalidating comparisons within a measured run.
+        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B test -pl tests -am -Dgroups=benchmark -Dparparvm.test.forkCount=1 -Djacoco.skip=true
         env:
           # Narrowed because this step RUNS TESTS: retry.sh retries every nonzero exit
           # without it, so a test that failed once and passed on a later attempt would take
