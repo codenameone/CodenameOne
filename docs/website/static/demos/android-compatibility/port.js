@@ -1,0 +1,7870 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/**
+ * JavaScriptPort - Native bindings for JSO interfaces
+ * This file contains native implementations for the com.codename1.html5.js.* interfaces
+ * used by the JavaScript port of Codename One.
+ */
+
+// Worker-side jQuery shim. The main thread pulls in real jQuery via
+// <script src="js/jquery.min.js"> in index.html, but port.js is also
+// imported into the worker (see JavascriptBundleWriter.writeWorker) and
+// several @JSBody natives on HTML5Implementation embed inline jQuery
+// expressions that the translator emits verbatim into worker-side JS
+// (e.g. getScrollY_ returns ``jQuery(window).scrollTop()``). Before the
+// worker-callback event forwarding landed those natives were never
+// reached because no DOM event ever made it into the worker; now that
+// mouse/key events do flow through, every single one was crashing with
+// ``ReferenceError: jQuery is not defined``. Install a minimal no-op
+// shim so those callsites don't throw — their real DOM side effects
+// either no-op on the worker side or go through the host bridge on the
+// main thread anyway. This shim is ONLY active in the worker (the main
+// thread's real jQuery wins via the typeof check).
+(function() {
+  var target = typeof globalThis !== "undefined" ? globalThis
+             : (typeof self !== "undefined" ? self
+             : (typeof window !== "undefined" ? window : null));
+  if (!target || typeof target.jQuery === "function") {
+    return;
+  }
+  var stub;
+  stub = {
+    length: 0,
+    scrollTop: function(v) { return v === undefined ? 0 : stub; },
+    scrollLeft: function(v) { return v === undefined ? 0 : stub; },
+    scroll: function() { return stub; },
+    is: function() { return false; },
+    on: function() { return stub; },
+    off: function() { return stub; },
+    one: function() { return stub; },
+    trigger: function() { return stub; },
+    get: function() { return null; },
+    find: function() { return stub; },
+    each: function() { return stub; },
+    filter: function() { return stub; },
+    fadeOut: function(_ms, cb) {
+      if (typeof cb === "function") { try { cb.call(stub); } catch (_e) {} }
+      return stub;
+    },
+    fadeIn: function(_ms, cb) {
+      if (typeof cb === "function") { try { cb.call(stub); } catch (_e) {} }
+      return stub;
+    },
+    hide: function() { return stub; },
+    show: function() { return stub; },
+    remove: function() { return stub; },
+    append: function() { return stub; },
+    prepend: function() { return stub; },
+    focus: function() { return stub; },
+    blur: function() { return stub; },
+    css: function() { return ""; },
+    attr: function() { return ""; },
+    prop: function() { return null; },
+    addClass: function() { return stub; },
+    removeClass: function() { return stub; },
+    hasClass: function() { return false; },
+    val: function() { return ""; },
+    text: function() { return ""; },
+    html: function() { return ""; },
+    height: function() { return 0; },
+    width: function() { return 0; },
+    innerHeight: function() { return 0; },
+    innerWidth: function() { return 0; },
+    outerHeight: function() { return 0; },
+    outerWidth: function() { return 0; },
+    offset: function() { return { top: 0, left: 0 }; },
+    position: function() { return { top: 0, left: 0 }; }
+  };
+  target.jQuery = function() { return stub; };
+  target.jQuery.fn = {};
+  target.jQuery.extend = function(out) { return out || {}; };
+  if (typeof target.$ === "undefined") {
+    target.$ = target.jQuery;
+  }
+
+  // Worker-side cn1NormalizeWheel — HTML5Implementation.mouseWheelMoved
+  // calls this via @JSBody as ``window.cn1NormalizeWheel(evt)``. On the
+  // main thread the function is installed by fontmetrics.js; that file
+  // never runs in the worker. The body itself is pure data munging (no
+  // DOM access), so inlining a copy here is enough to keep the wheel
+  // event path from tripping over a ReferenceError once events are
+  // forwarded to Java handlers.
+  if (typeof target.cn1NormalizeWheel !== "function") {
+    var normalizeWheel = function(event) {
+      if (!event) {
+        return { spinX: 0, spinY: 0, pixelX: 0, pixelY: 0 };
+      }
+      var PIXEL_STEP = 10, LINE_HEIGHT = 40, PAGE_HEIGHT = 800;
+      var sX = 0, sY = 0, pX = 0, pY = 0;
+      if ("detail"      in event) { sY = event.detail; }
+      if ("wheelDelta"  in event) { sY = -event.wheelDelta / 120; }
+      if ("wheelDeltaY" in event) { sY = -event.wheelDeltaY / 120; }
+      if ("wheelDeltaX" in event) { sX = -event.wheelDeltaX / 120; }
+      if ("axis" in event && event.axis === event.HORIZONTAL_AXIS) {
+        sX = sY; sY = 0;
+      }
+      pX = sX * PIXEL_STEP;
+      pY = sY * PIXEL_STEP;
+      if ("deltaY" in event) { pY = event.deltaY; }
+      if ("deltaX" in event) { pX = event.deltaX; }
+      if ((pX || pY) && event.deltaMode) {
+        if (event.deltaMode === 1) { pX *= LINE_HEIGHT; pY *= LINE_HEIGHT; }
+        else { pX *= PAGE_HEIGHT; pY *= PAGE_HEIGHT; }
+      }
+      if (pX && !sX) { sX = (pX < 1) ? -1 : 1; }
+      if (pY && !sY) { sY = (pY < 1) ? -1 : 1; }
+      return { spinX: sX, spinY: sY, pixelX: pX, pixelY: pY };
+    };
+    normalizeWheel.getEventType = function() { return "wheel"; };
+    target.cn1NormalizeWheel = normalizeWheel;
+  }
+})();
+
+(function(global) {
+  const jsoRegistry = global.jvm && global.jvm.jsoRegistry;
+  if (!jsoRegistry) {
+    console.warn("JSO registry not found in VM runtime. JSO bindings may not work correctly.");
+    return;
+  }
+
+  jsoRegistry.classPrefixes.push(
+    "com_codename1_html5_js_",
+    "com_codename1_impl_html5_JSOImplementations_",
+    // TeaVM-era JSO interfaces under com.codename1.teavm.ext.* (LocalForage,
+    // Popover, JQuery, WebSQL, FileChooser, PhotoCapture, ...) -- every
+    // class under this package is ``interface X extends JSObject`` with
+    // method calls routed via the JS bridge. Without registering the
+    // prefix, ``resolveVirtual`` throws ``Missing virtual method`` on the
+    // first call (e.g. ``LocalForage.config(...)`` during storage init),
+    // which on initializr produces an uncaught Promise rejection that
+    // surfaces as the "Application failed to start" symptom AND blocks
+    // every subsequent storage / DOM-style read until the failure path
+    // is exhausted.
+    "com_codename1_teavm_ext_"
+  );
+
+  jsoRegistry.inferFn = function(value, expectedClass, jvm) {
+    if (value === (global.window || global.self || global)) {
+      return "com_codename1_html5_js_browser_Window";
+    }
+    if (value && value.nodeType === 9) {
+      return "com_codename1_html5_js_dom_HTMLDocument";
+    }
+    if (typeof global.ArrayBuffer !== "undefined" && value instanceof global.ArrayBuffer) {
+      return "com_codename1_html5_js_typedarrays_ArrayBuffer";
+    }
+    if (typeof global.Uint8ClampedArray !== "undefined" && value instanceof global.Uint8ClampedArray) {
+      return "com_codename1_html5_js_typedarrays_Uint8ClampedArray";
+    }
+    if (typeof global.Uint8Array !== "undefined" && value instanceof global.Uint8Array) {
+      return "com_codename1_html5_js_typedarrays_Uint8Array";
+    }
+    if (value && value.canvas && typeof value.drawImage === "function" && typeof value.fillRect === "function") {
+      return "com_codename1_html5_js_canvas_CanvasRenderingContext2D";
+    }
+    if (value && value.data && value.width !== undefined && value.height !== undefined && typeof value.data.length === "number") {
+      return "com_codename1_html5_js_canvas_ImageData";
+    }
+    if (value && value.setProperty && value.removeProperty) {
+      return "com_codename1_html5_js_dom_CSSStyleDeclaration";
+    }
+    if (value && value.href != null && value.assign && value.replace) {
+      if (jvm.classes["com_codename1_impl_html5_JSOImplementations_WindowLocation"]) {
+        return "com_codename1_impl_html5_JSOImplementations_WindowLocation";
+      }
+      return expectedClass || "com_codename1_html5_js_browser_Location";
+    }
+    if (value && value.tagName) {
+      const tagName = String(value.tagName).toUpperCase();
+      switch (tagName) {
+        case "CANVAS":
+          return "com_codename1_html5_js_dom_HTMLCanvasElement";
+        case "IMG":
+          return "com_codename1_html5_js_dom_HTMLImageElement";
+        case "INPUT":
+          return "com_codename1_html5_js_dom_HTMLInputElement";
+        case "TEXTAREA":
+          return "com_codename1_html5_js_dom_HTMLTextAreaElement";
+        case "BODY":
+          return "com_codename1_html5_js_dom_HTMLBodyElement";
+        case "IFRAME":
+          return jvm.classes["com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement"] 
+            ? "com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement" 
+            : "com_codename1_html5_js_dom_HTMLElement";
+        default:
+          return expectedClass || "com_codename1_html5_js_dom_HTMLElement";
+      }
+    }
+    if (value && value.type !== undefined && value.target !== undefined) {
+      return expectedClass || "com_codename1_html5_js_dom_Event";
+    }
+    return null;
+  };
+
+  jsoRegistry.nativeArgConverters.push(function(value, jvm) {
+    if (jvm.instanceOf(value, "com_codename1_html5_js_dom_EventListener")) {
+      if (value.__nativeEventListener) {
+        return value.__nativeEventListener;
+      }
+      value.__nativeEventListener = function(event) {
+        try {
+          const wrappedEvent = jvm.wrapJsResult(event, "com_codename1_html5_js_dom_Event");
+          const method = jvm.resolveVirtual(value.__class, "cn1_s_handleEvent_com_codename1_html5_js_dom_Event");
+          jvm.spawn(null, method(value, wrappedEvent));
+        } catch (err) {
+          jvm.fail(err);
+        }
+      };
+      return value.__nativeEventListener;
+    }
+    if (jvm.instanceOf(value, "com_codename1_html5_js_browser_AnimationFrameCallback")) {
+      if (value.__nativeAnimationFrameCallback) {
+        return value.__nativeAnimationFrameCallback;
+      }
+      value.__nativeAnimationFrameCallback = function(time) {
+        try {
+          spawnVirtualCallback(
+            value,
+            "cn1_s_onAnimationFrame_double",
+            [+time],
+            "__cn1RafCallbackPending",
+            true
+          );
+        } catch (err) {
+          jvm.fail(err);
+        }
+      };
+      return value.__nativeAnimationFrameCallback;
+    }
+    return value;
+  });
+})(self);
+
+function isPhoneUserAgent() {
+  const agent = (global.navigator && global.navigator.userAgent) || "";
+  if (!agent) {
+    return false;
+  }
+  const mobileRegex = /(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i;
+  const prefixRegex = /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i;
+  return mobileRegex.test(agent) || prefixRegex.test(agent.substring(0, 4));
+}
+
+function isPhoneOrTabletUserAgent() {
+  const agent = (global.navigator && global.navigator.userAgent) || "";
+  if (!agent) {
+    return false;
+  }
+  const mobileOrTabletRegex = /(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino|android|ipad|playbook|silk/i;
+  const prefixRegex = /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i;
+  return mobileOrTabletRegex.test(agent) || prefixRegex.test(agent.substring(0, 4));
+}
+
+function isIOSUserAgent() {
+  const nav = global.navigator || {};
+  const ua = String(nav.userAgent || "");
+  const platform = String(nav.platform || "");
+  const maxTouchPoints = Number(nav.maxTouchPoints || 0);
+  return (/iPad|iPhone|iPod/.test(ua) && !global.MSStream) || (platform === "MacIntel" && maxTouchPoints > 1);
+}
+
+function isMacUserAgent() {
+  return /Mac/.test((global.navigator && global.navigator.userAgent) || "");
+}
+
+function isIPadUserAgent() {
+  const nav = global.navigator || {};
+  const ua = String(nav.userAgent || "");
+  const platform = String(nav.platform || "");
+  const maxTouchPoints = Number(nav.maxTouchPoints || 0);
+  return /iPad/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
+}
+
+function getQueryParameter(name) {
+  const loc = (global.window || global).location;
+  if (!loc || !loc.search) {
+    return null;
+  }
+  const search = String(loc.search).charAt(0) === "?" ? String(loc.search).substring(1) : String(loc.search);
+  if (!search) {
+    return null;
+  }
+  const pairs = search.split("&");
+  for (let i = 0; i < pairs.length; i++) {
+    const part = pairs[i];
+    if (!part) {
+      continue;
+    }
+    const eq = part.indexOf("=");
+    const rawKey = eq >= 0 ? part.substring(0, eq) : part;
+    if (decodeURIComponent(rawKey.replace(/\+/g, " ")) !== name) {
+      continue;
+    }
+    const rawValue = eq >= 0 ? part.substring(eq + 1) : "";
+    return decodeURIComponent(rawValue.replace(/\+/g, " "));
+  }
+  return null;
+}
+
+// Gate for port.js's PARPAR:DIAG:* and PARPAR:DIAG:FALLBACK:* log emissions.
+// Opt-in via ``?parparDiag=1`` (same toggle CI uses). Before this gate every
+// emitDiagLine / emitCiFallbackMarker call produced a console.log entry, and
+// browser_bridge.js was unconditionally echoing worker-side log messages on
+// the main thread — which meant a production Initializr bundle dumped a few
+// hundred PARPAR:DIAG:INIT:missingGlobalDelegate + PARPAR:DIAG:FALLBACK lines
+// to every user's browser console on load. The diagnostics are useful for
+// screenshot-test debugging, so keep them available behind the same query
+// parameter the rest of the port already looks for.
+let __cn1PortDiagEnabledCache = null;
+function __cn1PortDiagEnabled() {
+  if (__cn1PortDiagEnabledCache !== null) {
+    return __cn1PortDiagEnabledCache;
+  }
+  let enabled = false;
+  try {
+    enabled = !!getQueryParameter("parparDiag");
+  } catch (_err) {
+    enabled = false;
+  }
+  if (!enabled && typeof global !== "undefined" && global.__cn1Verbose) {
+    enabled = true;
+  }
+  __cn1PortDiagEnabledCache = enabled;
+  return enabled;
+}
+
+const ciFallbackMarkerSeen = Object.create(null);
+function emitCiFallbackMarker(symbol, markerType) {
+  const key = markerType + ":" + symbol;
+  if (ciFallbackMarkerSeen[key]) {
+    return;
+  }
+  ciFallbackMarkerSeen[key] = true;
+  if (!__cn1PortDiagEnabled()) {
+    return;
+  }
+  if (global.console && typeof global.console.log === "function") {
+    global.console.log("PARPAR:DIAG:FALLBACK:key=FALLBACK:" + symbol + ":" + markerType);
+  }
+}
+function bindCiFallback(symbol, names, fn) {
+  emitCiFallbackMarker(symbol, "ENABLED");
+  const wrappedFallback = function*() {
+    emitCiFallbackMarker(symbol, "HIT");
+    return yield* fn.apply(this, arguments);
+  };
+  wrappedFallback.__cn1CiFallbackSymbol = symbol;
+  bindNative(names, wrappedFallback);
+}
+function bindCiFallbackWithMethodId(symbol, names, fn) {
+  emitCiFallbackMarker(symbol, "ENABLED");
+  for (let i = 0; i < names.length; i++) {
+    const methodId = names[i];
+    const wrappedFallback = function*() {
+      emitCiFallbackMarker(symbol, "HIT");
+      const args = new Array(arguments.length + 1);
+      args[0] = methodId;
+      for (let j = 0; j < arguments.length; j++) {
+        args[j + 1] = arguments[j];
+      }
+      return yield* fn.apply(this, args);
+    };
+    wrappedFallback.__cn1CiFallbackSymbol = symbol;
+    bindNative([methodId], wrappedFallback);
+  }
+}
+function aliasGlobalToImpl(symbol) {
+  if (typeof global[symbol] === "function") {
+    return false;
+  }
+  const impl = global[symbol + "__impl"];
+  if (typeof impl !== "function") {
+    return false;
+  }
+  global[symbol] = impl;
+  cn1RefreshAlias(symbol, impl);
+  emitDiagLine("PARPAR:DIAG:INIT:aliasGlobalToImpl=" + symbol);
+  return true;
+}
+
+function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey, queuePending) {
+  if (!receiver || !receiver.__class) {
+    return false;
+  }
+  if (pendingFlagKey && receiver[pendingFlagKey]) {
+    if (queuePending) {
+      // A one-shot rAF may arrive while the previous Java callback is suspended
+      // waiting for the host to acknowledge its next frame request. Dropping it
+      // strands that loop forever. Serialize these deliveries; repeating timers
+      // keep their existing coalescing behavior.
+      const queueKey = pendingFlagKey + "Queue";
+      const queue = receiver[queueKey] || (receiver[queueKey] = []);
+      queue.push(args || []);
+      return true;
+    }
+    return false;
+  }
+  if (pendingFlagKey) {
+    receiver[pendingFlagKey] = true;
+  }
+  let method = null;
+  try {
+    method = jvm.resolveVirtual(receiver.__class, methodId);
+  } catch (err) {
+    if (pendingFlagKey) {
+      receiver[pendingFlagKey] = false;
+    }
+    throw err;
+  }
+  function* run() {
+    try {
+      let nextArgs = args || [];
+      let result;
+      do {
+        result = yield* cn1_ivAdapt(method.apply(null, [receiver].concat(nextArgs)));
+        const queue = queuePending && receiver[pendingFlagKey + "Queue"];
+        nextArgs = queue && queue.length ? queue.shift() : null;
+      } while (nextArgs !== null);
+      return result;
+    } finally {
+      if (pendingFlagKey) {
+        receiver[pendingFlagKey] = false;
+        if (queuePending) {
+          receiver[pendingFlagKey + "Queue"] = null;
+        }
+      }
+    }
+  }
+  jvm.spawn(null, run());
+  return true;
+}
+
+function* stringifyThrowable(throwable) {
+  if (!throwable || !throwable.__class) {
+    if (throwable == null) {
+      return "null";
+    }
+    return String(throwable);
+  }
+  const className = String(throwable.__class || "java_lang_Throwable");
+  const pieces = [className];
+  if (throwable.message) {
+    pieces.push("jsMessage=" + String(throwable.message));
+  }
+  if (throwable.cn1_java_lang_Throwable_detailMessage && throwable.cn1_java_lang_Throwable_detailMessage.__class === "java_lang_String") {
+    try {
+      pieces.push("detail=" + jvm.toNativeString(throwable.cn1_java_lang_Throwable_detailMessage));
+    } catch (_err) {
+      // Best effort diagnostic path only.
+    }
+  }
+  try {
+    const toStringMethod = jvm.resolveVirtual(throwable.__class, "cn1_s_toString_R_java_lang_String");
+    const value = yield* cn1_ivAdapt(toStringMethod(throwable));
+    if (value && value.__class === "java_lang_String") {
+      pieces.push(jvm.toNativeString(value));
+    }
+  } catch (_err) {
+    // Best effort diagnostic path only.
+  }
+  try {
+    const messageMethod = jvm.resolveVirtual(throwable.__class, "cn1_s_getMessage_R_java_lang_String");
+    const message = yield* cn1_ivAdapt(messageMethod(throwable));
+    if (message && message.__class === "java_lang_String") {
+      pieces.push("message=" + jvm.toNativeString(message));
+    }
+  } catch (_err) {
+    // Best effort diagnostic path only.
+  }
+  // Read the cached stack-trace string when ``Throwable.fillInStack``
+  // populated it (rare in this port — the Codename One ``Throwable``
+  // constructors don't call ``fillInStack``). Skip the fresh
+  // ``new Error().stack`` fallback: the giant per-exception stack dump
+  // it produced was useful once, for the bindCrashProtection diagnosis,
+  // but it's far too noisy to keep on. With the targeted
+  // instrumentation now in ``Log.bindCrashProtection`` we don't need
+  // every Log.e call to ship its caller stack any more.
+  try {
+    const stackField = throwable.cn1_java_lang_Throwable_stack;
+    if (stackField && stackField.__class === "java_lang_String") {
+      const stackText = jvm.toNativeString(stackField);
+      if (stackText) {
+        pieces.push("stack=" + stackText);
+      }
+    }
+  } catch (_err) {
+    // Best effort diagnostic path only.
+  }
+  const cause = throwable.cn1_java_lang_Throwable_cause;
+  if (cause && cause.__class) {
+    pieces.push("cause=" + String(cause.__class));
+  }
+  try {
+    const keys = Object.keys(throwable);
+    if (keys.length > 0) {
+      pieces.push("keys=" + keys.slice(0, 8).join(","));
+    }
+  } catch (_err) {
+    // Best effort diagnostic path only.
+  }
+  return pieces.join(" | ");
+}
+
+function checkDisplayInitState() {
+  const displayClass = jvm && jvm.classes ? jvm.classes["com_codename1_ui_Display"] : null;
+  if (!displayClass) {
+    return { displayClassExists: false, instance: null, edt: null };
+  }
+  const instanceField = displayClass.staticFields ? displayClass.staticFields["INSTANCE"] : null;
+  const edtValue = instanceField && instanceField.cn1_java_lang_Display_edt ? instanceField.cn1_java_lang_Display_edt : null;
+  return {
+    displayClassExists: true,
+    instance: instanceField,
+    edt: edtValue,
+    edtThreadName: edtValue && edtValue.cn1_java_lang_Thread_name ? function() {
+      try {
+        const nameField = edtValue.cn1_java_lang_Thread_name;
+        return nameField && nameField.__class === "java_lang_String" ? jvm.toNativeString(nameField) : String(nameField);
+      } catch (_e) {
+        return String(edtValue.cn1_java_lang_Thread_name);
+      }
+    }() : null
+  };
+}
+
+function ensureDisplayEdt() {
+  const state = checkDisplayInitState();
+  if (state.edt) {
+    return true;
+  }
+  if (!state.instance) {
+    emitDiagLine("PARPAR:DIAG:EDT_ENSURE:instanceMissing=1");
+    return false;
+  }
+  const threadClass = jvm.classes && jvm.classes["java_lang_Thread"];
+  if (!threadClass) {
+    emitDiagLine("PARPAR:DIAG:EDT_ENSURE:threadClassMissing=1");
+    return false;
+  }
+  const mainThread = jvm.mainThreadObject || (jvm.currentThread && jvm.currentThread.object);
+  if (!mainThread) {
+    emitDiagLine("PARPAR:DIAG:EDT_ENSURE:mainThreadMissing=1");
+    return false;
+  }
+  const existingActive = threadClass.staticFields && threadClass.staticFields["activeThreads"];
+  if (existingActive && existingActive > 0) {
+    state.instance.cn1_java_lang_Display_edt = mainThread;
+    emitDiagLine("PARPAR:DIAG:EDT_ENSURE:reusedMainThread=1");
+    return true;
+  }
+  const edtThread = jvm.newObject("java_lang_Thread");
+  edtThread.cn1_java_lang_Thread_alive = 1;
+  edtThread.cn1_java_lang_Thread_name = jvm.createStringLiteral("EDT");
+  edtThread.cn1_java_lang_Thread_nativeThreadId = jvm.nextThreadId++;
+  state.instance.cn1_java_lang_Display_edt = edtThread;
+  if (threadClass.staticFields) {
+    threadClass.staticFields["activeThreads"] = (threadClass.staticFields["activeThreads"] || 0) + 1;
+  }
+  emitDiagLine("PARPAR:DIAG:EDT_ENSURE:createdSyntheticEdt=1");
+  return true;
+}
+
+function emitDisplayInitDiag(marker) {
+  const state = checkDisplayInitState();
+  emitDiagLine("PARPAR:DIAG:" + marker + ":displayClassExists=" + (state.displayClassExists ? "1" : "0")+ ":instance=" + (state.instance ? "present" : "null")+ ":edt=" + (state.edt ? "present" : "null") + (state.edtThreadName ? ":edtThreadName=" + state.edtThreadName : ""));
+}
+
+// Enable forwarding System.out.println output to the main thread via postMessage.
+// This is only needed in the browser JS port where Playwright cannot reliably
+// capture Worker console.log.  Detect the browser Worker context by checking
+// for the native importScripts function (not the polyfill used in Node.js
+// worker_threads test harnesses which uses vm.runInThisContext).
+global.__cn1ForwardConsoleToMain = (typeof WorkerGlobalScope !== "undefined"
+    || (typeof self !== "undefined" && typeof self.importScripts === "function" && typeof process === "undefined"));
+
+function emitDiagLine(line) {
+  if (!__cn1PortDiagEnabled()) {
+    return;
+  }
+  if (global.console && typeof global.console.log === "function") {
+    global.console.log(line);
+  }
+  // Forward to main thread so Playwright (page.on('console')) can capture
+  // CN1SS output from the worker.  Worker console.log is not always
+  // observable from the page context.
+  if (typeof global.postMessage === "function") {
+    try {
+      global.postMessage({ type: "log", message: String(line) });
+    } catch (postErr) {
+      if (global.console && typeof global.console.warn === "function") {
+        global.console.warn("emitDiagLine:postMessage failed: " + String(postErr && postErr.message ? postErr.message : postErr));
+      }
+    }
+  }
+}
+
+function wrapVirtualMethodWithDiag(className, methodId, marker) {
+  if (!jvm || !jvm.classes || !jvm.classes[className]) {
+    return false;
+  }
+  const classDef = jvm.classes[className];
+  if (!classDef.methods || typeof classDef.methods[methodId] !== "function") {
+    return false;
+  }
+  const original = classDef.methods[methodId];
+  if (original.__cn1DiagWrapped) {
+    return true;
+  }
+  const wrapped = function*() {
+    emitDiagLine("PARPAR:DIAG:" + marker + ":enter");
+    try {
+      const result = yield* cn1_ivAdapt(original.apply(this, arguments));
+      emitDiagLine("PARPAR:DIAG:" + marker + ":exit");
+      return result;
+    } catch (err) {
+      const detail = yield* stringifyThrowable(err);
+      emitDiagLine("PARPAR:DIAG:" + marker + ":error=" + detail);
+      throw err;
+    }
+  };
+  wrapped.__cn1DiagWrapped = true;
+  classDef.methods[methodId] = wrapped;
+  return true;
+}
+
+function wrapGlobalGeneratorWithDiag(symbol, marker) {
+  if (typeof global[symbol] !== "function") {
+    return false;
+  }
+  const original = global[symbol];
+  if (original.__cn1DiagWrapped) {
+    return true;
+  }
+  const wrapped = function*() {
+    emitDiagLine("PARPAR:DIAG:" + marker + ":enter");
+    try {
+      const result = yield* cn1_ivAdapt(original.apply(this, arguments));
+      emitDiagLine("PARPAR:DIAG:" + marker + ":exit");
+      return result;
+    } catch (err) {
+      const detail = yield* stringifyThrowable(err);
+      emitDiagLine("PARPAR:DIAG:" + marker + ":error=" + detail);
+      throw err;
+    }
+  };
+  wrapped.__cn1DiagWrapped = true;
+  global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
+  return true;
+}
+
+function installLifecycleDiagnostics() {
+  if (!getQueryParameter("parparDiag")) {
+    return;
+  }
+  const targets = [
+    ["com_codename1_ui_Form", "cn1_com_codename1_ui_Form_show", "FORM_SHOW"],
+    ["com_codename1_ui_Form", "cn1_com_codename1_ui_Form_onShowCompletedImpl", "FORM_ON_SHOW_COMPLETED_IMPL"],
+    ["com_codename1_ui_Form", "cn1_com_codename1_ui_Form_onShowCompleted", "FORM_ON_SHOW_COMPLETED"],
+    ["com_codename1_ui_Display", "cn1_com_codename1_ui_Display_setCurrentForm_com_codename1_ui_Form", "DISPLAY_SET_CURRENT_FORM"],
+    ["com_codename1_system_Lifecycle", "cn1_com_codename1_system_Lifecycle_setCurrentForm_com_codename1_ui_Form", "LIFECYCLE_SET_CURRENT_FORM"],
+    ["com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner", "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runSuite", "CN1SS_RUNNER_SUITE"],
+    ["com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner", "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runNextTest_int", "CN1SS_RUNNER_NEXT_INDEX"],
+    ["com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner", "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int", "CN1SS_RUNNER_NEXT_TEST"],
+    ["com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner", "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean", "CN1SS_RUNNER_FINALIZE_TEST"],
+    ["com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner", "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finishSuite", "CN1SS_RUNNER_FINISH_SUITE"],
+    ["com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner", "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_log_java_lang_String", "CN1SS_RUNNER_LOG"]
+  ];
+  let wrappedCount = 0;
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+    const ok = wrapVirtualMethodWithDiag(target[0], target[1], target[2]);
+    if (ok) {
+      wrappedCount++;
+    }
+    emitDiagLine("PARPAR:DIAG:INIT:lifecycleDiagWrap:" + target[2] + "=" + (ok ? "1" : "0"));
+  }
+  emitDiagLine("PARPAR:DIAG:INIT:lifecycleDiagWrapped=" + wrappedCount);
+
+  const globalTargets = [
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_createForm_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String_R_com_codename1_ui_Form", "BASETEST_CREATE_FORM"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1___INIT___com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String", "BASETEST_FORM_INIT"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_onShowCompleted", "BASETEST_ONSHOW_COMPLETED"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_onShowCompleted__impl", "BASETEST_ONSHOW_COMPLETED_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String", "BASETEST_ONSHOW_LAMBDA"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String__impl", "BASETEST_ONSHOW_LAMBDA_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable", "CN1SS_HELPER_EMIT_SCREENSHOT"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable__impl", "CN1SS_HELPER_EMIT_SCREENSHOT_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_lambda_emitCurrentFormScreenshot_0_java_lang_String_java_lang_Runnable_int_int_com_codename1_ui_Image", "CN1SS_HELPER_EMIT_SCREENSHOT_LAMBDA"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_lambda_emitCurrentFormScreenshot_0_java_lang_String_java_lang_Runnable_int_int_com_codename1_ui_Image__impl", "CN1SS_HELPER_EMIT_SCREENSHOT_LAMBDA_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String", "CN1SS_HELPER_EMIT_CHANNEL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String__impl", "CN1SS_HELPER_EMIT_CHANNEL_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable", "CN1SS_HELPER_COMPLETE"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable__impl", "CN1SS_HELPER_COMPLETE_IMPL"],
+    ["cn1_com_codename1_ui_Form___INIT___java_lang_String_com_codename1_ui_layouts_Layout", "FORM_INIT_LAYOUT"],
+    ["cn1_com_codename1_ui_Form_onShowCompletedImpl", "FORM_ON_SHOW_COMPLETED_IMPL_GLOBAL"],
+    ["cn1_com_codename1_ui_Display_setCurrent_com_codename1_ui_Form_boolean", "DISPLAY_SET_CURRENT"]
+  ];
+  for (let i = 0; i < globalTargets.length; i++) {
+    const target = globalTargets[i];
+    const ok = wrapGlobalGeneratorWithDiag(target[0], target[1]);
+    emitDiagLine("PARPAR:DIAG:INIT:globalDiagWrap:" + target[1] + "=" + (ok ? "1" : "0"));
+  }
+}
+
+installLifecycleDiagnostics();
+function ensureKotlinUnitShim() {
+  if (!jvm || typeof jvm.defineClass !== "function" || !jvm.classes) {
+    return;
+  }
+  if (jvm.classes["kotlin_Unit"]) {
+    return;
+  }
+  jvm.defineClass({
+    name: "kotlin_Unit",
+    baseClass: "java_lang_Object",
+    interfaces: [],
+    isInterface: false,
+    isAbstract: false,
+    assignableTo: { "kotlin_Unit": true, "java_lang_Object": true },
+    instanceFields: [],
+    staticFields: { "INSTANCE": null },
+    methods: {},
+    classObject: null
+  });
+  function* cn1_kotlin_Unit___INIT__(__cn1ThisObject) {
+    // Object's <init> is empty bytecode → CHA classifies sync →
+    // emitted as plain ``function`` returning undefined. yield* on
+    // that throws ``not iterable``. Adapt via cn1_ivAdapt so the
+    // call works regardless of how the translator classified the
+    // target.
+    yield* cn1_ivAdapt(cn1_java_lang_Object___INIT__(__cn1ThisObject));
+    return null;
+  }
+  function* cn1_kotlin_Unit_toString_R_java_lang_String() {
+    return jvm.createStringLiteral("kotlin.Unit");
+  }
+  jvm.addVirtualMethod("kotlin_Unit", "cn1_kotlin_Unit_toString_R_java_lang_String", cn1_kotlin_Unit_toString_R_java_lang_String);
+  jvm.classes["kotlin_Unit"].clinit = function*() {
+    const unit = jvm.newObject("kotlin_Unit");
+    yield* cn1_kotlin_Unit___INIT__(unit);
+    jvm.classes["kotlin_Unit"].staticFields["INSTANCE"] = unit;
+    return null;
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=kotlinUnit");
+}
+ensureKotlinUnitShim();
+
+
+// Bundle call-site aliasing: hot cn1_* call sites go through short $J*
+// aliases (see JavascriptBundleWriter.aliasHotCn1Identifiers). Whenever
+// port.js reassigns a cn1_* global, refresh the alias too or aliased
+// call sites keep invoking the replaced function.
+function cn1RefreshAlias(symbol, fn) {
+  if (typeof global.__cn1RefreshAlias === "function") {
+    global.__cn1RefreshAlias(symbol, fn);
+  } else if (global.__cn1Al && global.__cn1Al[symbol]) {
+    global[global.__cn1Al[symbol]] = fn;
+  }
+}
+
+function installMissingGlobalDelegate(symbol, delegateSymbol, marker) {
+  if (typeof global[symbol] === "function") {
+    return false;
+  }
+  global[symbol] = function*() {
+    emitCiFallbackMarker(marker, "HIT");
+    const delegate = global[delegateSymbol];
+    if (typeof delegate === "function") {
+      return yield* cn1_ivAdapt(delegate.apply(this, arguments));
+    }
+    return null;
+  };
+  cn1RefreshAlias(symbol, global[symbol]);
+  emitCiFallbackMarker(marker, "ENABLED");
+  emitDiagLine("PARPAR:DIAG:INIT:missingGlobalDelegate:" + symbol + "->" + delegateSymbol);
+  return true;
+}
+
+function installMissingOwnerDelegates(owner, delegateOwner, suffixes, markerPrefix) {
+  for (let i = 0; i < suffixes.length; i++) {
+    const suffix = suffixes[i];
+    installMissingGlobalDelegate(
+      "cn1_" + owner + "_" + suffix,
+      "cn1_" + delegateOwner + "_" + suffix,
+      markerPrefix + "." + suffix
+    );
+  }
+}
+
+function installInferredMissingOwnerDelegates(owner, delegateOwner, markerPrefix) {
+  const ownerPrefix = "cn1_" + owner + "_";
+  const delegatePrefix = "cn1_" + delegateOwner + "_";
+  const usagePattern = new RegExp(ownerPrefix + "([A-Za-z0-9_]+)", "g");
+  const suffixes = Object.create(null);
+  const keys = Object.keys(global);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (typeof global[key] !== "function" || key.indexOf("cn1_") !== 0) {
+      continue;
+    }
+    let source = "";
+    try {
+      source = Function.prototype.toString.call(global[key]);
+    } catch (_err) {
+      source = "";
+    }
+    if (!source || source.indexOf(ownerPrefix) < 0) {
+      continue;
+    }
+    usagePattern.lastIndex = 0;
+    let match;
+    while ((match = usagePattern.exec(source)) !== null) {
+      if (match[1]) {
+        suffixes[match[1]] = true;
+      }
+    }
+  }
+  const names = Object.keys(suffixes);
+  let installed = 0;
+  for (let i = 0; i < names.length; i++) {
+    const suffix = names[i];
+    const symbol = ownerPrefix + suffix;
+    const delegate = delegatePrefix + suffix;
+    if (typeof global[symbol] === "function" || typeof global[delegate] !== "function") {
+      continue;
+    }
+    if (installMissingGlobalDelegate(symbol, delegate, markerPrefix + "." + suffix)) {
+      installed++;
+    }
+  }
+  emitDiagLine("PARPAR:DIAG:INIT:inferredMissingOwnerDelegates:" + owner + "->" + delegateOwner + ":installed=" + installed);
+  return installed;
+}
+
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_focusGainedInternal",
+  "cn1_com_codename1_ui_Component_focusGainedInternal",
+  "Label.focusGainedInternalMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_focusLostInternal",
+  "cn1_com_codename1_ui_Component_focusLostInternal",
+  "Label.focusLostInternalMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_getStyle_R_com_codename1_ui_plaf_Style",
+  "cn1_com_codename1_ui_Component_getStyle_R_com_codename1_ui_plaf_Style",
+  "Label.getStyleMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_getUIManager_R_com_codename1_ui_plaf_UIManager",
+  "cn1_com_codename1_ui_Component_getUIManager_R_com_codename1_ui_plaf_UIManager",
+  "Label.getUIManagerMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_keyPressed_int",
+  "cn1_com_codename1_ui_Component_keyPressed_int",
+  "Label.keyPressedMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_keyReleased_int",
+  "cn1_com_codename1_ui_Component_keyReleased_int",
+  "Label.keyReleasedMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_paintComponentBackground_com_codename1_ui_Graphics",
+  "cn1_com_codename1_ui_Component_paintComponentBackground_com_codename1_ui_Graphics",
+  "Label.paintComponentBackgroundMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_fireActionEvent",
+  "cn1_com_codename1_ui_Component_fireActionEvent",
+  "Label.fireActionEventMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Button_initLaf_com_codename1_ui_plaf_UIManager",
+  "cn1_com_codename1_ui_Component_initLaf_com_codename1_ui_plaf_UIManager",
+  "Button.initLafMissing"
+);
+installMissingOwnerDelegates(
+  "com_codename1_ui_Container",
+  "com_codename1_ui_Component",
+  [
+    "animate_R_boolean",
+    "deinitialize",
+    "fireActionEvent",
+    "getComponentForm_R_com_codename1_ui_Form",
+    "getPreferredW_R_int",
+    "getPropertyValue_java_lang_String_R_java_lang_Object",
+    "initComponent",
+    "initUnselectedStyle_com_codename1_ui_plaf_Style",
+    "internalPaintImpl_com_codename1_ui_Graphics_boolean",
+    "isVisible_R_boolean",
+    "paintBackground_com_codename1_ui_Graphics",
+    "paintScrollbars_com_codename1_ui_Graphics",
+    "putClientProperty_java_lang_String_java_lang_Object",
+    "repaint_com_codename1_ui_Component",
+    "setHeight_int",
+    "setPropertyValue_java_lang_String_java_lang_Object_R_java_lang_String",
+    "setRTL_boolean",
+    "setScrollY_int",
+    "setUIID_java_lang_String",
+    "setUnselectedStyle_com_codename1_ui_plaf_Style",
+    "setWidth_int",
+    "setX_int",
+    "setY_int",
+    "styleChanged_java_lang_String_com_codename1_ui_plaf_Style"
+  ],
+  "Container.missing"
+);
+installInferredMissingOwnerDelegates("com_codename1_ui_Label", "com_codename1_ui_Component", "Label.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_Container", "com_codename1_ui_Component", "Container.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_TextArea", "com_codename1_ui_Component", "TextArea.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_TextField", "com_codename1_ui_TextArea", "TextField.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_Form", "com_codename1_ui_Container", "Form.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_List", "com_codename1_ui_Container", "List.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_PeerComponent", "com_codename1_ui_Component", "PeerComponent.inferred");
+
+if (typeof global.cn1_com_codename1_ui_Container_setVisible_boolean !== "function") {
+  global.cn1_com_codename1_ui_Container_setVisible_boolean = function*(__cn1ThisObject, visible) {
+    if (!__cn1ThisObject) {
+      return null;
+    }
+    const containerClass = jvm.classes && jvm.classes["com_codename1_ui_Container"];
+    const containerMethod = containerClass && containerClass.methods
+      ? containerClass.methods["cn1_com_codename1_ui_Container_setVisible_boolean"]
+      : null;
+    if (typeof containerMethod === "function") {
+      return yield* cn1_ivAdapt(containerMethod(__cn1ThisObject, visible));
+    }
+    const componentClass = jvm.classes && jvm.classes["com_codename1_ui_Component"];
+    const componentMethod = componentClass && componentClass.methods
+      ? componentClass.methods["cn1_com_codename1_ui_Component_setVisible_boolean"]
+      : null;
+    if (typeof componentMethod === "function") {
+      return yield* cn1_ivAdapt(componentMethod(__cn1ThisObject, visible));
+    }
+    return null;
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=containerSetVisibleDirect");
+}
+if (typeof global.cn1_com_codename1_ui_Container_setAlwaysTensile_boolean !== "function") {
+  global.cn1_com_codename1_ui_Container_setAlwaysTensile_boolean = function*(__cn1ThisObject, enabled) {
+    if (!__cn1ThisObject) {
+      return null;
+    }
+    const containerClass = jvm.classes && jvm.classes["com_codename1_ui_Container"];
+    const containerMethod = containerClass && containerClass.methods
+      ? containerClass.methods["cn1_com_codename1_ui_Container_setAlwaysTensile_boolean"]
+      : null;
+    if (typeof containerMethod === "function") {
+      return yield* cn1_ivAdapt(containerMethod(__cn1ThisObject, enabled));
+    }
+    const componentClass = jvm.classes && jvm.classes["com_codename1_ui_Component"];
+    const componentMethod = componentClass && componentClass.methods
+      ? componentClass.methods["cn1_com_codename1_ui_Component_setAlwaysTensile_boolean"]
+      : null;
+    if (typeof componentMethod === "function") {
+      return yield* cn1_ivAdapt(componentMethod(__cn1ThisObject, enabled));
+    }
+    return null;
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=containerSetAlwaysTensileDirect");
+}
+if (typeof global.cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_String_com_codename1_ui_plaf_Style !== "function") {
+  global.cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_String_com_codename1_ui_plaf_Style = function*(__cn1ThisObject, propertyName, style) {
+    if (!__cn1ThisObject) {
+      return null;
+    }
+    const componentStyleChanged = global.cn1_com_codename1_ui_Component_styleChanged_java_lang_String_com_codename1_ui_plaf_Style;
+    if (typeof componentStyleChanged === "function") {
+      return yield* cn1_ivAdapt(componentStyleChanged(__cn1ThisObject, propertyName, style));
+    }
+    return null;
+  };
+  emitDiagLine(
+    "PARPAR:DIAG:INIT:missingGlobalDelegate:cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_String_com_codename1_ui_plaf_Style"
+    + "->cn1_com_codename1_ui_Component_styleChanged_java_lang_String_com_codename1_ui_plaf_Style"
+  );
+}
+
+// Bulk Uint8Array -> Java byte[] copy. Backs
+// ``ArrayBufferInputStream.read(byte[], int, int)`` so that
+// ``DataInputStream.readFully(...)`` paths (e.g. Resources.load
+// parsing 755 KiB of theme.res) drain in one tight JS loop instead of
+// thousands of single-byte virtual dispatches through the cooperative
+// scheduler. The default ``InputStream.read(byte[], int, int)`` Java
+// fallback calls ``read()`` once per byte, which routes every byte
+// through a ``function*`` boundary -- about 750k generator
+// allocations for a single theme.res load.
+//
+// The Java byte[] is a plain JS Array with index access, and it must
+// hold SIGNED values (-128..127): BALOAD/BASTORE are emitted as plain
+// array reads and writes, so whatever number sits in the slot is what
+// Java code sees. Storing the raw 0..255 Uint8Array value made every
+// byte above 0x7f a value no Java byte can have -- ``b[i] == (byte) i``
+// was false for it, ``b[i] < 0`` never held, and a downloaded binary
+// file read back with the right length and the wrong contents. Each
+// value is therefore sign-extended on the way in, the same
+// ``v > 127 ? v - 256 : v`` conversion the crypto, vault, sqlite and
+// bluetooth bindings in this file already apply.
+bindNative([
+  // Void return → no ``_R_void`` suffix; the int signature variant
+  // is registered too in case future translator versions normalise it.
+  "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int",
+  "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int_R_void",
+  "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int_R_int"
+], function(src, srcOff, dst, dstOff, length) {
+  if (!src || length <= 0) {
+    return null;
+  }
+  // ``src`` arrives as a JSO wrapper around the underlying typed
+  // array — see ``jvm.wrapJsObject`` which stashes the raw value in
+  // ``__jsValue``. Direct index access ``src[i]`` on the wrapper
+  // returns undefined; we need the unwrapped Uint8Array.
+  const raw = src.__jsValue !== undefined ? src.__jsValue : src;
+  const n = length | 0;
+  const so = srcOff | 0;
+  const dO = dstOff | 0;
+  // ``raw`` is the JS Uint8Array; typed-array indexed loads are
+  // direct memory access. ``dst`` is a plain JS Array carrying Java
+  // byte[] metadata, so indexed store is the same as for any array.
+  for (let i = 0; i < n; i++) {
+    dst[dO + i] = (raw[so + i] << 24) >> 24;
+  }
+  return null;
+});
+
+// Native text must not swallow pointer overrides on a custom top-level container.
+// Cache by runtime class: virtual implementations are fixed after registration.
+const nativeTextPointerOverrides = new Map();
+bindNative([
+  "cn1_com_codename1_ui_Accessor_hasCustomPointerHandlers_com_codename1_ui_Component_int_R_boolean"
+], function(owner, baseKind) {
+  const className = owner && owner.__class;
+  if (!className) return 1;
+  if (nativeTextPointerOverrides.has(className)) return nativeTextPointerOverrides.get(className);
+  const base = ["com_codename1_ui_Form", "com_codename1_ui_Dialog", "com_codename1_ui_Window"][baseKind];
+  let custom = 0;
+  try {
+    for (const name of ["pointerPressed", "pointerReleased", "pointerDragged", "longPointerPress"]) {
+      const signatures = name === "longPointerPress" ? ["int_int"] : ["int_int", "int_1ARRAY_int_1ARRAY"];
+      for (const signature of signatures) {
+        const method = "cn1_s_" + name + "_" + signature;
+        if (jvm.resolveVirtual(className, method) !== jvm.resolveVirtual(base, method)) custom = 1;
+      }
+    }
+  } catch (_err) {
+    // If a runtime cannot establish ownership, keep the framework gesture path.
+    custom = 1;
+  }
+  nativeTextPointerOverrides.set(className, custom);
+  return custom;
+});
+
+// Bulk RGBA -> ARGB pixel-buffer conversion. Backs
+// ``JavaScriptImageDataAdapter.readRgbaToArgbBulk`` which is the
+// fast-path for ``screenshot()`` and ``getRGB()``. The legacy
+// ``readRgbaToArgb(PixelReader, ...)`` path did 4 JSO virtual-dispatch
+// calls per pixel -- 4.6 million calls for a single 1280x900 frame.
+// The intrinsic does the same conversion in one tight worker-side
+// loop with zero cross-boundary cost.
+bindNative([
+  "cn1_com_codename1_impl_html5_JavaScriptImageDataAdapter_readRgbaToArgbBulk_com_codename1_html5_js_typedarrays_Uint8ClampedArray_int_1ARRAY_int",
+  "cn1_com_codename1_impl_html5_JavaScriptImageDataAdapter_readRgbaToArgbBulk_com_codename1_html5_js_typedarrays_Uint8ClampedArray_int_1ARRAY_int_R_void"
+], function(src, dst, offset) {
+  if (!src || !dst) {
+    return null;
+  }
+  // Unwrap the JSO wrapper to the raw Uint8ClampedArray; direct
+  // index access on the wrapper returns undefined (see the same
+  // unwrap in ``ArrayBufferInputStream_readBulkImpl`` above).
+  const raw = src.__jsValue !== undefined ? src.__jsValue : src;
+  const len = raw.length | 0;
+  const dO = offset | 0;
+  for (let i = 0, j = dO; i < len; i += 4, j++) {
+    const r = raw[i];
+    const g = raw[i + 1];
+    const b = raw[i + 2];
+    const a = raw[i + 3];
+    // ARGB packed int. ``| 0`` to keep the result a 32-bit signed
+    // integer (Java int) instead of an unsigned >2^31 value.
+    dst[j] = ((a << 24) | (r << 16) | (g << 8) | b) | 0;
+  }
+  return null;
+});
+
+// Bulk Java byte[] -> JS Uint8Array. Backs ``BlobUtil.createBlob(byte[],
+// type)`` and ``LocalForage`` byte[] storage so they stop paying a JSO
+// virtual-dispatch per byte. ``Uint8Array.from`` reads the source via
+// the iteration protocol once and copies in one tight native loop, so
+// even multi-MiB byte[] inputs cost a single ``yield*`` boundary.
+bindNative([
+  "cn1_com_codename1_teavm_io_BlobUtil_byteArrayToUint8Array_byte_1ARRAY_R_com_codename1_html5_js_typedarrays_Uint8Array"
+], function(bytes) {
+  if (!bytes) {
+    return jvm.wrapJsObject(new Uint8Array(0), "com_codename1_html5_js_typedarrays_Uint8Array");
+  }
+  // ``bytes`` is the Java byte[] -- a plain JS Array of signed
+  // -128..127 numbers with byte[] metadata stamped on.
+  // ``Uint8Array.from`` accepts any iterable / array-like and stores
+  // each value modulo 256, so -1 lands as 255: a single native-loop
+  // copy that is also the signed-to-unsigned conversion.
+  const u8 = Uint8Array.from(bytes);
+  return jvm.wrapJsObject(u8, "com_codename1_html5_js_typedarrays_Uint8Array");
+});
+
+function javaRegexReplacement(matchArgs, replacement) {
+  let out = "";
+  for (let i = 0; i < replacement.length; i++) {
+    const ch = replacement.charAt(i);
+    if (ch === "\\" && i + 1 < replacement.length) {
+      out += replacement.charAt(++i);
+      continue;
+    }
+    if (ch === "$" && i + 1 < replacement.length) {
+      let end = i + 1;
+      while (end < replacement.length && /[0-9]/.test(replacement.charAt(end))) {
+        end++;
+      }
+      if (end > i + 1) {
+        const group = parseInt(replacement.substring(i + 1, end), 10);
+        if (group < matchArgs.length - 2) {
+          out += matchArgs[group] == null ? "" : String(matchArgs[group]);
+          i = end - 1;
+          continue;
+        }
+      }
+    }
+    out += ch;
+  }
+  return out;
+}
+
+function replaceJavaRegex(source, regex, replacement, replaceAll) {
+  const input = jvm.toNativeString(source);
+  const pattern = jvm.toNativeString(regex);
+  const replacementText = jvm.toNativeString(replacement);
+  const compiled = new RegExp(pattern, replaceAll ? "g" : "");
+  return jvm.createStringLiteral(input.replace(compiled, function() {
+    return javaRegexReplacement(arguments, replacementText);
+  }));
+}
+
+bindNative([
+  "cn1_com_codename1_impl_JdkApiRewriteHelper_replaceAll_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"
+], function*(source, regex, replacement) {
+  return replaceJavaRegex(source, regex, replacement, true);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_JdkApiRewriteHelper_replaceFirst_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"
+], function*(source, regex, replacement) {
+  return replaceJavaRegex(source, regex, replacement, false);
+});
+
+function cn1CryptoByteValues(value) {
+  if (value == null) {
+    return null;
+  }
+  const out = new Array(value.length | 0);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = (value[i] | 0) & 0xff;
+  }
+  return out;
+}
+
+function cn1CryptoJavaBytes(value) {
+  if (value == null) {
+    return null;
+  }
+  const out = jvm.newArray(value.length | 0, "JAVA_BYTE", 1);
+  for (let i = 0; i < out.length; i++) {
+    const unsigned = value[i] | 0;
+    out[i] = unsigned > 127 ? unsigned - 256 : unsigned;
+  }
+  return out;
+}
+
+function* cn1CryptoHost(request) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    throw new Error("Web Crypto host bridge is unavailable");
+  }
+  try {
+    return yield jvm.invokeHostNative("__cn1_crypto__", [request]);
+  } catch (err) {
+    // The public security API deliberately translates port RuntimeExceptions
+    // into CryptoException.  A rejected Web Crypto Promise arrives as a host
+    // Error, so normalize it into the Java exception hierarchy before it
+    // crosses back through Cipher/Signature/KeyGenerator.
+    const ex = jvm.createException("java_lang_RuntimeException");
+    if (typeof ex.ctor === "function") {
+      yield* cn1_ivAdapt(ex.ctor(ex.object));
+    }
+    ex.object.__cn1HostCryptoError = err == null ? "Web Crypto operation failed" : String(err);
+    throw ex.object;
+  }
+}
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_secureRandomBytes_byte_1ARRAY_R_void",
+  "cn1_com_codename1_impl_CodenameOneImplementation_secureRandomBytes_byte_1ARRAY"
+], function*(_impl, out) {
+  const random = yield* cn1CryptoHost({ op: "random", length: out.length | 0 });
+  for (let i = 0; i < out.length; i++) {
+    const unsigned = random[i] | 0;
+    out[i] = unsigned > 127 ? unsigned - 256 : unsigned;
+  }
+  return null;
+});
+
+function cn1CryptoAesBinding(op) {
+  return function*(_impl, transformation, key, iv, aad, data) {
+    const result = yield* cn1CryptoHost({
+      op: op,
+      transformation: jvm.toNativeString(transformation),
+      key: cn1CryptoByteValues(key),
+      iv: cn1CryptoByteValues(iv),
+      aad: cn1CryptoByteValues(aad),
+      data: cn1CryptoByteValues(data)
+    });
+    return cn1CryptoJavaBytes(result);
+  };
+}
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_aesEncrypt_java_lang_String_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], cn1CryptoAesBinding("aesEncrypt"));
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_aesDecrypt_java_lang_String_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], cn1CryptoAesBinding("aesDecrypt"));
+
+function cn1CryptoRsaBinding(op) {
+  return function*(_impl, transformation, key, data) {
+    const result = yield* cn1CryptoHost({
+      op: op,
+      transformation: jvm.toNativeString(transformation),
+      key: cn1CryptoByteValues(key),
+      data: cn1CryptoByteValues(data)
+    });
+    return cn1CryptoJavaBytes(result);
+  };
+}
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_rsaEncrypt_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], cn1CryptoRsaBinding("rsaEncrypt"));
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_rsaDecrypt_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], cn1CryptoRsaBinding("rsaDecrypt"));
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_cryptoSign_java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], function*(_impl, algorithm, keyAlgorithm, key, data) {
+  const result = yield* cn1CryptoHost({
+    op: "sign",
+    algorithm: jvm.toNativeString(algorithm),
+    keyAlgorithm: jvm.toNativeString(keyAlgorithm),
+    key: cn1CryptoByteValues(key),
+    data: cn1CryptoByteValues(data)
+  });
+  return cn1CryptoJavaBytes(result);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_cryptoVerify_java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_boolean"
+], function*(_impl, algorithm, keyAlgorithm, key, data, signature) {
+  return (yield* cn1CryptoHost({
+    op: "verify",
+    algorithm: jvm.toNativeString(algorithm),
+    keyAlgorithm: jvm.toNativeString(keyAlgorithm),
+    key: cn1CryptoByteValues(key),
+    data: cn1CryptoByteValues(data),
+    signature: cn1CryptoByteValues(signature)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_generateRsaKeyPair_int_R_byte_2ARRAY"
+], function*(_impl, bits) {
+  const result = yield* cn1CryptoHost({ op: "generateRsaKeyPair", bits: bits | 0 });
+  const pair = jvm.newArray(2, "JAVA_BYTE", 2);
+  pair[0] = cn1CryptoJavaBytes(result[0]);
+  pair[1] = cn1CryptoJavaBytes(result[1]);
+  return pair;
+});
+
+// --------------------------------------------------------------------------
+// com.codename1.impl.html5.HTML5DeviceProtection -- the browser half of
+// com.codename1.security.vault.
+//
+// Each native forwards one request to the ``__cn1_vault__`` host bridge in
+// browser_bridge.js, where Web Crypto and IndexedDB live, and converts the
+// reply into a Java byte[]. The reply's first byte is a status; the Java side
+// maps it to a VaultError. Nothing here interprets it, so a status added on one
+// side and not the other degrades to VaultError.UNKNOWN rather than to a
+// silently wrong answer.
+// --------------------------------------------------------------------------
+
+function* cn1VaultHost(request) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    // One byte: STATUS_STORAGE_UNAVAILABLE with no payload. Returned rather
+    // than thrown so the Java side takes its normal typed-failure path.
+    return [4];
+  }
+  try {
+    return yield jvm.invokeHostNative("__cn1_vault__", [request]);
+  } catch (err) {
+    // STATUS_UNKNOWN. A rejected host promise has already lost whatever the
+    // browser knew, and guessing a more specific code from the message would be
+    // inventing one.
+    return [8];
+  }
+}
+
+function cn1VaultByteValues(value) {
+  if (value == null) {
+    return null;
+  }
+  const out = new Array(value.length | 0);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = (value[i] | 0) & 0xff;
+  }
+  return out;
+}
+
+function cn1VaultJavaBytes(value) {
+  const source = value == null ? [] : value;
+  const out = jvm.newArray(source.length | 0, "JAVA_BYTE", 1);
+  for (let i = 0; i < out.length; i++) {
+    const unsigned = source[i] | 0;
+    out[i] = unsigned > 127 ? unsigned - 256 : unsigned;
+  }
+  return out;
+}
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeCapabilities_R_byte_1ARRAY"
+], function*() {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({ op: "capabilities" }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeKeyState_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "keyState",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+// The atomic create for an ordinary secure-storage account. Two tabs opening the same managed
+// database both find nothing and both generate a value; IndexedDB's ``add`` accepts exactly one
+// and this hands the loser back the record that won, so both proceed under the same value.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeSetIfAbsent_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreSetIfAbsent",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
+// Reads the settled record without creating one, so the mirror can tell whether what it is
+// about to copy is still what the store holds.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeRead_java_lang_String_R_byte_1ARRAY"
+], function*(entry) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreRead",
+    entry: jvm.toNativeString(entry)
+  }));
+});
+
+// An ordinary set(), settled in the same store the create gate uses. Without it a tab paused
+// inside setIfAbsent could create the gate after this write and mirror its own candidate over
+// the value set() had already stored.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeSet_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreSet",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
+// Releases the gate only while it still holds the record this tab wrote, which is what a
+// rollback needs: by then another tab may own it.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeForgetIf_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreForgetIf",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
+// Releases the create gate, so remove() leaves nothing behind that a later setIfAbsent could
+// answer with.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeForget_java_lang_String_R_byte_1ARRAY"
+], function*(entry) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreForget",
+    entry: jvm.toNativeString(entry)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeEnsureKey_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "ensureKey",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeWrap_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], function*(keyId, plaintext, aad) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "wrap",
+    keyId: jvm.toNativeString(keyId),
+    data: cn1VaultByteValues(plaintext),
+    aad: cn1VaultByteValues(aad)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeUnwrap_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], function*(keyId, wrapped, aad) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "unwrap",
+    keyId: jvm.toNativeString(keyId),
+    data: cn1VaultByteValues(wrapped),
+    aad: cn1VaultByteValues(aad)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeDeleteKey_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "deleteKey",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+// --------------------------------------------------------------------------
+// com.codename1.impl.html5.HTML5PasskeyProtection -- the user-verifying variant.
+//
+// Enrol and derive both put a prompt on screen; prfState deliberately does not,
+// so an application can ask whether the option is available without asking for
+// the thing it is offering.
+// --------------------------------------------------------------------------
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfState_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfState",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfEnroll_java_lang_String_java_lang_String_boolean_R_byte_1ARRAY"
+], function*(keyId, userName, deviceBound) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfEnroll",
+    keyId: jvm.toNativeString(keyId),
+    userName: jvm.toNativeString(userName),
+    deviceBound: !!deviceBound
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfDerive_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfDerive",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfForget_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfForget",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+// PBKDF2 through Web Crypto. The portable fallback in KdfProfile is the same
+// algorithm in pure Java and produces identical bytes, and at the default six
+// hundred thousand iterations it is minutes of a translated worker's time
+// rather than the tens of milliseconds the browser takes natively. Returning
+// null from this native is how a port says "no native derivation"; this one
+// never does, and a browser that refuses the derivation throws instead, which
+// surfaces as a crypto failure rather than a silent slow path.
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_pbkdf2_java_lang_String_byte_1ARRAY_byte_1ARRAY_int_int_R_byte_1ARRAY"
+], function*(_impl, hashAlgorithm, password, salt, iterations, length) {
+  const result = yield* cn1CryptoHost({
+    op: "pbkdf2",
+    hash: jvm.toNativeString(hashAlgorithm),
+    password: cn1VaultByteValues(password),
+    salt: cn1VaultByteValues(salt),
+    iterations: iterations | 0,
+    length: length | 0
+  });
+  return cn1CryptoJavaBytes(result);
+});
+
+bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function() {
+  const arr = [];
+  return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");
+});
+
+bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___int_R_com_codename1_html5_js_core_JSArray"], function(length) {
+  const size = Math.max(0, length | 0);
+  const arr = new Array(size);
+  for (let i = 0; i < size; i++) {
+    arr[i] = null;
+  }
+  return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");
+});
+
+// The JS interop interfaces' static factories have Java bodies that return
+// null ("Native implementation"); the bridge only dispatches instance members,
+// so without a binding here the null IS the answer. JSString.valueOf was
+// unbound, so every LocalForage.setItem(String, String) stored null -- which
+// localStorage reads as a delete -- and FileSystemStorage.mkdir, whose marker
+// is an empty string, never created a directory.
+// scripts/test-javascript-native-stub-bindings.mjs fails on an unbound stub.
+function cn1Typed(ctor, cls, arg) {
+  const value = (typeof arg === "number") ? new ctor(arg | 0) : new ctor(jvm.unwrapJsValue(arg));
+  return jvm.wrapJsObject(value, cls);
+}
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSString_valueOf_java_lang_String_R_com_codename1_html5_js_core_JSString",
+  "cn1_com_codename1_html5_js_core_JSString_valueOf___java_lang_String_R_com_codename1_html5_js_core_JSString"
+], function(str) {
+  return str == null ? null : jvm.toNativeString(str);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf_int_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf___int_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf_double_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf___double_R_com_codename1_html5_js_core_JSNumber"
+], function(value) {
+  return Number(value);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSBoolean_valueOf_boolean_R_com_codename1_html5_js_core_JSBoolean",
+  "cn1_com_codename1_html5_js_core_JSBoolean_valueOf___boolean_R_com_codename1_html5_js_core_JSBoolean"
+], function(value) {
+  return !!value;
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_encodeURIComponent_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_html5_js_browser_Window_encodeURIComponent___java_lang_String_R_java_lang_String"
+], function(value) {
+  return value == null ? null : jvm.wrapJsResult(encodeURIComponent(jvm.toNativeString(value)), "java_lang_String");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create_int_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create___int_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int32Array"
+], function(arg) {
+  return cn1Typed(global.Int32Array, "com_codename1_html5_js_typedarrays_Int32Array", arg);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create_int_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create___int_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int16Array"
+], function(arg) {
+  return cn1Typed(global.Int16Array, "com_codename1_html5_js_typedarrays_Int16Array", arg);
+});
+
+bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_html5_js_browser_Window", "cn1_com_codename1_html5_js_browser_Window_current___R_com_codename1_html5_js_browser_Window"], function*() {
+  // Cache the main-thread window reference: it never changes for
+  // the lifetime of the worker, but ``Window.current()`` on the JS
+  // port is called dozens of times during boot (UIManager,
+  // Resources, BrowserComponent ... 42 invocations on Initializr
+  // boot in profiling), and each one was a worker->main HOST_CALL
+  // round-trip via ``__cn1_dom_window_current__``. Caching turns
+  // 42 round-trips into 1.
+  if (self.__cn1WindowWrapper) {
+    return self.__cn1WindowWrapper;
+  }
+  const nativeWindow = global.window;
+  const hasDomWindow = !!(nativeWindow && nativeWindow.document);
+  let wrapper;
+  if (!hasDomWindow && typeof jvm.invokeHostNative === "function") {
+    const hostWindow = yield jvm.invokeHostNative("__cn1_dom_window_current__", []);
+    if (hostWindow != null) {
+      wrapper = jvm.wrapJsObject(hostWindow, "com_codename1_html5_js_browser_Window");
+      jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
+      self.__cn1WindowWrapper = wrapper;
+      return wrapper;
+    }
+  }
+  // FALLBACK: no DOM window here and the host could not supply one. The
+  // worker global is NOT a window -- no document, no localforage, none of the
+  // members the JSO bridge is about to look up -- so this is a degraded
+  // answer, and it MUST NOT be cached. It used to be, and one early failed
+  // round-trip then pinned it for the life of the worker: every later
+  // ``Window.current()`` returned the worker global, and issue #5774's
+  // ``((LocalForageFactory)Window.current()).getLocalforage()`` read
+  // ``self.localforage`` -- undefined -> a Java null -> NPE inside
+  // ``LocalForage.<init>``, long after the call that actually failed.
+  // Leaving it uncached lets the next call retry and get the real window.
+  wrapper = jvm.wrapJsObject((hasDomWindow ? nativeWindow : null) || global.self || global, "com_codename1_html5_js_browser_Window");
+  jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
+  if (hasDomWindow) {
+    self.__cn1WindowWrapper = wrapper;
+  }
+  return wrapper;
+});
+
+// Window's static timer methods are Java stubs so the same API can compile
+// without a DOM. On the worker port they must run on the browser host: leaving
+// the stubs in place returns timer id 0 and silently drops every callback
+// (camera frame delivery was the first assertion test to expose this).
+function* cn1SetHostTimer(kind, handler, delay) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  if (!handler || !handler.__class) {
+    return 0;
+  }
+  if (!handler.__cn1NativeTimerCallback) {
+    handler.__cn1NativeTimerCallback = function() {
+      try {
+        spawnVirtualCallback(handler, "cn1_s_onTimer", [], "__cn1TimerCallbackPending");
+      } catch (err) {
+        jvm.fail(err);
+      }
+    };
+  }
+  return (yield jvm.invokeHostNative(kind, [
+    handler.__cn1NativeTimerCallback,
+    Math.max(0, delay | 0)
+  ])) | 0;
+}
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_setTimeout_java_lang_Object_int_R_int",
+  "cn1_com_codename1_html5_js_browser_Window_setTimeout___java_lang_Object_int_R_int"
+], function*(handler, delay) {
+  return yield* cn1SetHostTimer("__cn1_timer_set_timeout__", handler, delay);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_clearTimeout_int",
+  "cn1_com_codename1_html5_js_browser_Window_clearTimeout___int"
+], function*(id) {
+  if (typeof jvm.invokeHostNative === "function") {
+    yield jvm.invokeHostNative("__cn1_timer_clear_timeout__", [id | 0]);
+  }
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_setInterval_java_lang_Object_int_R_int",
+  "cn1_com_codename1_html5_js_browser_Window_setInterval___java_lang_Object_int_R_int"
+], function*(handler, delay) {
+  return yield* cn1SetHostTimer("__cn1_timer_set_interval__", handler, delay);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_clearInterval_int",
+  "cn1_com_codename1_html5_js_browser_Window_clearInterval___int"
+], function*(id) {
+  if (typeof jvm.invokeHostNative === "function") {
+    yield jvm.invokeHostNative("__cn1_timer_clear_interval__", [id | 0]);
+  }
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5BrowserComponent_installShouldLoadURLCallback_com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement_com_codename1_impl_html5_HTML5BrowserComponent_ShouldLoadURLCallback"
+], function*(iframe, callback) {
+  yield jvm.invokeHostNative("__cn1_install_browser_navigation_callback__", [iframe, callback]);
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5BrowserComponent_installShouldLoadURLCallbackShared_com_codename1_impl_html5_HTML5BrowserComponent_ShouldLoadURLCallback"
+], function*(callback) {
+  yield jvm.invokeHostNative("__cn1_install_browser_navigation_callback__", [null, callback]);
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSOImplementations_WindowExt_getCn1_R_com_codename1_impl_html5_JSOImplementations_CN1Native",
+  "cn1_com_codename1_impl_html5_JSOImplementations_WindowExt_getCn1___R_com_codename1_impl_html5_JSOImplementations_CN1Native"
+], function*(__cn1ThisObject) {
+  // Cache the CN1Native bridge handle. ``WindowExt.getCn1()`` is
+  // the entry point to the host bridge object (cn1HostBridge); it
+  // never changes for the worker's lifetime, but is fetched ~5
+  // times during boot and ~once per resource fetch / native call
+  // afterwards. Worker-side cache turns N round-trips into 1.
+  const win = jvm.unwrapJsValue(__cn1ThisObject);
+  if (win && win.__cn1CachedCn1Wrapper) {
+    return win.__cn1CachedCn1Wrapper;
+  }
+  if (win && win.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: win,
+      kind: "getter",
+      member: "cn1",
+      args: []
+    }]);
+    if (hostResult == null) return null;
+    const wrapper = jvm.wrapJsObject(hostResult, "com_codename1_impl_html5_JSOImplementations_CN1Native");
+    try { win.__cn1CachedCn1Wrapper = wrapper; } catch (_e) {}
+    return wrapper;
+  }
+  // Direct-context (worker has its own window with cn1) fall-through
+  if (win && win.cn1 != null) {
+    const wrapper = jvm.wrapJsObject(win.cn1, "com_codename1_impl_html5_JSOImplementations_CN1Native");
+    try { win.__cn1CachedCn1Wrapper = wrapper; } catch (_e) {}
+    return wrapper;
+  }
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_getDocument_R_com_codename1_html5_js_dom_HTMLDocument",
+  "cn1_com_codename1_html5_js_browser_Window_getDocument___R_com_codename1_html5_js_dom_HTMLDocument"
+], function*(__cn1ThisObject) {
+  const documentExtClass = "com_codename1_impl_html5_JSOImplementations_DocumentExt";
+  const win = jvm.unwrapJsValue(__cn1ThisObject);
+  // Cache the document wrapper per host-window receiver. Boot
+  // calls ``Window.getDocument`` 9-10 times via UIManager /
+  // BrowserComponent / Resources init; each was a round-trip JSO
+  // bridge call. The host-thread document never changes.
+  // Defensive validation: a cached doc wrapper without __class is a
+  // signal that something (cooperative scheduler interleaving, partial
+  // wrapper construction, or an upstream bug we haven't traced yet)
+  // produced a broken wrapper. The NULL_RECEIVER diag captured at
+  // 4d564b1bc proved this happens: cn1_iv1 then dispatches on the
+  // empty {} and fails with VIRTUAL_FAIL receiverClass=null. Forcing
+  // a re-fetch through the host bridge yields a fresh, well-formed
+  // wrapper. This is also what causes the late-suite tests
+  // (Sheet/SheetSlide/Toast/CssGradients/themes) to flake-hang.
+  if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper
+          && win.__cn1CachedDocWrapper.__class) {
+    return win.__cn1CachedDocWrapper;
+  }
+  if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper
+          && !win.__cn1CachedDocWrapper.__class) {
+    // Clear the broken cache so the next branch re-fetches.
+    try { win.__cn1CachedDocWrapper = null; } catch (_e) {}
+  }
+  if (win && win.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: win,
+      kind: "getter",
+      member: "document",
+      args: []
+    }]);
+    if (hostResult == null) {
+      return null;
+    }
+    const docWrapper = jvm.wrapJsObject(hostResult, "com_codename1_html5_js_dom_HTMLDocument");
+    jvm.enhanceJsWrapper(docWrapper, documentExtClass);
+    try { win.__cn1CachedDocWrapper = docWrapper; } catch (_e) {}
+    return docWrapper;
+  }
+  if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {
+    const hostWindow = yield jvm.invokeHostNative("__cn1_dom_window_current__", []);
+    if (hostWindow != null) {
+      const hostDocument = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+        receiver: hostWindow,
+        kind: "getter",
+        member: "document",
+        args: []
+      }]);
+      if (hostDocument == null) {
+        return null;
+      }
+      const docWrapper = jvm.wrapJsObject(hostDocument, "com_codename1_html5_js_dom_HTMLDocument");
+      jvm.enhanceJsWrapper(docWrapper, documentExtClass);
+      return docWrapper;
+    }
+  }
+  if (!win || !win.document) {
+    return null;
+  }
+  const docWrapper = jvm.wrapJsObject(win.document, "com_codename1_html5_js_dom_HTMLDocument");
+  jvm.enhanceJsWrapper(docWrapper, documentExtClass);
+  return docWrapper;
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_createElement_java_lang_String_R_com_codename1_html5_js_dom_HTMLElement",
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_createElement___java_lang_String_R_com_codename1_html5_js_dom_HTMLElement"
+], function*(__cn1ThisObject, tagName) {
+  const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  const tag = tagName == null ? "" : jvm.toNativeString(tagName);
+  const canvasClass = "com_codename1_html5_js_dom_HTMLCanvasElement";
+  if (doc && doc.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: doc,
+      kind: "method",
+      member: "createElement",
+      args: [tag]
+    }]);
+    if (hostResult == null) {
+      return null;
+    }
+    const expectedClass = String(tag).toLowerCase() === "canvas"
+      ? canvasClass
+      : jvm.inferJsObjectClass(hostResult, "com_codename1_html5_js_dom_HTMLElement");
+    return jvm.wrapJsObject(hostResult, expectedClass);
+  }
+  if (!doc || typeof doc.createElement !== "function") {
+    return null;
+  }
+  const element = doc.createElement(tag);
+  const expectedClass = String(tag).toLowerCase() === "canvas"
+    ? canvasClass
+    : jvm.inferJsObjectClass(element, "com_codename1_html5_js_dom_HTMLElement");
+  return jvm.wrapJsObject(element, expectedClass);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_getBody_R_com_codename1_html5_js_dom_HTMLElement",
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_getBody___R_com_codename1_html5_js_dom_HTMLElement"
+], function*(__cn1ThisObject) {
+  const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  if (doc && doc.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: doc,
+      kind: "getter",
+      member: "body",
+      args: []
+    }]);
+    return hostResult == null ? null : jvm.wrapJsObject(hostResult, "com_codename1_html5_js_dom_HTMLBodyElement");
+  }
+  if (!doc || !doc.body) {
+    return null;
+  }
+  return jvm.wrapJsObject(doc.body, "com_codename1_html5_js_dom_HTMLBodyElement");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_getElementById_java_lang_String_R_com_codename1_html5_js_dom_HTMLElement",
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_getElementById___java_lang_String_R_com_codename1_html5_js_dom_HTMLElement"
+], function*(__cn1ThisObject, id) {
+  const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  const nativeId = id == null ? "" : jvm.toNativeString(id);
+  const canvasClass = "com_codename1_html5_js_dom_HTMLCanvasElement";
+  if (doc && doc.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: doc,
+      kind: "method",
+      member: "getElementById",
+      args: [nativeId]
+    }]);
+    if (hostResult == null) {
+      return null;
+    }
+    const tagName = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: hostResult,
+      kind: "getter",
+      member: "tagName",
+      args: []
+    }]);
+    const expectedClass = String(tagName || "").toUpperCase() === "CANVAS"
+      ? canvasClass
+      : jvm.inferJsObjectClass(hostResult, "com_codename1_html5_js_dom_HTMLElement");
+    return jvm.wrapJsObject(hostResult, expectedClass);
+  }
+  if (!doc || typeof doc.getElementById !== "function") {
+    return null;
+  }
+  const element = doc.getElementById(nativeId);
+  return element == null ? null : jvm.wrapJsObject(element, jvm.inferJsObjectClass(element, "com_codename1_html5_js_dom_HTMLElement"));
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create_R_com_codename1_html5_js_ajax_XMLHttpRequest",
+  "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create___R_com_codename1_html5_js_ajax_XMLHttpRequest"
+], function() {
+  if (typeof global.XMLHttpRequest !== "function") {
+    throw new Error("XMLHttpRequest is not available in this javascript runtime");
+  }
+  return jvm.wrapJsObject(new global.XMLHttpRequest(), "com_codename1_html5_js_ajax_XMLHttpRequest");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create_int_R_com_codename1_html5_js_typedarrays_ArrayBuffer",
+  "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create___int_R_com_codename1_html5_js_typedarrays_ArrayBuffer"
+], function(size) {
+  return jvm.wrapJsObject(new global.ArrayBuffer(size | 0), "com_codename1_html5_js_typedarrays_ArrayBuffer");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___int_R_com_codename1_html5_js_typedarrays_Uint8Array"
+], function(size) {
+  return jvm.wrapJsObject(new global.Uint8Array(size | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
+});
+
+// Float64Array factory methods — needed by HTML5Implementation.transformPoint /
+// transformPoints and anywhere scene-graph / spinner rendering converts float[] to
+// a typed array for native matrix math. Without these the `static create(int)` in
+// Float64Array.java returns its stub `null`, crashing the worker with
+// `TypeError: Cannot read properties of null (reading '__classDef')`.
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Float64Array_create_int_R_com_codename1_html5_js_typedarrays_Float64Array",
+  "cn1_com_codename1_html5_js_typedarrays_Float64Array_create___int_R_com_codename1_html5_js_typedarrays_Float64Array"
+], function(size) {
+  return jvm.wrapJsObject(new global.Float64Array(size | 0), "com_codename1_html5_js_typedarrays_Float64Array");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Float64Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Float64Array",
+  "cn1_com_codename1_html5_js_typedarrays_Float64Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Float64Array"
+], function(buffer) {
+  return jvm.wrapJsObject(new global.Float64Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Float64Array");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array"
+], function(buffer) {
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8Array");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array"
+], function(bufferView) {
+  const nativeView = jvm.unwrapJsValue(bufferView);
+  return jvm.wrapJsObject(new global.Uint8Array(nativeView.buffer, nativeView.byteOffset || 0, nativeView.byteLength || undefined), "com_codename1_html5_js_typedarrays_Uint8Array");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
+], function(buffer, offset) {
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
+], function(buffer, offset, length) {
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
+});
+
+// Uint8ClampedArray factory methods – needed by createImageData() in
+// HTML5Implementation which converts ARGB int[] pixels into canvas ImageData.
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function(size) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(size | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function(buffer) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function(buffer, offset) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function(buffer, offset, length) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent_java_lang_String_int_R_com_codename1_html5_js_dom_Event",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent___java_lang_String_int_R_com_codename1_html5_js_dom_Event"
+], function*(message, code) {
+  const win = global.window || global.self || global;
+  const detail = message == null ? null : jvm.toNativeString(message);
+  if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {
+    const hostEvent = yield jvm.invokeHostNative("__cn1_create_custom_event__", [{
+      type: "cn1outbox",
+      detail: detail,
+      code: code | 0
+    }]);
+    return hostEvent == null ? null : jvm.wrapJsObject(hostEvent, "com_codename1_html5_js_dom_Event");
+  }
+  const event = new win.CustomEvent("cn1outbox", { detail: detail, code: code |0 });
+  return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent_java_lang_String_java_lang_String_int_R_com_codename1_html5_js_dom_Event",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent___java_lang_String_java_lang_String_int_R_com_codename1_html5_js_dom_Event"
+], function*(type, message, code) {
+  const win = global.window || global.self || global;
+  const eventType = type == null ? "" : jvm.toNativeString(type);
+  const detail = message == null ? null : jvm.toNativeString(message);
+  if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {
+    const hostEvent = yield jvm.invokeHostNative("__cn1_create_custom_event__", [{
+      type: eventType,
+      detail: detail,
+      code: code | 0
+    }]);
+    return hostEvent == null ? null : jvm.wrapJsObject(hostEvent, "com_codename1_html5_js_dom_Event");
+  }
+  const event = new win.CustomEvent(eventType, { detail: detail, code: code |0 });
+  return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function(name) {
+  const value = getQueryParameter(jvm.toNativeString(name));
+  return value == null ? null : jvm.createStringLiteral(value);
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function() {
+  // Report the display's real scale factor. Codename One addresses DEVICE pixels --
+  // the iOS port detects the retina factor and scales the values it hands the native
+  // primitives, so the framework draws at native resolution rather than rendering at
+  // 1x. Pinning this to 1 made the browser upscale a 1x canvas on every HiDPI display,
+  // which is why canvas text looked soft next to DOM text.
+  //
+  // ``?pixelRatio=N`` still forces a specific factor, which the screenshot harness and
+  // the skin designer rely on.
+  const ratioOverride = getQueryParameter("pixelRatio");
+  const win = global.window || global;
+  if (ratioOverride != null && ratioOverride !== "") {
+    const parsed = Number(ratioOverride);
+    win.overridePixelRatio = (!isNaN(parsed) && parsed > 0) ? parsed : 1;
+  }
+  if (typeof win.cn1ScaleCoord === "undefined") {
+    win.cn1ScaleCoord = function(x) {
+      return x === -1 ? -1 : x / (win.overridePixelRatio || win.devicePixelRatio || 1.0);
+    };
+  }
+  if (typeof win.cn1UnscaleCoord === "undefined") {
+    win.cn1UnscaleCoord = function(x) {
+      return x === -1 ? -1 : x * (win.overridePixelRatio || win.devicePixelRatio || 1.0);
+    };
+  }
+  return Number(win.overridePixelRatio || win.devicePixelRatio || 1.0);
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize___R_int"], function() {
+  const value = getQueryParameter("baseFont");
+  if (value == null || value === "") {
+    return 0;
+  }
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? 0 : parsed |0;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride___R_int"], function() {
+  const value = getQueryParameter("density");
+  if (value == null || value === "") {
+    return 0;
+  }
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? 0 : parsed |0;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhone__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhone___R_boolean"], function() {
+  return isPhoneUserAgent() ? 1 : 0;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet___R_boolean"], function() {
+  return isPhoneOrTabletUserAgent() ? 1 : 0;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIOS_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIOS___R_boolean"], function() {
+  return isIOSUserAgent() ? 1 : 0;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isMac_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isMac___R_boolean"], function() {
+  return isMacUserAgent() ? 1 : 0;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIPad_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIPad___R_boolean"], function() {
+  return isIPadUserAgent() ? 1 : 0;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage___R_java_lang_String"], function() {
+  const nav = global.navigator || {};
+  const value = nav.language || nav.browserLanguage || "";
+  return jvm.createStringLiteral(String(value));
+});
+
+// The probe has to ask about the primitive we actually use. It used to ask
+// about WeakMap, which every engine since 2015 has and which tells you nothing
+// about WeakRef (ES2021: Chrome 84, Firefox 79, Safari 14.1). Keep this name in
+// step with HTML5Implementation.isWeakRefSupported.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakRefSupported_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakRefSupported___R_boolean"
+], function() {
+  return typeof WeakRef === "function" ? 1 : 0;
+});
+
+// ===================================================================
+// SURFACE BRIDGE worker glue (surface-id render model).
+// -------------------------------------------------------------------
+// These bindNative generators back the HTML5Implementation.nativeSurface*
+// natives. They translate the worker's flat command buffers into a single
+// structured message per surface op and route it to the host bridge
+// (browser_bridge.js __cn1_surface_*). The host keeps the id->{canvas,ctx}
+// lookup table and replays; ONLY readRGB returns pixels.
+//
+// Every void surface op is FIRE-AND-FORGET: it posts a host-call the worker
+// never waits on (``__cn1_no_response``), so nothing the renderer issues can
+// park the worker if a response is lost/crossed -- the failure mode that hard-
+// froze the suite when these were round-trips. Posting preserves FIFO order to
+// the host, so create -> flush -> ... -> read stay correctly ordered; the one
+// read (getRGB) is the only round-trip and the only thing that waits.
+function cn1SurfacePost(symbol, arg) {
+  arg.__cn1_no_response = true;
+  var msg = { type: "host-call", symbol: symbol, args: [arg], id: 0 };
+  // Route through the runtime's emitVmMessage (same path the scheduler uses for
+  // every other worker->host message) so the payload goes through
+  // sanitizeMessagePayload -- a raw self.postMessage THROWS on any non-cloneable
+  // value (cycle / stray function) and the flush is silently lost, leaving the
+  // surface unpopulated (the intermittent "Failed to encode" / stall). Sanitize
+  // never throws; at worst it drops a bad field.
+  if (typeof self.emitVmMessage === "function") {
+    self.emitVmMessage(msg);
+  } else {
+    self.postMessage(msg);
+  }
+}
+
+// Sanitize a worker-side host-ref (a live JSObject whose interface methods are
+// FUNCTION-valued and thus not structured-cloneable) into a clean transferable
+// marker {__cn1HostRef, __cn1HostClass}. Mirrors what invokeJsoBridge does via
+// toHostTransferArg; without it a drawImage/pattern/attach arg crashes the
+// fire-and-forget postMessage with "function(){} could not be cloned".
+function cn1CleanRef(o) {
+  if (o == null) {
+    return o;
+  }
+  if (jvm && typeof jvm.toHostTransferArg === "function") {
+    return jvm.toHostTransferArg(o);
+  }
+  if (o.__cn1HostRef != null) {
+    return { __cn1HostRef: o.__cn1HostRef, __cn1HostClass: o.__cn1HostClass };
+  }
+  return o;
+}
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate_int_int_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate_int_int_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int"
+], function(id, w, h) {
+  cn1SurfacePost("__cn1_surface_create__", { id: id | 0, w: w | 0, h: h | 0 });
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush_int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush___int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush_int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush___int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int"
+], function(id, w, h, ops, opCount, nums, numCount, objs, objCount) {
+  const oc = opCount | 0;
+  if (oc <= 0) {
+    return null;
+  }
+  // ``objs`` carries Java Strings (colors/fonts/text) AND host-ref markers
+  // (loaded images, which stay host-side resources). Convert the strings to
+  // native JS strings; pass markers through verbatim for the host to resolve.
+  const nObj = objCount | 0;
+  const outObjs = new Array(nObj);
+  for (let i = 0; i < nObj; i++) {
+    const o = objs[i];
+    if (o && o.__class === "java_lang_String") {
+      outObjs[i] = jvm.toNativeString(o);
+    } else {
+      outObjs[i] = cn1CleanRef(o); // host image/canvas ref -> clean marker
+    }
+  }
+  // Java primitive arrays are plain JS arrays here; slice to the exact used
+  // length so the structured clone doesn't ship the growable buffer's slack.
+  const outOps = ops.slice(0, oc);
+  const outNums = nums.slice(0, numCount | 0);
+  cn1SurfacePost("__cn1_surface_flush__", {
+    id: id | 0, w: w | 0, h: h | 0,
+    ops: outOps, opCount: oc, nums: outNums, objs: outObjs
+  });
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceReadRGB_int_int_int_int_int_int_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceReadRGB___int_int_int_int_int_int_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceReadRGB_int_int_int_int_int_int_1ARRAY",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceReadRGB___int_int_int_int_int_int_1ARRAY"
+], function*(id, x, y, w, h, dest) {
+  const arr = yield jvm.invokeHostNative("__cn1_surface_read__", [{
+    id: id | 0, x: x | 0, y: y | 0, w: w | 0, h: h | 0
+  }]);
+  if (arr && dest) {
+    const n = (w | 0) * (h | 0);
+    for (let i = 0; i < n; i++) {
+      dest[i] = arr[i] | 0;
+    }
+  }
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceToDataUrl_int_java_lang_String_double_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceToDataUrl___int_java_lang_String_double_R_java_lang_String"
+], function*(id, mime, quality) {
+  const mimeStr = mime == null ? "image/png" : jvm.toNativeString(mime);
+  const q = +quality;
+  // Defensive idempotent-read retry. surface_to_dataurl is a round-trip READ:
+  // the host encodes surface `id` and posts the data URL back. The scheduler
+  // race that lost these responses (a stale wait-timeout spuriously resuming a
+  // host-call-parked thread) is fixed in parparvm_runtime.js's
+  // _processExpiredTimedWakeups, so a null is now rare; this small bounded
+  // re-issue (re-encoding the same surface is side-effect free) covers any
+  // residual transient. A genuinely missing/disposed surface falls through to
+  // null after the attempts and the Java caller encodes a placeholder.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) {
+      yield { op: "sleep", millis: Math.min(8 * attempt, 32) };
+    }
+    const url = yield jvm.invokeHostNative("__cn1_surface_to_dataurl__", [{
+      id: id | 0, mime: mimeStr, quality: q
+    }]);
+    if (url != null) {
+      return jvm.createStringLiteral(String(url));
+    }
+  }
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int"
+], function(id) {
+  cn1SurfacePost("__cn1_surface_dispose__", { id: id | 0 });
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels_int_int_1ARRAY_int_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels___int_int_1ARRAY_int_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels_int_int_1ARRAY_int_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels___int_int_1ARRAY_int_int"
+], function(id, argb, w, h) {
+  const n = (w | 0) * (h | 0);
+  cn1SurfacePost("__cn1_surface_write__", {
+    id: id | 0, w: w | 0, h: h | 0, argb: argb.slice(0, n)
+  });
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeReadImagePixels_com_codename1_html5_js_JSObject_int_int_int_int_int_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeReadImagePixels___com_codename1_html5_js_JSObject_int_int_int_int_int_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeReadImagePixels_com_codename1_html5_js_JSObject_int_int_int_int_int_1ARRAY",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeReadImagePixels___com_codename1_html5_js_JSObject_int_int_int_int_int_1ARRAY"
+], function*(image, x, y, w, h, dest) {
+  const arr = yield jvm.invokeHostNative("__cn1_image_read__", [{
+    image: cn1CleanRef(image), x: x | 0, y: y | 0, w: w | 0, h: h | 0
+  }]);
+  if (arr && dest) {
+    const n = (w | 0) * (h | 0);
+    for (let i = 0; i < n; i++) {
+      dest[i] = arr[i] | 0;
+    }
+  }
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur_int_com_codename1_html5_js_JSObject_int_int_int_float_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur___int_com_codename1_html5_js_JSObject_int_int_int_float_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur_int_com_codename1_html5_js_JSObject_int_int_int_float",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur___int_com_codename1_html5_js_JSObject_int_int_int_float"
+], function(dstId, srcImage, srcSurfaceId, w, h, radius) {
+  cn1SurfacePost("__cn1_surface_blur__", {
+    dstId: dstId | 0, srcImage: cn1CleanRef(srcImage), srcSurfaceId: srcSurfaceId | 0,
+    w: w | 0, h: h | 0, radius: +radius
+  });
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement_int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement___int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement_int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement___int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String"
+], function(id, element, cssWidth, cssHeight) {
+  cn1SurfacePost("__cn1_attach_surface_to_element__", {
+    id: id | 0, element: cn1CleanRef(element),
+    cssWidth: cssWidth == null ? null : jvm.toNativeString(cssWidth),
+    cssHeight: cssHeight == null ? null : jvm.toNativeString(cssHeight)
+  });
+  return null;
+});
+
+// Surface GC disposal: register the owning Java image in a FinalizationRegistry
+// so the host surface (its backing canvas) is released when the image is
+// collected. Mirrors the host-ref release path but targets the surface table.
+var __cn1SurfaceFinalizers = (typeof FinalizationRegistry === "function")
+  ? new FinalizationRegistry(function(surfaceId) {
+      try {
+        if (typeof self !== "undefined" && typeof self.postMessage === "function") {
+          self.postMessage({
+            type: "host-call",
+            symbol: "__cn1_surface_dispose__",
+            args: [{ id: surfaceId | 0, __cn1_no_response: true }],
+            id: 0
+          });
+        }
+      } catch (_e) {}
+    })
+  : null;
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal_java_lang_Object_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal___java_lang_Object_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal_java_lang_Object_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal___java_lang_Object_int"
+], function(owner, surfaceId) {
+  if (__cn1SurfaceFinalizers && owner && typeof owner === "object") {
+    try { __cn1SurfaceFinalizers.register(owner, surfaceId | 0); } catch (_e) {}
+  }
+  return null;
+});
+
+// createSoftWeakRef must hand back a token that does NOT keep its referent alive.
+// This used to be built on a WeakMap: a fresh {} was the key, the referent was the
+// VALUE, and the key came back to Java as the token. A WeakMap holds its keys
+// weakly and its values STRONGLY, so that is backwards -- Java parks the token in
+// EncodedImage.cache / Image.scaleCache / Border's round-rect cache, the token
+// keeps the key alive, the live key keeps the entry alive, and the entry holds the
+// referent strongly. The result had exactly the lifetime of a plain field: nothing
+// was ever reclaimable, and the two call sites that own the token map rather than
+// borrow it -- CacheMap.weakCache and com.codename1.ui.util.WeakHashMap, both plain
+// hashtables that only ever drop an entry on explicit remove/clear -- grew without
+// bound. WeakRef (ES2021) is the direct analogue of java.lang.ref.WeakReference and
+// is what belongs here: the token IS the WeakRef, and deref() is get().
+//
+// Keep these names in step with HTML5Implementation.createSoftWeakRefImpl --
+// ParparVM encodes the whole signature here, so a stale name binds nothing and the
+// (correct, but slower to notice) @JSBody twin in the Java file runs instead.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_java_lang_Object_R_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___java_lang_Object_R_com_codename1_html5_js_JSObject"
+], function(objectRef) {
+  if (typeof WeakRef !== "function") {
+    return null;
+  }
+  const referent = jvm.unwrapJsValue(objectRef);
+  // new WeakRef(x) throws TypeError for a non-object target. A VM object is
+  // always an object, but returning null rather than throwing means an
+  // unforeseen shape degrades to the Java-side strong fallback instead of
+  // taking down whatever was trying to cache.
+  if (referent == null || (typeof referent !== "object" && typeof referent !== "function")) {
+    return null;
+  }
+  return jvm.wrapJsObject(new WeakRef(referent), "com_codename1_html5_js_JSObject");
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_com_codename1_html5_js_JSObject_R_java_lang_Object",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___com_codename1_html5_js_JSObject_R_java_lang_Object"
+], function(keyRef) {
+  const token = jvm.unwrapJsValue(keyRef);
+  if (token == null || typeof token.deref !== "function") {
+    return null;
+  }
+  // deref() answers undefined once the referent has been collected; == null
+  // covers both that and an explicitly stored null.
+  const value = token.deref();
+  if (value == null) {
+    return null;
+  }
+  // A stored Java object is already a VM object: wrapping it again would hand the
+  // caller a JSObject shell around its own instance, and the cast back to the type
+  // it cached would not throw to say so. Only a genuinely foreign JS value needs a
+  // wrapper.
+  return value.__classDef ? value : jvm.wrapJsObject(value, jvm.inferJsObjectClass(value, null));
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function(name) {
+  const win = global.window || global;
+  const flags = win.cn1_debug_flags;
+  if (!flags) {
+    return 0;
+  }
+  return flags[jvm.toNativeString(name)] ? 1 : 0;
+});
+
+// A host call whose handler is absent is rejected by browser_bridge.js with
+// "Unhandled host call <symbol>" (see its dispatch fallback). browser_bridge.js
+// ships from the translator while this file ships from JavaScriptPort.jar, so a
+// page built against an older bridge can lack a handler this file already uses.
+// Detect that specific rejection so callers can degrade, without swallowing a
+// genuine failure reported BY a handler that does exist.
+function isUnhandledHostCall(err, symbol) {
+  const message = err && err.message ? String(err.message) : String(err == null ? "" : err);
+  return message.indexOf("Unhandled host call") >= 0 && message.indexOf(symbol) >= 0;
+}
+
+// The backside-hook queue (window.cn1NativeBacksideHooks, filled by
+// window.cn1RunOnMainThread in js/fontmetrics.js) lives on the MAIN thread and
+// holds main-thread closures. Draining it from the worker -- where `window` is
+// the worker global and the array does not exist -- threw
+// "Cannot read properties of undefined (reading 'length')" on every poll, so
+// route the drain to the host. A missing handler (older browser_bridge.js) is a
+// no-op rather than a hard failure: there is nothing drainable on this side
+// anyway, and the poll runs on a timer, so throwing would break it repeatedly.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_runPendingNativeBacksideHooks"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  try {
+    yield jvm.invokeHostNative("__cn1_run_backside_hooks__", []);
+  } catch (err) {
+    if (!isUnhandledHostCall(err, "__cn1_run_backside_hooks__")) {
+      throw err;
+    }
+  }
+  return null;
+});
+
+// Display.execute("javascript:...") -> HTML5Implementation.eval_(js). The
+// stock @JSBody body is a bare ``eval(js)``, which runs inside the WORKER:
+// there is no document there and ``window`` is the worker global, so any
+// script that touches the DOM (the common case -- installing a listener,
+// appending an iframe, reading document.hidden) dies with
+// "document is not defined". Route it to the main thread instead, where the
+// page's real window/document live.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_eval__java_lang_String"
+], function*(js) {
+  const src = js == null ? "" : jvm.toNativeString(js);
+  if (!src) {
+    return null;
+  }
+  if (typeof jvm.invokeHostNative !== "function") {
+    eval(src);
+    return null;
+  }
+  try {
+    yield jvm.invokeHostNative("__cn1_eval_on_main__", [{ script: src }]);
+  } catch (err) {
+    if (!isUnhandledHostCall(err, "__cn1_eval_on_main__")) {
+      // A real failure from the page-side eval. Propagate it, exactly as the
+      // in-worker eval(js) used to -- and do NOT re-run the script here, which
+      // would repeat whatever side effects it already had.
+      throw err;
+    }
+    // Older browser_bridge.js without the handler: fall back to the legacy
+    // worker-side eval. DOM-touching scripts still fail there (that is the bug
+    // this binding fixes), but everything else keeps working.
+    eval(src);
+  }
+  return null;
+});
+
+// The clipboard is unreachable from the worker (no document/execCommand, and
+// navigator.clipboard is Window-only), so route the write to the main thread
+// host bridge, which performs it within the forwarded click's user activation.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_boolean"
+], function*(text, html, rtf, markdown, asciidoc) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const value = text == null ? "" : jvm.toNativeString(text);
+  const request = { text: value };
+  if (html != null) request.html = jvm.toNativeString(html);
+  if (rtf != null) request.rtf = jvm.toNativeString(rtf);
+  if (markdown != null) request.markdown = jvm.toNativeString(markdown);
+  if (asciidoc != null) request.asciidoc = jvm.toNativeString(asciidoc);
+  const result = yield jvm.invokeHostNative("__cn1_copy_to_clipboard__", [request]);
+  return result ? 1 : 0;
+});
+
+// Image copy is likewise routed to the main thread, where navigator.clipboard +
+// ClipboardItem live. Best-effort and permission-gated. The host handler
+// (__cn1_copy_image_to_clipboard__) ships from the translator's browser_bridge.js,
+// which may lag this port.js; a missing handler rejects the call, so swallow the
+// error and report failure (copyToClipboard then falls back to the text path).
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyImageToClipboard_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyImageToClipboard___java_lang_String_R_boolean"
+], function*(dataUrl) {
+  if (typeof jvm.invokeHostNative !== "function" || dataUrl == null) {
+    return 0;
+  }
+  let result;
+  try {
+    result = yield jvm.invokeHostNative("__cn1_copy_image_to_clipboard__", [jvm.toNativeString(dataUrl)]);
+  } catch (err) {
+    return 0;
+  }
+  return result ? 1 : 0;
+});
+
+// navigator.share lives on the main-thread Window only, so the worker cannot
+// answer "is native share supported" itself -- route the check to the host.
+// (The actual share() invocations are void and self-route via the @JSBody
+// fire-and-forget host-call in HTML5Implementation.) Symbol mangling mirrors
+// the no-arg boolean isPhone_ binding above.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isNavigatorShareSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isNavigatorShareSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const result = yield jvm.invokeHostNative("__cn1_native_share_supported__", []);
+  return result ? 1 : 0;
+});
+
+// The build version lives on the host page's <html data-cn1-app-version> and is
+// unreadable from the worker. Route to the host; null falls back to AppVersion
+// in getBuildVersion(). Safe either way -- the @JSBody is document-guarded.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBuildVersion__R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBuildVersion___R_java_lang_String"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  // Preserve the original @JSBody's null-safe contract. That script returned
+  // null whenever document was unreadable (always, in the worker) and
+  // getBuildVersion() then fell back to the AppVersion property -- it never
+  // threw. This binding replaced it with a host call, but browser_bridge.js
+  // ships from the translator artifact while port.js ships fresh from source,
+  // so a host bundle predating the __cn1_build_version__ handler rejects the
+  // call with "Unhandled host call". getBuildVersion() runs during boot inside
+  // the synchronous getArrayBufferInputStream (cache-busting ?v=), so that
+  // error would propagate out and abort app init. Swallow it and fall back.
+  let value;
+  try {
+    value = yield jvm.invokeHostNative("__cn1_build_version__", []);
+  } catch (err) {
+    return null;
+  }
+  return value == null ? null : jvm.createStringLiteral(String(value));
+});
+
+// DOM-element creation for the native overlay button (fullscreen gesture) and
+// the FileChooser file inputs/buttons (photo capture) can't run in the worker
+// (no document/jQuery). Route to the host element factory; the click
+// EventListener is passed as a top-level arg so mapHostArgs materialises it into
+// a worker-callback proxy on the main thread.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_showButton__java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_showButton___java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement"
+], function*(label, l) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const text = label == null ? "" : jvm.toNativeString(label);
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "button", attrs: { "class": "btn btn-default" }, text: text, appendToBody: true }, l]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLButtonElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createFileInput__R_com_codename1_html5_js_dom_HTMLInputElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createFileInput___R_com_codename1_html5_js_dom_HTMLInputElement"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__", [{ tag: "input", attrs: { type: "file" } }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLInputElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createMultiFileInput__R_com_codename1_html5_js_dom_HTMLInputElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createMultiFileInput___R_com_codename1_html5_js_dom_HTMLInputElement"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "input", attrs: { type: "file", multiple: "" } }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLInputElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_showButton_java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_showButton___java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement"
+], function*(label, l) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const text = label == null ? "" : jvm.toNativeString(label);
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "button", attrs: { "class": "btn btn-default" }, text: text, appendToBody: true }, l]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLButtonElement");
+});
+
+// FileChooser file reading: the chosen <input>.files only exist on the MAIN
+// thread; in the worker fileEl is a host-ref proxy with no real .files. Read the
+// count + per-file bytes (base64) via the host so the worker can persist them.
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFileCount_com_codename1_html5_js_dom_HTMLInputElement_R_int",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFileCount___com_codename1_html5_js_dom_HTMLInputElement_R_int"
+], function*(el) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const ref = jvm.unwrapJsValue(el);
+  const n = yield jvm.invokeHostNative("__cn1_input_file_count__", [{ el: ref }]);
+  return n | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFile_com_codename1_html5_js_dom_HTMLInputElement_int_R_java_lang_String",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFile___com_codename1_html5_js_dom_HTMLInputElement_int_R_java_lang_String"
+], function*(el, index) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = jvm.unwrapJsValue(el);
+  const r = yield jvm.invokeHostNative("__cn1_read_input_file__", [{ el: ref, index: index | 0 }]);
+  return r == null ? null : jvm.createStringLiteral(String(r));
+});
+
+// Live camera (com.codename1.camera.Camera): getUserMedia, the <video> preview
+// and the capture <canvas> are all main-thread only -- and a MediaStream can't
+// cross the worker boundary -- so the whole media session runs on the host and
+// the worker holds only the opaque <video> host-ref (handed to PeerComponent for
+// the live preview and back to the host to grab still frames).
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_camera_supported__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraOpen_java_lang_String_boolean_R_com_codename1_html5_js_dom_HTMLVideoElement",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraOpen___java_lang_String_boolean_R_com_codename1_html5_js_dom_HTMLVideoElement"
+], function*(facing, audio) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const f = facing == null ? "environment" : jvm.toNativeString(facing);
+  const ref = yield jvm.invokeHostNative("__cn1_camera_open__", [{ facing: f, audio: !!audio }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLVideoElement");
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError__R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError___R_java_lang_String"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return jvm.createStringLiteral("");
+  }
+  const v = yield jvm.invokeHostNative("__cn1_camera_last_error__", []);
+  return jvm.createStringLiteral(v == null ? "" : String(v));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraGrab_com_codename1_html5_js_dom_HTMLVideoElement_int_int_double_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraGrab___com_codename1_html5_js_dom_HTMLVideoElement_int_int_double_R_java_lang_String"
+], function*(video, w, h, quality) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = jvm.unwrapJsValue(video);
+  const r = yield jvm.invokeHostNative("__cn1_camera_grab__", [{ video: ref, w: w | 0, h: h | 0, quality: +quality }]);
+  return r == null ? null : jvm.createStringLiteral(String(r));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraClose_com_codename1_html5_js_dom_HTMLVideoElement",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraClose___com_codename1_html5_js_dom_HTMLVideoElement"
+], function*(video) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return;
+  }
+  const ref = jvm.unwrapJsValue(video);
+  yield jvm.invokeHostNative("__cn1_camera_close__", [{ video: ref }]);
+});
+
+// HTML5VideoIO uses Window-only APIs (document, HTMLVideoElement, WebCodecs,
+// and the muxer scripts).  Translated Java runs in a Worker, so every one of
+// these operations must execute on the browser host.  Keeping the complete
+// media session on the host also means async script loads and encoder flushes
+// have a real Promise completion instead of a worker-side polling race.
+function* cn1VideoIoHost(request) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    throw new Error("VideoIO host bridge is unavailable");
+  }
+  return yield jvm.invokeHostNative("__cn1_video_io__", [request]);
+}
+
+function cn1VideoIoString(value) {
+  return value == null ? null : jvm.createStringLiteral(String(value));
+}
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1WebCodecsAvailable_R_boolean"
+], function*() {
+  return (yield* cn1VideoIoHost({ op: "webCodecsAvailable" })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioWebCodecsAvailable_R_boolean"
+], function*() {
+  return (yield* cn1VideoIoHost({ op: "audioWebCodecsAvailable" })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoEncoderSupported_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoEncoderSupported___java_lang_String_R_boolean"
+], function*(codec) {
+  return (yield* cn1VideoIoHost({
+    op: "videoEncoderSupported", codec: jvm.toNativeString(codec)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioEncoderSupported_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioEncoderSupported___java_lang_String_R_boolean"
+], function*(codec) {
+  return (yield* cn1VideoIoHost({
+    op: "audioEncoderSupported", codec: jvm.toNativeString(codec)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoOpen_java_lang_String_R_int"
+], function*(url) {
+  return (yield* cn1VideoIoHost({ op: "videoOpen", url: jvm.toNativeString(url) })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoReady_int_R_boolean"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoReady", id: id | 0 })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoWidth_int_R_int"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoWidth", id: id | 0 })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoHeight_int_R_int"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoHeight", id: id | 0 })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoDuration_int_R_int"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoDuration", id: id | 0 })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoSeek_int_int"
+], function*(id, ms) {
+  yield* cn1VideoIoHost({ op: "videoSeek", id: id | 0, ms: ms | 0 });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoSeeked_int_R_boolean"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoSeeked", id: id | 0 })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoCapture_int_int_int_R_java_lang_String"
+], function*(id, w, h) {
+  return cn1VideoIoString(yield* cn1VideoIoHost({
+    op: "videoCapture", id: id | 0, w: w | 0, h: h | 0
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoClose_int"
+], function*(id) {
+  yield* cn1VideoIoHost({ op: "videoClose", id: id | 0 });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoBlobUrl_java_lang_String_java_lang_String_R_java_lang_String"
+], function*(b64, mime) {
+  return cn1VideoIoString(yield* cn1VideoIoHost({
+    op: "videoBlobUrl", b64: jvm.toNativeString(b64), mime: jvm.toNativeString(mime)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncEnsureLibs"
+], function*() {
+  yield* cn1VideoIoHost({ op: "encEnsureLibs" });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncLibsReady_java_lang_String_R_boolean"
+], function*(container) {
+  return (yield* cn1VideoIoHost({
+    op: "encLibsReady", container: jvm.toNativeString(container)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncOpen_java_lang_String_java_lang_String_int_int_int_int_boolean_java_lang_String_int_int_int_R_int"
+], function*(container, videoCodec, w, h, fps, videoBitRate, hasAudio,
+             audioCodec, audioBitRate, sampleRate, channels) {
+  return (yield* cn1VideoIoHost({
+    op: "encOpen",
+    container: jvm.toNativeString(container),
+    videoCodec: jvm.toNativeString(videoCodec),
+    w: w | 0,
+    h: h | 0,
+    fps: fps | 0,
+    videoBitRate: videoBitRate | 0,
+    hasAudio: !!hasAudio,
+    audioCodec: audioCodec == null ? null : jvm.toNativeString(audioCodec),
+    audioBitRate: audioBitRate | 0,
+    sampleRate: sampleRate | 0,
+    channels: channels | 0
+  })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncError_int_R_java_lang_String"
+], function*(peer) {
+  return cn1VideoIoString(yield* cn1VideoIoHost({ op: "encError", peer: peer | 0 }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncFrame_int_java_lang_String_int_int_double"
+], function*(peer, b64, w, h, ptsUs) {
+  yield* cn1VideoIoHost({
+    op: "encFrame", peer: peer | 0, b64: jvm.toNativeString(b64),
+    w: w | 0, h: h | 0, ptsUs: +ptsUs
+  });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncAudio_int_java_lang_String_int_int_double"
+], function*(peer, b64, sampleRate, channels, ptsUs) {
+  yield* cn1VideoIoHost({
+    op: "encAudio", peer: peer | 0, b64: jvm.toNativeString(b64),
+    sampleRate: sampleRate | 0, channels: channels | 0, ptsUs: +ptsUs
+  });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncFlush_int"
+], function*(peer) {
+  yield* cn1VideoIoHost({ op: "encFlush", peer: peer | 0 });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncDone_int_R_boolean"
+], function*(peer) {
+  return (yield* cn1VideoIoHost({ op: "encDone", peer: peer | 0 })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncResult_int_R_java_lang_String"
+], function*(peer) {
+  return cn1VideoIoString(yield* cn1VideoIoHost({ op: "encResult", peer: peer | 0 }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncClose_int"
+], function*(peer) {
+  yield* cn1VideoIoHost({ op: "encClose", peer: peer | 0 });
+});
+
+// Fullscreen: document.fullscreen* lives on the main thread. Queries return the
+// real host state; enter/exit do the host request and then invoke the Java
+// RequestFullScreenCallback (onComplete(boolean)) back in the worker.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreenSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreenSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_fullscreen_supported__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreen__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreen___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_is_fullscreen__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestFullScreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestFullScreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_boolean"
+], function*(onComplete) {
+  const cb = jvm.unwrapJsValue(onComplete);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [0], null); }
+    return 0;
+  }
+  const ok = yield jvm.invokeHostNative("__cn1_request_fullscreen__", []);
+  if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [ok ? 1 : 0], null); }
+  return 1;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_void"
+], function*(onComplete) {
+  const cb = jvm.unwrapJsValue(onComplete);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [0], null); }
+    return null;
+  }
+  const ok = yield jvm.invokeHostNative("__cn1_exit_fullscreen__", []);
+  if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [ok ? 1 : 0], null); }
+  return null;
+});
+
+// Print: the Blob + object URL + iframe + window.print() must all run on the
+// main thread (a worker-created blob: URL is invalid in the main-thread iframe).
+// Hand the base64 document bytes to the host, then invoke the Java
+// PrintFrameCallback (onResult(boolean, String)) with the {ok, error} outcome.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData__java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData___java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData__java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData___java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void"
+], function*(b64, mimeType, callback) {
+  const cb = jvm.unwrapJsValue(callback);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) {
+      spawnVirtualCallback(cb, "cn1_s_onResult_boolean_java_lang_String",
+        [0, jvm.createStringLiteral("Printing host bridge unavailable")], null);
+    }
+    return null;
+  }
+  const data = b64 == null ? "" : jvm.toNativeString(b64);
+  const type = mimeType == null ? "application/octet-stream" : jvm.toNativeString(mimeType);
+  const res = yield jvm.invokeHostNative("__cn1_print_data__", [{ b64: data, mimeType: type }]);
+  if (cb) {
+    const ok = res && res.ok ? 1 : 0;
+    const err = (res && res.error != null) ? jvm.createStringLiteral(String(res.error)) : null;
+    // Invoke onResult on THIS green thread (which resumed on the EDT after the
+    // host call) rather than via spawnVirtualCallback: a freshly-spawned thread's
+    // callSerially never reaches the EDT queue, so the PrintResultListener would
+    // never fire.
+    const onResult = jvm.resolveVirtual(cb.__class, "cn1_s_onResult_boolean_java_lang_String");
+    yield* cn1_ivAdapt(onResult.apply(null, [cb, ok, err]));
+  }
+  return null;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function() {
+  const win = global.window || global;
+  const normalizeWheel = win.cn1NormalizeWheel;
+  let value = "wheel";
+  if (normalizeWheel && typeof normalizeWheel.getEventType === "function") {
+    try {
+      value = normalizeWheel.getEventType() || value;
+    } catch (e) {}
+  }
+  return jvm.createStringLiteral(String(value));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded___java_lang_String"
+], function(resource) {
+  const win = global.window || global;
+  const handler = win.cn1LoadedFile;
+  if (typeof handler === "function") {
+    try {
+      handler(String(jvm.toNativeString(resource)));
+    } catch (e) {}
+  }
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload__"
+], function() {
+  const win = global.window || global;
+  win.onbeforeunload = function() {
+    return "Leaving or refreshing the page may cause you to lose unsaved data.";
+  };
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler_R_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler___R_com_codename1_html5_js_JSObject"
+], function() {
+  const win = global.window || global;
+  const handler = win.onbeforeunload;
+  return handler == null ? null : jvm.wrapJsObject(handler, "com_codename1_html5_js_JSObject");
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler___com_codename1_html5_js_JSObject"
+], function(handler) {
+  const win = global.window || global;
+  win.onbeforeunload = handler == null ? null : jvm.unwrapJsValue(handler);
+  return null;
+});
+
+// Java-side finalizer hook: arm release of an image's front-end resource
+// (backing canvas / HTMLImageElement). ``owner`` is the long-lived Java image
+// (NativeImage) and ``resource`` is its host wrapper; the finalizer is keyed on
+// the OWNER, not the wrapper, because the worker re-wraps host refs on demand
+// (the JSO wrapper table is a WeakMap) -- keying on a transient wrapper would
+// release the id while the canvas/image is still in use. When the owning image
+// becomes unreachable the host drops the resource's id. Keeps the JS host a
+// dumb hard-reference table whose cleanup is driven entirely by Java GC --
+// mirroring the C/iOS backend.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource_java_lang_Object_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource___java_lang_Object_com_codename1_html5_js_JSObject"
+], function(owner, resource) {
+  if (owner != null && resource != null && jvm && typeof jvm.registerNativeResource === "function") {
+    jvm.registerNativeResource(owner, resource);
+  }
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage___java_lang_String"
+], function(msg) {
+  const win = global.window || global;
+  const value = msg == null ? "" : jvm.toNativeString(msg);
+  win.onbeforeunload = function() {
+    return value;
+  };
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload__"
+], function() {
+  const win = global.window || global;
+  win.onbeforeunload = function() {};
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter_com_codename1_teavm_io_BlobUtil_BlobToFileFunc",
+  "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter___com_codename1_teavm_io_BlobUtil_BlobToFileFunc"
+], function(_func) {
+  const win = global.window || global;
+  win.saveBlobToFile = function(_blob, _fileName, callback) {
+    if (callback && typeof callback.error === "function") {
+      callback.error("Blob-to-file conversion is not implemented in the ParparVM runtime yet.");
+    }
+  };
+  return null;
+});
+
+bindCiFallback("BlobUtil.canvasToBlobDirect", [
+  "cn1_com_codename1_teavm_io_BlobUtil_canvasToBlob_com_codename1_html5_js_dom_HTMLCanvasElement_java_lang_String_double_R_com_codename1_teavm_jso_io_Blob",
+  "cn1_com_codename1_teavm_io_BlobUtil_canvasToBlob_com_codename1_html5_js_dom_HTMLCanvasElement_java_lang_String_double_R_com_codename1_teavm_jso_io_Blob__impl"
+], function*(canvas, mimeType, quality) {
+  const nativeCanvas = jvm.unwrapJsValue(canvas) || canvas;
+  const mime = mimeType && mimeType.__class === "java_lang_String"
+    ? jvm.toNativeString(mimeType)
+    : (typeof mimeType === "string" ? mimeType : "image/png");
+  const q = typeof quality === "number" ? quality : 0.92;
+  let dataUrl = "";
+  if (nativeCanvas && nativeCanvas.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    try {
+      dataUrl = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+        receiver: nativeCanvas,
+        kind: "method",
+        member: "toDataURL",
+        args: [mime || "image/png", q]
+      }]);
+    } catch (_err) {
+      dataUrl = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+        receiver: nativeCanvas,
+        kind: "method",
+        member: "toDataURL",
+        args: ["image/png"]
+      }]);
+    }
+  } else if (!nativeCanvas || typeof nativeCanvas.toDataURL !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:blobUtilCanvasToBlob:missingCanvas=1");
+    return null;
+  } else {
+    try {
+      dataUrl = nativeCanvas.toDataURL(mime || "image/png", q);
+    } catch (_err) {
+      dataUrl = nativeCanvas.toDataURL("image/png");
+    }
+  }
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) {
+    return null;
+  }
+  const header = dataUrl.substring(0, comma);
+  const payload = dataUrl.substring(comma + 1);
+  const match = /data:([^;]+);base64/i.exec(header);
+  const contentType = match && match[1] ? match[1] : (mime || "image/png");
+  const decoded = global.atob ? global.atob(payload) : "";
+  const bytes = new global.Uint8Array(decoded.length);
+  for (let i = 0; i < decoded.length; i++) {
+    bytes[i] = decoded.charCodeAt(i) & 0xff;
+  }
+  const blob = new global.Blob([bytes], { type: contentType });
+  const wrappedBlob = jvm.wrapJsObject(blob, "com_codename1_teavm_jso_io_Blob");
+  wrappedBlob.__cn1BlobBytes = bytes;
+  return wrappedBlob;
+});
+
+bindCiFallback("BlobUtil.toUint8ArrayDirect", [
+  "cn1_com_codename1_teavm_io_BlobUtil_toUint8Array_com_codename1_teavm_jso_io_Blob_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_teavm_io_BlobUtil_toUint8Array_com_codename1_teavm_jso_io_Blob_R_com_codename1_html5_js_typedarrays_Uint8Array__impl"
+], function*(blob) {
+  if (blob && blob.__cn1BlobBytes) {
+    return jvm.wrapJsObject(new global.Uint8Array(blob.__cn1BlobBytes), "com_codename1_html5_js_typedarrays_Uint8Array");
+  }
+  const nativeBlob = jvm.unwrapJsValue(blob);
+  if (nativeBlob && nativeBlob.__cn1BlobBytes) {
+    return jvm.wrapJsObject(new global.Uint8Array(nativeBlob.__cn1BlobBytes), "com_codename1_html5_js_typedarrays_Uint8Array");
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:blobUtilToUint8Array:empty=1");
+  return jvm.wrapJsObject(new global.Uint8Array(0), "com_codename1_html5_js_typedarrays_Uint8Array");
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative___com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int"
+], function(handler) {
+  const win = global.window || global;
+  return (win.requestAnimationFrame || function(cb) { return win.setTimeout(function() { cb(Date.now()); }, 16); })(function(time) {
+    try {
+      spawnVirtualCallback(
+        handler,
+        "cn1_s_onAnimationFrame_double",
+        [+time],
+        "__cn1RafCallbackPending",
+        true
+      );
+    } catch (err) {
+      jvm.fail(err);
+    }
+  }) |0;
+});
+
+// Display.setProperty is intentionally left to the translated Java method so
+// it stays in sync with Display.getProperty (see the note next to the former
+// Display.getProperty fallback below). The real method also routes special
+// keys such as "AppArg" (deep-link dispatch) and "blockOverdraw" into the
+// implementation, which a JS-map-only override silently swallowed.
+
+// The JSAffineTransform matrix is stored as { m00, m10, m01, m11, m02, m12 }
+// — plain fields, no accessor methods. The earlier version of this fallback
+// called getScaleX()/getShearY()/etc. (mirroring the JS-side getter methods
+// that used to exist) and broke the moment that JS wrapper was simplified to
+// field-only storage. Read the six fields directly to match the Java-side
+// @JSBody scripts in JSAffineTransform.JSOFactory.
+bindCiFallback("JSAffineTransform.setTransformHostBridge", [
+  "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_setTransform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform",
+  "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_setTransform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform__impl"
+], function*(context, transform) {
+  const nativeContext = jvm.unwrapJsValue(context) || context;
+  const nativeTransform = jvm.unwrapJsValue(transform) || transform;
+  const args = [
+    nativeTransform.m00,
+    nativeTransform.m10,
+    nativeTransform.m01,
+    nativeTransform.m11,
+    nativeTransform.m02,
+    nativeTransform.m12
+  ];
+  if (nativeContext && nativeContext.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: nativeContext,
+      kind: "method",
+      member: "setTransform",
+      args
+    }]);
+    return null;
+  }
+  nativeContext.setTransform.apply(nativeContext, args);
+  return null;
+});
+
+bindCiFallback("JSAffineTransform.transformHostBridge", [
+  "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_transform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform",
+  "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_transform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform__impl"
+], function*(context, transform) {
+  const nativeContext = jvm.unwrapJsValue(context) || context;
+  const nativeTransform = jvm.unwrapJsValue(transform) || transform;
+  const args = [
+    nativeTransform.m00,
+    nativeTransform.m10,
+    nativeTransform.m01,
+    nativeTransform.m11,
+    nativeTransform.m02,
+    nativeTransform.m12
+  ];
+  if (nativeContext && nativeContext.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: nativeContext,
+      kind: "method",
+      member: "transform",
+      args
+    }]);
+    return null;
+  }
+  nativeContext.transform.apply(nativeContext, args);
+  return null;
+});
+
+// Route createCrossOriginImageElement through the main-thread image decoder
+// so the worker receives an already-decoded <img>. The stock Java flow
+// (createElement + setSrc + return) returns before the browser has actually
+// fetched/decoded the image, so NativeImage.isComplete() reports false on
+// the first paint and Border.paintBorderBackground ends up painting only
+// the first 9-patch piece whose blob happened to decode fastest. Awaiting
+// img.decode() here makes the subsequent draws have a ready pixel source.
+bindCiFallback("BrowserDomRenderingBackend.createCrossOriginImageElement", [
+  "cn1_com_codename1_impl_html5_HTML5Implementation_BrowserDomRenderingBackend_createCrossOriginImageElement_java_lang_String_R_com_codename1_html5_js_dom_HTMLImageElement"
+], function*(__cn1ThisObject, sourceUrl) {
+  const url = sourceUrl == null ? null : jvm.toNativeString(sourceUrl);
+  if (!url) {
+    return null;
+  }
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const hostImage = yield jvm.invokeHostNative("__cn1_decode_image_from_url__", [{
+    sourceUrl: url,
+    crossOrigin: "anonymous"
+  }]);
+  if (hostImage == null) {
+    return null;
+  }
+  return jvm.wrapJsObject(hostImage, "com_codename1_html5_js_dom_HTMLImageElement");
+});
+
+// Display.getProperty / Display.setProperty are deliberately NOT overridden
+// here. An earlier fallback pair kept properties in a JS-side map and
+// answered getProperty from that map alone, returning defaultValue on a
+// miss. That silently dropped the ``return impl.getProperty(key,
+// defaultValue)`` tail of the real Display.getProperty, so EVERY
+// implementation-provided key (browser.window.location.*, os.gzip,
+// browser.timezone, HTML5.platformName, ...) came back as the default.
+// Apps that resolve their API base from ``browser.window.location.origin``
+// then got "" and built relative URLs, which ConnectionRequest rejects with
+// "Only HTTP urls are supported!". The translated Display methods already
+// handle both the local-property map and the impl delegation.
+
+// Display.addEdtErrorHandler is deliberately NOT overridden here either. A
+// fallback once stored the listener in a JS-side array that nothing read, so
+// every handler a web application installed was silently dropped and the
+// default "internal application error" dialog showed instead. The translated
+// method registers the listener where Display's EDT error path reads it.
+
+bindCiFallback("Log.print", [
+  "cn1_com_codename1_io_Log_print_java_lang_String_int"
+], function*(__cn1ThisObject, message, level) {
+  // Codename One's Log levels: DEBUG=1, INFO=2, WARNING=3, ERROR=4.
+  // Any level >= 1 goes to console.error (WARNING/ERROR) or console.log
+  // (DEBUG/INFO with level >= 1 actually hits the .error branch here —
+  // mirrors the pre-existing behaviour). Level 0 is the "untagged"
+  // Log.p(String) path which Codename One calls from internals like
+  // [installNativeTheme] tracing; that chatter doesn't belong in a
+  // production browser console, so silence it unless the diagnostic
+  // toggle is on. User code that wants noisy logs can either route
+  // through Log.e() (always surfaced) or load with ?parparDiag=1.
+  //
+  // NOTE this stub SHADOWS the translated ``Log.print`` rather than
+  // falling back to it (see the ``Log.e`` note below for why
+  // ``bindCiFallback`` is not conditional), so text logged through
+  // ``Log.p`` never reaches the ``Writer`` a ``Log`` subclass returns
+  // from ``createWriter()``, and ``Log.getLog()`` stays empty on this
+  // port. That is deliberate for now: the translated method writes every
+  // line through ``Storage`` and drops the level-0 gate above. ``Log.e``
+  // is the path that has to run the real Java code (issue #5519) and it
+  // does -- ``logThrowable`` opens the writer itself.
+  const text = message == null ? "" : jvm.toNativeString(message);
+  const lv = level | 0;
+  if (lv >= 1 && global.console && typeof global.console.error === "function") {
+    global.console.error(text);
+  } else if (lv < 1 && !__cn1PortDiagEnabled()) {
+    return null;
+  } else if (global.console && typeof global.console.log === "function") {
+    global.console.log(text);
+  }
+  return null;
+});
+
+// ``Log.e(Throwable)`` deliberately has NO binding here.
+//
+// ``bindCiFallback`` reads like "use this only when the real method is
+// missing", but it is not conditional: ``bindNative`` stashes the
+// translated body in ``jvm.translatedMethods`` and then overwrites the
+// live binding, so anything bound here REPLACES the Codename One method
+// outright. A stub used to sit on ``Log.e`` and print the throwable to
+// ``console.error``. That meant ``Log.e`` never reached
+// ``Log.logThrowable``, which is the only caller of ``Log.getWriter()``
+// -> ``Log.createWriter()``. Every ``Log`` subclass that captures output
+// through its own writer therefore got a writer that was never created;
+// the app-visible symptom in issue #5519 was a ``NullPointerException``
+// raised the moment such a subclass read its (still null) writer back.
+//
+// Nothing is lost by letting the translated method run: ``logThrowable``
+// prints through ``Log.print`` (bound above) and ``Throwable
+// .printStackTrace()``, both of which reach the browser console, and
+// ``HTML5Implementation.printStackTraceToStream`` now feeds the writer
+// the same trace the console gets.
+
+bindCiFallback("NetworkManager.addErrorListener", [
+  "cn1_com_codename1_io_NetworkManager_addErrorListener_com_codename1_ui_events_ActionListener"
+], function*(__cn1ThisObject, listener) {
+  if (!__cn1ThisObject) {
+    return null;
+  }
+  const handlers = __cn1ThisObject.__cn1NetworkErrorListeners || (__cn1ThisObject.__cn1NetworkErrorListeners = []);
+  handlers.push(listener || null);
+  return null;
+});
+
+// Load a TTF into the WORKER's own FontFaceSet (self.fonts) and return a promise
+// that resolves once it is added. The worker-side OffscreenCanvas that
+// HTML5Graphics.stringWidthOffscreen() measures against has its OWN font set,
+// separate from the host's document.fonts where __cn1_load_truetype_font__
+// installs the paint font. Until a custom font (the Initializr "Inter" family,
+// "Material Icons") is in self.fonts the worker measures it against the default
+// sans-serif fallback, which is narrower -- so stringWidth under-reports, the
+// label box is sized too tight, and the host paints the real (wider) glyphs
+// clipped ("Essentials" -> "Essential"). TeaVM never hit this because it
+// measures and paints on the same main thread. The returned promise lets the
+// font loader SUSPEND the green thread until the metrics are real (see the
+// loadTrueTypeFont binding below) -- the same suspend-until-ready barrier the
+// image path uses via __cn1_decode_image_from_url__. Mirrors the host's
+// assets/<name> path resolution (browser_bridge.js __cn1_load_truetype_font__).
+function cn1WorkerFontFacePromise(fontName, rawPath, fontFormat) {
+  try {
+    if (typeof FontFace === "undefined"
+        || typeof self === "undefined"
+        || typeof self.fonts === "undefined"
+        || typeof self.fonts.add !== "function"
+        || !fontName || !rawPath) {
+      return Promise.resolve(false); // FontFaceSet unavailable: nothing to wait on
+    }
+    let url = String(rawPath);
+    if (!/^(?:data:|https?:|\/)/i.test(url)) {
+      const lastSlash = url.lastIndexOf("/");
+      if (lastSlash >= 0) {
+        url = url.substring(lastSlash + 1);
+      }
+      if (url !== "icon.png" && url.indexOf("assets/") !== 0) {
+        url = "assets/" + url;
+      }
+    }
+    // Cache the in-flight/settled load per (family,url) so repeated
+    // createTrueTypeFont calls for the same font share one fetch and the
+    // suspend on the 2nd+ call resolves immediately ("fetch it right away").
+    const cache = self.__cn1WorkerFontPromises || (self.__cn1WorkerFontPromises = {});
+    const key = fontName + "|" + url;
+    if (cache[key]) {
+      return cache[key];
+    }
+    let p;
+    try {
+      const ff = new FontFace(fontName, "url('" + url + "') format('" + (fontFormat || "truetype") + "')");
+      p = ff.load().then(function (loaded) {
+        try { self.fonts.add(loaded); } catch (e) { /* already added */ }
+        return true;
+      }, function () {
+        // 404 / decode error: resume the waiter anyway (degrade to fallback
+        // metrics) instead of parking it forever. Drop the cache entry so a
+        // later attempt can retry.
+        delete cache[key];
+        return false;
+      });
+    } catch (e) {
+      p = Promise.resolve(false);
+    }
+    cache[key] = p;
+    return p;
+  } catch (e) {
+    return Promise.resolve(false);
+  }
+}
+
+// Pre-warm the material icon font in the worker so icon-glyph widths (FontImage,
+// Toolbar/Tabs/Picker) measure against the same TTF the host @font-face
+// (index.html) paints. Kicked off at boot; no green thread to suspend here.
+cn1WorkerFontFacePromise("Material Icons", "assets/material-design-font.ttf", "truetype");
+
+// Worker-safe implementation of HTML5Implementation.loadTrueTypeFont_. SUSPENDS
+// the calling green thread until the font is cached in the worker's self.fonts,
+// so that by the time any stringWidth() runs the OffscreenCanvas can measure the
+// real font (fast synchronous fetch) instead of returning fallback metrics and
+// patching them later. This is the same suspend-until-ready model the image
+// decode barrier uses (__cn1_decode_image_from_url__): the bridge getter blocks,
+// the scheduler runs other green threads meanwhile, and we resume the instant
+// the resource is ready. Blocking here (at load) rather than inside stringWidth
+// keeps the hot layout path off the suspending/generator code path.
+//
+// The host load (document.fonts, for PAINTING) stays fire-and-forget: it is a
+// separate FontFaceSet, the host resolves 'font-family' at paint time, and the
+// old worker->host round-trip caused a 21s boot stall when the reply was lost.
+// The worker-LOCAL FontFace.load() promise we await instead cannot be "lost"
+// (no cross-thread message) and is bounded by a local fetch.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_loadTrueTypeFont__java_lang_String_java_lang_String_java_lang_String"
+], function*(fontName, fontFile, fontFormat) {
+  const toStr = function(v) {
+    if (v == null) return "";
+    return typeof v === "string" ? v : (jvm.toNativeString ? jvm.toNativeString(v) : String(v));
+  };
+  const payload = {
+    fontName: toStr(fontName),
+    fontUrl: toStr(fontFile),
+    fontFormat: toStr(fontFormat) || "truetype"
+  };
+  // Host load for PAINTING (fire-and-forget; FOUT on the host is cosmetic).
+  cn1SurfacePost("__cn1_load_truetype_font__", payload);
+  // Worker load for MEASURING: suspend until the FontFace is in self.fonts.
+  const fontReady = cn1WorkerFontFacePromise(payload.fontName, payload.fontUrl, payload.fontFormat);
+  yield { op: "await", promise: fontReady };
+  return null;
+});
+
+const nativeFontGetCssMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_NativeFont_getCSS_R_java_lang_String";
+const nativeFontCharWidthMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_NativeFont_charWidth_char_R_int";
+
+// Resolve the translated NativeFont methods lazily. bindCiFallback captures the
+// original symbol at port.js evaluation time, which runs before the translated
+// class metadata is attached to jvm.classes - so a top-level lookup returns
+// null and the fallback silently returns "16px sans-serif" for every font,
+// stripping the 'Material Icons' (or any) family from the CSS. bindNative
+// preserves the pre-override function in jvm.translatedMethods, so prefer that
+// path. Fall back to the __impl global (which is not replaced by bindNative).
+// Never read back from global[methodId] itself or jvm.classes[..].methods[id]
+// because bindCiFallback has overwritten those with this very fallback - that
+// would be an infinite recursion (was the cause of a Maximum call stack size
+// exceeded during the first attempt at lazy resolution).
+function resolveNativeFontOriginal(methodId) {
+  if (jvm.translatedMethods && typeof jvm.translatedMethods[methodId] === "function") {
+    return jvm.translatedMethods[methodId];
+  }
+  const implKey = methodId + "__impl";
+  if (typeof global[implKey] === "function" && !global[implKey].__cn1CiFallbackSymbol) {
+    return global[implKey];
+  }
+  return null;
+}
+
+bindCiFallback("NativeFont.getCSSNullSafe", [
+  nativeFontGetCssMethodId
+], function*(__cn1ThisObject) {
+  const original = resolveNativeFontOriginal(nativeFontGetCssMethodId);
+  if (typeof original !== "function") {
+    return jvm.createStringLiteral("16px sans-serif");
+  }
+  try {
+    return yield* cn1_ivAdapt(original(__cn1ThisObject));
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err || "");
+    if (message.indexOf("__classDef") >= 0) {
+      emitCiFallbackMarker("NativeFont.getCSSNullReceiver", "HIT");
+      return jvm.createStringLiteral("16px sans-serif");
+    }
+    throw err;
+  }
+});
+
+bindCiFallback("NativeFont.charWidthNullSafe", [
+  nativeFontCharWidthMethodId
+], function*(__cn1ThisObject, chr) {
+  const original = resolveNativeFontOriginal(nativeFontCharWidthMethodId);
+  if (typeof original !== "function") {
+    return 8;
+  }
+  try {
+    return yield* cn1_ivAdapt(original(__cn1ThisObject, chr));
+  } catch (err) {
+    emitCiFallbackMarker("NativeFont.charWidthDefaulted", "HIT");
+    return 8;
+  }
+});
+
+bindCiFallback("HTML5Graphics.colorWithAlphaDirect", [
+  "cn1_com_codename1_impl_html5_HTML5Graphics_colorWithAlpha_int_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Graphics_colorWithAlpha_int_R_java_lang_String__impl"
+], function*(argb) {
+  const value = argb | 0;
+  const r = (value >>> 16) & 0xff;
+  const g = (value >>> 8) & 0xff;
+  const b = value & 0xff;
+  const a = ((value >>> 24) & 0xff) / 255;
+  return jvm.createStringLiteral("rgba(" + r + "," + g + "," + b + "," + a + ")");
+});
+
+const determineFontHeightMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_determineFontHeight_java_lang_String_R_double";
+const determineFontHeightImplMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_determineFontHeight_java_lang_String_R_double__impl";
+const determineFontHeightOriginal = typeof global[determineFontHeightImplMethodId] === "function"
+  ? global[determineFontHeightImplMethodId]
+  : (typeof global[determineFontHeightMethodId] === "function" ? global[determineFontHeightMethodId] : null);
+
+bindCiFallback("HTML5Implementation.determineFontHeightCoerce", [
+  determineFontHeightImplMethodId,
+  determineFontHeightMethodId
+], function*(fontStyle) {
+  if (typeof determineFontHeightOriginal === "function") {
+    try {
+      return yield* cn1_ivAdapt(determineFontHeightOriginal(fontStyle));
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err || "");
+      if (message.indexOf("indexOf is not a function") < 0) {
+        throw err;
+      }
+    }
+  }
+  let css = "";
+  if (fontStyle && fontStyle.__class === "java_lang_String") {
+    css = jvm.toNativeString(fontStyle);
+  } else if (typeof fontStyle === "string") {
+    css = fontStyle;
+  } else if (fontStyle != null) {
+    css = String(fontStyle);
+  }
+  const match = /([0-9]+(?:\.[0-9]+)?)\s*(px|pt)/i.exec(css);
+  if (match) {
+    const value = parseFloat(match[1]);
+    if (!isNaN(value) && value > 0) {
+      return value;
+    }
+  }
+  return 16.0;
+});
+
+const hashMapComputeHashCodeImplMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int__impl";
+const hashMapComputeHashCodeMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int";
+
+bindCiFallback("HashMap.computeHashCodeNullKey", [
+  hashMapComputeHashCodeImplMethodId,
+  hashMapComputeHashCodeMethodId
+], function*(key) {
+  if (key == null) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCode:nullKey=1");
+    return 0;
+  }
+  // Resolve the translator-generated original lazily — port.js evaluates
+  // before translated_app.js, so a snapshot taken at load time would be
+  // null and force every non-null lookup down the resolveVirtual fallback.
+  // jvm.translatedMethods is populated by bindNative when registering
+  // the native overrides; checking it last preserves any port-specific
+  // override of the same method.
+  let original = null;
+  if (jvm && jvm.translatedMethods) {
+    original = jvm.translatedMethods[hashMapComputeHashCodeImplMethodId]
+      || jvm.translatedMethods[hashMapComputeHashCodeMethodId]
+      || null;
+  }
+  if (typeof original !== "function") {
+    if (typeof global[hashMapComputeHashCodeImplMethodId] === "function"
+        && !global[hashMapComputeHashCodeImplMethodId].__cn1CiFallbackSymbol) {
+      original = global[hashMapComputeHashCodeImplMethodId];
+    } else if (typeof global[hashMapComputeHashCodeMethodId] === "function"
+        && !global[hashMapComputeHashCodeMethodId].__cn1CiFallbackSymbol) {
+      original = global[hashMapComputeHashCodeMethodId];
+    }
+  }
+  if (typeof original === "function") {
+    return yield* cn1_ivAdapt(original(key));
+  }
+  // Last-ditch path when the translated original genuinely isn't
+  // available. ``computeHashCode(key)`` is just ``key.hashCode()`` —
+  // dispatch via the SHARED dispatch id (``cn1_s_hashCode_R_int``), not
+  // the legacy class-specific name. Every translated class registers its
+  // ``hashCode`` slot under the shared key after the dispatch-id
+  // refactor; resolving against ``cn1_java_lang_Object_hashCode_R_int``
+  // skips that slot and silently returns the inherited Object.hashCode
+  // (identity hash), which made every String key in CSSBorder.STYLE_MAP
+  // store under its identity hash and every subsequent ``get("solid")``
+  // miss the entry.
+  var hashCodeMethod = jvm.resolveVirtual(key.__class || "java_lang_Object",
+    "cn1_s_hashCode_R_int");
+  if (typeof hashCodeMethod === "function") {
+    return yield* cn1_ivAdapt(hashCodeMethod(key));
+  }
+  return 0;
+});
+if (typeof global[hashMapComputeHashCodeImplMethodId] === "function") {
+  const originalHashMapComputeHashCodeImpl = global[hashMapComputeHashCodeImplMethodId];
+  global[hashMapComputeHashCodeImplMethodId] = function*(key) {
+    if (key == null) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
+      return 0;
+    }
+    return yield* cn1_ivAdapt(originalHashMapComputeHashCodeImpl(key));
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeImplNullKey");
+}
+if (typeof global[hashMapComputeHashCodeMethodId] === "function") {
+  const originalHashMapComputeHashCode = global[hashMapComputeHashCodeMethodId];
+  global[hashMapComputeHashCodeMethodId] = function*(key) {
+    if (key == null) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
+      return 0;
+    }
+    return yield* cn1_ivAdapt(originalHashMapComputeHashCode(key));
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeNullKey");
+}
+const hashMapClassDef = jvm.classes && jvm.classes["java_util_HashMap"];
+if (hashMapClassDef && hashMapClassDef.methods && typeof hashMapClassDef.methods[hashMapComputeHashCodeMethodId] === "function") {
+  const originalClassHashMapComputeHashCode = hashMapClassDef.methods[hashMapComputeHashCodeMethodId];
+  hashMapClassDef.methods[hashMapComputeHashCodeMethodId] = function*(__cn1ThisObject, key) {
+    if (key == null) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeClass:nullKey=1");
+      return 0;
+    }
+    return yield* cn1_ivAdapt(originalClassHashMapComputeHashCode(__cn1ThisObject, key));
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeClassNullKey");
+}
+
+const styleSetPaddingUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setPaddingUnit_byte_1ARRAY";
+const styleSetMarginUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setMarginUnit_byte_1ARRAY";
+const styleConvertUnitMethodId = "cn1_com_codename1_ui_plaf_Style_convertUnit_byte_1ARRAY_float_int_R_int";
+// The translator-generated method functions aren't all registered yet at
+// port.js evaluation time, so capturing a snapshot here can leave these
+// originals null. When the fallback below then short-circuits to `return 0`,
+// every Style.getMarginTop()/getPaddingTop() call returns 0 — which
+// collapses every layout's margin/padding and in particular leaves the
+// Picker's InteractionDialog filling the full layered pane instead of
+// anchoring to the bottom. Resolve the original lazily at call time
+// against the jvm.translatedMethods map (populated by bindNative before it
+// replaces the global), with fallbacks so late registrations still work.
+function resolveTranslatedMethod(className, methodId) {
+  if (jvm && jvm.translatedMethods && typeof jvm.translatedMethods[methodId] === "function") {
+    return jvm.translatedMethods[methodId];
+  }
+  if (jvm && jvm.classes && jvm.classes[className] && jvm.classes[className].methods) {
+    const method = jvm.classes[className].methods[methodId];
+    if (typeof method === "function") {
+      return method;
+    }
+  }
+  if (typeof global[methodId] === "function" && !global[methodId].__cn1CiFallbackSymbol) {
+    return global[methodId];
+  }
+  return null;
+}
+
+function ensureJavaByteArray4(value) {
+  if (value && value.__array) {
+    if ((value.length | 0) >= 4) {
+      return value;
+    }
+    const outArr = jvm.newArray(4, "JAVA_BYTE", 1);
+    for (let i = 0; i < 4; i++) {
+      outArr[i] = i < value.length ? (value[i] | 0) : 0;
+    }
+    return outArr;
+  }
+  const out = jvm.newArray(4, "JAVA_BYTE", 1);
+  if (Array.isArray(value)) {
+    for (let i = 0; i < 4; i++) {
+      out[i] = i < value.length ? (value[i] | 0) : 0;
+    }
+    return out;
+  }
+  const scalar = value == null ? 0 : (value | 0);
+  for (let i = 0; i < 4; i++) {
+    out[i] = scalar;
+  }
+  return out;
+}
+
+function installGlobalArrayReturnCoerce(symbol, className, marker) {
+  const original = global[symbol];
+  if (typeof original !== "function" || original.__cn1ArrayReturnCoerceWrapped) {
+    return false;
+  }
+  const wrapped = function*() {
+    const result = yield* cn1_ivAdapt(original.apply(this, arguments));
+    const coerced = ensureJavaByteArray4(result);
+    if (result !== coerced) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":coerced=1");
+    }
+    return coerced;
+  };
+  wrapped.__cn1ArrayReturnCoerceWrapped = true;
+  global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
+  if (jvm && jvm.classes && jvm.classes[className] && jvm.classes[className].methods && typeof jvm.classes[className].methods[symbol] === "function") {
+    jvm.classes[className].methods[symbol] = wrapped;
+  }
+  emitCiFallbackMarker(marker, "ENABLED");
+  return true;
+}
+
+bindCiFallback("Style.setPaddingUnitArrayCoerce", [
+  styleSetPaddingUnitMethodId
+], function*(__cn1ThisObject, arr) {
+  const original = resolveTranslatedMethod("com_codename1_ui_plaf_Style", styleSetPaddingUnitMethodId);
+  if (typeof original !== "function") {
+    return null;
+  }
+  return yield* cn1_ivAdapt(original(__cn1ThisObject, ensureJavaByteArray4(arr)));
+});
+
+bindCiFallback("Style.setMarginUnitArrayCoerce", [
+  styleSetMarginUnitMethodId
+], function*(__cn1ThisObject, arr) {
+  const original = resolveTranslatedMethod("com_codename1_ui_plaf_Style", styleSetMarginUnitMethodId);
+  if (typeof original !== "function") {
+    return null;
+  }
+  return yield* cn1_ivAdapt(original(__cn1ThisObject, ensureJavaByteArray4(arr)));
+});
+
+bindCiFallback("Style.convertUnitArrayCoerce", [
+  styleConvertUnitMethodId
+], function*(__cn1ThisObject, arr, value, side) {
+  const original = resolveTranslatedMethod("com_codename1_ui_plaf_Style", styleConvertUnitMethodId);
+  if (typeof original !== "function") {
+    // Null unit means PIXELS in CN1; for any other byte value the translator
+    // already normalises through the original body, but if we can't find it
+    // at all, at least behave like pixels for the null-unit path instead of
+    // collapsing every margin/padding getter to zero.
+    if (arr == null || !arr.__array) {
+      return value | 0;
+    }
+    return 0;
+  }
+  return yield* cn1_ivAdapt(original(__cn1ThisObject, ensureJavaByteArray4(arr), value, side));
+});
+
+installGlobalArrayReturnCoerce(
+  "cn1_com_codename1_ui_plaf_Style_getPaddingUnit_R_byte_1ARRAY",
+  "com_codename1_ui_plaf_Style",
+  "Style.getPaddingUnitReturnCoerce"
+);
+installGlobalArrayReturnCoerce(
+  "cn1_com_codename1_ui_plaf_Style_getMarginUnit_R_byte_1ARRAY",
+  "com_codename1_ui_plaf_Style",
+  "Style.getMarginUnitReturnCoerce"
+);
+
+const formInitLafMethodId = "cn1_com_codename1_ui_Form_initLaf_com_codename1_ui_plaf_UIManager";
+const formInitFocusedMethodId = "cn1_com_codename1_ui_Form_initFocused";
+const formFlushRevalidateQueueMethodId = "cn1_com_codename1_ui_Form_flushRevalidateQueue";
+const formDeinitializeImplMethodId = "cn1_com_codename1_ui_Form_deinitializeImpl";
+// Sig-based dispatch ids — match the keys the translator uses in
+// each class's ``m:{}`` map (post-fa4247a4 INVOKEVIRTUAL /
+// INVOKEINTERFACE emission). The class-specific
+// ``cn1_<class>_<method>_<sig>`` form would have to round-trip the
+// runtime's legacy→sig conversion in resolveVirtual, but that
+// conversion only fires when the methodId still STARTS with
+// ``cn1_`` — once the mangle pass renames the literal to ``$X`` the
+// conversion silently no-ops and the dispatch misses the method
+// table key. Using the sig-based literal up front keeps port.js's
+// resolveVirtual-fed identifiers in lockstep with the m: keys both
+// before and after mangling.
+const formGetActualPaneMethodId = "cn1_s_getActualPane_R_com_codename1_ui_Container";
+const formSetFocusedMethodId = "cn1_s_setFocused_com_codename1_ui_Component";
+const formLayoutContainerMethodId = "cn1_s_layoutContainer";
+const containerFindFirstFocusableMethodId = "cn1_s_findFirstFocusable_R_com_codename1_ui_Component";
+const displayGetInstanceMethodId = "cn1_com_codename1_ui_Display_getInstance_R_com_codename1_ui_Display";
+const displayShouldRenderSelectionMethodId = "cn1_s_shouldRenderSelection_R_boolean";
+let formInitLafDiagCount = 0;
+function emitFormInitLafDiag(line) {
+  if (formInitLafDiagCount >= 80) {
+    return;
+  }
+  formInitLafDiagCount++;
+  emitDiagLine(line);
+}
+function isCiFallbackFunction(candidate, fallbackSymbol) {
+  return !!(candidate && candidate.__cn1CiFallbackSymbol === fallbackSymbol);
+}
+function resolveCurrentTranslatedMethod(methodIds, ownerClassName, fallbackSymbol) {
+  const ids = Array.isArray(methodIds) ? methodIds : [methodIds];
+  const translatedMethods = jvm && jvm.translatedMethods ? jvm.translatedMethods : null;
+  if (translatedMethods) {
+    for (let i = 0; i < ids.length; i++) {
+      const candidate = translatedMethods[ids[i]];
+      if (typeof candidate === "function" && !isCiFallbackFunction(candidate, fallbackSymbol)) {
+        return candidate;
+      }
+    }
+  }
+  const ownerClass = jvm && jvm.classes ? jvm.classes[ownerClassName] : null;
+  const methods = ownerClass && ownerClass.methods ? ownerClass.methods : null;
+  if (methods) {
+    for (let i = 0; i < ids.length; i++) {
+      const candidate = methods[ids[i]];
+      if (typeof candidate === "function" && !isCiFallbackFunction(candidate, fallbackSymbol)) {
+        return candidate;
+      }
+    }
+  }
+  for (let i = 0; i < ids.length; i++) {
+    const candidate = global[ids[i]];
+    if (typeof candidate === "function" && !isCiFallbackFunction(candidate, fallbackSymbol)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+function isLikelyFormObject(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const classId = value.__class ? String(value.__class) : "";
+  if (classId.indexOf("com_codename1_ui_Form") === 0 || classId.indexOf("com_codename1_ui_Dialog") === 0) {
+    return true;
+  }
+  const classDef = value.__classDef;
+  if (classDef && classDef.assignableTo) {
+    if (classDef.assignableTo["com_codename1_ui_Form"] || classDef.assignableTo["com_codename1_ui_Dialog"]) {
+      return true;
+    }
+  }
+  if (typeof jvm.instanceOf === "function") {
+    try {
+      return jvm.instanceOf(value, "com_codename1_ui_Form") || jvm.instanceOf(value, "com_codename1_ui_Dialog");
+    } catch (_err) {
+      return false;
+    }
+  }
+  return false;
+}
+
+function* safeInitLafPath(form, uiManager, lookAndFeel) {
+  const containerInitLaf = global.cn1_com_codename1_ui_Container_initLaf_com_codename1_ui_plaf_UIManager;
+  if (typeof containerInitLaf === "function") {
+    yield* cn1_ivAdapt(containerInitLaf(form, uiManager));
+  }
+  let effectiveLookAndFeel = lookAndFeel || null;
+  if (!effectiveLookAndFeel && uiManager && uiManager.__class) {
+    try {
+      const getLookAndFeel = jvm.resolveVirtual(
+        uiManager.__class,
+        "cn1_com_codename1_ui_plaf_UIManager_getLookAndFeel_R_com_codename1_ui_plaf_LookAndFeel"
+      );
+      effectiveLookAndFeel = yield* cn1_ivAdapt(getLookAndFeel(uiManager));
+    } catch (_err) {
+      effectiveLookAndFeel = null;
+    }
+  }
+  let menuBar = form["cn1_com_codename1_ui_Form_menuBar"] || null;
+  if (!menuBar) {
+    const menuBarCtor = global.cn1_com_codename1_ui_MenuBar___INIT____impl
+      || global.cn1_com_codename1_ui_MenuBar___INIT__;
+    if (typeof menuBarCtor === "function") {
+      menuBar = jvm.newObject("com_codename1_ui_MenuBar");
+      yield* cn1_ivAdapt(menuBarCtor(menuBar));
+      form["cn1_com_codename1_ui_Form_menuBar"] = menuBar;
+    }
+  }
+  if (menuBar && menuBar.__class) {
+    try {
+      const initMenuBar = jvm.resolveVirtual(
+        menuBar.__class,
+        "cn1_com_codename1_ui_MenuBar_initMenuBar_com_codename1_ui_Form"
+      );
+      yield* cn1_ivAdapt(initMenuBar(menuBar, form));
+    } catch (_err) {
+      // best effort
+    }
+  }
+  if (effectiveLookAndFeel && effectiveLookAndFeel.__class) {
+    try {
+      const getTint = jvm.resolveVirtual(
+        effectiveLookAndFeel.__class,
+        "cn1_com_codename1_ui_plaf_LookAndFeel_getDefaultFormTintColor_R_int"
+      );
+      form["cn1_com_codename1_ui_Form_tintColor"] = yield* cn1_ivAdapt(getTint(effectiveLookAndFeel));
+    } catch (_err) {
+      // best effort
+    }
+  }
+  return null;
+}
+
+function* recoverInitFocusedNullReceiver(form) {
+  if (!form || !form.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:formInitFocused:recoverSkipped=noForm");
+    return null;
+  }
+  yield* ensureComponentBounds(form, "formInitFocused:self");
+  yield* ensureContainerComponentsList(form, "formInitFocused:self");
+  yield* ensureContainerLayout(form, true, "formInitFocused:self");
+  yield* ensureFormRevalidateQueues(form, "formInitFocused:self");
+  yield* ensureFormAnimationManager(form, "formInitFocused:self");
+  let focusCandidate = null;
+  const formLayeredPane = form["cn1_com_codename1_ui_Form_formLayeredPane"] || null;
+  if (formLayeredPane && formLayeredPane.__class) {
+    try {
+      const findFirstFocusable = jvm.resolveVirtual(formLayeredPane.__class, containerFindFirstFocusableMethodId);
+      focusCandidate = yield* cn1_ivAdapt(findFirstFocusable(formLayeredPane));
+    } catch (_err) {
+      focusCandidate = null;
+    }
+  }
+  if (!focusCandidate) {
+    let pane = null;
+    try {
+      const getActualPane = jvm.resolveVirtual(form.__class, formGetActualPaneMethodId);
+      pane = yield* cn1_ivAdapt(getActualPane(form));
+    } catch (_err) {
+      pane = null;
+    }
+    if (!pane || !pane.__class) {
+      pane = yield* ensureFormContentPane(form, "formInitFocused");
+    }
+    if (pane && pane.__class) {
+      yield* ensureComponentBounds(pane, "formInitFocused:pane");
+      yield* ensureContainerComponentsList(pane, "formInitFocused:pane");
+      yield* ensureContainerLayout(pane, false, "formInitFocused:pane");
+      try {
+        const findFirstFocusable = jvm.resolveVirtual(pane.__class, containerFindFirstFocusableMethodId);
+        focusCandidate = yield* cn1_ivAdapt(findFirstFocusable(pane));
+      } catch (_err) {
+        focusCandidate = null;
+      }
+    }
+  }
+  try {
+    const setFocused = jvm.resolveVirtual(form.__class, formSetFocusedMethodId);
+    yield* cn1_ivAdapt(setFocused(form, focusCandidate));
+  } catch (_err) {
+    form["cn1_com_codename1_ui_Form_focused"] = focusCandidate || null;
+  }
+  let shouldRenderSelection = 0;
+  try {
+    const getDisplay = global[displayGetInstanceMethodId + "__impl"] || global[displayGetInstanceMethodId];
+    if (typeof getDisplay === "function") {
+      const display = yield* cn1_ivAdapt(getDisplay());
+      if (display && display.__class) {
+        const shouldRenderSelectionFn = jvm.resolveVirtual(display.__class, displayShouldRenderSelectionMethodId);
+        shouldRenderSelection = (yield* cn1_ivAdapt(shouldRenderSelectionFn(display))) | 0;
+      }
+    }
+  } catch (_err) {
+    shouldRenderSelection = 0;
+  }
+  if (shouldRenderSelection) {
+    try {
+      const layoutContainer = jvm.resolveVirtual(form.__class, formLayoutContainerMethodId);
+      yield* cn1_ivAdapt(layoutContainer(form));
+    } catch (_err) {
+      // Best effort.
+    }
+  }
+  emitDiagLine(
+    "PARPAR:DIAG:FALLBACK:formInitFocused:recoverApplied=1"
+    + ":focus=" + (focusCandidate && focusCandidate.__class ? focusCandidate.__class : "null")
+    + ":render=" + (shouldRenderSelection ? "1" : "0")
+  );
+  return null;
+}
+
+bindCiFallback("Form.initLafNullUiManagerBridge", [
+  formInitLafMethodId
+], function*(__cn1ThisObject, uiManager) {
+  const formInitLafOriginalMethod = resolveCurrentTranslatedMethod(
+    [formInitLafMethodId],
+    "com_codename1_ui_Form",
+    "Form.initLafNullUiManagerBridge"
+  );
+  let effectiveSelf = __cn1ThisObject;
+  let effectiveUiManager = uiManager;
+  if (!isLikelyFormObject(effectiveSelf)) {
+    let remappedField = null;
+    if (effectiveSelf && typeof effectiveSelf === "object") {
+      const keys = Object.keys(effectiveSelf);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const value = effectiveSelf[key];
+        if (isLikelyFormObject(value)) {
+          effectiveSelf = value;
+          remappedField = key;
+          break;
+        }
+      }
+    }
+    if (remappedField) {
+      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:receiverRemap=" + remappedField);
+    }
+  }
+  emitFormInitLafDiag(
+    "PARPAR:DIAG:FALLBACK:formInitLaf:enter:self="
+    + (effectiveSelf && effectiveSelf.__class ? effectiveSelf.__class : "null")
+    + ":uiManager=" + (effectiveUiManager && effectiveUiManager.__class ? effectiveUiManager.__class : "null")
+  );
+  if (!isLikelyFormObject(effectiveSelf)) {
+    emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:receiverStillNonForm=1");
+    return null;
+  }
+  if (!effectiveUiManager) {
+    emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:nullUiManager=1");
+    const getInstance = global.cn1_com_codename1_ui_plaf_UIManager_getInstance_R_com_codename1_ui_plaf_UIManager__impl
+      || global.cn1_com_codename1_ui_plaf_UIManager_getInstance_R_com_codename1_ui_plaf_UIManager;
+    if (typeof getInstance === "function") {
+      effectiveUiManager = yield* cn1_ivAdapt(getInstance());
+    }
+  }
+  if (!effectiveUiManager) {
+    emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:uiManagerStillNull=1");
+    return null;
+  }
+  let lookAndFeel = null;
+  try {
+    const getLookAndFeel = jvm.resolveVirtual(
+      effectiveUiManager.__class,
+      "cn1_com_codename1_ui_plaf_UIManager_getLookAndFeel_R_com_codename1_ui_plaf_LookAndFeel"
+    );
+    lookAndFeel = yield* cn1_ivAdapt(getLookAndFeel(effectiveUiManager));
+  } catch (_err) {
+    lookAndFeel = null;
+  }
+  emitFormInitLafDiag(
+    "PARPAR:DIAG:FALLBACK:formInitLaf:lookAndFeel="
+    + (lookAndFeel && lookAndFeel.__class ? lookAndFeel.__class : "null")
+  );
+  if (!lookAndFeel) {
+    const defaultLookAndFeelCtor = global.cn1_com_codename1_ui_plaf_DefaultLookAndFeel___INIT___com_codename1_ui_plaf_UIManager__impl
+      || global.cn1_com_codename1_ui_plaf_DefaultLookAndFeel___INIT___com_codename1_ui_plaf_UIManager;
+    if (typeof defaultLookAndFeelCtor === "function") {
+      const defaultLookAndFeel = jvm.newObject("com_codename1_ui_plaf_DefaultLookAndFeel");
+      yield* cn1_ivAdapt(defaultLookAndFeelCtor(defaultLookAndFeel, effectiveUiManager));
+      effectiveUiManager["cn1_com_codename1_ui_plaf_UIManager_current"] = defaultLookAndFeel;
+      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:defaultLookAndFeelInjected=1");
+    } else {
+      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:defaultLookAndFeelCtorMissing=1");
+    }
+  }
+  // Don't pre-inject a MenuBar here. The original Form.initLaf body
+  // creates one via ``laf.getMenuBarClass().newInstance()`` AND calls
+  // ``initMenuBar(this)`` to populate ``MenuBar.parent``. Pre-injecting
+  // a fresh MenuBar via ``jvm.newObject + __INIT__`` (no initMenuBar)
+  // and then handing off to the original would make the original's
+  // ``if (menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass()))``
+  // check fall through (menuBar non-null AND class matches) — so
+  // initMenuBar never runs and ``MenuBar.parent`` stays null. Any later
+  // ``MenuBar.setBackCommand`` (e.g. ``Dialog.show("Hello", "...", "OK", null)``
+  // → ``Form.setBackCommand`` → ``MenuBar.setBackCommand``) NPEs on
+  // ``parent.getToolbar()``. Leave the field untouched and let the
+  // original constructor pathway initialize both fields together.
+  if (typeof formInitLafOriginalMethod !== "function") {
+    emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:originalMissing=1");
+    return yield* safeInitLafPath(effectiveSelf, effectiveUiManager, lookAndFeel);
+  }
+  emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:invokeOriginal=1");
+  try {
+    return yield* cn1_ivAdapt(formInitLafOriginalMethod(effectiveSelf, effectiveUiManager));
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err || "");
+    if (message.indexOf("__classDef") >= 0) {
+      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:recoverFromNullClassDef=1");
+      return yield* safeInitLafPath(effectiveSelf, effectiveUiManager, lookAndFeel);
+    }
+    throw err;
+  }
+});
+
+bindCiFallback("Form.initFocusedNullPaneGuard", [
+  formInitFocusedMethodId
+], function*(__cn1ThisObject) {
+  const formInitFocusedOriginalMethod = resolveCurrentTranslatedMethod(
+    [formInitFocusedMethodId],
+    "com_codename1_ui_Form",
+    "Form.initFocusedNullPaneGuard"
+  );
+  if (typeof formInitFocusedOriginalMethod !== "function") {
+    return yield* recoverInitFocusedNullReceiver(__cn1ThisObject);
+  }
+  try {
+    return yield* cn1_ivAdapt(formInitFocusedOriginalMethod(__cn1ThisObject));
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err || "");
+    if (message.indexOf("__classDef") >= 0) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:formInitFocused:recoverFromNullClassDef=1");
+      return yield* recoverInitFocusedNullReceiver(__cn1ThisObject);
+    }
+    throw err;
+  }
+});
+
+bindCiFallback("Form.flushRevalidateQueueNullGuard", [
+  formFlushRevalidateQueueMethodId
+], function*(__cn1ThisObject) {
+  const formFlushRevalidateQueueOriginalMethod = resolveCurrentTranslatedMethod(
+    [formFlushRevalidateQueueMethodId],
+    "com_codename1_ui_Form",
+    "Form.flushRevalidateQueueNullGuard"
+  );
+  if (__cn1ThisObject && __cn1ThisObject.__class) {
+    yield* ensureFormRevalidateQueues(__cn1ThisObject, "formFlushRevalidateQueue");
+  }
+  if (typeof formFlushRevalidateQueueOriginalMethod === "function") {
+    try {
+      return yield* cn1_ivAdapt(formFlushRevalidateQueueOriginalMethod(__cn1ThisObject));
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err || "");
+      if (message.indexOf("__classDef") >= 0) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:formFlushRevalidateQueue:nullClassDefBypass=1");
+        return null;
+      }
+      throw err;
+    }
+  }
+  return null;
+});
+
+bindCiFallback("Form.deinitializeImplAnimManagerNullGuard", [
+  formDeinitializeImplMethodId
+], function*(__cn1ThisObject) {
+  const formDeinitializeImplOriginalMethod = resolveCurrentTranslatedMethod(
+    [formDeinitializeImplMethodId],
+    "com_codename1_ui_Form",
+    "Form.deinitializeImplAnimManagerNullGuard"
+  );
+  if (__cn1ThisObject && __cn1ThisObject.__class) {
+    yield* ensureFormAnimationManager(__cn1ThisObject, "formDeinitializeImpl");
+  }
+  if (typeof formDeinitializeImplOriginalMethod === "function") {
+    try {
+      return yield* cn1_ivAdapt(formDeinitializeImplOriginalMethod(__cn1ThisObject));
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err || "");
+      if (message.indexOf("__classDef") >= 0) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:formDeinitializeImpl:nullClassDefBypass=1");
+        return null;
+      }
+      throw err;
+    }
+  }
+  return null;
+});
+
+const formCtorLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___com_codename1_ui_layouts_Layout";
+const formCtorTitleLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___java_lang_String_com_codename1_ui_layouts_Layout";
+const formAddComponentMethodIds = [
+  "cn1_com_codename1_ui_Form_addComponent_com_codename1_ui_Component",
+  "cn1_com_codename1_ui_Form_addComponent_java_lang_Object_com_codename1_ui_Component",
+  "cn1_com_codename1_ui_Form_addComponent_int_java_lang_Object_com_codename1_ui_Component",
+  "cn1_com_codename1_ui_Form_addComponent_int_com_codename1_ui_Component"
+];
+const formDefaultCtorMethodId = "cn1_com_codename1_ui_Form___INIT__";
+// Sig-based dispatch ids (see comment above). These reach
+// jvm.resolveVirtual as the methodId argument, so they MUST match
+// the ``cn1_s_<method>_<sig>`` keys the translator emits in
+// ``m:{}`` for the receiver's class.
+const formSetTitleMethodId = "cn1_s_setTitle_java_lang_String";
+const containerSetLayoutMethodId = "cn1_s_setLayout_com_codename1_ui_layouts_Layout";
+const containerDefaultCtorMethodId = "cn1_com_codename1_ui_Container___INIT__";
+const componentDefaultCtorMethodId = "cn1_com_codename1_ui_Component___INIT__";
+const arrayListDefaultCtorMethodId = "cn1_java_util_ArrayList___INIT__";
+const hashSetDefaultCtorMethodId = "cn1_java_util_HashSet___INIT__";
+const containerComponentsFieldId = "cn1_com_codename1_ui_Container_components";
+const containerLayoutFieldId = "cn1_com_codename1_ui_Container_layout";
+const componentBoundsFieldId = "cn1_com_codename1_ui_Component_bounds";
+const formContentPaneFieldId = "cn1_com_codename1_ui_Form_contentPane";
+const formPendingRevalidateQueueFieldId = "cn1_com_codename1_ui_Form_pendingRevalidateQueue";
+const formRevalidateQueueFieldId = "cn1_com_codename1_ui_Form_revalidateQueue";
+const formAnimationManagerFieldId = "cn1_com_codename1_ui_Form_animMananger";
+const animationManagerCtorMethodId = "cn1_com_codename1_ui_AnimationManager___INIT___com_codename1_ui_Form";
+const borderLayoutCtorMethodId = "cn1_com_codename1_ui_layouts_BorderLayout___INIT__";
+const flowLayoutCtorMethodId = "cn1_com_codename1_ui_layouts_FlowLayout___INIT__";
+
+function* ensureContainerComponentsList(container, marker) {
+  if (!container || !container.__class) {
+    return null;
+  }
+  const existing = container[containerComponentsFieldId];
+  if (existing && existing.__class) {
+    return existing;
+  }
+  const arrayListCtor = global[arrayListDefaultCtorMethodId + "__impl"] || global[arrayListDefaultCtorMethodId];
+  if (typeof arrayListCtor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":componentsCtorMissing=1");
+    return null;
+  }
+  let list = null;
+  try {
+    list = jvm.newObject("java_util_ArrayList");
+    yield* cn1_ivAdapt(arrayListCtor(list));
+  } catch (err) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:" + marker + ":componentsCtorErr="
+      + String(err && err.message ? err.message : err)
+    );
+    return null;
+  }
+  container[containerComponentsFieldId] = list;
+  emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":componentsInjected=1");
+  return list;
+}
+
+function* ensureComponentBounds(component, marker) {
+  if (!component || !component.__class) {
+    return null;
+  }
+  const bounds = component[componentBoundsFieldId];
+  if (bounds && bounds.__class) {
+    return bounds;
+  }
+  const componentCtor = global[componentDefaultCtorMethodId + "__impl"] || global[componentDefaultCtorMethodId];
+  if (typeof componentCtor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":componentCtorMissing=1");
+    return null;
+  }
+  try {
+    yield* cn1_ivAdapt(componentCtor(component));
+  } catch (err) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:" + marker + ":componentCtorErr="
+      + String(err && err.message ? err.message : err)
+    );
+    return null;
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":componentInitApplied=1");
+  return component[componentBoundsFieldId] || null;
+}
+
+function* createLayoutInstance(layoutClassId, ctorMethodId, marker) {
+  const ctor = global[ctorMethodId + "__impl"] || global[ctorMethodId];
+  if (typeof ctor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":layoutCtorMissing=" + ctorMethodId);
+    return null;
+  }
+  const layout = jvm.newObject(layoutClassId);
+  try {
+    yield* cn1_ivAdapt(ctor(layout));
+  } catch (err) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:" + marker + ":layoutCtorErr="
+      + String(err && err.message ? err.message : err)
+    );
+    return null;
+  }
+  return layout;
+}
+
+function* ensureContainerLayout(container, preferBorderLayout, marker) {
+  if (!container || !container.__class) {
+    return null;
+  }
+  const existing = container[containerLayoutFieldId];
+  if (existing && existing.__class) {
+    return existing;
+  }
+  let layout = null;
+  if (preferBorderLayout) {
+    layout = yield* createLayoutInstance("com_codename1_ui_layouts_BorderLayout", borderLayoutCtorMethodId, marker + ":border");
+    if (!layout) {
+      layout = yield* createLayoutInstance("com_codename1_ui_layouts_FlowLayout", flowLayoutCtorMethodId, marker + ":flowFallback");
+    }
+  } else {
+    layout = yield* createLayoutInstance("com_codename1_ui_layouts_FlowLayout", flowLayoutCtorMethodId, marker + ":flow");
+    if (!layout) {
+      layout = yield* createLayoutInstance("com_codename1_ui_layouts_BorderLayout", borderLayoutCtorMethodId, marker + ":borderFallback");
+    }
+  }
+  if (!layout || !layout.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":layoutCreateFailed=1");
+    return null;
+  }
+  let applied = false;
+  try {
+    const setLayout = jvm.resolveVirtual(container.__class, containerSetLayoutMethodId);
+    yield* cn1_ivAdapt(setLayout(container, layout));
+    applied = true;
+  } catch (_setLayoutErr) {
+    // Fall through to direct field patch.
+  }
+  if (!applied) {
+    container[containerLayoutFieldId] = layout;
+  }
+  emitDiagLine(
+    "PARPAR:DIAG:FALLBACK:" + marker + ":layoutInjected="
+    + (layout.__class || "unknown")
+    + ":mode=" + (applied ? "setLayout" : "field")
+  );
+  return layout;
+}
+
+function* ensureFormRevalidateQueues(form, marker) {
+  if (!form || !form.__class || String(form.__class).indexOf("com_codename1_ui_Form") !== 0) {
+    return null;
+  }
+  if (!(form[formPendingRevalidateQueueFieldId] && form[formPendingRevalidateQueueFieldId].__class)) {
+    const hashSetCtor = global[hashSetDefaultCtorMethodId + "__impl"] || global[hashSetDefaultCtorMethodId];
+    if (typeof hashSetCtor === "function") {
+      try {
+        const pending = jvm.newObject("java_util_HashSet");
+        yield* cn1_ivAdapt(hashSetCtor(pending));
+        form[formPendingRevalidateQueueFieldId] = pending;
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":pendingRevalidateQueueInjected=1");
+      } catch (err) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":pendingRevalidateQueueErr=" + String(err && err.message ? err.message : err));
+      }
+    } else {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":pendingRevalidateQueueCtorMissing=1");
+    }
+  }
+  if (!(form[formRevalidateQueueFieldId] && form[formRevalidateQueueFieldId].__class)) {
+    const arrayListCtor = global[arrayListDefaultCtorMethodId + "__impl"] || global[arrayListDefaultCtorMethodId];
+    if (typeof arrayListCtor === "function") {
+      try {
+        const queue = jvm.newObject("java_util_ArrayList");
+        yield* cn1_ivAdapt(arrayListCtor(queue));
+        form[formRevalidateQueueFieldId] = queue;
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":revalidateQueueInjected=1");
+      } catch (err) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":revalidateQueueErr=" + String(err && err.message ? err.message : err));
+      }
+    } else {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":revalidateQueueCtorMissing=1");
+    }
+  }
+  return null;
+}
+
+function* ensureFormAnimationManager(form, marker) {
+  if (!form || !form.__class || String(form.__class).indexOf("com_codename1_ui_Form") !== 0) {
+    return null;
+  }
+  const existing = form[formAnimationManagerFieldId];
+  if (existing && existing.__class) {
+    return existing;
+  }
+  const ctor = global[animationManagerCtorMethodId + "__impl"] || global[animationManagerCtorMethodId];
+  if (typeof ctor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":animManagerCtorMissing=1");
+    return null;
+  }
+  try {
+    const manager = jvm.newObject("com_codename1_ui_AnimationManager");
+    yield* cn1_ivAdapt(ctor(manager, form));
+    form[formAnimationManagerFieldId] = manager;
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":animManagerInjected=1");
+    return manager;
+  } catch (err) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":animManagerErr=" + String(err && err.message ? err.message : err));
+    return null;
+  }
+}
+
+function* ensureFormContentPane(form, marker) {
+  if (!form || !form.__class) {
+    return null;
+  }
+  yield* ensureComponentBounds(form, marker + ":form");
+  yield* ensureContainerComponentsList(form, marker + ":form");
+  yield* ensureContainerLayout(form, true, marker + ":form");
+  yield* ensureFormRevalidateQueues(form, marker + ":form");
+  let contentPane = form[formContentPaneFieldId] || null;
+  if (contentPane && contentPane.__class) {
+    yield* ensureComponentBounds(contentPane, marker + ":pane");
+    yield* ensureContainerComponentsList(contentPane, marker + ":pane");
+    yield* ensureContainerLayout(contentPane, false, marker + ":pane");
+    return contentPane;
+  }
+  const containerCtor = global[containerDefaultCtorMethodId + "__impl"] || global[containerDefaultCtorMethodId];
+  if (typeof containerCtor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":contentPaneCtorMissing=1");
+    return null;
+  }
+  contentPane = jvm.newObject("com_codename1_ui_Container");
+  try {
+    yield* cn1_ivAdapt(containerCtor(contentPane));
+  } catch (err) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:" + marker + ":contentPaneCtorErr="
+      + String(err && err.message ? err.message : err)
+    );
+    return null;
+  }
+  form[formContentPaneFieldId] = contentPane;
+  yield* ensureComponentBounds(contentPane, marker + ":pane");
+  yield* ensureContainerComponentsList(contentPane, marker + ":pane");
+  yield* ensureContainerLayout(contentPane, false, marker + ":pane");
+  emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":contentPaneInjected=1");
+  return contentPane;
+}
+
+function* recoverFormCtorIllegalState(self, title, layout, marker) {
+  if (!self || !self.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":recoverSkipped=noSelf");
+    return null;
+  }
+  if (self.__cn1FormCtorRecovering) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":recoverSkipped=reentry");
+    return null;
+  }
+  self.__cn1FormCtorRecovering = true;
+  let ctorApplied = false;
+  try {
+    const defaultCtor = global[formDefaultCtorMethodId + "__impl"] || global[formDefaultCtorMethodId];
+    if (typeof defaultCtor === "function") {
+      try {
+        yield* cn1_ivAdapt(defaultCtor(self));
+        ctorApplied = true;
+      } catch (ctorErr) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":recoverCtorError=" + String(ctorErr && ctorErr.__class ? ctorErr.__class : ctorErr));
+      }
+    }
+    if (layout && layout.__class) {
+      let layoutApplied = false;
+      try {
+        const setLayout = jvm.resolveVirtual(self.__class, containerSetLayoutMethodId);
+        yield* cn1_ivAdapt(setLayout(self, layout));
+        layoutApplied = true;
+      } catch (_setLayoutErr) {
+        // Fall through to direct field patch.
+      }
+      if (!layoutApplied) {
+        self["cn1_com_codename1_ui_Container_layout"] = layout;
+      }
+    }
+    if (title && title.__class === "java_lang_String") {
+      let titleApplied = false;
+      try {
+        const setTitle = jvm.resolveVirtual(self.__class, formSetTitleMethodId);
+        yield* cn1_ivAdapt(setTitle(self, title));
+        titleApplied = true;
+      } catch (_setTitleErr) {
+        // Fall through to direct field patch.
+      }
+      if (!titleApplied) {
+        self["cn1_com_codename1_ui_Form_title"] = title;
+      }
+    }
+    yield* ensureComponentBounds(self, marker + ":self");
+    yield* ensureContainerComponentsList(self, marker + ":self");
+    yield* ensureContainerLayout(self, true, marker + ":self");
+    yield* ensureFormRevalidateQueues(self, marker + ":self");
+    yield* ensureFormAnimationManager(self, marker + ":self");
+    self.__cn1FormCtorRecovered = true;
+  } finally {
+    self.__cn1FormCtorRecovering = false;
+  }
+  emitDiagLine(
+    "PARPAR:DIAG:FALLBACK:" + marker + ":recoverApplied=1"
+    + ":ctor=" + (ctorApplied ? "1" : "0")
+    + ":layout=" + (layout && layout.__class ? "1" : "0")
+    + ":title=" + (title && title.__class === "java_lang_String" ? "1" : "0")
+  );
+  return null;
+}
+
+function installGlobalIllegalStateBypass(symbol, marker) {
+  const original = global[symbol];
+  if (typeof original !== "function" || original.__cn1IllegalStateBypassWrapped) {
+    return false;
+  }
+  const wrapped = function*() {
+    emitDisplayInitDiag("PRE_" + marker);
+    if (!checkDisplayInitState().edt) {
+      ensureDisplayEdt();
+      emitDisplayInitDiag("POST_EDT_ENSURE_" + marker);
+    }
+    try {
+      return yield* cn1_ivAdapt(original.apply(this, arguments));
+    } catch (err) {
+      const classId = String(err && err.__class ? err.__class : "");
+      if (classId === "java_lang_IllegalStateException") {
+        let detail = classId;
+        let messageOnly = "";
+        try {
+          detail = yield* stringifyThrowable(err);
+          if (err.cn1_java_lang_Throwable_detailMessage && err.cn1_java_lang_Throwable_detailMessage.__class === "java_lang_String") {
+            messageOnly = jvm.toNativeString(err.cn1_java_lang_Throwable_detailMessage);
+          } else if (err.message) {
+            messageOnly = String(err.message);
+          }
+        } catch (_diagErr) {
+          // Best effort diagnostic path only.
+        }
+        emitDisplayInitDiag("ERR_" + marker);
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":bypassIllegalState=1:detail=" + detail);
+        if (messageOnly) {
+          emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":messageOnly=" + messageOnly);
+        }
+        return null;
+      }
+      throw err;
+    }
+  };
+  wrapped.__cn1IllegalStateBypassWrapped = true;
+  global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
+  if (jvm && jvm.classes && jvm.classes["com_codename1_ui_Form"] && jvm.classes["com_codename1_ui_Form"].methods && typeof jvm.classes["com_codename1_ui_Form"].methods[symbol] === "function") {
+    jvm.classes["com_codename1_ui_Form"].methods[symbol] = wrapped;
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":installed=1");
+  return true;
+}
+
+bindCiFallback("Form.layoutCtorIllegalStateBypass", [
+  formCtorLayoutMethodId
+], function*(__cn1ThisObject, layout) {
+  const formCtorLayoutOriginal = resolveCurrentTranslatedMethod(
+    [formCtorLayoutMethodId],
+    "com_codename1_ui_Form",
+    "Form.layoutCtorIllegalStateBypass"
+  );
+  if (typeof formCtorLayoutOriginal !== "function") {
+    return null;
+  }
+  emitDisplayInitDiag("PRE_formCtorLayout");
+  if (!checkDisplayInitState().edt) {
+    ensureDisplayEdt();
+    emitDisplayInitDiag("POST_EDT_ENSURE_formCtorLayout");
+  }
+  try {
+    return yield* cn1_ivAdapt(formCtorLayoutOriginal(__cn1ThisObject, layout));
+  } catch (err) {
+    const classId = String(err && err.__class ? err.__class : "");
+    if (classId === "java_lang_IllegalStateException") {
+      let detail = classId;
+      let messageOnly = "";
+      try {
+        detail = yield* stringifyThrowable(err);
+        if (err.cn1_java_lang_Throwable_detailMessage && err.cn1_java_lang_Throwable_detailMessage.__class === "java_lang_String") {
+          messageOnly = jvm.toNativeString(err.cn1_java_lang_Throwable_detailMessage);
+        } else if (err.message) {
+          messageOnly = String(err.message);
+        }
+      } catch (_diagErr) {
+        // Diagnostic path only.
+      }
+      emitDisplayInitDiag("ERR_formCtorLayout");
+      emitDiagLine(
+        "PARPAR:DIAG:FALLBACK:formCtorLayout:bypassIllegalState=1:detail=" + detail
+        + ":self=" + (__cn1ThisObject && __cn1ThisObject.__class ? __cn1ThisObject.__class : "null")
+        + ":layout=" + (layout && layout.__class ? layout.__class : (layout == null ? "null" : typeof layout))
+      );
+      if (messageOnly) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorLayout:messageOnly=" + messageOnly);
+      }
+      return yield* recoverFormCtorIllegalState(__cn1ThisObject, null, layout, "formCtorLayout");
+    }
+    throw err;
+  }
+});
+
+bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
+  formCtorTitleLayoutMethodId
+], function*(__cn1ThisObject, title, layout) {
+  const formCtorTitleLayoutOriginal = resolveCurrentTranslatedMethod(
+    [formCtorTitleLayoutMethodId],
+    "com_codename1_ui_Form",
+    "Form.titleLayoutCtorIllegalStateBypass"
+  );
+  if (typeof formCtorTitleLayoutOriginal !== "function") {
+    return null;
+  }
+  emitDisplayInitDiag("PRE_formCtorTitleLayout");
+  if (!checkDisplayInitState().edt) {
+    ensureDisplayEdt();
+    emitDisplayInitDiag("POST_EDT_ENSURE_formCtorTitleLayout");
+  }
+  try {
+    return yield* cn1_ivAdapt(formCtorTitleLayoutOriginal(__cn1ThisObject, title, layout));
+  } catch (err) {
+    const classId = String(err && err.__class ? err.__class : "");
+    if (classId === "java_lang_IllegalStateException") {
+      let detail = classId;
+      let messageOnly = "";
+      try {
+        detail = yield* stringifyThrowable(err);
+        if (err.cn1_java_lang_Throwable_detailMessage && err.cn1_java_lang_Throwable_detailMessage.__class === "java_lang_String") {
+          messageOnly = jvm.toNativeString(err.cn1_java_lang_Throwable_detailMessage);
+        } else if (err.message) {
+          messageOnly = String(err.message);
+        }
+      } catch (_diagErr) {
+        // Diagnostic path only.
+      }
+      emitDisplayInitDiag("ERR_formCtorTitleLayout");
+      emitDiagLine(
+        "PARPAR:DIAG:FALLBACK:formCtorTitleLayout:bypassIllegalState=1:detail=" + detail
+        + ":self=" + (__cn1ThisObject && __cn1ThisObject.__class ? __cn1ThisObject.__class : "null")
+        + ":title=" + (title && title.__class ? title.__class : (title == null ? "null" : typeof title))
+        + ":layout=" + (layout && layout.__class ? layout.__class : (layout == null ? "null" : typeof layout))
+      );
+      if (messageOnly) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorTitleLayout:messageOnly=" + messageOnly);
+      }
+      return yield* recoverFormCtorIllegalState(__cn1ThisObject, title, layout, "formCtorTitleLayout");
+    }
+    throw err;
+  }
+});
+
+installGlobalIllegalStateBypass(formCtorLayoutMethodId, "formCtorLayoutGlobal");
+installGlobalIllegalStateBypass(formCtorTitleLayoutMethodId, "formCtorTitleLayoutGlobal");
+
+bindCiFallbackWithMethodId("Form.addComponentNullContentPaneGuard", formAddComponentMethodIds, function*(invokedMethodId, __cn1ThisObject) {
+  const original = resolveCurrentTranslatedMethod(
+    [invokedMethodId],
+    "com_codename1_ui_Form",
+    "Form.addComponentNullContentPaneGuard"
+  );
+  if (typeof original !== "function") {
+    return null;
+  }
+  let effectiveSelf = __cn1ThisObject;
+  let receiverRemapField = null;
+  if (!(effectiveSelf && effectiveSelf.__class && effectiveSelf.__class.indexOf("com_codename1_ui_Form") === 0) && effectiveSelf && typeof effectiveSelf === "object") {
+    const keys = Object.keys(effectiveSelf);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const value = effectiveSelf[key];
+      if (value && value.__class && value.__class.indexOf("com_codename1_ui_Form") === 0) {
+        effectiveSelf = value;
+        receiverRemapField = key;
+        break;
+      }
+    }
+  }
+  if (receiverRemapField) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:formAddComponent:receiverRemap=" + receiverRemapField);
+  }
+  if (effectiveSelf && effectiveSelf.__class && effectiveSelf.__class.indexOf("com_codename1_ui_Form") === 0) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:formAddComponent:receiver="
+      + effectiveSelf.__class
+      + ":contentPaneBefore="
+      + (effectiveSelf[formContentPaneFieldId] && effectiveSelf[formContentPaneFieldId].__class
+        ? effectiveSelf[formContentPaneFieldId].__class
+        : "null")
+    );
+    yield* ensureFormContentPane(effectiveSelf, "formAddComponent");
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:formAddComponent:contentPaneAfter="
+      + (effectiveSelf[formContentPaneFieldId] && effectiveSelf[formContentPaneFieldId].__class
+        ? effectiveSelf[formContentPaneFieldId].__class
+        : "null")
+    );
+  }
+  const args = [effectiveSelf];
+  for (let i = 2; i < arguments.length; i++) {
+    args.push(arguments[i]);
+  }
+  return yield* cn1_ivAdapt(original.apply(null, args));
+});
+
+const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
+const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String";
+const cn1ssBridgeCountsMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_jsBridgeCallCounts_R_java_lang_String";
+const baseTestCreateFormMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_createForm_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String_R_com_codename1_ui_Form";
+const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
+const baseTestFormSubclassClassId = "com_codenameone_examples_hellocodenameone_tests_BaseTest_1";
+const baseTestFormSubclassCtorMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1___INIT___com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String";
+const html5HideSplashMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_hideSplash";
+const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
+const cn1ssRunnerRunNextTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runNextTest_int";
+const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_awaitTestCompletion_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
+// Mirrors Cn1ssDeviceRunner.TEST_TIMEOUT_MS in Java (10s). Must match that constant
+// so awaitTestCompletion's deadline behaves the same way whether dispatch goes via
+// the Java runSuite path or the JS runCn1ssResolvedTest shortcut. Stuck UI tests
+// finalize at this deadline; with 48 tests and a 150s browser lifetime budget a
+// longer deadline cannot fit.
+const cn1ssTestTimeoutMs = 10000;
+// PER-TEST DISPATCH WATCHDOG deadline. A test whose runTest BLOCKS (parked on a
+// hung host round-trip) never returns, so it never reaches awaitTestCompletion
+// (whose own type-aware deadline tops out ~30s) -- there is no other timeout on
+// the blocking path, and the suite wedges. The watchdog runs as a concurrent
+// green-thread and force-advances if the suite is still on the same index after
+// this deadline. Set well ABOVE the ~30s awaitTestCompletion max so it never
+// preempts a legitimately-slow-but-completing test, and well BELOW the ~40min
+// suite-level harness timeout so it always recovers a true wedge in time.
+// Erring LONG is deliberate: a false-positive (killing a legitimately-slow test)
+// loses that test's screenshot and breaks green, whereas a long deadline only
+// slows wedge recovery (wedges are rare), so 90s = 3x the ~30s legit max.
+const cn1ssDispatchWatchdogMs = 90000;
+const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
+const cn1ssRunnerFinishSuiteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finishSuite";
+// The translator numbers lambdas in their declaration order within the class.
+// Earlier revs hardcoded `_4_` / `_3_` based on what Cn1ssDeviceRunner emitted
+// at that snapshot, but adding new methods to the runner (e.g. PR #4821, which
+// added animation-suite plumbing) shifts the indices — `awaitTestCompletion_3`
+// became `awaitTestCompletion_0`, and the lambda2RunBridge poll loop died with
+// `missingDispatch=1` after the first tick because the hardcoded ID no longer
+// existed. Build the candidate-id list from a fixed range so the lookup keeps
+// working across translator renumberings.
+function cn1ssRunnerLambdaIdsByName(methodName, paramSig) {
+  const ids = [];
+  for (let i = 0; i < 16; i++) {
+    ids.push("cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_"
+      + methodName + "_" + i + "_" + paramSig);
+  }
+  return ids;
+}
+const cn1ssRunnerFinalizeLambda4MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_finalizeTest_4_java_lang_String_int";
+const cn1ssRunnerAwaitLambda3MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_awaitTestCompletion_3_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
+const cn1ssRunnerLambda1RunMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1_run";
+const cn1ssRunnerLambda2RunMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_2_run";
+const cn1ssRunnerLambda3RunMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_3_run";
+const cn1ssLambdaRunNextTest0MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
+// Sig-based dispatch ids (see comment above) — these go to
+// jvm.resolveVirtual.
+const baseTestPrepareMethodId = "cn1_s_prepare";
+const baseTestRunTestMethodId = "cn1_s_runTest_R_boolean";
+const baseTestFailMethodId = "cn1_s_fail_java_lang_String";
+const baseTestDoneMethodId = "cn1_s_done";
+// Every selected port-status test executes normally. Failures are surfaced to
+// the harness; there is no forced-timeout or known-bad bypass list.
+
+if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
+  const stringMethods = jvm.classes["java_lang_String"].methods || {};
+  // Cover whichever index the current bundle uses for the finalizeTest lambda
+  // (see cn1ssRunnerLambdaIdsByName for why the index drifts).
+  const finalizeLambdaIds = cn1ssRunnerLambdaIdsByName("finalizeTest", "java_lang_String_int");
+  for (let i = 0; i < finalizeLambdaIds.length; i++) {
+    const finalizeLambdaId = finalizeLambdaIds[i];
+    if (typeof stringMethods[finalizeLambdaId] !== "function") {
+      jvm.addVirtualMethod("java_lang_String", finalizeLambdaId, function*() {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssFinalizeLambda:stringReceiverBypass=1");
+        return null;
+      });
+    }
+  }
+}
+
+// The translated body of ``HTML5Implementation.hideSplash`` is a
+// one-line ``jQuery("div#cn1-splash").fadeOut(...)``, which only
+// works when it runs on the main thread (where the DOM and jQuery
+// live). In the new ParparVM JS port, runtime code runs in a Worker
+// — the ``jQuery`` global isn't visible from there, so calling the
+// translated body inline throws ``ReferenceError: jQuery is not
+// defined`` and the splash stays on screen forever (covering the
+// app UI).
+//
+// The bytecode emits the call as ``yield* $ajc()`` (a direct
+// global-function reference, NOT a virtual dispatch), so a
+// ``bindCiFallback`` on the dispatch id doesn't intercept it. Replace
+// the global function directly: the worker-side override yields a
+// host-bridge call to the matching ``__cn1_hide_splash__`` handler in
+// browser_bridge.js, which does the actual splash removal on the main
+// thread.
+const html5HideSplashWorkerSymbol = "cn1_com_codename1_impl_html5_HTML5Implementation_hideSplash";
+(function installHideSplashWorkerOverride() {
+  const replacement = function*() {
+    // The jQuery branch is for the rare scenario where this override
+    // somehow runs in a context that has real DOM access (real browser
+    // tab, jsdom, etc.). In the WORKER -- which is where this override
+    // is installed by definition (port.js loads under importScripts) --
+    // ``globalThis.jQuery`` IS defined, but only because the
+    // worker-side jQuery stub installed earlier in this same port.js
+    // satisfies translated_app.js's runtime reflection probes. That
+    // stub's ``fadeOut(ms, cb)`` calls ``cb`` and returns the stub --
+    // it does NOT actually hide the splash DOM (the DOM doesn't even
+    // exist in the worker). The whole point of this override is to
+    // route around exactly that case, so we gate the jQuery branch on
+    // ``typeof document !== "undefined"`` (workers don't have
+    // ``document``) before trusting jQuery to do anything DOM-level.
+    if (typeof document !== "undefined"
+            && typeof globalThis !== "undefined" && typeof globalThis.jQuery === "function") {
+      try {
+        globalThis.jQuery("div#cn1-splash").fadeOut(100, function() {
+          globalThis.jQuery(this).remove();
+        });
+        return null;
+      } catch (_e) { /* fall through to host bridge */ }
+    }
+    if (typeof jvm !== "undefined" && typeof jvm.invokeHostNative === "function") {
+      yield jvm.invokeHostNative("__cn1_hide_splash__", []);
+    }
+    return null;
+  };
+  global[html5HideSplashWorkerSymbol] = replacement;
+  cn1RefreshAlias(html5HideSplashWorkerSymbol, replacement);
+  if (jvm && jvm.nativeMethods) {
+    jvm.nativeMethods["cn1_s_hideSplash"] = replacement;
+    jvm.nativeMethods[html5HideSplashWorkerSymbol] = replacement;
+  }
+})();
+
+
+bindCiFallback("BaseTest.createFormNullGuard", [
+  baseTestCreateFormMethodId,
+  baseTestCreateFormMethodId + "__impl"
+], function*(__cn1ThisObject, title, layout, imageName) {
+  const baseTestCreateFormOriginal = resolveCurrentTranslatedMethod(
+    [baseTestCreateFormMethodId, baseTestCreateFormMethodId + "__impl"],
+    "com_codenameone_examples_hellocodenameone_tests_BaseTest",
+    "BaseTest.createFormNullGuard"
+  );
+  let form = null;
+  if (typeof baseTestCreateFormOriginal === "function") {
+    try {
+      form = yield* cn1_ivAdapt(baseTestCreateFormOriginal(__cn1ThisObject, title, layout, imageName));
+      if (form && form.__class) {
+        return form;
+      }
+      emitDiagLine(
+        "PARPAR:DIAG:FALLBACK:baseTestCreateForm:originalReturnedNull=1:title="
+        + (title && title.__class ? title.__class : (title == null ? "null" : typeof title))
+      );
+    } catch (err) {
+      const detail = yield* stringifyThrowable(err);
+      emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestCreateForm:originalError=" + detail);
+    }
+  }
+  try {
+    form = jvm.newObject(baseTestFormSubclassClassId);
+    const ctor = global[baseTestFormSubclassCtorMethodId];
+    if (form && typeof ctor === "function") {
+      yield* cn1_ivAdapt(ctor(form, __cn1ThisObject, title, layout, imageName));
+      if (form && form.__class) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestCreateForm:recoveredSubclassCtor=1");
+        return form;
+      }
+    }
+  } catch (err) {
+    const detail = yield* stringifyThrowable(err);
+    emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestCreateForm:recoverSubclassError=" + detail);
+  }
+  try {
+    form = jvm.newObject("com_codename1_ui_Form");
+    const fallbackCtor = typeof global[formCtorTitleLayoutMethodId] === "function"
+      ? global[formCtorTitleLayoutMethodId]
+      : global[formCtorTitleLayoutMethodId + "__impl"];
+    if (form && typeof fallbackCtor === "function") {
+      yield* cn1_ivAdapt(fallbackCtor(form, title, layout));
+      emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestCreateForm:degradedPlainForm=1");
+      return form;
+    }
+  } catch (err) {
+    const detail = yield* stringifyThrowable(err);
+    emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestCreateForm:degradedPlainFormError=" + detail);
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestCreateForm:returningNull=1");
+  return null;
+});
+function collectCn1ssRunnerLambdaMethodIds() {
+  const idSet = Object.create(null);
+  if (!jvm || !jvm.classes) {
+    return [];
+  }
+  const prefix = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_";
+  const suffixes = [
+    "_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
+    "_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest"
+  ];
+  for (const classId in jvm.classes) {
+    const classDef = jvm.classes[classId];
+    if (!classDef || !classDef.methods) {
+      continue;
+    }
+    const methods = classDef.methods;
+    for (const methodId in methods) {
+      if (methodId.indexOf(prefix) === 0) {
+        for (let s = 0; s < suffixes.length; s++) {
+          if (methodId.endsWith(suffixes[s])) {
+            idSet[methodId] = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+  const ids = Object.keys(idSet);
+  ids.sort();
+  return ids;
+}
+const cn1ssLambdaBridgeMethodIds = (function() {
+  const collected = collectCn1ssRunnerLambdaMethodIds();
+  if (collected.length > 0) {
+    return collected;
+  }
+  return [
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_1_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_1_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest"
+  ];
+})();
+function getCn1ssLambdaCaptureValue(lambdaObject, ordinal) {
+  if (!lambdaObject || typeof lambdaObject !== "object") {
+    return null;
+  }
+  const suffix = "_arg_" + String(ordinal);
+  const keys = Object.keys(lambdaObject);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (key.indexOf("Cn1ssDeviceRunner_lambda_") >= 0 && key.endsWith(suffix)) {
+      return lambdaObject[key];
+    }
+  }
+  return null;
+}
+
+function getCn1ssLambdaCaptureValues(lambdaObject) {
+  if (!lambdaObject || typeof lambdaObject !== "object") {
+    return [];
+  }
+  const captures = [];
+  const keys = Object.keys(lambdaObject);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (key.indexOf("Cn1ssDeviceRunner_lambda_") >= 0 && /_arg_\d+$/.test(key)) {
+      captures.push(lambdaObject[key]);
+    }
+  }
+  return captures;
+}
+
+function resolveCn1ssRunnerTranslatedMethod(methodIds, fallbackSymbol) {
+  return resolveCurrentTranslatedMethod(methodIds, cn1ssRunnerClassId, fallbackSymbol);
+}
+
+function resolveCn1ssRunNextLambdaMethod(fallbackSymbol) {
+  const preferred = [];
+  for (let i = 0; i < cn1ssLambdaBridgeMethodIds.length; i++) {
+    const methodId = cn1ssLambdaBridgeMethodIds[i];
+    if (String(methodId).indexOf("_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest") >= 0) {
+      preferred.push(methodId);
+    }
+  }
+  for (let i = 0; i < cn1ssLambdaBridgeMethodIds.length; i++) {
+    const methodId = cn1ssLambdaBridgeMethodIds[i];
+    if (preferred.indexOf(methodId) < 0) {
+      preferred.push(methodId);
+    }
+  }
+  return resolveCn1ssRunnerTranslatedMethod(preferred, fallbackSymbol);
+}
+
+function resolveCn1ssLambdaBridgeOriginalRunnerMethod(invokedMethodId) {
+  const methodIds = [];
+  if (invokedMethodId) {
+    methodIds.push(invokedMethodId);
+  }
+  for (let i = 0; i < cn1ssLambdaBridgeMethodIds.length; i++) {
+    const methodId = cn1ssLambdaBridgeMethodIds[i];
+    if (methodIds.indexOf(methodId) < 0) {
+      methodIds.push(methodId);
+    }
+  }
+  return resolveCn1ssRunnerTranslatedMethod(methodIds, "Cn1ssDeviceRunner.lambdaRunNextTestBridge");
+}
+
+function cn1ssToSimpleClassName(classId) {
+  const raw = String(classId || "");
+  const pos = raw.lastIndexOf("_");
+  return pos >= 0 ? raw.substring(pos + 1) : raw;
+}
+
+function cn1ssToJavaString(value) {
+  if (value && value.__class === "java_lang_String") {
+    return value;
+  }
+  return jvm.createStringLiteral(String(value == null ? "" : value));
+}
+
+function resolveCn1ssTestNameObject(testObject, preferredName) {
+  if (preferredName && preferredName.__class === "java_lang_String") {
+    return preferredName;
+  }
+  if (testObject && testObject.__class) {
+    return cn1ssToJavaString(cn1ssToSimpleClassName(testObject.__class));
+  }
+  return cn1ssToJavaString("unknown");
+}
+
+function getCn1ssRunnerTestTotal() {
+  const runnerClass = jvm && jvm.classes ? jvm.classes[cn1ssRunnerClassId] : null;
+  if (!runnerClass || !runnerClass.staticFields) {
+    return 0;
+  }
+  const defaults = runnerClass.staticFields["DEFAULT_TEST_CLASSES"];
+  const prepended = runnerClass.staticFields["prependedTest"];
+  const base = (defaults && typeof defaults.length === "number") ? (defaults.length | 0) : 0;
+  return base + (prepended != null ? 1 : 0);
+}
+
+function resolveCn1ssIndexedTestObject(index) {
+  const runnerClass = jvm && jvm.classes ? jvm.classes[cn1ssRunnerClassId] : null;
+  if (!runnerClass || !runnerClass.staticFields) {
+    return null;
+  }
+  const prepended = runnerClass.staticFields["prependedTest"];
+  const hasOffset = prepended != null;
+  if (hasOffset && index === 0) {
+    return prepended;
+  }
+  const tests = runnerClass.staticFields["DEFAULT_TEST_CLASSES"];
+  if (!tests || !tests.__array) {
+    return null;
+  }
+  const arrIndex = index - (hasOffset ? 1 : 0);
+  if (arrIndex < 0 || arrIndex >= tests.length) {
+    return null;
+  }
+  return tests[arrIndex];
+}
+
+function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestName, effectiveIndex) {
+  if (!callTarget || callTarget.__class !== cn1ssRunnerClassId) {
+    return null;
+  }
+  if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+    return null;
+  }
+  // IDEMPOTENCY GUARD for the per-test dispatch watchdog (below): each test
+  // index runs at most once. If the watchdog force-advanced past a wedged test,
+  // the original (blocked) dispatch will eventually unblock and try to advance
+  // to the same nextIndex -- this makes that a silent no-op so the suite never
+  // double-runs or skips a test. Cooperative scheduling makes this check-and-set
+  // atomic until the first yield, so the watchdog thread and a recovered
+  // original thread can never both pass it. Monotonic in normal flow (index is
+  // always exactly lastStarted+1), so passing runs are completely unaffected.
+  const __cn1LastStarted = (callTarget.__cn1LastStartedIndex == null) ? -1 : (callTarget.__cn1LastStartedIndex | 0);
+  if ((effectiveIndex | 0) <= __cn1LastStarted) {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchSuperseded:index=" + String(effectiveIndex)
+      + ":lastStarted=" + __cn1LastStarted
+    );
+    return null;
+  }
+  callTarget.__cn1LastStartedIndex = (effectiveIndex | 0);
+  const normalizedTestName = resolveCn1ssTestNameObject(effectiveTestObject, effectiveTestName);
+  const nativeTestName = toCn1StringValue(normalizedTestName);
+  cn1ssActiveTestName = nativeTestName || "default";
+  cn1ssActiveTestObject = effectiveTestObject || null;
+  if (!shouldRunCn1ssTest(nativeTestName, effectiveTestObject)) {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:skipFiltered:index=" + String(effectiveIndex)
+      + ":name=" + nativeTestName
+    );
+    return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "filterSkip");
+  }
+  if (cn1ssSelectedTests) {
+    cn1ssSelectedTestMatched = true;
+  }
+  const effectiveTestClassId = effectiveTestObject && effectiveTestObject.__class
+    ? String(effectiveTestObject.__class)
+    : "";
+  emitLambdaBridgeDiag(
+    "PARPAR:DIAG:FALLBACK:lambdaBridge:effectiveClass=" + (effectiveTestClassId || "null")
+    + ":name=" + nativeTestName
+    + ":index=" + String(effectiveIndex)
+  );
+  if (global.console && typeof global.console.log === "function") {
+    global.console.log("CN1SS:INFO:suite starting test=" + nativeTestName);
+  }
+  // Eagerly open the screenshot WebSocket at the first test start so the
+  // transport is established long before any emit. The lazy connect (on first
+  // emitCn1ssChunks) otherwise races a mid-suite wedge: the socket is left in
+  // "connecting" with the PNG queued, and onopen's flush never runs -> 0
+  // delivered even though capture succeeded.
+  cn1ssWsConnect();
+  // PER-TEST DISPATCH WATCHDOG: a test whose prepare()/runTest() BLOCKS (parked
+  // on a hung host round-trip -- LocalForage.getItem, getContext, etc.) never
+  // returns, so it never reaches the catch (only synchronous THROWS do -- those
+  // are handled by the runErrored guard below) nor awaitTestCompletion, and the
+  // whole suite wedges with no SUITE:FINISHED (observed: FileSystemStorage at
+  // index 121, SwitchTheme-class hangs). The blocked runTest is a SUSPENDED
+  // generator, so the cooperative scheduler is free to run this concurrent
+  // watchdog green-thread. After a deadline well above the ~30s awaitTestCompletion
+  // max, if the suite is STILL on this index (LastStartedIndex unchanged), force
+  // -advance so the suite always reaches comparison. The idempotency guard at the
+  // top makes the original's eventual unblock a no-op. A test that completes
+  // normally advances long before the deadline, so this is a SILENT no-op on
+  // green runs -- it only ever fires on a genuine wedge, converting a whole-suite
+  // hang into at-worst one test's missing screenshot (same tradeoff as the
+  // synchronous-throw wedge-guard). This is the general safety net that removes
+  // the need to park each individual flaky-blocking test.
+  const __cn1WdIndex = (effectiveIndex | 0);
+  const __cn1WdRunner = callTarget;
+  const __cn1WdName = nativeTestName;
+  try {
+    var __cn1SelfHealOff = (typeof self.getParameterByName === "function"
+      && self.getParameterByName("cn1DisableSelfHeal") === "1");
+    jvm.spawn(null, (function*() {
+      // With self-heal OFF, dump + hang FAST (deterministic) instead of masking
+      // the wedge with a 90s force-advance.
+      yield { op: "sleep", millis: __cn1SelfHealOff ? 20000 : cn1ssDispatchWatchdogMs };
+      if ((__cn1WdRunner.__cn1LastStartedIndex | 0) === __cn1WdIndex) {
+        emitLambdaBridgeDiag(
+          "PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdog:stall:index=" + __cn1WdIndex
+          + ":name=" + __cn1WdName
+        );
+        // TRACK: snapshot what EVERY green thread is blocked on at the stall, so
+        // the wedge (EDT parked on a monitor/capture-gate, a lost host read, a
+        // stalled sleep) is isolated without attaching a JS debugger to the
+        // worker.
+        try {
+          if (typeof jvm.dumpThreadStates === "function") {
+            emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdog:" + jvm.dumpThreadStates());
+          }
+        } catch (__cn1DumpErr) { void __cn1DumpErr; }
+        if (__cn1SelfHealOff) {
+          // Deterministic mode: do NOT force-advance. Leave the wedge so it is
+          // reproducible; the suite-level timeout ends the run.
+          emitLambdaBridgeDiag(
+            "PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdog:NOFORCEADVANCE(selfHealDisabled):index=" + __cn1WdIndex);
+          return;
+        }
+        if (global.console && typeof global.console.log === "function") {
+          global.console.log("CN1SS:ERR:suite test=" + __cn1WdName
+            + " force-advanced by dispatch watchdog (runTest blocked > "
+            + cn1ssDispatchWatchdogMs + "ms)");
+        }
+        yield* forceAdvanceCn1ssRunner(__cn1WdRunner, __cn1WdIndex, "dispatchWatchdogStall");
+      }
+    })());
+  } catch (__cn1WdErr) {
+    // Best effort: if spawn is unavailable the suite falls back to the prior
+    // behavior (a blocking test can still wedge); never let arming the watchdog
+    // break dispatch.
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdogArmError=1:index=" + __cn1WdIndex);
+  }
+  let runErrored = false;
+  let runPhase = "prepare";
+  try {
+    // CHA-classified-sync overrides (e.g. AbstractTest.prepare's empty
+    // body) translate to plain functions that return ``undefined``.
+    // ``yield* undefined`` throws ``TypeError: ... is not iterable``,
+    // so route the dispatch result through ``cn1_ivAdapt``: forwards
+    // iterator results via yield*, returns sync results unchanged.
+    const prepareMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestPrepareMethodId);
+    if (typeof prepareMethod === "function") {
+      yield* cn1_ivAdapt(prepareMethod(effectiveTestObject));
+    }
+    runPhase = "runTest";
+    const runTestMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestRunTestMethodId);
+    if (typeof runTestMethod === "function") {
+      yield* cn1_ivAdapt(runTestMethod(effectiveTestObject));
+    }
+  } catch (err) {
+    runErrored = true;
+    let errText = null;
+    try {
+      errText = yield* stringifyThrowable(err);
+    } catch (_stringifyErr) {
+      errText = String(err && err.message ? err.message : err);
+    }
+    if ((!errText || errText === "[object Object]") && err && typeof err === "object") {
+      try {
+        const errKeys = Object.keys(err);
+        if (errKeys.length > 0) {
+          errText = (errText || "[object Object]") + " keys=" + errKeys.slice(0, 8).join(",");
+        }
+      } catch (_keyErr) {
+        // Best effort only.
+      }
+      if (err && err.__class) {
+        errText = (errText || "[object Object]") + " class=" + String(err.__class);
+      }
+    }
+    const errStack = err && err.stack ? String(err.stack) : "";
+    if (global.console && typeof global.console.log === "function") {
+      global.console.log("CN1SS:ERR:suite test=" + nativeTestName + " failed=" + errText + " phase=" + runPhase);
+    }
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:runError:phase=" + runPhase + ":error=" + errText);
+    if (errStack) {
+      emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:runErrorStack=" + errStack.substring(0, 320));
+      if (cn1ssLambdaRunErrorStackCount < 6 && global.console && typeof global.console.log === "function") {
+        cn1ssLambdaRunErrorStackCount++;
+        global.console.log("PARPAR:RUN_ERROR_STACK:test=" + nativeTestName + ":phase=" + runPhase + ":" + errStack);
+      }
+    }
+    try {
+      const failMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestFailMethodId);
+      if (typeof failMethod === "function") {
+        yield* cn1_ivAdapt(failMethod(effectiveTestObject, cn1ssToJavaString(errText)));
+      }
+    } catch (_failErr) {
+      // Best effort only.
+    }
+  }
+  // SUITE-WEDGE GUARD: if prepare()/runTest() threw synchronously, the form
+  // never finished showing, so onShowCompleted→UITimer→emitCurrentFormScreenshot
+  // →done() will NEVER run and isDone() stays false forever. awaitTestCompletion
+  // would then poll until its (type-aware, up to ~30s) deadline -- and when that
+  // deadline mechanism is itself starved (heavy long-overhead runs, no armed
+  // phase timer because the form never showed), the poll hangs indefinitely and
+  // wedges the WHOLE suite. Observed: SwitchThemeScreenshotTest throwing
+  // "Missing JS member getContext for host receiver" during form.show() stalled
+  // the suite at index 88 with no advance. A test that already errored has
+  // nothing to wait for: finalize + advance immediately so one test's throw can
+  // never wedge the suite. The host-ref getContext flake itself is the separate,
+  // deeper issue; this guarantees forward progress regardless of it.
+  if (runErrored) {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:runErroredSkipAwait=1:phase=" + runPhase
+      + ":test=" + nativeTestName);
+    try {
+      const finalizeAfterErr = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
+      if (typeof finalizeAfterErr === "function") {
+        return yield* cn1_ivAdapt(finalizeAfterErr(
+          callTarget,
+          effectiveIndex,
+          effectiveTestObject,
+          normalizedTestName,
+          0
+        ));
+      }
+    } catch (_finalizeErroredErr) {
+      const finalizeErroredDetail = yield* stringifyThrowable(_finalizeErroredErr);
+      emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:finalizeAfterRunErrorFailed=" + finalizeErroredDetail);
+    }
+    return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "runErroredAdvance");
+  }
+  // Mirror Java's runNextTest lambda: after prepare()+runTest() (or catch),
+  // delegate to awaitTestCompletion which polls isDone() and handles the
+  // finalize+timeout logic. Skipping this step finalizes the test before
+  // onShowCompleted→UITimer→emitCurrentFormScreenshot→done() can run, so no
+  // screenshot is ever emitted for tests routed through this helper.
+  try {
+    const awaitMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerAwaitTestCompletionMethodId);
+    if (typeof awaitMethod === "function") {
+      // Pass 0 (sentinel) so awaitTestCompletion computes the TYPE-AWARE deadline
+      // itself via testTimeoutMs(testClass): DualAppearanceBaseTest tests need
+      // ~30s on HTML5 (light + dark phases each pay registerReadyCallback's
+      // 1500ms + settle + capture). Hard-coding the flat 10s cn1ssTestTimeoutMs
+      // here used to guillotine them mid-dark-phase, so the pending dark emit
+      // captured the NEXT test's form (e.g. ChatInput_dark -> ImageViewer).
+      return yield* cn1_ivAdapt(awaitMethod(
+        callTarget,
+        effectiveIndex,
+        effectiveTestObject,
+        normalizedTestName,
+        0
+      ));
+    }
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:awaitTestCompletionMissing=1");
+  } catch (_awaitErr) {
+    const awaitErrDetail = yield* stringifyThrowable(_awaitErr);
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:awaitTestCompletionError=" + awaitErrDetail);
+  }
+  // Fallback to direct finalize if awaitTestCompletion isn't available.
+  try {
+    const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
+    if (typeof finalizeMethod === "function") {
+      return yield* cn1_ivAdapt(finalizeMethod(
+        callTarget,
+        effectiveIndex,
+        effectiveTestObject,
+        normalizedTestName,
+        0
+      ));
+    }
+    return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "directFinalizeMissing");
+  } catch (_finalizeAfterRunErr) {
+    const finalizeErrDetail = yield* stringifyThrowable(_finalizeAfterRunErr);
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:directFinalizeError=" + finalizeErrDetail);
+    return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "directFinalizeFailed");
+  }
+}
+
+bindCiFallback("Cn1ssDeviceRunner.lambda1RunBridge", [
+  cn1ssRunnerLambda1RunMethodId
+], function*(__cn1ThisObject) {
+  const captures = getCn1ssLambdaCaptureValues(__cn1ThisObject);
+  let runner = null;
+  let testName = null;
+  let index = null;
+  let testObject = null;
+  for (let i = 0; i < captures.length; i++) {
+    const value = captures[i];
+    if (value && value.__class === cn1ssRunnerClassId) {
+      runner = value;
+    } else if (jvm.instanceOf(value, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+      testObject = value;
+    } else if (value && value.__class === "java_lang_String") {
+      testName = value;
+    } else if (typeof value === "number" || typeof value === "bigint") {
+      index = Number(value);
+    }
+  }
+  if (!runner || runner.__class !== cn1ssRunnerClassId) {
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambda1RunBridge:missingDispatch=1");
+    return null;
+  }
+  emitLambdaBridgeDiag(
+    "PARPAR:DIAG:FALLBACK:lambda1RunBridge:dispatch:index=" + String(index == null ? "null" : (index | 0))
+    + ":test=" + (testObject && testObject.__class ? testObject.__class : "null")
+  );
+  if (!testObject && index != null) {
+    testObject = resolveCn1ssIndexedTestObject(index | 0);
+  }
+  return yield* runCn1ssResolvedTest(runner, testObject, testName, index | 0);
+});
+
+bindCiFallback("Cn1ssDeviceRunner.lambda2RunBridge", [
+  cn1ssRunnerLambda2RunMethodId
+], function*(__cn1ThisObject) {
+  const runner = getCn1ssLambdaCaptureValue(__cn1ThisObject, 1);
+  const index = getCn1ssLambdaCaptureValue(__cn1ThisObject, 2);
+  const testObject = getCn1ssLambdaCaptureValue(__cn1ThisObject, 3);
+  const testName = getCn1ssLambdaCaptureValue(__cn1ThisObject, 4);
+  const deadline = getCn1ssLambdaCaptureValue(__cn1ThisObject, 5);
+  const awaitLambdaMethod = resolveCn1ssRunnerTranslatedMethod(
+    cn1ssRunnerLambdaIdsByName(
+      "awaitTestCompletion",
+      "int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long"
+    ),
+    "Cn1ssDeviceRunner.lambda2RunBridge"
+  );
+  if (!runner || runner.__class !== cn1ssRunnerClassId || typeof awaitLambdaMethod !== "function") {
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambda2RunBridge:missingDispatch=1");
+    return null;
+  }
+  emitLambdaBridgeDiag(
+    "PARPAR:DIAG:FALLBACK:lambda2RunBridge:dispatch:index=" + String(index == null ? "null" : (index | 0))
+    + ":test=" + (testObject && testObject.__class ? testObject.__class : "null")
+  );
+  return yield* cn1_ivAdapt(awaitLambdaMethod(runner, index | 0, testObject, testName, deadline));
+});
+
+function emitGuaranteedConsole(line) {
+  if (global.console && typeof global.console.log === "function") {
+    global.console.log(line);
+  }
+}
+
+function* invokeCn1ssFinishSuite(runner, reason) {
+  let finishErr = null;
+  try {
+    const finishSuiteMethod = jvm.resolveVirtual(runner.__class, cn1ssRunnerFinishSuiteMethodId);
+    if (typeof finishSuiteMethod === "function") {
+      emitGuaranteedConsole("CN1SS:INFO:lambda3RunBridge:finishSuiteInvoked reason=" + String(reason || "unknown"));
+      return yield* cn1_ivAdapt(finishSuiteMethod(runner));
+    }
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:finishSuiteMissing reason=" + String(reason || "unknown"));
+  } catch (err) {
+    finishErr = err;
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:finishSuiteError reason=" + String(reason || "unknown")
+      + " error=" + String(err && err.message ? err.message : err));
+  }
+  // Guaranteed terminator — even if finishSuite threw, ensure the harness can observe completion.
+  emitGuaranteedConsole("CN1SS:INFO:swift_diag_status=unknown");
+  emitGuaranteedConsole("CN1SS:SUITE:FINISHED");
+  if (finishErr) {
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:finishSuiteStack="
+      + String(finishErr && finishErr.stack ? finishErr.stack : "none").substring(0, 512));
+  }
+  return null;
+}
+
+bindCiFallback("Cn1ssDeviceRunner.lambda3RunBridge", [
+  cn1ssRunnerLambda3RunMethodId
+], function*(__cn1ThisObject) {
+  const runner = getCn1ssLambdaCaptureValue(__cn1ThisObject, 1);
+  const testName = getCn1ssLambdaCaptureValue(__cn1ThisObject, 2);
+  const index = getCn1ssLambdaCaptureValue(__cn1ThisObject, 3);
+  if (!runner || runner.__class !== cn1ssRunnerClassId) {
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambda3RunBridge:missingRunner=1");
+    return null;
+  }
+  const nextIndex = ((index | 0) + 1) | 0;
+  const nativeTestName = toCn1StringValue(testName);
+  emitGuaranteedConsole("CN1SS:INFO:suite finished test=" + nativeTestName);
+  emitLambdaBridgeDiag(
+    "PARPAR:DIAG:FALLBACK:lambda3RunBridge:dispatch:index=" + String(index == null ? "null" : (index | 0))
+    + ":nextIndex=" + String(nextIndex)
+  );
+  const totalTests = getCn1ssRunnerTestTotal();
+  if (cn1ssSelectedTests && cn1ssSelectedTestMatched) {
+    return yield* invokeCn1ssFinishSuite(runner, "filteredSuite");
+  }
+  if (totalTests > 0 && nextIndex >= totalTests) {
+    return yield* invokeCn1ssFinishSuite(runner, "endOfSuite:nextIndex=" + nextIndex + ":total=" + totalTests);
+  }
+  try {
+    const nextTestObject = resolveCn1ssIndexedTestObject(nextIndex);
+    if (jvm.instanceOf(nextTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+      return yield* runCn1ssResolvedTest(
+        runner,
+        nextTestObject,
+        resolveCn1ssTestNameObject(nextTestObject, null),
+        nextIndex
+      );
+    }
+    const runNextTestMethod = jvm.resolveVirtual(runner.__class, cn1ssRunnerRunNextTestMethodId);
+    if (typeof runNextTestMethod === "function") {
+      return yield* cn1_ivAdapt(runNextTestMethod(runner, nextIndex));
+    }
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:runNextTestMissing nextIndex=" + nextIndex);
+  } catch (err) {
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:runNextError nextIndex=" + nextIndex
+      + " error=" + String(err && err.message ? err.message : err));
+    if (err && err.stack) {
+      emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:runNextStack=" + String(err.stack).substring(0, 512));
+    }
+  }
+  // If we got here, advancement failed — fall back to finishing the suite so the harness doesn't hang.
+  return yield* invokeCn1ssFinishSuite(runner, "runNextFailed:nextIndex=" + nextIndex);
+});
+
+let cn1ssLambdaRunErrorStackCount = 0;
+function emitLambdaBridgeDiag(line) {
+  emitDiagLine(line);
+}
+function* forceAdvanceCn1ssRunner(callTarget, currentIndex, reason) {
+  if (!callTarget || callTarget.__class !== cn1ssRunnerClassId) {
+    return null;
+  }
+  const nextIndex = ((currentIndex | 0) + 1) | 0;
+  callTarget.__cn1ForcedNextIndex = nextIndex;
+  emitLambdaBridgeDiag(
+    "PARPAR:DIAG:FALLBACK:lambdaBridge:forceAdvance:reason=" + String(reason || "unknown")
+    + ":nextIndex=" + String(nextIndex)
+  );
+  const totalTests = getCn1ssRunnerTestTotal();
+  if (totalTests > 0 && nextIndex >= totalTests) {
+    return yield* invokeCn1ssFinishSuite(callTarget, "forceAdvance:endOfSuite:" + String(reason || "unknown"));
+  }
+  try {
+    const runNextTestMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerRunNextTestMethodId);
+    if (typeof runNextTestMethod === "function") {
+      return yield* cn1_ivAdapt(runNextTestMethod(callTarget, nextIndex));
+    }
+  } catch (advanceErr) {
+    emitGuaranteedConsole(
+      "CN1SS:ERR:lambdaBridge:forceAdvanceError reason=" + String(reason || "unknown")
+      + " error=" + String(advanceErr && advanceErr.message ? advanceErr.message : advanceErr)
+    );
+  }
+  return yield* invokeCn1ssFinishSuite(callTarget, "forceAdvance:runNextFailed:" + String(reason || "unknown"));
+}
+
+bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMethodIds, function*(invokedMethodId, __cn1ThisObject, arg1, arg2, arg3) {
+  const signatureStringIntBaseTest = invokedMethodId
+    && String(invokedMethodId).indexOf("_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest") >= 0;
+  const testName = arg1;
+  const index = signatureStringIntBaseTest ? arg2 : arg3;
+  const testObject = signatureStringIntBaseTest ? arg3 : arg2;
+  const toSimpleClassName = function(classId) {
+    const raw = String(classId || "");
+    const pos = raw.lastIndexOf("_");
+    return pos >= 0 ? raw.substring(pos + 1) : raw;
+  };
+  const toJavaString = function(value) {
+    if (value && value.__class === "java_lang_String") {
+      return value;
+    }
+    return jvm.createStringLiteral(String(value == null ? "" : value));
+  };
+  emitLambdaBridgeDiag(
+    "PARPAR:DIAG:FALLBACK:lambdaBridge:receiver=" + (__cn1ThisObject && __cn1ThisObject.__class ? __cn1ThisObject.__class : "null")
+    + ":arg1=" + (testName && testName.__class ? testName.__class : typeof testName)
+    + ":arg2=" + (testObject && testObject.__class ? testObject.__class : typeof testObject)
+    + ":arg3=" + (index == null ? "null" : String(index))
+  );
+  if (!__cn1ThisObject) {
+    return null;
+  }
+  let extractedRunner = null;
+  let capturedTestName = null;
+  let capturedTestObject = null;
+  let capturedIndex = null;
+  const fieldKeys = __cn1ThisObject && typeof __cn1ThisObject === "object" ? Object.keys(__cn1ThisObject) : [];
+  for (let i = 0; i < fieldKeys.length; i++) {
+    const key = fieldKeys[i];
+    const match = key.match(/Cn1ssDeviceRunner_lambda_\d+_arg_(\d+)$/);
+    if (!match) {
+      continue;
+    }
+    const ordinal = match[1];
+    const value = __cn1ThisObject[key];
+    if (ordinal === "1") {
+      extractedRunner = value;
+    } else if (ordinal === "2") {
+      capturedTestName = value;
+    } else if (ordinal === "3") {
+      capturedTestObject = value;
+    } else if (ordinal === "4") {
+      capturedIndex = value;
+    }
+  }
+  const runner = extractedRunner || (__cn1ThisObject.__class === cn1ssRunnerClassId ? __cn1ThisObject : null);
+  let effectiveTestObject = testObject;
+  if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+    if (jvm.instanceOf(capturedTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+      effectiveTestObject = capturedTestObject;
+    } else if (jvm.instanceOf(testName, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+      effectiveTestObject = testName;
+    }
+  }
+  if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+    const rawArgs = [arg1, arg2, arg3];
+    for (let i = 0; i < rawArgs.length; i++) {
+      if (jvm.instanceOf(rawArgs[i], "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+        effectiveTestObject = rawArgs[i];
+        break;
+      }
+    }
+  }
+  let effectiveTestName = testName;
+  if ((!effectiveTestName || effectiveTestName.__class !== "java_lang_String")) {
+    if (capturedTestName && capturedTestName.__class === "java_lang_String") {
+      effectiveTestName = capturedTestName;
+    } else {
+      const rawArgs = [arg1, arg2, arg3];
+      for (let i = 0; i < rawArgs.length; i++) {
+        const raw = rawArgs[i];
+        if (raw && raw.__class === "java_lang_String") {
+          effectiveTestName = raw;
+          break;
+        }
+      }
+    }
+  }
+  if (!effectiveTestName || effectiveTestName.__class !== "java_lang_String") {
+    if (effectiveTestObject && effectiveTestObject.__class) {
+      effectiveTestName = toJavaString(toSimpleClassName(effectiveTestObject.__class));
+    } else {
+      effectiveTestName = toJavaString("unknown");
+    }
+  }
+  let effectiveIndex = index | 0;
+  if (typeof index !== "number") {
+    const rawArgs = [arg1, arg2, arg3];
+    for (let i = 0; i < rawArgs.length; i++) {
+      const raw = rawArgs[i];
+      if (typeof raw === "number") {
+        effectiveIndex = raw | 0;
+        break;
+      }
+    }
+    if (capturedIndex != null) {
+      effectiveIndex = capturedIndex | 0;
+    }
+  } else if (capturedIndex != null && (capturedIndex | 0) !== effectiveIndex) {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:indexFromArgsOverride:capture="
+      + String(capturedIndex | 0) + ":effective=" + String(effectiveIndex)
+    );
+  }
+  if (runner && typeof runner.__cn1ForcedNextIndex === "number" && (runner.__cn1ForcedNextIndex | 0) > effectiveIndex) {
+    effectiveIndex = runner.__cn1ForcedNextIndex | 0;
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:indexForcedOverride="
+      + String(effectiveIndex)
+    );
+  }
+  const indexedTestObject = resolveCn1ssIndexedTestObject(effectiveIndex);
+  if (jvm.instanceOf(indexedTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+    if (!effectiveTestObject || !effectiveTestObject.__class || effectiveTestObject.__class !== indexedTestObject.__class) {
+      emitLambdaBridgeDiag(
+        "PARPAR:DIAG:FALLBACK:lambdaBridge:indexedOverride:index=" + String(effectiveIndex)
+        + ":from=" + (effectiveTestObject && effectiveTestObject.__class ? effectiveTestObject.__class : "null")
+        + ":to=" + indexedTestObject.__class
+      );
+    }
+    effectiveTestObject = indexedTestObject;
+  }
+  emitLambdaBridgeDiag(
+    "PARPAR:DIAG:FALLBACK:lambdaBridge:capturedRunner="
+    + (runner && runner.__class ? runner.__class : "null")
+    + ":capturedName=" + (effectiveTestName && effectiveTestName.__class ? effectiveTestName.__class : typeof effectiveTestName)
+    + ":capturedTest=" + (effectiveTestObject && effectiveTestObject.__class ? effectiveTestObject.__class : typeof effectiveTestObject)
+    + ":capturedIndex=" + String(effectiveIndex)
+  );
+  if (!runner || !runner.__class) {
+    return null;
+  }
+  if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+    return null;
+  }
+  const isRunnerLambda = __cn1ThisObject && __cn1ThisObject.__class
+    && String(__cn1ThisObject.__class).indexOf("com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_") === 0;
+  const callTarget = isRunnerLambda ? runner : __cn1ThisObject;
+  if (!callTarget || callTarget.__class !== cn1ssRunnerClassId) {
+    return null;
+  }
+  if (callTarget.__cn1LambdaBridgeDispatching) {
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:reentry-guard=hit:method=" + String(invokedMethodId || "unknown"));
+    return null;
+  }
+  if (!invokedMethodId || cn1ssLambdaBridgeMethodIds.indexOf(invokedMethodId) >= 0) {
+    return yield* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestName, effectiveIndex);
+  }
+  const cn1ssLambdaBridgeOriginalRunnerMethod = resolveCn1ssLambdaBridgeOriginalRunnerMethod(invokedMethodId);
+  if (typeof cn1ssLambdaBridgeOriginalRunnerMethod !== "function") {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:originalRunnerMethod=missing:method="
+      + String(invokedMethodId || "unknown")
+    );
+    return null;
+  }
+  callTarget.__cn1LambdaBridgeDispatching = true;
+  try {
+    return yield* cn1_ivAdapt(cn1ssLambdaBridgeOriginalRunnerMethod(callTarget, effectiveTestName, effectiveTestObject, effectiveIndex));
+  } finally {
+    callTarget.__cn1LambdaBridgeDispatching = false;
+  }
+});
+
+function toCn1StringValue(value) {
+  if (value && value.__class === "java_lang_String") {
+    try {
+      return jvm.toNativeString(value);
+    } catch (_err) {
+      return "";
+    }
+  }
+  if (value == null) {
+    return "";
+  }
+  return String(value);
+}
+
+function byteArrayToBase64(value) {
+  if (!value || typeof value.length !== "number") {
+    return "";
+  }
+  const len = value.length | 0;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    let b = value[i] | 0;
+    if (b < 0) {
+      b += 256;
+    }
+    bytes[i] = b & 0xff;
+  }
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const sub = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, sub);
+  }
+  if (typeof global.btoa === "function") {
+    return global.btoa(binary);
+  }
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64");
+  }
+  return "";
+}
+
+function normalizeCn1ssTestName(raw) {
+  const value = raw && raw.length > 0 ? raw : "default";
+  const normalized = String(value).replace(/[^A-Za-z0-9_.-]/g, "_");
+  return normalized.length > 0 ? normalized : "default";
+}
+
+function readCiQueryParam(name) {
+  const loc = global.location || (global.window && global.window.location) || null;
+  const rawSearch = (loc && loc.search) ? String(loc.search) : String(global.__cn1LocationSearch || "");
+  if (!rawSearch) {
+    return "";
+  }
+  const search = rawSearch.charAt(0) === "?" ? rawSearch.substring(1) : rawSearch;
+  if (!search) {
+    return "";
+  }
+  const pairs = search.split("&");
+  for (let i = 0; i < pairs.length; i++) {
+    const entry = pairs[i];
+    if (!entry) {
+      continue;
+    }
+    const eq = entry.indexOf("=");
+    const key = decodeURIComponent((eq >= 0 ? entry.substring(0, eq) : entry).replace(/\+/g, " "));
+    if (key !== name) {
+      continue;
+    }
+    return decodeURIComponent((eq >= 0 ? entry.substring(eq + 1) : "").replace(/\+/g, " "));
+  }
+  return "";
+}
+
+function toCn1ssFilterKey(raw) {
+  return normalizeCn1ssTestName(raw).toLowerCase();
+}
+
+const cn1ssSelectedTests = (function() {
+  const raw = readCiQueryParam("cn1ssTest");
+  if (!raw) {
+    return null;
+  }
+  const out = Object.create(null);
+  const parts = String(raw).split(",");
+  for (let i = 0; i < parts.length; i++) {
+    const key = toCn1ssFilterKey(parts[i]);
+    if (key && key !== "default") {
+      out[key] = true;
+    }
+  }
+  return Object.keys(out).length ? out : null;
+})();
+
+const cn1ssChunkIndexByStream = Object.create(null);
+const cn1ssScreenshotEmitted = Object.create(null);
+let cn1ssActiveTestName = "default";
+let cn1ssActiveTestObject = null;
+let cn1ssSelectedTestMatched = false;
+
+function simpleCn1ssClassName(classId) {
+  const raw = String(classId || "");
+  const pos = raw.lastIndexOf("_");
+  return pos >= 0 ? raw.substring(pos + 1) : raw;
+}
+
+function shouldRunCn1ssTest(nativeTestName, testObject) {
+  if (!cn1ssSelectedTests) {
+    return true;
+  }
+  const candidates = Object.create(null);
+  candidates[toCn1ssFilterKey(nativeTestName)] = true;
+  if (testObject && testObject.__class) {
+    candidates[toCn1ssFilterKey(simpleCn1ssClassName(testObject.__class))] = true;
+  }
+  const keys = Object.keys(candidates);
+  for (let i = 0; i < keys.length; i++) {
+    if (cn1ssSelectedTests[keys[i]]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function resolveCn1ssTestName(raw) {
+  const normalized = normalizeCn1ssTestName(raw);
+  if (normalized !== "default") {
+    return normalized;
+  }
+  const active = normalizeCn1ssTestName(cn1ssActiveTestName || "");
+  return active !== "default" ? active : normalized;
+}
+
+function resolveBaseTestFromRunnable(runnable) {
+  if (!runnable || typeof runnable !== "object") {
+    return null;
+  }
+  if (typeof jvm.instanceOf === "function") {
+    try {
+      if (jvm.instanceOf(runnable, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+        return runnable;
+      }
+    } catch (_err) {
+      // Continue scanning captured fields.
+    }
+  }
+  const keys = Object.keys(runnable);
+  for (let i = 0; i < keys.length; i++) {
+    const value = runnable[keys[i]];
+    if (!value || typeof value !== "object") {
+      continue;
+    }
+    if (typeof jvm.instanceOf === "function") {
+      try {
+        if (jvm.instanceOf(value, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+          return value;
+        }
+      } catch (_err) {
+        // Continue scanning.
+      }
+    }
+  }
+  return null;
+}
+
+// --- cn1ss WebSocket transport -------------------------------------------
+// The JS port runs in a Web Worker, which has no DOM but does have WebSocket.
+// Every screenshot funnels through emitCn1ssChunks(); rather than chunk the
+// PNG as base64 over the console (rate-limited, log-scraped on the host), we
+// ship it straight to the cn1ss test server over a browser WebSocket -- the
+// same single pipeline the native ports use via the core WebSocket. The
+// browser handles RFC6455 framing, so we just send a META text frame followed
+// by the binary PNG, matching what the server parses. The server replies with
+// an ACK text frame; we track it only for an optional drain. The hash is
+// omitted from META (the server still computes it for dedup); only png_bytes
+// is advertised so a truncated transfer is caught as length_mismatch.
+const cn1ssWs = {
+  socket: null,
+  status: "idle", // idle | connecting | open | failed
+  queue: [],      // {test, bytes} buffered while the socket is still connecting
+  pending: 0      // sent-but-unacked frames, for an optional flush at suite end
+};
+cn1RefreshAlias(hashMapComputeHashCodeMethodId, global[hashMapComputeHashCodeMethodId]);
+cn1RefreshAlias(hashMapComputeHashCodeImplMethodId, global[hashMapComputeHashCodeImplMethodId]);
+
+function cn1ssWsHost() {
+  try {
+    if (global.location && global.location.hostname) {
+      return global.location.hostname;
+    }
+  } catch (e) { /* worker without location */ }
+  return "127.0.0.1";
+}
+
+function cn1ssWsConnect() {
+  if (cn1ssWs.status === "open" || cn1ssWs.status === "connecting") {
+    return;
+  }
+  if (typeof global.WebSocket === "undefined") {
+    cn1ssWs.status = "failed";
+    return;
+  }
+  cn1ssWs.status = "connecting";
+  const url = "ws://" + cn1ssWsHost() + ":8765";
+  let sock;
+  try {
+    sock = new global.WebSocket(url);
+  } catch (e) {
+    cn1ssWs.status = "failed";
+    emitDiagLine("CN1SS:WSJS:connectError=" + String(e && e.message ? e.message : e));
+    return;
+  }
+  emitDiagLine("CN1SS:WSJS:connecting url=" + url);
+  sock.binaryType = "arraybuffer";
+  cn1ssWs.socket = sock;
+  sock.onopen = function () {
+    cn1ssWs.status = "open";
+    const q = cn1ssWs.queue;
+    cn1ssWs.queue = [];
+    emitDiagLine("CN1SS:WSJS:open flushQueued=" + q.length);
+    for (let i = 0; i < q.length; i++) {
+      cn1ssWsSendNow(q[i].test, q[i].bytes);
+    }
+  };
+  sock.onmessage = function (ev) {
+    const d = (ev && typeof ev.data === "string") ? ev.data : "";
+    if (d.indexOf("ACK ") === 0 && cn1ssWs.pending > 0) {
+      cn1ssWs.pending--;
+    }
+  };
+  sock.onerror = function () { /* failures surface via onclose -> status=failed */ };
+  sock.onclose = function () {
+    emitDiagLine("CN1SS:WSJS:close priorStatus=" + cn1ssWs.status + " queued=" + cn1ssWs.queue.length);
+    if (cn1ssWs.socket !== sock) {
+      return;
+    }
+    cn1ssWs.socket = null;
+    if (cn1ssWs.status === "open") {
+      // A socket that was up and dropped is reconnected by the next send. Left
+      // "open", every later screenshot went to a closed socket, which drops a
+      // send without throwing, and the rest of the run produced none.
+      cn1ssWs.status = "idle";
+      cn1ssWs.pending = 0;
+    } else {
+      cn1ssWs.status = "failed";
+    }
+  };
+}
+
+function cn1ssBase64ToBytes(base64) {
+  const bin = global.atob ? global.atob(base64) : "";
+  const len = bin.length;
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    out[i] = bin.charCodeAt(i) & 0xff;
+  }
+  return out;
+}
+
+function cn1ssWsSendNow(test, bytes) {
+  const sock = cn1ssWs.socket;
+  if (!sock || cn1ssWs.status !== "open" || sock.readyState !== 1) {
+    return false;
+  }
+  try {
+    // META is a JSON object (the server's Cn1ssEndpoint parses it as JSON,
+    // matching the native ports' Cn1ssWebSocketSink). The hash is omitted --
+    // the server computes its own for dedup and only flags a mismatch when an
+    // expected hash is supplied; png_bytes lets it catch a truncated transfer.
+    const metaStr = 'META {"test":"' + test + '","png_bytes":' + bytes.length + '}';
+    sock.send(metaStr);
+    sock.send(bytes.buffer);
+    cn1ssWs.pending++;
+    return true;
+  } catch (e) {
+    emitDiagLine("CN1SS:WSJS:sendError=" + String(e && e.message ? e.message : e));
+    return false;
+  }
+}
+
+// Hands a primary-channel screenshot to the WebSocket transport. Returns true
+// when the bytes were sent or buffered for send; false when WS is unavailable
+// (caller then relies on the transitional base64 fallback).
+function cn1ssWsSend(base64, test) {
+  if (cn1ssWs.status === "failed") {
+    return false;
+  }
+  if (cn1ssWs.status === "idle") {
+    cn1ssWsConnect();
+  }
+  if (cn1ssWs.status === "failed") {
+    return false;
+  }
+  let bytes;
+  try {
+    bytes = cn1ssBase64ToBytes(base64);
+  } catch (e) {
+    emitDiagLine("CN1SS:WSJS:decodeError=" + String(e && e.message ? e.message : e));
+    return false;
+  }
+  if (cn1ssWs.status === "open") {
+    return cn1ssWsSendNow(test, bytes);
+  }
+  cn1ssWs.queue.push({ test: test, bytes: bytes });
+  return true;
+}
+
+// Single screenshot transport for the JS port: ship the captured PNG to the
+// host-side cn1ss test server over the worker WebSocket. The function is
+// still named emitCn1ssChunks (and still takes a base64 PNG) because the DOM /
+// host-canvas capture paths -- emitCurrentFormScreenshotDom, emitChannelFastJs
+// -- feed it a base64 data-URL payload; we decode and send it as one binary
+// frame rather than chunking it over the console. Only the primary channel is
+// shipped; the PREVIEW channel (host-side PR-comment thumbnails) is no longer
+// produced on-device. There is no base64-over-console fallback any more.
+function emitCn1ssChunks(base64, testName, channelName) {
+  const channel = channelName ? String(channelName).toUpperCase() : "";
+  if (channel) {
+    return;
+  }
+  cn1ssWsSend(base64, normalizeCn1ssTestName(testName));
+}
+
+const cn1ssEmitCurrentFormScreenshotMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable";
+const cn1ssHelperClassName = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper";
+let cn1ssEmitCurrentFormScreenshotInvokeDepth = 0;
+
+function isFallbackFunctionForSymbol(fn, symbol) {
+  return !!(fn && fn.__cn1CiFallbackSymbol === symbol);
+}
+
+function resolveTranslatedMethodCandidate(methodIds, ownerClassName, fallbackSymbol) {
+  const translatedMethods = jvm && jvm.translatedMethods ? jvm.translatedMethods : null;
+  if (translatedMethods) {
+    for (let i = 0; i < methodIds.length; i++) {
+      const methodId = methodIds[i];
+      const candidate = translatedMethods[methodId];
+      if (typeof candidate === "function" && !isFallbackFunctionForSymbol(candidate, fallbackSymbol)) {
+        return { fn: candidate, source: "translated:" + methodId };
+      }
+    }
+  }
+  for (let i = 0; i < methodIds.length; i++) {
+    const methodId = methodIds[i];
+    const candidate = global[methodId];
+    if (typeof candidate === "function" && !isFallbackFunctionForSymbol(candidate, fallbackSymbol)) {
+      return { fn: candidate, source: "global:" + methodId };
+    }
+  }
+  const ownerClass = jvm && jvm.classes ? jvm.classes[ownerClassName] : null;
+  const methods = ownerClass && ownerClass.methods ? ownerClass.methods : null;
+  if (methods) {
+    for (let i = 0; i < methodIds.length; i++) {
+      const methodId = methodIds[i];
+      const candidate = methods[methodId];
+      if (typeof candidate === "function" && !isFallbackFunctionForSymbol(candidate, fallbackSymbol)) {
+        return { fn: candidate, source: "class:" + ownerClassName + ":" + methodId };
+      }
+    }
+  }
+  return null;
+}
+
+function isInstanceAssignableTo(value, targetClassName) {
+  if (!value || !value.__class || !targetClassName) {
+    return false;
+  }
+  const classDef = value.__classDef || (jvm && jvm.classes ? jvm.classes[value.__class] : null);
+  const assignableTo = classDef && classDef.assignableTo ? classDef.assignableTo : null;
+  return !!(assignableTo && assignableTo[targetClassName]);
+}
+
+function resolveDisplaySingleton() {
+  const displayClass = jvm && jvm.classes ? jvm.classes["com_codename1_ui_Display"] : null;
+  const staticFields = displayClass && displayClass.staticFields ? displayClass.staticFields : null;
+  if (!staticFields) {
+    return null;
+  }
+  const instance = staticFields["INSTANCE"];
+  return instance && instance.__class ? instance : null;
+}
+
+function resolveDisplayImplementationObject() {
+  const displayClass = jvm && jvm.classes ? jvm.classes["com_codename1_ui_Display"] : null;
+  const staticFields = displayClass && displayClass.staticFields ? displayClass.staticFields : null;
+  if (!staticFields) {
+    return null;
+  }
+  const exact = staticFields["impl"];
+  if (exact && exact.__class) {
+    return exact;
+  }
+  const keys = Object.keys(staticFields);
+  for (let i = 0; i < keys.length; i++) {
+    const value = staticFields[keys[i]];
+    if (!value || !value.__class) {
+      continue;
+    }
+    if (isInstanceAssignableTo(value, "com_codename1_impl_CodenameOneImplementation")) {
+      return value;
+    }
+  }
+  return null;
+}
+
+// As invokeFirstResolvableInstanceMethod, but hands back what the call returned.
+// Needed to walk from one object to the next -- Display -> its current Form.
+function* invokeFirstResolvableInstanceMethodValue(receiver, methodIds) {
+  if (!receiver || !receiver.__class || !methodIds || !methodIds.length) {
+    return { methodId: null, value: null };
+  }
+  for (let i = 0; i < methodIds.length; i++) {
+    const methodId = methodIds[i];
+    try {
+      const method = jvm.resolveVirtual(receiver.__class, methodId);
+      if (typeof method === "function") {
+        const value = yield* cn1_ivAdapt(method(receiver));
+        return { methodId: methodId, value: value };
+      }
+    } catch (_err) {
+      // Best-effort compatibility shim. Try the next translated name.
+    }
+  }
+  return { methodId: null, value: null };
+}
+
+// Mark the whole displayed form dirty, so the paint that follows redraws all of it.
+//
+// The settle this precedes decides the UI is ready by watching the canvas stop changing. A
+// screen that draws in stages is momentarily still between two of them and satisfies that,
+// which is how graphics-draw-image-rect has twice been captured with the top half of its grid
+// drawn and the bottom half not. Widening the quiet window only moves the race; a full repaint
+// removes it, because after one there are no stages left outstanding -- whatever the frame
+// draws, it draws all of it.
+//
+// Only Display.getCurrent() and Component.repaint() are used, both of which the framework calls
+// from Java, so neither can be dropped by the unused-method cull the way a method that existed
+// solely for this would be. If neither resolves, nothing happens and the settle behaves exactly
+// as it did before.
+function* repaintEntireDisplayedForm(reason) {
+  const impl = resolveDisplayImplementationObject();
+  if (!impl || !impl.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:repaintEntireForm:reason=" + String(reason || "unknown")
+        + ":impl=null");
+    return false;
+  }
+  // CodenameOneImplementation.getCurrentForm() rather than Display.getCurrent(): the receiver is
+  // the object this file already holds, and both this and Component.repaint() are called from
+  // Java by the framework itself, so neither can be dropped by the unused-method cull. Verified
+  // present as cn1_s_getCurrentForm_R_com_codename1_ui_Form and cn1_s_repaint in a translated
+  // bundle. The short cn1_s_ spelling is what the runtime maps to the long one; the long forms
+  // follow as fallbacks.
+  const current = yield* invokeFirstResolvableInstanceMethodValue(impl, [
+    "cn1_s_getCurrentForm_R_com_codename1_ui_Form",
+    "cn1_com_codename1_impl_CodenameOneImplementation_getCurrentForm_R_com_codename1_ui_Form",
+    "cn1_com_codename1_impl_CodenameOneImplementation_getCurrentForm"
+  ]);
+  const form = current.value;
+  if (!form || !form.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:repaintEntireForm:reason=" + String(reason || "unknown")
+        + ":getCurrentForm=" + String(current.methodId) + ":form=null");
+    return false;
+  }
+  const repainted = yield* invokeFirstResolvableInstanceMethod(form, [
+    "cn1_s_repaint",
+    "cn1_com_codename1_ui_Component_repaint",
+    "cn1_com_codename1_ui_Form_repaint"
+  ]);
+  emitDiagLine("PARPAR:DIAG:FALLBACK:repaintEntireForm:reason=" + String(reason || "unknown")
+      + ":form=" + form.__class + ":repaint=" + String(repainted));
+  return repainted != null;
+}
+
+function* invokeFirstResolvableInstanceMethod(receiver, methodIds) {
+  if (!receiver || !receiver.__class || !methodIds || !methodIds.length) {
+    return null;
+  }
+  for (let i = 0; i < methodIds.length; i++) {
+    const methodId = methodIds[i];
+    try {
+      const method = jvm.resolveVirtual(receiver.__class, methodId);
+      if (typeof method === "function") {
+        yield* cn1_ivAdapt(method(receiver));
+        return methodId;
+      }
+    } catch (_err) {
+      // Best-effort compatibility shim. Try the next translated name.
+    }
+  }
+  return null;
+}
+
+function* forceDisplayPresentationForScreenshot(reason) {
+  const display = resolveDisplaySingleton();
+  const impl = resolveDisplayImplementationObject();
+  const invoked = [];
+  if (display && display.__class) {
+    const displayMethodId = yield* invokeFirstResolvableInstanceMethod(display, [
+      "cn1_com_codename1_ui_Display_flushEdt",
+      "cn1_com_codename1_ui_Display_flushEdt__"
+    ]);
+    if (displayMethodId) {
+      invoked.push("display:" + displayMethodId);
+    }
+  }
+  if (impl && impl.__class) {
+    const paintMethodId = yield* invokeFirstResolvableInstanceMethod(impl, [
+      "cn1_com_codename1_impl_CodenameOneImplementation_paintDirty",
+      "cn1_com_codename1_impl_CodenameOneImplementation_paintDirty__",
+      "cn1_com_codename1_impl_html5_HTML5Implementation_paintDirty",
+      "cn1_com_codename1_impl_html5_HTML5Implementation_paintDirty__"
+    ]);
+    if (paintMethodId) {
+      invoked.push("impl:" + paintMethodId);
+    }
+    const flushMethodId = yield* invokeFirstResolvableInstanceMethod(impl, [
+      "cn1_com_codename1_impl_html5_HTML5Implementation_flushGraphics",
+      "cn1_com_codename1_impl_html5_HTML5Implementation_flushGraphics__",
+      "cn1_com_codename1_impl_CodenameOneImplementation_flushGraphics",
+      "cn1_com_codename1_impl_CodenameOneImplementation_flushGraphics__"
+    ]);
+    if (flushMethodId) {
+      invoked.push("impl:" + flushMethodId);
+    }
+  }
+  emitDiagLine(
+    "PARPAR:DIAG:FALLBACK:forceDisplayPresentation:reason=" + String(reason || "unknown")
+    + ":display=" + (display && display.__class ? display.__class : "null")
+    + ":impl=" + (impl && impl.__class ? impl.__class : "null")
+    + ":invoked=" + (invoked.length ? invoked.join(",") : "none")
+  );
+  return invoked.length > 0;
+}
+
+bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
+  cn1ssEmitCurrentFormScreenshotMethodId,
+  cn1ssEmitCurrentFormScreenshotMethodId + "__impl"
+], function*(testName, completion) {
+  const fallbackSymbol = "Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom";
+  const test = toCn1StringValue(testName);
+  const normalizedTest = resolveCn1ssTestName(test);
+  let shouldUseDomFallback = true;
+  const originalResolved = resolveTranslatedMethodCandidate([
+    // Prefer translated __impl first. The non-impl wrapper may dispatch via
+    // rebound globals and recurse into this fallback.
+    cn1ssEmitCurrentFormScreenshotMethodId + "__impl",
+    cn1ssEmitCurrentFormScreenshotMethodId
+  ], cn1ssHelperClassName, fallbackSymbol);
+  // In worker mode the translated screenshot path eventually calls
+  // BlobUtil.canvasToBlob() which uses HTMLCanvasElement.toBlob(callback).
+  // That callback is a Java object and cannot be invoked from the host
+  // thread, so the worker hangs forever in a wait-loop.  Always use the
+  // DOM-based capture via host bridge calls instead – this avoids async
+  // callbacks entirely and works reliably across the worker boundary.
+  if (originalResolved && typeof originalResolved.fn === "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:skipTranslated=canvasToBlob_hang");
+  } else {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalMissing=1");
+  }
+  const canvas = global.document && typeof global.document.querySelector === "function"
+    ? global.document.querySelector("canvas")
+    : null;
+  if (cn1ssScreenshotEmitted[normalizedTest]) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:skipDuplicate=" + normalizedTest);
+  } else if (shouldUseDomFallback && canvas && typeof canvas.toDataURL === "function") {
+    yield* forceDisplayPresentationForScreenshot("domCanvas:" + normalizedTest);
+    cn1ssScreenshotEmitted[normalizedTest] = true;
+    const dataUrl = String(canvas.toDataURL("image/png") || "");
+    const comma = dataUrl.indexOf(",");
+    const base64 = comma >= 0 ? dataUrl.substring(comma + 1) : "";
+    emitCn1ssChunks(base64, normalizedTest, "");
+  } else if (shouldUseDomFallback) {
+    let capturedDataUrl = "";
+    if (jvm && typeof jvm.invokeHostNative === "function") {
+      try {
+        const captureSettle = cn1SsSettleParams(normalizedTest);
+        if (captureSettle.staged) {
+          // Before the presentation below, not after: paintDirty() paints what is marked dirty,
+          // so the repaint has to be requested first for that paint to cover the whole form.
+          yield* repaintEntireDisplayedForm("hostCanvas:" + normalizedTest);
+        }
+        yield* forceDisplayPresentationForScreenshot("hostCanvas:" + normalizedTest);
+        // Serialize the canvas read against concurrent painters. The settle +
+        // capture host round-trips span many rAF frames during which the
+        // cooperative scheduler would otherwise run other green threads (the
+        // next test's show()/paint, or a dual-appearance second-stream emit)
+        // that draw onto codenameone-canvas mid-sample -- the screenshot
+        // off-by-one. Holding the capture gate defers those threads until the
+        // pixels are read. The present above runs BEFORE the gate, so the owner
+        // holds no monitor while gated (deadlock-safe), and endCaptureGate is in
+        // a finally so a watchdog-aborted/throwing capture still frees it.
+        if (typeof jvm.beginCaptureGate === "function") {
+          jvm.beginCaptureGate();
+        }
+        try {
+          yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+            reason: "screenshot:" + normalizedTest,
+            maxFrames: captureSettle.maxFrames,
+            stableFrames: captureSettle.stableFrames,
+            quietFrames: captureSettle.quietFrames
+          }]);
+          const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
+          capturedDataUrl = hostResult == null ? "" : String(hostResult);
+        } finally {
+          if (typeof jvm.endCaptureGate === "function") {
+            jvm.endCaptureGate();
+          }
+        }
+      } catch (_hostCaptureErr) {
+        capturedDataUrl = "";
+      }
+    }
+    if (capturedDataUrl && capturedDataUrl.indexOf("data:image/") === 0) {
+      cn1ssScreenshotEmitted[normalizedTest] = true;
+      const comma = capturedDataUrl.indexOf(",");
+      const base64 = comma >= 0 ? capturedDataUrl.substring(comma + 1) : "";
+      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:hostCanvas=1:test=" + normalizedTest);
+      emitCn1ssChunks(base64, normalizedTest, "");
+    } else {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:noCanvas=1:test=" + normalizedTest);
+    }
+  }
+  let completionRunnableRan = false;
+  if (completion && completion.__class) {
+    try {
+      const runMethod = jvm.resolveVirtual(completion.__class, "cn1_s_run");
+      yield* cn1_ivAdapt(runMethod(completion));
+      completionRunnableRan = true;
+    } catch (err) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:completionRunErr=" + String(err && err.message ? err.message : err));
+    }
+  }
+  const baseTest = resolveBaseTestFromRunnable(completion);
+  const effectiveBaseTest = (baseTest && baseTest.__class)
+    ? baseTest
+    : (cn1ssActiveTestObject && cn1ssActiveTestObject.__class ? cn1ssActiveTestObject : null);
+  if (effectiveBaseTest && effectiveBaseTest.__class) {
+    try {
+      const isDoneMethod = jvm.resolveVirtual(effectiveBaseTest.__class, "cn1_s_isDone_R_boolean");
+      const alreadyDone = ((yield* cn1_ivAdapt(isDoneMethod(effectiveBaseTest))) | 0) !== 0;
+      if (!alreadyDone) {
+        const doneMethod = jvm.resolveVirtual(effectiveBaseTest.__class, baseTestDoneMethodId);
+        yield* cn1_ivAdapt(doneMethod(effectiveBaseTest));
+        emitDiagLine(
+          "PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:forcedDone=1:completionRun="
+          + (completionRunnableRan ? "1" : "0")
+          + ":source=" + (baseTest ? "completion" : "activeTest")
+        );
+      }
+    } catch (err) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:forcedDoneErr=" + String(err && err.message ? err.message : err));
+    }
+  }
+  return null;
+});
+
+// Bridge-call counters for BridgeBulkTransferGuardTest: large-volume
+// transfers must cost bridge calls proportional to operations, not bytes.
+bindCiFallback("Cn1ssDeviceRunnerHelper.jsBridgeCallCounts", [
+  cn1ssBridgeCountsMethodId,
+  cn1ssBridgeCountsMethodId + "__impl"
+], function*() {
+  // _L is the runtime's exported string-literal constructor (the same one
+  // every translated call site uses), so the return value is a real
+  // java.lang.String object.
+  return _L("jso=" + (jvm.__cn1JsoDispatchCount | 0)
+    + ":host=" + (jvm.__cn1HostCallCount | 0));
+});
+
+bindCiFallback("Cn1ssDeviceRunnerHelper.emitChannelFastJs", [
+  cn1ssEmitChannelMethodId,
+  cn1ssEmitChannelMethodId + "__impl"
+], function*(payloadBytes, testName, channelName) {
+  const test = resolveCn1ssTestName(toCn1StringValue(testName));
+  const channel = toCn1StringValue(channelName);
+  // For the primary screenshot channel (empty channel name), the Java-side
+  // Display.screenshot() in the worker reads from OffscreenCanvas which
+  // may not reflect the main-thread visible canvas.  Replace the payload
+  // with a main-thread canvas capture via the host bridge when available.
+  if (!channel && jvm && typeof jvm.invokeHostNative === "function" && !cn1ssScreenshotEmitted[test]) {
+    try {
+      yield* forceDisplayPresentationForScreenshot("emitChannel:" + test);
+      const channelSettle = cn1SsSettleParams(test);
+      yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+        reason: "screenshot:" + test,
+        maxFrames: channelSettle.maxFrames,
+        stableFrames: channelSettle.stableFrames,
+        quietFrames: channelSettle.quietFrames
+      }]);
+      const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
+      const capturedDataUrl = hostResult == null ? "" : String(hostResult);
+      if (capturedDataUrl && capturedDataUrl.indexOf("data:image/") === 0) {
+        cn1ssScreenshotEmitted[test] = true;
+        const comma = capturedDataUrl.indexOf(",");
+        const hostBase64 = comma >= 0 ? capturedDataUrl.substring(comma + 1) : "";
+        emitDiagLine("PARPAR:DIAG:FALLBACK:emitChannelFastJs:hostCapture=1:test=" + test + ":len=" + hostBase64.length);
+        emitCn1ssChunks(hostBase64, test, channel);
+        return null;
+      }
+    } catch (_hostErr) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:emitChannelFastJs:hostCaptureErr=" + String(_hostErr && _hostErr.message ? _hostErr.message : _hostErr));
+    }
+  }
+  const base64 = byteArrayToBase64(payloadBytes);
+  emitCn1ssChunks(base64, test, channel);
+  return null;
+});
+
+bindCiFallback("Cn1ssDeviceRunnerHelper.completeNullRunnableGuard", [
+  cn1ssCompleteMethodId,
+  cn1ssCompleteMethodId + "__impl"
+], function*(completion) {
+  if (!completion || !completion.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssComplete:nullOrClasslessRunnable=1");
+    return null;
+  }
+  const runMethod = jvm.resolveVirtual(completion.__class, "cn1_s_run");
+  return yield* cn1_ivAdapt(runMethod(completion));
+});
+
+// How hard to wait for the canvas to stop changing, per test.
+//
+// The heavy drawing tests were already given a longer wait before they are declared ready, but
+// the capture that follows used a fixed short one -- three still frames out of forty-eight. A
+// test that draws in stages can be still for three frames between two of them, and
+// graphics-draw-image-rect was captured exactly there: the top half of its grid drawn, the
+// bottom half not, on a run where the same test had passed all week. The two waits now come from
+// one place, so a test that needs a longer settle gets it at the moment that matters.
+function cn1SsSettleParams(testName) {
+  const normalized = normalizeCn1ssTestName(testName || "default");
+  const heavy = normalized === "DrawImage" || normalized === "graphics-draw-image-rect";
+  return {
+    // These are the screens that compose their result in stages, so they are the ones a
+    // stillness-based settle can catch half-finished. They get the full repaint before capture.
+    staged: heavy,
+    maxFrames: heavy ? 120 : 48,
+    stableFrames: heavy ? 6 : 3,
+    quietFrames: heavy ? 6 : 3
+  };
+}
+
+bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
+  baseTestRegisterReadyCallbackMethodId,
+  baseTestRegisterReadyCallbackMethodId + "__impl"
+], function*(_baseTest, _form, callback) {
+  const activeTest = normalizeCn1ssTestName(cn1ssActiveTestName || "default");
+  let settleChanged = "na";
+  let delayMillis = 1500;
+  if (activeTest === "DrawImage" || activeTest === "graphics-draw-image-rect") {
+    delayMillis = 4000;
+  }
+  if (jvm && typeof jvm.invokeHostNative === "function") {
+    try {
+      // A pure time delay is a WORKER scheduler sleep, never a host round-trip.
+      // The old __cn1_delay__ host native was just setTimeout(resolve, millis):
+      // round-tripping to the host to sleep parked the green thread on a host
+      // reply for no reason and added another lost-response wedge surface. The
+      // scheduler's {op:"sleep"} arms a timed wakeup with zero host traffic.
+      // (A/B-confirmed: this is NOT the cause of the SlideHorizontal settle
+      // message loss -- reverting to the host delay did not change it.)
+      yield { op: "sleep", millis: delayMillis };
+      const readySettle = cn1SsSettleParams(activeTest);
+      const settleResult = yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+        reason: "ready:" + activeTest,
+        maxFrames: readySettle.maxFrames,
+        stableFrames: readySettle.stableFrames,
+        quietFrames: readySettle.quietFrames
+      }]);
+      if (settleResult && settleResult.changedFromPrevious != null) {
+        settleChanged = String((settleResult.changedFromPrevious | 0) !== 0 ? 1 : 0);
+      }
+    } catch (_settleErr) {
+      settleChanged = "err";
+    }
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestRegisterReady:afterUiSettle=1:test=" + activeTest + ":delayMs=" + delayMillis + ":changed=" + settleChanged);
+  if (!callback || !callback.__class) {
+    return null;
+  }
+  const runMethod = jvm.resolveVirtual(callback.__class, "cn1_s_run");
+  return yield* cn1_ivAdapt(runMethod(callback));
+});
+
+const baseTestOnShowLambdaMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String";
+const baseTestOnShowLambdaCarrierClass = "com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_0";
+function installBaseTestOnShowLambdaShim() {
+  if (!(jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes[baseTestOnShowLambdaCarrierClass])) {
+    return false;
+  }
+  const carrierMethods = jvm.classes[baseTestOnShowLambdaCarrierClass].methods || {};
+  if (typeof carrierMethods[baseTestOnShowLambdaMethodId] === "function") {
+    return true;
+  }
+  jvm.addVirtualMethod(baseTestOnShowLambdaCarrierClass, baseTestOnShowLambdaMethodId, function*(__cn1ThisObject, onShowMessage) {
+    const target = __cn1ThisObject
+      ? (__cn1ThisObject["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_0_arg_1"] || __cn1ThisObject)
+      : null;
+    if (!target || !target.__class) {
+      return null;
+    }
+    const classDef = target.__classDef || (jvm.classes ? jvm.classes[target.__class] : null);
+    if (!classDef) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestOnShowLambda:noClassDef=1:class=" + String(target.__class || "null"));
+      return null;
+    }
+    let method = (classDef && classDef.methods) ? classDef.methods[baseTestOnShowLambdaMethodId] : null;
+    if (!method) {
+      method = jvm.resolveVirtual(target.__class, baseTestOnShowLambdaMethodId);
+    }
+    return yield* cn1_ivAdapt(method(target, onShowMessage));
+  });
+  emitDiagLine("PARPAR:DIAG:INIT:shim=baseTestOnShowLambdaDispatch");
+  return true;
+}
+if (!installBaseTestOnShowLambdaShim() && typeof setTimeout === "function") {
+  setTimeout(function() {
+    if (installBaseTestOnShowLambdaShim()) {
+      emitDiagLine("PARPAR:DIAG:INIT:shim=baseTestOnShowLambdaDispatch:deferred=1");
+    }
+  }, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Shim: CodenameOneImplementation.initImpl – guard against getClass()/getName()
+// failures on the Runnable argument passed to Display.init().
+//
+// In the ParparVM JS translation, Object.getClass() may return null or
+// Class.getName() may return a name with underscores instead of dots.
+// The base initImpl calls m.getClass().getName() and then
+// String.substring(0, String.lastIndexOf('.')) which can throw a TypeError
+// (null receiver) or StringIndexOutOfBoundsException (-1 index).
+//
+// This shim wraps the original initImpl; if it fails it falls back to calling
+// init(m) directly and setting the packageName field from the class name of the
+// bootstrap object.
+// ---------------------------------------------------------------------------
+const initImplMethodId = "cn1_com_codename1_impl_CodenameOneImplementation_initImpl_java_lang_Object";
+const initImplOriginal = (function() {
+  if (!jvm || !jvm.classes) {
+    return null;
+  }
+  const cls = jvm.classes["com_codename1_impl_CodenameOneImplementation"];
+  if (cls && cls.methods && typeof cls.methods[initImplMethodId] === "function") {
+    return cls.methods[initImplMethodId];
+  }
+  return typeof global[initImplMethodId] === "function" ? global[initImplMethodId] :
+         typeof global[initImplMethodId + "__impl"] === "function" ? global[initImplMethodId + "__impl"] : null;
+})();
+
+// The mangler rewrites class-specific names (``cn1_<class>_initImpl_*``) and
+// dispatch-id names (``cn1_s_initImpl_*``) to *different* short symbols.
+// Class methods maps key on the dispatch-id form, so binding only the
+// class-specific form (which is what bindCiFallback's name list would
+// normally carry) leaves resolveVirtual finding the original translated
+// $aJ4 in cls.methods first and never consulting the override stashed
+// under nativeMethods[$aJ4]. Include both forms so installVirtualOverride
+// patches the dispatch-id slot as well.
+bindCiFallback("CodenameOneImplementation.initImplSafe", [
+  initImplMethodId,
+  initImplMethodId + "__impl",
+  "cn1_s_initImpl_java_lang_Object",
+  "cn1_s_initImpl_java_lang_Object__impl"
+], function*(__cn1ThisObject, m) {
+  if (typeof initImplOriginal === "function") {
+    try {
+      return yield* cn1_ivAdapt(initImplOriginal(__cn1ThisObject, m));
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err || "");
+      // Translated Java exceptions arrive as plain JS objects with __class
+      // set to the (mangled) Java class name. ``String(err)`` yields
+      // ``[object Object]`` for those, so the message-substring check below
+      // would silently rethrow real AIOOBE/NPE/StringIndexOOB cases coming
+      // out of m.getClass().getName().substring(0, lastIndexOf('.')) — the
+      // exact recovery path this shim is for. Recognise them by class so the
+      // recovery still kicks in on Safari/WebKit (where the translator
+      // peephole strips the source-side defensive clamps in initImpl).
+      const cls = err && err.__class ? String(err.__class) : "";
+      const isJavaIndexEx = cls.indexOf("ArrayIndexOutOfBounds") >= 0
+              || cls.indexOf("StringIndexOutOfBounds") >= 0
+              || cls.indexOf("NullPointer") >= 0;
+      if (message.indexOf("__classDef") >= 0 || message.indexOf("lastIndexOf") >= 0
+              || message.indexOf("substring") >= 0 || isJavaIndexEx) {
+        emitCiFallbackMarker("CodenameOneImplementation.initImplSafe.recover", "HIT");
+        // The original initImpl calls init(m) first, then m.getClass().getName().
+        // If we land here, init(m) already succeeded – only the getClass/getName
+        // chain failed.  Do NOT call init(m) again; just set the missing fields.
+        const className = (m && m.__class) ? String(m.__class).replace(/_/g, ".") : "com.codename1.impl.html5";
+        const dotIndex = className.lastIndexOf(".");
+        const pkg = dotIndex >= 0 ? className.substring(0, dotIndex) : className;
+        __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_packageName"] = jvm.createStringLiteral(pkg);
+        __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_initiailized"] = 1;
+        return null;
+      }
+      throw err;
+    }
+  }
+  // No original method found – perform safe init inline
+  const initMethodId2 = "cn1_s_init_java_lang_Object";
+  try {
+    const initMethod2 = jvm.resolveVirtual(__cn1ThisObject.__class, initMethodId2);
+    if (typeof initMethod2 === "function") {
+      yield* cn1_ivAdapt(initMethod2(__cn1ThisObject, m));
+    }
+  } catch (_ignore) {
+    // Best effort – init may already have been called
+  }
+  const className2 = (m && m.__class) ? String(m.__class).replace(/_/g, ".") : "com.codename1.impl.html5";
+  const dotIndex2 = className2.lastIndexOf(".");
+  const pkg2 = dotIndex2 >= 0 ? className2.substring(0, dotIndex2) : className2;
+  __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_packageName"] = jvm.createStringLiteral(pkg2);
+  __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_initiailized"] = 1;
+  return null;
+});
+
+bindCiFallback("BrowserComponent.access102InternalAssignFix", [
+  "cn1_com_codename1_ui_BrowserComponent_access_102_com_codename1_ui_BrowserComponent_com_codename1_ui_PeerComponent_R_com_codename1_ui_PeerComponent"
+], function*(browserComponent, peerComponent) {
+  if (browserComponent) {
+    browserComponent["cn1_com_codename1_ui_BrowserComponent_internal"] = peerComponent;
+  }
+  return peerComponent;
+});
+
+// ============================ Web Bluetooth ============================
+// Worker-side natives for com.codename1.impl.html5.JSBluetooth. The Java
+// app runs in the worker where navigator.bluetooth does not exist, so every
+// operation is an invokeHostNative round-trip to the __cn1_bt_*__ handlers
+// in browser_bridge.js (which owns the BluetoothDevice / GATT handle
+// tables). browser_bridge.js ships from the translator artifact while
+// port.js ships fresh from source, so every binding here is NULL-SAFE
+// against an older host bundle that lacks the __cn1_bt_*__ handlers: an
+// unhandled-host-call rejection is caught and converted into the typed
+// {ok:0, code:"NOT_SUPPORTED"} result contract instead of throwing raw.
+
+function cn1BtJavaString(value) {
+  return jvm.createStringLiteral(String(value));
+}
+
+// One host round-trip; always resolves to a plain result object (never
+// throws) so the Java side can rely on the {ok, code, message} contract.
+function* cn1BtHostCall(symbol, args) {
+  if (!jvm || typeof jvm.invokeHostNative !== "function") {
+    return { ok: 0, code: "NOT_SUPPORTED", message: "Bluetooth host bridge unavailable" };
+  }
+  let res;
+  try {
+    res = yield jvm.invokeHostNative(symbol, args);
+  } catch (err) {
+    // Older browser_bridge.js without the Bluetooth handlers rejects with
+    // "Unhandled host call ..." -- surface it as a typed unsupported error.
+    return {
+      ok: 0, code: "NOT_SUPPORTED",
+      message: "Bluetooth host call " + symbol + " failed: "
+        + (err && err.message ? err.message : String(err))
+    };
+  }
+  if (res == null || typeof res !== "object") {
+    return { ok: 0, code: "UNKNOWN", message: "Empty response from " + symbol };
+  }
+  return res;
+}
+
+// Same, but marshals the result object to a Java JSON string -- the shape
+// all the String-returning JSBluetooth natives use.
+function* cn1BtHostCallJson(symbol, args) {
+  const res = yield* cn1BtHostCall(symbol, args);
+  let json;
+  try {
+    json = JSON.stringify(res);
+  } catch (_err) {
+    json = "{\"ok\":0,\"code\":\"UNKNOWN\",\"message\":\"unserializable host response\"}";
+  }
+  return cn1BtJavaString(json);
+}
+
+// Java byte[] (plain JS array with byte metadata, possibly signed values)
+// -> structured-cloneable Uint8Array for the host.
+function cn1BtToUint8Array(bytes) {
+  if (!bytes || typeof bytes.length !== "number") {
+    return new Uint8Array(0);
+  }
+  const n = bytes.length | 0;
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = bytes[i] & 0xff;
+  }
+  return out;
+}
+
+// --------------------------------------------------------------------
+// host -> worker event pump
+// --------------------------------------------------------------------
+// browser_bridge.js posts {kind, deviceId, detail, bytes} payloads through
+// the standard worker-callback channel; this dispatches them into the
+// translated static JSBluetooth.dispatchNativeEvent(String,String,String,
+// byte[]). The callback token is minted directly against jvm's
+// worker-callback table (rather than passing a bare function through
+// toHostTransferArg) so it works even when DOM event forwarding is
+// disabled (cn1DisableEventForwarding=1 in the screenshot harness).
+
+const cn1BtDispatchEventCandidates = [
+  "cn1_com_codename1_impl_html5_JSBluetooth_dispatchNativeEvent_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY",
+  "cn1_com_codename1_impl_html5_JSBluetooth_dispatchNativeEvent_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_JSBluetooth_dispatchNativeEvent___java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY",
+  "cn1_com_codename1_impl_html5_JSBluetooth_dispatchNativeEvent___java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_R_void"
+];
+let cn1BtDispatchMissingLogged = false;
+
+function cn1BtResolveDispatch() {
+  for (let i = 0; i < cn1BtDispatchEventCandidates.length; i++) {
+    const name = cn1BtDispatchEventCandidates[i];
+    if (typeof global[name] === "function") {
+      return global[name];
+    }
+    if (jvm && jvm.translatedMethods && typeof jvm.translatedMethods[name] === "function") {
+      return jvm.translatedMethods[name];
+    }
+  }
+  return null;
+}
+
+function cn1BtDeliverEvent(payload) {
+  const fn = cn1BtResolveDispatch();
+  if (!fn) {
+    if (!cn1BtDispatchMissingLogged) {
+      cn1BtDispatchMissingLogged = true;
+      if (global.console && typeof global.console.warn === "function") {
+        global.console.warn("PARPAR:bt-event-dropped:JSBluetooth.dispatchNativeEvent not found");
+      }
+    }
+    return;
+  }
+  const kind = payload && payload.kind != null ? cn1BtJavaString(payload.kind) : null;
+  const deviceId = payload && payload.deviceId != null ? cn1BtJavaString(payload.deviceId) : null;
+  const detail = payload && payload.detail != null ? cn1BtJavaString(payload.detail) : null;
+  let bytes = null;
+  const raw = payload && payload.bytes;
+  if (raw && typeof raw.length === "number") {
+    const n = raw.length | 0;
+    bytes = jvm.newArray(n, "JAVA_BYTE", 1);
+    for (let i = 0; i < n; i++) {
+      const v = raw[i] & 0xff;
+      bytes[i] = v > 127 ? v - 256 : v;
+    }
+  }
+  try {
+    jvm.spawn(null, (function*() {
+      yield* cn1_ivAdapt(fn(kind, deviceId, detail, bytes));
+    })());
+  } catch (err) {
+    if (global.console && typeof global.console.error === "function") {
+      global.console.error("PARPAR:bt-event-error:" + (err && err.message ? err.message : String(err)));
+    }
+  }
+}
+
+function cn1BtMintEventCallbackToken() {
+  try {
+    if (jvm && jvm.workerCallbacks && typeof jvm.nextWorkerCallbackId === "number") {
+      const id = jvm.nextWorkerCallbackId++;
+      jvm.workerCallbacks[id] = cn1BtDeliverEvent;
+      return { __cn1WorkerCallback: id };
+    }
+  } catch (_err) {}
+  return null;
+}
+
+// --------------------------------------------------------------------
+// native bindings
+// --------------------------------------------------------------------
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtSupported__R_int",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtSupported___R_int"
+], function*() {
+  const res = yield* cn1BtHostCall("__cn1_bt_support__", []);
+  return res.ok === 1 && res.supported ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtInit__R_int",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtInit___R_int"
+], function*() {
+  const token = cn1BtMintEventCallbackToken();
+  if (!token) {
+    // no event channel (very old runtime) -- request/read/write still work,
+    // notifications and disconnect events just won't stream
+    return 0;
+  }
+  const res = yield* cn1BtHostCall("__cn1_bt_set_event_callback__", [token]);
+  return res.ok === 1 ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtAdapterState__R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtAdapterState___R_java_lang_String"
+], function*() {
+  return yield* cn1BtHostCallJson("__cn1_bt_adapter_state__", []);
+});
+
+// Reads the (setter-only) ScanFilter criteria straight off the translated
+// object's fields -- worker-local, no host call. Long fields (the
+// BluetoothUuid halves) may be BigInt (exact-longs runtime), the legacy
+// {__l:1,l,h} record, or a plain number; all three are handled.
+function cn1BtLongToUnsignedHex16(v) {
+  try {
+    if (typeof v === "bigint") {
+      return BigInt.asUintN(64, v).toString(16).padStart(16, "0");
+    }
+    if (v && typeof v === "object" && v.__l === 1) {
+      return (v.h >>> 0).toString(16).padStart(8, "0")
+        + (v.l >>> 0).toString(16).padStart(8, "0");
+    }
+    if (typeof v === "number" && isFinite(v)) {
+      return BigInt.asUintN(64, BigInt(Math.trunc(v))).toString(16).padStart(16, "0");
+    }
+  } catch (_err) {}
+  return null;
+}
+
+function cn1BtUuidFieldToString(uuidObj) {
+  if (!uuidObj) {
+    return null;
+  }
+  const msb = cn1BtLongToUnsignedHex16(uuidObj.cn1_com_codename1_bluetooth_BluetoothUuid_msb);
+  const lsb = cn1BtLongToUnsignedHex16(uuidObj.cn1_com_codename1_bluetooth_BluetoothUuid_lsb);
+  if (msb == null || lsb == null) {
+    return null;
+  }
+  const hex = msb + lsb;
+  return hex.substring(0, 8) + "-" + hex.substring(8, 12) + "-"
+    + hex.substring(12, 16) + "-" + hex.substring(16, 20) + "-"
+    + hex.substring(20);
+}
+
+function cn1BtJavaBytesToPlainArray(bytes) {
+  if (!bytes || typeof bytes.length !== "number") {
+    return null;
+  }
+  const n = bytes.length | 0;
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = bytes[i] & 0xff;
+  }
+  return out;
+}
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtExtractScanFilter_java_lang_Object_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtExtractScanFilter___java_lang_Object_R_java_lang_String"
+], function(filter) {
+  const out = {};
+  try {
+    if (filter) {
+      const service = cn1BtUuidFieldToString(filter.cn1_com_codename1_bluetooth_le_ScanFilter_serviceUuid);
+      if (service) {
+        out.service = service;
+      }
+      const name = filter.cn1_com_codename1_bluetooth_le_ScanFilter_name;
+      if (name != null) {
+        out.name = jvm.toNativeString(name);
+      }
+      const namePrefix = filter.cn1_com_codename1_bluetooth_le_ScanFilter_namePrefix;
+      if (namePrefix != null) {
+        out.namePrefix = jvm.toNativeString(namePrefix);
+      }
+      const address = filter.cn1_com_codename1_bluetooth_le_ScanFilter_address;
+      if (address != null) {
+        out.address = jvm.toNativeString(address);
+      }
+      const manufacturerId = filter.cn1_com_codename1_bluetooth_le_ScanFilter_manufacturerId;
+      out.manufacturerId = typeof manufacturerId === "number" ? manufacturerId | 0 : -1;
+      const data = cn1BtJavaBytesToPlainArray(filter.cn1_com_codename1_bluetooth_le_ScanFilter_manufacturerData);
+      if (data) {
+        out.manufacturerData = data;
+      }
+      const mask = cn1BtJavaBytesToPlainArray(filter.cn1_com_codename1_bluetooth_le_ScanFilter_manufacturerDataMask);
+      if (mask) {
+        out.manufacturerDataMask = mask;
+      }
+    }
+  } catch (_err) {
+    // best effort -- an unreadable filter degrades to acceptAllDevices
+  }
+  return cn1BtJavaString(JSON.stringify(out));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtRequestDevice_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtRequestDevice___java_lang_String_R_java_lang_String"
+], function*(optionsJson) {
+  let options = {};
+  try {
+    options = JSON.parse(jvm.toNativeString(optionsJson));
+  } catch (_err) {
+    options = { acceptAllDevices: true };
+  }
+  return yield* cn1BtHostCallJson("__cn1_bt_request_device__", [options]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtConnect_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtConnect___java_lang_String_R_java_lang_String"
+], function*(deviceId) {
+  return yield* cn1BtHostCallJson("__cn1_bt_connect__", [{ id: jvm.toNativeString(deviceId) }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtDisconnect_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtDisconnect___java_lang_String_R_java_lang_String"
+], function*(deviceId) {
+  return yield* cn1BtHostCallJson("__cn1_bt_disconnect__", [{ id: jvm.toNativeString(deviceId) }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtDiscoverServices_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtDiscoverServices___java_lang_String_R_java_lang_String"
+], function*(deviceId) {
+  return yield* cn1BtHostCallJson("__cn1_bt_discover__", [{ id: jvm.toNativeString(deviceId) }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtReadCharacteristic_java_lang_String_int_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtReadCharacteristic___java_lang_String_int_R_java_lang_String"
+], function*(deviceId, iid) {
+  return yield* cn1BtHostCallJson("__cn1_bt_read_char__",
+    [{ id: jvm.toNativeString(deviceId), iid: iid | 0 }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtWriteCharacteristic_java_lang_String_int_byte_1ARRAY_boolean_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtWriteCharacteristic___java_lang_String_int_byte_1ARRAY_boolean_R_java_lang_String"
+], function*(deviceId, iid, value, withResponse) {
+  return yield* cn1BtHostCallJson("__cn1_bt_write_char__", [{
+    id: jvm.toNativeString(deviceId), iid: iid | 0,
+    value: cn1BtToUint8Array(value), withResponse: !!withResponse
+  }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtReadDescriptor_java_lang_String_int_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtReadDescriptor___java_lang_String_int_R_java_lang_String"
+], function*(deviceId, iid) {
+  return yield* cn1BtHostCallJson("__cn1_bt_read_desc__",
+    [{ id: jvm.toNativeString(deviceId), iid: iid | 0 }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtWriteDescriptor_java_lang_String_int_byte_1ARRAY_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtWriteDescriptor___java_lang_String_int_byte_1ARRAY_R_java_lang_String"
+], function*(deviceId, iid, value) {
+  return yield* cn1BtHostCallJson("__cn1_bt_write_desc__", [{
+    id: jvm.toNativeString(deviceId), iid: iid | 0,
+    value: cn1BtToUint8Array(value)
+  }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtSetNotifications_java_lang_String_int_boolean_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtSetNotifications___java_lang_String_int_boolean_R_java_lang_String"
+], function*(deviceId, iid, enable) {
+  return yield* cn1BtHostCallJson("__cn1_bt_set_notify__", [{
+    id: jvm.toNativeString(deviceId), iid: iid | 0, enable: !!enable
+  }]);
+});
+
+// ---------------------------------------------------------------------------
+// SQLite, compiled to WebAssembly.
+//
+// Replaces WebSQL, which Chrome removed in 119 and Firefox never implemented.
+// The engine is loaded into this worker on first use, so every call after the
+// initial load is an ordinary synchronous call with no host round trip.
+//
+// Storage uses the opfs-sahpool VFS. The default OPFS VFS needs
+// crossOriginIsolated, which needs COOP/COEP response headers, which we cannot
+// require: Codename One JavaScript apps are deployed to arbitrary static
+// hosting. opfs-sahpool needs only OPFS plus createSyncAccessHandle in a
+// worker, acquires its file handles once during install, and is fully
+// synchronous afterwards.
+// ---------------------------------------------------------------------------
+let cn1Sqlite = null;          // the sqlite3 namespace once initialised
+let cn1SqlitePoolVfs = null;   // encrypting VFS over the OPFS pool, or null if there is none
+let cn1SqliteMemoryVfs = "memdb"; // the VFS memory-backed databases open through
+let cn1SqlitePool = null;      // the opfs-sahpool utility, when persistent
+let cn1SqliteInitPromise = null;
+let cn1SqliteHandles = new Map();
+let cn1SqliteNextHandle = 1;
+
+function cn1SqliteRegister(obj) {
+  const id = cn1SqliteNextHandle++;
+  cn1SqliteHandles.set(id, obj);
+  return id;
+}
+
+function cn1SqliteLookup(id) {
+  const obj = cn1SqliteHandles.get(id);
+  if (!obj) {
+    throw new Error("this database handle has been closed");
+  }
+  return obj;
+}
+
+/**
+ * Distinguishes a browser that cannot do synchronous OPFS from one that merely would not.
+ *
+ * The first is permanent and memory is the best available answer. The second - another tab
+ * holding the handles, a quota, a timeout - is transient, and quietly substituting an empty
+ * in-memory database for a persistent one that exists is data loss, not degradation.
+ */
+function cn1SqliteOpfsIsUnsupported(err) {
+  if (typeof FileSystemFileHandle === "undefined"
+      || typeof FileSystemFileHandle.prototype === "undefined"
+      || typeof FileSystemFileHandle.prototype.createSyncAccessHandle !== "function") {
+    return true;
+  }
+  const message = String((err && err.message) || err || "").toLowerCase();
+  return message.indexOf("not supported") >= 0
+      || message.indexOf("unsupported") >= 0
+      || message.indexOf("is not a function") >= 0
+      || message.indexOf("undefined") >= 0;
+}
+
+/** How long either half of the engine bring-up may take before it is treated as unavailable. */
+const CN1_SQLITE_INIT_TIMEOUT_MS = 15000;
+
+/**
+ * Slots in the OPFS access-handle pool.
+ *
+ * The pool preallocates a fixed number of file handles and throws "SAH pool is full" once they
+ * are taken, so the default of six is a hard ceiling on databases -- and journal files take slots
+ * of their own, so the real ceiling is lower than it looks. Slots are cheap, an empty one is an
+ * unused zero length file, so this is set well above what an application is likely to need.
+ */
+const CN1_SQLITE_POOL_CAPACITY = 64;
+
+/**
+ * Rejects if the given promise has not settled in time.
+ *
+ * Neither step of the bring-up is guaranteed to settle at all. Acquiring a synchronous OPFS
+ * access handle blocks while another context holds the same file, and a browser that never
+ * releases it leaves the promise pending forever rather than rejecting. The translated code is
+ * waiting on this through the yield-on-promise bridge, which resumes only when the promise
+ * settles, so "pending forever" parks the event thread and every thread behind it -- a hang with
+ * nothing logged anywhere. A rejection, by contrast, is something the caller can report.
+ */
+function cn1SqliteWithin(promise, millis, what) {
+  return new Promise(function(resolve, reject) {
+    let settled = false;
+    const timer = setTimeout(function() {
+      if (!settled) {
+        settled = true;
+        reject(new Error(what + " did not complete within " + millis + "ms"));
+      }
+    }, millis);
+    Promise.resolve(promise).then(function(value) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      }
+    }, function(err) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  });
+}
+
+function cn1SqliteStartInit() {
+  if (cn1SqliteInitPromise) {
+    return cn1SqliteInitPromise;
+  }
+  cn1SqliteInitPromise = (async function() {
+    // This promise must never reject. The translated code awaits it through the runtime's
+    // yield-on-promise bridge, which resumes the calling thread only on resolution -- a rejection
+    // leaves the event thread parked on an await that never returns, and every other thread then
+    // blocks behind it. That is a hang with no error anywhere, not a failed database call. So
+    // every failure here resolves to false instead, and the caller reports the engine as
+    // unavailable in the ordinary way.
+    try {
+      // Classic worker, so importScripts is the load mechanism and is synchronous.
+      importScripts("js/sqlite3mc.js");
+      // locateFile is not optional here. importScripts does not change the worker's base URL, so
+      // the loader resolves its .wasm against the worker script's directory rather than its own
+      // and fetches /sqlite3.wasm from the site root - a 404, and then a fifteen second wait for
+      // the init timeout before the engine reports itself unavailable. The bundle keeps both
+      // files together under js/, so that is where the payload is.
+      cn1Sqlite = await cn1SqliteWithin(sqlite3InitModule({
+        locateFile: function(path) { return "js/" + path; }
+      }), CN1_SQLITE_INIT_TIMEOUT_MS, "loading the SQLite WebAssembly module");
+    } catch (err) {
+      console.warn("Codename One: the SQLite engine could not be loaded, so databases are "
+        + "unavailable in this build. Reported cause: " + err);
+      cn1Sqlite = null;
+      cn1SqlitePool = null;
+      return false;
+    }
+    try {
+      cn1SqlitePool = await cn1SqliteWithin(
+        cn1Sqlite.installOpfsSAHPoolVfs({ name: "cn1-db", initialCapacity: CN1_SQLITE_POOL_CAPACITY }),
+        CN1_SQLITE_INIT_TIMEOUT_MS,
+        "opening the OPFS storage pool");
+    } catch (err) {
+      if (!cn1SqliteOpfsIsUnsupported(err)) {
+        // Contention with another tab, a timeout, a quota or any other transient storage failure.
+        // Falling back here would open a fresh in-memory database, so an existing persistent one
+        // would look empty and everything written this session would vanish at page close -
+        // silent data loss dressed up as a working database. Reporting the database as
+        // unavailable is the only answer that does not lie.
+        console.warn("Codename One: the OPFS storage pool could not be opened, so databases are "
+          + "unavailable in this session. This is usually another tab holding the same storage. "
+          + "Reported cause: " + err);
+        cn1Sqlite = null;
+        cn1SqlitePool = null;
+        return false;
+      }
+      // Firefox before 111 and Safari before 15.2 have no createSyncAccessHandle at all. There is
+      // no persistent storage to lose on those, so memory is a genuine improvement over nothing -
+      // but say so, because losing every write on reload should not be discovered in production.
+      console.warn("Codename One: this browser has no synchronous OPFS access, so databases are "
+        + "kept in memory for the lifetime of this page and are lost when it closes. Reported "
+        + "cause: " + err);
+      cn1SqlitePool = null;
+    }
+    cn1SqliteInstallCipherVfs();
+    return true;
+  })();
+  return cn1SqliteInitPromise;
+}
+
+/**
+ * Wraps the storage VFS in the one that can encrypt.
+ *
+ * SQLite3MC does not encrypt through an arbitrary VFS: the cipher lives in a shim VFS that has to
+ * be created over the real one, and a database opened directly on the real one answers "Setting key
+ * failed. Encryption is not supported by the VFS." to every PRAGMA key. sqlite3mc_vfs_create
+ * registers "multipleciphers-<name>" over <name>; unencrypted databases work through either, so
+ * everything opens through the shim and the plain case simply never sets a key.
+ *
+ * A failure here is not fatal. It costs encryption, not storage, and the ports report encryption as
+ * unsupported in the ordinary way.
+ */
+function cn1SqliteInstallCipherVfs() {
+  if (!cn1Sqlite || !cn1Sqlite.capi || !cn1Sqlite.capi.sqlite3mc_vfs_create) {
+    return;
+  }
+  if (cn1SqlitePool) {
+    const real = cn1SqlitePool.vfsName || "opfs-sahpool";
+    if (cn1Sqlite.capi.sqlite3mc_vfs_create(real, 0) === 0) {
+      cn1SqlitePoolVfs = "multipleciphers-" + real;
+    } else {
+      console.warn("Codename One: this SQLite build cannot encrypt through the storage pool, so "
+        + "databases opened with a key will be refused.");
+    }
+    return;
+  }
+  if (cn1Sqlite.capi.sqlite3mc_vfs_create("memdb", 0) === 0) {
+    cn1SqliteMemoryVfs = "multipleciphers-memdb";
+  }
+}
+
+/**
+ * Anchor connections for the degraded in-memory path, by database name.
+ *
+ * The memdb VFS frees a named store as soon as its last connection closes, so without a connection
+ * held open here, closing a database would discard it instead of leaving it readable until the page
+ * closes. These are never handed out: every open gets its own connection, because handing the same
+ * one back would make a second open skip key validation entirely and report an encrypted database
+ * as plaintext.
+ */
+const cn1SqliteMemoryAnchors = new Map();
+
+/**
+ * Live application connections to each database, by name, whichever storage backs it.
+ *
+ * Neither backend refuses a delete on its own. The store behind a memdb URI is released only once
+ * every connection to it closes, and the pool's unlink drops the name-to-file mapping without
+ * touching the handles already open on it -- so in both cases deleting an open database removes
+ * the name while the data lives on behind the open connection: exists() says no, reopening the
+ * name creates a fresh database, and everything the old connection writes until it closes is
+ * discarded with the orphan. Counting is what lets delete refuse instead of doing half of it.
+ */
+const cn1SqliteOpenCounts = new Map();
+
+/** All three take the reduced name cn1SqliteDbPath produces, not the one the caller typed. */
+function cn1SqliteOpened(name) {
+  cn1SqliteOpenCounts.set(name, (cn1SqliteOpenCounts.get(name) || 0) + 1);
+}
+
+function cn1SqliteClosed(name) {
+  const count = cn1SqliteOpenCounts.get(name) || 0;
+  if (count <= 1) {
+    cn1SqliteOpenCounts.delete(name);
+  } else {
+    cn1SqliteOpenCounts.set(name, count - 1);
+  }
+}
+
+function cn1SqliteIsOpen(name) {
+  return (cn1SqliteOpenCounts.get(name) || 0) > 0;
+}
+
+/** Whether the last failed open failed because of the key, rather than storage or corruption. */
+let cn1SqliteLastOpenWrongKey = false;
+
+/** The message from the last failed call, for the exception the Java side raises. */
+let cn1SqliteLastError = "";
+
+/**
+ * Runs a database operation, turning any failure into a value the caller can test.
+ *
+ * Nothing in this file may throw across the bridge. An exception raised inside a native binding
+ * does not arrive in the translated code as a Java throwable: it unwinds the worker and leaves
+ * every thread blocked on a call that never returns, so an ordinary SQL error - a syntax mistake,
+ * a constraint violation - would hang the application instead of reporting itself. Each binding
+ * therefore records the message here and answers with a sentinel the Java side checks.
+ *
+ * The rule for anything added below: every binding that touches the engine goes through this.
+ * The only ones that do not are init and open, which catch for themselves because they have
+ * their own sentinels, and the four that just read a variable. "This one cannot throw" has been
+ * wrong four times in this file already -- reset looked inert and reports the previous step's
+ * error, close and finalize report the last error of what they are closing.
+ */
+function cn1SqliteGuard(fn, failureValue) {
+  // Cleared on entry so that what lastError() reports belongs to this call. The readers whose
+  // failure value is also a legal value -- a null blob, a null string -- cannot tell the two apart
+  // from the value alone, and an error left over from something earlier would make every one of
+  // them look like a failure.
+  cn1SqliteLastError = "";
+  try {
+    return fn();
+  } catch (err) {
+    cn1SqliteLastError = err && err.message ? String(err.message) : String(err);
+    return failureValue;
+  }
+}
+
+/**
+ * The page size every platform's databases use, set before the file has any pages.
+ *
+ * This build creates databases with 8192-byte pages, and SQLCipher 4 -- the on-disk format all the
+ * ports share -- is defined at 4096. The mismatch does not show up until the database is encrypted:
+ * a rekey has to change the page size, which SQLite refuses on a database that already has pages,
+ * so "Rekeying failed. Pagesize cannot be changed for an encrypted database." A page size set on a
+ * database that already has pages is silently ignored, which is exactly what makes this safe to
+ * issue on every open and useless to issue anywhere later.
+ */
+const CN1_SQLITE_PAGE_SIZE = 4096;
+
+/** Puts a newly opened connection on the shared page size, before anything writes to it. */
+function cn1SqlitePrepareConnection(db) {
+  db.exec("PRAGMA page_size = " + CN1_SQLITE_PAGE_SIZE);
+}
+
+/** Applies the key, if there is one, selecting the portable cipher scheme first. */
+function cn1SqliteApplyKey(db, key) {
+  if (key !== null && key !== undefined && key !== "") {
+    // Select the SQLCipher 4 scheme before applying the key, or the engine uses
+    // its own and the file cannot be read on any other platform.
+    db.exec("PRAGMA cipher = 'sqlcipher'");
+    db.exec("PRAGMA legacy = 4");
+    db.exec("PRAGMA key = \"" + key.replace(/"/g, '""') + "\"");
+  }
+}
+
+/**
+ * Recognises the engine's report for a file whose header did not decrypt.
+ *
+ * SQLite answers SQLITE_NOTADB for a wrong key, because the bytes it produces are not a database
+ * header. A corrupt image reports SQLITE_CORRUPT instead, which no key can fix.
+ */
+function cn1SqliteLooksLikeAKeyFailure(err) {
+  const message = String((err && err.message) || err || "").toLowerCase();
+  return message.indexOf("not a database") >= 0
+      || message.indexOf("notadb") >= 0
+      || message.indexOf("file is encrypted") >= 0;
+}
+
+/**
+ * Applies the key and proves it works, tagging a failure as a key failure.
+ *
+ * Only this step can fail because of the key. Opening the file, the pool and the VFS can all fail
+ * for reasons no key would fix -- storage full, a corrupt file, OPFS unavailable -- and reporting
+ * those as WRONG_KEY would have an application prompting for a passphrase that cannot help, even
+ * when it never supplied one.
+ */
+function cn1SqliteApplyKeyAndProbe(db, key) {
+  const keyed = key !== null && key !== undefined && key !== "";
+  try {
+    cn1SqliteApplyKey(db, key);
+    // Read the schema either way. Key validation is lazy, so an unkeyed open of an encrypted file
+    // also succeeds: without this, opening one without a key would look like proof it is plaintext.
+    db.exec("SELECT count(*) FROM sqlite_master");
+  } catch (err) {
+    // A wrong key looks like a file that is not a database, because the plaintext it produces has
+    // no valid header. A malformed image or a read error is a different thing entirely and no key
+    // repairs it, so only the first is tagged - and only when a key was actually supplied, since
+    // reporting a key problem to a caller who supplied none is a diagnosis impossible on its face.
+    if (keyed && cn1SqliteLooksLikeAKeyFailure(err) && err && typeof err === "object") {
+      err.cn1WrongKey = true;
+    }
+    throw err;
+  }
+}
+
+/** Opens a database by name, through the pool when one is available. */
+function cn1SqliteOpen(name, key) {
+  if (cn1SqlitePool) {
+    // Not OpfsSAHPoolDb, which pins the connection to the pool's own VFS and so cannot be
+    // keyed. Same file, same pool underneath, reached through the shim that can encrypt.
+    const pooled = cn1SqlitePoolVfs
+        ? new cn1Sqlite.oo1.DB({ filename: cn1SqliteDbPath(name), flags: "c",
+            vfs: cn1SqlitePoolVfs })
+        : new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
+    try {
+      cn1SqlitePrepareConnection(pooled);
+      cn1SqliteApplyKeyAndProbe(pooled, key);
+    } catch (err) {
+      try {
+        pooled.close();
+      } catch (ignored) {
+        // Must not replace the tagged error: doing so would lose the wrong-key classification
+        // and surface a raw close failure instead.
+      }
+      throw err;
+    }
+    // Tagged and counted exactly as the memdb path below is: unlink() drops the pool's mapping
+    // for a name without rejecting handles already open on it, so delete has to be told.
+    pooled.cn1DbName = cn1SqliteDbPath(name);
+    cn1SqliteOpened(pooled.cn1DbName);
+    return pooled;
+  }
+  // The same reduction the pool path applies, so "foo" and "/foo" are one database here too --
+  // they are one file in the pool, and two stores in memory would make the fallback disagree with
+  // the storage it stands in for, down to exists() and delete() seeing only one spelling.
+  const memoryName = cn1SqliteDbPath(name);
+  // filename: gives the connection a name inside the VFS, so reopening finds it again.
+  const uri = "file:" + encodeURIComponent(memoryName) + "?vfs=" + cn1SqliteMemoryVfs;
+  const anchored = cn1SqliteMemoryAnchors.has(memoryName);
+  const db = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
+  try {
+    cn1SqlitePrepareConnection(db);
+    cn1SqliteApplyKeyAndProbe(db, key);
+  } catch (err) {
+    // Closing releases the store if this connection was the one that created it, so a rejected
+    // key leaves nothing behind.
+    db.close();
+    throw err;
+  }
+  if (!anchored) {
+    // Created after the real connection so the store already exists. The anchor takes the same
+    // key, but only so that opening it succeeds; it never reads or writes a page afterwards, so
+    // a later rekey through another connection leaves it holding a key it no longer needs.
+    let anchor = null;
+    try {
+      anchor = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
+      cn1SqliteApplyKey(anchor, key);
+    } catch (err) {
+      // The primary too, not just the anchor. It is open, prepared and keyed by this point, and
+      // nothing has recorded it yet -- the handle map and the open count are both written after
+      // this block -- so letting the throw past here left a live connection that nothing could
+      // close and that would keep the store alive against a later delete. Each failed open
+      // leaked another.
+      if (anchor !== null) {
+        try {
+          anchor.close();
+        } catch (alsoFailed) {
+          // The original failure is the one worth reporting.
+        }
+      }
+      db.close();
+      throw err;
+    }
+    cn1SqliteMemoryAnchors.set(memoryName, anchor);
+  }
+  // Tagged so closing this connection can decrement the count without another lookup, and so the
+  // close binding can tell a memdb connection from a pooled one.
+  db.cn1MemoryName = memoryName;
+  db.cn1DbName = memoryName;
+  cn1SqliteOpened(memoryName);
+  return db;
+}
+
+
+/**
+ * Java longs cross the bridge as a BigInt on the exact-longs runtime, as a {__l,l,h} record on the
+ * legacy one, or as a plain Number. Round-tripping through Number silently rounds anything past
+ * 2^53, which is exactly the range identifiers and epoch-microsecond values live in, so convert
+ * through BigInt instead and hand the engine a value it stores exactly.
+ */
+function cn1SqliteToBigInt(v) {
+  if (typeof v === "bigint") {
+    return v;
+  }
+  if (v && typeof v === "object" && v.__l === 1) {
+    return (BigInt(v.h | 0) << 32n) | BigInt(v.l >>> 0);
+  }
+  return BigInt(Math.trunc(Number(v)));
+}
+
+/**
+ * Converts an engine integer into the runtime's Java long.
+ *
+ * A long is a hi/lo pair here, not a BigInt and not a number: handing back a BigInt sends it
+ * through the runtime's _Lc(), whose BigInt branch goes via Number and drops everything past 53
+ * bits. SQLite stores 64-bit integers and the API promises a Java long, so 9007199254740993 came
+ * back as ...992 -- close enough to look right and wrong by one.
+ */
+function cn1SqliteFromBigInt(v) {
+  const big = typeof v === "bigint" ? v : BigInt(Math.trunc(Number(v)));
+  if (typeof _Llit === "function") {
+    // Two's complement both halves: asIntN keeps the sign of a negative value in the high word,
+    // and the low word is read back unsigned on the way in.
+    return _Llit(Number(BigInt.asIntN(32, big & 0xFFFFFFFFn)) | 0,
+      Number(BigInt.asIntN(32, big >> 32n)) | 0);
+  }
+  // A runtime without the hi/lo helpers represents longs as numbers, which is the precision it
+  // has everywhere else too.
+  return Number(big);
+}
+
+function cn1SqliteDbPath(name) {
+  return name.charAt(0) === "/" ? name : "/" + name;
+}
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_init_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_init___R_boolean"], function*() {
+  if (cn1Sqlite) {
+    return true;
+  }
+  yield { op: "await", promise: cn1SqliteStartInit() };
+  return !!cn1Sqlite;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isPersistent_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_isPersistent___R_boolean"],
+  function() { return !!cn1SqlitePool; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailable_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailable___R_boolean"],
+  // A loaded engine is not enough: the cipher lives in a shim VFS, and a database opened on the
+  // storage VFS directly refuses every key. Answering yes here on an engine that cannot key the
+  // storage it actually uses turns a clear "encryption is unsupported" into an open that fails.
+  function() {
+    if (!cn1Sqlite) {
+      return false;
+    }
+    return cn1SqlitePool ? !!cn1SqlitePoolVfs : cn1SqliteMemoryVfs !== "memdb";
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_exists___java_lang_String_R_boolean"],
+  function(name) {
+    return cn1SqliteGuard(function() {
+      const n = jvm.toNativeString(name);
+      if (!cn1SqlitePool) {
+        return cn1SqliteMemoryAnchors.has(cn1SqliteDbPath(n));
+      }
+      return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(n)) >= 0;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String_R_boolean"],
+  function(name) {
+    return cn1SqliteGuard(function() {
+      const n = jvm.toNativeString(name);
+      if (cn1SqliteIsOpen(cn1SqliteDbPath(n))) {
+        // Refused rather than half done, and for both backends. The pool's unlink() removes the
+        // name-to-file mapping and clears the path on the access handle; it does not reject the
+        // SQLite handles already open on that file, and dropping the memdb anchor does not
+        // release a store another connection still holds. Either way the name would go while the
+        // data lived on behind the open connection: exists() would answer no, reopening would
+        // create a fresh database, and every write through the old handle would be discarded with
+        // the orphan when it closed. Saying so is the only honest answer.
+        cn1SqliteLastError = "the database " + n + " is still open; close it before deleting it";
+        return false;
+      }
+      if (cn1SqlitePool) {
+        // The rollback journal first, and the database itself last. The pool holds each as its own
+        // entry, so unlinking the database alone left a file holding the pages of an interrupted
+        // transaction, under a name reopening the database reads back. (This VFS has no shared
+        // memory and so no WAL, but the whole set is unlinked anyway: it costs nothing when the
+        // entry is absent, and it does not have to be revisited if that ever changes.)
+        //
+        // Order matters as much as the set does. Removing the database first and then failing on a
+        // companion reported a failure over a database that was already gone -- the caller is told
+        // to retry what cannot be retried, and reads the error as its data being intact. With the
+        // database last, anything that throws before it leaves a database that really can be
+        // deleted again.
+        //
+        // Unwrapped, all of them. The pool answers a name it never had by returning false, so the
+        // entries this database never created cost nothing and raise nothing; it throws only when
+        // it held the entry and could not release it, and that has to reach the guard. Swallowing
+        // it would report a deletion that did not happen while a file holding database pages
+        // stayed in the pool, which is the whole of what deleting the working files is for.
+        const cn1SqliteSidecars = ["-journal", "-wal", "-shm"];
+        for (let i = 0; i < cn1SqliteSidecars.length; i++) {
+          cn1SqlitePool.unlink(cn1SqliteDbPath(n) + cn1SqliteSidecars[i]);
+        }
+        cn1SqlitePool.unlink(cn1SqliteDbPath(n));
+      } else {
+        const anchor = cn1SqliteMemoryAnchors.get(cn1SqliteDbPath(n));
+        if (anchor) {
+          // Dropping the anchor releases the store once every other connection to it has closed.
+          anchor.close();
+          cn1SqliteMemoryAnchors.delete(cn1SqliteDbPath(n));
+        }
+      }
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_String_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_open___java_lang_String_java_lang_String_R_long"],
+  function(name, key) {
+    cn1SqliteLastOpenWrongKey = false;
+    cn1SqliteLastError = "";
+    try {
+      return cn1SqliteRegister(cn1SqliteOpen(jvm.toNativeString(name), key === null ? null : jvm.toNativeString(key)));
+    } catch (err) {
+      // Report through a sentinel and two accessors rather than by throwing. An exception raised
+      // inside a native binding does not cross back into the translated code as a Java throwable:
+      // it unwinds the worker and leaves every thread waiting on a call that never returns, which
+      // is a hang rather than an error.
+      cn1SqliteLastOpenWrongKey = !!(err && err.cn1WrongKey);
+      cn1SqliteLastError = err && err.message ? String(err.message) : String(err);
+      return 0;
+    }
+  });
+
+// The store the previous implementation used, which this engine cannot read.
+//
+// WebSQL went out of Chrome in 119 and Firefox never had it, so on nearly every browser this
+// answers false without doing anything. The overlap that matters is one old enough to still hold a
+// WebSQL store and new enough for the OPFS pool this engine needs, where an application that
+// upgrades would otherwise open a new empty database and show its user an empty application.
+//
+// There is no way to ask WebSQL whether a database exists: openDatabase creates one when it does
+// not. So this asks for the smallest store it can and reads the schema, and on a browser that has
+// the API but not the data it leaves an empty legacy database behind -- a few kilobytes, once, on
+// a browser that is already carrying the old store this is looking for.
+const CN1_SQLITE_LEGACY_TABLES =
+  "SELECT count(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+
+function cn1SqliteLegacyRowCount(resultSet) {
+  return resultSet && resultSet.rows && resultSet.rows.length > 0
+      ? resultSet.rows.item(0).c > 0 : false;
+}
+
+/// A worker gets the synchronous form, which answers without the await bridge.
+function cn1SqliteLegacyHasDataSync(name) {
+  const db = openDatabaseSync(name, "", name, 1);
+  let found = false;
+  db.readTransaction(function(tx) {
+    found = cn1SqliteLegacyRowCount(tx.executeSql(CN1_SQLITE_LEGACY_TABLES, []));
+  });
+  return found;
+}
+
+/// A window has only the callback form, which is why the binding below is a generator.
+function cn1SqliteLegacyHasDataAsync(name) {
+  return new Promise(function(resolve) {
+    let db;
+    try {
+      db = openDatabase(name, "", name, 1);
+    } catch (cannotOpen) {
+      resolve(false);
+      return;
+    }
+    if (!db) {
+      resolve(false);
+      return;
+    }
+    db.readTransaction(function(tx) {
+      tx.executeSql(CN1_SQLITE_LEGACY_TABLES, [], function(ignoredTx, resultSet) {
+        resolve(cn1SqliteLegacyRowCount(resultSet));
+      }, function() {
+        resolve(false);
+        return false;
+      });
+    }, function() {
+      resolve(false);
+    });
+  });
+}
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_legacyStoreHasData_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_legacyStoreHasData___java_lang_String_R_boolean"],
+  function*(name) {
+    const n = jvm.toNativeString(name);
+    try {
+      if (typeof openDatabaseSync === "function") {
+        return cn1SqliteLegacyHasDataSync(n);
+      }
+      if (typeof openDatabase === "function") {
+        return yield { op: "await", promise: cn1SqliteLegacyHasDataAsync(n) };
+      }
+    } catch (cannotAsk) {
+      // A browser that refuses the question is not one holding data this can lose: WebSQL threw
+      // for a disabled or full store, and answering true there would refuse every new database.
+      return false;
+    }
+    return false;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey___R_boolean"],
+  function() { return cn1SqliteLastOpenWrongKey; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastError_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastError___R_java_lang_String"],
+  function() { return jvm.createStringLiteral(String(cn1SqliteLastError)); });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_inTransaction_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_inTransaction___long_R_boolean"],
+  function(dbId) {
+    // The engine's own answer. A script that fails partway stops at the failing statement, and
+    // nothing outside can see which one that was, so reading the script cannot tell an unexecuted
+    // trailing COMMIT from an executed one.
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteHandles.get(Number(dbId));
+      return db ? !cn1Sqlite.capi.sqlite3_get_autocommit(db.pointer) : false;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_boolean"],
+  function(dbId) {
+    // Reports failure rather than swallowing it. A close that fails on an OPFS flush has not
+    // written the data, and the caller's peer is already cleared, so returning normally would be
+    // the last chance to say so passing silently. The handle is dropped before the close so a
+    // failure cannot leave it stranded in the map either.
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteHandles.get(Number(dbId));
+      if (db) {
+        // Always close: this is a connection of its own, never the anchor, and the anchor is what
+        // keeps a memdb-backed database readable after its last application connection goes away.
+        cn1SqliteHandles.delete(Number(dbId));
+        if (db.cn1DbName) {
+          cn1SqliteClosed(db.cn1DbName);
+        }
+        db.close();
+      }
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String_R_boolean"],
+  function(dbId, key) {
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteLookup(Number(dbId));
+      db.exec("PRAGMA cipher = 'sqlcipher'");
+      db.exec("PRAGMA legacy = 4");
+      const k = key === null ? "" : jvm.toNativeString(key);
+      db.exec("PRAGMA rekey = \"" + k.replace(/"/g, '""') + "\"");
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_execScript_long_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript___long_java_lang_String_R_boolean"],
+  function(dbId, sql) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(dbId)).exec(jvm.toNativeString(sql));
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_prepare_long_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_prepare___long_java_lang_String_R_long"],
+  function(dbId, sql) {
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteLookup(Number(dbId));
+      return cn1SqliteRegister(db.prepare(jvm.toNativeString(sql)));
+    }, 0);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount___long_R_int"],
+  function(stmtId) {
+    return cn1SqliteGuard(function() { return cn1SqliteLookup(Number(stmtId)).parameterCount; }, -1);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int_R_boolean"],
+  function(stmtId, index) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, null);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindString_long_int_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString___long_int_java_lang_String_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0,
+        value === null ? null : jvm.toNativeString(value));
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob_long_int_byte_1ARRAY_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob___long_int_byte_1ARRAY_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      if (value === null) {
+        cn1SqliteLookup(Number(stmtId)).bind(index | 0, null);
+        return true;
+      }
+      // Java bytes are signed; the engine wants raw octets.
+      const bytes = new Uint8Array(value.length);
+      for (let i = 0; i < value.length; i++) {
+        bytes[i] = value[i] & 0xff;
+      }
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, bytes);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, cn1SqliteToBigInt(value));
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble_long_int_double_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble___long_int_double_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, value);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_step_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_step___long_R_int"],
+  function(stmtId) {
+    // 1 landed on a row, 0 reached the end, -1 failed. A boolean had no room to say "failed",
+    // which is why this one is an int.
+    return cn1SqliteGuard(function() {
+      return cn1SqliteLookup(Number(stmtId)).step() ? 1 : 0;
+    }, -1);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long_R_boolean"],
+  function(stmtId) {
+    return cn1SqliteGuard(function() {
+      // Keep the bindings: re-stepping a parameterised query is how a backward seek works.
+      //
+      // Guarded because reset is not the inert call it looks like: the wrapper checks
+      // sqlite3_reset, which reports the error from the statement's last step, so resetting
+      // after a failed step raises that error here rather than at the step.
+      cn1SqliteLookup(Number(stmtId)).reset(false);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish___long_R_void"],
+  function(stmtId) {
+    // Same reasoning as close: finalize reports the statement's last error, and this is a
+    // cleanup path that cannot usefully raise. Handle dropped either way so it cannot be
+    // finalized twice.
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteHandles.get(Number(stmtId));
+      if (stmt) {
+        cn1SqliteHandles.delete(Number(stmtId));
+        stmt.finalize();
+      }
+      return null;
+    }, null);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish___long_R_boolean"],
+  function(stmtId) {
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteHandles.get(Number(stmtId));
+      if (stmt) {
+        // Dropped before anything that can throw. finalize() reports the result of the statement
+        // it is finalizing, so a failed write -- a constraint violation, say -- throws from step()
+        // and then throws again from the cleanup, and a delete placed after it never runs. The
+        // entry would stay in the map forever with nothing left able to reach it, one per failed
+        // write. The same reasoning the close binding already follows.
+        cn1SqliteHandles.delete(Number(stmtId));
+        try {
+          while (stmt.step()) {
+            // A statement that returns rows still has to run to completion.
+          }
+        } finally {
+          stmt.finalize();
+        }
+      }
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount___long_R_int"],
+  function(stmtId) {
+    return cn1SqliteGuard(function() { return cn1SqliteLookup(Number(stmtId)).columnCount; }, -1);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnName_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnName___long_int_R_java_lang_String"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      const name = cn1SqliteLookup(Number(stmtId)).getColumnName(col | 0);
+      return name === null || name === undefined ? null : jvm.createStringLiteral(String(name));
+    }, null);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_long_int_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull___long_int_R_int"],
+  function(stmtId, col) {
+    // -1 rather than a boolean, because "true" here is indistinguishable from a real SQL NULL:
+    // an out-of-range column index would be reported as a null value and the getter would hand
+    // back null or zero instead of raising. 1 is null, 0 is not, -1 is a failed lookup.
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      const index = col | 0;
+      if (index < 0 || index >= stmt.columnCount) {
+        throw new Error("Column " + index + " is out of range");
+      }
+      // The column's type, not its value. Asking for the value materialises it, and for a blob
+      // that means allocating and copying every byte out of the wasm heap into a Uint8Array which
+      // is then thrown away -- on the read path the cursor takes before every getBlob, so a large
+      // value was copied a second time for nothing and could fail on memory that would otherwise
+      // have held it. The type is what the question was about anyway.
+      return cn1Sqlite.capi.sqlite3_column_type(stmt.pointer, index)
+              === cn1Sqlite.capi.SQLITE_NULL ? 1 : 0;
+    }, -1);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnString_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnString___long_int_R_java_lang_String"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      const index = col | 0;
+      if (index < 0 || index >= stmt.columnCount) {
+        throw new Error("Column " + index + " is out of range");
+      }
+      // Asked as text, which is what every other port does: they read through
+      // sqlite3_column_text, and SQLite converts whatever is stored. Left to the stored type this
+      // handed back the value as it sits, so a blob arrived as a Uint8Array and String() rendered
+      // it "65,66" where the native ports return "AB" -- the same row read through the same API
+      // giving different answers on one platform.
+      //
+      // NULL is decided before the conversion rather than after it, so that a column holding SQL
+      // NULL stays null instead of becoming whatever text a forced conversion produces for it.
+      if (cn1Sqlite.capi.sqlite3_column_type(stmt.pointer, index)
+              === cn1Sqlite.capi.SQLITE_NULL) {
+        return null;
+      }
+      const v = stmt.get(index, cn1Sqlite.capi.SQLITE_TEXT);
+      return v === null || v === undefined ? null : jvm.createStringLiteral(String(v));
+    }, null);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob_long_int_R_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob___long_int_R_byte_1ARRAY"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      // SQLITE_BLOB, not the Uint8Array constructor: this API takes a type code there, and a
+      // constructor makes it answer "Don't know how to translate type of result column" for every
+      // blob read rather than returning the bytes.
+      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0, cn1Sqlite.capi.SQLITE_BLOB);
+      if (v === null || v === undefined) {
+        return null;
+      }
+      const out = jvm.newArray(v.length, "JAVA_BYTE", 1);
+      for (let i = 0; i < v.length; i++) {
+        // Back to signed Java bytes.
+        out[i] = v[i] > 127 ? v[i] - 256 : v[i];
+      }
+      return out;
+    }, null);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble_long_int_R_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble___long_int_R_double"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      // Asked of the engine for the same reason columnLong is: a value stored as TEXT is read by
+      // SQLite as the number its leading characters spell, and Number() makes NaN of anything
+      // with a non-numeric tail. sqlite3_column_double answers 0.0 for a null column, which is
+      // what a double getter has to return anyway.
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      return cn1Sqlite.capi.sqlite3_column_double(stmt.pointer, col | 0);
+    }, 0);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong_long_int_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong___long_int_R_long"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      // Asked of the engine as an integer, which is what the ports that call
+      // sqlite3_column_int64 get. Reading the column's own type and converting here does not
+      // agree with them on a value stored as TEXT: SQLite reads as many leading digits as it
+      // finds, so '123abc' is 123 and 'abc' is 0, while Number() makes NaN of both -- and BigInt
+      // then throws, which this guard would report as 0 for one and 0 for the other. A decimal
+      // too large for a long clamps to its limit there and wraps here.
+      // No null check either: sqlite3_column_int64 answers 0 for a NULL column, which is what a
+      // long getter returns for one anyway, and what the native ports return through the same
+      // call.
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      return cn1SqliteFromBigInt(
+        cn1Sqlite.capi.sqlite3_column_int64(stmt.pointer, col | 0));
+    }, 0);
+  });

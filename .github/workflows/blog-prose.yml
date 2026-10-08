@@ -49,7 +49,7 @@ jobs:
           # base version of each changed post.
           fetch-depth: 0
 
-      - name: Detect changed blog and social prose
+      - name: Detect changed prose and diagram rendering inputs
         id: detect
         run: |
           set -euo pipefail
@@ -58,7 +58,7 @@ jobs:
           if [ -z "$mb" ]; then
             count=0
           else
-            count="$(git diff --name-only --diff-filter=ACMR "$mb" HEAD -- 'docs/website/content/blog/*.md' 'docs/website/social/linkedin/*.md' | wc -l | tr -d ' ')"
+            count="$(git diff --name-only --diff-filter=ACMR "$mb" HEAD -- 'docs/website/content/blog/*.md' 'docs/website/social/linkedin/*.md' 'docs/website/layouts/shortcodes/mermaid.html' 'docs/website/hugo.toml' 'scripts/website/validate_mermaid.mjs' 'scripts/website/test_validate_mermaid.mjs' '.github/workflows/blog-prose.yml' | wc -l | tr -d ' ')"
           fi
           echo "Changed blog and social files: $count"
           if [ "$count" -gt 0 ]; then
@@ -130,7 +130,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright browsers
         if: steps.detect.outputs.has_posts == 'true'
         run: |
           set -euo pipefail
@@ -141,12 +141,30 @@ jobs:
           # vendor mirror makes its apt-get fail as a whole and it reports
           # only "Failed to install browser dependencies".
           bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
-          npx playwright install-deps chromium
-          npx playwright install chromium
+          npx playwright install-deps chromium firefox
+          npx playwright install chromium firefox
+
+      - name: Test Mermaid render gate
+        if: steps.detect.outputs.has_posts == 'true'
+        run: node --test scripts/website/test_validate_mermaid.mjs
+
+      - name: Set up Hugo for rendered diagram checks
+        if: steps.detect.outputs.has_posts == 'true'
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: 'latest'
+          extended: true
+
+      - name: Build minified blog pages including upcoming posts
+        if: steps.detect.outputs.has_posts == 'true'
+        run: hugo --source docs/website --destination "${{ runner.temp }}/blog-mermaid-site" --buildFuture --minify
 
       - name: Validate blog Mermaid diagrams
         if: steps.detect.outputs.has_posts == 'true'
-        run: node scripts/website/validate_mermaid.mjs docs/website/content/blog
+        run: |
+          node scripts/website/validate_mermaid.mjs \
+            --site "${{ runner.temp }}/blog-mermaid-site" \
+            --browser chromium --browser firefox docs/website/content/blog
 
       - name: Upload net-new findings report
         if: ${{ !cancelled() && steps.detect.outputs.has_posts == 'true' }}
