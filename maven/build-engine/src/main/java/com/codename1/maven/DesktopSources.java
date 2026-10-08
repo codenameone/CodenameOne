@@ -55,11 +55,19 @@ public final class DesktopSources {
     ///   the `javafx.application.Application` subclass of a JavaFX
     ///   application, the class holding `public static void main(String[])`
     ///   of a Swing one.
-    /// - `kind`: `javafx` or `swing`, which says which of the two that is.
+    /// - `kind`: `javafx` or `swing`, which says which of the two that is --
+    ///   or `library`, which says the sources are not an application at all:
+    ///   they are screens another application uses, no main class is
+    ///   generated, and `mainClass` is not read.
     ///
     /// `cn1:import-desktop-project` writes it; a developer who places sources
-    /// in the directory by hand writes it too.
+    /// in the directory by hand writes it too. Without the file, a project
+    /// whose own main class exists is treated as `kind=library`.
     public static final String ENTRY_RECORD = "cn1-desktop.properties";
+
+    /// The `kind` of desktop sources that another application uses rather
+    /// than starts: nothing is generated for them.
+    public static final String KIND_LIBRARY = "library";
 
     /// The `kind` of an application started through a `main` method.
     public static final String KIND_SWING = "swing";
