@@ -146,12 +146,7 @@ public class JXErrorPane extends JComponent {
             }
             at = at.getCause();
         }
-        // The text goes in while the area is out of its scroll pane: set
-        // inside one that was never laid out, it asks the viewport to show
-        // the caret, and the viewport's first layout then never ends.
-        detailsScroll.setViewportView(null);
         details.setText(sb.toString());
-        detailsScroll.setViewportView(details);
         detailsButton.setEnabled(true);
     }
 

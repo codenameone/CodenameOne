@@ -39,6 +39,7 @@ public class Container extends Component {
 
     private final ArrayList<Component> children = new ArrayList<Component>();
     private LayoutManager layoutMgr;
+    private boolean cn1Validating;
     private FocusTraversalPolicy focusPolicy;
     private ArrayList<ContainerListener> containerListeners;
 
@@ -261,27 +262,43 @@ public class Container extends Component {
 
     @Override
     public void validate() {
-        if (!cn1Valid()) {
+        if (!cn1Valid() && !cn1Validating) {
             validateTree();
             repaint();
         }
     }
 
+    /// Lays this container out and then its invalid children.
+    ///
+    /// A pass that is asked for while this container is in the middle of
+    /// one does nothing. A layout may ask for something to be scrolled
+    /// into view, and showing a rectangle validates the viewport first so
+    /// that it scrolls within the view's new size: without this the
+    /// viewport's layout would start the viewport's layout, without end.
+    /// The pass under way reaches everything the second one would have.
     protected void validateTree() {
-        if (!cn1Valid()) {
-            doLayout();
-            for (int i = 0; i < children.size(); i++) {
-                Component c = children.get(i);
-                if (c instanceof Container) {
-                    if (!c.cn1Valid()) {
-                        ((Container) c).validateTree();
+        if (cn1Validating) {
+            return;
+        }
+        cn1Validating = true;
+        try {
+            if (!cn1Valid()) {
+                doLayout();
+                for (int i = 0; i < children.size(); i++) {
+                    Component c = children.get(i);
+                    if (c instanceof Container) {
+                        if (!c.cn1Valid()) {
+                            ((Container) c).validateTree();
+                        }
+                    } else {
+                        c.validate();
                     }
-                } else {
-                    c.validate();
                 }
             }
+            cn1SetValid(true);
+        } finally {
+            cn1Validating = false;
         }
-        cn1SetValid(true);
     }
 
     @Override

@@ -268,22 +268,50 @@ public abstract class JTextComponent extends JComponent implements Scrollable {
 
     private final class Sync implements DocumentListener, ChangeListener {
 
+        /// The caret is being moved by an edit whose text the widget does
+        /// not have yet.
+        private boolean deferReveal;
+        private boolean revealOwed;
+
         @Override
         public void insertUpdate(DocumentEvent e) {
             int offs = e.getOffset();
             int len = e.getLength();
             int dot = caret.getDot();
             int mark = caret.getMark();
-            moveCaret(mark >= offs ? mark + len : mark, dot >= offs ? dot + len : dot);
+            deferReveal = true;
+            try {
+                moveCaret(mark >= offs ? mark + len : mark, dot >= offs ? dot + len : dot);
+            } finally {
+                deferReveal = false;
+            }
             changed();
+            revealDeferred();
+        }
+
+        /// Tells the component that the caret moved once the widget has
+        /// the text that moved it. Showing the caret before that would
+        /// scroll within the size of the old text, one line short of the
+        /// end of a log that is being appended to.
+        private void revealDeferred() {
+            if (revealOwed) {
+                revealOwed = false;
+                cn1CaretMoved(caret.getDot());
+            }
         }
 
         @Override
         public void removeUpdate(DocumentEvent e) {
             int offs = e.getOffset();
             int len = e.getLength();
-            moveCaret(after(caret.getMark(), offs, len), after(caret.getDot(), offs, len));
+            deferReveal = true;
+            try {
+                moveCaret(after(caret.getMark(), offs, len), after(caret.getDot(), offs, len));
+            } finally {
+                deferReveal = false;
+            }
             changed();
+            revealDeferred();
         }
 
         private int after(int p, int offs, int len) {
@@ -322,7 +350,11 @@ public abstract class JTextComponent extends JComponent implements Scrollable {
                 }
             }
             fireCaretUpdate(new Moved(JTextComponent.this, dot, caret.getMark()));
-            cn1CaretMoved(dot);
+            if (deferReveal) {
+                revealOwed = true;
+            } else {
+                cn1CaretMoved(dot);
+            }
         }
     }
 

@@ -112,21 +112,36 @@ public class JTextArea extends JTextComponent {
 
     // ------------------------------------------------------------ caret
 
-    /// Scrolls the viewport this area is in so that the caret's line
-    /// shows. The line's place is estimated from the hard line breaks;
-    /// the end of the text is exact.
+    /// Asks for the caret's line to be shown in the viewport this area is
+    /// in. A viewport that is waiting for a layout is laid out first, and
+    /// that layout shows the caret within the size the text has now; one
+    /// that is not is scrolled at once.
     @Override
     protected void cn1CaretMoved(int dot) {
-        if (getParent() instanceof JViewport) {
-            revealPending = true;
-            cn1RevealCaret();
+        java.lang.Object p = getParent();
+        if (!(p instanceof JViewport)) {
+            return;
+        }
+        revealPending = true;
+        JViewport viewport = (JViewport) p;
+        if (viewport.getWidth() > 0 && viewport.getHeight() > 0) {
+            // Does nothing when the viewport is laid out already, or is in
+            // the middle of the layout this was called from.
+            viewport.validate();
+        }
+        if (revealPending && cn1RevealCaret() && viewport.isValid()) {
+            revealPending = false;
         }
     }
 
-    /// Called by the viewport once it gave the area its new size.
-    public void cn1RevealCaret() {
+    /// Scrolls the viewport so that the caret's line shows, if that was
+    /// asked for and the area has a size; answers whether it did. Called
+    /// by the viewport once it gave the area its new size. The line's
+    /// place is estimated from the hard line breaks; the end of the text
+    /// is exact.
+    public boolean cn1RevealCaret() {
         if (!revealPending || !(getParent() instanceof JViewport) || getHeight() <= 0) {
-            return;
+            return false;
         }
         Document doc = getDocument();
         int lines = getLineCount();
@@ -139,6 +154,7 @@ public class JTextArea extends JTextComponent {
             y = doc == null ? 0 : doc.getDefaultRootElement().getElementIndex(dot) * rowHeight;
         }
         JViewport.cn1ScrollRectToVisible(this, new Rectangle(0, y, 1, rowHeight));
+        return true;
     }
 
     /// Forgets the pending request to show the caret, after a layout

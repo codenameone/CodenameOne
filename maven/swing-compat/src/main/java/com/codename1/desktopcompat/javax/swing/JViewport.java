@@ -67,6 +67,7 @@ public class JViewport extends JComponent {
     private boolean nativeScrolling = true;
     private boolean scrollableX = true;
     private boolean scrollableY = true;
+    private boolean layingOut;
 
     public JViewport() {
         setOpaque(true);
@@ -309,7 +310,10 @@ public class JViewport extends JComponent {
         if (view == null) {
             return;
         }
-        if (!view.isValid()) {
+        if (!layingOut && !view.isValid()) {
+            // The view may just have grown: scroll within its new size.
+            // Not from this viewport's own layout, which is what gives the
+            // view that size and would otherwise be started again.
             validate();
         }
         Dimension extent = getExtentSize();
@@ -347,6 +351,18 @@ public class JViewport extends JComponent {
 
     @Override
     public void doLayout() {
+        if (layingOut) {
+            return;
+        }
+        layingOut = true;
+        try {
+            layOutView();
+        } finally {
+            layingOut = false;
+        }
+    }
+
+    private void layOutView() {
         Component view = getView();
         if (view == null) {
             return;
