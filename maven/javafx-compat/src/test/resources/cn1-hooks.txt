@@ -13,6 +13,7 @@ javafx.scene.Node#cn1Events
 javafx.scene.Node#cn1FocusRequested
 javafx.scene.Node#cn1GeometryChanged
 javafx.scene.Node#cn1HasPeer
+javafx.scene.Node#cn1HasPseudoClass
 javafx.scene.Node#cn1Matches
 javafx.scene.Node#cn1Paint
 javafx.scene.Node#cn1PaintMatrix
@@ -25,11 +26,14 @@ javafx.scene.Node#cn1PickLocal
 javafx.scene.Node#cn1Repaint
 javafx.scene.Node#cn1RequestLayout
 javafx.scene.Node#cn1Restyle
+javafx.scene.Node#cn1SetStyleState
 javafx.scene.Node#cn1SetStyleValue
+javafx.scene.Node#cn1StyleState
 javafx.scene.Node#cn1StyleValue
 javafx.scene.Node#cn1SyncPeerBounds
 javafx.scene.Parent#cn1Children
 javafx.scene.Parent#cn1ClearSizeCache
+javafx.scene.Parent#cn1HasStylesheets
 javafx.scene.Parent#cn1MarkNeedsLayout
 javafx.scene.Parent#cn1PeerChildOffset
 javafx.scene.Parent#cn1PickSelf

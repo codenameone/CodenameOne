@@ -200,6 +200,12 @@ public abstract class Parent extends Node {
         return managed;
     }
 
+    /// Returns whether this parent has style sheets of its own, without
+    /// creating the list [#getStylesheets()] answers.
+    public final boolean cn1HasStylesheets() {
+        return stylesheets != null && !stylesheets.isEmpty();
+    }
+
     /// Returns the style sheet locations of this parent. The list is
     /// passed to the installed style engine; without one it has no effect.
     public final ObservableList<String> getStylesheets() {

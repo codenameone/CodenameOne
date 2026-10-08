@@ -28,6 +28,7 @@ import java.io.InputStream;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
 
+import javafx.beans.NamedArg;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyDoubleProperty;
@@ -82,27 +83,30 @@ public class Image {
     private com.codename1.ui.Image nativeImage;
 
     /// Loads an image from a URL at its own size.
-    public Image(String url) {
+    public Image(@NamedArg("url") String url) {
         this(url, 0, 0, false, false, false);
     }
 
     /// Loads an image from a URL at its own size. Loading is synchronous
     /// whatever the flag says.
-    public Image(String url, boolean backgroundLoading) {
+    public Image(@NamedArg("url") String url, @NamedArg("backgroundLoading") boolean backgroundLoading) {
         this(url, 0, 0, false, false, backgroundLoading);
     }
 
     /// Loads an image from a URL and scales it to a requested size; a
     /// dimension that is not positive keeps the picture's own, or follows
     /// the other one when the ratio is preserved.
-    public Image(String url, double requestedWidth, double requestedHeight, boolean preserveRatio, boolean smooth) {
+    public Image(@NamedArg("url") String url, @NamedArg("requestedWidth") double requestedWidth,
+            @NamedArg("requestedHeight") double requestedHeight, @NamedArg("preserveRatio") boolean preserveRatio,
+            @NamedArg("smooth") boolean smooth) {
         this(url, requestedWidth, requestedHeight, preserveRatio, smooth, false);
     }
 
     /// Loads an image from a URL and scales it to a requested size.
     /// Loading is synchronous whatever the flag says.
-    public Image(String url, double requestedWidth, double requestedHeight, boolean preserveRatio, boolean smooth,
-            boolean backgroundLoading) {
+    public Image(@NamedArg("url") String url, @NamedArg("requestedWidth") double requestedWidth,
+            @NamedArg("requestedHeight") double requestedHeight, @NamedArg("preserveRatio") boolean preserveRatio,
+            @NamedArg("smooth") boolean smooth, @NamedArg("backgroundLoading") boolean backgroundLoading) {
         if (url == null) {
             throw new NullPointerException("URL must not be null");
         }

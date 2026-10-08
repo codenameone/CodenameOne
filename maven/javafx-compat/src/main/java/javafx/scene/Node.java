@@ -130,6 +130,7 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     private final ObservableList<String> styleClass = FXCollections.observableArrayList();
     private ObservableSet<PseudoClass> pseudoClasses;
     private HashMap<String, Object> styledFrom;
+    private Object styleState;
 
     private final BooleanProperty visible = new FxBoolean(this, "visible", true, Dirty.PAINT | VISIBILITY);
     private final BooleanProperty managed = new FxBoolean(this, "managed", true, Dirty.LAYOUT);
@@ -515,22 +516,26 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         return styleClass;
     }
 
+    /// The name a style sheet selects this node by: the simple name of
+    /// its class.
+    ///
+    /// An anonymous subclass has no simple name, and is selected by the
+    /// name of its class without the package (`Outer$1`), which is what a
+    /// desktop JavaFX answers for it too. The name of the class it extends
+    /// is not used: the device library cannot ask a class for its
+    /// superclass. Select such a node by its style class, as the style
+    /// sheets of the controls do, or override this method.
     @Override
     public String getTypeSelector() {
-        Class<?> c = getClass();
-        String name = c.getName();
+        String name = getClass().getName();
+        int dot = name.lastIndexOf('.');
         int dollar = name.lastIndexOf('$');
-        // An anonymous subclass is selected as the class it extends.
-        while (dollar >= 0 && dollar + 1 < name.length() && name.charAt(dollar + 1) >= '0'
-                && name.charAt(dollar + 1) <= '9') {
-            c = c.getSuperclass();
-            if (c == null) {
-                break;
+        if (dollar > dot && dollar + 1 < name.length()) {
+            char first = name.charAt(dollar + 1);
+            if (first < '0' || first > '9') {
+                return name.substring(dollar + 1);
             }
-            name = c.getName();
-            dollar = name.lastIndexOf('$');
         }
-        int dot = Math.max(name.lastIndexOf('.'), dollar);
         return name.substring(dot + 1);
     }
 
@@ -558,6 +563,24 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         if (changed) {
             cn1Restyle();
         }
+    }
+
+    /// Returns whether a pseudo-class state is on, without creating the
+    /// set [#getPseudoClassStates()] answers; what a style engine asks for
+    /// every selector it tries.
+    public final boolean cn1HasPseudoClass(PseudoClass pseudoClass) {
+        return pseudoClasses != null && pseudoClasses.contains(pseudoClass);
+    }
+
+    /// Returns what the style engine keeps for this node between two
+    /// restyles, or `null`. The object is the engine's own.
+    public final Object cn1StyleState() {
+        return styleState;
+    }
+
+    /// Stores what the style engine keeps for this node.
+    public final void cn1SetStyleState(Object state) {
+        styleState = state;
     }
 
     /// Asks the style engine to style this node now.

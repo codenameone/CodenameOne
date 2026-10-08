@@ -126,6 +126,14 @@
             <artifactId>codenameone-android-res-compiler</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The FXML and style sheet compiler of the JavaFX layer: the build
+             plugins call it before javac, and CompatRemapper calls its
+             dispatch generator after relocation. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-fxml-compiler</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.ant</groupId>
             <artifactId>ant</artifactId>

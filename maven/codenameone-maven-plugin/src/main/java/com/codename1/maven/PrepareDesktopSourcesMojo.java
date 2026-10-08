@@ -105,8 +105,8 @@ public class PrepareDesktopSourcesMojo extends AbstractCN1Mojo {
         }
     }
 
-    /// EXTENSION POINT, deliberately empty: the build-time FXML and CSS
-    /// compile step goes here.
+    /// The build-time FXML and style sheet compile step of the JavaFX
+    /// layer: [com.codename1.fxml.DesktopResourceCompiler].
     ///
     /// A device has no XML parser to spare and no reflection, so what a
     /// desktop JavaFX runtime does when it loads an `.fxml` document or a
@@ -125,25 +125,59 @@ public class PrepareDesktopSourcesMojo extends AbstractCN1Mojo {
     ///   compile (`**/*.fxml`, `**/*.css`); it may not exist.
     /// - `classpath`: the module's resolved compile classpath, which holds
     ///   `codenameone-javafx-compat` when the JavaFX layer is available.
-    /// - `javaOut`: where to write generated Java sources. Whatever is
-    ///   written there is compiled with the application: the directory is
-    ///   registered as a source root right after this returns, if it exists.
-    /// - `resourcesOut`: where to write generated classpath resources (a
-    ///   binary form of the documents); registered as a resource root the
-    ///   same way.
+    /// - `javaOut`: where the generated Java sources are written. The
+    ///   directory is registered as a source root right after this returns,
+    ///   if it exists.
+    /// - `resourcesOut`: where the compiled style sheets are written;
+    ///   registered as a resource root the same way.
     ///
     /// Generated sources are compiled before the application is relocated, so
     /// they name the JavaFX API as an application does (`javafx.scene...`),
-    /// and `remap-compat` relocates them with everything else. An
-    /// implementation should leave both directories untouched when its inputs
-    /// have not changed, as `compile-android-res` does, so an unchanged build
-    /// recompiles nothing.
+    /// and `remap-compat` relocates them with everything else. Neither
+    /// directory is touched when its inputs have not changed, so an unchanged
+    /// build recompiles nothing.
     ///
-    /// The Gradle build needs the same step as a task with declared inputs
-    /// and outputs; see the matching note in the Gradle plugin's `AppSupport`.
+    /// A document or a sheet the compiler rejects fails the build with every
+    /// error it found, each as `file:line:column: message`; what it only
+    /// warns about -- a style property this layer does not have -- is logged.
+    ///
+    /// The Gradle build runs the same compiler as a task with declared inputs
+    /// and outputs; see `CompileDesktopResourcesTask` in the Gradle plugin.
     protected void compileDesktopResources(File desktopDir, File resourcesDir, List<File> classpath, File javaOut,
                                            File resourcesOut) throws MojoExecutionException, MojoFailureException {
-        getLog().debug("No build-time FXML/CSS compile step is installed; " + resourcesDir + " is shipped as it is");
+        if (CompatLayers.runtimeJar(CompatLayers.JAVAFX, classpath) == null) {
+            getLog().debug("The JavaFX layer is not on the class path; no FXML or style sheet is compiled");
+            return;
+        }
+        com.codename1.fxml.DesktopResourceCompiler compiler = new com.codename1.fxml.DesktopResourceCompiler(
+                java.util.Collections.singletonList(resourcesDir), classpath, javaOut, resourcesOut,
+                new com.codename1.fxml.DesktopResourceCompiler.Log() {
+                    @Override
+                    public void info(String message) {
+                        getLog().info(message);
+                    }
+
+                    @Override
+                    public void warn(String message) {
+                        getLog().warn(message);
+                    }
+                });
+        List<String> errors;
+        try {
+            errors = compiler.run();
+        } catch (java.io.IOException e) {
+            throw new MojoExecutionException("Could not compile the FXML documents and style sheets of "
+                    + resourcesDir + ": " + e.getMessage(), e);
+        }
+        if (!errors.isEmpty()) {
+            StringBuilder all = new StringBuilder();
+            for (String error : errors) {
+                getLog().error(error);
+                all.append(all.length() == 0 ? "" : "\n").append(error);
+            }
+            throw new MojoFailureException(errors.size() + " error(s) in the FXML documents and style sheets of "
+                    + resourcesDir + ":\n" + all);
+        }
     }
 
     private void registerResourceRoot(File dir) {

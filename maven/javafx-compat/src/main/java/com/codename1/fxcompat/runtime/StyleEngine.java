@@ -30,7 +30,9 @@ import javafx.scene.Scene;
 /// The pluggable style sheet engine. The scene graph calls the installed
 /// instance at every point where the styles of a node may have changed; the
 /// engine answers by calling [StyleTarget#cn1ApplyStyle(String, Object)] on
-/// the nodes concerned. The default engine does nothing.
+/// the nodes concerned. The engine installed by default is [CssEngine],
+/// which applies the application's compiled style sheets and the inline
+/// styles of its nodes.
 ///
 /// #### When the scene graph calls
 ///
@@ -71,16 +73,28 @@ public abstract class StyleEngine {
         }
     };
 
-    private static StyleEngine instance = NONE;
+    private static StyleEngine instance;
 
     /// Returns the installed engine; never `null`.
     public static StyleEngine getInstance() {
+        if (instance == null) {
+            // Made on first use rather than in a static initializer: the
+            // default engine is a subclass of this class.
+            instance = new CssEngine();
+        }
         return instance;
     }
 
-    /// Installs an engine; `null` returns to the one that does nothing.
+    /// Installs an engine; `null` returns to the default one, with nothing
+    /// kept of the style sheets the previous default had read.
     public static void setInstance(StyleEngine engine) {
-        instance = engine == null ? NONE : engine;
+        instance = engine;
+    }
+
+    /// Returns an engine that does nothing, for an application that styles
+    /// its nodes in code only and wants no cascade run.
+    public static StyleEngine none() {
+        return NONE;
     }
 
     /// Computes and applies the styles of one node.
