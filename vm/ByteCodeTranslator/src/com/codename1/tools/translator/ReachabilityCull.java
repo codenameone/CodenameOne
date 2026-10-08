@@ -549,12 +549,12 @@ final class ReachabilityCull {
                     plain = false;
                 }
                 int op = i.getOpcode();
-                if (plain && (op == org.objectweb.asm.Opcodes.INVOKEVIRTUAL || op == org.objectweb.asm.Opcodes.INVOKESPECIAL
-                        || op == org.objectweb.asm.Opcodes.INVOKEINTERFACE)) {
+                if (plain && (op == com.codename1.tools.translator.classfile.Opcodes.INVOKEVIRTUAL || op == com.codename1.tools.translator.classfile.Opcodes.INVOKESPECIAL
+                        || op == com.codename1.tools.translator.classfile.Opcodes.INVOKEINTERFACE)) {
                     // A virtual, special or interface call never reaches a static method.
                     continue;
                 }
-                if (plain && op != org.objectweb.asm.Opcodes.INVOKESTATIC) {
+                if (plain && op != com.codename1.tools.translator.classfile.Opcodes.INVOKESTATIC) {
                     // invokedynamic and anything else: no owner to go by.
                     plain = false;
                 }
@@ -922,14 +922,14 @@ final class ReachabilityCull {
             for (com.codename1.tools.translator.bytecodes.Instruction i : ins) {
                 Class<?> k = i.getClass();
                 if (k == com.codename1.tools.translator.bytecodes.TypeInstruction.class) {
-                    if (i.getOpcode() == org.objectweb.asm.Opcodes.NEW) {
+                    if (i.getOpcode() == com.codename1.tools.translator.classfile.Opcodes.NEW) {
                         allocate(mangleCached(((com.codename1.tools.translator.bytecodes.TypeInstruction) i).getTypeName()));
                     }
                 } else if (k == com.codename1.tools.translator.bytecodes.Ldc.class) {
                     Object v = ((com.codename1.tools.translator.bytecodes.Ldc) i).getValue();
-                    if (v instanceof org.objectweb.asm.Type) {
-                        org.objectweb.asm.Type t = (org.objectweb.asm.Type) v;
-                        if (t.getSort() == org.objectweb.asm.Type.OBJECT) {
+                    if (v instanceof com.codename1.tools.translator.classfile.Type) {
+                        com.codename1.tools.translator.classfile.Type t = (com.codename1.tools.translator.classfile.Type) v;
+                        if (t.getSort() == com.codename1.tools.translator.classfile.Type.OBJECT) {
                             allocate(mangleCached(t.getInternalName()));
                         }
                     } else if (v instanceof String) {
@@ -943,7 +943,7 @@ final class ReachabilityCull {
                     }
                 } else if (k == com.codename1.tools.translator.bytecodes.Field.class) {
                     int op = i.getOpcode();
-                    if (op == org.objectweb.asm.Opcodes.GETSTATIC || op == org.objectweb.asm.Opcodes.PUTSTATIC) {
+                    if (op == com.codename1.tools.translator.classfile.Opcodes.GETSTATIC || op == com.codename1.tools.translator.classfile.Opcodes.PUTSTATIC) {
                         touch(byName.get(mangleCached(((com.codename1.tools.translator.bytecodes.Field) i).getOwner())));
                     }
                 } else if (k != com.codename1.tools.translator.bytecodes.BasicInstruction.class
