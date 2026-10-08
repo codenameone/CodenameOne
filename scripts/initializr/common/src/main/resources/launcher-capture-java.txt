@@ -15,16 +15,23 @@ import java.util.List;
  * still reaches Maven, its output still reaches your console byte for byte,
  * and this exits with Maven's own status.
  *
- * Usage (from .mvn\cn1-capture.cmd): java Cn1Capture.java LOG MVNW ARGS...
- * The log is only read for the reason and deleted by build.bat afterwards.
+ * Usage (from .mvn\cn1-capture.cmd): java Cn1Capture.java LOG MARKER MVNW ARGS...
+ * MARKER is created before Maven starts: cn1-capture.cmd runs Maven itself if
+ * it is missing, so a helper that could not start never costs a build. The log
+ * is only read for the reason and deleted by build.bat afterwards; a log this
+ * could not write completely is deleted here, so a lost line is never misread.
  */
 public class Cn1Capture {
+    private static volatile boolean logFailed;
+
     public static void main(String[] args) throws Exception {
-        List<String> command = new ArrayList<>(Arrays.asList(args).subList(1, args.length));
+        new File(args[1]).createNewFile();
+        List<String> command = new ArrayList<>(Arrays.asList(args).subList(2, args.length));
         Process maven = new ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.INHERIT).start();
+        File logFile = new File(args[0]);
         OutputStream log;
         try {
-            log = new FileOutputStream(new File(args[0]), true);
+            log = new FileOutputStream(logFile, true);
         } catch (IOException noLog) {
             log = null; // no copy, no reason; the build itself is unaffected
         }
@@ -36,7 +43,11 @@ public class Cn1Capture {
         if (log != null) {
             try {
                 log.close();
-            } catch (IOException ignored) {
+            } catch (IOException closing) {
+                logFailed = true;
+            }
+            if (logFailed) {
+                logFile.delete();
             }
         }
         System.out.flush();
@@ -52,12 +63,13 @@ public class Cn1Capture {
                 while ((n = from.read(buffer)) > 0) {
                     console.write(buffer, 0, n);
                     console.flush();
-                    if (log != null) {
+                    if (log != null && !logFailed) {
                         synchronized (log) {
                             try {
                                 log.write(buffer, 0, n);
                             } catch (IOException full) {
                                 // a full disk loses the copy, never the build output
+                                logFailed = true;
                             }
                         }
                     }

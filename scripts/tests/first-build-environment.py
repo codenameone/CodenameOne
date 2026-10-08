@@ -81,7 +81,9 @@ with tempfile.TemporaryDirectory(prefix='cn1-first-build-') as directory:
     if case in ('non_ascii', 'mirror'):
         # A user home Maven has never seen: its own settings.xml and an empty
         # local repository, so nothing is served from the runner's cache.
-        home = parent / ('Jösé Ñ user' if case == 'non_ascii' else 'home')
+        # No space: MAVEN_OPTS is split on spaces by mvn. A real user's home
+        # never travels through MAVEN_OPTS, so this only shapes the test.
+        home = parent / ('Jösé_Ñ_用户' if case == 'non_ascii' else 'home')
         (home / '.m2').mkdir(parents=True)
         opts.append('-Duser.home=' + str(home))
         if case == 'mirror':
@@ -96,10 +98,15 @@ with tempfile.TemporaryDirectory(prefix='cn1-first-build-') as directory:
         command = '"' + os.environ.get('COMSPEC', 'cmd.exe') + '" /d /s /c ""' + str(script) + '" javascript_cloud"'
     result = subprocess.run(command, cwd=project, env=env, text=True, encoding='utf-8', errors='replace',
                             capture_output=True, timeout=1500)
-    tail = '\n'.join((result.stdout + result.stderr).splitlines()[-40:])
+    lines = (result.stdout + result.stderr).splitlines()
+    # Enough to see what failed: every error line, then the last stretch.
+    errors = [l for l in lines if any(k in l for k in ('ERROR', 'Exception', 'Caused by', 'rror:', 'FATAL'))]
+    tail = '\n'.join(errors[:60] + ['----- last lines -----'] + lines[-120:])
     exits = [e for e in events if e.get('step') == 'exit']
     reason = exits[-1].get('reason') if exits else None
     print(f'{case}: exit {result.returncode}, reason {reason!r} (expected {expected!r})')
+    if reason != expected or result.returncode == 0:
+        print(tail)
     assert result.returncode != 0, ('the headless first build must stop at sign-in or before', tail)
     assert reason == expected, (case, reason, expected, tail)
     print(f'PASS: {case}')

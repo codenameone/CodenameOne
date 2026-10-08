@@ -18,7 +18,8 @@ jobs:
         # macOS: its bash 3.2 and BSD tools run build.sh too.
         os: [ubuntu-24.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    # macOS runners take ~37 s per generated download (twenty of them).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
