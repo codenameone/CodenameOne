@@ -72,5 +72,7 @@ javafx.stage.Stage#cn1IsPrimary
 javafx.stage.Stage#cn1MarkPrimary
 javafx.stage.Window#cn1Bounds
 javafx.stage.Window#cn1CloseRequested
+javafx.stage.Window#cn1Embed
+javafx.stage.Window#cn1Embedded
 javafx.stage.Window#cn1Host
 javafx.stage.Window#cn1Show

@@ -64,6 +64,7 @@ public class Window implements EventTarget {
     private ObservableMap<Object, Object> properties;
     private Object userData;
     private StageHost host;
+    private boolean embedded;
 
     /// Creates a window.
     protected Window() {
@@ -223,6 +224,26 @@ public class Window implements EventTarget {
         return host;
     }
 
+    /// Puts the window inside a host its caller owns, for good: a
+    /// Codename One component that shows a scene inside a form of the
+    /// application (see `com.codename1.fxcompat.FxInterop`).
+    ///
+    /// Such a window is showing from here on and is not one of the
+    /// application's windows: [#getWindows()] does not list it, hiding it
+    /// does nothing, and it never counts as the last window closing. The
+    /// component that hosts it is what comes and goes.
+    public final void cn1Embed(StageHost value) {
+        embedded = true;
+        host = value;
+        showing.set(true);
+        value.sceneChanged();
+    }
+
+    /// Whether [#cn1Embed] put this window inside a component.
+    public final boolean cn1Embedded() {
+        return embedded;
+    }
+
     /// Shows the window.
     protected void show() {
         cn1Show(false);
@@ -231,7 +252,7 @@ public class Window implements EventTarget {
     /// Shows the window, and with `block` returns only once it is hidden
     /// again while events keep being handled.
     protected final void cn1Show(boolean block) {
-        if (showing.get()) {
+        if (showing.get() || embedded) {
             return;
         }
         fireEvent(new WindowEvent(this, WindowEvent.WINDOW_SHOWING));
@@ -248,7 +269,7 @@ public class Window implements EventTarget {
 
     /// Hides the window.
     public void hide() {
-        if (!showing.get()) {
+        if (!showing.get() || embedded) {
             return;
         }
         fireEvent(new WindowEvent(this, WindowEvent.WINDOW_HIDING));

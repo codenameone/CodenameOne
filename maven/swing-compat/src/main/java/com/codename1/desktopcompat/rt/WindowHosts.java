@@ -59,6 +59,7 @@ public final class WindowHosts {
     private static Runnable exitHook;
     private static int shows;
     private static boolean idlePending;
+    private static boolean nativeWindows = true;
 
     private WindowHosts() {
     }
@@ -69,24 +70,49 @@ public final class WindowHosts {
         secondary = s == null ? NATIVE : s;
     }
 
+    /// Says whether the windows after the first are windows of the
+    /// platform's window manager where it has one, which is the default.
+    /// With `false` every window stays inside the application's own: a
+    /// frame is a form and a dialog floats over the current form, as on a
+    /// phone.
+    public static void setNativeWindows(boolean value) {
+        nativeWindows = value;
+    }
+
+    /// Whether [#setNativeWindows] left the window manager in use.
+    public static boolean isNativeWindows() {
+        return nativeWindows;
+    }
+
     /// Sets what runs, a moment later, whenever the last showing window
     /// was hidden or disposed of. The lifecycle uses it.
     public static void setIdleHook(Runnable r) {
         idleHook = r;
     }
 
-    /// Replaces what `EXIT_ON_CLOSE` does; `null` restores
-    /// `Display.exitApplication()`. For tests and the lifecycle.
+    /// Replaces what `EXIT_ON_CLOSE` does; `null` restores the default,
+    /// which is library mode (see [#exit]). For tests and the lifecycle.
     public static void setExitHook(Runnable r) {
         exitHook = r;
     }
 
-    /// Ends the application, as `System.exit` does on the desktop.
+    /// Ends the Swing application: what `EXIT_ON_CLOSE` does, and the
+    /// last window being disposed of.
+    ///
+    /// Where the layer IS the application, [DesktopLifecycle] installs the
+    /// hook that exits it. With no hook the Swing windows are a part of a
+    /// Codename One application that has a main class of its own (library
+    /// mode), and ending them must not end that: every window is disposed
+    /// of, the one on top first, which shows the form the first of them was
+    /// shown over. The application goes on.
     public static void exit() {
         if (exitHook != null) {
             exitHook.run();
-        } else if (Display.isInitialized()) {
-            Display.getInstance().exitApplication();
+            return;
+        }
+        Window[] ws = windows();
+        for (int i = ws.length - 1; i >= 0; i--) {
+            ws[i].dispose();
         }
     }
 
@@ -131,7 +157,7 @@ public final class WindowHosts {
         // The first window always fills the application's own form; only
         // a window shown over another one is a secondary window or floats.
         boolean over = !SHOWING.isEmpty() && !(SHOWING.size() == 1 && SHOWING.get(0) == w);
-        if (over && secondary.supported()) {
+        if (over && nativeWindows && secondary.supported()) {
             WindowHost h = secondary.open(w);
             if (h != null) {
                 return h;
