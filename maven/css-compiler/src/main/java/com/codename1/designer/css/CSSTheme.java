@@ -321,6 +321,24 @@ public class CSSTheme {
         /// of emitting SAC_IDENT. The keyword token itself sits in the
         /// ATTR's stringValue. Treat the two interchangeably so the position
         /// / shape / extent keywords parse the same in both layouts.
+        /// The angle `u` in degrees, or null when `u` is not an angle. CSS
+        /// has four angle units: `deg`, `rad`, `grad` (400 to a turn) and
+        /// `turn`, which the parser reports as a dimension it has no type for.
+        private static Double angleDegrees(ScaledUnit u) {
+            switch (u.getLexicalUnitType()) {
+                case LexicalUnit.SAC_DEGREE:
+                    return u.getNumericValue();
+                case LexicalUnit.SAC_RADIAN:
+                    return u.getNumericValue() * 180.0 / Math.PI;
+                case LexicalUnit.SAC_GRADIAN:
+                    return u.getNumericValue() * 0.9;
+                case LexicalUnit.SAC_DIMENSION:
+                    return "turn".equalsIgnoreCase(u.getDimensionUnitText()) ? u.getNumericValue() * 360.0 : null;
+                default:
+                    return null;
+            }
+        }
+
         private static boolean isIdentLike(ScaledUnit u) {
             int t = u.getLexicalUnitType();
             return t == LexicalUnit.SAC_IDENT || t == LexicalUnit.SAC_ATTR;
@@ -411,13 +429,32 @@ public class CSSTheme {
                 spec.type(GradientSpec.Type.RADIAL);
                 spec.shape(rg.getShape() == RadialGradient.SHAPE_CIRCLE
                         ? GradientSpec.Shape.CIRCLE : GradientSpec.Shape.ELLIPSE);
-                // The descriptor resolves its own extent keyword against a box,
-                // so ask it for the radii rather than restating that arithmetic.
-                float[] geometry = new float[4];
-                rg.computeRadii(width, height, geometry);
-                spec.extent(GradientSpec.Extent.EXPLICIT);
-                spec.radiusX(geometry[2]);
-                spec.radiusY(geometry[3]);
+                switch (rg.getExtent()) {
+                    // An extent keyword is handed on as the keyword. The
+                    // descriptor's own arithmetic gives an ellipse sized to a
+                    // corner equal radii, a circle, where CSS keeps the
+                    // proportions of the box: on the wide, short page these
+                    // images are painted on that is a very different shape.
+                    case RadialGradient.EXTENT_CLOSEST_SIDE:
+                        spec.extent(GradientSpec.Extent.CLOSEST_SIDE);
+                        break;
+                    case RadialGradient.EXTENT_FARTHEST_SIDE:
+                        spec.extent(GradientSpec.Extent.FARTHEST_SIDE);
+                        break;
+                    case RadialGradient.EXTENT_CLOSEST_CORNER:
+                        spec.extent(GradientSpec.Extent.CLOSEST_CORNER);
+                        break;
+                    case RadialGradient.EXTENT_FARTHEST_CORNER:
+                        spec.extent(GradientSpec.Extent.FARTHEST_CORNER);
+                        break;
+                    default: {
+                        float[] geometry = new float[4];
+                        rg.computeRadii(width, height, geometry);
+                        spec.extent(GradientSpec.Extent.EXPLICIT);
+                        spec.radiusX(geometry[2]);
+                        spec.radiusY(geometry[3]);
+                    }
+                }
                 spec.center(rg.getRelativeCenterX() * 100.0, true, rg.getRelativeCenterY() * 100.0, true);
             } else if (d instanceof ConicGradient) {
                 ConicGradient cg = (ConicGradient) d;
@@ -440,13 +477,8 @@ public class CSSTheme {
             }
             float angle = 180f; // CSS default for linear-gradient is "to bottom" (180deg)
             // Optionally consume an angle or "to <side>" prefix terminated by comma.
-            if (p.getLexicalUnitType() == LexicalUnit.SAC_DEGREE
-                    || p.getLexicalUnitType() == LexicalUnit.SAC_RADIAN) {
-                double v = p.getNumericValue();
-                if (p.getLexicalUnitType() == LexicalUnit.SAC_RADIAN) {
-                    v = v * 180.0 / Math.PI;
-                }
-                angle = (float) v;
+            if (angleDegrees(p) != null) {
+                angle = angleDegrees(p).floatValue();
                 p = (ScaledUnit) p.getNextLexicalUnit();
                 if (p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
                     p = (ScaledUnit) p.getNextLexicalUnit();
@@ -633,13 +665,8 @@ public class CSSTheme {
                     String s = identValue(p);
                     if ("from".equals(s)) {
                         ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
-                        if (nx != null && (nx.getLexicalUnitType() == LexicalUnit.SAC_DEGREE
-                                || nx.getLexicalUnitType() == LexicalUnit.SAC_RADIAN)) {
-                            double v = nx.getNumericValue();
-                            if (nx.getLexicalUnitType() == LexicalUnit.SAC_RADIAN) {
-                                v = v * 180.0 / Math.PI;
-                            }
-                            fromAngle = (float) v;
+                        if (nx != null && angleDegrees(nx) != null) {
+                            fromAngle = angleDegrees(nx).floatValue();
                             p = nx;
                         }
                         consumedHeader = true;
@@ -1734,6 +1761,10 @@ public class CSSTheme {
 
                         } else if ("vmax".equals(unitText)) {
                             return lu.getFloatValue()+"vmax";
+
+                        } else if ("turn".equalsIgnoreCase(unitText)) {
+                            // An angle, as in linear-gradient(0.25turn, ...).
+                            return lu.getFloatValue()+"turn";
 
                         }
                     }

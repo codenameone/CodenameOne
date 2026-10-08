@@ -82,6 +82,30 @@ public final class CssImports {
         return imported;
     }
 
+    /// Every existing local file a `url()` of `css`, or of anything it
+    /// imports, names: its images and fonts.
+    ///
+    /// These are compiled into the theme, so a caller deciding whether a
+    /// theme is stale has to look at them as well as at the stylesheets.
+    public static Set<File> assets(File css) throws IOException {
+        final File dir = css.getCanonicalFile().getParentFile();
+        final Set<File> found = new java.util.LinkedHashSet<File>();
+        String text = inline(css, readFully(css), new java.util.LinkedHashSet<File>());
+        rewriteUrls(text, new UrlRewriter() {
+            @Override
+            public String rewrite(String url) {
+                if (isRelativeUrl(url)) {
+                    File file = new File(dir, url);
+                    if (file.isFile()) {
+                        found.add(file);
+                    }
+                }
+                return url;
+            }
+        });
+        return found;
+    }
+
     /// Expands the imports of `text`, the contents of `current`. Every `url()`
     /// in the result is relative to the directory of `current`.
     private static String inline(File current, String text, List<File> stack, Set<File> imported)

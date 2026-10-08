@@ -331,6 +331,13 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void anglesInGradiansAndTurnsCompile(@TempDir Path dir) {
+        assertCompilesPromptly(dir, "G { background: linear-gradient(100grad, #ff0000, #0000ff);"
+                + " box-shadow: 0 0 4px black; }\n"
+                + "H { background: linear-gradient(0.25turn, #ff0000, #0000ff); box-shadow: 0 0 4px black; }");
+    }
+
+    @Test
     void aRadialGradientPositionedByALengthIsPaintedWhereItSays(@TempDir Path dir) throws Exception {
         // A length has no meaning in a resolution-independent gradient, so this
         // one is painted: the page is 640x100 and the centre is 10px in from

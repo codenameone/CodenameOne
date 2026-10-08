@@ -237,6 +237,25 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void anEditToAnImageAloneRecompilesAMergedBuild(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File app = write(new File(dir, "app/theme.css"),
+                "Badge { background-image: url(img/a.png); cn1-source-dpi: 160; }\n");
+        File image = png(new File(dir, "app/img/a.png"), 8, 6, 0xff336699);
+        File merged = new File(dir, "work/theme.css.merged");
+        File res = new File(dir, "work/theme.res");
+        String[] args = {"-input", app.getPath(), "-output", res.getPath(), "-merge", merged.getPath()};
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        assertEquals(8, open(res).getImage("a.png").getWidth());
+
+        png(image, 20, 6, 0xff336699);
+        assertTrue(image.setLastModified(res.lastModified() + 5000));
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+
+        assertEquals(20, open(res).getImage("a.png").getWidth(), "the new image is in the theme");
+    }
+
+    @Test
     void anImportIsCompiledAndAnEditToItRecompiles(@TempDir Path tmp) throws Exception {
         File common = mavenProject(tmp.toFile());
         File css = write(new File(common, "src/main/css/theme.css"),

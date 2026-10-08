@@ -50,7 +50,7 @@ class CssImportDependenciesTest {
                 "/* @import \"../ignored.css\"; */\n@import \"parts/local.css\";\n@IMPORT url(../../../../shared/base.css);\n");
         write(new File(css, "parts/local.css"), "Label { color: red; }\n");
         File base = write(new File(dir, "shared/base.css"), "@import 'deeper/colors.css';\n");
-        File colors = write(new File(dir, "shared/deeper/colors.css"), "@import \"base.css\";\n@import \"http://x/y.css\";\n");
+        File colors = write(new File(dir, "shared/deeper/colors.css"), "@import \"../base.css\";\n@import \"http://x/y.css\";\n");
         write(new File(dir, "app/src/main/ignored.css"), "");
 
         Set<File> found = CssImportDependencies.outside(css);
@@ -73,9 +73,24 @@ class CssImportDependenciesTest {
 
         Set<File> found = CssImportDependencies.outside(css);
 
-        assertEquals(2, found.size(), found.toString());
+        assertEquals(3, found.size(), found.toString());
         assertTrue(found.contains(base.getCanonicalFile()));
         assertTrue(found.contains(out.getCanonicalFile()));
+        assertTrue(found.contains(new File(dir, "shared/img/missing.png").getCanonicalFile()),
+                "a file that is named but not there is still a dependency");
+    }
+
+    @Test
+    void aDeletedOutsideDependencyMakesTheOutputStale(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "@import \"../shared.css\";\n");
+        File shared = write(new File(dir, "shared.css"), "Label { color: red; }\n");
+        assertTrue(CssImportDependencies.lastModified(css) < Long.MAX_VALUE);
+
+        assertTrue(shared.delete());
+
+        assertEquals(Long.MAX_VALUE, CssImportDependencies.lastModified(css));
     }
 
     @Test

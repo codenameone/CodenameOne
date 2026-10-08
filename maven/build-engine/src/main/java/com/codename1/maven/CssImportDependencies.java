@@ -61,7 +61,8 @@ public final class CssImportDependencies {
 
     /// Every file imported, directly or through another import, by a
     /// stylesheet under `cssDir`, and every file one of those stylesheets
-    /// names in a `url()`, that is not itself under `cssDir`.
+    /// names in a `url()`, that is not itself under `cssDir`. A file that is
+    /// named but missing is included.
     public static Set<File> outside(File cssDir) {
         Set<File> out = new LinkedHashSet<File>();
         if (cssDir == null || !cssDir.isDirectory()) {
@@ -100,19 +101,27 @@ public final class CssImportDependencies {
                 if (file == null || !seen.add(file)) {
                     continue;
                 }
-                pending.addLast(file);
                 if (!file.toPath().startsWith(root.toPath())) {
                     out.add(file);
+                }
+                if (file.isFile()) {
+                    pending.addLast(file);
                 }
             }
         }
         return out;
     }
 
-    /// The existing file `target` names from the stylesheet `css`, or null
-    /// when it is remote, a `data:` URI, or not there.
+    /// The file `target` names from the stylesheet `css`, whether or not it
+    /// exists, or null when it is remote or a `data:` URI.
+    ///
+    /// A file that is not there is still answered. Deleting something a
+    /// stylesheet refers to from outside the directory changes no
+    /// modification time anywhere, so the only way a build can notice is by
+    /// being told the reference is now broken.
     private static File resolve(File css, String target) {
-        if (target.contains(":") && !new File(target).isAbsolute()) {
+        if (target.length() == 0 || target.charAt(0) == '#'
+                || (target.contains(":") && !new File(target).isAbsolute())) {
             return null;
         }
         File file = new File(target);
@@ -120,18 +129,24 @@ public final class CssImportDependencies {
             file = new File(css.getParentFile(), target);
         }
         try {
-            file = file.getCanonicalFile();
+            return file.getCanonicalFile();
         } catch (IOException ex) {
             return null;
         }
-        return file.isFile() ? file : null;
     }
 
     /// The newest modification time among [#outside(File)], or 0 when there
     /// are none.
+    ///
+    /// When one of them does not exist the answer is the largest time there
+    /// is, which makes any existing output stale: the compile then runs and
+    /// reports the missing file, instead of an old theme being kept.
     public static long lastModified(File cssDir) {
         long newest = 0;
         for (File f : outside(cssDir)) {
+            if (!f.isFile()) {
+                return Long.MAX_VALUE;
+            }
             newest = Math.max(newest, f.lastModified());
         }
         return newest;

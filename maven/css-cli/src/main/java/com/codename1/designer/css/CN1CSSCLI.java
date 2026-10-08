@@ -306,6 +306,10 @@ public class CN1CSSCLI {
         List<File> out = new ArrayList<File>();
         try {
             out.addAll(CssImports.collect(css));
+            // The images and fonts too. An edit to one changes the theme and
+            // no stylesheet; in a merged build the copy in the mirror is what
+            // the merged file names, and refreshing it moves its time.
+            out.addAll(CssImports.assets(css));
         } catch (IOException ex) {
             // A broken import is the compile's error to report, with its message.
         }
@@ -347,6 +351,14 @@ public class CN1CSSCLI {
         }
         long built = output.lastModified();
         if (css.lastModified() > built) {
+            return false;
+        }
+        try {
+            CssImports.collect(css);
+        } catch (IOException ex) {
+            // An import that cannot be followed -- a file deleted since the
+            // last build -- is for the compile to report. Calling the old
+            // output current would hide it.
             return false;
         }
         for (File dependency : dependencies(css, options)) {
