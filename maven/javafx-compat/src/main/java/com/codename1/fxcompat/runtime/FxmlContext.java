@@ -178,29 +178,42 @@ public final class FxmlContext {
         if (target == null) {
             throw error("the handler #" + name + " needs a controller, and the document has none");
         }
-        final FxmlDispatch d = dispatch;
-        final String document = path;
-        return new EventHandler<Event>() {
-            @Override
-            public void handle(Event event) {
-                boolean called;
-                try {
-                    called = d.invoke(target, name, event);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (Exception e) {
-                    RuntimeException wrapped = new RuntimeException(document + ": the handler #" + name
-                            + " failed: " + e);
-                    wrapped.initCause(e);
-                    throw wrapped;
-                }
-                if (!called) {
-                    throw new IllegalStateException(document + ": the controller " + target.getClass().getName()
-                            + " has no handler method " + name
-                            + "() that is public or annotated @FXML and takes no argument or the event");
-                }
+        return new Handler(dispatch, path, target, name);
+    }
+
+    /// The handler of one `#name`: a call of the controller's method.
+    private static final class Handler implements EventHandler<Event> {
+        private final FxmlDispatch dispatch;
+        private final String document;
+        private final Object target;
+        private final String name;
+
+        Handler(FxmlDispatch dispatch, String document, Object target, String name) {
+            this.dispatch = dispatch;
+            this.document = document;
+            this.target = target;
+            this.name = name;
+        }
+
+        @Override
+        public void handle(Event event) {
+            boolean called;
+            try {
+                called = dispatch.invoke(target, name, event);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                RuntimeException wrapped = new RuntimeException(document + ": the handler #" + name
+                        + " failed: " + e);
+                wrapped.initCause(e);
+                throw wrapped;
             }
-        };
+            if (!called) {
+                throw new IllegalStateException(document + ": the controller " + target.getClass().getName()
+                        + " has no handler method " + name
+                        + "() that is public or annotated @FXML and takes no argument or the event");
+            }
+        }
     }
 
     /// The string of a `%key`.

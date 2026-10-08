@@ -638,18 +638,26 @@ public final class CssEngine extends StyleEngine {
         return false;
     }
 
-    private CssSheet.Decl[] parseInline(final String text) {
+    /// The inline style being parsed, for the message of a warning.
+    private String inlineText;
+
+    /// One reporter for every inline style, rather than one per parse.
+    private final CssDeclarations.Reporter inlineReporter = new CssDeclarations.Reporter() {
+        @Override
+        public void warning(int offset, String message) {
+            warnOnce("In the inline style \"" + inlineText + "\": " + message);
+        }
+    };
+
+    private CssSheet.Decl[] parseInline(String text) {
         if (text.trim().length() == 0) {
             return NO_DECLS;
         }
         parsed.clear();
         String clean = CssDeclarations.stripComments(text);
-        CssDeclarations.parse(clean, 0, clean.length(), parser, new CssDeclarations.Reporter() {
-            @Override
-            public void warning(int offset, String message) {
-                warnOnce("In the inline style \"" + text + "\": " + message);
-            }
-        }, parsed);
+        inlineText = text;
+        CssDeclarations.parse(clean, 0, clean.length(), parser, inlineReporter, parsed);
+        inlineText = null;
         CssSheet.Decl[] out = new CssSheet.Decl[parsed.size()];
         for (int i = 0; i < out.length; i++) {
             out[i] = new CssSheet.Decl(parsed.get(i));

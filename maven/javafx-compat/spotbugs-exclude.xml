@@ -199,4 +199,49 @@
         </Or>
         <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
     </Match>
+
+    <!--
+        The value parser answers null for a list of gradient stops it could
+        not read, with the reason in error(); an empty array would be a
+        gradient without stops, which is a different thing.
+    -->
+    <Match>
+        <Class name="com.codename1.fxcompat.runtime.css.CssValueParser"/>
+        <Method name="stops"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!--
+        The default style engine and the FXML registry are created on first
+        use, on the JavaFX application thread like every call of the layer:
+        Codename One is single threaded, and a lock or a volatile here would
+        be the only ones in the runtime.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.fxcompat.runtime.StyleEngine"/>
+                <Method name="getInstance"/>
+            </And>
+            <And>
+                <Class name="com.codename1.fxcompat.runtime.FxmlDispatch"/>
+                <Method name="current"/>
+            </And>
+        </Or>
+        <Bug pattern="LI_LAZY_INIT_STATIC"/>
+    </Match>
+
+    <!--
+        FXMLLoader's resources and namespace are the caller's objects by
+        contract: JavaFX hands back the bundle it was given, and the
+        namespace is the live map an application reads fx:id values from
+        and may add to before load().
+    -->
+    <Match>
+        <Class name="javafx.fxml.FXMLLoader"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
 </FindBugsFilter>

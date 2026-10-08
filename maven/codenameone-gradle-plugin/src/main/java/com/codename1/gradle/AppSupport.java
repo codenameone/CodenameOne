@@ -176,12 +176,28 @@ final class AppSupport {
         // Declared always, like the Android directories: Gradle is happy with
         // a directory that does not exist.
         //
-        // EXTENSION POINT: the build-time FXML and CSS compile step belongs
-        // here, as a task registered the way compileAndroidRes is above --
-        // inputs resourcesDir(desktopDir), outputs a generated-sources and a
-        // generated-resources directory added to `main` with srcDir(task.flatMap(...)).
-        // The Maven build's counterpart, with the full contract, is
+        // The build-time FXML and style sheet compile step of the JavaFX
+        // layer, registered the way compileAndroidRes is above. Its outputs
+        // are source and resource roots of `main`, so compileJava and
+        // processResources depend on it without being told. The Maven
+        // build's counterpart, with the full contract, is
         // PrepareDesktopSourcesMojo.compileDesktopResources.
+        final File desktopResources = com.codename1.maven.DesktopSources.resourcesDir(desktopDir);
+        TaskProvider<com.codename1.gradle.tasks.CompileDesktopResourcesTask> desktopRes = project.getTasks().register(
+                "compileDesktopResources", com.codename1.gradle.tasks.CompileDesktopResourcesTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Compiles the FXML documents and style sheets of src/main/desktop/resources");
+                    t.getSources().from(project.fileTree(desktopResources,
+                            tree -> tree.include("**/*.fxml", "**/*.css")));
+                    t.getResourcesRoot().set(desktopResources);
+                    t.getCompileClasspath().from(project.getConfigurations().getByName("compileClasspath"));
+                    t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-desktop"));
+                    t.getResourcesDirectory().set(new File(layout.buildDir(), "generated/resources/cn1-desktop"));
+                });
+        main.getJava().srcDir(desktopRes.flatMap(
+                com.codename1.gradle.tasks.CompileDesktopResourcesTask::getOutputDirectory));
+        main.getResources().srcDir(desktopRes.flatMap(
+                com.codename1.gradle.tasks.CompileDesktopResourcesTask::getResourcesDirectory));
         main.getJava().srcDir(com.codename1.maven.DesktopSources.javaDir(desktopDir));
         main.getResources().srcDir(com.codename1.maven.DesktopSources.resourcesDir(desktopDir));
         final File desktopEntry = com.codename1.maven.DesktopSources.entryRecord(desktopDir);

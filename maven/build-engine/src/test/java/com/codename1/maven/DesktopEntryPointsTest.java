@@ -208,34 +208,6 @@ public class DesktopEntryPointsTest {
         new BytecodeCompliance(RealCompatJars.host(classes, tmp.newFolder(), scratch)).execute();
     }
 
-    /// The JavaFX runtime has one reference of its own the device cannot
-    /// honour: `Node.getTypeSelector` walks `Class.getSuperclass()`, which
-    /// the device's `Class` does not have. That is the runtime's to fix, not
-    /// the remap's, so until it is this accepts that one finding and nothing
-    /// beside it -- a second one, from the application or a shared class,
-    /// still fails.
-    private void assertCompliantButForTheTypeSelector(File classes) throws Exception {
-        File buildDir = tmp.newFolder();
-        try {
-            new BytecodeCompliance(RealCompatJars.host(classes, buildDir, scratch)).execute();
-        } catch (Exception e) {
-            assertTrue(e.getMessage(), e.getMessage().contains("with 1 forbidden API reference"));
-            String report = e.getMessage() + reports(buildDir);
-            assertTrue(report, report.contains("getSuperclass"));
-        }
-    }
-
-    private static String reports(File dir) throws Exception {
-        StringBuilder out = new StringBuilder();
-        File[] files = dir.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                out.append(f.isDirectory() ? reports(f) : new String(Files.readAllBytes(f.toPath()), "UTF-8"));
-            }
-        }
-        return out.toString();
-    }
-
     private static void assertFails(CompatRemapper remapper, String... expected) throws Exception {
         try {
             remapper.run();
@@ -308,7 +280,7 @@ public class DesktopEntryPointsTest {
         // device lacks: the copy that ships extends the shared class.
         assertEquals("com.codename1.compat.jdk.EventObject", application.getClass().getClassLoader()
                 .loadClass("com.codename1.fxcompat.javafx.event.Event").getSuperclass().getName());
-        assertCompliantButForTheTypeSelector(classes);
+        assertCompliant(classes);
     }
 
     @Test

@@ -191,6 +191,15 @@ public final class FxmlDispatchGenerator {
     private int documents;
     private int controllers;
 
+    /// The order the registry asks the controllers in: a subclass before
+    /// the class it extends, so the first that matches is the nearest.
+    private static final Comparator<Controller> MOST_DERIVED_FIRST = new Comparator<Controller>() {
+        @Override
+        public int compare(Controller a, Controller b) {
+            return a.depth != b.depth ? b.depth - a.depth : a.type.name.compareTo(b.type.name);
+        }
+    };
+
     /// Creates a generator over a directory of compiled classes.
     public FxmlDispatchGenerator(File classesDir, Names names) {
         this.classesDir = classesDir;
@@ -216,7 +225,7 @@ public final class FxmlDispatchGenerator {
         for (String name : appClasses) {
             File f = new File(classesDir, name + ".class");
             if (f.isFile() && !name.equals(names.registry) && !name.startsWith(names.registry + PART)) {
-                Scanned s = scan(read(f));
+                Scanned s = scan(read(f), names.annotation);
                 all.put(s.name, s);
             }
         }
@@ -242,12 +251,7 @@ public final class FxmlDispatchGenerator {
             }
             found.add(controller(s, all, handlerNames));
         }
-        Collections.sort(found, new Comparator<Controller>() {
-            @Override
-            public int compare(Controller a, Controller b) {
-                return a.depth != b.depth ? b.depth - a.depth : a.type.name.compareTo(b.type.name);
-            }
-        });
+        Collections.sort(found, MOST_DERIVED_FIRST);
 
         // Widen first: the registry refers to the members as public ones.
         Map<String, Set<String>> widen = new LinkedHashMap<String, Set<String>>();
@@ -364,9 +368,8 @@ public final class FxmlDispatchGenerator {
         return true;
     }
 
-    private Scanned scan(byte[] bytes) {
+    private static Scanned scan(byte[] bytes, final String fxml) {
         final Scanned s = new Scanned();
-        final String fxml = names.annotation;
         new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public void visit(int version, int access, String name, String signature, String superName,
