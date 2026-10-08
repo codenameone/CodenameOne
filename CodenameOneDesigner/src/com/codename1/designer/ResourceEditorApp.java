@@ -35,8 +35,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.Font;
 import com.codename1.designer.css.CN1CSSCLI;
-import com.codename1.designer.css.MissingNativeBrowserException;
-import com.codename1.impl.javase.CN1Bootstrap;
 //import com.codename1.impl.javase.JavaFXLoader;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.resource.util.QuitAction;
@@ -256,17 +254,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
     }
 
     public static void main(String[] args) throws Exception {
-        try {
-            // First try to run without adding CEF to classpath
-            _main(args);
-        } catch (MissingNativeBrowserException ex) {
-            // If the CSS compiler tried to run and requires CEF because
-            // some CSS needs a browser component to generate 9-piece border
-            // it throws the MissingNativeBrowserException
-            // Catch it here and try to add CEF to the classpath, then run again.
-            System.out.println("Looks like this CSS file needs CEF on classpath... adding it now, and retrying...");
-            CN1Bootstrap.run(ResourceEditorApp.class, args);
-        }
+        _main(args);
     }
     
     /**
@@ -568,15 +556,19 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 List<String> cssArgs = new ArrayList<String>(Arrays.asList(args));
                 
                 cssArgs.remove(0);
-                CN1CSSCLI.main(cssArgs.toArray(new String[cssArgs.size()]));
-                //CN1Bootstrap.run(cssArgs.toArray(new String[cssArgs.size()]));
-                
+                // The compiler proper lives in codenameone-css-cli and needs no
+                // display; this entry point only keeps `-css` working for
+                // whoever still launches the editor jar to compile a stylesheet.
+                System.exit(CN1CSSCLI.run(cssArgs.toArray(new String[cssArgs.size()])));
                 return;
                 
             }
         }
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());
         Display.init(null);
+        // EditableResources is shared with the CSS compiler, which has no
+        // display, so its dialogs are supplied from here.
+        com.codename1.ui.util.ResourceEditorUi.install(new SwingResourceEditorUi());
         launch(ResourceEditorApp.class, args);
     }
     
