@@ -160,6 +160,17 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         # build.bat copies the output through .mvn/Cn1Capture.java.
         output_file = parent / 'maven-output.txt'
         script = project / ('build.bat' if windows else 'build.sh')
+        table_env = dict(env)
+        if not windows:
+            # The table is about the output, not this machine's JDK: a stub java
+            # reporting 17, so a run under JDK 8 (gradle-smoke) does not turn
+            # "BUILD FAILURE" into java_too_old. Windows needs the real JDK, which
+            # runs the output-capture helper.
+            fake_jdk = parent / 'fake-jdk'
+            (fake_jdk / 'bin').mkdir(parents=True, exist_ok=True)
+            (fake_jdk / 'bin/java').write_text('#!/bin/sh\necho \'openjdk version "17.0.9" 2023-10-17\' >&2\n')
+            (fake_jdk / 'bin/java').chmod(0o755)
+            table_env['JAVA_HOME'] = str(fake_jdk)
         for text, exit_code, expected_reason in (REASON_CASES if check_reasons else []):
             output_file.write_text(text)
             events.clear()
@@ -168,7 +179,8 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
                 command = ('"' + os.environ.get('COMSPEC', 'cmd.exe') + '" /d /s /c ""' + str(script)
                            + '" javascript_cloud"')
             result = subprocess.run(command, cwd=parent,
-                                    env=dict(env, CN1_TEST_EXIT=str(exit_code), CN1_TEST_OUTPUT_FILE=str(output_file)),
+                                    env=dict(table_env, CN1_TEST_EXIT=str(exit_code),
+                                             CN1_TEST_OUTPUT_FILE=str(output_file)),
                                     text=True, capture_output=True, timeout=60)
             assert result.returncode == exit_code, (text, result.returncode, result.stdout, result.stderr)
             # Copying the output for the reason must not keep it from the console.

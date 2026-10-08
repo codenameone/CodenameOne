@@ -16,8 +16,8 @@ import java.util.List;
  * and this exits with Maven's own status.
  *
  * Usage (from .mvn\cn1-capture.cmd): java Cn1Capture.java LOG MARKER MVNW ARGS...
- * MARKER is created before Maven starts: cn1-capture.cmd runs Maven itself if
- * it is missing, so a helper that could not start never costs a build. The log
+ * MARKER is created once Maven HAS started: cn1-capture.cmd runs Maven itself
+ * if it is missing, so a helper or a launch that failed never costs a build. The log
  * is only read for the reason and deleted by build.bat afterwards; a log this
  * could not write completely is deleted here, so a lost line is never misread.
  */
@@ -25,9 +25,9 @@ public class Cn1Capture {
     private static volatile boolean logFailed;
 
     public static void main(String[] args) throws Exception {
-        new File(args[1]).createNewFile();
         List<String> command = new ArrayList<>(Arrays.asList(args).subList(2, args.length));
         Process maven = new ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.INHERIT).start();
+        new File(args[1]).createNewFile();
         File logFile = new File(args[0]);
         OutputStream log;
         try {

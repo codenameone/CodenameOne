@@ -73,7 +73,14 @@ jobs:
         with:
           name: initializr-download
           path: ${{ runner.temp }}/download
+      # A Linux desktop has a display, and the CSS compiler needs one (it
+      # rasterizes through the JavaSE port); without it the first build stops
+      # with a HeadlessException. That is a separate, known gap -- this models
+      # the desktop a developer builds on.
+      - name: Virtual display (Linux)
+        if: runner.os == 'Linux'
+        run: command -v xvfb-run || (sudo apt-get update -q && sudo apt-get install -y -q xvfb)
       - name: First build in this environment
         env:
           PYTHONUTF8: '1'
-        run: python scripts/tests/first-build-environment.py "${{ runner.temp }}/download/INTELLIJ-JAVA_17.zip" ${{ matrix.case }}
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}python scripts/tests/first-build-environment.py "${{ runner.temp }}/download/INTELLIJ-JAVA_17.zip" ${{ matrix.case }}

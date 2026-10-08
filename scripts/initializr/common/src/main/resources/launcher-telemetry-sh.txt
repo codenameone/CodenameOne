@@ -63,16 +63,17 @@ function cn1_java_major {
 function cn1_reason {
   local code="$1" log="$2" java="$3"
   if [ "$code" = "0" ]; then
-    # No copy of the output (no temp file could be made): a clean exit cannot
-    # be told from size_limit or not_submitted, so it is not claimed as ok.
-    if [ -z "$log" ]; then echo unknown; return; fi
+    # No copy of the output (no temp file could be made, or a tee could not
+    # write all of it and removed it): a clean exit cannot be told from
+    # size_limit or not_submitted, so it is not claimed as ok.
+    if [ -z "$log" ] || [ ! -f "$log" ]; then echo unknown; return; fi
     if grep -qE "Jar size limit reached|Quota size limit reached" "$log"; then echo size_limit
     elif grep -q "Sending build request to the server" "$log" && ! grep -q "Your build was submitted" "$log"; then echo not_submitted
     else echo ok
     fi
     return
   fi
-  [ -z "$log" ] && log=/dev/null
+  { [ -z "$log" ] || [ ! -f "$log" ]; } && log=/dev/null
   if grep -qE "JAVA_HOME environment variable is not defined correctly|java/javac command does not exist|No compiler is provided in this environment" "$log"; then echo no_jdk
   elif grep -qE "invalid target release|release version [0-9]+ not supported|UnsupportedClassVersionError|class file version" "$log"; then echo java_too_old
   elif grep -qE "Browser login timed out" "$log"; then echo login_timeout
@@ -177,7 +178,10 @@ function cn1_mvnw {
   # as stdin unless that command carries its own redirection, so a `<&0`
   # inside it would only duplicate /dev/null and a Maven prompt would read EOF.
   if [ -n "$log" ]; then
-    ( ./mvnw "$@" 2> >(tee -a "$log" >&2) | tee -a "$log"; exit "${PIPESTATUS[0]}" ) <&0 &
+    # A tee that cannot write the whole copy (a disk that fills) removes it:
+    # a partial copy could be missing the very line that decides the reason.
+    ( ./mvnw "$@" 2> >(tee -a "$log" >&2 || rm -f "$log") | { tee -a "$log" || rm -f "$log"; }
+      exit "${PIPESTATUS[0]}" ) <&0 &
   else
     ( ./mvnw "$@" ) <&0 &
   fi

@@ -8,12 +8,14 @@ REM Paths given to Java are relative and ASCII: java.exe reads its command line
 REM in the console code page, so a project folder with other characters in its
 REM name would not reach it intact. And if the helper did not start for ANY
 REM reason (no marker), Maven runs directly: reporting never costs a build.
+REM The marker is per run: two builds in one project must not see each other's.
 pushd "%~dp0.."
-if exist ".mvn\cn1-capture.ran" del /q ".mvn\cn1-capture.ran" >nul 2>&1
-"%CN1_JAVA_EXE%" .mvn\Cn1Capture.java "%CN1_LOG%" .mvn\cn1-capture.ran .\mvnw.cmd %*
+set "CN1_RAN=.mvn\cn1-capture-%RANDOM%%RANDOM%.ran"
+if exist "%CN1_RAN%" del /q "%CN1_RAN%" >nul 2>&1
+"%CN1_JAVA_EXE%" .mvn\Cn1Capture.java "%CN1_LOG%" "%CN1_RAN%" .\mvnw.cmd %*
 set "CN1_CAPTURE_RC=%errorlevel%"
-if not exist ".mvn\cn1-capture.ran" goto :direct
-del /q ".mvn\cn1-capture.ran" >nul 2>&1
+if not exist "%CN1_RAN%" goto :direct
+del /q "%CN1_RAN%" >nul 2>&1
 popd
 exit /b %CN1_CAPTURE_RC%
 :direct

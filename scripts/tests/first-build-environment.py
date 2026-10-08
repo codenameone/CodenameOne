@@ -13,7 +13,10 @@ The launcher's report goes to a local recorder, never the production funnel.
 
 Cases (the workflow provides the JDK each one needs through JAVA_HOME):
   baseline   JDK 17                                    -> login_failed
-  non_ascii  project path and user home with non-ASCII -> login_failed
+  non_ascii  a non-ASCII project path                   -> login_failed
+             (Windows: characters of its ANSI code page; a
+             user home cannot be simulated here -- forked
+             JVMs take the real one -- so that is manual)
   jre        a JRE: java but no javac                  -> no_jdk
   old_jdk    JDK 11 for a Java 17 project              -> java_too_old
   mirror     settings.xml mirroring everything to an
@@ -69,7 +72,7 @@ threading.Thread(target=recorder.serve_forever, daemon=True).start()
 
 with tempfile.TemporaryDirectory(prefix='cn1-first-build-') as directory:
     parent = Path(directory)
-    name = 'Prøject Jösé 测试' if case == 'non_ascii' else 'MyFirstApp'
+    name = ('Prøject Jösé' if windows else 'Prøject Jösé 测试') if case == 'non_ascii' else 'MyFirstApp'
     project = parent / name
     if windows:
         subprocess.run(['powershell', '-NoProfile', '-Command',
@@ -78,12 +81,10 @@ with tempfile.TemporaryDirectory(prefix='cn1-first-build-') as directory:
     else:
         subprocess.run(['unzip', '-q', str(source), '-d', str(project)], check=True)
     opts = ['-Djava.awt.headless=true']
-    if case in ('non_ascii', 'mirror'):
+    if case == 'mirror':
         # A user home Maven has never seen: its own settings.xml and an empty
         # local repository, so nothing is served from the runner's cache.
-        # No space: MAVEN_OPTS is split on spaces by mvn. A real user's home
-        # never travels through MAVEN_OPTS, so this only shapes the test.
-        home = parent / ('Jösé_Ñ_用户' if case == 'non_ascii' else 'home')
+        home = parent / 'home'
         (home / '.m2').mkdir(parents=True)
         opts.append('-Duser.home=' + str(home))
         if case == 'mirror':
