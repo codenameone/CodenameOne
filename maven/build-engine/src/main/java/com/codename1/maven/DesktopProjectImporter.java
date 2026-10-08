@@ -110,6 +110,11 @@ public final class DesktopProjectImporter {
         /// What the import could not read from the project's build, as
         /// sentences.
         public final List<String> unresolved = new ArrayList<String>();
+        /// The dependencies the application's own build has to declare for
+        /// the imported sources to compile, each with the scope it needs
+        /// there; see [Library]. A plugin adds them to the build it is
+        /// importing into.
+        public final List<Library> libraries = new ArrayList<Library>();
         public String generatedMain;
         /// The source of the project's previous main class, where the import
         /// set it aside to make room for the generated one; null when there
@@ -125,6 +130,42 @@ public final class DesktopProjectImporter {
         public String kind;
         public boolean kotlin;
         public int copiedFiles;
+    }
+
+    /// A dependency of the imported project that the application's build has
+    /// to declare too.
+    ///
+    /// Nothing a layer authors under the toolkit's own names is one: the
+    /// JavaFX layer's jar already holds `javafx.*`. SwingX is different, and
+    /// for the reason Swing is -- the layer's classes live under the names
+    /// they ship with, so the sources can only be compiled against the real
+    /// library. It is therefore declared `provided`: there to compile
+    /// against, never bundled, with the layer's own classes shipping in its
+    /// place. A library no layer implements is application code and is
+    /// declared `compile`, which is what makes the build bundle and
+    /// relocate it ([CompatRemapper#withApplicationLibraries]).
+    public static final class Library {
+        public final String groupId;
+        public final String artifactId;
+        /// As the project's build spells it, with a property of the same
+        /// build file resolved; null when the build file does not say (a
+        /// managed version, a version catalog), and the dependency then has
+        /// to be added by hand.
+        public final String version;
+        /// True for `provided`, false for `compile`.
+        public final boolean provided;
+
+        Library(String groupId, String artifactId, String version, boolean provided) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.version = version;
+            this.provided = provided;
+        }
+
+        /// `group:artifact`.
+        public String coordinate() {
+            return groupId + ":" + artifactId;
+        }
     }
 
     /// A class the application could be started through.
@@ -604,7 +645,7 @@ public final class DesktopProjectImporter {
 
     private static final Pattern POM_DEPENDENCY = Pattern.compile("<dependency>(.*?)</dependency>", Pattern.DOTALL);
     private static final Pattern GRADLE_DEPENDENCY = Pattern.compile(
-            "(?:implementation|api|compileOnly|runtimeOnly)\\s*\\(?\\s*[\"']([^\"':]+:[^\"':]+)(?::[^\"']*)?[\"']");
+            "(?:implementation|api|compileOnly|runtimeOnly)\\s*\\(?\\s*[\"']([^\"':]+:[^\"':]+)(?::([^\"':@]*)[^\"']*)?[\"']");
     private static final Pattern GRADLE_FX_MODULES = Pattern.compile("\\bmodules\\s*(?:=|\\()([^\\n]*)");
     private static final Pattern GRADLE_FX_MODULE = Pattern.compile("[\"']javafx\\.(\\w+)[\"']");
 
@@ -613,8 +654,23 @@ public final class DesktopProjectImporter {
         return m.find() ? m.group(1) : null;
     }
 
+    /// The dependencies of the project in `moduleDir` that the application
+    /// importing it has to declare: what [Result#libraries] of an import of
+    /// it holds, for a plugin that edits the application's build before
+    /// anything is copied.
+    public static List<Library> librariesOf(File moduleDir) throws BuildException {
+        Result r = new Result();
+        try {
+            readDependencies(moduleDir, r);
+        } catch (IOException e) {
+            throw new BuildException("Could not read the build of " + moduleDir + ": " + e.getMessage(), e);
+        }
+        return r.libraries;
+    }
+
     static void readDependencies(File moduleDir, Result r) throws IOException {
         Set<String> coords = new LinkedHashSet<String>();
+        Map<String, String> versions = new java.util.HashMap<String, String>();
         boolean catalog = false;
         // The module's own build only: what a parent declares for every module
         // says nothing about what this one uses.
@@ -628,6 +684,11 @@ public final class DesktopProjectImporter {
             String artifact = element(dep.group(1), "artifactId");
             if (group != null && artifact != null && !"test".equals(element(dep.group(1), "scope"))) {
                 coords.add(group + ":" + artifact);
+                String version = element(dep.group(1), "version");
+                version = version == null ? null : resolve(version, pom);
+                if (version != null && version.indexOf("${") < 0) {
+                    versions.put(group + ":" + artifact, version);
+                }
             }
         }
         for (String name : new String[] {"build.gradle.kts", "build.gradle"}) {
@@ -635,6 +696,10 @@ public final class DesktopProjectImporter {
             Matcher g = GRADLE_DEPENDENCY.matcher(gradle);
             while (g.find()) {
                 coords.add(g.group(1));
+                String version = g.group(2);
+                if (version != null && version.length() > 0 && version.indexOf('$') < 0) {
+                    versions.put(g.group(1), version);
+                }
             }
             // The JavaFX Gradle plugin's javafx { modules = [...] }.
             Matcher modules = GRADLE_FX_MODULES.matcher(gradle);
@@ -657,10 +722,14 @@ public final class DesktopProjectImporter {
                 continue;
             }
             String covered = COVERED.get(coord);
+            // Covered by a prefix: implemented by a layer under the names it
+            // ships with, so still needed to compile against.
+            boolean compiledAgainst = false;
             if (covered == null) {
                 for (String[] prefix : COVERED_PREFIXES) {
                     if (coord.startsWith(prefix[0])) {
                         covered = prefix[1];
+                        compiledAgainst = true;
                     }
                 }
             }
@@ -668,6 +737,11 @@ public final class DesktopProjectImporter {
                 r.covered.add(coord + " (" + covered + ")");
             } else {
                 r.uncovered.add(coord);
+            }
+            if (compiledAgainst || (covered == null && !isToolkitModule(coord))) {
+                int colon = coord.indexOf(':');
+                r.libraries.add(new Library(coord.substring(0, colon), coord.substring(colon + 1), versions.get(coord),
+                        compiledAgainst));
             }
         }
         if (catalog) {

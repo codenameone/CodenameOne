@@ -186,10 +186,7 @@ public class JEditorPane extends JTextComponent {
         if (fg != null) {
             g.setColor(fg);
         }
-        Font f = getFont();
-        if (f != null) {
-            g.setFont(f);
-        }
+        g.setFont(getFont());
         Insets in = cn1TextInsets();
         MiniHtml.paint(g, doc, in.left, in.top, Math.max(1, getWidth() - in.left - in.right), MiniHtml.ALIGN_LEFT);
     }

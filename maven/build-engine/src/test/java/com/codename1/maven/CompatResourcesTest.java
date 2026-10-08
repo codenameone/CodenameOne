@@ -389,12 +389,27 @@ public class CompatResourcesTest {
             + "    }\n"
             + "}\n";
 
-    /// A use of a class loader that nothing stands in for.
+    /// A use of a class loader that nothing stands in for: one made at run
+    /// time, to load classes the application was not built with.
     private static final String LOADS = "package p;\n"
             + "public class Loads {\n"
             + "    javax.swing.JLabel label;\n"
             + "    public static Class<?> load() throws Exception {\n"
-            + "        return Loads.class.getClassLoader().loadClass(\"p.Plugin\");\n"
+            + "        return new java.net.URLClassLoader(new java.net.URL[0]).loadClass(\"p.Plugin\");\n"
+            + "    }\n"
+            + "}\n";
+
+    /// Asking the application's own loader for one of its classes, which is
+    /// how desktop code finds out whether an optional class is present.
+    private static final String ASKS = "package p;\n"
+            + "public class Asks {\n"
+            + "    javax.swing.JLabel label;\n"
+            + "    public static boolean has(String name) {\n"
+            + "        try {\n"
+            + "            return Asks.class.getClassLoader().loadClass(name) != null;\n"
+            + "        } catch (ClassNotFoundException e) {\n"
+            + "            return false;\n"
+            + "        }\n"
             + "    }\n"
             + "}\n";
 
@@ -549,7 +564,7 @@ public class CompatResourcesTest {
     }
 
     @Test
-    public void loadingAClassByNameIsStillABuildError() throws Exception {
+    public void loadingClassesTheApplicationWasNotBuiltWithIsStillABuildError() throws Exception {
         File classes = tmp.newFolder("classes");
         CompatFixtures.compile(tmp.newFolder("src"), classes, "p/Loads.java", LOADS);
         File swing = swingJar();
@@ -557,9 +572,23 @@ public class CompatResourcesTest {
         assertTrue(new CompatRemapper(classes, Arrays.asList(swing, jdk), null, CompatRemapperTest.LOG).run());
         try {
             checkCompliance(classes, swing, jdk);
-            fail("ClassLoader.loadClass does not exist on a device");
+            fail("A device loads no classes at run time");
         } catch (BuildFailureException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("loadClass"));
+            assertTrue(expected.getMessage(), expected.getMessage().contains("URLClassLoader"));
         }
+    }
+
+    /// `loadClass` on the loader the application already has is
+    /// `Class.forName`, which a device does have.
+    @Test
+    public void askingTheApplicationsLoaderForAClassIsNot() throws Exception {
+        File classes = tmp.newFolder("classes");
+        CompatFixtures.compile(tmp.newFolder("src"), classes, "p/Asks.java", ASKS);
+        File swing = swingJar();
+        File jdk = jdkJar();
+        assertTrue(new CompatRemapper(classes, Arrays.asList(swing, jdk), null, CompatRemapperTest.LOG).run());
+        assertTrue(CompatFixtures.members(Files.readAllBytes(new File(classes, "p/Asks.class").toPath()))
+                .contains("com/codename1/compat/jdk/Resources.loadClass"));
+        checkCompliance(classes, swing, jdk);
     }
 }

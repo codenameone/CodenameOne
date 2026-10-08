@@ -69,9 +69,11 @@ import java.util.Map;
 ///
 /// #### What is deliberately absent
 ///
-/// Anything else of `ClassLoader` -- `loadClass`, `defineClass`, a
-/// `URLClassLoader` -- has no rule and so reaches the compliance check as the
-/// build error it is: a device loads no classes at run time.
+/// Anything else of `ClassLoader` -- `defineClass`, a `URLClassLoader` -- has
+/// no rule and so reaches the compliance check as the build error it is: a
+/// device loads no classes at run time. `loadClass(String)` is the one
+/// exception, because all it does with the one loader there is, is what
+/// `Class.forName` does: answer a class the application already has.
 final class CompatRewrites {
 
     private static final String RESOURCES = Relocation.JDK_PACKAGE + "Resources";
@@ -112,6 +114,7 @@ final class CompatRewrites {
         VIRTUAL.put("java/lang/ClassLoader.getResource" + url, RESOURCES);
         VIRTUAL.put("java/lang/ClassLoader.getResourceAsStream" + stream, RESOURCES);
         VIRTUAL.put("java/lang/ClassLoader.getResources" + urls, RESOURCES);
+        VIRTUAL.put("java/lang/ClassLoader.loadClass(Ljava/lang/String;)Ljava/lang/Class;", RESOURCES);
         STATIC.put("java/lang/ClassLoader.getSystemResource" + url, RESOURCES);
         STATIC.put("java/lang/ClassLoader.getSystemResourceAsStream" + stream, RESOURCES);
         STATIC.put("java/lang/ClassLoader.getSystemResources" + urls, RESOURCES);

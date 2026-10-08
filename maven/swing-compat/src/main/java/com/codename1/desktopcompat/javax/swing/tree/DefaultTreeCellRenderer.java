@@ -158,7 +158,7 @@ public class DefaultTreeCellRenderer extends JLabel implements TreeCellRenderer 
         }
         if (tree != null) {
             Font f = tree.getFont();
-            if (f != null && !f.equals(isFontSet() ? getFont() : null)) {
+            if (!f.equals(isFontSet() ? getFont() : null)) {
                 setFont(f);
             }
             if (isEnabled() != tree.isEnabled()) {

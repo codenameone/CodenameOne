@@ -308,8 +308,7 @@ public class JXMonthView extends JComponent {
     // ------------------------------------------------------------ geometry
 
     private Font font() {
-        Font f = getFont();
-        return f != null ? f : CellTheme.font();
+        return getFont();
     }
 
     /// `{x, y, boxWidth, boxHeight}` of the grid of seven columns and

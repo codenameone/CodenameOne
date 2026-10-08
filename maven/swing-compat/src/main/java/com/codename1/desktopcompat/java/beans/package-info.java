@@ -24,6 +24,19 @@
 /// listeners, the proxy that binds a listener to one property name, the
 /// support class that fires them, and the veto exception.
 ///
-/// Introspection (`Introspector`, `BeanInfo`) and the persistence classes are
-/// not provided, and the support class does not synchronize.
+/// The support class does not synchronize.
+///
+/// [Beans] answers the two environment questions, and [Introspector] answers
+/// a [BeanInfo] that holds a class's [BeanDescriptor] and nothing discovered
+/// about it: properties, events and methods are found by reflection on a
+/// desktop, and a device has none.
+///
+/// Long-term persistence ([XMLEncoder], [XMLDecoder], [Encoder],
+/// [PersistenceDelegate], [Statement], [Expression]) is reflection from end
+/// to end and does not work. Those classes are here, marked
+/// `com.codename1.compat.jdk.LinkOnly`, because libraries written against
+/// Swing offer to save themselves that way beside everything else they do
+/// and could not be bundled otherwise: the build accepts a reference from a
+/// bundled library and reports one from an application's own code, as it
+/// does for API that is absent.
 package com.codename1.desktopcompat.java.beans;

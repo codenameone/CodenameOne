@@ -135,8 +135,7 @@ public class JTextField extends JTextComponent implements SwingConstants {
 
     /// The width of one column: that of the letter m in the field's font.
     protected int getColumnWidth() {
-        com.codename1.desktopcompat.java.awt.Font f = getFont();
-        return f == null ? 0 : getFontMetrics(f).charWidth('m');
+        return getFontMetrics(getFont()).charWidth('m');
     }
 
     public int getHorizontalAlignment() {

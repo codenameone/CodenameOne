@@ -98,6 +98,13 @@ final class DesktopEntryPoints {
     static final String BRIDGE = "CN1DesktopEntryBridge";
 
     static final String SWING_LIFECYCLE = "com/codename1/desktopcompat/rt/DesktopLifecycle";
+    /// The lifecycle the Android layer's main class extends, as the Android
+    /// remap leaves it. That remap runs first in a real build, so this is the
+    /// name seen there; a first end to end build of a project holding both
+    /// layers is what showed the unrelocated name alone never matched.
+    static final String ANDROID_LIFECYCLE = AndroidRemapper.RUNTIME_TARGET + "AndroidLifecycle";
+    /// The same class before the Android remap has moved it.
+    static final String ANDROID_LIFECYCLE_SOURCE = "com/codename1/androidcompat/runtime/AndroidLifecycle";
     private static final String FX_LIFECYCLE_SOURCE = "com/codename1/fxcompat/runtime/FxLifecycle";
     private static final String FX_APPLICATION_SOURCE = "javafx/application/Application";
     private static final String BOOT = Relocation.JDK_PACKAGE + "CompatBoot";
@@ -196,6 +203,20 @@ final class DesktopEntryPoints {
                 log.debug(dotted(target) + " is the application's own main class; no desktop entry point is "
                         + "generated without " + DesktopSources.ENTRY_RECORD);
                 return null;
+            }
+            if (extendsOneOf(existing, ANDROID_LIFECYCLE, ANDROID_LIFECYCLE_SOURCE)) {
+                // The Android layer's main class: its build writes one
+                // whenever the project has none, so "delete the source" is
+                // advice nobody could follow. A target starts ONE class, and
+                // which of two applications that should be is not something
+                // to guess -- say what the two ways out are.
+                throw new BuildException("This project holds an Android application (src/main/android) and a "
+                        + "desktop application (src/main/desktop), and each is to be started by the project's one "
+                        + "main class, " + dotted(target) + ". A project starts one application. To keep the "
+                        + "Android application as the one that starts, delete " + DesktopSources.ENTRY_RECORD
+                        + ": the desktop classes still ship, relocated, and the Android code can use them. To "
+                        + "start " + value(record, "mainClass") + " instead, move the Android application to a "
+                        + "project of its own.");
             }
             throw new BuildException(dotted(target) + " is this project's main class and has a source of its own, "
                     + "but " + DesktopSources.ENTRY_RECORD + " asks the build to generate the class that starts "

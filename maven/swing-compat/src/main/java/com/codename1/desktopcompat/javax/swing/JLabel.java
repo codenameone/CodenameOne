@@ -31,7 +31,6 @@ import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
 import com.codename1.desktopcompat.rt.Align;
-import com.codename1.desktopcompat.rt.Fonts;
 import com.codename1.desktopcompat.rt.Icons;
 import com.codename1.desktopcompat.rt.LabelPeer;
 import com.codename1.desktopcompat.rt.MiniHtml;
@@ -133,8 +132,7 @@ public class JLabel extends JComponent implements SwingConstants {
     }
 
     private Font htmlFont() {
-        Font f = getFont();
-        return f != null ? f : Fonts.defaultFont();
+        return getFont();
     }
 
     /// The space around the content of an HTML label: the border's, and

@@ -334,13 +334,11 @@ public class JTextArea extends JTextComponent {
     }
 
     protected int getRowHeight() {
-        Font f = getFont();
-        return f == null ? 0 : getFontMetrics(f).getHeight();
+        return getFontMetrics(getFont()).getHeight();
     }
 
     protected int getColumnWidth() {
-        Font f = getFont();
-        return f == null ? 0 : getFontMetrics(f).charWidth('m');
+        return getFontMetrics(getFont()).charWidth('m');
     }
 
     public boolean getLineWrap() {

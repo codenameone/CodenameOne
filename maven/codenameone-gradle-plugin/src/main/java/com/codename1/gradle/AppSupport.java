@@ -199,7 +199,19 @@ final class AppSupport {
         main.getResources().srcDir(desktopRes.flatMap(
                 com.codename1.gradle.tasks.CompileDesktopResourcesTask::getResourcesDirectory));
         main.getJava().srcDir(com.codename1.maven.DesktopSources.javaDir(desktopDir));
-        main.getResources().srcDir(com.codename1.maven.DesktopSources.resourcesDir(desktopDir));
+        final File desktopResources = com.codename1.maven.DesktopSources.resourcesDir(desktopDir).getAbsoluteFile();
+        main.getResources().srcDir(desktopResources);
+        // A device bundle has no directories, so the relocation step ships a
+        // nested desktop resource under a flat name, written into the classes
+        // directory from the source file. Maven's resources land in that same
+        // directory and the step removes the nested copy there; Gradle's land
+        // in a directory of their own, which the step never sees, so the
+        // nested copy shipped a second time under a name nothing reads. It is
+        // left out here instead: a directory of the desktop resource root is
+        // not copied, and the files at the root, which keep their names, are.
+        // The filter is the source set's, so it holds for whatever reads the
+        // resources; it matches nothing outside that one root.
+        main.getResources().exclude(new NestedDesktopResources(desktopResources));
         final File desktopEntry = com.codename1.maven.DesktopSources.entryRecord(desktopDir);
         // The class a desktop application's entry point is generated as.
         final String desktopMain = applicationMain(settings);
@@ -995,6 +1007,29 @@ final class AppSupport {
         }
     }
 
+    /// Matches the directories directly inside the desktop resource root, so
+    /// that the main resources leave everything nested in it alone: those
+    /// resources ship under flat names the relocation step writes. A class of
+    /// its own rather than a lambda so that the configuration cache can store
+    /// it.
+    static final class NestedDesktopResources
+            implements org.gradle.api.specs.Spec<org.gradle.api.file.FileTreeElement>, java.io.Serializable {
+        private static final long serialVersionUID = 1L;
+        private final File root;
+
+        NestedDesktopResources(File root) {
+            this.root = root;
+        }
+
+        @Override
+        public boolean isSatisfiedBy(org.gradle.api.file.FileTreeElement element) {
+            if (!element.isDirectory()) {
+                return false;
+            }
+            File parent = element.getFile().getAbsoluteFile().getParentFile();
+            return root.equals(parent);
+        }
+    }
 
     /// `codename1.packageName` and `codename1.mainName` as one class name,
     /// or null when the settings name no main class.

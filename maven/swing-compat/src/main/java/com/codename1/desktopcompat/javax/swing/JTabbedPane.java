@@ -25,7 +25,6 @@ package com.codename1.desktopcompat.javax.swing;
 import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Dimension;
-import com.codename1.desktopcompat.java.awt.Font;
 import com.codename1.desktopcompat.java.awt.FontMetrics;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Rectangle;
@@ -712,8 +711,7 @@ public class JTabbedPane extends JComponent implements SwingConstants {
                 return new Dimension(Units.toLogicalCeil(d.getWidth()), Units.toLogicalCeil(d.getHeight()));
             }
         }
-        Font f = getFont();
-        FontMetrics fm = Fonts.metrics(f != null ? f : Fonts.defaultFont());
+        FontMetrics fm = Fonts.metrics(getFont());
         int w = 0;
         int h = 0;
         for (int i = 0; i < pages.size(); i++) {

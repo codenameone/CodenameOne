@@ -89,6 +89,45 @@ public class DesktopPomUpdaterTest {
         assertTrue(u.pom.contains("<goal>prepare-desktop-sources</goal>"));
     }
 
+    /// The imported sources are compiled against the libraries the desktop
+    /// project declared, so the pom that receives them has to declare them:
+    /// in the module's own dependencies, once, and never a version nobody
+    /// stated.
+    @Test
+    public void declaresTheImportedProjectsLibraries() throws Exception {
+        String current = read("../cn1app-archetype/src/main/resources/archetype-resources/common/pom.xml");
+        File project = Files.createTempDirectory("desktop-libs").toFile();
+        Files.write(new File(project, "pom.xml").toPath(), ("<project><dependencies>\n"
+                + "<dependency><groupId>com.miglayout</groupId><artifactId>miglayout-swing</artifactId>"
+                + "<version>5.3</version></dependency>\n"
+                + "<dependency><groupId>org.swinglabs.swingx</groupId><artifactId>swingx-all</artifactId>"
+                + "<version>1.6.5-1</version></dependency>\n"
+                + "<dependency><groupId>org.example</groupId><artifactId>managed</artifactId></dependency>\n"
+                + "</dependencies></project>\n").getBytes("UTF-8"));
+        java.util.List<com.codename1.maven.DesktopProjectImporter.Library> libraries =
+                com.codename1.maven.DesktopProjectImporter.librariesOf(project);
+        DesktopPomUpdater u = new DesktopPomUpdater(current, false, libraries);
+        assertTrue(u.changed);
+        assertEquals(java.util.Arrays.asList("com.miglayout:miglayout-swing:5.3 (compile)",
+                "org.swinglabs.swingx:swingx-all:1.6.5-1 (provided)"), u.addedLibraries);
+        int mig = u.pom.indexOf("<artifactId>miglayout-swing</artifactId>");
+        int swingx = u.pom.indexOf("<artifactId>swingx-all</artifactId>");
+        assertTrue(mig > 0 && swingx > 0);
+        assertTrue(u.pom.substring(mig, mig + 200).contains("<scope>compile</scope>"), u.pom.substring(mig, mig + 200));
+        assertTrue(u.pom.substring(swingx, swingx + 200).contains("<scope>provided</scope>"));
+        assertFalse(u.pom.contains("<artifactId>managed</artifactId>"), "no version was stated for it");
+        // In the module's dependencies: not under dependencyManagement, a
+        // plugin or a profile, where it would compile nothing.
+        int build = u.pom.indexOf("<build>");
+        assertTrue(build < 0 || mig < build, "declared before <build>");
+        assertTrue(mig < u.pom.indexOf("<profiles>"));
+
+        DesktopPomUpdater again = new DesktopPomUpdater(u.pom, false, libraries);
+        assertFalse(again.changed);
+        assertTrue(again.addedLibraries.isEmpty(), again.addedLibraries.toString());
+        assertEquals(u.pom, again.pom);
+    }
+
     @Test
     public void neverWiresTheGoalIntoALaterPlugin() {
         String pom = "<project><build><plugins>\n"

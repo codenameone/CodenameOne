@@ -249,8 +249,7 @@ public class JXLabel extends JLabel {
     }
 
     private Font textFont() {
-        Font f = getFont();
-        return f != null ? f : Fonts.defaultFont();
+        return getFont();
     }
 
     /// The border's insets and the padding the theme gives a label.
