@@ -2,4 +2,153 @@
 <!-- Intentional SpotBugs exceptions for this module. The report is a
      zero-findings gate, so every entry is scoped and explained. -->
 <FindBugsFilter>
+
+    <!-- AWT and Swing are an object graph by contract: getParent(),
+         getLayout(), getModel(), getContentPane(), an event's getChild()
+         return THE object, and a setter or constructor keeps the one it is
+         given. A defensive copy would be a different component. Scoped to
+         the relocated JDK packages, whose signatures are not ours to
+         change. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.(java\.awt|java\.beans|javax\.swing)\..*"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The runtime's wiring objects exist to hold a reference to the
+         component, form, image or graphics they bridge to. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.rt.PeerSupport"/>
+            <Class name="com.codename1.desktopcompat.rt.FrameForm"/>
+            <Class name="com.codename1.desktopcompat.rt.LayoutBridge"/>
+            <Class name="com.codename1.desktopcompat.rt.NativeImage"/>
+            <Class name="com.codename1.desktopcompat.rt.G2D"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The focus owner is one component for the whole application, as in
+         AWT's KeyboardFocusManager; it is read and written on the event
+         dispatch thread only. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.EventBridge"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+        </Or>
+    </Match>
+
+    <!-- Object.clone() returns null for anything but an array on ParparVM
+         and in the CLDC class library, so no clone() here may call
+         super.clone(); each one copies its fields explicitly. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.java\.awt\..*"/>
+        <Method name="clone"/>
+        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
+    </Match>
+
+    <!-- The event classes are Serializable only because java.util.EventObject
+         is. A device has no object streams, so there is no serialized form
+         to version and no field that could fail to be written. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.(java\.awt\.event|java\.beans|javax\.swing\.event)\..*Event"/>
+        <Or>
+            <Bug pattern="SE_NO_SERIALVERSIONID"/>
+            <Bug pattern="SE_BAD_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- The four public arrays are GridBagLayout's API: the application
+         assigns them to set minimum sizes and weights, the layout only
+         reads them. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.GridBagLayout"/>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
+    <!-- Swing's constructors build the root pane through overridable
+         methods (setRootPane, setContentPane, setLayout), and applications
+         override them counting on that. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.JFrame"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JDialog"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JRootPane"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The JDK documents null, not an empty array, as the answer of these
+         three when there is nothing selected or no key defined, and callers
+         test for it. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.AbstractAction"/>
+                <Method name="getKeys"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.AbstractButton"/>
+                <Method name="getSelectedObjects"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.DefaultButtonModel"/>
+                <Method name="getSelectedObjects"/>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- Point and Rectangle define equals and inherit hashCode from Point2D
+         and Rectangle2D, exactly as the JDK's do; the inherited hash is
+         computed from the same coordinates and is consistent with both. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.java.awt.Point"/>
+            <Class name="com.codename1.desktopcompat.java.awt.Rectangle"/>
+        </Or>
+        <Bug pattern="HE_EQUALS_NO_HASHCODE"/>
+    </Match>
+
+    <!-- Rectangle is declared "implements Shape, Serializable" in the JDK
+         although Rectangle2D already implements Shape; the declaration is
+         kept so the class has the JDK's shape. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.Rectangle"/>
+        <Bug pattern="RI_REDUNDANT_INTERFACES"/>
+    </Match>
+
+    <!-- Exact comparison is the specification here: two transforms are
+         equal when their six entries are, and the type flags ask whether an
+         entry IS 0 or 1, not whether it is near it. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.geom.AffineTransform"/>
+        <Or>
+            <Method name="equals"/>
+            <Method name="getType"/>
+        </Or>
+        <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+    </Match>
+
+    <!-- Created on first use by the event dispatch thread, which is the
+         only thread that touches the toolkit; the layer takes no locks. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.Toolkit"/>
+        <Method name="getDefaultToolkit"/>
+        <Bug pattern="LI_LAZY_INIT_STATIC"/>
+    </Match>
+
+    <!-- EventQueue has a public constructor in the JDK and
+         Toolkit.getSystemEventQueue() must return an instance, even though
+         everything the layer implements on it is static. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.DesktopToolkit"/>
+        <Bug pattern="ISC_INSTANTIATE_STATIC_CLASS"/>
+    </Match>
 </FindBugsFilter>

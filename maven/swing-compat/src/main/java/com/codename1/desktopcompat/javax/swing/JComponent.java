@@ -1,0 +1,287 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.desktopcompat.javax.swing;
+
+import com.codename1.desktopcompat.java.awt.Color;
+import com.codename1.desktopcompat.java.awt.Container;
+import com.codename1.desktopcompat.java.awt.Dimension;
+import com.codename1.desktopcompat.java.awt.Graphics;
+import com.codename1.desktopcompat.java.awt.Insets;
+import com.codename1.desktopcompat.java.awt.Rectangle;
+import com.codename1.desktopcompat.javax.swing.border.Border;
+import com.codename1.desktopcompat.javax.swing.event.EventListenerList;
+import java.util.HashMap;
+
+/// The base of the Swing components.
+///
+/// Painting follows Swing: `paint` calls `paintComponent`, `paintBorder`
+/// and `paintChildren`. The default `paintComponent` draws the Codename
+/// One widget behind a component that has one (a button, a label) and
+/// otherwise fills the background of an opaque component; an override that
+/// does not call `super.paintComponent` therefore starts from what its
+/// parent painted. There are no UI delegates: `updateUI` does nothing, and
+/// key bindings (input and action maps), tool tips and client side
+/// scrolling are absent.
+public abstract class JComponent extends Container {
+
+    public static final int WHEN_FOCUSED = 0;
+    public static final int WHEN_ANCESTOR_OF_FOCUSED_COMPONENT = 1;
+    public static final int WHEN_IN_FOCUSED_WINDOW = 2;
+    public static final int UNDEFINED_CONDITION = -1;
+    public static final String TOOL_TIP_TEXT_KEY = "ToolTipText";
+
+    protected EventListenerList listenerList = new EventListenerList();
+
+    private Border border;
+    private boolean opaque;
+    private float alignmentX = -1;
+    private float alignmentY = -1;
+    private String toolTipText;
+    private HashMap<Object, Object> clientProperties;
+
+    public JComponent() {
+    }
+
+    /// Does nothing: there are no UI delegates to refresh.
+    public void updateUI() {
+    }
+
+    // ------------------------------------------------------------ paint
+
+    @Override
+    public void paint(Graphics g) {
+        if (getWidth() <= 0 || getHeight() <= 0) {
+            return;
+        }
+        Graphics co = g.create();
+        try {
+            paintComponent(co);
+        } finally {
+            co.dispose();
+        }
+        co = g.create();
+        try {
+            paintBorder(co);
+        } finally {
+            co.dispose();
+        }
+        paintChildren(g);
+    }
+
+    @Override
+    public void update(Graphics g) {
+        paint(g);
+    }
+
+    /// Draws the Codename One widget behind this component if it has one;
+    /// otherwise fills the background when the component is opaque.
+    protected void paintComponent(Graphics g) {
+        if (cn1PaintNative(g)) {
+            return;
+        }
+        if (isOpaque()) {
+            Color bg = getBackground();
+            if (bg != null) {
+                g.setColor(bg);
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        }
+    }
+
+    protected void paintBorder(Graphics g) {
+        if (border != null) {
+            border.paintBorder(this, g, 0, 0, getWidth(), getHeight());
+        }
+    }
+
+    protected void paintChildren(Graphics g) {
+        cn1PaintChildren(g);
+    }
+
+    public void repaint(Rectangle r) {
+        repaint(0, r.x, r.y, r.width, r.height);
+    }
+
+    /// Asks for a repaint; nothing is painted before this returns.
+    public void paintImmediately(int x, int y, int w, int h) {
+        repaint(0, x, y, w, h);
+    }
+
+    public void paintImmediately(Rectangle r) {
+        repaint(0, r.x, r.y, r.width, r.height);
+    }
+
+    @Override
+    public boolean isOpaque() {
+        return opaque;
+    }
+
+    public void setOpaque(boolean isOpaque) {
+        boolean old = opaque;
+        opaque = isOpaque;
+        firePropertyChange("opaque", old, isOpaque);
+        repaint();
+    }
+
+    @Override
+    public boolean isDoubleBuffered() {
+        return true;
+    }
+
+    public void setDoubleBuffered(boolean aFlag) {
+    }
+
+    public Rectangle getVisibleRect() {
+        return new Rectangle(0, 0, getWidth(), getHeight());
+    }
+
+    // ------------------------------------------------------------ border
+
+    public void setBorder(Border border) {
+        Border old = this.border;
+        this.border = border;
+        firePropertyChange("border", old, border);
+        if (border != old) {
+            revalidate();
+            repaint();
+        }
+    }
+
+    public Border getBorder() {
+        return border;
+    }
+
+    @Override
+    public Insets getInsets() {
+        if (border != null) {
+            return border.getBorderInsets(this);
+        }
+        return super.getInsets();
+    }
+
+    public Insets getInsets(Insets insets) {
+        Insets i = getInsets();
+        if (insets == null) {
+            return i;
+        }
+        insets.top = i.top;
+        insets.left = i.left;
+        insets.bottom = i.bottom;
+        insets.right = i.right;
+        return insets;
+    }
+
+    // ------------------------------------------------------------ sizes
+
+    @Override
+    public Dimension getMaximumSize() {
+        if (!isMaximumSizeSet()) {
+            Dimension d = cn1NativePreferredSize();
+            if (d != null) {
+                return d;
+            }
+        }
+        return super.getMaximumSize();
+    }
+
+    @Override
+    public float getAlignmentX() {
+        return alignmentX >= 0 ? alignmentX : super.getAlignmentX();
+    }
+
+    public void setAlignmentX(float alignmentX) {
+        this.alignmentX = alignmentX > 1.0f ? 1.0f : alignmentX < 0.0f ? 0.0f : alignmentX;
+    }
+
+    @Override
+    public float getAlignmentY() {
+        return alignmentY >= 0 ? alignmentY : super.getAlignmentY();
+    }
+
+    public void setAlignmentY(float alignmentY) {
+        this.alignmentY = alignmentY > 1.0f ? 1.0f : alignmentY < 0.0f ? 0.0f : alignmentY;
+    }
+
+    // ------------------------------------------------------------ misc
+
+    /// Recorded only; no tool tip is shown.
+    public void setToolTipText(String text) {
+        String old = toolTipText;
+        toolTipText = text;
+        firePropertyChange(TOOL_TIP_TEXT_KEY, old, text);
+    }
+
+    public String getToolTipText() {
+        return toolTipText;
+    }
+
+    public final Object getClientProperty(Object key) {
+        return clientProperties == null ? null : clientProperties.get(key);
+    }
+
+    public final void putClientProperty(Object key, Object value) {
+        if (clientProperties == null) {
+            if (value == null) {
+                return;
+            }
+            clientProperties = new HashMap<Object, Object>();
+        }
+        Object old = clientProperties.get(key);
+        if (value == null) {
+            clientProperties.remove(key);
+        } else {
+            clientProperties.put(key, value);
+        }
+        firePropertyChange(String.valueOf(key), old, value);
+    }
+
+    public void grabFocus() {
+        requestFocus();
+    }
+
+    public void setRequestFocusEnabled(boolean requestFocusEnabled) {
+    }
+
+    public JRootPane getRootPane() {
+        return SwingUtilities.getRootPane(this);
+    }
+
+    public Container getTopLevelAncestor() {
+        for (Container p = this; p != null; p = p.getParent()) {
+            if (p instanceof com.codename1.desktopcompat.java.awt.Window) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void firePropertyChange(String propertyName, boolean oldValue, boolean newValue) {
+        super.firePropertyChange(propertyName, oldValue, newValue);
+    }
+
+    @Override
+    public void firePropertyChange(String propertyName, int oldValue, int newValue) {
+        super.firePropertyChange(propertyName, oldValue, newValue);
+    }
+}
