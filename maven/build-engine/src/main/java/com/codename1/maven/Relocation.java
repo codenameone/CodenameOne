@@ -54,6 +54,7 @@ public final class Relocation {
         {"java/io/FilterInputStream", JDK_PACKAGE + "FilterInputStream"},
         {"java/io/FilterOutputStream", JDK_PACKAGE + "FilterOutputStream"},
         {"java/io/PrintWriter", JDK_PACKAGE + "PrintWriter"},
+        {"java/io/UncheckedIOException", JDK_PACKAGE + "UncheckedIOException"},
         // Every Codename One stream, reader and writer is AutoCloseable, and
         // close() is the interface's only method, so code holding a Closeable
         // runs unchanged against it.

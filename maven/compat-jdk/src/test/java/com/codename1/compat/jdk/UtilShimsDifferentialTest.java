@@ -234,6 +234,10 @@ public class UtilShimsDifferentialTest {
         assertEquals(new java.util.concurrent.ExecutionException(cause).getMessage(),
                 new ExecutionException(cause).getMessage());
         assertSame(cause, new ExecutionException("m", cause).getCause());
+        java.io.IOException io = new java.io.IOException("disk");
+        assertEquals(new java.io.UncheckedIOException(io).getMessage(), new UncheckedIOException(io).getMessage());
+        assertSame(io, new UncheckedIOException("m", io).getCause());
+        assertEquals("m", new UncheckedIOException("m", io).getMessage());
         assertEquals("m", new CancellationException("m").getMessage());
         assertNull(new CancellationException().getMessage());
         assertEquals("m", new TimeoutException("m").getMessage());
