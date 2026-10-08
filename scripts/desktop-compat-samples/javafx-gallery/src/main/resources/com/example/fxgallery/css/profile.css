@@ -1,0 +1,19 @@
+/* Loaded by profile.fxml through stylesheets="@../css/profile.css". */
+.profile {
+    -fx-background-color: linear-gradient(to bottom, white, #e3f2fd);
+}
+
+.profile .greeting {
+    -fx-font-size: 15px;
+    -fx-text-fill: #1b5e20;
+}
+
+.status-badge {
+    -fx-padding: 2 8 2 8;
+    -fx-background-color: #eceff1;
+    -fx-background-radius: 10;
+}
+
+.status-badge .label {
+    -fx-font-size: 11px;
+}
