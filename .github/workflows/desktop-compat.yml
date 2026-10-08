@@ -98,7 +98,7 @@ jobs:
       # A module added to the layer (an FXML compiler, say) joins this list.
       - name: Unit tests
         working-directory: maven
-        run: xvfb-run -a mvn -B -Plocal-dev-javase -pl compat-jdk,compat-testing,swing-compat,javafx-compat,build-engine test
+        run: xvfb-run -a mvn -B -Plocal-dev-javase -pl compat-jdk,compat-testing,swing-compat,javafx-compat,fxml-compiler,build-engine test
       - name: Refresh archetype catalog
         run: |
           cd maven
