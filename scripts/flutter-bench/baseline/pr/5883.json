@@ -124,25 +124,25 @@
      "from": {
       "value": 12910326
      },
-     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "reason": "master merge c717e15d2a (runtime and Playground support) grew the JavaScript bundle +0.13% code; run 37726200794 at be95ff25e5",
      "runs": 1,
-     "value": 12803600
+     "value": 12820642
     },
     "install_bytes": {
      "from": {
       "value": 110000963
      },
-     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "reason": "master merge c717e15d2a (runtime and Playground support) grew the JavaScript bundle +0.13% code; run 37726200794 at be95ff25e5",
      "runs": 1,
-     "value": 108089897
+     "value": 108106939
     },
     "wire_bytes": {
      "from": {
       "value": 80610118
      },
-     "reason": "runtime additions from the review fixes (Opacity layer, Transform hit testing, ScrollController positions, canvas clip, Duration operators, Uri ports, int.parse, late locals, Localizations/MediaQuery scopes); run 37127546884 at 7dd1db8d48",
+     "reason": "master merge c717e15d2a (runtime and Playground support) grew the JavaScript bundle +0.13% code; run 37726200794 at be95ff25e5",
      "runs": 1,
-     "value": 79709886
+     "value": 79714641
     }
    }
   },
