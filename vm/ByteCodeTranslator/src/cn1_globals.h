@@ -2180,6 +2180,16 @@ struct ThreadLocalData {
     /// therefore puts the outer one on the stack and the inner one on the heap, which is
     /// correct rather than merely safe -- the inner one's lifetime is the outer one's.
     void* pendingStackIter;
+#ifdef CN1_GC_VERIFY
+    /// Verifier only: how many times this thread has gone active through
+    /// cn1GcTryResumeActive, and the count the collector saw when it took the thread as
+    /// parked in a stop-the-world cycle. A held thread whose count moves before the
+    /// cycle releases it RAN while held -- the invariant that cycle depends on, checked
+    /// directly rather than through whatever damage the run happened to do.
+    long gcVerifyResumes;
+    long gcVerifyHeldAt;
+    JAVA_BOOLEAN gcVerifyHeld;
+#endif
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
@@ -2286,6 +2296,7 @@ static inline JAVA_BOOLEAN cn1GcTryResumeActive(struct ThreadLocalData* ts) {
         cn1GcFaultResumeWait();
         if(cn1__fault == 2) {
             __atomic_store_n(&ts->threadActive, JAVA_TRUE, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&ts->gcVerifyResumes, 1, __ATOMIC_SEQ_CST);
             return JAVA_TRUE;
         }
     }
@@ -2293,6 +2304,9 @@ static inline JAVA_BOOLEAN cn1GcTryResumeActive(struct ThreadLocalData* ts) {
     __atomic_store_n(&ts->threadActive, JAVA_TRUE, __ATOMIC_RELAXED);
     __atomic_thread_fence(__ATOMIC_SEQ_CST);
     if(!__atomic_load_n(&ts->threadBlockedByGC, __ATOMIC_RELAXED)) {
+#ifdef CN1_GC_VERIFY
+        __atomic_fetch_add(&ts->gcVerifyResumes, 1, __ATOMIC_SEQ_CST);
+#endif
         return JAVA_TRUE;
     }
     __atomic_store_n(&ts->threadActive, JAVA_FALSE, __ATOMIC_RELEASE);

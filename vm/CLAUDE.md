@@ -280,7 +280,12 @@ alternates phases for the verifier and gauntlet. Each of these was measured to b
   re-read the block, step back down if raised) and the collector fences
   (`CN1_GC_BLOCK_FENCE`) between raising the block and reading `threadActive`. A new
   resume site that stores `threadActive = JAVA_TRUE` directly reopens it.
-- **A "recycled slot" at mark -1 on an owned page is usually the verifier racing the
+  Verifier builds check the invariant itself rather than its damage: a thread the cycle
+  took as parked must not have resumed by the time it is released
+  (`cn1GcVerifyHeldThreadsStayedHeld`, "HELD THREAD RAN"). The escape only becomes a
+  dangling reference in a narrow interleaving -- every run on one host, never on a CI
+  runner -- so a negative control that waited for the damage depended on the machine.
+- **A "recycled slot" holding a fresh object is usually the verifier racing the
   allocator, not the collector.** The verifier walks the heap after the mutators are
   released. A slot is published as `header; dmb ishst; bumpIndex = bi + 1`, and nothing
   orders that bump store before the mutator's next store, the one that puts the object in
@@ -289,9 +294,10 @@ alternates phases for the verifier and gauntlet. Each of these was measured to b
   `Filler` "above the bump cursor"; it never reproduced on Apple silicon (0 in 67,000
   verify passes, and a 2.3-billion-read litmus of the same store pattern saw no
   reordering). The collector itself never rejects a precise field on `bumpIndex`, so the
-  verifier is what changed: `cn1GcVerifyPublishedLate` accepts such a slot only on an
-  owned page, among the owner's newest slots, holding a fresh object of a registered
-  class, and only once the bump really covers it. `LATEPUBLISH seen=` in the summary
+  verifier is what changed: `cn1GcVerifyPublishedLate` accepts such a slot only among
+  the page's newest slots, holding a fresh object of a registered class, and only once
+  the bump really covers it. It does not ask whether the page is still owned: the owner
+  can fill and retire it in between, which a fault run caught. `LATEPUBLISH seen=` in the summary
   counts them; `CN1_GC_FAULT=stalebump` reproduces the stale view on any host.
 
 A test whose evidence names one collector's mechanism goes vacuous when the hybrid takes

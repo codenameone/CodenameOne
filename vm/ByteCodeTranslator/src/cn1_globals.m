@@ -224,9 +224,9 @@ static int cn1GcFaultShouldFreeLive(JAVA_OBJECT o, int m) {
 // never reached it. "resumeescape" also skips the re-check -- the protocol every resume
 // site had before -- and the verifier must catch a thread that ran Java while a
 // stop-the-world cycle held it. Read at the first collection, like every fault here.
-// CN1_GC_FAULT=stalebump reads every OWNED page's bump one slot short in the verifier,
-// which is what an arm64 core can show it while the newest allocation's bump store is
-// still in flight (see cn1GcVerifyPublishedLate). It lets a host that keeps stores in
+// CN1_GC_FAULT=stalebump reads every OWNED page's bump short in the post-sweep verifier
+// pass, which is what an arm64 core can show it while the newest allocations' bump stores
+// are still in flight (see cn1GcVerifyPublishedLate). It lets a host that keeps stores in
 // order exercise that path: the gate requires a run under it to stay clean AND to have
 // counted late publications.
 int cn1GcFaultStaleBump = 0;
@@ -274,7 +274,7 @@ static void cn1GcFaultInit(void) {
         fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
     } else if(strcmp(f, "stalebump") == 0) {
         cn1GcFaultStaleBump = 1;
-        fprintf(stderr, "[GC-FAULT] verifier reads owned pages' bump one slot short\n");
+        fprintf(stderr, "[GC-FAULT] verifier reads owned pages' bump short\n");
     } else if(strcmp(f, "resumewindow") == 0 || strcmp(f, "resumeescape") == 0) {
         { const char* e = getenv("CN1_GC_FAULT_RESUME_US");
           if(e != 0 && atoi(e) > 0) { cn1GcFaultResumeUs = atoi(e); } }
@@ -6186,6 +6186,19 @@ void codenameOneGCMark() {
                     cn1GcWaitNs += cn1GcNowNs() - __wt0;
 #endif
                 }
+#ifdef CN1_GC_VERIFY
+                // The collector has just taken this thread as PARKED. In a stop-the-world
+                // cycle it must stay that way until cn1GcReleaseBlockedThreads, which checks
+                // that its resume count has not moved. A forced stop is excluded: that thread
+                // is released early on purpose (cn1GcMarkReleaseForced).
+                t->gcVerifyHeld = JAVA_FALSE;
+                if(cn1GcStwCycle && t->lightweightThread && !forcedStop && !vtExecuting
+                   && vtOfState == 0) {
+                    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+                    t->gcVerifyHeldAt = __atomic_load_n(&t->gcVerifyResumes, __ATOMIC_SEQ_CST);
+                    t->gcVerifyHeld = JAVA_TRUE;
+                }
+#endif
                 
                 // place allocations from the local thread into the global heap list.
                 // The critical section serializes this migration against
@@ -7113,12 +7126,46 @@ void cn1GcReleaseAllBlockedThreadsPublic(void) {
         cn1GcWakeUnblocked();
     }
 }
+#ifdef CN1_GC_VERIFY
+// HELD MEANS NOT RUNNING. A stop-the-world cycle retires a held thread's pages, takes the
+// remembered set and frees unmarked young objects on the premise that the thread it
+// scanned as parked has not run since. The resume handshake (cn1GcTryResumeActive) is
+// what makes that true; this checks it directly, before the release, for every thread the
+// cycle took as parked. It does not depend on the run happening to turn an escape into a
+// dangling reference -- an escape only does damage in a narrow interleaving, which one
+// host reached every run and a CI runner never did, so a gate that waited for the damage
+// was a gate that depended on the machine. Verifier builds only.
+static void cn1GcVerifyHeldThreadsStayedHeld(void) {
+    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+        lockCriticalSection();
+        struct ThreadLocalData* t = allThreads[iter];
+        unlockCriticalSection();
+        if(t == 0 || !t->gcVerifyHeld) {
+            continue;
+        }
+        t->gcVerifyHeld = JAVA_FALSE;
+        long now = __atomic_load_n(&t->gcVerifyResumes, __ATOMIC_SEQ_CST);
+        if(now != t->gcVerifyHeldAt) {
+            fprintf(stderr, "[GC-VERIFY] HELD THREAD RAN at epoch %d: thread %lld resumed %ld "
+                    "time(s) while a stop-the-world cycle held it as parked\n",
+                    currentGcMarkValue, (long long)t->threadId, now - t->gcVerifyHeldAt);
+            fflush(stderr);
+            if(getenv("CN1_GC_VERIFY_SOFT") == 0) {
+                abort();
+            }
+        }
+    }
+}
+#endif
 static void cn1GcReleaseBlockedThreads(void) {
     // A stop-the-world cycle raises every cooperative thread's flag before its loop, so it
     // releases them all whether or not the loop reached one.
     if(!hasAgressiveAllocator && !cn1GcStwCycle) {
         return;
     }
+#ifdef CN1_GC_VERIFY
+    cn1GcVerifyHeldThreadsStayedHeld();
+#endif
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
@@ -14423,18 +14470,30 @@ JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
 // owner holds, which no sweep touches, and are fresh). So the verifier, not the
 // allocator's hot path, is what changes: an in-flight publication is recognised by every
 // property it must have, and anything else is still reported.
-//   * the page is OWNED -- a thread is allocating into it right now;
 //   * the slot holds what an allocation just wrote: mark -1, a registered class;
-//   * it is among the owner's newest slots (a store buffer holds a few, not a page);
-//   * and the owner's bump really does cover it within a bounded wait.
-// A slot a sweep reclaimed fails the first test (a reclaimed page goes to the pool
-// unowned) or the second (verify builds stamp FREE_MARK or poison every slot they
-// free), so this recognises late publications without excusing reclamation.
-// Counted, and the count is printed with the summary.
+//   * it is among the page's newest slots (a store buffer holds a few, not a page);
+//   * and the page's bump really does cover it within a bounded wait.
+// A slot a sweep reclaimed fails the first test: verify builds stamp FREE_MARK on, or
+// poison, every slot they free. The one reclaimed slot that can still read as fresh is an
+// object allocated into a page after the sweep read its bump -- which only a thread
+// running while a stop-the-world cycle held it can do, and that is checked directly
+// (cn1GcVerifyHeldThreadsStayedHeld) rather than left to this classification.
+// Whether the page is still OWNED is deliberately not asked: the owner can fill and
+// retire it between the reference being read and this check, which a fault run showed
+// (owned=0, the slot covered by a full page's bump). Counted, and the count is printed
+// with the summary.
 static long cn1GcVerifyLatePublishes = 0;
 #define CN1_GC_LATE_PUBLISH_SLOTS 64
+// CN1_GC_FAULT=stalebump hides this many of every owned page's newest slots from the
+// post-sweep pass -- the pass that runs beside released mutators, which is the only place
+// a publication can be in flight (the resurrection audit runs with them held, so nothing
+// there ever catches up, and skewing it would test nothing real). Sixteen, so that the
+// fixture's 16-element sink, which holds its newest allocations, is reliably read through
+// the stale view on every run rather than only when a pass lands on the newest slot.
+#define CN1_GC_FAULT_STALE_SLOTS 16
+static int cn1GcVerifyPostSweep = 0;
 static JAVA_BOOLEAN cn1GcVerifyPublishedLate(CN1BibopPage* p, int idx, int bump, JAVA_OBJECT o) {
-    if(!p->owned || idx - bump >= CN1_GC_LATE_PUBLISH_SLOTS) {
+    if(idx - bump >= CN1_GC_LATE_PUBLISH_SLOTS) {
         return JAVA_FALSE;
     }
     if(CN1_OBJ_MARK_LOAD(o, __ATOMIC_ACQUIRE) != -1) {
@@ -14482,8 +14541,16 @@ static int cn1GcVerifyClassify(JAVA_OBJECT o, CN1BibopPage** outPage, int* outId
             if(outPage != 0) *outPage = p;
             if(outIdx != 0) *outIdx = idx;
             int bump = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
-            if(cn1GcFaultStaleBump && p->owned && bump > 0) {
-                bump--;   // CN1_GC_FAULT=stalebump: see cn1GcVerifyPublishedLate
+            if(cn1GcFaultStaleBump && cn1GcVerifyPostSweep && p->owned) {
+                // CN1_GC_FAULT=stalebump: see cn1GcVerifyPublishedLate. Only FRESH slots
+                // are hidden, as an in-flight publication only ever is: an object a
+                // collection has already marked was published long ago.
+                int hidden = 0;
+                while(hidden < CN1_GC_FAULT_STALE_SLOTS && bump > 0
+                      && CN1_OBJ_MARK_LOAD(cn1BibopSlot(p, bump - 1), __ATOMIC_ACQUIRE) == -1) {
+                    bump--;
+                    hidden++;
+                }
             }
             if(idx >= bump && !cn1GcVerifyPublishedLate(p, idx, bump, o)) {
                 return CN1_GC_VS_STALE_SLOT;
@@ -14791,6 +14858,7 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
     memset(cn1GcVerifyStatus, 0, sizeof(cn1GcVerifyStatus));
     cn1GcCollectStackRanges();
     cn1GcVerifyActive = 1;
+    cn1GcVerifyPostSweep = 1;
     long holders = 0;
 #ifndef CN1_DISABLE_BIBOP
     {
@@ -14848,6 +14916,7 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
         }
     }
     cn1GcVerifyActive = 0;
+    cn1GcVerifyPostSweep = 0;
     cn1GcVerifyHolder = JAVA_NULL;
     cn1GcVerifyTotalRefs += cn1GcVerifyChecked;
     cn1GcVerifyTotalViolations += cn1GcVerifyViolations;

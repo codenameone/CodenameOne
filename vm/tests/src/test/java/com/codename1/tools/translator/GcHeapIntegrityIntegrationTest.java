@@ -99,7 +99,10 @@ class GcHeapIntegrityIntegrationTest {
      * <p>The run with the handshake must stay clean AND must show the handshake doing
      * work, or "clean" would only mean the window was never reached. The run with the
      * re-check removed (resumeescape, the pre-fix protocol) must be caught, or this half
-     * proves nothing.</p>
+     * proves nothing -- and it is caught on the invariant ("HELD THREAD RAN": a thread the
+     * cycle took as parked resumed before release), because whether an escape goes on to
+     * leave a dangling reference depends on the interleaving, and on a CI runner it never
+     * did.</p>
      */
     @Test
     void aThreadHeldByAStopTheWorldCycleNeverRunsThroughAResume() throws Exception {
@@ -120,7 +123,8 @@ class GcHeapIntegrityIntegrationTest {
                     "With the resume handshake, a widened resume window must not let a held "
                             + "thread run.\n" + violationExcerpt(held.output)
                             + "\n--- tail ---\n" + tail(held.output));
-            assertTrue(!held.output.contains("DANGLING REFERENCE"),
+            assertTrue(!held.output.contains("DANGLING REFERENCE")
+                            && !held.output.contains("HELD THREAD RAN"),
                     "A held thread ran through a resume.\n" + violationExcerpt(held.output));
             java.util.regex.Matcher caught = java.util.regex.Pattern
                     .compile("resume handshake caught (\\d+) block").matcher(held.output);
@@ -138,7 +142,11 @@ class GcHeapIntegrityIntegrationTest {
             Run escaped = run(built.executable, built.buildDir, escape);
             assertTrue(escaped.output.contains("re-check skipped"),
                     "The resume-escape fault did not engage. Output: " + tail(escaped.output));
-            assertTrue(escaped.output.contains("DANGLING REFERENCE"),
+            // HELD THREAD RAN is the invariant itself (cn1GcVerifyHeldThreadsStayedHeld), so
+            // it fires whenever a block lands in an escaped window. A DANGLING REFERENCE is
+            // only the damage an escape can do, and whether it does any depends on the
+            // interleaving: one host produced it every run and a CI runner never did.
+            assertTrue(escaped.output.contains("HELD THREAD RAN"),
                     "The verifier did NOT detect a thread running while a stop-the-world cycle "
                             + "held it (the pre-handshake resume protocol, re-injected), so the "
                             + "half above proves nothing. Output: " + tail(escaped.output));
@@ -149,12 +157,13 @@ class GcHeapIntegrityIntegrationTest {
             // what an arm64 core shows it while the mutator's newest bump store is still in
             // flight (cn1GcVerifyPublishedLate). Linux arm64 CI reported exactly that as a
             // recycled slot twice on a sound heap; a host that keeps stores in order never
-            // shows it, so CN1_GC_FAULT=stalebump reads owned pages one slot short. Clean,
-            // and the path actually taken, or this half is not testing it.
+            // shows it, so CN1_GC_FAULT=stalebump hides owned pages' newest fresh slots from
+            // the post-sweep pass. Clean, and the path actually taken, or this half is not
+            // testing it.
             Map<String, String> stale = new HashMap<String, String>(window);
             stale.put("CN1_GC_FAULT", "stalebump");
             Run late = run(built.executable, built.buildDir, stale);
-            assertTrue(late.output.contains("[GC-FAULT] verifier reads owned pages' bump one slot short"),
+            assertTrue(late.output.contains("[GC-FAULT] verifier reads owned pages' bump short"),
                     "The stale-bump fault did not engage. Output: " + tail(late.output));
             assertEquals(0, late.exit,
                     "A reference to an object whose bump was not yet visible was reported as "
