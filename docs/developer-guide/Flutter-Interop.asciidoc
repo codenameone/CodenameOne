@@ -12,6 +12,11 @@ components, so it inherits the theme, the event thread, the accessibility
 tree and the native build at no extra cost -- and it can sit in the same `Form` as
 hand-written Codename One code.
 
+IMPORTANT: Dart support is experimental. Most widgets render, but some callbacks
+and parameters are accepted and then ignored, and the pipeline has so far been
+verified against one large sample application. Test every interaction your
+screens depend on before shipping.
+
 Two things follow from that, and they're the reason to reach for this at all:
 
 * An existing Dart UI can be reused without adopting a second runtime, a

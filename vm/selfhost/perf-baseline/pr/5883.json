@@ -189,6 +189,28 @@
     }
    }
   },
+  "macos-arm64": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.708,
+      "time": 1.106,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.958,
+     "reason": "macOS arm64 objectAllocation RAM ratio sits at ~0.95x on MASTER too (6478b2f347, run 37744181400, build-macos red there with the same verdict) and on this branch (run 37753610081); the base row 0.708 predates the hybrid generational GC (#5940). Inherited from master, not caused by this branch.",
+     "runs": 2,
+     "time": 1.106,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d84-microsoft-corporation": {
    "translator": {
     "all": {

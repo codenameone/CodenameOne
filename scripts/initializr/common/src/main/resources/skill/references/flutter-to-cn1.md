@@ -9,6 +9,13 @@ That makes this different from the other porting guides in this directory:
 This one is mostly about *keeping* the Dart and making the build consume it.
 Rewrite only what the transpiler refuses.
 
+**Experimental.** Translation succeeding does not mean the screen behaves. Some
+widget callbacks (for example `onGenerateRoute`, `onSaved`, `onKeyEvent`,
+`onDismissed`) and parameters (for example `AspectRatio.aspectRatio`,
+`Tooltip`, `Form.autovalidateMode`) are accepted and ignored.
+Tell the user so, and exercise every interaction the app relies on before
+calling a port done.
+
 > Read alongside `references/build-and-run.md` (Maven goals, JDK matrix) and
 > `references/ui-components.md` (for the parts you do hand-write).
 

@@ -59,12 +59,12 @@
      "from": {
       "value": 4720336
      },
-     "reason": "Android code grew with features added on this branch after the gate was armed: 4,720,336 -> 4,772,660 (d50f587217, +1.1%), +656 bytes for the custom theme mode (0bcf456eab), +188 bytes for the runtime mount/styling change (2fc4148b80); still 4.5x under Flutter. The tolerance went from 0 to 0.5% (d070d57bc1) because at 0 every change that added bytes failed the leg; growth past ~24 KB still fails it.",
+     "reason": "Android code grew with features added on this branch after the gate was armed: 4,720,336 -> 4,773,504 (custom theme mode, runtime mount/styling, earlier features; still 4.5x under Flutter); then +25,396 bytes (+0.53%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7). Tolerance is 0.5% (d070d57bc1).",
      "runs": 1,
      "tolerance": {
       "value": 0.005
      },
-     "value": 4773504
+     "value": 4798900
     },
     "install_bytes": {
      "from": {
@@ -124,25 +124,25 @@
      "from": {
       "value": 12910326
      },
-     "reason": "the lifecycle fix fe482ff7e8 (bootstrap waits for start(), lifecycle messages tagged with their source) adds 460 bytes of code; run 37733388159",
+     "reason": "+460 bytes for the lifecycle fix fe482ff7e8, then +15,693 code bytes (+0.12%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7).",
      "runs": 1,
-     "value": 12821102
+     "value": 12836795
     },
     "install_bytes": {
      "from": {
       "value": 110000963
      },
-     "reason": "the lifecycle fix fe482ff7e8 (bootstrap waits for start(), lifecycle messages tagged with their source) adds 460 bytes of code; run 37733388159",
+     "reason": "+460 bytes for the lifecycle fix fe482ff7e8, then +15,693 code bytes (+0.12%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7).",
      "runs": 1,
-     "value": 108107399
+     "value": 108123092
     },
     "wire_bytes": {
      "from": {
       "value": 80610118
      },
-     "reason": "the lifecycle fix fe482ff7e8 (bootstrap waits for start(), lifecycle messages tagged with their source) adds 460 bytes of code; run 37733388159",
+     "reason": "+460 bytes for the lifecycle fix fe482ff7e8, then +15,693 code bytes (+0.12%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7).",
      "runs": 1,
-     "value": 79714783
+     "value": 79717445
     }
    }
   },

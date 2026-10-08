@@ -8,12 +8,14 @@ Kept in the module rather than under `docs/`, which is published.
 
 **Baseline, 2026-09-20**
 
+Gap list re-checked against source on 2026-10-08 (pixel numbers still from 2026-09-20).
+
 | Axis | State |
 |---|---|
 | Routes rendering | 48 / 48, **0 runtime errors** |
 | Static parity | mean **2.46%** wrong pixels, worst **7.60%**, none above 8% |
 | Motion steps | 8, **all eight** at or below their ratchet |
-| Tests | 474 green (flutter-runtime 394, dart-transpiler 60, dart-runtime 20) |
+| Tests | 721 `@Test` methods by grep, 2026-10-08 (flutter-runtime 527, dart-transpiler 50 plus 2 `@TestFactory` that generate more at runtime, dart-runtime 144); not re-run, so green/red is not re-verified |
 | Static analysis | SpotBugs over core: **0 findings** (the gate's requirement) |
 | Ports | JavaSE simulator and iOS both build, launch and measure |
 
@@ -49,7 +51,7 @@ in the runtime. Counts are how many times the gallery's generated code passes th
 | `CupertinoSegmentedControl` | `onValueChanged` | 2 |
 | `CupertinoSlidingSegmentedControl` | `onValueChanged` | 2 |
 | `NavigationRail` | `onDestinationSelected` | 2 |
-| `GestureDetector` | `onTapUp`, `onVerticalDragUpdate` | 2 |
+| `GestureDetector` | `onTapUp` | 2 |
 | `Chip` | `onDeleted` | 1 |
 | `InputChip` | `onDeleted` | 1 |
 | `InteractiveViewer` | `onInteractionStart` | 1 |
@@ -59,6 +61,11 @@ in the runtime. Counts are how many times the gallery's generated code passes th
 
 The three Cupertino picker callbacks left this table on 2026-09-20: the wheels are
 real now and report as they turn.
+
+`onVerticalDragStart`/`onVerticalDragUpdate`/`onVerticalDragEnd` left this table on
+2026-10-08 (4282b9021e): `GestureDetector` now claims a drag past the touch slop
+and fires it with Flutter's detail objects. `onTapUp` on the same widget is still
+inert.
 
 ### Verified by use, not by counting
 
@@ -173,21 +180,23 @@ does not use that mode.
 **Still not visible to the sweep**, which photographs settled routes: the rows render
 correctly either way and the wheel only ever appears inside the popup.
 
-## 2d. OPEN: the text field is wrong in four separate ways
+## 2d. the text field was wrong in four separate ways; three RESOLVED (2fb7f19179)
 
-Measured on `/demo/text-field`, which is where all four show at once. None of them
-is a layout problem; the field is in the right place and the wrong shape.
+Measured on `/demo/text-field`, which is where all four showed at once. None of
+them was a layout problem; the field was in the right place and the wrong shape.
+The pixel numbers below are still the 2026-09-20 measurements and have not been
+re-taken; only the source check is current as of 2026-10-08.
 
 | What | Measured |
 |---|---|
-| The requested size never reaches the label | The field asks for **48px** (16sp at 3x, and 16 is right -- demo pages run the Material 2018 scale, not the gallery's Montserrat) and the label renders at **76px**. Glyph heights confirm it: our `Name*` run is 55px against the reference's 34 |
-| `TextField.maxLines` is stored and never read | The demo's Life story field asks for 3 lines and renders as one; the reference's box is three lines tall |
-| `InputDecoration.helperText` is stored and never read | The reference carries `0/14` under the phone number and "Keep it short, this is just a demo." under Life story. We show neither, and the counter is missing too |
-| `suffixIcon` is dropped | The password field's visibility toggle is absent |
+| OPEN: the requested size never reaches the label | The field asks for **48px** (16sp at 3x, and 16 is right -- demo pages run the Material 2018 scale, not the gallery's Montserrat) and the label renders at **76px**. Glyph heights confirm it: our `Name*` run is 55px against the reference's 34 |
+| RESOLVED: `TextField.maxLines` is stored and never read | Fixed in 2fb7f19179: rows now follow `maxLines`/`minLines` (Codename One's field is a `TextArea`, so this is just telling it how many rows to be). The demo's Life story field renders three lines tall |
+| RESOLVED: `InputDecoration.helperText` is stored and never read | Fixed in 2fb7f19179 (`withHelper`): the helper line and the length counter now draw under the field |
+| RESOLVED: `suffixIcon` is dropped | Fixed in 2fb7f19179: the trailing glyph renders inside the decoration; the password field's visibility toggle is no longer absent |
 
-The size is the one to fix first, because it is not confined to this demo: every
-field in the app is set in a face a half larger than it asked for, and the extra
-height pushes everything below it down.
+The label size is what remains open, and it is not confined to this demo: every
+field in the app may still be set in a face larger than it asked for, pushing
+everything below it down.
 
 ## 3. Structural gaps
 
@@ -196,7 +205,7 @@ height pushes everything below it down.
 | ~~A button **consumes** its child into a label string or icon char~~ | **RESOLVED.** A button now mounts a child it cannot reduce to a `Text` or an `Icon`, and makes it transparent to touch so the press still lands on the button underneath. It was not an exotic case: the compose page's account row is a `PopupMenuButton` whose child is a Row, and the row was a blank band |
 | `Notification.dispatch` is a no-op | needs the listener's type, and `NotificationListener<T>` erases `T`; delivering without a type token would hand every `ScrollNotification` to a listener waiting for something else. Wants a type token from the transpiler |
 | `CommonTransitions` drives both pages from one `Motion` | the iOS push works around it with its own transition; the outgoing page should ride `linearToEaseOut` while the incoming rides the three-point curve |
-| `Image.scaled` is a **point sampler** on two of three ports | the desktop port reads one source pixel per destination pixel and Android asks `createScaledBitmap` not to filter, so every downscaled picture aliases. `Image.scaledSmooth`/`fillSmooth` were added beside them and the runtime uses those; the ports themselves are untouched, because fixing them moves ~500 committed screenshot baselines and that is not a call to make silently |
+| `Image.scaled` is a **point sampler** on two of three ports | the desktop port reads one source pixel per destination pixel and Android asks `createScaledBitmap` not to filter, so every downscaled picture aliases. `Image.scaledSmooth`/`fillSmooth` were added beside them as a Java-side workaround, then DROPPED again in 3eb1c18aac ("scaling belongs to the implementation code"): the runtime's scaled-copy path is back on plain `scaled()`/`fill()`, so the two ports alias once more. The ports themselves remain untouched, because fixing them moves ~500 committed screenshot baselines and that is not a call to make silently |
 
 ## 4. Known per-screen differences
 
