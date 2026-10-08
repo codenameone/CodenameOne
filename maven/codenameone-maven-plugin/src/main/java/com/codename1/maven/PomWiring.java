@@ -67,6 +67,36 @@ final class PomWiring {
         }
     }
 
+    /// Adds `dependency` as the last of the module's own dependencies, unless
+    /// the pom names `artifactId` anywhere already; answers whether it was
+    /// added. The module's own are the `<dependencies>` that precede every
+    /// section which may hold another list -- managed versions, the build's
+    /// plugins, the profiles -- which is where an archetype-generated common
+    /// pom has them.
+    boolean addDependency(String artifactId, String dependency) {
+        if (has("<artifactId>" + artifactId + "</artifactId>")) {
+            return false;
+        }
+        int limit = pom.length();
+        for (String section : new String[] {"<dependencyManagement>", "<build>", "<profiles>"}) {
+            int at = pom.indexOf(section);
+            if (at >= 0 && at < limit) {
+                limit = at;
+            }
+        }
+        int open = pom.indexOf("<dependencies>");
+        int close = open < 0 ? -1 : pom.indexOf("</dependencies>", open);
+        if (open < 0 || open > limit || close < 0 || close > limit) {
+            manual.add("the dependency the imported sources are compiled against, in the module's own "
+                    + "<dependencies>:\n" + dependency);
+            return false;
+        }
+        int lineStart = pom.lastIndexOf('\n', close) + 1;
+        pom = pom.substring(0, lineStart) + dependency + pom.substring(lineStart);
+        changed = true;
+        return true;
+    }
+
     /// Adds `execution` to the Codename One plugin's executions unless some
     /// execution already runs `goal`.
     void addExecution(String goal, String execution) {

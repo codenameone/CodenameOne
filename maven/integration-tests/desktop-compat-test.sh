@@ -27,7 +27,7 @@ source "$SCRIPTPATH/inc/env.sh"
 source "$SCRIPTPATH/inc/gradle.sh"
 source "$SCRIPTPATH/inc/compat.sh"
 
-WORKDIR="$SCRIPTPATH/build/desktop-compat"
+WORKDIR="${CN1_COMPAT_WORKDIR:-$SCRIPTPATH/build}/desktop-compat"
 rm -rf "$WORKDIR"
 mkdir -p "$WORKDIR"
 

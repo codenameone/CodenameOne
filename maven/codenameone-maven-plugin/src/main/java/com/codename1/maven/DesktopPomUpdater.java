@@ -22,6 +22,7 @@
  */
 package com.codename1.maven;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /// Wires the desktop compatibility layers into an existing application's
@@ -73,8 +74,41 @@ final class DesktopPomUpdater {
     final List<String> manual;
     final boolean changed;
 
+    /// The libraries this update declared, as `group:artifact:version (scope)`.
+    final List<String> addedLibraries = new ArrayList<String>();
+
     DesktopPomUpdater(String pom, boolean kotlin) {
+        this(pom, kotlin, null);
+    }
+
+    /// As [#DesktopPomUpdater(String, boolean)], also declaring `libraries`:
+    /// the dependencies of the imported project its sources are compiled
+    /// against ([DesktopProjectImporter.Library]). One whose version the
+    /// project's build does not spell out is left for the developer, since a
+    /// guessed version is worse than a compile error naming the package.
+    DesktopPomUpdater(String pom, boolean kotlin, List<DesktopProjectImporter.Library> libraries) {
         PomWiring w = new PomWiring(pom);
+        if (libraries != null) {
+            for (DesktopProjectImporter.Library lib : libraries) {
+                if (lib.version == null) {
+                    continue;
+                }
+                String scope = lib.provided ? "provided" : "compile";
+                String note = lib.provided
+                        ? "compiled against; the Swing compatibility layer ships its own implementation"
+                        : "bundled and relocated with the application";
+                String xml = "        <!-- From the imported desktop project: " + note + ". -->\n"
+                        + "        <dependency>\n"
+                        + "            <groupId>" + lib.groupId + "</groupId>\n"
+                        + "            <artifactId>" + lib.artifactId + "</artifactId>\n"
+                        + "            <version>" + lib.version + "</version>\n"
+                        + "            <scope>" + scope + "</scope>\n"
+                        + "        </dependency>\n";
+                if (w.addDependency(lib.artifactId, xml)) {
+                    addedLibraries.add(lib.coordinate() + ":" + lib.version + " (" + scope + ")");
+                }
+            }
+        }
         // Either jar says the profile is there; a pom carrying only one was
         // edited by hand and is left as its author wrote it.
         if (!w.has("<artifactId>codenameone-swing-compat</artifactId>")
