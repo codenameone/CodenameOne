@@ -44,16 +44,13 @@ public class Desktop {
         OPEN, EDIT, PRINT, MAIL, BROWSE
     }
 
-    private static Desktop desktop;
+    private static final Desktop DESKTOP = new Desktop();
 
     private Desktop() {
     }
 
     public static Desktop getDesktop() {
-        if (desktop == null) {
-            desktop = new Desktop();
-        }
-        return desktop;
+        return DESKTOP;
     }
 
     /// Always true: every Codename One port can be asked to open a URL.

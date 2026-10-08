@@ -148,8 +148,10 @@ public class UIManager {
     private static final String LOOK_NAME = "Codename One";
     private static final String LOOK_CLASS = "javax.swing.plaf.metal.MetalLookAndFeel";
     private static final ThemeDefaults VALUES = new ThemeDefaults();
+    private static final LookAndFeel BUILT_IN = new ThemeLookAndFeel();
+    /// The look and feel that was set, or `null` for the built-in one.
     private static LookAndFeel current;
-    private static LookAndFeelInfo[] installed;
+    private static LookAndFeelInfo[] installed = {new LookAndFeelInfo(LOOK_NAME, LOOK_CLASS)};
 
     public UIManager() {
     }
@@ -263,10 +265,7 @@ public class UIManager {
     }
 
     public static LookAndFeel getLookAndFeel() {
-        if (current == null) {
-            current = new ThemeLookAndFeel();
-        }
-        return current;
+        return current == null ? BUILT_IN : current;
     }
 
     public static String getSystemLookAndFeelClassName() {
@@ -280,9 +279,6 @@ public class UIManager {
     /// The look and feels there are to choose from: one, unless the
     /// application installed more names. The array is a copy.
     public static LookAndFeelInfo[] getInstalledLookAndFeels() {
-        if (installed == null) {
-            installed = new LookAndFeelInfo[]{new LookAndFeelInfo(LOOK_NAME, LOOK_CLASS)};
-        }
         LookAndFeelInfo[] copy = new LookAndFeelInfo[installed.length];
         System.arraycopy(installed, 0, copy, 0, installed.length);
         return copy;
