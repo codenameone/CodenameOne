@@ -21,6 +21,14 @@ SKIP_PREFIXES = (
     "/developer-guide/single-page/",
 )
 
+# Cloudflare Pages refuses to deploy a file over 25 MiB, and the index is the text of
+# every page: it reached 24.8 MiB as one file, and the next few hundred API pages put it
+# over and stopped the deployment. It is therefore written in parts, each far below the
+# limit, beside a small lunr-index.json that names them. The search page and
+# check_developer_guide.py read the parts through that file.
+PAGES_FILE_LIMIT = 25 * 1024 * 1024
+PART_BYTES = 8 * 1024 * 1024
+
 WS_RE = re.compile(r"\s+")
 TAG_RE = re.compile(r"<[^>]+>")
 
@@ -141,14 +149,65 @@ def _date_sort_key(value: str) -> float:
         return 0.0
 
 
+def partition(docs: List[Dict[str, str]], budget: int) -> List[List[Dict[str, str]]]:
+    """Split docs, in order, into runs whose JSON stays within budget bytes.
+
+    A single document larger than the budget gets a part of its own rather than being
+    dropped or cut: write_index is what refuses a part the host would not take.
+    """
+    parts: List[List[Dict[str, str]]] = []
+    current: List[Dict[str, str]] = []
+    size = 0
+    for doc in docs:
+        doc_bytes = len(json.dumps(doc, ensure_ascii=False).encode("utf-8")) + 2
+        if current and size + doc_bytes > budget:
+            parts.append(current)
+            current = []
+            size = 0
+        current.append(doc)
+        size += doc_bytes
+    if current:
+        parts.append(current)
+    return parts
+
+
+def write_index(payload: Dict[str, object], out_file: Path, budget: int = PART_BYTES) -> List[Path]:
+    """Write the parts and the file that names them; returns every file written."""
+    for stale in out_file.parent.glob(out_file.stem + "-*.json"):
+        stale.unlink()
+    written: List[Path] = []
+    names: List[str] = []
+    for number, docs in enumerate(partition(payload["docs"], budget)):
+        part = out_file.with_name(f"{out_file.stem}-{number}.json")
+        part.write_text(json.dumps({"docs": docs}, ensure_ascii=False) + "\n", encoding="utf-8")
+        written.append(part)
+        names.append("/" + part.name)
+    manifest = {
+        "generated_at_utc": payload["generated_at_utc"],
+        "count": payload["count"],
+        "parts": names,
+    }
+    out_file.write_text(json.dumps(manifest, ensure_ascii=False) + "\n", encoding="utf-8")
+    written.append(out_file)
+    for path in written:
+        size = path.stat().st_size
+        if size > PAGES_FILE_LIMIT:
+            raise SystemExit(
+                f"{path.name} is {size} bytes, over the {PAGES_FILE_LIMIT} a deployment accepts: "
+                "one page's text is larger than a whole part may be")
+    return written
+
+
 def main() -> int:
     if not PUBLIC_DIR.exists():
         print(f"Public dir not found: {PUBLIC_DIR}")
         return 1
 
     payload = build_index()
-    OUT_FILE.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Generated {OUT_FILE} with {payload['count']} searchable documents")
+    written = write_index(payload, OUT_FILE)
+    largest = max(path.stat().st_size for path in written)
+    print(f"Generated {OUT_FILE} with {payload['count']} searchable documents in "
+          f"{len(written) - 1} part(s), the largest {largest} bytes")
     return 0
 
 

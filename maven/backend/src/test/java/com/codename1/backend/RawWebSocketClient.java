@@ -46,7 +46,7 @@ import java.util.Random;
  * ones RFC 6455 fixes, and {@link #dribble} puts a frame on the wire one byte at a
  * time so the decoder has to resume mid-header, mid-mask and mid-payload.
  */
-final class RawWebSocketClient implements Closeable {
+public final class RawWebSocketClient implements Closeable {
     private final Socket socket;
     private final InputStream in;
     private final OutputStream out;
@@ -54,6 +54,7 @@ final class RawWebSocketClient implements Closeable {
 
     private String statusLine;
     private Map responseHeaders;
+    private final java.util.List<String> responseCookies = new java.util.ArrayList<String>();
     private byte[] lastPayload;
     private int lastOpcode;
     private boolean lastFin;
@@ -62,7 +63,7 @@ final class RawWebSocketClient implements Closeable {
         this(port, "/echo", null);
     }
 
-    RawWebSocketClient(int port, String path, String extraHeaders) throws IOException {
+    public RawWebSocketClient(int port, String path, String extraHeaders) throws IOException {
         socket = new Socket("127.0.0.1", port);
         socket.setSoTimeout(10000);
         in = socket.getInputStream();
@@ -91,6 +92,9 @@ final class RawWebSocketClient implements Closeable {
         for(String line = readLine() ; line.length() > 0 ; line = readLine()) {
             int colon = line.indexOf(':');
             if(colon > 0) {
+                if ("set-cookie".equals(lower(line.substring(0, colon).trim()))) {
+                    responseCookies.add(line.substring(colon + 1).trim());
+                }
                 responseHeaders.put(lower(line.substring(0, colon).trim()),
                         line.substring(colon + 1).trim());
             }
@@ -104,11 +108,44 @@ final class RawWebSocketClient implements Closeable {
         }
     }
 
-    String getStatusLine() {
+    public java.util.List<String> getResponseCookies() {
+        return new java.util.ArrayList<String>(responseCookies);
+    }
+
+    public String getStatusLine() {
         return statusLine;
     }
 
-    String getResponseHeader(String name) {
+    /**
+     * The body of a handshake the server refused, read to the length it declared,
+     * and then the end of the stream: a refusal is one whole HTTP response on a
+     * connection the server closes. Throws when the server sends anything more,
+     * or leaves the connection open.
+     */
+    public String readRefusal() throws IOException {
+        String declared = getResponseHeader("content-length");
+        int length = declared == null ? 0 : Integer.parseInt(declared);
+        byte[] body = new byte[length];
+        for (int read = 0 ; read < length ; ) {
+            int n = in.read(body, read, length - read);
+            if (n < 0) {
+                throw new IOException("the refusal ended " + (length - read) + " bytes short");
+            }
+            read += n;
+        }
+        int more;
+        try {
+            more = in.read();
+        } catch (java.net.SocketTimeoutException open) {
+            throw new IOException("the server left a refused handshake's connection open");
+        }
+        if (more >= 0) {
+            throw new IOException("the server sent more after the refusal: byte " + more);
+        }
+        return latin1(body, length);
+    }
+
+    public String getResponseHeader(String name) {
         Object value = responseHeaders.get(lower(name));
         return value == null ? null : String.valueOf(value);
     }
@@ -157,7 +194,7 @@ final class RawWebSocketClient implements Closeable {
         out.flush();
     }
 
-    void sendText(String value) throws IOException {
+    public void sendText(String value) throws IOException {
         send(true, 0, WebSocketFrames.OP_TEXT, true, Utf8.encode(value), 0);
     }
 
@@ -179,7 +216,7 @@ final class RawWebSocketClient implements Closeable {
     }
 
     /** Reads one frame. Answers false at end of stream. */
-    boolean readFrame() throws IOException {
+    public boolean readFrame() throws IOException {
         int first = in.read();
         if(first < 0) {
             return false;
@@ -220,7 +257,7 @@ final class RawWebSocketClient implements Closeable {
         return lastPayload;
     }
 
-    String getLastText() {
+    public String getLastText() {
         return Utf8.decode(lastPayload, 0, lastPayload.length);
     }
 

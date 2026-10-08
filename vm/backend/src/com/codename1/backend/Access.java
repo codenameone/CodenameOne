@@ -55,6 +55,11 @@ final class Access extends BackendAccess {
     }
 
     @Override
+    public void security(Backend.Builder builder) {
+        builder.security();
+    }
+
+    @Override
     public void compiledSettings(Backend.Builder builder, String[] keysAndValues) {
         builder.compiledSettings(keysAndValues);
     }
@@ -62,6 +67,11 @@ final class Access extends BackendAccess {
     @Override
     public Config testConfig(java.util.Properties values, String profile) {
         return Config.overriding(values, profile);
+    }
+
+    @Override
+    public void testApplication(Backend.Builder builder) {
+        builder.testApplication();
     }
 
     @Override
@@ -140,6 +150,33 @@ final class Access extends BackendAccess {
             }
         }
         return new String(chars);
+    }
+
+    @Override
+    public boolean hasHeader(HttpServer.Response response, String name) {
+        return response.hasHeader(name);
+    }
+
+    @Override
+    public void setHeader(HttpServer.Response response, String name, String value) {
+        Map copy = new LinkedHashMap();
+        if (response.extraHeaders != null) {
+            Iterator it = response.extraHeaders.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry e = (Map.Entry) it.next();
+                if (e.getKey() == null || !name.equalsIgnoreCase(String.valueOf(e.getKey()))) {
+                    copy.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        copy.put(name, value);
+        response.extraHeaders = copy;
+    }
+
+    @Override
+    public void addHeader(HttpServer.Response response, String name, String value) {
+        // The map is replaced, not written into: it may be one a handler shares.
+        response.extraHeaders = Sessions.withHeader(response, name, value).extraHeaders;
     }
 
     @Override
@@ -301,6 +338,11 @@ final class Access extends BackendAccess {
     @Override
     public TaskExecutor executor(String name, int kind) {
         return Tasks.executor(name, kind);
+    }
+
+    @Override
+    public Object namedBean(String name) {
+        return Tasks.namedBean(name);
     }
 
     @Override

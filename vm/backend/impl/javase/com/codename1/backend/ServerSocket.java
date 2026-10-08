@@ -267,6 +267,26 @@ public final class ServerSocket {
         Deadlines.setReceive(fd, millis);
     }
 
+    /// The address of a connection's other end as its raw bytes -- 4 for IPv4,
+    /// 16 for IPv6 -- or null when the descriptor is not a connected socket.
+    public static byte[] peerAddress(int fd) {
+        Object entry = Descriptors.get(fd);
+        if (!(entry instanceof SocketChannel)) {
+            return null;
+        }
+        try {
+            java.net.SocketAddress remote = ((SocketChannel) entry).getRemoteAddress();
+            if (remote instanceof InetSocketAddress
+                    && ((InetSocketAddress) remote).getAddress() != null) {
+                return ((InetSocketAddress) remote).getAddress().getAddress();
+            }
+        } catch (IOException | RuntimeException gone) {
+            // Closed under us: the same answer as never having been connected.
+            return null;
+        }
+        return null;
+    }
+
     /// Breaks a descriptor in both directions without closing it.
     ///
     /// For the one case a close cannot serve: a thread is parked inside a write to

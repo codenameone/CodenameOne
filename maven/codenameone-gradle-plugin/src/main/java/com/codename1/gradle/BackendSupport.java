@@ -25,6 +25,7 @@ package com.codename1.gradle;
 import com.codename1.gradle.tasks.ProcessAnnotationsAction;
 import com.codename1.gradle.tasks.ProcessTestAnnotationsAction;
 import com.codename1.gradle.tasks.RunBackendTask;
+import com.codename1.maven.BackendMigrateEntryPoint;
 import com.codename1.maven.GradleProjectTemplate;
 import com.codename1.project.ProjectLayout;
 import org.gradle.api.DefaultTask;
@@ -127,8 +128,54 @@ final class BackendSupport {
                     .map(BackendSupport::split).orElse(Collections.<String>emptyList()));
             t.getWorkingDirectory().set(layout.projectDir());
         });
+        registerMigrate(project, layout, main, "backendMigrate", "migrate",
+                "Applies pending schema migrations to the configured database");
+        registerMigrate(project, layout, main, "backendMigrateInfo", "info",
+                "Lists every schema migration and its state in the configured database");
+        registerMigrate(project, layout, main, "backendMigrateValidate", "validate",
+                "Fails unless the configured database is exactly at this build's migrations");
+        registerMigrate(project, layout, main, "backendMigrateRepair", "repair",
+                "Removes failed rows from the schema history and realigns checksums");
+        registerMigrate(project, layout, main, "backendMigrateBaseline", "baseline",
+                "Marks an existing database as already being at cn1.flyway.baselineVersion");
         BackendPackageSupport.register(project, layout, main, ext);
         UpdateSupport.register(project, layout);
+    }
+
+    /// One migration command, as the Maven `cn1:migrate` goals run it: the entry point the
+    /// build generates beside `cn1app.BackendMigrations`, on this JVM, with every `cn1.*`
+    /// project property passed through and the processed `application.properties` as the
+    /// configuration.
+    ///
+    /// The class is [BackendMigrateEntryPoint#CLASS_NAME], which the Maven goals read too.
+    /// These tasks used to name `cn1app.BackendMigrations` themselves -- the class that
+    /// holds the scripts and has no `main` -- and every one of them failed at start-up.
+    private static void registerMigrate(Project project, ProjectLayout layout, SourceSet main, String name,
+            String command, String description) {
+        project.getTasks().register(name, RunBackendTask.class, t -> {
+            t.setGroup(AppSupport.GROUP);
+            t.setDescription(description);
+            t.dependsOn(main.getClassesTaskName());
+            t.getClasspath().from(main.getRuntimeClasspath());
+            t.getClassesDirectories().from(main.getOutput().getClassesDirs());
+            t.getMainClass().set(BackendMigrateEntryPoint.CLASS_NAME);
+            t.getMissingMainClassMessage().set(BackendMigrateEntryPoint.missingMessage());
+            t.getArgs().set(Collections.singletonList(command));
+            // Read now, not inside the provider: a lambda that held the source set would
+            // drag the whole project model into the configuration cache.
+            final File resources = main.getOutput().getResourcesDir();
+            t.getJvmArgs().set(project.getProviders().gradlePropertiesPrefixedBy("cn1.").map(given -> {
+                List<String> options = new ArrayList<String>();
+                for (Map.Entry<String, String> property : given.entrySet()) {
+                    options.add("-D" + property.getKey() + "=" + property.getValue());
+                }
+                if (!given.containsKey("cn1.config.location") && resources != null) {
+                    options.add("-Dcn1.config.location=" + resources.getAbsolutePath());
+                }
+                return options;
+            }));
+            t.getWorkingDirectory().set(layout.projectDir());
+        });
     }
 
     /// `@BackendTest` support, as the Maven archetype's backend module has it: the

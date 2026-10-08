@@ -74,6 +74,8 @@ final class BackendTestGenerator {
     static final String TEST_CONFIGURATION = "Lcom/codename1/backend/test/TestConfiguration;";
     static final String MOCKITO_BEAN = "Lcom/codename1/backend/test/MockitoBean;";
     static final String LOCAL_SERVER_PORT = "Lcom/codename1/backend/test/LocalServerPort;";
+    static final String WITH_MOCK_USER = "Lcom/codename1/backend/test/WithMockUser;";
+    static final String WITH_ANONYMOUS_USER = "Lcom/codename1/backend/test/WithAnonymousUser;";
 
     static final String JUNIT_TEST = "Lorg/junit/jupiter/api/Test;";
     static final String JUNIT_BEFORE_EACH = "Lorg/junit/jupiter/api/BeforeEach;";
@@ -527,6 +529,33 @@ final class BackendTestGenerator {
         }
         sb.append("    public String[] mockBeans() {\n        return ").append(array(mockNames))
           .append(";\n    }\n\n");
+        sb.append("    public void configure(com.codename1.backend.Backend.Builder builder) {\n");
+        if (settings.securitySchema) {
+            // As the generated main registers it, for a build that asked.
+            sb.append("        com.codename1.backend.Migrations.register(")
+              .append("com.codename1.backend.security.SecuritySchema.migrations());\n");
+        }
+        if (spec.model.hasSecurityChains()) {
+            // What the generated main does for a build with a chain bean, and
+            // named only here: a test application without one links none of it.
+            sb.append("        com.codename1.impl.backend.BackendAccess.get().security(builder);\n");
+        }
+        sb.append("    }\n\n");
+        sb.append("    public String[] securityContext(String method) {\n");
+        Set<String> described = new LinkedHashSet<String>();
+        for (AnnotatedClass c : methodHierarchy(spec.test)) {
+            for (MethodInfo m : c.getMethods()) {
+                if (!carries(m, JUNIT_TEST) || !described.add(m.getName())) {
+                    continue;
+                }
+                List<String> who = securitySpec(spec.test, m);
+                if (who != null) {
+                    sb.append("        if (").append(quote(m.getName())).append(".equals(method)) {\n")
+                      .append("            return ").append(array(who)).append(";\n        }\n");
+                }
+            }
+        }
+        sb.append("        return null;\n    }\n\n");
         sb.append("    public void inject(Object test, com.codename1.impl.backend.test.TestEnvironment "
                 + "environment) throws Exception {\n");
         sb.append("        if (!(test instanceof ").append(testType).append(")) {\n")
@@ -781,6 +810,7 @@ final class BackendTestGenerator {
         List<MethodInfo> beforeEach = lifecycle(chain, JUNIT_BEFORE_EACH, false, true, owners);
         List<MethodInfo> afterEach = lifecycle(chain, JUNIT_AFTER_EACH, false, false, owners);
         index = 0;
+        String afterSecurity = "";
         for (MethodInfo m : tests) {
             checkCallable(cls, m, false);
             sb.append("    private static void t").append(index++).append("() {\n");
@@ -795,12 +825,33 @@ final class BackendTestGenerator {
                 sb.append("            context.inject(test, com.codename1.impl.backend.test.TestContexts"
                         + ".acquire(context));\n");
             }
+            // Who the test runs as, written down here as a literal: the JUnit
+            // extension asks the generated context instead, and a runner whose
+            // tests name nobody links none of the security layer.
+            List<String> who = securitySpec(cls, m);
+            if (who != null && spec == null) {
+                ctx.error(cls, cls.getSourceName() + "." + m.getName() + " carries "
+                        + "@WithMockUser or @WithAnonymousUser, which act on the requests of "
+                        + "a @BackendTest; this class is not one.");
+                who = null;
+            }
+            if (who != null) {
+                sb.append("            com.codename1.impl.backend.test.TestSecurity.apply(")
+                  .append(array(who)).append(");\n");
+            }
             for (MethodInfo b : beforeEach) {
                 sb.append("            ").append(call(owners.get(b), b, pkg, "test")).append(";\n");
             }
             sb.append("            ").append(call(owners.get(m), m, pkg, "test")).append(";\n");
             sb.append("        } catch (Throwable err) {\n").append(RETHROW_UNRECOVERABLE)
               .append("            failure = err;\n        }\n");
+            if (who != null) {
+                // Before the @AfterEach methods would be Spring's order reversed;
+                // after them, so a teardown still acts as the test's user.
+                afterSecurity = "        com.codename1.impl.backend.test.TestSecurity.clear();\n";
+            } else {
+                afterSecurity = "";
+            }
             if (!afterEach.isEmpty()) {
                 sb.append("        if (test != null) {\n");
                 for (MethodInfo a : afterEach) {
@@ -816,6 +867,7 @@ final class BackendTestGenerator {
                 }
                 sb.append("        }\n");
             }
+            sb.append(afterSecurity);
             // Reported under the method name, never @DisplayName: Surefire's default
             // XML names JVM tests the same way, so the two runs' reports line up.
             sb.append("        com.codename1.impl.backend.test.TestRun.finished(CLS, ")
@@ -825,6 +877,81 @@ final class BackendTestGenerator {
         sources.put(runnerBinary, sb.toString());
         runners.add(runnerBinary);
         return true;
+    }
+
+    /// Who a test method runs as -- its own `@WithMockUser` or
+    /// `@WithAnonymousUser`, else the nearest one on its class or a superclass --
+    /// as the argument `TestSecurity.apply` takes; null when there is neither.
+    private List<String> securitySpec(AnnotatedClass cls, MethodInfo m) {
+        AnnotationValues user = annotation(m.getAnnotations(), WITH_MOCK_USER);
+        AnnotationValues anonymous = annotation(m.getAnnotations(), WITH_ANONYMOUS_USER);
+        String where = cls.getSourceName() + "." + m.getName();
+        if (user == null && anonymous == null) {
+            for (AnnotatedClass c : hierarchy(cls)) {
+                user = annotation(c.getClassAnnotations(), WITH_MOCK_USER);
+                anonymous = annotation(c.getClassAnnotations(), WITH_ANONYMOUS_USER);
+                if (user != null || anonymous != null) {
+                    where = c.getSourceName();
+                    break;
+                }
+            }
+        }
+        if (user != null && anonymous != null) {
+            ctx.error(cls, where + " carries both @WithMockUser and @WithAnonymousUser; a "
+                    + "test runs as one or the other.");
+            return null;
+        }
+        List<String> out = new ArrayList<String>();
+        if (anonymous != null) {
+            out.add("anonymous");
+            return out;
+        }
+        if (user == null) {
+            return null;
+        }
+        String name = user.getStringOrDefault("username", "");
+        if (name.length() == 0) {
+            name = user.getStringOrDefault("value", "user");
+        }
+        if (name.length() == 0) {
+            ctx.error(cls, "@WithMockUser on " + where + " names no user.");
+            return null;
+        }
+        out.add("user");
+        out.add(name);
+        out.add(user.getStringOrDefault("password", "password"));
+        List<String> authorities = stringList(user.get("authorities"));
+        List<String> roles = user.get("roles") == null ? java.util.Arrays.asList("USER")
+                : stringList(user.get("roles"));
+        if (authorities.isEmpty()) {
+            for (String role : roles) {
+                if (role.startsWith("ROLE_")) {
+                    ctx.error(cls, "@WithMockUser on " + where + " names the role \"" + role
+                            + "\"; roles cannot start with ROLE_, which is added. Got " + role);
+                    return null;
+                }
+                out.add("ROLE_" + role);
+            }
+        } else if (!(roles.size() == 1 && "USER".equals(roles.get(0)))) {
+            ctx.error(cls, "@WithMockUser on " + where + " gives both roles and authorities; "
+                    + "authorities replace roles, so give one of them.");
+            return null;
+        } else {
+            out.addAll(authorities);
+        }
+        return out;
+    }
+
+    private static List<String> stringList(Object value) {
+        List<String> out = new ArrayList<String>();
+        if (value instanceof List) {
+            for (Object o : (List<?>) value) {
+                out.add(String.valueOf(o));
+            }
+        } else if (value instanceof String) {
+            out.add((String) value);
+        }
+        return out;
     }
 
     /// The lifecycle methods of a kind across the hierarchy: superclass first for

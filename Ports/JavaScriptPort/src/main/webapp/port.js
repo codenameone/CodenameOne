@@ -247,7 +247,8 @@
             value,
             "cn1_s_onAnimationFrame_double",
             [+time],
-            "__cn1RafCallbackPending"
+            "__cn1RafCallbackPending",
+            true
           );
         } catch (err) {
           jvm.fail(err);
@@ -406,11 +407,21 @@ function aliasGlobalToImpl(symbol) {
   return true;
 }
 
-function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey) {
+function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey, queuePending) {
   if (!receiver || !receiver.__class) {
     return false;
   }
   if (pendingFlagKey && receiver[pendingFlagKey]) {
+    if (queuePending) {
+      // A one-shot rAF may arrive while the previous Java callback is suspended
+      // waiting for the host to acknowledge its next frame request. Dropping it
+      // strands that loop forever. Serialize these deliveries; repeating timers
+      // keep their existing coalescing behavior.
+      const queueKey = pendingFlagKey + "Queue";
+      const queue = receiver[queueKey] || (receiver[queueKey] = []);
+      queue.push(args || []);
+      return true;
+    }
     return false;
   }
   if (pendingFlagKey) {
@@ -427,10 +438,20 @@ function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey) {
   }
   function* run() {
     try {
-      return yield* cn1_ivAdapt(method.apply(null, [receiver].concat(args || [])));
+      let nextArgs = args || [];
+      let result;
+      do {
+        result = yield* cn1_ivAdapt(method.apply(null, [receiver].concat(nextArgs)));
+        const queue = queuePending && receiver[pendingFlagKey + "Queue"];
+        nextArgs = queue && queue.length ? queue.shift() : null;
+      } while (nextArgs !== null);
+      return result;
     } finally {
       if (pendingFlagKey) {
         receiver[pendingFlagKey] = false;
+        if (queuePending) {
+          receiver[pendingFlagKey + "Queue"] = null;
+        }
       }
     }
   }
@@ -3109,7 +3130,8 @@ bindNative([
         handler,
         "cn1_s_onAnimationFrame_double",
         [+time],
-        "__cn1RafCallbackPending"
+        "__cn1RafCallbackPending",
+        true
       );
     } catch (err) {
       jvm.fail(err);

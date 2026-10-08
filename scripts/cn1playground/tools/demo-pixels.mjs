@@ -47,3 +47,30 @@ export function sceneChecks(frames, region, kind) {
     animation: frames.every(f => f.foreground > 150) && frames.slice(1).some(f => changedPixels(frames[0], f) > 100)
   };
 }
+
+// Compilation and semantic layout can finish before software WebGL presents a
+// frame. Require the same pixel checks, but give startup/animation a bounded
+// opportunity to present three usable frames instead of assuming a frame rate.
+// Startup and animation get separate bounded windows: a slow screenshot of the
+// initial blank surface must not consume the moving scene's observation window.
+export async function sampleScene(sample, wait, region, kind, now = Date.now, timeout = 8000) {
+  let deadline = now() + timeout;
+  const frames = [];
+  let presented = false;
+  let index = 0;
+  do {
+    const frame = await sample(index++);
+    const {animation, ...appearance} = sceneChecks([frame], region, kind);
+    if (!presented && Object.values(appearance).every(Boolean)) {
+      presented = true;
+      deadline = now() + timeout;
+      frames.length = 0;
+    }
+    frames.push(frame);
+    if (frames.length > 3) frames.shift();
+    if (frames.length === 3 && Object.values(sceneChecks(frames, region, kind)).every(Boolean)) break;
+    if (now() >= deadline) break;
+    await wait(220);
+  } while (true);
+  return frames;
+}

@@ -39,6 +39,7 @@ package com.codename1.security;
 /// ```java
 /// boolean ok = Otp.verifyTotp(secret, userInput, 1);
 /// ```
+@com.codename1.impl.SharedWithBackend
 public final class Otp {
 
     private Otp() {}

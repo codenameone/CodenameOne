@@ -68,10 +68,31 @@ public final class EntityManager {
     /// Opens (or creates) the SQLite file `databaseName` via
     /// `Display.openOrCreate`. Throws `IOException` when the platform
     /// refuses to provide a SQLite database.
+    ///
+    /// When the application carries migrations (see `com.codename1.db.Migrations`)
+    /// they are applied before the manager is returned, because this overload
+    /// owns the database and nothing else has touched it yet. A migration that
+    /// fails, or a database a newer build already migrated, closes the database
+    /// and throws `com.codename1.migration.MigrationException`.
     public static EntityManager open(String databaseName) throws IOException {
         Database db = Display.getInstance().openOrCreate(databaseName);
         if (db == null) {
             throw new IOException("Platform does not support SQLite: " + Display.getInstance().getPlatformName());
+        }
+        if (com.codename1.db.Migrations.isRegistered()) {
+            boolean migrated = false;
+            try {
+                com.codename1.db.Migrations.migrate(db);
+                migrated = true;
+            } finally {
+                if (!migrated) {
+                    try {
+                        db.close();
+                    } catch (IOException ignored) {
+                        // The migration failure is the one to report.
+                    }
+                }
+            }
         }
         return open(db);
     }

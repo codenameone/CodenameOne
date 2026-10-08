@@ -136,6 +136,17 @@ public final class HttpServer {
         private boolean sessionResolved;
         /// The request's request-scoped beans, by the slot the build gave each.
         private Object[] scopedBeans;
+        /// The descriptor of the connection this request arrived on; -1 for a
+        /// request that arrived on none, which a test dispatching in process
+        /// makes.
+        int peerFd = -1;
+        /// Whether this server terminated TLS for the connection.
+        boolean overTls;
+        /// Whose word is taken for the forwarding headers; null for nobody's.
+        ForwardedHeaders forwarded;
+        /// The peer's address once asked for; see [#getPeerAddress].
+        private byte[] peerBytes;
+        private boolean peerResolved;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
                 int headerCount, String body) {
@@ -570,9 +581,71 @@ public final class HttpServer {
             this.sessionResolved = false;
             this.scopedBeans = null;
             this.sessions = null;
+            this.peerFd = -1;
+            this.overTls = false;
+            this.forwarded = null;
+            this.peerBytes = null;
+            this.peerResolved = false;
             this.endedSessions = null;
             this.sessionsInUse = null;
             this.sessionIdsFound = null;
+        }
+
+        private byte[] peer() {
+            if (!peerResolved) {
+                peerResolved = true;
+                peerBytes = peerFd < 0 ? null : ServerSocket.peerAddress(peerFd);
+            }
+            return peerBytes;
+        }
+
+        /// The address of the other end of the connection this request arrived
+        /// on: the client's when it connected directly, a load balancer's when
+        /// it did not. See [#getRemoteAddress] for the one to act on.
+        ///
+        /// @return the address as text, or null for a request that arrived on
+        /// no connection
+        public String getPeerAddress() {
+            return ForwardedHeaders.format(peer());
+        }
+
+        /// The address of the client this request is from.
+        ///
+        /// That is the other end of the connection, unless this server was told
+        /// it sits behind proxies and the connection is one of theirs. Then it
+        /// is what `X-Forwarded-For` says, read from the right past every
+        /// trusted proxy. From any other connection the header is ignored: it
+        /// is the client's own claim about itself.
+        ///
+        /// | Property | Meaning |
+        /// |---|---|
+        /// | `cn1.server.forwardHeaders` | `true` to read the forwarding headers at all; `false` unless set. |
+        /// | `cn1.server.trustedProxies` | The proxies, as addresses and CIDR ranges separated by commas. Unless explicitly listed, no peer is trusted, including loopback and private addresses. |
+        ///
+        /// IPv4 is dotted, IPv6 is eight groups of hexadecimal without `::`, and
+        /// an IPv4 address carried in IPv6 is written as IPv4 -- one spelling
+        /// per address, so the text can be a key.
+        ///
+        /// @return the address, or null for a request that arrived on no
+        /// connection
+        public String getRemoteAddress() {
+            byte[] peer = peer();
+            if (peer == null || forwarded == null) {
+                return ForwardedHeaders.format(peer);
+            }
+            return ForwardedHeaders.format(forwarded.client(peer, getHeader("X-Forwarded-For")));
+        }
+
+        /// Whether the client reached this request's server over TLS: this
+        /// server terminated it, or a trusted proxy did and says so in
+        /// `X-Forwarded-Proto`. The header is believed under the rule
+        /// [#getRemoteAddress] believes `X-Forwarded-For` under.
+        public boolean isSecure() {
+            if (overTls) {
+                return true;
+            }
+            return forwarded != null
+                    && forwarded.secure(peer(), getHeader("X-Forwarded-Proto"));
         }
 
         /// The session of this request, creating one if it has none.
@@ -628,6 +701,16 @@ public final class HttpServer {
         /// The value of one cookie the client sent, or null.
         public String getCookie(String name) {
             return Sessions.cookieValue(getHeader("cookie"), name);
+        }
+
+        /// Forgets the session this request resolved, once it has been stored and
+        /// released, so a later lookup on the same request starts again. A
+        /// WebSocket handshake is looked at twice -- by the upgrade guard and then
+        /// by a fallback router -- and each finishes the sessions it used.
+        void forgetSession() {
+            this.session = null;
+            this.sessionResolved = false;
+            this.endedSessions = null;
         }
 
         /// The session, if this request looked it up.
@@ -704,6 +787,11 @@ public final class HttpServer {
             this.sessionResolved = false;
             this.scopedBeans = null;
             this.sessions = null;
+            this.peerFd = -1;
+            this.overTls = false;
+            this.forwarded = null;
+            this.peerBytes = null;
+            this.peerResolved = false;
             this.endedSessions = null;
             this.sessionsInUse = null;
             this.sessionIdsFound = null;
@@ -1403,6 +1491,30 @@ public final class HttpServer {
         void decorateFallback(Request request, Response response);
     }
 
+    /// A handler that is also asked before a WebSocket upgrade is routed, for an
+    /// exact route and a fallback router alike. The upgrade does not pass through
+    /// [Handler#handle], so without this a handshake reached its endpoint having
+    /// met none of what guards the HTTP routes beside it. Package-private: only
+    /// Backend's chain is one.
+    interface UpgradeGuard {
+        /// Null or a 101 response to let the handshake reach its endpoint; a 101
+        /// carries security and session headers. Otherwise the answer it is
+        /// refused with: a whole response -- its status, and the headers that
+        /// tell the client what to do about it, a `WWW-Authenticate` challenge
+        /// above all. The server writes it as the HTTP response it is and
+        /// closes the connection; the response is the caller's to write into.
+        Response checkUpgrade(Request request);
+    }
+
+    /// A handler that knows whose word is taken for where a request came from;
+    /// see [ForwardedHeaders]. Asked once, when the server is made, so every
+    /// request -- a WebSocket handshake included -- carries the answer from the
+    /// first one on. Package-private: only Backend's chain is one.
+    interface Forwarding {
+        /// The policy, or null when the forwarding headers are not read.
+        ForwardedHeaders forwardedHeaders();
+    }
+
     /// The status-only answer for `request`, decorated by the handler when it asks.
     private Response fallback(Request request, int status, String text) {
         Response response = Response.text(status, text);
@@ -1852,6 +1964,8 @@ public final class HttpServer {
     private final Reactor reactor;
     private final ExecutorService workers;
     private final Handler handler;
+    /// See [Forwarding]; null when the forwarding headers are not read.
+    private final ForwardedHeaders forwardedHeaders;
     private final Tls tls;
     /// fd to SSL session. Only written when a connection is established or closed,
     /// never per request. A TLS connection genuinely costs an object; the plain
@@ -2004,6 +2118,8 @@ public final class HttpServer {
         this.workers = workers;
         this.workerCount = workerCount;
         this.handler = handler;
+        this.forwardedHeaders = handler instanceof Forwarding
+                ? ((Forwarding) handler).forwardedHeaders() : null;
         this.tls = tls;
         // Derived from the decision the caller actually made, not recomputed from
         // the statics behind it. Recomputing was right while "plaintext" was the
@@ -4428,16 +4544,30 @@ public final class HttpServer {
             return false;
         }
 
+        // Before the route is chosen, so a handshake the guard refuses learns
+        // nothing about which paths have an endpoint behind them -- an HTTP
+        // request to a path that does not exist is refused the same way.
+        Response upgrade = null;
+        if (handler instanceof UpgradeGuard) {
+            upgrade = ((UpgradeGuard) handler).checkUpgrade(request);
+            if (upgrade != null && upgrade.status != 101) {
+                writeRefusedUpgrade(conn, fd, session, upgrade);
+                return false;
+            }
+        }
+
         WebSocket endpoint;
         try {
             endpoint = routeWebSocket(request, path);
         } catch (Exception err) {
             System.err.println("websocket router failed: " + err);
-            writeStatusOnly(conn, 500, "internal error");
+            writeRefusedUpgrade(conn, fd, session, Response.text(500, "internal error")
+                    .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
         if (endpoint == null) {
-            writeStatusOnly(conn, 404, "not found");
+            writeRefusedUpgrade(conn, fd, session, Response.text(404, "not found")
+                    .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
 
@@ -4451,7 +4581,8 @@ public final class HttpServer {
                     request.getHeader("sec-websocket-protocol"), endpoint.getSubprotocols());
         } catch (RuntimeException err) {
             System.err.println("websocket endpoint getSubprotocols failed: " + err);
-            writeStatusOnly(conn, 500, "internal error");
+            writeRefusedUpgrade(conn, fd, session, Response.text(500, "internal error")
+                    .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
 
@@ -4480,7 +4611,7 @@ public final class HttpServer {
         conn.releaseIdleMemory();
 
         try {
-            writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol);
+            writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol, upgrade);
         } catch (IOException err) {
             trace("fd=" + fd + " handshake write failed: " + err);
             // Handled here, not by the caller: this path reports the connection
@@ -4894,7 +5025,8 @@ public final class HttpServer {
     /// One write, for the same reason the response path combines its own: on a
     /// fresh connection two writes are two segments, and the client waits a round
     /// trip before it can send anything.
-    private void writeHandshakeResponse(Conn conn, String accept, String subprotocol)
+    private void writeHandshakeResponse(Conn conn, String accept, String subprotocol,
+                                        Response upgrade)
             throws IOException {
         conn.reset();
         conn.put("HTTP/1.1 101 Switching Protocols\r\n");
@@ -4911,6 +5043,31 @@ public final class HttpServer {
             conn.put("Sec-WebSocket-Protocol: ");
             conn.put(subprotocol);
             conn.put("\r\n");
+        }
+        if (upgrade != null && upgrade.extraHeaders != null) {
+            java.util.Iterator entries = upgrade.extraHeaders.entrySet().iterator();
+            while (entries.hasNext()) {
+                Map.Entry entry = (Map.Entry) entries.next();
+                String name = String.valueOf(entry.getKey());
+                Object raw = entry.getValue();
+                List values = raw instanceof List ? (List) raw : null;
+                int count = values == null ? 1 : values.size();
+                for (int i = 0 ; i < count ; i++) {
+                    Object value = values == null ? raw : values.get(i);
+                    String text = String.valueOf(value);
+                    if (entry.getKey() != null && value != null && isHeaderName(name)
+                            && isHeaderSafe(text) && !isServerOwnedHeader(name)
+                            && !name.equalsIgnoreCase("Upgrade")
+                            && !name.equalsIgnoreCase("Sec-WebSocket-Accept")
+                            && !name.equalsIgnoreCase("Sec-WebSocket-Protocol")
+                            && !name.equalsIgnoreCase("Sec-WebSocket-Extensions")) {
+                        conn.put(name);
+                        conn.put(": ");
+                        conn.put(text);
+                        conn.put("\r\n");
+                    }
+                }
+            }
         }
         conn.put("\r\n");
         writeTo(conn.fd, conn.session, conn.out, 0, conn.outLength);
@@ -5821,6 +5978,9 @@ public final class HttpServer {
                 return;
             }
 
+            request.peerFd = fd;
+            request.overTls = tls != null;
+            request.forwarded = forwardedHeaders;
             boolean keepAlive = wantsKeepAlive(request);
             // BEFORE the handler, or the generated router answers 404 for a path
             // it was never told carried a websocket. After wantsKeepAlive, so
@@ -6259,6 +6419,9 @@ public final class HttpServer {
                 }
                 Request request = new Request(stream.getMethod(), stream.getPath(),
                         "HTTP/2", headers, h2Text, h2Binary);
+                request.peerFd = fd;
+                request.overTls = tls != null;
+                request.forwarded = forwardedHeaders;
                 Response response;
                 inFlightRequests.incrementAndGet();
                 SERVING_FD.set(Integer.valueOf(fd));
@@ -7257,6 +7420,34 @@ public final class HttpServer {
             return request.headerContains("connection", "keep-alive");
         }
         return !request.headerContains("connection", "close");
+    }
+
+    /// Answers a handshake its guard refused with the response the guard made:
+    /// an ordinary HTTP response, headers and body, on a connection that then
+    /// closes. Nothing of the upgrade has happened yet -- no 101 was sent, the
+    /// descriptor is still an HTTP connection's -- so the client reads a
+    /// complete answer and an end of stream, never half a socket.
+    private void writeRefusedUpgrade(Conn conn, int fd, long session, Response refused) {
+        int status = refused.status;
+        if (status < 300 || refused.fileFd >= 0) {
+            // Not a refusal anybody can act on: a guard that answered 200, or
+            // with a file. The handshake is refused all the same.
+            refused.discard();
+            writeStatusOnly(conn, 403, null);
+            return;
+        }
+        try {
+            if (refused.hasDeferredJson) {
+                conn.bodySink.reset();
+                Json.write(refused.deferredJson, conn.bodySink);
+            }
+            writeResponse(conn, fd, session, refused, false, false);
+            conn.writtenStatus = status;
+        } catch (IOException err) {
+            // The peer is already gone; there is nowhere to report this.
+        } catch (RuntimeException err) {
+            System.err.println("a refused websocket handshake could not be answered: " + err);
+        }
     }
 
     private void writeStatusOnly(Conn conn, int status, String message) {
@@ -9044,22 +9235,73 @@ public final class HttpServer {
         return true;
     }
 
+    /// The reason phrase of a status, as RFC 9110 and the registry it points to
+    /// have it. Nothing reads the phrase, but a status line that says
+    /// `302 OK` is the first thing anybody debugging with curl sees.
     private static String reason(int status) {
         switch (status) {
+            case 100: return "Continue";
+            case 101: return "Switching Protocols";
             case 200: return "OK";
             case 201: return "Created";
+            case 202: return "Accepted";
+            case 203: return "Non-Authoritative Information";
             case 204: return "No Content";
+            case 205: return "Reset Content";
+            case 206: return "Partial Content";
+            case 300: return "Multiple Choices";
+            case 301: return "Moved Permanently";
+            case 302: return "Found";
+            case 303: return "See Other";
+            case 304: return "Not Modified";
+            case 307: return "Temporary Redirect";
+            case 308: return "Permanent Redirect";
             case 400: return "Bad Request";
             case 401: return "Unauthorized";
+            case 402: return "Payment Required";
             case 403: return "Forbidden";
             case 404: return "Not Found";
             case 405: return "Method Not Allowed";
+            case 406: return "Not Acceptable";
+            case 407: return "Proxy Authentication Required";
+            case 408: return "Request Timeout";
             case 409: return "Conflict";
-            case 413: return "Payload Too Large";
+            case 410: return "Gone";
+            case 411: return "Length Required";
+            case 412: return "Precondition Failed";
+            case 413: return "Content Too Large";
+            case 414: return "URI Too Long";
+            case 415: return "Unsupported Media Type";
+            case 416: return "Range Not Satisfiable";
+            case 417: return "Expectation Failed";
+            case 421: return "Misdirected Request";
+            case 422: return "Unprocessable Content";
+            case 425: return "Too Early";
+            case 426: return "Upgrade Required";
+            case 428: return "Precondition Required";
+            case 429: return "Too Many Requests";
+            case 431: return "Request Header Fields Too Large";
+            case 451: return "Unavailable For Legal Reasons";
             case 500: return "Internal Server Error";
+            case 501: return "Not Implemented";
+            case 502: return "Bad Gateway";
             case 503: return "Service Unavailable";
-            default: return status < 400 ? "OK" : "Error";
+            case 504: return "Gateway Timeout";
+            case 505: return "HTTP Version Not Supported";
+            default: break;
         }
+        // A status nobody registered: named by its class, which is how a
+        // client is told to read one it does not know.
+        if (status < 200) {
+            return "Informational";
+        }
+        if (status < 300) {
+            return "Success";
+        }
+        if (status < 400) {
+            return "Redirection";
+        }
+        return status < 500 ? "Client Error" : "Server Error";
     }
 
     private static int indexOfHeaderEnd(byte[] data, int from) {

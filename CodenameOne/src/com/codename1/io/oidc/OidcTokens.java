@@ -91,20 +91,20 @@ public final class OidcTokens {
         Date expiresAt = null;
         Object expiresIn = json.get("expires_in");
         if (expiresIn != null) {
+            long seconds;
             try {
-                String raw = expiresIn.toString().trim();
-                int dot = raw.indexOf('.');
-                if (dot >= 0) {
-                    raw = raw.substring(0, dot);
-                }
-                long seconds = Long.parseLong(raw);
-                expiresAt = new Date(System.currentTimeMillis() + seconds * 1000L);
-            } catch (NumberFormatException ignored) {
-                // Provider returned a non-numeric `expires_in`; treat the
-                // expiry as unknown rather than failing the whole token
-                // response. `expiresAt` stays null and callers fall back to
-                // a 401 retry.
+                seconds = expiresIn instanceof Number ? ((Number) expiresIn).longValue()
+                        : Long.parseLong(expiresIn.toString().trim());
+            } catch (NumberFormatException invalid) {
+                throw new IllegalArgumentException("expires_in must be a nonnegative integer", invalid);
             }
+            long now = System.currentTimeMillis();
+            if (seconds < 0 || seconds > (Long.MAX_VALUE - now) / 1000L
+                    || (expiresIn instanceof Number
+                    && ((Number) expiresIn).doubleValue() != (double) seconds)) {
+                throw new IllegalArgumentException("expires_in must have a representable millisecond expiry");
+            }
+            expiresAt = new Date(now + seconds * 1000L);
         }
         Map<String, Object> claims = idToken != null ? decodeIdTokenClaims(idToken) : null;
         return new OidcTokens(accessToken, idToken, refreshToken, tokenType, scope,
@@ -197,13 +197,19 @@ public final class OidcTokens {
                 expiresAt.getTime() - System.currentTimeMillis() < leewaySeconds * 1000L;
     }
 
-    /// Read-only view of the ID token claims (empty if no ID token was returned).
+    /// Read-only view of the latest accepted ID token claims. A refresh that omits
+    /// its ID token retains the prior identity; [#getIdToken()] still returns null.
     public Map<String, Object> getIdTokenClaims() {
         return idTokenClaims;
     }
 
-    /// Convenience accessor for a single ID-token claim. Returns `null` when
-    /// the claim is absent or the ID token is missing.
+    OidcTokens withIdentityFrom(OidcTokens previous) {
+        return new OidcTokens(accessToken, idToken, refreshToken, tokenType, scope,
+                expiresAt, previous.getIdTokenClaims(), raw);
+    }
+
+    /// Convenience accessor for a claim in the latest accepted identity. Returns
+    /// `null` when the claim is absent or no identity has been accepted.
     public Object getClaim(String name) {
         return idTokenClaims.get(name);
     }

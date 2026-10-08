@@ -364,6 +364,112 @@ afterward, because there's nothing left to roll back and the call throws. The en
 here on their own -- Android ends the transaction before it reports the failure, while the SQLite C
 API and JDBC leave it open -- so the port reconciles them and your code sees one behaviour.
 
+[[client-schema-migrations]]
+==== Schema migrations
+
+The first release of an app creates its tables. Every later release has to cope
+with whichever of the earlier schemas a device still holds, and a user who skips
+three updates has to end up with the same tables as one who took each of them.
+A migration is one change to the schema, written once as a script. Each script
+runs exactly once per database, in order, so one call brings any database a
+device holds up to the schema this build expects.
+
+Scripts go in the `common` module, in a directory of their own:
+
+[source]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.txt[tag=migrations-layout-app,indent=0]
+----
+
+A file called `V<version>__<description>.sql` holds one change. Versions are
+digits separated by dots or underscores and sort as numbers, and a change to the
+schema is always a new file with a higher version: a script that has shipped is
+never edited, because devices that ran the old text would no longer match the
+ones that ran the new text.
+
+[source,sql]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.sql[tag=migrations-sql-002,indent=0]
+----
+
+The build compiles the scripts into the app, so they aren't resources and add
+no files to it. Run them when the database is opened, before anything else
+touches it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/MigrationSnippets.java[tag=migrations-client-migrate,indent=0]
+----
+
+`EntityManager.open(name)` does this by itself, since it opens the database and
+nothing else has used it yet:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/MigrationSnippets.java[tag=migrations-client-orm,indent=0]
+----
+
+Each script runs in a transaction, and is recorded with a checksum in a table
+called `flyway_schema_history`. A script that fails is rolled back and the call
+throws, so a database is never left halfway between two versions. Run the call
+on the thread that owns the database, and off the event dispatch thread when the
+scripts move a lot of data.
+
+The naming and the history table are Flyway's, and the same engine runs the
+<<backend-schema-migrations,server's migrations>>.
+
+===== When the data is newer than the app
+
+A user can install an older build over data that a newer one already migrated,
+by restoring a backup or downgrading. The older build can't know what the newer
+scripts did to its tables, so the call refuses before changing anything:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/MigrationSnippets.java[tag=migrations-client-future,indent=0]
+----
+
+===== An app that already shipped
+
+A database created by a release from before the app had migrations has tables
+and no history, and is refused for the same reason a server refuses one: `V1`
+would run against a schema it didn't create. Write the scripts so they add up to
+the schema the shipped releases created, and tell the first run which version
+that schema corresponds to:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/MigrationSnippets.java[tag=migrations-client-baseline,indent=0]
+----
+
+A fresh installation ignores the baseline and runs every script.
+
+===== Scripts that rebuild a table
+
+SQLite can't drop a constraint or change a column's type in place, so those
+changes rebuild the table. Foreign key enforcement can only be switched inside
+no transaction at all, so such a script manages its own. Put a file with the
+same name plus `.conf` beside it, containing `executeInTransaction=false`:
+
+[source,sql]
+----
+include::../demos/common/src/main/snippets/developer-guide/migrations.sql[tag=migrations-sql-003,indent=0]
+----
+
+Keep migration SQL to what every device's SQLite accepts. Use single quotes
+for strings, and prefer the oldest form of `ALTER TABLE` that does the job,
+since the engine on an older phone is older than the one in the simulator.
+
+===== Without the build step
+
+A project that isn't built with Maven or Gradle has no step to compile the
+scripts in. Register them in code instead; everything else works the same way:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/MigrationSnippets.java[tag=migrations-client-programmatic,indent=0]
+----
+
 ==== Attaching a second database
 
 `ATTACH` makes another database part of the connection, and SQLite holds it until you detach it or

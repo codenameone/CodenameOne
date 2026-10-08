@@ -27,6 +27,7 @@ package com.codename1.security;
 /// but it can be caught explicitly when needed (e.g. a malformed key, an
 /// authentication-tag mismatch, an algorithm that is not available on the
 /// current platform, etc.).
+@com.codename1.impl.SharedWithBackend
 public class CryptoException extends RuntimeException {
 
     /// Creates a new instance with the given message.

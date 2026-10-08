@@ -32,6 +32,7 @@ package com.codename1.security;
 /// byte[] secret = Base32.decode("JBSWY3DPEHPK3PXP");
 /// String enc    = Base32.encode(secret);
 /// ```
+@com.codename1.impl.SharedWithBackend
 public final class Base32 {
     private Base32() {}
 

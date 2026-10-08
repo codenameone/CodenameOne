@@ -117,12 +117,24 @@ public abstract class BackendAccess {
     /// Serves the management endpoints when the configuration turns them on.
     public abstract void management(Backend.Builder builder);
 
+    /// Puts the security layer in front of the application's routes, for a build
+    /// that found a `SecurityFilterChain` bean. The only call that names the
+    /// layer, so a server whose entry point does not make it has none of its code.
+    public abstract void security(Backend.Builder builder);
+
     /// The module's compiled-in settings: the bottom layer of the configuration.
     public abstract void compiledSettings(Backend.Builder builder, String[] keysAndValues);
 
     /// A configuration whose `values` win over every layer, the environment
     /// included: the settings a test names for itself.
     public abstract Config testConfig(java.util.Properties values, String profile);
+
+    /// Marks the server as the application of a `@BackendTest`. The test build links the
+    /// application and its security and leaves the management endpoints, the MCP endpoint
+    /// and the OpenTelemetry exporters out on purpose, while it compiles in the module's
+    /// `application.properties` -- which may well ask for them. That is not the mismatch
+    /// the start refuses for a packaged server.
+    public abstract void testApplication(Backend.Builder builder);
 
     /// Adds a tool to the MCP endpoint.
     public abstract void mcpTool(Backend.Builder builder, McpTool tool);
@@ -169,6 +181,17 @@ public abstract class BackendAccess {
     /// Releases what `response` holds without reading it -- the file a static file
     /// response keeps open -- for a caller that sends no body, as a HEAD answer.
     public abstract void discard(HttpServer.Response response);
+
+    /// Whether `response` has a header of this name, in any case.
+    public abstract boolean hasHeader(HttpServer.Response response, String name);
+
+    /// Sets a header of `response`, replacing every value under that name in any
+    /// case. For the server's own copy of a response, never a handler's object.
+    public abstract void setHeader(HttpServer.Response response, String name, String value);
+
+    /// Adds a value to a header of `response`, keeping the ones it has: one more
+    /// `Set-Cookie`. For the server's own copy of a response.
+    public abstract void addHeader(HttpServer.Response response, String name, String value);
 
     /// The response's content type, or null.
     public abstract String contentType(HttpServer.Response response);
@@ -235,6 +258,12 @@ public abstract class BackendAccess {
 
     /// The named executor of the calling thread's server, created on first use.
     public abstract TaskExecutor executor(String name, int kind);
+
+    /// The bean the wiring of the calling thread's server registered under
+    /// `name` with [WiringEnvironment#registerNamedBean], or null. Asked on every
+    /// call and never cached in a static: two servers in one process each have
+    /// their own beans.
+    public abstract Object namedBean(String name);
 
     /// Every executor of the given servers.
     public abstract List executorsOf(Collection servers);

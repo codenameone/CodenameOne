@@ -665,6 +665,62 @@ class ApplicationRuntimeTest {
     // --------------------------------------------------------------- sessions
 
     @Test
+    void sessionAttributesAreConsumedOnceAcrossRequestCopies(
+            @org.junit.jupiter.api.io.TempDir java.io.File dir) throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "consume.db").getAbsolutePath(),
+                4, 5000, 10000);
+        try {
+            SessionStore memory = new Sessions.Memory();
+            consumeOnce(memory, memory);
+            consumeOnce(new Sessions.Db(pool, "ceremonies"), new Sessions.Db(pool, "ceremonies"));
+        } finally {
+            pool.close();
+        }
+    }
+
+    private void consumeOnce(SessionStore first, SessionStore second) throws Exception {
+        long now = System.currentTimeMillis();
+        HttpSession created = new HttpSession("ceremony-session", now, now, 1800);
+        created.markNew();
+        created.setAttribute("challenge", "once");
+        first.save(created, null);
+        created.clean();
+        HttpSession left = first.load(created.getId());
+        HttpSession right = second.load(created.getId());
+        Sessions owner = new Sessions();
+        owner.setStore(first);
+        left.owner = owner;
+        Sessions otherOwner = new Sessions();
+        otherOwner.setStore(second);
+        right.owner = otherOwner;
+        java.util.concurrent.ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.CyclicBarrier together = new java.util.concurrent.CyclicBarrier(2);
+        try {
+            java.util.concurrent.Future<Object> a = workers.submit(() -> {
+                together.await();
+                return left.consumeAttribute("challenge");
+            });
+            java.util.concurrent.Future<Object> b = workers.submit(() -> {
+                together.await();
+                return right.consumeAttribute("challenge");
+            });
+            Object av = a.get(10, TimeUnit.SECONDS);
+            Object bv = b.get(10, TimeUnit.SECONDS);
+            assertEquals(1, ("once".equals(av) ? 1 : 0) + ("once".equals(bv) ? 1 : 0));
+            assertNull(first.load(created.getId()).getAttribute("challenge"));
+            HttpSession next = second.load(created.getId());
+            next.setAttribute("challenge", "new");
+            second.save(next, null);
+            left.setAttribute("unrelated", "kept");
+            first.save(left, null);
+            assertEquals("new", first.load(created.getId()).getAttribute("challenge"),
+                    "saving the consuming request must not erase the next ceremony");
+        } finally {
+            workers.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("two servers' database session stores never read each other's sessions")
     void dbSessionNamespaces(@org.junit.jupiter.api.io.TempDir java.io.File dir)
             throws Exception {

@@ -425,6 +425,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void clearNetworkMocks() {
         mockResponses.clear();
+        networkMockHandler = null;
+    }
+
+    /**
+     * Answers a request from what it carries. Called once per attempt, when the response code
+     * is asked for -- by which time the request's headers and body are on the connection -- so
+     * a test can answer 401 to one token and 200 to another on the same URL.
+     */
+    public interface NetworkMockHandler {
+        void handle(TestConnection connection);
+    }
+
+    private NetworkMockHandler networkMockHandler;
+
+    public void setNetworkMockHandler(NetworkMockHandler handler) {
+        this.networkMockHandler = handler;
     }
 
 
@@ -3528,6 +3544,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public int getResponseCode(Object connection) {
+        NetworkMockHandler handler = networkMockHandler;
+        if (handler != null) {
+            handler.handle((TestConnection) connection);
+        }
         return ((TestConnection) connection).responseCode;
     }
 
@@ -5714,6 +5734,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         public void setContentLength(int contentLength) {
             this.contentLength = contentLength;
+        }
+
+        /**
+         * Forgets the request headers and body. A connection is reused for every request to
+         * its URL, so a handler that tells attempts apart calls this once it has read one.
+         */
+        public void clearRequest() {
+            headers.clear();
+            output = null;
+            bufferedOutput = null;
+        }
+
+        /** Sets the status, body and length of the answer in one call. */
+        public void respond(int code, String message, byte[] body) {
+            responseCode = code;
+            responseMessage = message;
+            setInputData(body);
+            contentLength = body == null ? 0 : body.length;
         }
 
         @Override

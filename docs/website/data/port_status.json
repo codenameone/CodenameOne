@@ -627,6 +627,18 @@
       ]
     },
     {
+      "id": "backend-sign-in",
+      "category": "Application runtime",
+      "name": "Signing in to a Codename One backend",
+      "description": "Signs in to the CI's own backend with the app's OpenID Connect client: an authorization code with PKCE, a generated REST client that reaches a secured API through the request authorizer, a refused access token renewed with a rotating refresh token, the device grant from both ends, and a one-time code computed on the device as a second factor.",
+      "tests": [
+        "BackendAuthTest",
+        "BackendTokenRefreshTest",
+        "BackendDeviceGrantTest",
+        "BackendTotpTest"
+      ]
+    },
+    {
       "id": "contact-picker",
       "category": "Device APIs",
       "name": "Contact picker",
@@ -694,6 +706,15 @@
         "DatabaseEncryptionTest",
         "DatabaseStatementLegacyTest",
         "DatabaseCursorLegacyTest"
+      ]
+    },
+    {
+      "id": "sqlite-migrations",
+      "category": "Storage and security",
+      "name": "SQLite schema migrations",
+      "description": "Brings a database to the application's schema with versioned migrations: the set compiled into the application, a set built in code, and the same on a connection in legacy compatibility mode.",
+      "tests": [
+        "DatabaseMigrationTest"
       ]
     },
     {

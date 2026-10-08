@@ -61,6 +61,10 @@ import com.codename1.backend.Json;
 ///
 /// The endpoint answers POSTed JSON-RPC with a JSON body. It keeps no session
 /// and opens no event stream, so a GET is answered 405, as the transport allows.
+///
+/// `cn1.mcp.enabled` is a build-time setting as well as a switch: a packaged
+/// server with no tools has the endpoint only when its build found the key true,
+/// and one built without it that finds the key true at run time does not start.
 public final class McpServer implements HttpServer.Handler {
     public static final String ENABLED = "cn1.mcp.enabled";
     public static final String PATH = "cn1.mcp.path";
