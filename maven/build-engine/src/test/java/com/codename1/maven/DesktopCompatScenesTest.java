@@ -139,13 +139,14 @@ public class DesktopCompatScenesTest {
         List<File> jars = new ArrayList<File>(Arrays.asList(RealCompatJars.swing(scratch),
                 RealCompatJars.javafx(scratch), RealCompatJars.jdk(scratch), RealCompatJars.core(scratch)));
 
-        // prepare-desktop-sources: the FXML document becomes source and the
-        // style sheet a table.
+        // prepare-desktop-sources: the style sheet becomes a table. The FXML
+        // document is only recorded here; the remap below compiles it,
+        // against the compiled screens.
         File resources = new File(desktop(), "resources");
         File javaOut = tmp.newFolder();
         File resourcesOut = tmp.newFolder();
         final List<String> warnings = new ArrayList<String>();
-        List<String> errors = new DesktopResourceCompiler(Collections.singletonList(resources), jars, javaOut,
+        List<String> errors = new DesktopResourceCompiler(Collections.singletonList(resources), javaOut,
                 resourcesOut, new DesktopResourceCompiler.Log() {
                     @Override
                     public void info(String message) {
