@@ -755,13 +755,22 @@ An Android Studio module's `src/main` dropped into `common/src/main/android`
   (views are peers, layouts run Android's measure/layout). Apps compile against
   it under the real names; its own framework resources live in
   `src/main/framework-res`.
-- **The remap step** (`build-engine/.../AndroidRemapper`, goal `remap-android`)
-  relocates `android/`, `androidx/` and `com/google/android/material/` to
+- **The remap step** (goal `remap-compat`; `remap-android` is the same goal
+  under its old name, kept so existing poms need no edit) relocates `android/`,
+  `androidx/` and `com/google/android/material/` to
   `com/codename1/androidcompat/...`, copies the relocated runtime into the app's
   classes, maps the JDK classes CLDC lacks (`java.io.File`, the file streams,
-  `BufferedReader`, `PrintWriter`, `Closeable`) to `com.codename1.androidcompat.jdk`,
+  `BufferedReader`, `PrintWriter`, `Closeable`) to `com.codename1.compat.jdk`,
   and generates the `android:onClick`, fragment-factory and WebView JS-bridge
-  dispatchers from the compiled classes.
+  dispatchers from the compiled classes. The JDK shims are their own module,
+  `maven/compat-jdk`, because the desktop layers use them too.
+- **The remap is one pass over every layer**, split in `build-engine`:
+  `CompatLayers` declares each layer (artifact, source prefixes, target
+  package), `Relocation` holds the package and JDK-shim tables,
+  `ClassRelocator` rewrites a class against all active layers at once,
+  `CompatRemapper` drives the step and calls `AndroidRemapper` for what is
+  Android's own. The archetype binds `remap-compat` and then
+  `bytecode-compliance` in `process-classes`, in that order.
 
 Traps that have already cost a fix:
 
@@ -785,6 +794,109 @@ Traps that have already cost a fix:
   `scripts/android-compat-samples/*` and stages every target's upload jar
   (`.github/workflows/android-compat.yml`); it fails if any shipped class still
   names `android/`.
+
+### Desktop compatibility: Swing and JavaFX apps as Codename One apps
+
+A desktop project's `src/main` dropped into `common/src/main/desktop` (or
+imported with `cn1:import-desktop-project`) builds unmodified, for every target:
+
+- **`maven/swing-compat`** is `java.awt`, `javax.swing`, `java.beans`,
+  `javax.imageio` and a SwingX subset (`org.jdesktop`) written over Codename
+  One. **It is authored already relocated**, under
+  `com.codename1.desktopcompat.java.awt...`, because the JDK owns `java.awt` and
+  no module can declare it. Applications therefore compile against the *JDK's*
+  Swing, and the remap points them at this one.
+- **`maven/javafx-compat`** is the `javafx.*` subset. Nothing owns that name, so
+  it is authored under the real names like `android-compat`, applications
+  compile against its jar, and the remap moves it to `com/codename1/fxcompat/`.
+  Its internals live in `com/codename1/fxcompat/runtime/`, which the remap maps
+  to `com/codename1/fxcompat/rt/`.
+- **`maven/compat-jdk`** (`com.codename1.compat.jdk`) holds the JDK classes a
+  device lacks. `CompatRewrites` additionally redirects single missing
+  *members* of `Class`, `ClassLoader`, `System`, `Locale`, `String` and the
+  like, for the desktop layers only.
+- **`maven/fxml-compiler`** turns each `.fxml` into
+  `com.codename1.generated.fxml.Fxml_<name>` and each `.css` into a
+  `.cn1css` table, from `prepare-desktop-sources` (before javac);
+  `FxmlDispatchGenerator` then runs in the remap, on the compiled classes, to
+  widen and reach the controllers' private `@FXML` members. The CSS value
+  classes are compiled twice: `fxcompat/runtime/css` is copied into the compiler
+  under `com.codename1.fxml.css`, so build and device share one parser.
+- **`maven/compat-testing`** is the headless implementation and
+  `MainThreadRule` both layers' tests run on.
+
+What holds it together:
+
+- **Unsupported API is a build error, and that is the coverage gate.**
+  `bytecode-compliance` runs *after* the remap, so a member the layer lacks is
+  a reference to something that does not exist; `BytecodeCompliance` reports it
+  under the original name with the source line. What it cannot see: an
+  application *override* of a method the layer's type lacks passes, and is
+  simply never called.
+- **The API shape is tested, not trusted.** `ApiShapeTest` compares every
+  public class of `swing-compat` with the JDK class (SwingX with the real
+  `swingx-all`), and `NoJdkDesktopReferenceTest` fails if a shipped class names
+  the real `java/awt`. In `javafx-compat`, `ApiNamingTest` requires every
+  public member that is not JavaFX API to be named `cn1...`/`CN1_...` and listed
+  in `src/test/resources/cn1-hooks.txt`. A new hook means a new line there.
+- **Coordinates are logical pixels, 1/96 inch**, scaled by the display density
+  (Display property `desktopcompat.scale` overrides; both layers read it) and
+  snapped edge by edge. Never hand a Swing or JavaFX coordinate to Codename One
+  unscaled.
+- **The entry point is generated into the classes directory by the remap**
+  (`DesktopEntryPoints`), since only compiled classes say whether the recorded
+  class is an `Application` or holds a `main`. `main`/`start` run on the EDT,
+  which is the Swing EDT and the JavaFX application thread.
+- **Registries are generated over placeholders.** `CompatRegistry` (resources
+  and bundles, in `compat-jdk`) and the FXML dispatch class ship as empty
+  placeholders with the right shape and are replaced per application; a new
+  method on one needs the generator and the placeholder changed together.
+- A desktop layer is active only when its jar is present **and** the compiled
+  classes name its API, so a Swing app does not ship the JavaFX runtime.
+  Compile-scope dependency jars that name a layer are unpacked and relocated as
+  application code (`CompatLibraries`).
+
+`compat-jdk`, `swing-compat`, `javafx-compat` and `fxml-compiler` are in the
+SpotBugs zero-findings gate, each with its own `spotbugs-exclude.xml`.
+
+Traps that have already cost a fix:
+
+- **SpotBugs XML uses single-quoted attributes.** Grepping the report for
+  `type="` finds nothing and reads as zero findings. Match either quote, or
+  count `<BugInstance`.
+- **`-DskipTests verify` analyses stale classes** if the module was not
+  recompiled; delete `target/spotbugsXml.xml` or build clean before believing it.
+- **A test must never reach the real `Display.exitApplication()`.** It kills
+  the `invokeAndBlock` pool and every later test in the JVM hangs. Install
+  `WindowHosts.setExitHook` / `StageHosts.setExitHook` in any test that closes
+  a last window or calls `System.exit`/`Platform.exit`.
+- **Click count is static state**, kept per button and place.
+  `KernelTestBase` calls `EventBridge.resetClickCount()` in cleanup; a test
+  class outside it that clicks must do the same or it hands a double click to
+  the next test.
+- **Revealing a rectangle must not re-enter layout.** `JViewport.doLayout`
+  showed the caret, showing a rectangle validated the viewport, and the
+  viewport -- still invalid, mid-layout -- laid itself out again: a stack
+  overflow. `Container.validateTree` and `JViewport.doLayout` refuse to start a
+  pass that is already under way; keep that guard on any new reveal path.
+- **A wheel event must scroll exactly once.** The root peer hands Codename
+  One's wheel event to the `MouseWheelListener`s before anything scrolls, and
+  the content then scrolled as well. The Codename One event is consumed when a
+  listener received it or the pane has wheel scrolling off.
+- **`Class.getSuperclass()` is not on the device** -- absent from
+  `Ports/CLDC11`, though `vm/JavaAPI` has it, so the simulator and iOS pass and
+  the compliance check does not. `JTable` finds a renderer by assignability,
+  walking registered classes, never by walking up a hierarchy.
+- **The shimmed `NumberFormat` cannot extend the device's `java.text.Format`**,
+  which is not the JDK's class. Code holding one as a `Format` is a build error
+  by design; do not "fix" it by widening the shim.
+- **An FXML element cannot name a class of the application's own sources**:
+  documents compile before javac. It is an error with a message that says so.
+- **`maven/integration-tests/desktop-compat-test.sh`** imports
+  `scripts/desktop-compat-samples/*` (and skips when there are none), builds
+  with Maven and Gradle, and fails if
+  any shipped class still names `java/awt`, `javax/swing`, `java/beans`,
+  `org/jdesktop` or `javafx`.
 
 ### Integration Tests
 
