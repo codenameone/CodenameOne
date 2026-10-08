@@ -96,6 +96,10 @@ final class HostCore {
     }
 
     void sized() {
+        // An animation is commonly started before its stage is shown, and
+        // Codename One ticks only the form on screen: the frame clock follows
+        // whichever form was laid out last.
+        FrameClock.ensureCurrent();
         if (rootPeer != null) {
             double x = window.getX();
             double y = window.getY();
