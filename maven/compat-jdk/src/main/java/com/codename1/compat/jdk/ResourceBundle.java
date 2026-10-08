@@ -49,11 +49,20 @@ import java.util.Set;
 /// Each of the three is resolved in this order:
 ///
 /// 1. A resource registered through [#cn1Register(String, String, String)].
-/// 2. A class of that name which extends `ResourceBundle`, a
-///    `ListResourceBundle` typically, created through its public no-argument
-///    constructor.
-/// 3. The resource `/com/example/Messages_<suffix>.properties`, read through
-///    `Class.getResourceAsStream`.
+/// 2. A class registered through
+///    [#cn1RegisterBundleClass(String, Cn1Factory, int)], or a file
+///    registered through [#cn1RegisterProperties(String, String)].
+/// 3. Unless the registrations were declared complete ([#cn1Seal()]): a
+///    class of that name which extends `ResourceBundle`, created through its
+///    public no-argument constructor, and then the resource
+///    `/com/example/Messages_<suffix>.properties`, read through
+///    [Resources#open(String)].
+///
+/// An application built through a compatibility layer never reaches the
+/// third step. Its build finds every `.properties` bundle among the
+/// resources and every bundle class among the compiled classes, generates
+/// [CompatRegistry] to register them, and seals the registry -- so no class
+/// is created from its name, which a device cannot be relied on to do.
 ///
 /// #### Flat resource namespaces
 ///
@@ -77,6 +86,15 @@ public abstract class ResourceBundle {
     private static final Map<String, Object> CACHE = new HashMap<String, Object>();
 
     private static final Object MISSING = new Object();
+
+    /// Bundle classes, by class name: a `Cn1Factory` and the id to give it.
+    private static final Map<String, Object[]> CLASSES = new HashMap<String, Object[]>();
+
+    /// Bundle files, by the name `getBundle` composes, base name and suffix.
+    private static final Map<String, String> PROPERTIES = new HashMap<String, String>();
+
+    /// Set once the build's registry has registered everything there is.
+    private static boolean sealed;
 
     /// The bundle consulted for a key this one does not have, or `null`.
     protected ResourceBundle parent;
@@ -114,6 +132,72 @@ public abstract class ResourceBundle {
         CACHE.remove(key);
     }
 
+    /// Creates the bundle classes an application has, for
+    /// [#cn1RegisterBundleClass(String, Cn1Factory, int)]. A device has no
+    /// reflection to create a class from its name, so the build generates one
+    /// implementation whose `cn1Create` is a `switch` over `new` expressions.
+    public interface Cn1Factory {
+        /// A new instance of the bundle class registered under `id`.
+        ResourceBundle cn1Create(int id);
+    }
+
+    /// Registers a bundle that is a class -- a `ListResourceBundle` subclass,
+    /// typically. `getBundle` then creates it through `factory` instead of
+    /// looking the class up by name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `className`: the class's name as `getBundle` composes it, the base
+    ///   name followed by the locale suffix: `com.example.Labels_fr`
+    ///
+    /// - `factory`: creates the instance
+    ///
+    /// - `id`: what to pass to `factory` for this class
+    public static void cn1RegisterBundleClass(String className, Cn1Factory factory, int id) {
+        if (className == null || factory == null) {
+            throw new NullPointerException();
+        }
+        CLASSES.put(className.replace('/', '.'), new Object[] {factory, Integer.valueOf(id)});
+        CACHE.clear();
+    }
+
+    /// Registers a bundle that is a `.properties` file, by the name
+    /// `getBundle` composes for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bundleName`: the base name followed by the locale suffix,
+    ///   `com.example.Messages_fr`
+    ///
+    /// - `resourcePath`: the file's path as the application's sources had
+    ///   it, `/com/example/Messages_fr.properties`; [Resources#open(String)]
+    ///   reads it, when the bundle is first asked for
+    public static void cn1RegisterProperties(String bundleName, String resourcePath) {
+        if (bundleName == null || resourcePath == null) {
+            throw new NullPointerException();
+        }
+        PROPERTIES.put(bundleName.replace('/', '.'), resourcePath);
+        CACHE.clear();
+    }
+
+    /// Declares the registrations complete: from here on a bundle exists
+    /// only if it was registered, and no class is looked up by name. The
+    /// generated [CompatRegistry] calls this after registering every bundle
+    /// the build found.
+    public static void cn1Seal() {
+        sealed = true;
+        CACHE.clear();
+    }
+
+    /// Undoes [#cn1Seal()] and forgets every registration. For tests.
+    public static void cn1Reset() {
+        sealed = false;
+        REGISTERED.clear();
+        CLASSES.clear();
+        PROPERTIES.clear();
+        CACHE.clear();
+    }
+
     public static final ResourceBundle getBundle(String baseName) {
         return getBundle(baseName, Locale.getDefault());
     }
@@ -128,11 +212,16 @@ public abstract class ResourceBundle {
         if (baseName == null || locale == null) {
             throw new NullPointerException();
         }
+        // The build's registry, if it has not been installed yet.
+        CompatBoot.cn1Init();
         String name = baseName.replace('/', '.');
         String language = nonNull(locale.getLanguage());
         String country = nonNull(locale.getCountry());
         ResourceBundle found = findChain(name, language, country);
-        if (found == null || found.locale.getLanguage().length() == 0) {
+        // A bundle found by the chain has had its locale set; one that has
+        // none is the base bundle, like one of the empty language.
+        Locale foundLocale = found == null ? null : found.locale;
+        if (foundLocale == null || nonNull(foundLocale.getLanguage()).length() == 0) {
             // Nothing specific to the requested locale: the default locale's
             // bundle is preferred to the base bundle.
             Locale fallback = Locale.getDefault();
@@ -230,8 +319,29 @@ public abstract class ResourceBundle {
                 return fromRegistered;
             }
         }
+        String name = baseName + suffix;
+        Object[] registeredClass = CLASSES.get(name);
+        if (registeredClass != null && registeredClass[0] instanceof Cn1Factory
+                && registeredClass[1] instanceof Integer) {
+            ResourceBundle made = ((Cn1Factory) registeredClass[0]).cn1Create(((Integer) registeredClass[1]).intValue());
+            if (made != null) {
+                return made;
+            }
+        }
+        String registeredFile = PROPERTIES.get(name);
+        if (registeredFile != null) {
+            ResourceBundle fromFile = read(registeredFile);
+            if (fromFile != null) {
+                return fromFile;
+            }
+        }
+        if (sealed) {
+            // The build registered every bundle the application has; a name
+            // it did not register is a bundle that does not exist.
+            return null;
+        }
         try {
-            Object instance = Class.forName(baseName + suffix).newInstance();
+            Object instance = Class.forName(name).newInstance();
             if (instance instanceof ResourceBundle) {
                 return (ResourceBundle) instance;
             }
@@ -246,7 +356,8 @@ public abstract class ResourceBundle {
     }
 
     private static ResourceBundle read(String resource) {
-        InputStream in = ResourceBundle.class.getResourceAsStream(resource);
+        // Through Resources: on a device the file ships under a flat name.
+        InputStream in = Resources.open(resource);
         if (in == null) {
             return null;
         }

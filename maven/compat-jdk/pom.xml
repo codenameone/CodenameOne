@@ -32,6 +32,18 @@
     <build>
         <plugins>
             <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- A JVM per test class. Most of these classes are tested
+                         as they behave before Codename One has started (the
+                         number formats fall back to US English, a resource is
+                         read from the classpath), and the executor tests
+                         start it: once started it stays started for
+                         whatever class would run next in the same JVM. -->
+                    <reuseForks>false</reuseForks>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <version>4.7.3.4</version>
@@ -72,6 +84,14 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- The headless Codename One implementation the executor tests start
+             their background threads on. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-compat-testing</artifactId>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
