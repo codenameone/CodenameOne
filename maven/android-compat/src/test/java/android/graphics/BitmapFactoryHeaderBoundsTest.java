@@ -107,4 +107,15 @@ public class BitmapFactoryHeaderBoundsTest {
         assertEquals(before + 1, HeadlessImplementation.encodedDecodes);
         assertEquals(7, b.getWidth());
     }
+
+    @Test
+    public void failedDecodeClearsOutputsFromEarlierSuccess() throws Exception {
+        BitmapFactory.Options o = probe(encode("png", 30, 18), 1);
+        o.inJustDecodeBounds = false;
+        assertNull(BitmapFactory.decodeStream(null, null, o));
+        assertEquals(-1, o.outWidth);
+        assertEquals(-1, o.outHeight);
+        assertNull(o.outMimeType);
+        assertNull(o.outConfig);
+    }
 }

@@ -57,6 +57,7 @@ public class BitmapFactory {
     }
 
     public static Bitmap decodeStream(InputStream is, Rect outPadding, Options opts) {
+        resetOutputs(opts);
         if (is == null) {
             return null;
         }
@@ -73,6 +74,7 @@ public class BitmapFactory {
     }
 
     public static Bitmap decodeByteArray(byte[] data, int offset, int length, Options opts) {
+        resetOutputs(opts);
         if (boundsFromHeader(data, offset, length, opts)) {
             return null;
         }
@@ -95,6 +97,7 @@ public class BitmapFactory {
     /// Decodes a drawable resource and, like Android, scales it from the
     /// density bucket it came from to the device's density.
     public static Bitmap decodeResource(Resources res, int id, Options opts) {
+        resetOutputs(opts);
         TypedValue value = new TypedValue();
         InputStream in;
         try {
@@ -108,7 +111,15 @@ public class BitmapFactory {
             if (boundsFromHeader(data, 0, data.length, opts)) {
                 return null;
             }
-            Image img = Image.createImage(data, 0, data.length);
+            Image img;
+            try {
+                img = Image.createImage(data, 0, data.length);
+            } catch (RuntimeException e) {
+                return null;
+            }
+            if (img == null) {
+                return null;
+            }
             return finish(img, opts, bucket, mimeType(data, 0, data.length));
         } catch (IOException e) {
             return null;
@@ -126,6 +137,7 @@ public class BitmapFactory {
     }
 
     public static Bitmap decodeFile(String pathName, Options opts) {
+        resetOutputs(opts);
         try {
             InputStream in = FileSystemStorage.getInstance().openInputStream(pathName);
             try {
@@ -135,6 +147,15 @@ public class BitmapFactory {
             }
         } catch (IOException e) {
             return null;
+        }
+    }
+
+    private static void resetOutputs(Options opts) {
+        if (opts != null) {
+            opts.outWidth = -1;
+            opts.outHeight = -1;
+            opts.outMimeType = null;
+            opts.outConfig = null;
         }
     }
 

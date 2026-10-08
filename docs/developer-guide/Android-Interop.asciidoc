@@ -351,6 +351,9 @@ the gallery and automated tests cover a subset of those behaviors.
 * `BitmapFactory.Options.inBitmap` isn't used as a decode target. Decoding
   allocates a new bitmap; applications that depend on bitmap pooling should
   leave `inBitmap` unset and manage the old bitmap themselves.
+* `Canvas.setBitmap(null)` unbinds the target and clears its dimensions and
+  drawing state. Bind a live bitmap or view graphics before calling drawing
+  or state methods on that canvas; unbound drawing isn't supported.
 * Give sibling fragments of the same class stable, distinct IDs or tags when
   using `registerForActivityResult()`. Their launcher keys otherwise collide,
   and an outstanding result can be lost after activity recreation.
@@ -406,6 +409,8 @@ the gallery and automated tests cover a subset of those behaviors.
   classes (view transforms, colors, progress, drawable alpha and level), because
   there is no reflection. Animate a property of your own class through an
   `android.util.Property` instead.
+* `TimeAnimator` doesn't honor a nonzero start delay. Leave its start delay at
+  zero and schedule the `start()` call when delayed updates are needed.
 * An anchored `PopupWindow` keeps its position until `update()` is called.
   Applications must update or dismiss it when its anchor scrolls or moves.
   Automatic anchor tracking is deferred.

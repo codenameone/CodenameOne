@@ -30,6 +30,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -93,5 +94,41 @@ public class CanvasRecycledBitmapTest {
     @Test
     public void aLiveBitmapStillDraws() {
         canvas.drawBitmap(Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888), 0f, 0f, null);
+    }
+
+    @Test
+    public void aRecycledTargetIsRefused() {
+        Object originalGraphics = canvas.getGraphics();
+        assertRefused(new Runnable() {
+            public void run() {
+                new Canvas(recycled);
+            }
+        });
+        assertRefused(new Runnable() {
+            public void run() {
+                canvas.setBitmap(recycled);
+            }
+        });
+        assertSame(originalGraphics, canvas.getGraphics());
+    }
+
+    @Test
+    public void clearingTargetResetsCanvasStateBeforeRebind() {
+        com.codename1.ui.Graphics graphics = canvas.getGraphics();
+        canvas.bind(graphics, 0, 0, 8, 8);
+        canvas.save();
+        canvas.translate(3, 4);
+        canvas.setBitmap(null);
+        assertEquals(0, canvas.getWidth());
+        assertEquals(0, canvas.getHeight());
+        assertEquals(null, canvas.getGraphics());
+        Matrix transform = new Matrix();
+        canvas.getMatrix(transform);
+        assertEquals(new Matrix(), transform);
+
+        canvas.bind(graphics, 0, 0, 5, 6);
+        assertEquals(5, canvas.getWidth());
+        assertEquals(6, canvas.getHeight());
+        assertEquals(1, canvas.getSaveCount());
     }
 }

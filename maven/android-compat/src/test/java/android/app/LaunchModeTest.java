@@ -267,6 +267,37 @@ public class LaunchModeTest {
             }
         });
     }
+
+    @Test
+    public void reorderToFrontStopsWhenNewIntentFinishesTarget() {
+        onEdt(new Runnable() {
+            @Override public void run() {
+                Context app = AndroidTestSupport.context().getApplicationContext();
+                app.startActivity(new Intent(app, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                Activity target = ActivityThread.getTopActivity();
+                target.startActivity(new Intent(target, AndroidTestSupport.UiModeHandlingActivity.class));
+                Activity above = ActivityThread.getTopActivity();
+                AndroidTestSupport.TestActivity.newIntentHandler =
+                        new AndroidTestSupport.TestActivity.NewIntentHandler() {
+                            @Override public void onNewIntent(AndroidTestSupport.TestActivity activity) {
+                                activity.finish();
+                            }
+                        };
+                try {
+                    above.startActivity(new Intent(above, AndroidTestSupport.TestActivity.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+                } finally {
+                    AndroidTestSupport.TestActivity.newIntentHandler = null;
+                }
+                assertTrue(target.isDestroyed());
+                assertSame(above, ActivityThread.getTopActivity());
+                assertTrue(above.mRecord.resumed);
+                assertTrue(above.mRecord.started);
+                assertSame(above.mRecord.form, Display.getInstance().getCurrent());
+            }
+        });
+    }
     @Test
     public void clearTaskOverridesReuseModesAndFlags() {
         onEdt(new Runnable() {

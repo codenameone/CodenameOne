@@ -34,6 +34,7 @@ import java.lang.reflect.Field;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class AbsListViewSelectionAndStackTest {
@@ -50,6 +51,43 @@ public class AbsListViewSelectionAndStackTest {
             row.setLayoutParams(new AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 40));
             return row;
         }
+    }
+
+    private static final class ChangingRows extends BaseAdapter {
+        int count;
+        ChangingRows(int count) { this.count = count; }
+        @Override public int getCount() { return count; }
+        @Override public Object getItem(int position) {
+            if (position >= count) { throw new IndexOutOfBoundsException(); }
+            return Integer.valueOf(position);
+        }
+        @Override public long getItemId(int position) {
+            if (position >= count) { throw new IndexOutOfBoundsException(); }
+            return 100 + position;
+        }
+        @Override public View getView(int position, View convertView, ViewGroup parent) {
+            View row = new View(parent.getContext());
+            row.setLayoutParams(new AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 40));
+            return row;
+        }
+    }
+
+    @Test public void selectionClampsWhenAdapterShrinksOrEmpties() {
+        ListView list = new ListView(AndroidTestSupport.context());
+        ChangingRows rows = new ChangingRows(5);
+        list.setAdapter(rows);
+        list.setSelection(4);
+        layOut(list);
+        rows.count = 2;
+        rows.notifyDataSetChanged();
+        assertEquals(1, list.getSelectedItemPosition());
+        assertEquals(101, list.getSelectedItemId());
+        assertEquals(Integer.valueOf(1), list.getSelectedItem());
+        rows.count = 0;
+        rows.notifyDataSetChanged();
+        assertEquals(AdapterView.INVALID_POSITION, list.getSelectedItemPosition());
+        assertEquals(AdapterView.INVALID_ROW_ID, list.getSelectedItemId());
+        assertNull(list.getSelectedItem());
     }
 
     private static void layOut(AbsListView view) {

@@ -46,7 +46,12 @@ public final class AndroidTestSupport {
             void onResult(TestActivity activity, int requestCode);
         }
 
+        public interface NewIntentHandler {
+            void onNewIntent(TestActivity activity);
+        }
+
         public static ResultHandler resultHandler;
+        public static NewIntentHandler newIntentHandler;
 
         /// Fills the options menu of the next activities started, or null.
         public static OptionsMenu optionsMenu;
@@ -95,6 +100,14 @@ public final class AndroidTestSupport {
         protected void onDestroy() {
             finishingWhenDestroyed = Boolean.valueOf(isFinishing());
             super.onDestroy();
+        }
+
+        @Override
+        protected void onNewIntent(android.content.Intent intent) {
+            super.onNewIntent(intent);
+            if (newIntentHandler != null) {
+                newIntentHandler.onNewIntent(this);
+            }
         }
 
         @Override

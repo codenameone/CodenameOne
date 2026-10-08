@@ -372,7 +372,13 @@ public final class ActivityThread {
                     STACK.remove(i);
                     STACK.add(target);
                     target.activity.onNewIntent(intent);
+                    if (!isLive(target) || top() != target) {
+                        return;
+                    }
                     resumeRecord(target, false);
+                    if (!isLive(target) || top() != target || !isLive(current)) {
+                        return;
+                    }
                     if (current.noHistory && STACK.remove(current)) {
                         destroy(current, false);
                         queueResult(current);

@@ -224,6 +224,14 @@ public abstract class AbsListView extends AdapterView<ListAdapter> {
         if (mFirstPosition >= mItemCount) {
             mFirstPosition = Math.max(0, mItemCount - 1);
         }
+        if (mSelectedPosition >= mItemCount) {
+            mSelectedPosition = mItemCount == 0 ? INVALID_POSITION : mItemCount - 1;
+            mSelectedRowId = mSelectedPosition == INVALID_POSITION
+                    ? INVALID_ROW_ID : mAdapter.getItemId(mSelectedPosition);
+        }
+        if (mSyncPosition >= mItemCount) {
+            mSyncPosition = mItemCount == 0 ? INVALID_POSITION : mItemCount - 1;
+        }
         if (mTranscriptMode == TRANSCRIPT_MODE_ALWAYS_SCROLL && mItemCount > 0) {
             mSyncPosition = mItemCount - 1;
             mSyncTop = Integer.MIN_VALUE;

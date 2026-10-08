@@ -103,6 +103,9 @@ public class Canvas {
 
     public void setBitmap(Bitmap bitmap) {
         if (bitmap != null) {
+            if (bitmap.isRecycled()) {
+                throw new IllegalStateException("Cannot draw into a recycled bitmap");
+            }
             // As on Android: drawing would change pixels the bitmap promises
             // are fixed, and that a decoded or copied bitmap may share.
             if (!bitmap.isMutable()) {
@@ -114,9 +117,7 @@ public class Canvas {
             target = bitmap;
             targetImage = img;
         } else {
-            g = null;
-            target = null;
-            targetImage = null;
+            bind(null, 0, 0, 0, 0);
         }
     }
 
