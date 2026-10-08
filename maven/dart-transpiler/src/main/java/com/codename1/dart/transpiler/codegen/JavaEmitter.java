@@ -9711,6 +9711,14 @@ public final class JavaEmitter {
                 MapLit m = (MapLit) f.initializer;
                 return TypeRef.of("Map", m.keyType, m.valueType);
             }
+            // An UNTYPED collection literal: Dart infers its type from the elements, and a
+            // field declared from one must be that collection, not dynamic. Left dynamic,
+            // `static const xs = [1, 2];` was a Java Object and `xs.add(3)` -- valid Dart,
+            // which throws at runtime -- did not even compile.
+            TypeRef literal = untypedLiteralType(f.initializer, ctx);
+            if (literal != null) {
+                return literal;
+            }
             // `final x = Foo(1);`, `static const k = Foo.named();`, `var b = Box<int>();`:
             // the class constructed, as a local initialised the same way already gets.
             // Left dynamic, the field was declared Object and `x.member` did not compile.
@@ -9720,6 +9728,93 @@ public final class JavaEmitter {
             }
         }
         return TypeRef.DYNAMIC;
+    }
+
+    /**
+     * The type Dart infers for an untyped collection literal with no context type:
+     * {@code List<E>}, {@code Set<E>} or {@code Map<K, V>}, each argument the type every
+     * element agrees on, else {@code dynamic} -- so {@code []} is List&lt;dynamic&gt;, as in
+     * Dart. Null when {@code e} is not such a literal.
+     *
+     * <p>Narrower than Dart in one direction only: where the elements' types differ, Dart
+     * takes their least upper bound ({@code [1, 2.5]} is List&lt;num&gt;) and this answers
+     * dynamic. That is always a sound container for the values, and the emitter has no
+     * LUB to compute. Element types come from the literals themselves and from
+     * constructor calls, never from identifiers: a field's type is asked for while
+     * emitting arbitrary code, whose local scope could shadow the name the initializer
+     * means.</p>
+     */
+    private TypeRef untypedLiteralType(Expr e, Ctx ctx) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        if (e instanceof ListLit && ((ListLit) e).elementType == null) {
+            return TypeRef.of("List", commonLiteralType(((ListLit) e).elements, ctx));
+        }
+        if (e instanceof SetLit && ((SetLit) e).elementType == null) {
+            return TypeRef.of("Set", commonLiteralType(((SetLit) e).elements, ctx));
+        }
+        if (e instanceof MapLit && ((MapLit) e).keyType == null) {
+            MapLit m = (MapLit) e;
+            if (m.structured) {
+                return TypeRef.of("Map", TypeRef.DYNAMIC, TypeRef.DYNAMIC);
+            }
+            return TypeRef.of("Map", commonLiteralType(m.keys, ctx), commonLiteralType(m.values, ctx));
+        }
+        return null;
+    }
+
+    private TypeRef commonLiteralType(List<Expr> elements, Ctx ctx) {
+        TypeRef common = null;
+        for (Expr x : elements) {
+            TypeRef t = literalElementType(x, ctx);
+            if (t == null || isDynamicType(t)) {
+                return TypeRef.DYNAMIC;
+            }
+            if (common == null) {
+                common = t;
+            } else if (!common.toString().equals(t.toString())) {
+                return TypeRef.DYNAMIC;
+            }
+        }
+        return common == null ? TypeRef.DYNAMIC : common;
+    }
+
+    private TypeRef literalElementType(Expr x, Ctx ctx) {
+        while (x instanceof ParenExpr) {
+            x = ((ParenExpr) x).inner;
+        }
+        if (x instanceof Unary && "-".equals(((Unary) x).op)) {
+            Expr operand = ((Unary) x).operand;
+            return operand instanceof IntLit ? TypeRef.INT
+                    : operand instanceof DoubleLit ? TypeRef.DOUBLE : null;
+        }
+        if (x instanceof IntLit) {
+            return TypeRef.INT;
+        }
+        if (x instanceof DoubleLit) {
+            return TypeRef.DOUBLE;
+        }
+        if (x instanceof BoolLit) {
+            return TypeRef.BOOL;
+        }
+        if (x instanceof StringLit) {
+            return TypeRef.STRING;
+        }
+        if (x instanceof ListLit && ((ListLit) x).elementType != null) {
+            return TypeRef.of("List", ((ListLit) x).elementType);
+        }
+        if (x instanceof SetLit && ((SetLit) x).elementType != null) {
+            return TypeRef.of("Set", ((SetLit) x).elementType);
+        }
+        if (x instanceof MapLit && ((MapLit) x).keyType != null && ((MapLit) x).valueType != null) {
+            return TypeRef.of("Map", ((MapLit) x).keyType, ((MapLit) x).valueType);
+        }
+        TypeRef nested = untypedLiteralType(x, ctx);
+        if (nested != null) {
+            return nested;
+        }
+        return constructedType(x, ctx);
     }
 
     /**
