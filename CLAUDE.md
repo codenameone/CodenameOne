@@ -816,8 +816,8 @@ imported with `cn1:import-desktop-project`) builds unmodified, for every target:
   *members* of `Class`, `ClassLoader`, `System`, `Locale`, `String` and the
   like, for the desktop layers only.
 - **`maven/fxml-compiler`** turns each `.fxml` into
-  `com.codename1.generated.fxml.Fxml_<name>` and each `.css` into a
-  `.cn1css` table, from `prepare-desktop-sources` (before javac);
+  `com.codename1.generated.fxml.Fxml_<name>` (in the remap step, after javac)
+  and each `.css` into a `.cn1css` table (from `prepare-desktop-sources`);
   `FxmlDispatchGenerator` then runs in the remap, on the compiled classes, to
   widen and reach the controllers' private `@FXML` members. The CSS value
   classes are compiled twice: `fxcompat/runtime/css` is copied into the compiler
@@ -890,8 +890,12 @@ Traps that have already cost a fix:
 - **The shimmed `NumberFormat` cannot extend the device's `java.text.Format`**,
   which is not the JDK's class. Code holding one as a `Format` is a build error
   by design; do not "fix" it by widening the shim.
-- **An FXML element cannot name a class of the application's own sources**:
-  documents compile before javac. It is an error with a message that says so.
+- **FXML compiles after javac, not in `generate-sources`**: a document may
+  name the application's own classes (a custom control), so `remap-compat`
+  compiles the documents against the compiled application first and then
+  relocates. Nothing in the application references a generated `Fxml_*` class
+  by name -- only the generated registry does -- which is what makes the late
+  compile possible. CSS still compiles in `prepare-desktop-sources`.
 - **`maven/integration-tests/desktop-compat-test.sh`** imports
   `scripts/desktop-compat-samples/*` (and skips when there are none), builds
   with Maven and Gradle, and fails if

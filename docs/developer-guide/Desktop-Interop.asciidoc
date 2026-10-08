@@ -130,14 +130,15 @@ Three steps run as part of the normal build of the `common` module:
 
 . *`prepare-desktop-sources`* (in `generate-sources`) adds
   `src/main/desktop/java` as a source directory and
-  `src/main/desktop/resources` as a resource directory, and compiles the FXML
-  documents and JavaFX style sheets it finds there.
+  `src/main/desktop/resources` as a resource directory, and compiles the
+  JavaFX style sheets it finds there.
 . The Java compiler builds the application. Swing code compiles against the
   JDK's own `java.awt` and `javax.swing`, because those packages belong to
   the JDK and nothing else can supply them. JavaFX code compiles against the
   `javafx.*` API in the `codenameone-javafx-compat` artifact. This is why the
   sources need no changes.
-. *`remap-compat`* (in `process-classes`) rewrites the compiled classes so
+. *`remap-compat`* (in `process-classes`) compiles the FXML documents against
+  the application's compiled classes, then rewrites the compiled classes so
   that every reference to `java.awt`, `javax.swing`, `java.beans`,
   `org.jdesktop` or `javafx` points at the Codename One implementation,
   which ships inside the application under `com.codename1.desktopcompat` and
@@ -457,6 +458,10 @@ and class loader settings, aren't part of it.
 * `${...}` bindings to one property of the controller or of an element with
   an `fx:id`, such as `${slider.value}`.
 
+A document can name the application's own classes as elements, so a custom
+control works, including one that loads its own document with `fx:root`,
+`setRoot(this)` and `setController(this)`.
+
 The compiler checks every class and property a document names against the
 application's class path, so a mistake that the desktop reports when the
 document is loaded is reported when the application is built, with the
@@ -470,11 +475,6 @@ These are build errors:
 
 * An unknown class or property, and a value that can't be converted to the
   property's type.
-* An element that names a class from the application's own sources, such as
-  a custom control. Documents are compiled before those sources are, so an
-  element can only be a class of the layer or of a library. Create such a
-  control in the controller and add it to a pane that the document
-  declares.
 * Scripts: `<fx:script>` and the `<?language?>` instruction.
 * A `${...}` binding to anything other than one property, such as an
   arithmetic expression. Write it as a binding in the controller's
