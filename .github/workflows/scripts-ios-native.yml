@@ -26,7 +26,10 @@ jobs:
     permissions:
       contents: read
     runs-on: macos-15
-    timeout-minutes: 45
+    # Allow setup plus the separately bounded 30-minute generation and 45-minute
+    # XCTest build/run steps. A 45-minute job cap canceled a progressing native
+    # build after only 34 minutes of the XCTest step in run 37728629000.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
 
