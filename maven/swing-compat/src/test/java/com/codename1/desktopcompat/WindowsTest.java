@@ -535,9 +535,43 @@ public class WindowsTest extends WindowsTestBase {
             protected void runMain() {
             }
         };
+        final int[] exits = new int[1];
         app.runApp();
+        WindowHosts.setExitHook(new Runnable() {
+            @Override
+            public void run() {
+                exits[0]++;
+            }
+        });
         MainThreadRule.drain();
         assertNotNull(Display.getInstance().getCurrent());
         assertFalse(Display.getInstance().getCurrent() instanceof FrameForm);
+        assertEquals("an application that showed no window is not ended", 0, exits[0]);
+    }
+
+    @Test
+    public void disposingOfTheLastWindowEndsTheApplication() {
+        final JFrame[] made = new JFrame[1];
+        DesktopLifecycle app = new DesktopLifecycle() {
+            @Override
+            protected void runMain() {
+                made[0] = new JFrame("app");
+                made[0].setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                made[0].setVisible(true);
+            }
+        };
+        final int[] exits = new int[1];
+        app.runApp();
+        WindowHosts.setExitHook(new Runnable() {
+            @Override
+            public void run() {
+                exits[0]++;
+            }
+        });
+        MainThreadRule.drain();
+        assertEquals(0, exits[0]);
+        made[0].cn1Closing();
+        MainThreadRule.drain();
+        assertEquals(1, exits[0]);
     }
 }

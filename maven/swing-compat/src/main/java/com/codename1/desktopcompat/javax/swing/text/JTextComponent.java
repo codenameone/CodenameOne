@@ -76,7 +76,6 @@ public abstract class JTextComponent extends JComponent implements Scrollable {
     private Color selectionColor;
     private Color selectedTextColor;
     private Color disabledTextColor;
-    private InputVerifier inputVerifier;
     private char focusAccelerator;
     /// The document is being written to the widget.
     private boolean pushing;
@@ -606,22 +605,14 @@ public abstract class JTextComponent extends JComponent implements Scrollable {
 
     // ------------------------------------------------------------ verifier
 
-    public void setInputVerifier(InputVerifier inputVerifier) {
-        InputVerifier old = this.inputVerifier;
-        this.inputVerifier = inputVerifier;
-        firePropertyChange("inputVerifier", old, inputVerifier);
-    }
-
-    public InputVerifier getInputVerifier() {
-        return inputVerifier;
-    }
-
     /// Asks the input verifier before the focus leaves: when it does not
     /// yield, the focus comes back here.
     @Override
     protected void processFocusEvent(FocusEvent e) {
         super.processFocusEvent(e);
-        if (e.getID() == FocusEvent.FOCUS_LOST && inputVerifier != null && !inputVerifier.shouldYieldFocus(this)) {
+        InputVerifier inputVerifier = getInputVerifier();
+        if (e.getID() == FocusEvent.FOCUS_LOST && e.getOppositeComponent() == null && inputVerifier != null
+                && !inputVerifier.shouldYieldFocus(this)) {
             requestFocusInWindow();
         }
     }

@@ -31,6 +31,7 @@ import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Rectangle;
+import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
 import com.codename1.desktopcompat.javax.swing.event.ListDataEvent;
 import com.codename1.desktopcompat.javax.swing.event.ListDataListener;
@@ -131,6 +132,72 @@ public class JList<E> extends JComponent implements Scrollable {
         Color sf = UIManager.getColor("List.selectionForeground");
         selectionForeground = sf == null ? Color.WHITE : sf;
         enableEvents(AWTEvent.MOUSE_EVENT_MASK);
+        bind(KeyEvent.VK_UP, "selectPreviousRow", Move.PREVIOUS);
+        bind(KeyEvent.VK_DOWN, "selectNextRow", Move.NEXT);
+        bind(KeyEvent.VK_HOME, "selectFirstRow", Move.FIRST);
+        bind(KeyEvent.VK_END, "selectLastRow", Move.LAST);
+        bind(KeyEvent.VK_PAGE_UP, "scrollUp", Move.PAGE_UP);
+        bind(KeyEvent.VK_PAGE_DOWN, "scrollDown", Move.PAGE_DOWN);
+    }
+
+    private void bind(int key, String name, int kind) {
+        getInputMap(WHEN_FOCUSED).put(KeyStroke.getKeyStroke(key, 0), name);
+        getActionMap().put(name, new Move(this, kind));
+    }
+
+    /// Moves the selection with the keyboard: one row, one page, or to
+    /// either end. The bindings are in the input map under the names the
+    /// desktop uses (`selectNextRow` and so on).
+    private static final class Move extends AbstractAction {
+
+        static final int PREVIOUS = 0;
+        static final int NEXT = 1;
+        static final int FIRST = 2;
+        static final int LAST = 3;
+        static final int PAGE_UP = 4;
+        static final int PAGE_DOWN = 5;
+
+        private final JList<?> list;
+        private final int kind;
+
+        Move(JList<?> list, int kind) {
+            this.list = list;
+            this.kind = kind;
+        }
+
+        @Override
+        public void actionPerformed(com.codename1.desktopcompat.java.awt.event.ActionEvent e) {
+            int n = list.getModel().getSize();
+            if (n == 0) {
+                return;
+            }
+            int lead = list.getLeadSelectionIndex();
+            int page = Math.max(1, list.getLastVisibleIndex() - list.getFirstVisibleIndex());
+            int to;
+            switch (kind) {
+                case PREVIOUS:
+                    to = lead < 0 ? n - 1 : lead - 1;
+                    break;
+                case NEXT:
+                    to = lead < 0 ? 0 : lead + 1;
+                    break;
+                case FIRST:
+                    to = 0;
+                    break;
+                case LAST:
+                    to = n - 1;
+                    break;
+                case PAGE_UP:
+                    to = lead < 0 ? 0 : lead - page;
+                    break;
+                default:
+                    to = lead < 0 ? 0 : lead + page;
+                    break;
+            }
+            to = Math.max(0, Math.min(n - 1, to));
+            list.setSelectedIndex(to);
+            list.ensureIndexIsVisible(to);
+        }
     }
 
     public JList(final E[] listData) {
@@ -518,7 +585,8 @@ public class JList<E> extends JComponent implements Scrollable {
 
     @Override
     protected void processMouseEvent(MouseEvent e) {
-        if (e.getID() == MouseEvent.MOUSE_CLICKED && isEnabled()) {
+        if (e.getID() == MouseEvent.MOUSE_PRESSED && isEnabled()) {
+            requestFocusInWindow();
             int index = locationToIndex(e.getPoint());
             if (index >= 0) {
                 int anchor = selectionModel.getAnchorSelectionIndex();

@@ -22,6 +22,7 @@
  */
 package com.codename1.desktopcompat;
 
+import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Window;
 import com.codename1.desktopcompat.java.awt.event.InputEvent;
@@ -57,11 +58,12 @@ public abstract class WindowsTestBase extends KernelTestBase {
     @After
     public void restoreWindows() {
         MenuSelectionManager.defaultManager().clearSelectedPath();
+        WindowHosts.setIdleHook(null);
         disposeAll();
+        MainThreadRule.drain();
         EventBridge.setInputState(null);
         WindowHosts.setSecondaryWindows(null);
         WindowHosts.setExitHook(null);
-        WindowHosts.setIdleHook(null);
     }
 
     private static void disposeAll() {

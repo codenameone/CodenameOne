@@ -73,6 +73,7 @@ public abstract class DesktopLifecycle extends Lifecycle {
 
     private boolean ran;
     private boolean destroying;
+    private int showsBefore;
     private Form blank;
 
     /// Calls the application's `main`.
@@ -94,6 +95,7 @@ public abstract class DesktopLifecycle extends Lifecycle {
     @Override
     public void runApp() {
         ran = true;
+        showsBefore = WindowHosts.shownCount();
         WindowHosts.setIdleHook(new Runnable() {
             @Override
             public void run() {
@@ -159,8 +161,8 @@ public abstract class DesktopLifecycle extends Lifecycle {
         if (WindowHosts.showing().length > 0) {
             return;
         }
-        if (WindowHosts.everShown() && WindowHosts.windows().length == 0) {
-            Display.getInstance().exitApplication();
+        if (WindowHosts.shownCount() != showsBefore && WindowHosts.windows().length == 0) {
+            WindowHosts.exit();
             return;
         }
         Form current = Display.getInstance().getCurrent();

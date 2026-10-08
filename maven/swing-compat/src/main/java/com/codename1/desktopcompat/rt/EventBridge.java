@@ -145,6 +145,16 @@ public final class EventBridge {
         }
     }
 
+    /// Forgets the last click, so that the next one counts as the first
+    /// wherever and whenever it lands. The count otherwise belongs to a
+    /// place and a button: a click within half a second of the last one,
+    /// with the same button and within a few pixels of it, counts up.
+    public static void resetClickCount() {
+        lastClickTarget = null;
+        lastClickTime = 0;
+        clickCount = 0;
+    }
+
     // ------------------------------------------------------------ theme
 
     /// The background a window has when none was set: the theme's form
@@ -298,6 +308,11 @@ public final class EventBridge {
     public static boolean pointerEvent(Window w, int id, int deviceX, int deviceY) {
         com.codename1.ui.Component rp = w.cn1PeerOrNull();
         if (rp == null) {
+            return false;
+        }
+        if (Display.isInitialized() && Display.getInstance().isScrollWheeling()) {
+            // A desktop port scrolls with the wheel by sending a press, a
+            // drag and a release; those are not the mouse's buttons.
             return false;
         }
         int x = Units.toLogical(deviceX - rp.getAbsoluteX());

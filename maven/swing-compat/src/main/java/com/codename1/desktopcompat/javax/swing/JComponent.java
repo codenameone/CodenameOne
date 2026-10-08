@@ -36,6 +36,7 @@ import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
 import com.codename1.desktopcompat.javax.swing.border.Border;
 import com.codename1.desktopcompat.javax.swing.event.EventListenerList;
+import com.codename1.desktopcompat.rt.EventBridge;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -82,6 +83,8 @@ public abstract class JComponent extends Container {
     private ActionMap actionMap;
     private JPopupMenu popupMenu;
     private boolean inheritsPopupMenu;
+    private InputVerifier inputVerifier;
+    private boolean verifyInputWhenFocusTarget = true;
 
     public JComponent() {
     }
@@ -323,6 +326,61 @@ public abstract class JComponent extends Container {
     @Override
     public void firePropertyChange(String propertyName, int oldValue, int newValue) {
         super.firePropertyChange(propertyName, oldValue, newValue);
+    }
+
+    // ------------------------------------------------------------ scroll
+
+    /// Scrolls the viewports this component is in, innermost first, so
+    /// that a rectangle of it is visible. Nothing happens outside a
+    /// viewport.
+    public void scrollRectToVisible(Rectangle aRect) {
+        JViewport.cn1ScrollRectToVisible(this, aRect);
+    }
+
+    // ------------------------------------------------------------ verifier
+
+    /// Sets what decides whether the focus may leave this component.
+    ///
+    /// It is asked when another Swing component requests the focus, and
+    /// the request is refused when it does not yield. It cannot hold the
+    /// focus against the platform: when the Codename One widget behind
+    /// this component loses the focus by itself, it is gone.
+    public void setInputVerifier(InputVerifier inputVerifier) {
+        InputVerifier old = this.inputVerifier;
+        this.inputVerifier = inputVerifier;
+        firePropertyChange("inputVerifier", old, inputVerifier);
+    }
+
+    public InputVerifier getInputVerifier() {
+        return inputVerifier;
+    }
+
+    /// Whether the input verifier of the focus owner is asked before
+    /// this component takes the focus; true unless set otherwise, and
+    /// false is what a cancel button wants.
+    public void setVerifyInputWhenFocusTarget(boolean verifyInputWhenFocusTarget) {
+        boolean old = this.verifyInputWhenFocusTarget;
+        this.verifyInputWhenFocusTarget = verifyInputWhenFocusTarget;
+        firePropertyChange("verifyInputWhenFocusTarget", old, verifyInputWhenFocusTarget);
+    }
+
+    public boolean getVerifyInputWhenFocusTarget() {
+        return verifyInputWhenFocusTarget;
+    }
+
+    /// Takes the focus unless the input verifier of the component that
+    /// has it objects.
+    @Override
+    public boolean requestFocusInWindow() {
+        Component owner = EventBridge.focusOwner();
+        if (verifyInputWhenFocusTarget && owner != this && owner instanceof JComponent) {
+            JComponent from = (JComponent) owner;
+            InputVerifier v = from.getInputVerifier();
+            if (v != null && !v.shouldYieldFocus(from)) {
+                return false;
+            }
+        }
+        return super.requestFocusInWindow();
     }
 
     // ------------------------------------------------------------ popup

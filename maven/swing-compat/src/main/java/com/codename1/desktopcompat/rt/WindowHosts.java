@@ -57,7 +57,8 @@ public final class WindowHosts {
     private static SecondaryWindows secondary = NATIVE;
     private static Runnable idleHook;
     private static Runnable exitHook;
-    private static boolean everShown;
+    private static int shows;
+    private static boolean idlePending;
 
     private WindowHosts() {
     }
@@ -141,15 +142,15 @@ public final class WindowHosts {
         return floats ? new DialogForm(w) : new FrameForm(w);
     }
 
-    /// Whether any window was ever put on the screen.
-    public static boolean everShown() {
-        return everShown;
+    /// How many times a window was put on the screen so far.
+    public static int shownCount() {
+        return shows;
     }
 
     /// `w` was put on the screen or brought to the front: it becomes the
     /// active window.
     public static void shown(Window w) {
-        everShown = true;
+        shows++;
         Window old = active();
         SHOWING.remove(w);
         SHOWING.add(w);
@@ -178,8 +179,22 @@ public final class WindowHosts {
     }
 
     private static void idle() {
-        if (SHOWING.isEmpty() && idleHook != null && Display.isInitialized()) {
-            Display.getInstance().callSerially(idleHook);
+        // Hiding a window and disposing of it both come here; one pass of
+        // the hook answers both.
+        if (!idlePending && SHOWING.isEmpty() && idleHook != null && Display.isInitialized()) {
+            idlePending = true;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    idlePending = false;
+                    // The hook as it is now: it may have been replaced
+                    // since, and a window may have been shown.
+                    Runnable hook = idleHook;
+                    if (hook != null && SHOWING.isEmpty()) {
+                        hook.run();
+                    }
+                }
+            });
         }
     }
 

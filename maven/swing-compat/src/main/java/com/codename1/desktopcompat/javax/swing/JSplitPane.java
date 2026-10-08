@@ -28,6 +28,7 @@ import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Insets;
+import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.java.awt.event.MouseEvent;
 
 /// Two components side by side, or one above the other, with a divider
@@ -123,6 +124,54 @@ public class JSplitPane extends JComponent {
         }
         if (newRightComponent != null) {
             setRightComponent(newRightComponent);
+        }
+        bind(KeyEvent.VK_LEFT, "negativeIncrement", Nudge.BACK);
+        bind(KeyEvent.VK_UP, "negativeIncrement", Nudge.BACK);
+        bind(KeyEvent.VK_RIGHT, "positiveIncrement", Nudge.FORWARD);
+        bind(KeyEvent.VK_DOWN, "positiveIncrement", Nudge.FORWARD);
+        bind(KeyEvent.VK_HOME, "selectMin", Nudge.MIN);
+        bind(KeyEvent.VK_END, "selectMax", Nudge.MAX);
+    }
+
+    private void bind(int key, String name, int kind) {
+        getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(key, 0), name);
+        if (getActionMap().get(name) == null) {
+            getActionMap().put(name, new Nudge(this, kind));
+        }
+    }
+
+    /// Moves the divider with the keyboard. As on the desktop the keys
+    /// are the pane's only while the pane itself has the focus, which it
+    /// gets from `requestFocusInWindow()`; a focused child keeps its
+    /// arrow keys.
+    private static final class Nudge extends AbstractAction {
+
+        static final int BACK = 0;
+        static final int FORWARD = 1;
+        static final int MIN = 2;
+        static final int MAX = 3;
+        private static final int STEP = 10;
+
+        private final JSplitPane pane;
+        private final int kind;
+
+        Nudge(JSplitPane pane, int kind) {
+            this.pane = pane;
+            this.kind = kind;
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return pane.isFocusOwner();
+        }
+
+        @Override
+        public void actionPerformed(com.codename1.desktopcompat.java.awt.event.ActionEvent e) {
+            int min = pane.getMinimumDividerLocation();
+            int max = pane.getMaximumDividerLocation();
+            int at = pane.getDividerLocation();
+            int to = kind == MIN ? min : kind == MAX ? max : kind == BACK ? at - STEP : at + STEP;
+            pane.setDividerLocation(Math.max(min, Math.min(max, to)));
         }
     }
 

@@ -37,20 +37,11 @@ import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
 import com.codename1.desktopcompat.javax.swing.border.EmptyBorder;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 /// The split pane: where it puts its two components, and how the divider
 /// moves when set, dragged, collapsed and when the pane is resized.
 public class JSplitPaneTest extends KernelTestBase {
-
-    /// The click count of the layer is kept for the whole process and by
-    /// time alone, so the presses made here would be counted into the
-    /// first click of whichever test runs next.
-    @AfterClass
-    public static void letTheClicksLapse() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     private static JPanel page(int w, int h, int minW, int minH) {
         JPanel p = new JPanel(null);
