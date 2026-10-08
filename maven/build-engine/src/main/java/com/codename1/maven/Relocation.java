@@ -58,6 +58,41 @@ public final class Relocation {
         // close() is the interface's only method, so code holding a Closeable
         // runs unchanged against it.
         {"java/io/Closeable", "java/lang/AutoCloseable"},
+        // java.util classes the device library leaves out.
+        {"java/util/EventObject", JDK_PACKAGE + "EventObject"},
+        {"java/util/Optional", JDK_PACKAGE + "Optional"},
+        {"java/util/StringJoiner", JDK_PACKAGE + "StringJoiner"},
+        {"java/util/ResourceBundle", JDK_PACKAGE + "ResourceBundle"},
+        {"java/util/PropertyResourceBundle", JDK_PACKAGE + "PropertyResourceBundle"},
+        {"java/util/ListResourceBundle", JDK_PACKAGE + "ListResourceBundle"},
+        {"java/util/MissingResourceException", JDK_PACKAGE + "MissingResourceException"},
+        // java.util.concurrent. The device has the atomics and
+        // ThreadLocalRandom; these it does not. None of them synchronizes:
+        // application code is confined to one thread.
+        {"java/util/concurrent/Callable", JDK_PACKAGE + "Callable"},
+        {"java/util/concurrent/Future", JDK_PACKAGE + "Future"},
+        {"java/util/concurrent/ExecutionException", JDK_PACKAGE + "ExecutionException"},
+        {"java/util/concurrent/CancellationException", JDK_PACKAGE + "CancellationException"},
+        {"java/util/concurrent/TimeoutException", JDK_PACKAGE + "TimeoutException"},
+        {"java/util/concurrent/TimeUnit", JDK_PACKAGE + "TimeUnit"},
+        {"java/util/concurrent/ConcurrentMap", JDK_PACKAGE + "ConcurrentMap"},
+        {"java/util/concurrent/ConcurrentHashMap", JDK_PACKAGE + "ConcurrentHashMap"},
+        // keySet() is declared to return this nested class, so compiled
+        // callers name it in the method descriptor.
+        {"java/util/concurrent/ConcurrentHashMap$KeySetView", JDK_PACKAGE + "ConcurrentHashMap$KeySetView"},
+        {"java/util/concurrent/CopyOnWriteArrayList", JDK_PACKAGE + "CopyOnWriteArrayList"},
+        // java.text. The device has Format, DateFormat, SimpleDateFormat,
+        // DateFormatSymbols and ParseException, and those stay its own.
+        {"java/text/NumberFormat", JDK_PACKAGE + "NumberFormat"},
+        {"java/text/DecimalFormat", JDK_PACKAGE + "DecimalFormat"},
+        {"java/text/DecimalFormatSymbols", JDK_PACKAGE + "DecimalFormatSymbols"},
+        {"java/text/ChoiceFormat", JDK_PACKAGE + "ChoiceFormat"},
+        {"java/text/MessageFormat", JDK_PACKAGE + "MessageFormat"},
+        {"java/text/FieldPosition", JDK_PACKAGE + "FieldPosition"},
+        {"java/text/ParsePosition", JDK_PACKAGE + "ParsePosition"},
+        // java.net. The device has URI and URISyntaxException.
+        {"java/net/URL", JDK_PACKAGE + "URL"},
+        {"java/net/MalformedURLException", JDK_PACKAGE + "MalformedURLException"},
     };
 
     private final String name;

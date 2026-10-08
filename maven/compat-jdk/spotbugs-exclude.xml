@@ -24,4 +24,43 @@
         <Class name="com.codename1.compat.jdk.File"/>
         <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
     </Match>
+
+    <!--
+        Object.clone() answers null on the device for anything but an array,
+        so these copy field by field instead of calling super.clone(). Each
+        clone() builds an instance of its own class, so a subclass that adds
+        state has to override it rather than rely on super.clone().
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.compat.jdk.ChoiceFormat"/>
+            <Class name="com.codename1.compat.jdk.CopyOnWriteArrayList"/>
+            <Class name="com.codename1.compat.jdk.DecimalFormat"/>
+            <Class name="com.codename1.compat.jdk.DecimalFormatSymbols"/>
+            <Class name="com.codename1.compat.jdk.MessageFormat"/>
+        </Or>
+        <Method name="clone"/>
+        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
+    </Match>
+
+    <!--
+        KeySetView.getMap() is documented to return the map the view is
+        backed by; a copy would not be that map.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.ConcurrentHashMap$KeySetView"/>
+        <Method name="getMap"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!--
+        java.util.EventObject declares its source "protected transient", and
+        subclasses compiled against the JDK read the field by that name. The
+        device has no object serialization to restore it after.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.EventObject"/>
+        <Field name="source"/>
+        <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+    </Match>
 </FindBugsFilter>
