@@ -22,6 +22,14 @@
  */
 package com.codename1.designer.css;
 
+import com.codename1.designer.css.raster.BackgroundImage;
+import com.codename1.designer.css.raster.BorderImage;
+import com.codename1.designer.css.raster.BorderSide;
+import com.codename1.designer.css.raster.BorderStyle;
+import com.codename1.designer.css.raster.BoxStyle;
+import com.codename1.designer.css.raster.CssBoxRasterizer;
+import com.codename1.designer.css.raster.GradientSpec;
+import com.codename1.designer.css.raster.Shadow;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Util;
 import com.codename1.processing.Result;
@@ -47,6 +55,7 @@ import com.codename1.ui.util.Resources;
 import java.io.ByteArrayInputStream;
 import java.io.CharArrayReader;
 import java.io.DataOutputStream;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -71,6 +80,7 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
@@ -118,13 +128,16 @@ public class CSSTheme {
     private String themeName = "Theme";
     private ImagesMetadata imagesMetadata = new ImagesMetadata();
 
-    /**
-     * When true, {@link #createImageBorders(WebViewProvider)} refuses to rasterize any
-     * style via CEF and instead throws an {@link IllegalStateException} listing offending
-     * rules. Used by the native-themes build to guarantee that shipped platform themes
-     * contain no rasterized fallback images (which would bloat the .res file).
-     */
-    public static boolean strictNoCef = false;
+    /// When false, [#createImageBorders()] refuses to generate an image for any
+    /// rule and throws an [IllegalStateException] listing the rules that would
+    /// have needed one. The native-themes build sets this so a shipped platform
+    /// theme never carries a generated image where a native primitive was meant.
+    private boolean rasterizationAllowed = true;
+
+    /// See [#rasterizationAllowed]. The default is true.
+    public void setRasterizationAllowed(boolean rasterizationAllowed) {
+        this.rasterizationAllowed = rasterizationAllowed;
+    }
 
     private List<FontFace> fontFaces = new ArrayList<FontFace>();
     public static final int DEFAULT_TARGET_DENSITY = com.codename1.ui.Display.DENSITY_HD;
@@ -327,6 +340,69 @@ public class CSSTheme {
             return s;
         }
 
+        /// Describes a gradient for [CssBoxRasterizer], which paints it into a
+        /// generated image.
+        ///
+        /// Always goes through the multi-stop parsers. The two-colour legacy
+        /// parsers answer a narrower question (can the oldest theme format hold
+        /// this?) and record less than is needed to paint it.
+        static GradientSpec describeForRaster(ScaledUnit background, int width, int height) {
+            CN1Gradient g = new CN1Gradient();
+            g.rasterWidth = width;
+            g.rasterHeight = height;
+            String fn = background.getFunctionName();
+            if ("linear-gradient".equals(fn)) {
+                g.parseLinearGradientExtended(background, false);
+            } else if ("repeating-linear-gradient".equals(fn)) {
+                g.parseLinearGradientExtended(background, true);
+            } else if ("radial-gradient".equals(fn)) {
+                g.parseRadialGradientExtended(background, false);
+            } else if ("repeating-radial-gradient".equals(fn)) {
+                g.parseRadialGradientExtended(background, true);
+            } else if ("conic-gradient".equals(fn)) {
+                g.parseConicGradient(background);
+            }
+            Gradient d = g.extendedDescriptor;
+            if (!g.valid || d == null) {
+                throw new IllegalArgumentException("cannot paint " + fn + "(): "
+                        + (g.reason == null ? "unsupported syntax" : g.reason));
+            }
+            GradientSpec spec = new GradientSpec();
+            spec.repeating(d.getCycleMethod() != Gradient.CYCLE_NONE);
+            int[] colors = d.getColors();
+            float[] positions = d.getPositions();
+            List<GradientSpec.Stop> stops = new ArrayList<GradientSpec.Stop>();
+            for (int i = 0; i < colors.length; i++) {
+                stops.add(new GradientSpec.Stop(colors[i], positions[i] * 100.0, GradientSpec.Unit.PERCENT));
+            }
+            spec.stops(stops);
+            if (d instanceof LinearGradient) {
+                spec.type(GradientSpec.Type.LINEAR);
+                spec.angleDeg(((LinearGradient) d).getAngleDegrees());
+            } else if (d instanceof RadialGradient) {
+                RadialGradient rg = (RadialGradient) d;
+                spec.type(GradientSpec.Type.RADIAL);
+                spec.shape(rg.getShape() == RadialGradient.SHAPE_CIRCLE
+                        ? GradientSpec.Shape.CIRCLE : GradientSpec.Shape.ELLIPSE);
+                // The descriptor resolves its own extent keyword against a box,
+                // so ask it for the radii rather than restating that arithmetic.
+                float[] geometry = new float[4];
+                rg.computeRadii(width, height, geometry);
+                spec.extent(GradientSpec.Extent.EXPLICIT);
+                spec.radiusX(geometry[2]);
+                spec.radiusY(geometry[3]);
+                spec.center(rg.getRelativeCenterX() * 100.0, true, rg.getRelativeCenterY() * 100.0, true);
+            } else if (d instanceof ConicGradient) {
+                ConicGradient cg = (ConicGradient) d;
+                spec.type(GradientSpec.Type.CONIC);
+                spec.fromAngleDeg(cg.getFromAngleDegrees());
+                spec.center(cg.getRelativeCenterX() * 100.0, true, cg.getRelativeCenterY() * 100.0, true);
+            } else {
+                throw new IllegalArgumentException("cannot paint " + fn + "()");
+            }
+            return spec;
+        }
+
         private void parseLinearGradientExtended(ScaledUnit background, boolean repeating) {
             ScaledUnit fn = background;
             // Already passed by isGradient check.
@@ -360,7 +436,11 @@ public class CSSTheme {
                     p = (ScaledUnit) p.getNextLexicalUnit();
                 }
             }
-            ParsedStops st = parseStops(p);
+            // A length on a linear gradient is measured along the gradient line,
+            // whose length for a box is |w sin a| + |h cos a|.
+            double radians = Math.toRadians(angle);
+            double lineLength = Math.abs(rasterWidth * Math.sin(radians)) + Math.abs(rasterHeight * Math.cos(radians));
+            ParsedStops st = parseStops(p, lineLength);
             if (st == null || st.colors.length < 2) {
                 reason = "Could not parse stops for linear-gradient";
                 return;
@@ -382,9 +462,11 @@ public class CSSTheme {
             float rx = 1f, ry = 1f;
             boolean sawShapeOrExtent = false;
             boolean sawAt = false;
+            float[] centre = {cx, cy};
             // Consume optional shape / extent / at-position clauses until a comma.
             while (p != null && p.getLexicalUnitType() != LexicalUnit.SAC_OPERATOR_COMMA) {
                 int t = p.getLexicalUnitType();
+                boolean inPrelude = sawShapeOrExtent || sawAt;
                 if (isIdentLike(p)) {
                     String s = identValue(p);
                     if ("circle".equals(s)) {
@@ -404,9 +486,11 @@ public class CSSTheme {
                     } else if ("at".equals(s)) {
                         sawAt = true;
                     } else if (sawAt) {
-                        float[] pos = cssPositionKeyword(s);
-                        cx = pos[0];
-                        cy = pos[1];
+                        applyPositionKeyword(s, centre);
+                    } else if (!inPrelude) {
+                        // Not a shape or an extent, so the gradient has no
+                        // prelude and this is its first stop, a named colour.
+                        break;
                     } else {
                         reason = "Unrecognized radial-gradient ident: " + s; return;
                     }
@@ -416,11 +500,11 @@ public class CSSTheme {
                         float v = (float) (p.getNumericValue() / 100f);
                         ScaledUnit n = (ScaledUnit) p.getNextLexicalUnit();
                         if (n != null && n.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
-                            cx = v;
-                            cy = (float) (n.getNumericValue() / 100f);
+                            centre[0] = v;
+                            centre[1] = (float) (n.getNumericValue() / 100f);
                             p = n;
                         } else {
-                            cx = v;
+                            centre[0] = v;
                         }
                         sawShapeOrExtent = true;
                     } else {
@@ -436,13 +520,65 @@ public class CSSTheme {
                         extent = RadialGradient.EXTENT_EXPLICIT;
                         sawShapeOrExtent = true;
                     }
+                } else if (isLength(t)) {
+                    if (rasterWidth <= 0 || rasterHeight <= 0) {
+                        // Used to be skipped without a word, leaving a gradient
+                        // centred or sized somewhere other than where the rule
+                        // put it. Declining sends the rule to a generated
+                        // image, where the length has a box to be measured in.
+                        reason = "A length in the shape or position of a radial-gradient "
+                                + "cannot be expressed as a native gradient";
+                        return;
+                    }
+                    ScaledUnit n = (ScaledUnit) p.getNextLexicalUnit();
+                    boolean pair = n != null && isLength(n.getLexicalUnitType());
+                    if (sawAt) {
+                        centre[0] = (float) (rasterLength(p, rasterWidth) / rasterWidth);
+                        if (pair) {
+                            centre[1] = (float) (rasterLength(n, rasterHeight) / rasterHeight);
+                            p = n;
+                        }
+                    } else {
+                        // RadialGradient measures an explicit radius against the
+                        // longer side of the box.
+                        float ref = Math.max(rasterWidth, rasterHeight);
+                        rx = (float) (rasterLength(p, ref) / ref);
+                        if (pair) {
+                            ry = (float) (rasterLength(n, ref) / ref);
+                            p = n;
+                        } else {
+                            ry = rx;
+                        }
+                        extent = RadialGradient.EXTENT_EXPLICIT;
+                    }
+                    sawShapeOrExtent = true;
+                } else if (!inPrelude) {
+                    // The first stop, written as a colour value: the plain
+                    // radial-gradient(#fff, #000). Stepping past it here cost
+                    // the gradient its first colour and, with only two, the
+                    // whole parse.
+                    break;
                 }
                 p = (ScaledUnit) p.getNextLexicalUnit();
             }
+            cx = centre[0];
+            cy = centre[1];
             if (sawShapeOrExtent && p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
                 p = (ScaledUnit) p.getNextLexicalUnit();
             }
-            ParsedStops st = parseStops(p);
+            // A length on a radial gradient is measured along its horizontal
+            // radius, which the descriptor works out from the shape and extent.
+            double stopBasis = 0;
+            if (rasterWidth > 0 && rasterHeight > 0) {
+                float[] geometry = new float[4];
+                new RadialGradient(new int[] {0, 0}, new float[] {0f, 1f})
+                        .setShape(shape).setExtent(extent)
+                        .setRelativeCenterX(cx).setRelativeCenterY(cy)
+                        .setRelativeRadiusX(rx).setRelativeRadiusY(ry)
+                        .computeRadii(rasterWidth, rasterHeight, geometry);
+                stopBasis = geometry[2];
+            }
+            ParsedStops st = parseStops(p, stopBasis);
             if (st == null || st.colors.length < 2) {
                 reason = "Could not parse stops for radial-gradient";
                 return;
@@ -483,8 +619,14 @@ public class CSSTheme {
                     } else if ("at".equals(s)) {
                         ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
                         if (nx != null && isIdentLike(nx)) {
-                            float[] pos = cssPositionKeyword(identValue(nx));
-                            cx = pos[0]; cy = pos[1];
+                            float[] centre = {cx, cy};
+                            applyPositionKeyword(identValue(nx), centre);
+                            ScaledUnit second = (ScaledUnit) nx.getNextLexicalUnit();
+                            if (second != null && isIdentLike(second)) {
+                                applyPositionKeyword(identValue(second), centre);
+                                nx = second;
+                            }
+                            cx = centre[0]; cy = centre[1];
                             p = nx;
                         } else if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
                             cx = (float) (nx.getNumericValue() / 100f);
@@ -508,7 +650,7 @@ public class CSSTheme {
             if (consumedHeader && p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
                 p = (ScaledUnit) p.getNextLexicalUnit();
             }
-            ParsedStops st = parseStops(p);
+            ParsedStops st = parseStops(p, 0);
             if (st == null || st.colors.length < 2) {
                 reason = "Could not parse stops for conic-gradient";
                 return;
@@ -538,14 +680,45 @@ public class CSSTheme {
             return 180f;
         }
 
-        private static float[] cssPositionKeyword(String s) {
-            float cx = 0.5f, cy = 0.5f;
-            if ("left".equals(s)) cx = 0f;
-            else if ("right".equals(s)) cx = 1f;
-            else if ("top".equals(s)) cy = 0f;
-            else if ("bottom".equals(s)) cy = 1f;
-            return new float[]{cx, cy};
+        /// Applies one position keyword to a centre, touching only the axis it
+        /// names, so `at top left` lands in the corner rather than on whichever
+        /// edge was written last.
+        private static void applyPositionKeyword(String s, float[] centre) {
+            if ("left".equals(s)) {
+                centre[0] = 0f;
+            } else if ("right".equals(s)) {
+                centre[0] = 1f;
+            } else if ("top".equals(s)) {
+                centre[1] = 0f;
+            } else if ("bottom".equals(s)) {
+                centre[1] = 1f;
+            }
         }
+
+        private static boolean isLength(int type) {
+            switch (type) {
+                case LexicalUnit.SAC_PIXEL:
+                case LexicalUnit.SAC_POINT:
+                case LexicalUnit.SAC_MILLIMETER:
+                case LexicalUnit.SAC_CENTIMETER:
+                case LexicalUnit.SAC_INCH:
+                case LexicalUnit.SAC_EM:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// Size of the box a gradient is being parsed for, or 0 when it is
+        /// parsed as a resolution-independent theme entry.
+        ///
+        /// A native gradient is described in fractions of whatever box it is
+        /// later painted into, so a length in it (a stop at `20px`, a centre at
+        /// `10px 10px`) cannot be recorded and the parse is declined. A gradient
+        /// being painted into a generated image has a known box, and the length
+        /// is converted against it.
+        int rasterWidth;
+        int rasterHeight;
 
         private static final class ParsedStops {
             int[] colors;
@@ -555,7 +728,12 @@ public class CSSTheme {
         /// Parses a comma-separated stops list (color, color stop?, ...) into
         /// arrays of ARGB ints and [0,1] positions. Missing positions are
         /// auto-distributed linearly between the surrounding fixed positions.
-        private static ParsedStops parseStops(ScaledUnit start) {
+        ///
+        /// A position may be a percentage, an angle (the stops of a conic
+        /// gradient, as a fraction of the full turn), or a length when
+        /// `lengthBasis` is positive: the length the gradient runs over, in the
+        /// pixels of the image it is being painted into.
+        private static ParsedStops parseStops(ScaledUnit start, double lengthBasis) {
             if (start == null) return null;
             java.util.ArrayList<Integer> colors = new java.util.ArrayList<>();
             java.util.ArrayList<Float> positions = new java.util.ArrayList<>();
@@ -580,6 +758,19 @@ public class CSSTheme {
                 Float pos = null;
                 if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
                     pos = (float) (nx.getNumericValue() / 100f);
+                    nx = (ScaledUnit) nx.getNextLexicalUnit();
+                } else if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_DEGREE) {
+                    pos = (float) (nx.getNumericValue() / 360.0);
+                    nx = (ScaledUnit) nx.getNextLexicalUnit();
+                } else if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_RADIAN) {
+                    pos = (float) (nx.getNumericValue() / (2 * Math.PI));
+                    nx = (ScaledUnit) nx.getNextLexicalUnit();
+                } else if (nx != null && isLength(nx.getLexicalUnitType())) {
+                    if (lengthBasis <= 0) {
+                        // No box to measure the length in; see rasterWidth.
+                        return null;
+                    }
+                    pos = (float) (rasterLength(nx, lengthBasis) / lengthBasis);
                     nx = (ScaledUnit) nx.getNextLexicalUnit();
                 }
                 colors.add(argb);
@@ -780,7 +971,12 @@ public class CSSTheme {
                                     
                                     
                                 }
-                                break;
+                                // A length after 'at' is outside this parser's
+                                // grammar. Leaving the switch without advancing
+                                // param1 would spin the enclosing loop forever,
+                                // so decline and let the extended parser take it.
+                                reason = "Unsupported position after 'at' in radial-gradient. [4b]";
+                                return;
                             }
                             
                                 
@@ -790,7 +986,17 @@ public class CSSTheme {
                                 return;
 
                         }
+                        break;
                     }
+                    default:
+                        // Anything that is not a keyword -- most commonly the
+                        // first colour of the ordinary radial-gradient(#fff, #000),
+                        // or a length such as 'circle 40px' -- is not this
+                        // parser's to read. It must return rather than fall out
+                        // of the switch: nothing has advanced param1, and the
+                        // loop condition would stay true forever.
+                        reason = "Unsupported first argument for radial-gradient. [8b]";
+                        return;
                 }
             }
             if (param2 == null) {
@@ -1746,28 +1952,9 @@ public class CSSTheme {
         }
     }
     
-    public String getHtmlPreview() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("<!doctype html>\n<html><body>");
-        for (String name : elements.keySet()) {
-            Element el = (Element)elements.get(name);
-            sb.append("<h1>").append(name).append("</h1>")
-                    .append(el.getHtmlPreview())
-                    .append("<h2>::Unselected</h2>")
-                    .append(el.getUnselected().getHtmlPreview())
-                    .append("<h2>::Selected</h2>")
-                    .append(el.getSelected().getHtmlPreview())
-                    .append("<h2>::Pressed</h2>")
-                    .append(el.getPressed().getHtmlPreview())
-                    .append("<h2>::Disabled</h2>")
-                    .append(el.getDisabled().getHtmlPreview())
-                    .append("<hr/>");
-        }
-        sb.append("</body></html>");
-        return sb.toString();
-    }
-    
-    public boolean requiresCaptureHtml() {
+    /// True when at least one modified rule needs a generated image, either a
+    /// 9-piece border or a stretched background.
+    public boolean requiresRasterization() {
         for (String name : elements.keySet()) {
             if (!isModified(name)) {
                 continue;
@@ -1800,49 +1987,6 @@ public class CSSTheme {
                     
         }
         return false;
-    }
-    
-    public String generateCaptureHtml() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("<!doctype html>\n<html>"
-                + "<head><style type=\"text/css\">* {background-color: transparent;} "
-                + "body {padding:0; margin:0} "
-                + "div.element {margin: 0 !important; padding: 0 !important; }"
-                + "</style></head><body>");
-        for (String name : elements.keySet()) {
-            if (!isModified(name)) {
-                continue;
-            }
-            
-            
-            Element el = (Element)elements.get(name);
-            Map unselectedStyle = el.getUnselected().getFlattenedStyle();
-            if (el.requiresBackgroundImageGeneration(unselectedStyle) || el.requiresImageBorder(unselectedStyle)) {
-                sb.append(el.getUnselected().getEmptyHtmlWithId(name, unselectedStyle));
-            }
-            Map selectedStyle = el.getSelected().getFlattenedStyle();
-            if (el.requiresBackgroundImageGeneration(selectedStyle) || el.requiresImageBorder(selectedStyle)) {
-                sb.append(el.getSelected().getEmptyHtmlWithId(name+".sel", selectedStyle));
-            }
-            Map pressedStyle = el.getPressed().getFlattenedStyle();   
-            if (el.requiresBackgroundImageGeneration(pressedStyle) || el.requiresImageBorder(pressedStyle)) {
-                sb.append(el.getPressed().getEmptyHtmlWithId(name+".press", pressedStyle));
-            }
-            // Keep the DOM IDs aligned with the hover processors registered by createImageBorders.
-            if (el.declaresHover()) {
-                Map hoverStyle = el.getHover().getFlattenedStyle();
-                if (el.requiresBackgroundImageGeneration(hoverStyle) || el.requiresImageBorder(hoverStyle)) {
-                    sb.append(el.getHover().getEmptyHtmlWithId(name+".hover", hoverStyle));
-                }
-            }
-            Map disabledStyle = el.getDisabled().getFlattenedStyle();
-            if (el.requiresBackgroundImageGeneration(disabledStyle) || el.requiresImageBorder(disabledStyle)) {
-                sb.append(el.getDisabled().getEmptyHtmlWithId(name+".dis", disabledStyle));
-            }
-                    
-        }
-        sb.append("</body></html>");
-        return sb.toString();
     }
     
     public Map<String,String> calculateSelectorChecksums() {
@@ -2361,7 +2505,12 @@ public class CSSTheme {
 
                 for (String id : modifiedIds) {
                     for (String key : keys) {
-                        if (isOwnedBy(key, id)) {
+                        // createImageBorders has already run and stored the
+                        // generated border or background under a key this UIID
+                        // owns. Nothing below writes that key again for a rule
+                        // that needs an image, so clearing it here would leave
+                        // the images in the file and the theme not using them.
+                        if (isOwnedBy(key, id) && !generatedImageKeys.contains(key)) {
                              res.setThemeProperty(themeName, key, null);
                         }
                     }
@@ -3314,8 +3463,7 @@ public class CSSTheme {
             // file name so the theme references it by name; the runtime
             // com.codename1.generated.svg.SVGRegistry (when present) then
             // overrides the entry with the transcoded image during init().
-            String lowerName = fileName.toLowerCase();
-            if (lowerName.endsWith(".svg") || lowerName.endsWith(".json")) {
+            if (endsWithIgnoreCase(fileName, ".svg") || endsWithIgnoreCase(fileName, ".json")) {
                 Image placeholder = registerSVGPlaceholder(fileName);
                 if (placeholder != null) {
                     loadedImages.put(url, placeholder);
@@ -3498,318 +3646,307 @@ public class CSSTheme {
         }
     }
     
-    public static interface WebViewProvider {
-        com.codename1.ui.BrowserComponent getWebView();
+    private final Set<File> importedFiles = new LinkedHashSet<File>();
+
+    /// Every stylesheet pulled in through `@import`, directly or transitively,
+    /// in inclusion order. A caller deciding whether the output is stale, or
+    /// watching for edits, has to consider these as well as the root file.
+    public Set<File> getImportedFiles() {
+        return java.util.Collections.unmodifiableSet(importedFiles);
     }
+
     private static String currentId;
 
-    private void enforceNoCef() {
+    /// Theme keys [#createImageBorders()] stored a generated image under, which
+    /// [#updateResources()] must leave in place.
+    private final Set<String> generatedImageKeys = new HashSet<String>();
+
+    /// The state elements of one UIID in the order images are generated for
+    /// them, each with the suffix its generated image is reported under and
+    /// the prefix of its theme keys.
+    private static final String[] RASTER_STATE_LABELS = {"unselected", "selected", "pressed", "hover", "disabled"};
+    private static final String[] RASTER_KEY_PREFIXES = {"", "sel#", "press#", "hover#", "dis#"};
+
+    private Element[] rasterStates(Element e) {
+        // No hover rule, no work: above all, no image generated under a hover#
+        // key nothing asked for.
+        return new Element[] {
+            e.getUnselected(), e.getSelected(), e.getPressed(), e.declaresHover() ? e.getHover() : null, e.getDisabled()
+        };
+    }
+
+    private void enforceNoRasterization() {
         List<String> offenders = new ArrayList<String>();
-        String[] states = new String[] {"unselected", "selected", "pressed", "hover", "disabled"};
         for (String id : elements.keySet()) {
             if (!isModified(id)) {
                 continue;
             }
             Element e = (Element) elements.get(id);
-            Element[] stateElements = new Element[] {
-                e.getUnselected(), e.getSelected(), e.getPressed(), e.getHover(), e.getDisabled()
-            };
+            Element[] stateElements = rasterStates(e);
             for (int i = 0; i < stateElements.length; i++) {
+                if (stateElements[i] == null) {
+                    continue;
+                }
                 Map<String, LexicalUnit> styles =
                         (Map<String, LexicalUnit>) stateElements[i].getFlattenedStyle();
                 if (e.requiresImageBorder(styles)) {
-                    offenders.add(id + "." + states[i] + " (image border)");
+                    offenders.add(id + "." + RASTER_STATE_LABELS[i] + " (image border)");
                 } else if (e.requiresBackgroundImageGeneration(styles)) {
-                    offenders.add(id + "." + states[i] + " (background image)");
+                    offenders.add(id + "." + RASTER_STATE_LABELS[i] + " (background image)");
                 }
             }
         }
         if (!offenders.isEmpty()) {
             StringBuilder sb = new StringBuilder();
-            sb.append("CSS rules require CEF-backed image rasterization, which is disabled ");
-            sb.append("in no-cef mode (native-themes build). Offending rules:\n");
+            sb.append("CSS rules need a generated image, which this build does not allow ");
+            sb.append("(-no-raster). Offending rules:\n");
             for (String o : offenders) {
                 sb.append("  - ").append(o).append("\n");
             }
-            sb.append("Fix: avoid box-shadow, border-radius combined with a visible border, ");
-            sb.append("mixed-side borders, filter, and complex gradients. ");
-            sb.append("Use cn1-round-border / cn1-pill-border or solid backgrounds instead. ");
-            sb.append("If the effect is genuinely required, extend the CSS compiler and/or ");
-            sb.append("the resource format with a native primitive rather than rasterizing.");
+            sb.append("An image is generated for cn1-9patch, cn1-background-type: cn1-image-border, ");
+            sb.append("a background-image or gradient the theme format cannot express combined with a ");
+            sb.append("border or radius, and a box-shadow that is blurred, inset, tinted or has no ");
+            sb.append("spread. Use a native primitive instead (cn1-round-border, cn1-pill-border, a ");
+            sb.append("plain border-radius, a supported gradient, an unblurred shadow), or extend the ");
+            sb.append("theme format with one.");
             throw new IllegalStateException(sb.toString());
         }
     }
 
-    public void createImageBorders(WebViewProvider webviewProvider) {
+    /// Generates the image for every modified rule that has no native
+    /// equivalent: a 9-piece border where the box can stretch, one scaled
+    /// background image where it cannot (a percentage size, a bare gradient).
+    ///
+    /// Each box is painted in process by [CssBoxRasterizer], so this needs no
+    /// display and no browser. States are visited in a fixed order because the
+    /// generated images are numbered as they are stored.
+    public void createImageBorders() {
         if (res == null) {
             res = new EditableResourcesForCSS(resourceFile);
         }
-        if (strictNoCef) {
-            enforceNoCef();
+        if (!rasterizationAllowed) {
+            enforceNoRasterization();
         }
         ArrayList<Border> borders = new ArrayList<Border>();
-        
+
         ResourcesMutator resm = new ResourcesMutator(res, Display.DENSITY_VERY_HIGH, minDpi, maxDpi);
         resm.targetDensity = targetDensity;
-        
-        
-        List<Runnable> onComplete = new ArrayList<Runnable>();
+        CssBoxRasterizer rasterizer = new CssBoxRasterizer();
+
         for (String id : elements.keySet()) {
-            try {
-                if (!isModified(id)) {
+            if (!isModified(id)) {
+                continue;
+            }
+            Element e = (Element) elements.get(id);
+            currentId = id;
+            Element[] stateElements = rasterStates(e);
+            for (int i = 0; i < stateElements.length; i++) {
+                if (stateElements[i] == null) {
                     continue;
                 }
-                Element e = (Element) elements.get(id);
-
-                Element unselected = e.getUnselected();
-                Map<String, LexicalUnit> unselectedStyles = (Map<String, LexicalUnit>) unselected.getFlattenedStyle();
-                Border b = unselected.createBorder(unselectedStyles);
-                Border unselectedBorder = b;
-                currentId = id;
-                if (e.requiresImageBorder(unselectedStyles)) {
-                    if (!borders.contains(b)) {
-                        borders.add(b);
-                        resm.addImageProcessor(id, (img) -> {
-
-                            Insets insets = unselected.getImageBorderInsets(unselectedStyles, img.getWidth(), img.getHeight());
-                            resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
-                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
-                            resm.put(id + ".border", border);
-                            unselectedBorder.border = border;
-                            resm.targetDensity = targetDensity;
-                        });
-                    } else {
-                        onComplete.add(() -> {
-                            resm.put(id + ".border", borders.get(borders.indexOf(unselectedBorder)).border);
-                        });
-
-                    }
-                } else if (e.requiresBackgroundImageGeneration(unselectedStyles)) {
-                    if (!borders.contains(b)) {
-                        borders.add(b);
-                        resm.addImageProcessor(id, (img) -> {
-                            int i = 1;
-                            while (res.containsResource(id + "_" + i + ".png")) {
-                                i++;
-                            }
-                            String prefix = id + "_" + i + ".png";
-                            resm.targetDensity = getSourceDensity(unselectedStyles, resm.targetDensity);
-                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                            unselectedBorder.image = im;
-                            resm.put(id + ".bgImage", im);
-                            resm.targetDensity = targetDensity;
-                            //resm.put(id+".press#bgType", Style.B)
-                        });
-                    } else {
-                        onComplete.add(() -> {
-                            resm.put(id + ".bgImage", unselectedBorder.image);
-                        });
-                    }
+                try {
+                    createImageBorder(e, stateElements[i], id, RASTER_KEY_PREFIXES[i], borders, resm, rasterizer);
+                } catch (RuntimeException ex) {
+                    throw new RuntimeException("Could not generate the image for the " + RASTER_STATE_LABELS[i]
+                            + " style of " + id + ": " + ex.getMessage(), ex);
                 }
-
-                Element selected = e.getSelected();
-                Map<String, LexicalUnit> selectedStyles = (Map<String, LexicalUnit>) selected.getFlattenedStyle();
-                b = selected.createBorder(selectedStyles);
-                Border selectedBorder = b;
-                if (e.requiresImageBorder(selectedStyles)) {
-                    if (!borders.contains(b)) {
-                        borders.add(b);
-                        resm.addImageProcessor(id + ".sel", (img) -> {
-                            Insets insets = selected.getImageBorderInsets(selectedStyles, img.getWidth(), img.getHeight());
-                            resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
-                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
-                            resm.put(id + ".sel#border", border);
-                            selectedBorder.border = border;
-                            resm.targetDensity = targetDensity;
-                        });
-                    } else {
-                        onComplete.add(() -> {
-                            resm.put(id + ".sel#border", borders.get(borders.indexOf(selectedBorder)).border);
-                        });
-
-                    }
-                } else if (e.requiresBackgroundImageGeneration(selectedStyles)) {
-                    if (!borders.contains(b)) {
-                        borders.add(b);
-                        resm.addImageProcessor(id + ".sel", (img) -> {
-                            int i = 1;
-                            while (res.containsResource(id + "_" + i + ".png")) {
-                                i++;
-                            }
-                            String prefix = id + "_" + i + ".png";
-
-                            resm.targetDensity = getSourceDensity(selectedStyles, resm.targetDensity);
-                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                            selectedBorder.image = im;
-                            resm.put(id + ".sel#bgImage", im);
-                            //resm.put(id+".press#bgType", Style.B)
-                            resm.targetDensity = targetDensity;
-                        });
-                    } else {
-                        onComplete.add(() -> {
-                            resm.put(id + ".sel#bgImage", selectedBorder.image);
-                        });
-                    }
-                }
-
-                Element pressed = e.getPressed();
-                Map<String, LexicalUnit> pressedStyles = (Map<String, LexicalUnit>) pressed.getFlattenedStyle();
-
-                b = pressed.createBorder(pressedStyles);
-                Border pressedBorder = b;
-                if (e.requiresImageBorder(pressedStyles)) {
-                    if (!borders.contains(b)) {
-                        borders.add(b);
-                        resm.addImageProcessor(id + ".press", (img) -> {
-                            Insets insets = pressed.getImageBorderInsets(pressedStyles, img.getWidth(), img.getHeight());
-
-                            resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
-                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
-
-                            resm.put(id + ".press#border", border);
-                            pressedBorder.border = border;
-                            resm.targetDensity = targetDensity;
-                        });
-                    } else {
-                        onComplete.add(() -> {
-                            resm.put(id + ".press#border", borders.get(borders.indexOf(pressedBorder)).border);
-                        });
-
-                    }
-                } else if (e.requiresBackgroundImageGeneration(pressedStyles)) {
-                    if (!borders.contains(b)) {
-                        borders.add(b);
-                        resm.addImageProcessor(id + ".press", (img) -> {
-                            int i = 1;
-                            while (res.containsResource(id + "_" + i + ".png")) {
-                                i++;
-                            }
-                            String prefix = id + "_" + i + ".png";
-                            resm.targetDensity = getSourceDensity(pressedStyles, resm.targetDensity);
-                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                            pressedBorder.imageId = prefix;
-                            resm.put(id + ".press#bgImage", im/*res.findId(im, true)*/);
-                            resm.targetDensity = targetDensity;
-                            //resm.put(id+".press#bgType", Style.B)
-                        });
-                    } else {
-                        onComplete.add(() -> {
-                            resm.put(id + ".press#bgImage", res.findId(pressedBorder.imageId, true));
-                        });
-                    }
-                }
-
-                // Same declaration guard as the property emission: no hover rule, no work,
-                // and above all no image generated under a .hover# key nothing asked for.
-                if (e.declaresHover()) {
-                    Element hover = e.getHover();
-                    Map<String, LexicalUnit> hoverStyles = (Map<String, LexicalUnit>) hover.getFlattenedStyle();
-
-                    b = hover.createBorder(hoverStyles);
-                    Border hoverBorder = b;
-                    if (e.requiresImageBorder(hoverStyles)) {
-                        if (!borders.contains(b)) {
-                            borders.add(b);
-                            resm.addImageProcessor(id + ".hover", (img) -> {
-                                Insets insets = hover.getImageBorderInsets(hoverStyles, img.getWidth(), img.getHeight());
-
-                                resm.targetDensity = getSourceDensity(hoverStyles, resm.targetDensity);
-                                com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
-
-                                resm.put(id + ".hover#border", border);
-                                hoverBorder.border = border;
-                                resm.targetDensity = targetDensity;
-                            });
-                        } else {
-                            onComplete.add(() -> {
-                                resm.put(id + ".hover#border", borders.get(borders.indexOf(hoverBorder)).border);
-                            });
-
-                        }
-                    } else if (e.requiresBackgroundImageGeneration(hoverStyles)) {
-                        if (!borders.contains(b)) {
-                            borders.add(b);
-                            resm.addImageProcessor(id + ".hover", (img) -> {
-                                int i = 1;
-                                while (res.containsResource(id + "_" + i + ".png")) {
-                                    i++;
-                                }
-                                String prefix = id + "_" + i + ".png";
-                                resm.targetDensity = getSourceDensity(hoverStyles, resm.targetDensity);
-                                Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                                hoverBorder.imageId = prefix;
-                                resm.put(id + ".hover#bgImage", im/*res.findId(im, true)*/);
-                                resm.targetDensity = targetDensity;
-                                //resm.put(id+".hover#bgType", Style.B)
-                            });
-                        } else {
-                            onComplete.add(() -> {
-                                resm.put(id + ".hover#bgImage", res.findId(hoverBorder.imageId, true));
-                            });
-                        }
-                    }
-                }
-
-                Element disabled = e.getDisabled();
-                Map<String, LexicalUnit> disabledStyles = (Map<String, LexicalUnit>) disabled.getFlattenedStyle();
-
-                b = disabled.createBorder(disabledStyles);
-                Border disabledBorder = b;
-                if (e.requiresImageBorder(disabledStyles)) {
-                    if (!borders.contains(b)) {
-
-                        borders.add(b);
-                        resm.addImageProcessor(id + ".dis", (img) -> {
-                            Insets disabledInsets = disabled.getImageBorderInsets(disabledStyles, img.getWidth(), img.getHeight());
-
-                            resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
-                            com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) disabledInsets.top, (int) disabledInsets.right, (int) disabledInsets.bottom, (int) disabledInsets.left);
-                            disabledBorder.border = border;
-                            resm.put(id + ".dis#border", border);
-                            resm.targetDensity = targetDensity;
-                        });
-                    } else {
-                        onComplete.add(() -> {
-                            resm.put(id + ".dis#border", borders.get(borders.indexOf(disabledBorder)).border);
-                        });
-
-                    }
-                } else if (e.requiresBackgroundImageGeneration(disabledStyles)) {
-                    if (!borders.contains(b)) {
-                        borders.add(b);
-                        resm.addImageProcessor(id + ".dis", (img) -> {
-                            int i = 1;
-                            while (res.containsResource(id + "_" + i + ".png")) {
-                                i++;
-                            }
-                            String prefix = id + "_" + i + ".png";
-                            resm.targetDensity = getSourceDensity(disabledStyles, resm.targetDensity);
-                            Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                            disabledBorder.image = im;
-                            resm.put(id + ".dis#bgImage", im);
-                            resm.targetDensity = targetDensity;
-                            //resm.put(id+".press#bgType", Style.B)
-                        });
-                    } else {
-                        onComplete.add(() -> {
-                            resm.put(id + ".dis#bgImage", disabledBorder.image);
-                        });
-                    }
-                }
-            } catch (Exception ex) {
-                throw new RuntimeException("An exception occurred while processing the image border for element "+id, ex);
             }
         }
-        
-        if (requiresCaptureHtml()) {
-            resm.createScreenshots(webviewProvider.getWebView(), generateCaptureHtml(), this.baseURL.toExternalForm());
-        }
-        for (Runnable r : onComplete) {
-            r.run();
-        }
-        
     }
-    
+
+    private void createImageBorder(Element owner, Element state, String id, String keyPrefix,
+            List<Border> borders, ResourcesMutator resm, CssBoxRasterizer rasterizer) {
+        Map<String, LexicalUnit> styles = (Map<String, LexicalUnit>) state.getFlattenedStyle();
+        boolean imageBorder = owner.requiresImageBorder(styles);
+        if (!imageBorder && !owner.requiresBackgroundImageGeneration(styles)) {
+            return;
+        }
+        Border b = state.createBorder(styles);
+        String key = id + "." + keyPrefix + (imageBorder ? "border" : "bgImage");
+
+        // Two states (or two UIIDs) that describe the same box share one image.
+        // The image has to be read from the Border that was rasterized, which
+        // is the one already in the list: `b` is a fresh, equal instance that
+        // has never been given an image.
+        int known = borders.indexOf(b);
+        if (known >= 0) {
+            Border first = borders.get(known);
+            Object shared = imageBorder ? (Object) first.border : (Object) first.image;
+            if (shared != null) {
+                resm.put(key, shared);
+                generatedImageKeys.add(key);
+                return;
+            }
+        } else {
+            borders.add(b);
+        }
+
+        BufferedImage img = rasterizer.rasterize(state.toBoxStyle(styles));
+        resm.targetDensity = getSourceDensity(styles, resm.targetDensity);
+        try {
+            if (imageBorder) {
+                Insets insets = state.getImageBorderInsets(styles, img.getWidth(), img.getHeight());
+                com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id,
+                        (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
+                resm.put(key, border);
+                generatedImageKeys.add(key);
+                b.border = border;
+                if (known >= 0) {
+                    borders.get(known).border = border;
+                }
+            } else {
+                int i = 1;
+                while (res.containsResource(id + "_" + i + ".png")) {
+                    i++;
+                }
+                String name = id + "_" + i + ".png";
+                Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), name, false);
+                resm.put(key, im);
+                generatedImageKeys.add(key);
+                b.image = im;
+                if (known >= 0) {
+                    borders.get(known).image = im;
+                }
+            }
+        } finally {
+            resm.targetDensity = targetDensity;
+        }
+    }
+
+    /// See [Element#getChecksum()].
+    private static final int RASTER_GENERATION = 1;
+
+    /// Width of the box a rule is laid out in when it does not give one, and
+    /// the reference for a percentage width.
+    ///
+    /// The generated images were always measured on a 640x960 page: an element
+    /// with no `width` filled that page, and one with no `height` was given
+    /// [#RASTER_DEFAULT_CONTENT_HEIGHT]. The 9-piece insets are computed from
+    /// the image that results, so these are part of what a compiled theme
+    /// looks like and must not drift.
+    static final int RASTER_PAGE_WIDTH = 640;
+
+    /// Height that goes with [#RASTER_PAGE_WIDTH].
+    static final int RASTER_PAGE_HEIGHT = 960;
+
+    /// Content height of a box whose rule sets no `height`.
+    static final int RASTER_DEFAULT_CONTENT_HEIGHT = 100;
+
+    /// CSS pixels per CSS millimetre (96 per inch).
+    private static final double CSS_PX_PER_MM = 96.0 / 25.4;
+
+    /// The length of `value` in the pixels of a generated image.
+    ///
+    /// This is deliberately not [ScaledUnit#getPixelValue()]. A physical unit
+    /// is first rescaled from the unit's own density to the 160dpi the page is
+    /// described in and only then converted at the CSS rate, which puts one
+    /// millimetre at about 11.3 image pixels where `getPixelValue()` answers
+    /// 18.9. The 9-piece insets are computed with `getPixelValue()`, so the two
+    /// disagree, and always have: every theme compiled so far has its image
+    /// borders drawn at this scale, and reconciling them would resize the
+    /// radius and border of each one.
+    static double rasterLength(LexicalUnit value, double percentBase) {
+        if (value == null) {
+            return 0;
+        }
+        double density = value instanceof ScaledUnit ? ((ScaledUnit) value).dpi : 160;
+        switch (value.getLexicalUnitType()) {
+            case LexicalUnit.SAC_PIXEL:
+            case LexicalUnit.SAC_INTEGER:
+            case LexicalUnit.SAC_REAL:
+                return numericValue(value);
+            case LexicalUnit.SAC_POINT:
+                return numericValue(value) * density / 160.0;
+            case LexicalUnit.SAC_MILLIMETER:
+                return numericValue(value) * density / 160.0 * CSS_PX_PER_MM;
+            case LexicalUnit.SAC_CENTIMETER:
+                return numericValue(value) * density / 160.0 * CSS_PX_PER_MM * 10;
+            case LexicalUnit.SAC_INCH:
+                return numericValue(value) * density / 160.0 * 96.0;
+            case LexicalUnit.SAC_PERCENTAGE:
+                return numericValue(value) / 100.0 * percentBase;
+            case LexicalUnit.SAC_EM:
+                return numericValue(value) * 16.0;
+            case LexicalUnit.SAC_IDENT: {
+                String keyword = value.getStringValue();
+                if ("thin".equals(keyword)) {
+                    return 1;
+                }
+                if ("medium".equals(keyword)) {
+                    return 3;
+                }
+                if ("thick".equals(keyword)) {
+                    return 5;
+                }
+                if ("none".equals(keyword) || "auto".equals(keyword)) {
+                    return 0;
+                }
+                break;
+            }
+            default: {
+                String unit;
+                try {
+                    unit = value.getDimensionUnitText();
+                } catch (RuntimeException notADimension) {
+                    unit = null;
+                }
+                if ("rem".equals(unit)) {
+                    return numericValue(value) * 16.0;
+                }
+                if ("vw".equals(unit) || "vmin".equals(unit)) {
+                    return numericValue(value) / 100.0 * RASTER_PAGE_WIDTH;
+                }
+                if ("vh".equals(unit) || "vmax".equals(unit)) {
+                    return numericValue(value) / 100.0 * RASTER_PAGE_HEIGHT;
+                }
+            }
+        }
+        throw new IllegalArgumentException("Unsupported length " + value + " in a rule that needs a generated image");
+    }
+
+    private static double numericValue(LexicalUnit value) {
+        return value.getLexicalUnitType() == LexicalUnit.SAC_INTEGER ? value.getIntegerValue() : value.getFloatValue();
+    }
+
+    /// The colour of `value` as non-premultiplied ARGB, or `fallback` when the
+    /// property is not set.
+    private static int rasterColor(LexicalUnit value, int fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        if (value.getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
+            String keyword = value.getStringValue();
+            if ("transparent".equals(keyword) || "none".equals(keyword)) {
+                return 0;
+            }
+            if ("currentColor".equalsIgnoreCase(keyword) || "inherit".equals(keyword)) {
+                return fallback;
+            }
+        }
+        Integer alpha = getColorAlphaInt(value);
+        int a = alpha == null ? 0xff : Math.max(0, Math.min(0xff, alpha.intValue()));
+        return (a << 24) | (getColorInt(value) & 0xffffff);
+    }
+
+    private BufferedImage readRasterImage(String url) {
+        try {
+            URL imgURL = url.startsWith("http://") || url.startsWith("https://") ? new URL(url) : new URL(baseURL, url);
+            InputStream in = imgURL.openStream();
+            try {
+                BufferedImage img = javax.imageio.ImageIO.read(in);
+                if (img == null) {
+                    throw new IllegalArgumentException(url + " is not an image the compiler can decode (PNG, JPEG, "
+                            + "GIF or BMP). A vector image cannot be painted into a generated border or background.");
+                }
+                return img;
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("Could not read " + url + ": " + ex.getMessage(), ex);
+        }
+    }
+
     public void save(File outputFile) throws IOException {
          DataOutputStream resFile = new DataOutputStream(new FileOutputStream(outputFile));
          res.save(resFile);
@@ -4280,7 +4417,13 @@ public class CSSTheme {
         
         public String getChecksum() {
             StringBuilder sb = new StringBuilder();
-            sb.append("STYLE=").append(this.getFlattenedStyle())
+            // The checksum decides whether the images already stored for this
+            // selector can be reused. It therefore has to cover how they were
+            // produced as well as what the rule says: bump the generation when
+            // a change to the rasterizer or its geometry should invalidate
+            // every cached image, including ones a browser rendered.
+            sb.append("RASTER=").append(RASTER_GENERATION)
+                    .append(";STYLE=").append(this.getFlattenedStyle())
                     .append(";UNSELECTED=").append(this.getFlattenedUnselectedStyle())
                     .append(";SELECTED=").append(this.getFlattenedSelectedStyle())
                     .append(";PRESSED=").append(this.getFlattenedPressedStyle())
@@ -4320,67 +4463,209 @@ public class CSSTheme {
             return i;
         }
         
-        String generateBoxShadowPaddingString() {
-            StringBuilder sb = new StringBuilder();
-            Map styles = new LinkedHashMap();
-            styles.putAll(getFlattenedStyle());
-            
-            return ""+getBoxShadowPadding(styles);
-        }
-        
-        String generateStyleCSS() {
-            Map styles = new LinkedHashMap();
-            styles.putAll(getFlattenedStyle());
-            try {
-                StringBuilder sb = new StringBuilder();
-
-
-                if (this.requiresImageBorder(styles)) {
-                    if (styles.get("min-height") != null) {
-                        styles.put("height", styles.get("min-height"));
-                    }
-                    if (styles.get("min-width") != null) {
-                        styles.put("width", styles.get("min-width"));
-                    }
-                }
-
-                if (styles.get("height") == null) {
-                    styles.put("height", new ScaledUnit(new PixelUnit(100), 320, 640, 960));
-                }
-                //styles.put("margin", new ScaledUnit(new PixelUnit(1), 144, 640, 960));
-
-                for (Object key : styles.keySet()) {
-                    String property = (String) key;
-                    LexicalUnit value = (LexicalUnit) styles.get(key);
-                    String prop = renderCSSProperty(property, styles);
-                    if (!prop.isEmpty()) {
-                        sb.append(prop).append(";");
-                    }
-
-                }
-
-                Insets shadowInset = getBoxShadowPadding(styles);
-                if (shadowInset.top > 0) {
-                    sb.append("margin-top: ").append(shadowInset.top).append("px !important;");
-                }
-                if (shadowInset.left > 0) {
-                    sb.append("margin-left: ").append(shadowInset.left).append("px !important;");
-                }
-                if (shadowInset.right > 0) {
-                    sb.append("margin-right: ").append(shadowInset.right).append("px !important;");
-                }
-                if (shadowInset.bottom > 0) {
-                    sb.append("margin-bottom: ").append(shadowInset.bottom).append("px !important;");
-                }
-
-                //sb.append("border-top-right-radius: 10px / 20px;");
-                return sb.toString();
-            } catch (Exception ex) {
-                System.err.println("Failed to generate style CSS for style: " + styles + ".  Message was "+ex.getMessage());
-                throw ex;
+        private BorderSide rasterBorderSide(Map<String, LexicalUnit> styles, String side, int currentColor) {
+            LexicalUnit styleUnit = styles.get("border-" + side + "-style");
+            BorderStyle style = BorderStyle.parse(styleUnit == null ? null : styleUnit.getStringValue());
+            LexicalUnit widthUnit = styles.get("border-" + side + "-width");
+            double width;
+            if (style == BorderStyle.NONE || style == BorderStyle.HIDDEN) {
+                // A width with no style draws nothing and takes no room.
+                width = 0;
+            } else if (widthUnit == null) {
+                // CSS's initial border-width is `medium`.
+                width = 3;
+            } else {
+                width = Math.max(0, rasterLength(widthUnit, 0));
             }
+            return new BorderSide(width, style, rasterColor(styles.get("border-" + side + "-color"), currentColor));
         }
-        
+
+        private boolean isUnsetLength(LexicalUnit value) {
+            return value == null || (value.getLexicalUnitType() == LexicalUnit.SAC_IDENT
+                    && ("auto".equals(value.getStringValue()) || "none".equals(value.getStringValue())));
+        }
+
+        /// Describes the box of one state for [CssBoxRasterizer].
+        ///
+        /// Only what paints is carried over: backgrounds, borders, radii and the
+        /// shadow. Padding and margin are layout the runtime applies, opacity is
+        /// a native style property, and nothing else in a rule draws on an empty
+        /// box. The geometry -- a 640-wide page, a 100px default height, the
+        /// shadow margin of [#getBoxShadowPadding] -- is fixed, because the
+        /// 9-piece insets are derived from the size of the image it produces.
+        BoxStyle toBoxStyle(Map<String, LexicalUnit> flattened) {
+            Map<String, LexicalUnit> styles = new LinkedHashMap<String, LexicalUnit>(flattened);
+            if (this.requiresImageBorder(styles)) {
+                // A 9-piece border is cut from the smallest box the rule allows.
+                if (styles.get("min-height") != null) {
+                    styles.put("height", styles.get("min-height"));
+                }
+                if (styles.get("min-width") != null) {
+                    styles.put("width", styles.get("min-width"));
+                }
+            }
+
+            int currentColor = rasterColor(styles.get("color"), 0xff000000);
+            BorderSide top = rasterBorderSide(styles, "top", currentColor);
+            BorderSide right = rasterBorderSide(styles, "right", currentColor);
+            BorderSide bottom = rasterBorderSide(styles, "bottom", currentColor);
+            BorderSide left = rasterBorderSide(styles, "left", currentColor);
+
+            Insets shadowPad = getBoxShadowPadding(styles);
+            int padTop = (int) shadowPad.top;
+            int padRight = (int) shadowPad.right;
+            int padBottom = (int) shadowPad.bottom;
+            int padLeft = (int) shadowPad.left;
+
+            // width and height size the content box (the page is content-box and
+            // padding is never painted), so the borders are added on top. A box
+            // with no width fills the page between its shadow margins.
+            LexicalUnit widthUnit = styles.get("width");
+            double boxWidth;
+            if (isUnsetLength(widthUnit)) {
+                boxWidth = RASTER_PAGE_WIDTH - padLeft - padRight;
+            } else if (widthUnit.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                boxWidth = (int) (widthUnit.getFloatValue() / 100f * RASTER_PAGE_WIDTH) + left.getWidth() + right.getWidth();
+            } else {
+                boxWidth = rasterLength(widthUnit, RASTER_PAGE_WIDTH) + left.getWidth() + right.getWidth();
+            }
+            LexicalUnit heightUnit = styles.get("height");
+            double boxHeight;
+            if (isUnsetLength(heightUnit)) {
+                boxHeight = RASTER_DEFAULT_CONTENT_HEIGHT + top.getWidth() + bottom.getWidth();
+            } else if (heightUnit.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                boxHeight = (int) (heightUnit.getFloatValue() / 100f * RASTER_PAGE_HEIGHT) + top.getWidth() + bottom.getWidth();
+            } else {
+                boxHeight = rasterLength(heightUnit, RASTER_PAGE_HEIGHT) + top.getWidth() + bottom.getWidth();
+            }
+            if (boxWidth < 1 || boxHeight < 1) {
+                throw new IllegalArgumentException("the box is " + boxWidth + "x" + boxHeight
+                        + " pixels; a generated image needs a width and height of at least one pixel");
+            }
+
+            String[] corners = {"top-left", "top-right", "bottom-right", "bottom-left"};
+            double[] radii = new double[8];
+            for (int c = 0; c < corners.length; c++) {
+                radii[c * 2] = Math.max(0, rasterLength(nullIfNone(styles.get("cn1-border-" + corners[c] + "-radius-x")), boxWidth));
+                radii[c * 2 + 1] = Math.max(0, rasterLength(nullIfNone(styles.get("cn1-border-" + corners[c] + "-radius-y")), boxHeight));
+            }
+
+            BoxStyle.Builder box = BoxStyle.builder()
+                    .borderBoxWidth(boxWidth).borderBoxHeight(boxHeight)
+                    .padTop(padTop).padRight(padRight).padBottom(padBottom).padLeft(padLeft)
+                    .backgroundColor(rasterColor(styles.get("background-color"), 0))
+                    .top(top).right(right).bottom(bottom).left(left)
+                    .radii(radii);
+
+            LexicalUnit background = styles.get("background");
+            while (background != null) {
+                if (isGradient(background)) {
+                    box.gradient(CN1Gradient.describeForRaster((ScaledUnit) background, (int) boxWidth, (int) boxHeight));
+                    break;
+                }
+                background = background.getNextLexicalUnit();
+            }
+
+            LexicalUnit bgImage = styles.get("background-image");
+            if (bgImage != null && bgImage.getLexicalUnitType() == LexicalUnit.SAC_URI) {
+                box.backgroundImage(rasterBackgroundImage(styles, bgImage, boxWidth, boxHeight));
+            }
+
+            LexicalUnit shadowH = styles.get("cn1-box-shadow-h");
+            if (shadowH != null && !"none".equals(shadowH.getStringValue())) {
+                LexicalUnit inset = styles.get("cn1-box-shadow-inset");
+                box.shadow(new Shadow(
+                        rasterLength(shadowH, 0),
+                        rasterLength(nullIfNone(styles.get("cn1-box-shadow-v")), 0),
+                        Math.max(0, rasterLength(nullIfNone(styles.get("cn1-box-shadow-blur")), 0)),
+                        rasterLength(nullIfNone(styles.get("cn1-box-shadow-spread")), 0),
+                        rasterColor(styles.get("cn1-box-shadow-color"), currentColor),
+                        inset != null && "inset".equals(inset.getStringValue())));
+            }
+
+            LexicalUnit borderImage = styles.get("border-image");
+            if (borderImage != null && borderImage.getLexicalUnitType() == LexicalUnit.SAC_URI) {
+                box.borderImage(rasterBorderImage(styles, borderImage));
+            }
+            return box.build();
+        }
+
+        private LexicalUnit nullIfNone(LexicalUnit value) {
+            return isNone(value) ? null : value;
+        }
+
+        private BackgroundImage rasterBackgroundImage(Map<String, LexicalUnit> styles, LexicalUnit bgImage,
+                double boxWidth, double boxHeight) {
+            BufferedImage image = readRasterImage(bgImage.getStringValue());
+            BackgroundImage.Repeat repeat = BackgroundImage.Repeat.REPEAT;
+            LexicalUnit repeatUnit = styles.get("background-repeat");
+            if (repeatUnit != null && repeatUnit.getStringValue() != null) {
+                String keyword = repeatUnit.getStringValue();
+                if ("no-repeat".equals(keyword)) {
+                    repeat = BackgroundImage.Repeat.NO_REPEAT;
+                } else if ("repeat-x".equals(keyword)) {
+                    repeat = BackgroundImage.Repeat.REPEAT_X;
+                } else if ("repeat-y".equals(keyword)) {
+                    repeat = BackgroundImage.Repeat.REPEAT_Y;
+                }
+            }
+            BackgroundImage.Size size = BackgroundImage.Size.AUTO;
+            double sizeW = -1;
+            double sizeH = -1;
+            LexicalUnit sizeUnit = styles.get("background-size");
+            if (sizeUnit != null) {
+                String keyword = sizeUnit.getLexicalUnitType() == LexicalUnit.SAC_IDENT ? sizeUnit.getStringValue() : null;
+                if ("cover".equals(keyword)) {
+                    size = BackgroundImage.Size.COVER;
+                } else if ("contain".equals(keyword)) {
+                    size = BackgroundImage.Size.CONTAIN;
+                } else if (!"auto".equals(keyword) || sizeUnit.getNextLexicalUnit() != null) {
+                    size = BackgroundImage.Size.EXPLICIT;
+                    sizeW = "auto".equals(keyword) ? -1 : rasterLength(sizeUnit, boxWidth);
+                    LexicalUnit second = sizeUnit.getNextLexicalUnit();
+                    if (second != null) {
+                        boolean auto = second.getLexicalUnitType() == LexicalUnit.SAC_IDENT
+                                && "auto".equals(second.getStringValue());
+                        sizeH = auto ? -1 : rasterLength(second, boxHeight);
+                    }
+                }
+            }
+            // background-position is not a property the compiler keeps, so the
+            // image sits at the CSS initial position, the top left corner.
+            BackgroundImage layer = new BackgroundImage(image).withRepeat(repeat).withPosition(0, true, 0, true);
+            return size == BackgroundImage.Size.EXPLICIT ? layer.withSize(sizeW, sizeH) : layer.withSize(size);
+        }
+
+        private BorderImage rasterBorderImage(Map<String, LexicalUnit> styles, LexicalUnit borderImage) {
+            BufferedImage image = readRasterImage(borderImage.getStringValue());
+            // CSS reads one to four slice values as top, right, bottom, left with
+            // the usual shorthand fill-in. Only percentages ever reached the
+            // page these images used to be measured on; any other value was
+            // dropped there and the slice fell back to its initial 100%.
+            double[] slices = {100, 100, 100, 100};
+            int count = 0;
+            LexicalUnit slice = styles.get("border-image-slice");
+            while (slice != null && count < 4) {
+                if (slice.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                    slices[count++] = slice.getFloatValue();
+                }
+                slice = slice.getNextLexicalUnit();
+            }
+            if (count == 1) {
+                slices[1] = slices[0];
+            }
+            if (count <= 2) {
+                slices[2] = slices[0];
+            }
+            if (count <= 3) {
+                slices[3] = slices[1];
+            }
+            int w = image.getWidth();
+            int h = image.getHeight();
+            return new BorderImage(image, slices[0] / 100.0 * h, slices[1] / 100.0 * w,
+                    slices[2] / 100.0 * h, slices[3] / 100.0 * w, false, BorderImage.Mode.STRETCH);
+        }
+
         void setParent(String name) {
             Element parentEl = getElementByName(name);
             Element self = this;
@@ -4391,23 +4676,6 @@ public class CSSTheme {
             }
             
             self.parent = parentEl;
-        }
-        
-        String getHtmlPreview() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("<div style=\"").append(generateStyleCSS()).append("\">Lorem Ipsum</div>");
-            return sb.toString();
-        }
-        
-        public String getEmptyHtmlWithId(String id, Map<String,LexicalUnit> style) {
-            StringBuilder sb = new StringBuilder();
-            String generateImage = (this.requiresBackgroundImageGeneration(style) || this.requiresImageBorder(style)) ? "true" : "false";
-
-            sb.append("<div id=\""+id+"\" class=\"element\" style=\"").append(generateStyleCSS())
-                    .append("\" data-box-shadow-padding=\"").append(generateBoxShadowPaddingString()).append("\"")
-                    .append(" data-generate-image=\"").append(generateImage).append("\"")
-                    .append("></div>");
-            return sb.toString();
         }
         
         Map getFlattenedSelectedStyle() {
@@ -5046,8 +5314,12 @@ public class CSSTheme {
                         }
                         break;
                     }
-                    tmpUnit = tmpUnit.getNextLexicalUnit();
                 }
+                // Advance on every token. This used to sit inside the function
+                // test above, so a non-function token in the background (a
+                // colour ahead of a gradient, say) was never stepped past and
+                // the loop never ended.
+                tmpUnit = tmpUnit.getNextLexicalUnit();
             }
             
             Insets boxShadowInsets = getBoxShadowPadding(styles);
@@ -7403,6 +7675,26 @@ public class CSSTheme {
                 
                 while (value != null) {
                     
+                    if (value.getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
+                        // The shorthand's repeat and position keywords. Every
+                        // identifier used to fall through to "it may be a
+                        // colour", so `background: url(x.png) no-repeat`
+                        // recorded a background colour named no-repeat and
+                        // failed the compile when that was read back.
+                        String keyword = value.getStringValue();
+                        if ("repeat".equals(keyword) || "no-repeat".equals(keyword)
+                                || "repeat-x".equals(keyword) || "repeat-y".equals(keyword)) {
+                            style.put("background-repeat", value);
+                            value = value.getNextLexicalUnit();
+                            continue;
+                        }
+                        if ("left".equals(keyword) || "right".equals(keyword) || "top".equals(keyword)
+                                || "bottom".equals(keyword) || "center".equals(keyword)) {
+                            // A position is not something a theme records.
+                            value = value.getNextLexicalUnit();
+                            continue;
+                        }
+                    }
                     
                     switch (value.getLexicalUnitType()) {
                         case LexicalUnit.SAC_IDENT:
@@ -8757,6 +9049,17 @@ public class CSSTheme {
             InputStream stream = uri.openStream();
             String stringContents = Util.readToString(stream);
 
+            // Inline @import before anything else looks at the text, so the
+            // rewrites below and the parser see one complete stylesheet.
+            Set<File> importedFiles = new LinkedHashSet<File>();
+            if ("file".equals(uri.getProtocol())) {
+                try {
+                    stringContents = CssImports.inline(new File(uri.toURI()), stringContents, importedFiles);
+                } catch (java.net.URISyntaxException ex) {
+                    throw new IOException("Cannot resolve @import against " + uri, ex);
+                }
+            }
+
             stringContents = transformDarkModeMediaQueries(stringContents);
 
             // The flute parser chokes on properties beginning with -- so we need to replace these with cn1 prefix
@@ -8777,6 +9080,7 @@ public class CSSTheme {
             Parser parser = parserFactory.makeParser();
             final CSSTheme theme = new CSSTheme();
             theme.baseURL = uri;
+            theme.importedFiles.addAll(importedFiles);
             parser.setErrorHandler(new ErrorHandler() {
 
                 @Override
@@ -8836,7 +9140,11 @@ public class CSSTheme {
                 
                 @Override
                 public void importStyle(String string, SACMediaList sacml, String string1) throws CSSException {
-                    //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                    // Imports of a local stylesheet are inlined before the parse
+                    // (CssImports), so the parser only reports one when the root
+                    // is not a file. Dropping it would silently lose every rule
+                    // of the imported sheet, so refuse instead.
+                    throw new CSSException("@import of " + string + " is only supported from a stylesheet on the local filesystem");
                 }
                 
                 @Override

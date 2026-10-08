@@ -80,9 +80,6 @@ import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
-import javax.swing.JPasswordField;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.tree.TreeModel;
@@ -95,12 +92,6 @@ import javax.swing.tree.TreePath;
 public class EditableResources extends Resources implements TreeModel {
     private static final short MINOR_VERSION = 16;
     private static final short MAJOR_VERSION = 1;
-
-    private static final boolean IS_MAC;
-    static {
-        String osName = System.getProperty("os.name", "");
-        IS_MAC = osName.toLowerCase().contains("mac");
-    }
 
     private boolean modified;
     private boolean loadingMode = false;
@@ -325,13 +316,12 @@ public class EditableResources extends Resources implements TreeModel {
     private static byte[] key;
     private static String currentPassword;
     void checkKey(String id) {
-        JPasswordField password = new JPasswordField();
-        if(currentPassword != null) {
-            password.setText(currentPassword);
-        }
-        int v = JOptionPane.showConfirmDialog(java.awt.Frame.getFrames()[0], password, "Enter Password", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-        if(v == JOptionPane.OK_OPTION) {
-            currentPassword = password.getText();
+        // Asking is the editor's job. With no editor attached (the CSS compiler,
+        // a test) there is nobody to ask, the answer is null, and the file is
+        // rejected by the superclass exactly as if the prompt had been cancelled.
+        String entered = ResourceEditorUi.get().promptPassword(currentPassword);
+        if(entered != null) {
+            currentPassword = entered;
             setPassword(currentPassword);
             try {
                 key = currentPassword.getBytes("UTF-8");
@@ -343,8 +333,7 @@ public class EditableResources extends Resources implements TreeModel {
             //keyOffset = 0;
             if(l != 'l' || w != 'w') {
                 // incorrect password!
-                JOptionPane.showMessageDialog(java.awt.Frame.getFrames()[0],
-                        "Incorrect Password!", "Error", JOptionPane.ERROR_MESSAGE);
+                ResourceEditorUi.get().reportError("Error", "Incorrect Password!");
                 throw new IllegalStateException("Incorrect password");
             }
             return;
@@ -1695,17 +1684,7 @@ public class EditableResources extends Resources implements TreeModel {
             overrideResource.updateModified();
             return;
         }
-        if(IS_MAC) {
-            for(java.awt.Window w : java.awt.Frame.getWindows()) {
-                if(w instanceof JFrame) {
-                    if(modified) {
-                        ((JFrame)w).getRootPane().putClientProperty("Window.documentModified", Boolean.TRUE);
-                    } else {
-                        ((JFrame)w).getRootPane().putClientProperty("Window.documentModified", Boolean.FALSE);
-                    }
-                }
-            }
-        }
+        ResourceEditorUi.get().modifiedChanged(modified);
     }
     
     public void setModified() {
@@ -1984,7 +1963,7 @@ public class EditableResources extends Resources implements TreeModel {
                 themeLoadingErrors = new HashSet();
             }
             if (!themeLoadingErrors.contains(e.getMessage())) {
-                JOptionPane.showMessageDialog(java.awt.Frame.getFrames()[0], e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                ResourceEditorUi.get().reportError("Error", e.getMessage());
                 themeLoadingErrors.add(e.getMessage());
             }
         }
@@ -3410,8 +3389,7 @@ public class EditableResources extends Resources implements TreeModel {
                             if(img != null) {
                                 String id = findId(img);
                                 if(id == null) {
-                                    JOptionPane.showMessageDialog(java.awt.Frame.getFrames()[0],
-                                            "Missing image from border: " + key, "Error", JOptionPane.ERROR_MESSAGE);
+                                    ResourceEditorUi.get().reportError("Error", "Missing image from border: " + key);
                                     continue;
                                 }
                                 if(isMultiImage(id)) {

@@ -38,7 +38,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.util.HashMap;
 import java.util.Map;
-import javax.swing.JOptionPane;
 
 /**
  * Font object for creation within the Theme Creator which stores all the fallback
@@ -94,7 +93,7 @@ public class EditorFont extends Font {
                 return;
             } catch(Exception err) {
                 err.printStackTrace();
-                JOptionPane.showMessageDialog(java.awt.Frame.getFrames()[0], "Error creating font: " + err, "TTF Error", JOptionPane.ERROR_MESSAGE);
+                com.codename1.ui.util.ResourceEditorUi.get().reportError("TTF Error", "Error creating font: " + err);
             }
         }
 

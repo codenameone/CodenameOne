@@ -7,9 +7,14 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+
+import javax.imageio.ImageIO;
 
 /**
  * Minimal stub of {@link CodenameOneImplementation} the headless CSS
@@ -27,10 +32,14 @@ import java.io.OutputStream;
  * implementation those calls NPE.
  *
  * <p>Rather than littering CN1 core with {@code if (impl == null)}
- * fallbacks, the css-compiler module installs this stub at startup
- * (NoCefCSSCLI.main). The pattern mirrors what the unit-test module
+ * fallbacks, the CSS compiler installs this stub at startup through
+ * {@link #install()}. The pattern mirrors what the unit-test module
  * does with {@code TestCodenameOneImplementation}: provide a minimal
  * subclass and inject it via reflection.
+ *
+ * <p>This is the only implementation the compiler ever runs on. It needs
+ * no display: images are plain {@link BufferedImage}s decoded by ImageIO,
+ * which works under {@code java.awt.headless=true}.
  *
  * <p>Most overrides return zero / null / -1 / false. The only methods
  * that need to do real work are the ones that the theme-build path
@@ -41,15 +50,83 @@ import java.io.OutputStream;
  *       {@link #getFace(Object)} / {@link #getSize(Object)} /
  *       {@link #getStyle(Object)} for the original face/style/size.
  *       We round-trip via a small {@link Triple} carrier.</li>
- *   <li>{@link #convertToPixels(int,boolean)} - returns 1:1 (1 mm = 1 pixel)
- *       so theme padding/margin serialization does not collapse to
- *       zero. The actual conversion happens at app runtime when a
- *       full implementation is loaded.</li>
+ *   <li>{@link #convertToPixels(int,boolean)} and
+ *       {@link #getDeviceDensity()} - pinned to the constants below. A few
+ *       values the compiler serializes are computed from them, so they
+ *       must not depend on the machine the build runs on.</li>
+ *   <li>the image methods - {@code url()} images are decoded to read
+ *       their size, scaled into the densities of a multi-image, and
+ *       re-encoded, all through {@link BufferedImage}.</li>
  *   <li>{@link #cleanup(Object)} - closes any closeable streams used
  *       by Util.copy when serializing the resource.</li>
  * </ul>
  */
-final class HeadlessCssCompilerImplementation extends CodenameOneImplementation {
+public final class HeadlessCssCompilerImplementation extends CodenameOneImplementation {
+
+    /**
+     * Pixels per millimetre the compiler assumes wherever theme construction
+     * asks the display to convert a length. The value is the one application
+     * themes have always been compiled with: the compiler used to run on the
+     * simulator port with no skin, which on an ordinary (non-retina) display
+     * reports {@link com.codename1.ui.Display#DENSITY_MEDIUM} and converts at
+     * five pixels to the millimetre. That was measured, not derived: the same
+     * stylesheet compiled by that compiler and by this one produces the same
+     * theme entry for entry. Changing it changes serialized defaults (the
+     * shadow spread of a round border, for one), so it is a constant rather
+     * than something read from the host.
+     */
+    public static final int PIXELS_PER_MILLIMETRE = 5;
+
+    /** The density that goes with {@link #PIXELS_PER_MILLIMETRE}. */
+    public static final int DEVICE_DENSITY = com.codename1.ui.Display.DENSITY_MEDIUM;
+
+    /**
+     * See {@link #setNativeThemeUnits(boolean)}.
+     */
+    private static boolean nativeThemeUnits;
+
+    /**
+     * Selects the unit conversion the framework's own native themes are
+     * compiled with, in place of {@link #PIXELS_PER_MILLIMETRE}.
+     *
+     * <p>Those themes have always been compiled on an implementation that
+     * answered zero pixels for any length under half a metre, so a round
+     * border in them carries no default shadow spread, where the same rule in
+     * an application theme carries the 10px / 1mm the constants above produce.
+     * That spread adds to a component's size, and the native themes are tuned
+     * and screenshot-tested to the pixel without it. Both sets of themes are
+     * shipped, so both conversions are kept rather than resizing one of them;
+     * the native-themes build asks for this one explicitly.
+     */
+    public static void setNativeThemeUnits(boolean nativeThemeUnits) {
+        HeadlessCssCompilerImplementation.nativeThemeUnits = nativeThemeUnits;
+    }
+
+    /**
+     * Installs this implementation into {@code Display} and {@code Util}
+     * unless an implementation is already present. Idempotent.
+     *
+     * <p>{@code Display.impl} is package-private and there is no public
+     * installer, so the field is set reflectively; {@code Util} keeps its own
+     * reference, which has a public setter.
+     */
+    public static void install() {
+        try {
+            Class<?> displayCls = Class.forName("com.codename1.ui.Display");
+            java.lang.reflect.Field implField = displayCls.getDeclaredField("impl");
+            implField.setAccessible(true);
+            Object current = implField.get(null);
+            if (current == null) {
+                current = new HeadlessCssCompilerImplementation();
+                implField.set(null, current);
+            }
+            if (current instanceof HeadlessCssCompilerImplementation) {
+                com.codename1.io.Util.setImplementation((CodenameOneImplementation) current);
+            }
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Could not install the headless CSS compiler implementation", ex);
+        }
+    }
 
     private static final class Triple {
         final int face, style, size;
@@ -69,8 +146,86 @@ final class HeadlessCssCompilerImplementation extends CodenameOneImplementation 
         return nativeFont instanceof Triple ? ((Triple) nativeFont).size : 0;
     }
     @Override public int convertToPixels(int dipCount, boolean horizontal) {
-        // 1:1 - the real device DPI is only needed at app runtime.
-        return Math.round(dipCount / 1000f);
+        if (nativeThemeUnits) {
+            // The argument is in thousandths of a millimetre and the caller
+            // divides the answer by a thousand again, so this is zero for any
+            // length a theme uses. See setNativeThemeUnits.
+            return Math.round(dipCount / 1000f);
+        }
+        return dipCount * PIXELS_PER_MILLIMETRE;
+    }
+    @Override public int getDeviceDensity() {
+        if (nativeThemeUnits) {
+            // What a display of no size has always been classified as.
+            return com.codename1.ui.Display.DENSITY_VERY_LOW;
+        }
+        return DEVICE_DENSITY;
+    }
+
+    // ---- Images: BufferedImage is the native image. ----
+
+    private static BufferedImage toArgb(BufferedImage src) {
+        if (src == null) {
+            return null;
+        }
+        if (src.getType() == BufferedImage.TYPE_INT_ARGB) {
+            return src;
+        }
+        return HeadlessImages.toArgb(src);
+    }
+
+    @Override public Object createImage(byte[] bytes, int offset, int len) {
+        try {
+            return toArgb(ImageIO.read(new ByteArrayInputStream(bytes, offset, len)));
+        } catch (IOException ex) {
+            // The caller (EncodedImage) reports a null image as "create image
+            // failed", which is the right outcome for bytes that are not an image.
+            return null;
+        }
+    }
+    @Override public Object createImage(InputStream i) throws IOException {
+        return toArgb(ImageIO.read(i));
+    }
+    @Override public Object createImage(String path) throws IOException {
+        InputStream in = new FileInputStream(path);
+        try {
+            return toArgb(ImageIO.read(in));
+        } finally {
+            in.close();
+        }
+    }
+    @Override public Object createImage(int[] rgb, int width, int height) {
+        BufferedImage out = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        out.setRGB(0, 0, width, height, rgb, 0, width);
+        return out;
+    }
+    @Override public Object createMutableImage(int width, int height, int fillColor) {
+        BufferedImage out = new BufferedImage(Math.max(1, width), Math.max(1, height), BufferedImage.TYPE_INT_ARGB);
+        if (fillColor != 0) {
+            int[] row = new int[out.getWidth()];
+            java.util.Arrays.fill(row, fillColor);
+            for (int y = 0; y < out.getHeight(); y++) {
+                out.setRGB(0, y, row.length, 1, row, 0, row.length);
+            }
+        }
+        return out;
+    }
+    @Override public int getImageWidth(Object i) {
+        return i instanceof BufferedImage ? ((BufferedImage) i).getWidth() : 0;
+    }
+    @Override public int getImageHeight(Object i) {
+        return i instanceof BufferedImage ? ((BufferedImage) i).getHeight() : 0;
+    }
+    @Override public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
+        if (nativeImage instanceof BufferedImage) {
+            ((BufferedImage) nativeImage).getRGB(x, y, width, height, arr, offset, width);
+        }
+    }
+    @Override public Object scale(Object nativeImage, int width, int height) {
+        if (!(nativeImage instanceof BufferedImage)) {
+            return nativeImage;
+        }
+        return HeadlessImages.scale((BufferedImage) nativeImage, Math.max(1, width), Math.max(1, height));
     }
     @Override public void cleanup(Object o) {
         if (o instanceof java.io.Closeable) {
@@ -87,15 +242,6 @@ final class HeadlessCssCompilerImplementation extends CodenameOneImplementation 
     @Override public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {}
     @Override public void flushGraphics(int x, int y, int width, int height) {}
     @Override public void flushGraphics() {}
-    @Override public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {}
-    @Override public Object createImage(int[] rgb, int width, int height) { return null; }
-    @Override public Object createImage(String path) throws IOException { return null; }
-    @Override public Object createImage(InputStream i) throws IOException { return null; }
-    @Override public Object createMutableImage(int width, int height, int fillColor) { return null; }
-    @Override public Object createImage(byte[] bytes, int offset, int len) { return null; }
-    @Override public int getImageWidth(Object i) { return 0; }
-    @Override public int getImageHeight(Object i) { return 0; }
-    @Override public Object scale(Object nativeImage, int width, int height) { return nativeImage; }
     @Override public int getSoftkeyCount() { return 0; }
     @Override public int[] getSoftkeyCode(int index) { return new int[0]; }
     @Override public int getClearKeyCode() { return 0; }
