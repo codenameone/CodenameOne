@@ -978,7 +978,7 @@ public class BytecodeCompliance {
         InputStream fis = new BufferedInputStream(new FileInputStream(archive));
         try {
             indexArchiveStream(fis, archive.getAbsolutePath(), index,
-                    archive.getName().startsWith(AndroidResourceRunner.COMPAT_ARTIFACT + "-"));
+                    CompatLayers.EVERY.layerOf(archive) != null);
         } finally {
             fis.close();
         }
@@ -988,7 +988,7 @@ public class BytecodeCompliance {
         indexArchiveStream(archiveStream, sourcePrefix, index, false);
     }
 
-    /// `relocated`: the Android compatibility runtime, which the remap step
+    /// `relocated`: a compatibility layer's runtime, which the remap step
     /// ships relocated; its classes are indexed under those names too, so a
     /// pass checked before the runtime is copied in (Gradle's Kotlin pass)
     /// resolves the relocated references.
@@ -1012,7 +1012,7 @@ public class BytecodeCompliance {
                         index.put(metadata.name, metadata);
                     }
                     if (relocated) {
-                        ClassMetadata moved = readClassMetadata(new ByteArrayInputStream(AndroidRemapper.remap(bytes)),
+                        ClassMetadata moved = readClassMetadata(new ByteArrayInputStream(CompatLayers.EVERY.remap(bytes)),
                                 sourcePrefix + "!" + entryName);
                         if (moved != null) {
                             index.put(moved.name, moved);

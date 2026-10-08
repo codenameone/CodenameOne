@@ -26,7 +26,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.*;
 import static org.junit.Assert.*;
 

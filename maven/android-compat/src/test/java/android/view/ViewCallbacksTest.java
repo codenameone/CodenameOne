@@ -33,7 +33,7 @@ import com.codename1.androidcompat.runtime.CompiledAttributeSet;
 import com.codename1.androidcompat.runtime.ResValue;
 import com.codename1.androidcompat.runtime.XmlNode;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.ui.Image;
 
 import org.junit.Rule;

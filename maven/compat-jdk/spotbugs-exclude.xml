@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Intentional SpotBugs exceptions for the shared JDK classes. The report is
+     a zero-findings gate, so every entry is scoped and explained. -->
+<FindBugsFilter>
+    <!--
+        A wrapping stream or writer holds the one it was given; that is the
+        whole contract of java.io's BufferedWriter, FilterOutputStream and
+        PrintWriter, and copying a stream is not possible.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.compat.jdk.BufferedWriter"/>
+            <Class name="com.codename1.compat.jdk.FilterOutputStream"/>
+            <Class name="com.codename1.compat.jdk.PrintWriter"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+        java.io.File documents null, not an empty array, from list() and
+        listFiles() when the path is not a directory, and callers test for it.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.File"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+</FindBugsFilter>

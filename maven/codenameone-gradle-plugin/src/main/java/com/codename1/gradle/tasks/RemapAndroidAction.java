@@ -70,6 +70,8 @@ public class RemapAndroidAction implements Action<Task> {
         }
         Log log = new GradleLog(task.getLogger());
         AndroidRemapper r = new AndroidRemapper(classesDir, jar, onClickNames, log);
+        r.withSupportJars(java.util.Collections.singletonList(
+                com.codename1.maven.CompatLayers.jdkJar(compileClasspath.getFiles())));
         if (relocateOnly) {
             r.relocateOnly();
         } else if (handlerDirs != null) {

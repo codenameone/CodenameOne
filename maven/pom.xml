@@ -91,6 +91,8 @@
         <module>svg-transcoder</module>
         <!-- Android compatibility: the res/ compiler (used by the Maven and
              Gradle plugins) and the android.* runtime built on top of core. -->
+        <module>compat-testing</module>
+        <module>compat-jdk</module>
         <module>android-res-compiler</module>
         <module>android-compat</module>
         <module>lottie-transcoder</module>

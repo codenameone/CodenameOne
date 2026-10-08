@@ -54,7 +54,14 @@ public class RemapAndroidMojo extends AbstractCN1Mojo {
         copyKotlinIncrementalCompileOutputToOutputDir();
         File onClick = AndroidResourceRunner.onClickNamesFile(new File(project.getBuild().getDirectory()));
         try {
-            new AndroidRemapper(classes, jar, onClick, MavenLog.of(getLog())).run();
+            java.util.List<File> classpath = new java.util.ArrayList<File>();
+            for (org.apache.maven.artifact.Artifact artifact : project.getArtifacts()) {
+                if (artifact.getFile() != null) {
+                    classpath.add(artifact.getFile());
+                }
+            }
+            new AndroidRemapper(classes, jar, onClick, MavenLog.of(getLog()))
+                    .withSupportJars(java.util.Collections.singletonList(CompatLayers.jdkJar(classpath))).run();
         } catch (com.codename1.builders.BuildException ex) {
             throw new MojoFailureException(ex.getMessage(), ex);
         }

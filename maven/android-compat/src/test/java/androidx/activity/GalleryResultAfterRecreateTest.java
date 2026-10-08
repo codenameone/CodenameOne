@@ -32,7 +32,7 @@ import android.content.Context;
 import android.content.Intent;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.HeadlessImplementation;
+import com.codename1.compat.testing.HeadlessImplementation;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;

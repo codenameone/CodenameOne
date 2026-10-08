@@ -153,6 +153,14 @@
             <artifactId>codenameone-core</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- The JDK classes Android code expects and the device runtime lacks.
+             Compile scope on purpose: an application depends on this module
+             alone, and the remap step finds the shared classes through it. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-compat-jdk</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Reactor ordering only: the exec plugin above needs the compiler
              built first, and a plugin dependency does not order the reactor. -->
         <dependency>
@@ -165,6 +173,13 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- The headless Codename One implementation the tests run on. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-compat-testing</artifactId>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <!-- A real SQLite engine for the android.database tests, behind a

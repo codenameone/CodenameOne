@@ -31,7 +31,7 @@ import static org.junit.Assert.fail;
 import android.util.TypedValue;
 import android.util.Xml;
 
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.xmlpull.v1.XmlPullParser;

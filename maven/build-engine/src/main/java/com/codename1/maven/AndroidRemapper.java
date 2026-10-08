@@ -30,27 +30,17 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.commons.ClassRemapper;
-import org.objectweb.asm.commons.Remapper;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 /// Relocates an application's compiled Android code onto the compatibility
 /// runtime, and ships the runtime with it.
@@ -101,12 +91,19 @@ public final class AndroidRemapper {
         "(L" + APPLICATION + ";L" + SAVED_STATE_HANDLE + ";)V", "(L" + SAVED_STATE_HANDLE + ";)V",
         "(L" + APPLICATION + ";)V", "()V"};
 
+    /// The Android layer's naming rules.
+    public static final Relocation RELOCATION = new Relocation("Android", AndroidResourceRunner.COMPAT_ARTIFACT,
+            TARGET, PREFIXES, Relocation.JDK_SHIMS, RUNTIME_PACKAGE, RUNTIME_TARGET);
+    private static final ClassRelocator ANDROID = new ClassRelocator(RELOCATION);
+
     private final File classesDir;
     private final File compatJar;
     private final File onClickNames;
     private final Log log;
     private boolean shipRuntime = true;
     private final List<File> handlerDirs = new ArrayList<File>();
+    private final List<File> supportJars = new ArrayList<File>();
+    private ClassRelocator relocator = ANDROID;
 
     public AndroidRemapper(File classesDir, File compatJar, File onClickNames, Log log) {
         this.classesDir = classesDir;
@@ -135,158 +132,48 @@ public final class AndroidRemapper {
         return this;
     }
 
-    /// JDK classes Android code uses that the Codename One runtime lacks,
-    /// redirected to the compatibility runtime's implementations.
-    static final String[][] JDK_SHIMS = {
-        {"java/io/BufferedReader", "com/codename1/androidcompat/jdk/BufferedReader"},
-        {"java/io/BufferedWriter", "com/codename1/androidcompat/jdk/BufferedWriter"},
-        {"java/io/BufferedInputStream", "com/codename1/androidcompat/jdk/BufferedInputStream"},
-        {"java/io/BufferedOutputStream", "com/codename1/androidcompat/jdk/BufferedOutputStream"},
-        {"java/io/File", "com/codename1/androidcompat/jdk/File"},
-        {"java/io/FileFilter", "com/codename1/androidcompat/jdk/FileFilter"},
-        {"java/io/FilenameFilter", "com/codename1/androidcompat/jdk/FilenameFilter"},
-        {"java/io/FileInputStream", "com/codename1/androidcompat/jdk/FileInputStream"},
-        {"java/io/FileOutputStream", "com/codename1/androidcompat/jdk/FileOutputStream"},
-        {"java/io/FileReader", "com/codename1/androidcompat/jdk/FileReader"},
-        {"java/io/FileWriter", "com/codename1/androidcompat/jdk/FileWriter"},
-        {"java/io/FilterInputStream", "com/codename1/androidcompat/jdk/FilterInputStream"},
-        {"java/io/FilterOutputStream", "com/codename1/androidcompat/jdk/FilterOutputStream"},
-        {"java/io/PrintWriter", "com/codename1/androidcompat/jdk/PrintWriter"},
-        // Every Codename One stream, reader and writer is AutoCloseable, and
-        // close() is the interface's only method, so code holding a Closeable
-        // runs unchanged against it.
-        {"java/io/Closeable", "java/lang/AutoCloseable"},
-    };
-
-    /// The relocated internal name, or `name` unchanged.
-    public static String map(String name) {
-        if (name == null) {
-            return null;
-        }
-        for (String[] shim : JDK_SHIMS) {
-            if (shim[0].equals(name)) {
-                return shim[1];
+    /// Jars the runtime needs beside it in the application -- the shared JDK
+    /// classes ([Relocation#JDK_ARTIFACT]) -- extracted the way the runtime is.
+    public AndroidRemapper withSupportJars(List<File> jars) {
+        if (jars != null) {
+            for (File j : jars) {
+                if (j != null && j.isFile()) {
+                    supportJars.add(j);
+                }
             }
         }
-        if (name.startsWith(RUNTIME_PACKAGE)) {
-            return RUNTIME_TARGET + name.substring(RUNTIME_PACKAGE.length());
-        }
-        for (String p : PREFIXES) {
-            if (name.startsWith(p)) {
-                return TARGET + name;
-            }
-        }
-        return name;
+        return this;
     }
 
-    static final Remapper REMAPPER = new Remapper() {
-        @Override
-        public String map(String internalName) {
-            return AndroidRemapper.map(internalName);
-        }
-    };
+    /// Relocates by every active layer's rules at once, when the application
+    /// has more than Android sources; see [ClassRelocator].
+    public AndroidRemapper withRelocator(ClassRelocator composed) {
+        relocator = composed;
+        return this;
+    }
+
+    /// The relocated internal name by the Android layer's rules alone, or
+    /// `name` unchanged.
+    public static String map(String name) {
+        return ANDROID.map(name);
+    }
 
     static byte[] remap(byte[] in) {
-        ClassReader cr = new ClassReader(in);
-        ClassWriter cw = new ClassWriter(0);
-        cr.accept(new ClassRemapper(new PostRemapFixes(cw), REMAPPER), 0);
-        return cw.toByteArray();
-    }
-
-    /// What the remapper itself does not cover: two source interfaces can map
-    /// to one target (`Closeable` and `AutoCloseable` both become
-    /// `AutoCloseable`), and a class file that names an interface twice is
-    /// rejected by the JVM; and Kotlin's metadata strings (below).
-    private static final class PostRemapFixes extends ClassVisitor {
-        private final Set<String> methods = new LinkedHashSet<String>();
-        private String className;
-
-        PostRemapFixes(ClassVisitor next) {
-            super(Opcodes.ASM9, next);
-        }
-
-        @Override
-        public void visit(int version, int access, String name, String signature, String superName,
-                          String[] interfaces) {
-            className = name;
-            String[] distinct = interfaces;
-            if (interfaces != null && interfaces.length > 1) {
-                Set<String> seen = new LinkedHashSet<String>(Arrays.asList(interfaces));
-                if (seen.size() != interfaces.length) {
-                    distinct = seen.toArray(new String[seen.size()]);
-                }
-            }
-            super.visit(version, access, name, signature, superName, distinct);
-        }
-
-        @Override
-        public MethodVisitor visitMethod(int access, String name, String descriptor,
-                                         String signature, String[] exceptions) {
-            if (!methods.add(name + descriptor)) {
-                throw new IllegalArgumentException("Android remapping collapses overloads in "
-                        + className + ": " + name + descriptor
-                        + ". Rename the overload or use one AutoCloseable signature.");
-            }
-            return super.visitMethod(access, name, descriptor, signature, exceptions);
-        }
-
-        /// Kotlin records the JVM descriptors of a class's members as plain
-        /// strings in `@kotlin.Metadata`'s `d2` array. The remapper never sees
-        /// those, so without this they would keep naming android/... types.
-        @Override
-        public org.objectweb.asm.AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-            org.objectweb.asm.AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
-            if (av == null || !"Lkotlin/Metadata;".equals(descriptor)) {
-                return av;
-            }
-            return new org.objectweb.asm.AnnotationVisitor(Opcodes.ASM9, av) {
-                @Override
-                public org.objectweb.asm.AnnotationVisitor visitArray(String name) {
-                    org.objectweb.asm.AnnotationVisitor array = super.visitArray(name);
-                    if (array == null || !"d2".equals(name)) {
-                        return array;
-                    }
-                    return new org.objectweb.asm.AnnotationVisitor(Opcodes.ASM9, array) {
-                        @Override
-                        public void visit(String n, Object value) {
-                            super.visit(n, value instanceof String ? mapMetadataString((String) value) : value);
-                        }
-                    };
-                }
-            };
-        }
-    }
-
-    /// A `kotlin.Metadata` string: a method or field descriptor, or a name
-    /// that is left alone.
-    static String mapMetadataString(String s) {
-        if (s.length() == 0) {
-            return s;
-        }
-        try {
-            if (s.charAt(0) == '(') {
-                return REMAPPER.mapMethodDesc(s);
-            }
-            if ((s.charAt(0) == 'L' && s.endsWith(";")) || s.charAt(0) == '[') {
-                return REMAPPER.mapDesc(s);
-            }
-        } catch (RuntimeException e) {
-            // Not a descriptor after all (a name that happens to start with
-            // L or a bracket): keep it as written.
-            return s;
-        }
-        return s;
+        return ANDROID.remap(in);
     }
 
     public void run() throws BuildException {
         try {
             List<String> appClasses = new ArrayList<String>();
-            remapDirectory(classesDir, appClasses);
+            relocator.remapDirectory(classesDir, appClasses, log);
             if (!shipRuntime) {
                 log.info("Relocated " + appClasses.size() + " application classes");
                 return;
             }
-            int runtime = extractRuntime();
+            int runtime = relocator.extractRuntime(compatJar, classesDir);
+            for (File jar : supportJars) {
+                runtime += relocator.extractRuntime(jar, classesDir);
+            }
             int handlers = writeOnClickDispatch(appClasses);
             int fragments = writeFragmentFactory();
             int viewModels = writeViewModelFactory();
@@ -305,104 +192,6 @@ public final class AndroidRemapper {
         } catch (IOException e) {
             throw new BuildException("Android remapping failed: " + e.getMessage(), e);
         }
-    }
-
-    private void remapDirectory(File dir, List<String> out) throws IOException {
-        File[] files = dir.listFiles();
-        if (files == null) {
-            return;
-        }
-        for (File f : files) {
-            if (f.isDirectory()) {
-                String rel = relative(f) + "/";
-                // The relocated runtime is extracted, not application code.
-                if (rel.equals(TARGET) || rel.startsWith(TARGET)) {
-                    continue;
-                }
-                remapDirectory(f, out);
-            } else if (f.getName().endsWith(".class")) {
-                byte[] in = Files.readAllBytes(f.toPath());
-                byte[] remapped = remap(in);
-                String name = relative(f);
-                name = name.substring(0, name.length() - ".class".length());
-                String mapped = map(name);
-                if (!mapped.equals(name)) {
-                    // Application code inside android.* (a support shim
-                    // the app carries itself) moves with the rest.
-                    File dest = new File(classesDir, mapped + ".class");
-                    dest.getParentFile().mkdirs();
-                    write(dest, remapped);
-                    if (!f.delete()) {
-                        log.warn("Could not delete " + f);
-                    }
-                    out.add(mapped);
-                } else {
-                    if (!Arrays.equals(in, remapped)) {
-                        write(f, remapped);
-                    }
-                    out.add(name);
-                }
-            }
-        }
-    }
-
-    private String relative(File f) {
-        String base = classesDir.getAbsolutePath();
-        String p = f.getAbsolutePath();
-        return p.substring(base.length() + 1).replace(File.separatorChar, '/');
-    }
-
-    /// `dest` when it lies inside the classes directory. An entry name with
-    /// `..` (or an absolute one) would write elsewhere; the runtime jar never
-    /// has one, so meeting one means the artifact is not what it should be.
-    private File inside(File dest, String entry) throws IOException {
-        String root = classesDir.getCanonicalPath() + File.separator;
-        if (!dest.getCanonicalPath().startsWith(root)) {
-            throw new IOException(compatJar + " entry " + entry + " resolves outside " + classesDir);
-        }
-        return dest;
-    }
-
-    private int extractRuntime() throws IOException {
-        int count = 0;
-        ZipFile zip = new ZipFile(compatJar);
-        try {
-            Enumeration<? extends ZipEntry> en = zip.entries();
-            while (en.hasMoreElements()) {
-                ZipEntry e = en.nextElement();
-                String name = e.getName();
-                if (e.isDirectory() || name.startsWith("META-INF/")) {
-                    continue;
-                }
-                byte[] data = read(zip.getInputStream(e));
-                if (name.endsWith(".class")) {
-                    String cls = name.substring(0, name.length() - ".class".length());
-                    File dest = inside(new File(classesDir, map(cls) + ".class"), name);
-                    writeIfDifferent(dest, remap(data));
-                    count++;
-                } else {
-                    // Resource tables and assets are compared byte for byte
-                    // too: a rebuilt table routinely keeps its length while
-                    // its contents change, and a length check alone kept the
-                    // previous runtime's copy.
-                    writeIfDifferent(inside(new File(classesDir, name), name), data);
-                }
-            }
-        } finally {
-            zip.close();
-        }
-        return count;
-    }
-
-    /// Writes `data` to `dest` unless the file already holds exactly those
-    /// bytes, so an incremental build leaves unchanged outputs (and their
-    /// timestamps) alone.
-    private static void writeIfDifferent(File dest, byte[] data) throws IOException {
-        if (dest.isFile() && dest.length() == data.length && Arrays.equals(Files.readAllBytes(dest.toPath()), data)) {
-            return;
-        }
-        dest.getParentFile().mkdirs();
-        write(dest, data);
     }
 
     /// Writes `OnClickDispatch.dispatch(Object, String, View)`: for each layout
@@ -442,14 +231,14 @@ public final class AndroidRemapper {
                 classFiles.add(new File(classesDir, cls + ".class"));
             }
             for (File dir : handlerDirs) {
-                collectClassFiles(dir, classFiles);
+                ClassRelocator.collectClassFiles(dir, classFiles);
             }
             for (final File f : classFiles) {
                 final ClassReader cr = new ClassReader(Files.readAllBytes(f.toPath()));
                 if ((cr.getAccess() & Opcodes.ACC_INTERFACE) != 0) {
                     continue;
                 }
-                final String cls = map(cr.getClassName());
+                final String cls = relocator.map(cr.getClassName());
                 final Set<String> wanted = names;
                 cr.accept(new ClassVisitor(Opcodes.ASM9) {
                     @Override
@@ -459,7 +248,7 @@ public final class AndroidRemapper {
                         }
                         // Mapped first: a handler directory's classes may not
                         // be relocated yet (Gradle relocates Kotlin's after javac).
-                        String mapped = REMAPPER.mapMethodDesc(desc);
+                        String mapped = relocator.remapper().mapMethodDesc(desc);
                         if (mapped.equals(viewDesc) && wanted.contains(name)) {
                             handlers.add(new String[] {cls, name});
                         } else if ((mapped.equals(menuVoidDesc) || mapped.equals(menuBoolDesc))
@@ -534,7 +323,7 @@ public final class AndroidRemapper {
         cw.visitEnd();
         File out = new File(classesDir, ON_CLICK_DISPATCH + ".class");
         out.getParentFile().mkdirs();
-        write(out, cw.toByteArray());
+        ClassRelocator.write(out, cw.toByteArray());
         for (String n : menuNames) {
             boolean found = false;
             for (String[] h : menuHandlers) {
@@ -575,16 +364,16 @@ public final class AndroidRemapper {
     private int writeFragmentFactory() throws IOException {
         final Map<String, String> supers = new HashMap<String, String>();
         List<File> all = new ArrayList<File>();
-        collectClassFiles(classesDir, all);
+        ClassRelocator.collectClassFiles(classesDir, all);
         for (File dir : handlerDirs) {
-            collectClassFiles(dir, all);
+            ClassRelocator.collectClassFiles(dir, all);
         }
         final Map<String, Boolean> candidates = new HashMap<String, Boolean>();
         for (File f : all) {
             ClassReader cr = new ClassReader(Files.readAllBytes(f.toPath()));
-            final String cls = map(cr.getClassName());
+            final String cls = relocator.map(cr.getClassName());
             if (cr.getSuperName() != null) {
-                supers.put(cls, map(cr.getSuperName()));
+                supers.put(cls, relocator.map(cr.getSuperName()));
             }
             int access = cr.getAccess();
             if ((access & (Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT)) != 0 || (access & Opcodes.ACC_PUBLIC) == 0
@@ -644,7 +433,7 @@ public final class AndroidRemapper {
         cw.visitEnd();
         File out = new File(classesDir, FRAGMENT_FACTORY + ".class");
         out.getParentFile().mkdirs();
-        write(out, cw.toByteArray());
+        ClassRelocator.write(out, cw.toByteArray());
         return fragments.size();
     }
 
@@ -660,16 +449,16 @@ public final class AndroidRemapper {
     private int writeViewModelFactory() throws IOException {
         final Map<String, String> supers = new HashMap<String, String>();
         List<File> all = new ArrayList<File>();
-        collectClassFiles(classesDir, all);
+        ClassRelocator.collectClassFiles(classesDir, all);
         for (File dir : handlerDirs) {
-            collectClassFiles(dir, all);
+            ClassRelocator.collectClassFiles(dir, all);
         }
         final Map<String, List<String>> ctorOf = new HashMap<String, List<String>>();
         for (File f : all) {
             ClassReader cr = new ClassReader(Files.readAllBytes(f.toPath()));
-            final String cls = map(cr.getClassName());
+            final String cls = relocator.map(cr.getClassName());
             if (cr.getSuperName() != null) {
-                supers.put(cls, map(cr.getSuperName()));
+                supers.put(cls, relocator.map(cr.getSuperName()));
             }
             int access = cr.getAccess();
             if ((access & (Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT)) != 0 || (access & Opcodes.ACC_PUBLIC) == 0
@@ -681,7 +470,7 @@ public final class AndroidRemapper {
                 @Override
                 public MethodVisitor visitMethod(int acc, String name, String desc, String sig, String[] ex) {
                     if (name.equals("<init>") && (acc & Opcodes.ACC_PUBLIC) != 0) {
-                        ctors.add(REMAPPER.mapMethodDesc(desc));
+                        ctors.add(relocator.remapper().mapMethodDesc(desc));
                     }
                     return null;
                 }
@@ -760,7 +549,7 @@ public final class AndroidRemapper {
         cw.visitEnd();
         File out = new File(classesDir, VIEW_MODEL_FACTORY + ".class");
         out.getParentFile().mkdirs();
-        write(out, cw.toByteArray());
+        ClassRelocator.write(out, cw.toByteArray());
         return models.size();
     }
 
@@ -802,7 +591,7 @@ public final class AndroidRemapper {
             classFiles.add(new File(classesDir, cls + ".class"));
         }
         for (File dir : handlerDirs) {
-            collectClassFiles(dir, classFiles);
+            ClassRelocator.collectClassFiles(dir, classFiles);
         }
         final List<String[]> methods = new ArrayList<String[]>();
         // Every scanned class's superclass, and the public instance methods
@@ -817,9 +606,9 @@ public final class AndroidRemapper {
             if ((cr.getAccess() & Opcodes.ACC_INTERFACE) != 0) {
                 continue;
             }
-            final String cls = map(cr.getClassName());
+            final String cls = relocator.map(cr.getClassName());
             if (cr.getSuperName() != null) {
-                supers.put(cls, map(cr.getSuperName()));
+                supers.put(cls, relocator.map(cr.getSuperName()));
             }
             final List<String> plain = new ArrayList<String>();
             unannotated.put(cls, plain);
@@ -837,7 +626,7 @@ public final class AndroidRemapper {
                         @Override
                         public void visitEnd() {
                             if (!annotated) {
-                                plain.add(name + REMAPPER.mapMethodDesc(desc));
+                                plain.add(name + relocator.remapper().mapMethodDesc(desc));
                             }
                         }
 
@@ -846,7 +635,7 @@ public final class AndroidRemapper {
                             for (String a : JS_INTERFACE_ANNOTATIONS) {
                                 if (a.equals(annotation)) {
                                     annotated = true;
-                                    String mapped = REMAPPER.mapMethodDesc(desc);
+                                    String mapped = relocator.remapper().mapMethodDesc(desc);
                                     if (jsCallable(mapped)) {
                                         methods.add(new String[] {cls, name, mapped});
                                     } else {
@@ -994,7 +783,7 @@ public final class AndroidRemapper {
         cw.visitEnd();
         File out = new File(classesDir, JS_INTERFACE_DISPATCH + ".class");
         out.getParentFile().mkdirs();
-        write(out, cw.toByteArray());
+        ClassRelocator.write(out, cw.toByteArray());
         return methods.size();
     }
 
@@ -1045,43 +834,6 @@ public final class AndroidRemapper {
                 return "toBoolean";
             default:
                 return null;
-        }
-    }
-
-    private static void collectClassFiles(File dir, List<File> out) {
-        File[] files = dir.listFiles();
-        if (files == null) {
-            return;
-        }
-        for (File f : files) {
-            if (f.isDirectory()) {
-                collectClassFiles(f, out);
-            } else if (f.getName().endsWith(".class")) {
-                out.add(f);
-            }
-        }
-    }
-
-    private static byte[] read(InputStream in) throws IOException {
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[16384];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                out.write(buf, 0, n);
-            }
-            return out.toByteArray();
-        } finally {
-            in.close();
-        }
-    }
-
-    private static void write(File f, byte[] data) throws IOException {
-        OutputStream out = new FileOutputStream(f);
-        try {
-            out.write(data);
-        } finally {
-            out.close();
         }
     }
 }
