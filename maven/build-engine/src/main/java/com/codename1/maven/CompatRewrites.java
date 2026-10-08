@@ -81,8 +81,20 @@ final class CompatRewrites {
     private static final String JAVA_LOCALE = "java/util/Locale";
     private static final String STRING = "Ljava/lang/String;";
 
+    private static final String SYSTEM = Relocation.JDK_PACKAGE + "JdkSystem";
+    private static final String STRINGS = Relocation.JDK_PACKAGE + "JdkStrings";
+    private static final String NUMBERS = Relocation.JDK_PACKAGE + "JdkNumbers";
+    /// The framework's own math class: the device's `Math` has no
+    /// transcendental functions, and this one has them under the JDK's names.
+    private static final String MATH_UTIL = "com/codename1/util/MathUtil";
+
     /// Instance methods, as `owner.name descriptor`, to the class holding
     /// the static method that takes the receiver as its first parameter.
+    ///
+    /// In all three tables a target of the form `class#name` names a member
+    /// called something else than the one it stands in for, which is how two
+    /// methods that differ only in their return type -- `Long.decode` and
+    /// `Integer.decode` -- share one class.
     private static final Map<String, String> VIRTUAL = new HashMap<String, String>();
     /// Static methods, as `owner.name descriptor`, to the class holding the
     /// static method of the same name and descriptor.
@@ -131,7 +143,186 @@ final class CompatRewrites {
         }
     }
 
+    static {
+        String sys = "java/lang/System.";
+        // getProperty(String) exists on the device and answers null for
+        // every key; the rule is what gives user.home a value.
+        STATIC.put(sys + "getProperty(" + STRING + ")" + STRING, SYSTEM);
+        STATIC.put(sys + "getProperty(" + STRING + STRING + ")" + STRING, SYSTEM);
+        STATIC.put(sys + "setProperty(" + STRING + STRING + ")" + STRING, SYSTEM);
+        STATIC.put(sys + "clearProperty(" + STRING + ")" + STRING, SYSTEM);
+        STATIC.put(sys + "getenv(" + STRING + ")" + STRING, SYSTEM);
+        STATIC.put(sys + "getenv()Ljava/util/Map;", SYSTEM);
+        STATIC.put(sys + "lineSeparator()" + STRING, SYSTEM);
+        // The device's exit ends the process under the framework; this one
+        // runs the shutdown hooks and leaves through Display.
+        STATIC.put(sys + "exit(I)V", SYSTEM);
+
+        String runtime = "java/lang/Runtime.";
+        String thread = "Ljava/lang/Thread;";
+        VIRTUAL.put(runtime + "exit(I)V", SYSTEM);
+        VIRTUAL.put(runtime + "halt(I)V", SYSTEM);
+        VIRTUAL.put(runtime + "addShutdownHook(" + thread + ")V", SYSTEM);
+        VIRTUAL.put(runtime + "removeShutdownHook(" + thread + ")Z", SYSTEM);
+        VIRTUAL.put(runtime + "availableProcessors()I", SYSTEM);
+        VIRTUAL.put(runtime + "maxMemory()J", SYSTEM);
+
+        String thr = "java/lang/Thread.";
+        String handler = "Ljava/lang/Thread$UncaughtExceptionHandler;";
+        VIRTUAL.put(thr + "setDaemon(Z)V", SYSTEM);
+        VIRTUAL.put(thr + "isDaemon()Z", SYSTEM);
+        VIRTUAL.put(thr + "setName(" + STRING + ")V", SYSTEM);
+        VIRTUAL.put(thr + "isInterrupted()Z", SYSTEM);
+        VIRTUAL.put(thr + "getId()J", SYSTEM);
+        VIRTUAL.put(thr + "join(J)V", SYSTEM);
+        VIRTUAL.put(thr + "join(JI)V", SYSTEM);
+        VIRTUAL.put(thr + "setUncaughtExceptionHandler(" + handler + ")V", SYSTEM);
+        VIRTUAL.put(thr + "getUncaughtExceptionHandler()" + handler, SYSTEM);
+        STATIC.put(thr + "interrupted()Z", SYSTEM);
+        STATIC.put(thr + "sleep(JI)V", SYSTEM);
+        STATIC.put(thr + "setDefaultUncaughtExceptionHandler(" + handler + ")V", SYSTEM);
+        STATIC.put(thr + "getDefaultUncaughtExceptionHandler()" + handler, SYSTEM);
+        VIRTUAL.put("java/lang/Throwable.printStackTrace(Ljava/io/PrintWriter;)V", SYSTEM);
+
+        String str = "java/lang/String.";
+        String seq = "Ljava/lang/CharSequence;";
+        STATIC.put(str + "join(" + seq + "[" + seq + ")" + STRING, STRINGS);
+        STATIC.put(str + "join(" + seq + "Ljava/lang/Iterable;)" + STRING, STRINGS);
+        STATIC.put(str + "valueOf([C)" + STRING, STRINGS);
+        STATIC.put(str + "format(Ljava/util/Locale;" + STRING + "[Ljava/lang/Object;)" + STRING, STRINGS);
+        VIRTUAL.put(str + "matches(" + STRING + ")Z", STRINGS);
+        VIRTUAL.put(str + "toLowerCase(Ljava/util/Locale;)" + STRING, STRINGS);
+        for (String builder : new String[] {"java/lang/StringBuilder", "java/lang/StringBuffer"}) {
+            VIRTUAL.put(builder + ".indexOf(" + STRING + ")I", STRINGS);
+            VIRTUAL.put(builder + ".indexOf(" + STRING + "I)I", STRINGS);
+            VIRTUAL.put(builder + ".lastIndexOf(" + STRING + ")I", STRINGS);
+            VIRTUAL.put(builder + ".lastIndexOf(" + STRING + "I)I", STRINGS);
+            VIRTUAL.put(builder + ".substring(I)" + STRING, STRINGS);
+            VIRTUAL.put(builder + ".substring(II)" + STRING, STRINGS);
+            VIRTUAL.put(builder + ".replace(II" + STRING + ")L" + builder + ";", STRINGS);
+        }
+        VIRTUAL.put("java/lang/StringBuilder.insert(I[C)Ljava/lang/StringBuilder;", STRINGS);
+
+        String chr = "java/lang/Character.";
+        STATIC.put(chr + "toString(C)" + STRING, STRINGS);
+        for (String test : new String[] {"isLetter", "isLetterOrDigit", "isISOControl"}) {
+            STATIC.put(chr + test + "(C)Z", STRINGS);
+            STATIC.put(chr + test + "(I)Z", STRINGS);
+        }
+        for (String test : new String[] {"isAlphabetic", "isDigit", "isLowerCase", "isUpperCase", "isSpaceChar"}) {
+            STATIC.put(chr + test + "(I)Z", STRINGS);
+        }
+        STATIC.put(chr + "toLowerCase(I)I", STRINGS);
+        STATIC.put(chr + "toUpperCase(I)I", STRINGS);
+        STATIC.put(chr + "forDigit(II)C", STRINGS);
+        STATIC.put(chr + "digit(II)I", STRINGS);
+        STATIC.put(chr + "getNumericValue(C)I", STRINGS);
+        STATIC.put(chr + "getNumericValue(I)I", STRINGS);
+
+        String integer = "java/lang/Integer.";
+        for (String op : new String[] {"max", "min", "sum", "rotateLeft", "rotateRight"}) {
+            STATIC.put(integer + op + "(II)I", NUMBERS);
+        }
+        for (String op : new String[] {"bitCount", "highestOneBit", "lowestOneBit", "numberOfTrailingZeros",
+            "reverse"}) {
+            STATIC.put(integer + op + "(I)I", NUMBERS);
+        }
+        STATIC.put(integer + "decode(" + STRING + ")Ljava/lang/Integer;", NUMBERS + "#decodeInteger");
+
+        String lng = "java/lang/Long.";
+        for (String op : new String[] {"max", "min", "sum"}) {
+            STATIC.put(lng + op + "(JJ)J", NUMBERS);
+        }
+        STATIC.put(lng + "rotateLeft(JI)J", NUMBERS);
+        STATIC.put(lng + "rotateRight(JI)J", NUMBERS);
+        for (String op : new String[] {"signum", "bitCount", "numberOfLeadingZeros", "numberOfTrailingZeros"}) {
+            STATIC.put(lng + op + "(J)I", NUMBERS);
+        }
+        for (String op : new String[] {"highestOneBit", "lowestOneBit", "reverse"}) {
+            STATIC.put(lng + op + "(J)J", NUMBERS);
+        }
+        for (String op : new String[] {"toHexString", "toOctalString", "toBinaryString"}) {
+            STATIC.put(lng + op + "(J)" + STRING, NUMBERS);
+        }
+        STATIC.put(lng + "decode(" + STRING + ")Ljava/lang/Long;", NUMBERS + "#decodeLong");
+        STATIC.put(lng + "valueOf(" + STRING + ")Ljava/lang/Long;", NUMBERS + "#longValueOf");
+        STATIC.put(lng + "valueOf(" + STRING + "I)Ljava/lang/Long;", NUMBERS + "#longValueOf");
+        VIRTUAL.put(lng + "shortValue()S", NUMBERS);
+
+        String shrt = "java/lang/Short.";
+        STATIC.put(shrt + "decode(" + STRING + ")Ljava/lang/Short;", NUMBERS + "#decodeShort");
+        STATIC.put(shrt + "valueOf(" + STRING + ")Ljava/lang/Short;", NUMBERS + "#shortValueOf");
+        STATIC.put(shrt + "valueOf(" + STRING + "I)Ljava/lang/Short;", NUMBERS + "#shortValueOf");
+        STATIC.put(shrt + "toString(S)" + STRING, NUMBERS);
+        VIRTUAL.put(shrt + "byteValue()B", NUMBERS);
+        String bte = "java/lang/Byte.";
+        STATIC.put(bte + "decode(" + STRING + ")Ljava/lang/Byte;", NUMBERS + "#decodeByte");
+        STATIC.put(bte + "valueOf(" + STRING + ")Ljava/lang/Byte;", NUMBERS + "#byteValueOf");
+        STATIC.put(bte + "valueOf(" + STRING + "I)Ljava/lang/Byte;", NUMBERS + "#byteValueOf");
+        STATIC.put(bte + "toString(B)" + STRING, NUMBERS);
+        VIRTUAL.put(bte + "shortValue()S", NUMBERS);
+
+        STATIC.put("java/lang/Double.isFinite(D)Z", NUMBERS);
+        STATIC.put("java/lang/Float.isFinite(F)Z", NUMBERS);
+        for (String op : new String[] {"max", "min", "sum"}) {
+            STATIC.put("java/lang/Double." + op + "(DD)D", NUMBERS);
+            STATIC.put("java/lang/Float." + op + "(FF)F", NUMBERS);
+        }
+
+        String bool = "java/lang/Boolean.";
+        STATIC.put(bool + "toString(Z)" + STRING, NUMBERS);
+        STATIC.put(bool + "getBoolean(" + STRING + ")Z", NUMBERS);
+        for (String op : new String[] {"logicalAnd", "logicalOr", "logicalXor"}) {
+            STATIC.put(bool + op + "(ZZ)Z", NUMBERS);
+        }
+
+        String math = "java/lang/Math.";
+        for (String fn : new String[] {"exp", "log", "log10", "asin", "acos", "atan", "ulp"}) {
+            STATIC.put(math + fn + "(D)D", MATH_UTIL);
+        }
+        STATIC.put(math + "pow(DD)D", MATH_UTIL);
+        STATIC.put(math + "atan2(DD)D", MATH_UTIL);
+        STATIC.put(math + "copySign(DD)D", MATH_UTIL);
+        STATIC.put(math + "scalb(DI)D", MATH_UTIL);
+        STATIC.put(math + "copySign(FF)F", NUMBERS);
+        STATIC.put(math + "random()D", NUMBERS);
+        STATIC.put(math + "signum(D)D", NUMBERS);
+        STATIC.put(math + "signum(F)F", NUMBERS);
+        STATIC.put(math + "hypot(DD)D", NUMBERS);
+        for (String fn : new String[] {"cbrt", "rint", "sinh", "cosh", "tanh"}) {
+            STATIC.put(math + fn + "(D)D", NUMBERS);
+        }
+        for (String op : new String[] {"floorDiv", "floorMod", "addExact", "subtractExact", "multiplyExact"}) {
+            STATIC.put(math + op + "(II)I", NUMBERS);
+            STATIC.put(math + op + "(JJ)J", NUMBERS);
+        }
+        for (String op : new String[] {"incrementExact", "decrementExact", "negateExact"}) {
+            STATIC.put(math + op + "(I)I", NUMBERS);
+            STATIC.put(math + op + "(J)J", NUMBERS);
+        }
+        STATIC.put(math + "toIntExact(J)I", NUMBERS);
+        // StrictMath is not on a device at all; its results are Math's here.
+        String[] keys = STATIC.keySet().toArray(new String[0]);
+        for (String key : keys) {
+            if (key.startsWith(math)) {
+                STATIC.put("java/lang/StrictMath." + key.substring(math.length()), STATIC.get(key));
+            }
+        }
+    }
+
     private CompatRewrites() {
+    }
+
+    /// The class of a rule's target.
+    private static String targetOwner(String target) {
+        int hash = target.indexOf('#');
+        return hash < 0 ? target : target.substring(0, hash);
+    }
+
+    /// The member a rule's target names, `name` unless it says otherwise.
+    private static String targetName(String target, String name) {
+        int hash = target.indexOf('#');
+        return hash < 0 ? name : target.substring(hash + 1);
     }
 
     /// Whether the class named `internalName` is one whose calls are left as
@@ -183,13 +374,15 @@ final class CompatRewrites {
             if (opcode == Opcodes.INVOKESTATIC) {
                 String target = STATIC.get(owner + "." + name + descriptor);
                 if (target != null) {
-                    super.visitMethodInsn(Opcodes.INVOKESTATIC, target, name, descriptor, false);
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, targetOwner(target), targetName(target, name),
+                            descriptor, false);
                     return;
                 }
             } else if (opcode == Opcodes.INVOKEVIRTUAL) {
                 String target = VIRTUAL.get(owner + "." + name + descriptor);
                 if (target != null) {
-                    super.visitMethodInsn(Opcodes.INVOKESTATIC, target, name, receiverFirst(owner, descriptor), false);
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, targetOwner(target), targetName(target, name),
+                            receiverFirst(owner, descriptor), false);
                     return;
                 }
             } else if (opcode == Opcodes.INVOKESPECIAL && JAVA_LOCALE.equals(owner) && "<init>".equals(name)) {
@@ -216,7 +409,7 @@ final class CompatRewrites {
             if (opcode == Opcodes.GETSTATIC) {
                 String target = FIELDS.get(owner + "." + name);
                 if (target != null) {
-                    super.visitFieldInsn(opcode, target, name, descriptor);
+                    super.visitFieldInsn(opcode, targetOwner(target), targetName(target, name), descriptor);
                     return;
                 }
             }
@@ -246,12 +439,13 @@ final class CompatRewrites {
             if (h.getTag() == Opcodes.H_INVOKESTATIC) {
                 String target = STATIC.get(key);
                 if (target != null) {
-                    return new Handle(Opcodes.H_INVOKESTATIC, target, h.getName(), h.getDesc(), false);
+                    return new Handle(Opcodes.H_INVOKESTATIC, targetOwner(target), targetName(target, h.getName()),
+                            h.getDesc(), false);
                 }
             } else if (h.getTag() == Opcodes.H_INVOKEVIRTUAL) {
                 String target = VIRTUAL.get(key);
                 if (target != null) {
-                    return new Handle(Opcodes.H_INVOKESTATIC, target, h.getName(),
+                    return new Handle(Opcodes.H_INVOKESTATIC, targetOwner(target), targetName(target, h.getName()),
                             receiverFirst(h.getOwner(), h.getDesc()), false);
                 }
             }

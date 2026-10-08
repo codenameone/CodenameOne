@@ -98,6 +98,17 @@ public final class Relocation {
         {"java/text/MessageFormat", JDK_PACKAGE + "MessageFormat"},
         {"java/text/FieldPosition", JDK_PACKAGE + "FieldPosition"},
         {"java/text/ParsePosition", JDK_PACKAGE + "ParsePosition"},
+        // java.lang. Thread has no nested handler interface on the device,
+        // and nothing there can be invoked reflectively: the exception is
+        // only ever declared, caught or wrapped.
+        {"java/lang/Thread$UncaughtExceptionHandler", JDK_PACKAGE + "UncaughtExceptionHandler"},
+        {"java/lang/reflect/InvocationTargetException", JDK_PACKAGE + "InvocationTargetException"},
+        // java.util.logging, over Codename One's Log, and java.util.prefs,
+        // over its Preferences.
+        {"java/util/logging/Logger", JDK_PACKAGE + "Logger"},
+        {"java/util/logging/Level", JDK_PACKAGE + "Level"},
+        {"java/util/prefs/Preferences", JDK_PACKAGE + "Preferences"},
+        {"java/util/prefs/BackingStoreException", JDK_PACKAGE + "BackingStoreException"},
         // java.net. The device has URI and URISyntaxException.
         {"java/net/URL", JDK_PACKAGE + "URL"},
         {"java/net/MalformedURLException", JDK_PACKAGE + "MalformedURLException"},
