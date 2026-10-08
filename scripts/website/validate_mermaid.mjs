@@ -12,8 +12,8 @@ export function diagramRenderError(node) {
   const svg = node.querySelector("svg");
   if (!svg) return "No rendered SVG";
   // Mermaid's error display is itself an SVG. Counting SVGs is not validation.
-  if (svg.querySelector(".error-icon, .error-text") ||
-      /Syntax error in text|mermaid version/i.test(svg.textContent.replace(/<[^>]*>/g, ""))) {
+  // Use the error renderer's markers; ordinary labels may discuss these errors.
+  if (svg.querySelector(".error-icon, .error-text")) {
     return "Mermaid rendered an error diagram";
   }
   const box = svg.getBoundingClientRect();

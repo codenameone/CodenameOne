@@ -58,7 +58,8 @@ jobs:
           if [ -z "$mb" ]; then
             count=0
           else
-            count="$(git diff --name-only --diff-filter=ACMR "$mb" HEAD -- 'docs/website/content/blog/*.md' 'docs/website/social/linkedin/*.md' 'docs/website/layouts/shortcodes/mermaid.html' 'docs/website/hugo.toml' 'scripts/website/validate_mermaid.mjs' 'scripts/website/test_validate_mermaid.mjs' '.github/workflows/blog-prose.yml' | wc -l | tr -d ' ')"
+            # Deleting a gate input must still run validation and expose the missing file.
+            count="$(git diff --name-only --diff-filter=ACDMR "$mb" HEAD -- 'docs/website/content/blog/*.md' 'docs/website/social/linkedin/*.md' 'docs/website/layouts/shortcodes/mermaid.html' 'docs/website/hugo.toml' 'scripts/website/validate_mermaid.mjs' 'scripts/website/test_validate_mermaid.mjs' '.github/workflows/blog-prose.yml' | wc -l | tr -d ' ')"
           fi
           echo "Changed blog and social files: $count"
           if [ "$count" -gt 0 ]; then

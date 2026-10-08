@@ -19,7 +19,12 @@ before(async () => {
     res.setHeader("Content-Type", "text/html");
     // The failure has a perfectly valid SVG, just like Mermaid's error output.
     const content = req.url === "/error" ? '<text class="error-text">Syntax error in text</text>' : '<rect width="80" height="30"/>';
-    if (req.url === "/late-error") {
+    if (req.url === "/error-labels") {
+      res.end(`<div class="cn1-mermaid"><svg width="400" height="100">
+        <g class="node"><text>Mermaid version 10</text></g>
+        <g class="node"><text>Syntax error in text</text></g>
+        </svg></div><script>window.__cn1MermaidRender = Promise.resolve();</script>`);
+    } else if (req.url === "/late-error") {
       res.end(`<div class="cn1-mermaid"><svg width="100" height="50"></svg></div><script>
         window.__cn1MermaidRender = new Promise(resolve => setTimeout(() => {
           document.querySelector('svg').innerHTML = '<text class="error-text">Syntax error in text</text>';
@@ -40,6 +45,9 @@ after(async () => {
 
 test("accepts a visible diagram in a generated page", async () => {
   await checkRenderedPage(page, `${base}/valid`, 1);
+});
+test("accepts ordinary diagram labels discussing Mermaid versions and syntax errors", async () => {
+  await checkRenderedPage(page, `${base}/error-labels`, 1);
 });
 test("rejects Mermaid's error SVG in a generated page", async () => {
   await assert.rejects(checkRenderedPage(page, `${base}/error`, 1), /error diagram/);
