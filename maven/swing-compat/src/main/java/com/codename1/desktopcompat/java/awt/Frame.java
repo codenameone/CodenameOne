@@ -22,7 +22,16 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
-/// A window with a title, which the form shows in its title area.
+import com.codename1.desktopcompat.java.awt.event.WindowEvent;
+import java.util.ArrayList;
+
+/// A window with a title.
+///
+/// The title shows in the title area of the form, or the title bar of
+/// the window where there is a window manager. Resizability, decoration
+/// and the extended state -- iconified, maximized -- apply to a window of
+/// the window manager and are only recorded for a frame that fills a
+/// form, which is always the size of the screen.
 public class Frame extends Window {
 
     public static final int NORMAL = 0;
@@ -45,9 +54,46 @@ public class Frame extends Window {
         this.title = title == null ? "" : title;
     }
 
+    /// The frames that were shown or packed and not disposed of since.
+    public static Frame[] getFrames() {
+        Window[] all = Window.getWindows();
+        ArrayList<Frame> l = new ArrayList<Frame>();
+        for (int i = 0; i < all.length; i++) {
+            if (all[i] instanceof Frame) {
+                l.add((Frame) all[i]);
+            }
+        }
+        return l.toArray(new Frame[l.size()]);
+    }
+
     @Override
     public String cn1Title() {
         return title;
+    }
+
+    @Override
+    protected boolean cn1Resizable() {
+        return resizable;
+    }
+
+    @Override
+    protected boolean cn1Decorated() {
+        return !undecorated;
+    }
+
+    @Override
+    protected int cn1State() {
+        return state;
+    }
+
+    @Override
+    public void cn1Iconified(boolean iconified) {
+        int old = state;
+        state = iconified ? state | ICONIFIED : state & ~ICONIFIED;
+        super.cn1Iconified(iconified);
+        if (old != state) {
+            dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_STATE_CHANGED, old, state));
+        }
     }
 
     public String getTitle() {
@@ -57,26 +103,35 @@ public class Frame extends Window {
     public void setTitle(String title) {
         String old = this.title;
         this.title = title == null ? "" : title;
-        if (cn1Form() != null) {
-            cn1Form().setTitle(this.title);
+        if (cn1Host() != null) {
+            cn1Host().title(this.title);
         }
         firePropertyChange("title", old, this.title);
+    }
+
+    public Image getIconImage() {
+        java.util.List<Image> l = getIconImages();
+        return l.isEmpty() ? null : l.get(0);
     }
 
     public boolean isResizable() {
         return resizable;
     }
 
-    /// Recorded only.
     public void setResizable(boolean resizable) {
+        boolean old = this.resizable;
         this.resizable = resizable;
+        if (cn1Host() != null) {
+            cn1Host().resizable(resizable);
+        }
+        firePropertyChange("resizable", old, resizable);
     }
 
     public boolean isUndecorated() {
         return undecorated;
     }
 
-    /// Recorded only.
+    /// Takes effect the next time the frame is shown.
     public void setUndecorated(boolean undecorated) {
         this.undecorated = undecorated;
     }
@@ -85,9 +140,19 @@ public class Frame extends Window {
         return state;
     }
 
-    /// Recorded only: a frame always fills its form.
+    /// Minimizes, maximizes or restores a window of the window manager,
+    /// and tells the window state listeners. A frame that fills a form
+    /// records the state and stays as it is.
     public void setExtendedState(int state) {
+        int old = this.state;
+        if (old == state) {
+            return;
+        }
         this.state = state;
+        if (cn1Host() != null) {
+            cn1Host().state(state);
+        }
+        dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_STATE_CHANGED, old, state));
     }
 
     public int getState() {
@@ -95,6 +160,6 @@ public class Frame extends Window {
     }
 
     public void setState(int state) {
-        this.state = state == ICONIFIED ? this.state | ICONIFIED : this.state & ~ICONIFIED;
+        setExtendedState(state == ICONIFIED ? this.state | ICONIFIED : this.state & ~ICONIFIED);
     }
 }

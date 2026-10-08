@@ -29,15 +29,18 @@ import com.codename1.desktopcompat.java.awt.Frame;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.LayoutManager;
 import com.codename1.desktopcompat.java.awt.event.WindowEvent;
-import com.codename1.ui.Display;
+import com.codename1.desktopcompat.rt.WindowHosts;
 
 /// The Swing frame: a frame whose single child is a root pane, so that
 /// adding to the frame adds to its content pane.
 ///
-/// A request to close the frame -- the back command of its form -- runs
-/// the default close operation after the window listeners. `EXIT_ON_CLOSE`
-/// exits the application.
-public class JFrame extends Frame implements WindowConstants {
+/// A request to close the frame -- the back command of its form, the
+/// close box of its window, the platform ending the application -- runs
+/// the default close operation after the window listeners:
+/// `HIDE_ON_CLOSE` (the default) hides it, `DISPOSE_ON_CLOSE` disposes of
+/// it, `DO_NOTHING_ON_CLOSE` leaves it to the listeners and
+/// `EXIT_ON_CLOSE` exits the application.
+public class JFrame extends Frame implements WindowConstants, RootPaneContainer {
 
     public static final int EXIT_ON_CLOSE = 3;
 
@@ -64,6 +67,7 @@ public class JFrame extends Frame implements WindowConstants {
         return new JRootPane();
     }
 
+    @Override
     public JRootPane getRootPane() {
         return rootPane;
     }
@@ -84,12 +88,43 @@ public class JFrame extends Frame implements WindowConstants {
         }
     }
 
+    @Override
     public Container getContentPane() {
         return rootPane.getContentPane();
     }
 
+    @Override
     public void setContentPane(Container contentPane) {
         rootPane.setContentPane(contentPane);
+    }
+
+    @Override
+    public JLayeredPane getLayeredPane() {
+        return rootPane.getLayeredPane();
+    }
+
+    @Override
+    public void setLayeredPane(JLayeredPane layeredPane) {
+        rootPane.setLayeredPane(layeredPane);
+    }
+
+    @Override
+    public Component getGlassPane() {
+        return rootPane.getGlassPane();
+    }
+
+    @Override
+    public void setGlassPane(Component glassPane) {
+        rootPane.setGlassPane(glassPane);
+    }
+
+    public JMenuBar getJMenuBar() {
+        return rootPane.getJMenuBar();
+    }
+
+    /// Sets the menu bar; see `JRootPane.setJMenuBar` for how it shows.
+    public void setJMenuBar(JMenuBar menubar) {
+        rootPane.setJMenuBar(menubar);
     }
 
     protected boolean isRootPaneCheckingEnabled() {
@@ -159,9 +194,7 @@ public class JFrame extends Frame implements WindowConstants {
                     dispose();
                     break;
                 case EXIT_ON_CLOSE:
-                    if (Display.isInitialized()) {
-                        Display.getInstance().exitApplication();
-                    }
+                    WindowHosts.exit();
                     break;
                 default:
                     break;

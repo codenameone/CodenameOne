@@ -40,21 +40,12 @@ import com.codename1.desktopcompat.java.beans.PropertyChangeEvent;
 import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 /// The button and label properties that reach the peer: icons by state,
 /// text position, alignment, gap and margin, and the labels written in
 /// HTML.
 public class ButtonLabelGapsTest extends KernelTestBase {
-
-    /// The click count of the layer is kept for the whole process and by
-    /// time alone, so the presses made here would be counted into the
-    /// first click of whichever test runs next.
-    @AfterClass
-    public static void letTheClicksLapse() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     /// An icon of a given size that counts how often it was painted.
     private static final class Square implements Icon {

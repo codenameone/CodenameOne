@@ -29,11 +29,16 @@ import com.codename1.desktopcompat.java.awt.Dialog;
 import com.codename1.desktopcompat.java.awt.Frame;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.LayoutManager;
+import com.codename1.desktopcompat.java.awt.Window;
 import com.codename1.desktopcompat.java.awt.event.WindowEvent;
 
-/// The Swing dialog, a skeleton: a root pane and a content pane like a
-/// frame's, shown as a form. A modal dialog does not block its caller.
-public class JDialog extends Dialog implements WindowConstants {
+/// The Swing dialog: a dialog with a root pane and a content pane like a
+/// frame's. Showing a modal one blocks its caller; see `Dialog`.
+///
+/// A request to close it runs the default close operation after the
+/// window listeners: `HIDE_ON_CLOSE` (the default), `DISPOSE_ON_CLOSE` or
+/// `DO_NOTHING_ON_CLOSE`.
+public class JDialog extends Dialog implements WindowConstants, RootPaneContainer {
 
     protected JRootPane rootPane;
     protected boolean rootPaneCheckingEnabled;
@@ -61,6 +66,40 @@ public class JDialog extends Dialog implements WindowConstants {
         dialogInit();
     }
 
+    public JDialog(Dialog owner) {
+        this(owner, "", false);
+    }
+
+    public JDialog(Dialog owner, boolean modal) {
+        this(owner, "", modal);
+    }
+
+    public JDialog(Dialog owner, String title) {
+        this(owner, title, false);
+    }
+
+    public JDialog(Dialog owner, String title, boolean modal) {
+        super(owner, title, modal);
+        dialogInit();
+    }
+
+    public JDialog(Window owner) {
+        this(owner, "", ModalityType.MODELESS);
+    }
+
+    public JDialog(Window owner, ModalityType modalityType) {
+        this(owner, "", modalityType);
+    }
+
+    public JDialog(Window owner, String title) {
+        this(owner, title, ModalityType.MODELESS);
+    }
+
+    public JDialog(Window owner, String title, ModalityType modalityType) {
+        super(owner, title, modalityType);
+        dialogInit();
+    }
+
     protected void dialogInit() {
         setRootPane(createRootPane());
         setRootPaneCheckingEnabled(true);
@@ -70,6 +109,7 @@ public class JDialog extends Dialog implements WindowConstants {
         return new JRootPane();
     }
 
+    @Override
     public JRootPane getRootPane() {
         return rootPane;
     }
@@ -90,12 +130,42 @@ public class JDialog extends Dialog implements WindowConstants {
         }
     }
 
+    @Override
     public Container getContentPane() {
         return rootPane.getContentPane();
     }
 
+    @Override
     public void setContentPane(Container contentPane) {
         rootPane.setContentPane(contentPane);
+    }
+
+    @Override
+    public JLayeredPane getLayeredPane() {
+        return rootPane.getLayeredPane();
+    }
+
+    @Override
+    public void setLayeredPane(JLayeredPane layeredPane) {
+        rootPane.setLayeredPane(layeredPane);
+    }
+
+    @Override
+    public Component getGlassPane() {
+        return rootPane.getGlassPane();
+    }
+
+    @Override
+    public void setGlassPane(Component glassPane) {
+        rootPane.setGlassPane(glassPane);
+    }
+
+    public JMenuBar getJMenuBar() {
+        return rootPane.getJMenuBar();
+    }
+
+    public void setJMenuBar(JMenuBar menu) {
+        rootPane.setJMenuBar(menu);
     }
 
     protected boolean isRootPaneCheckingEnabled() {
