@@ -36,9 +36,26 @@ import java.util.List;
 /// exists, so nothing else has to be configured.
 public final class CompatLayers {
 
+    /// The Swing layer. `java.awt` and `javax.swing` belong to the JDK, so
+    /// unlike the other layers its runtime cannot be authored under the names
+    /// an application compiles against: the application compiles against the
+    /// JDK's own classes, and the runtime jar is written directly under the
+    /// names it ships with. It therefore has no bridge package to move, and
+    /// relocating its jar changes no class name.
+    public static final Relocation SWING = new Relocation("Swing", "codenameone-swing-compat",
+            "com/codename1/desktopcompat/",
+            new String[] {"java/awt/", "javax/swing/", "java/beans/", "javax/accessibility/", "org/jdesktop/"},
+            Relocation.JDK_SHIMS, null, null);
+
+    /// The JavaFX layer, authored under `javafx.*` and relocated like the
+    /// Android one.
+    public static final Relocation JAVAFX = new Relocation("JavaFX", "codenameone-javafx-compat",
+            "com/codename1/fxcompat/", new String[] {"javafx/"}, Relocation.JDK_SHIMS,
+            "com/codename1/fxcompat/runtime/", "com/codename1/fxcompat/rt/");
+
     /// Every layer, in the order their rules are tried.
     public static final List<Relocation> ALL = Collections.unmodifiableList(
-            Arrays.asList(AndroidRemapper.RELOCATION));
+            Arrays.asList(AndroidRemapper.RELOCATION, SWING, JAVAFX));
 
     /// A relocator applying every layer's rules. Their packages are disjoint,
     /// so it is correct for any class; what it cannot say is which layers an
@@ -68,6 +85,34 @@ public final class CompatLayers {
             }
         }
         return found;
+    }
+
+    /// The layer whose API `internalName` belongs to, as an application is
+    /// compiled against it (`javax/swing/JTable`), or null.
+    public static Relocation owning(String internalName) {
+        for (Relocation r : ALL) {
+            if (r.owns(internalName)) {
+                return r;
+            }
+        }
+        return null;
+    }
+
+    /// What a build tells a developer whose application uses `layer`'s API
+    /// without having switched the layer on, or null when the build has
+    /// nothing to suggest. The only place this wording lives.
+    public static String enableHint(Relocation layer) {
+        if (layer == SWING) {
+            return "Codename One runs AWT/Swing code through its Swing compatibility layer, which this project "
+                    + "has not enabled. Move the Swing sources to src/main/desktop to enable it, or use "
+                    + "com.codename1.ui components for UI logic.";
+        }
+        if (layer == JAVAFX) {
+            return "Codename One runs JavaFX code through its JavaFX compatibility layer, which this project "
+                    + "has not enabled. Move the JavaFX sources to src/main/desktop to enable it, or use "
+                    + "com.codename1.ui components for UI logic.";
+        }
+        return null;
     }
 
     /// The jar of shared JDK classes among `classpath`, or null.

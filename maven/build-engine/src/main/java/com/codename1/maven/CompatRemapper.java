@@ -1,0 +1,230 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven;
+
+import com.codename1.build.Log;
+import com.codename1.builders.BuildException;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Relocates an application's compiled classes onto whichever compatibility
+/// layers it has switched on, and ships their runtimes with it.
+///
+/// The one entry point a build plugin needs: it works out the active layers
+/// from the compile classpath ([CompatLayers#active]), relocates by all of
+/// their rules in a single pass ([ClassRelocator]) and extracts each runtime
+/// jar, and the shared JDK classes, exactly once. An application with no
+/// layer is left untouched, so the step can run unconditionally.
+///
+/// Only the layers that are active are applied, never [CompatLayers#EVERY]:
+/// an application without the Swing layer keeps its `java/awt/` references as
+/// written, and the compliance check then reports them with the instruction
+/// to enable the layer.
+///
+/// Running it again over the same directory changes nothing. The relocation
+/// rules only match names an application is compiled against, extracted
+/// runtimes are skipped by the directory walk, and every extracted file is
+/// compared before it is written.
+public final class CompatRemapper {
+
+    private final File classesDir;
+    private final List<File> classpath;
+    private final File onClickNames;
+    private final Log log;
+    private final List<Relocation> active;
+    private final ClassRelocator relocator;
+    private final List<File> handlerDirs = new ArrayList<File>();
+    private boolean shipRuntime = true;
+
+    /// `classesDir` is the application's output directory, rewritten in
+    /// place. `classpath` is its compile classpath, which decides the active
+    /// layers and supplies their jars. `onClickNames` is the Android resource
+    /// compiler's list of `android:onClick` names, or null when the
+    /// application has no Android sources.
+    public CompatRemapper(File classesDir, Iterable<File> classpath, File onClickNames, Log log) {
+        this.classesDir = classesDir;
+        this.classpath = new ArrayList<File>();
+        if (classpath != null) {
+            for (File f : classpath) {
+                if (f != null) {
+                    this.classpath.add(f);
+                }
+            }
+        }
+        this.onClickNames = onClickNames;
+        this.log = log;
+        this.active = Collections.unmodifiableList(CompatLayers.active(this.classpath));
+        this.relocator = new ClassRelocator(active);
+    }
+
+    /// Only relocates the classes, without copying in any runtime or
+    /// generating anything: for a second output directory of the same
+    /// application (Gradle's Kotlin classes), which the main pass covers.
+    public CompatRemapper relocateOnly() {
+        shipRuntime = false;
+        return this;
+    }
+
+    /// Further class directories of the same application, whose classes the
+    /// generators consider beside those of the classes directory.
+    public CompatRemapper withHandlerDirectories(List<File> dirs) {
+        if (dirs != null) {
+            for (File d : dirs) {
+                if (d != null && d.isDirectory() && !d.equals(classesDir)) {
+                    handlerDirs.add(d);
+                }
+            }
+        }
+        return this;
+    }
+
+    /// The layers this application has switched on, in the order their rules
+    /// are tried; empty when it has none.
+    public List<Relocation> activeLayers() {
+        return active;
+    }
+
+    /// Whether `layer` is among the active ones.
+    public boolean isActive(Relocation layer) {
+        return active.contains(layer);
+    }
+
+    /// The relocator composed of every active layer's rules.
+    public ClassRelocator relocator() {
+        return relocator;
+    }
+
+    /// Relocates and ships. Answers false, having done nothing, when the
+    /// application has no compatibility layer.
+    public boolean run() throws BuildException {
+        if (active.isEmpty()) {
+            log.debug("No compatibility layer on the classpath; nothing to relocate");
+            return false;
+        }
+        try {
+            File jdkJar = CompatLayers.jdkJar(classpath);
+            List<String> appClasses;
+            int runtime = 0;
+            boolean android = isActive(AndroidRemapper.RELOCATION);
+            if (android) {
+                // The Android step relocates the directory itself, with the
+                // composed rules, and extracts its own runtime and the JDK
+                // classes before generating its dispatchers.
+                AndroidRemapper remapper = new AndroidRemapper(classesDir,
+                        CompatLayers.runtimeJar(AndroidRemapper.RELOCATION, classpath), onClickNames, log)
+                        .withRelocator(relocator)
+                        .withHandlerDirectories(handlerDirs)
+                        .withSupportJars(Collections.singletonList(jdkJar));
+                if (!shipRuntime) {
+                    remapper.relocateOnly();
+                }
+                remapper.run();
+                appClasses = remapper.applicationClasses();
+            } else {
+                appClasses = new ArrayList<String>();
+                relocator.remapDirectory(classesDir, appClasses, log);
+                if (shipRuntime && jdkJar != null) {
+                    runtime += relocator.extractRuntime(jdkJar, classesDir);
+                }
+            }
+            if (!shipRuntime) {
+                if (!android) {
+                    log.info("Relocated " + appClasses.size() + " application classes");
+                }
+                return true;
+            }
+            StringBuilder names = new StringBuilder();
+            for (Relocation layer : active) {
+                if (layer == AndroidRemapper.RELOCATION) {
+                    continue;
+                }
+                runtime += relocator.extractRuntime(CompatLayers.runtimeJar(layer, classpath), classesDir);
+                names.append(names.length() == 0 ? "" : ", ").append(layer.name());
+            }
+            List<String> unmodifiable = Collections.unmodifiableList(appClasses);
+            if (isActive(CompatLayers.SWING)) {
+                generateSwingEntryPoint(unmodifiable);
+                generateSwingResources(unmodifiable);
+            }
+            if (isActive(CompatLayers.JAVAFX)) {
+                generateJavaFxEntryPoint(unmodifiable);
+                generateFxmlDispatch(unmodifiable);
+                generateJavaFxResources(unmodifiable);
+            }
+            if (names.length() > 0) {
+                log.info("Relocated " + appClasses.size() + " application classes and " + runtime + " "
+                        + names + " runtime classes");
+            }
+            return true;
+        } catch (IOException e) {
+            throw new BuildException("Compatibility layer remapping failed: " + e.getMessage(), e);
+        }
+    }
+
+    /// Hook, not implemented yet: generates the class that starts a Swing
+    /// application -- the Codename One lifecycle class that calls the
+    /// application's `main`, since nothing on a device runs a `main` method.
+    /// `appClasses` are the application's relocated internal names. Called
+    /// after every runtime is in place, on a full (not relocate-only) run with
+    /// the Swing layer active. Whatever it writes must be written with
+    /// [ClassRelocator#writeIfDifferent], to keep a second run a no-op.
+    void generateSwingEntryPoint(List<String> appClasses) throws IOException {
+        // Deliberately empty: see the comment above.
+    }
+
+    /// Hook, not implemented yet: ships what a Swing application loads by
+    /// name -- `Class.getResource` images, `ResourceBundle` properties -- in
+    /// the form the runtime looks them up. Same contract as
+    /// [#generateSwingEntryPoint].
+    void generateSwingResources(List<String> appClasses) throws IOException {
+        // Deliberately empty: see the comment above.
+    }
+
+    /// Hook, not implemented yet: generates the class that starts a JavaFX
+    /// application, instantiating its `javafx.application.Application`
+    /// subclass with `new` rather than by reflection. Same contract as
+    /// [#generateSwingEntryPoint], for the JavaFX layer.
+    void generateJavaFxEntryPoint(List<String> appClasses) throws IOException {
+        // Deliberately empty: see the comment above.
+    }
+
+    /// Hook, not implemented yet: generates what FXML resolves by name at
+    /// run time on a desktop -- controller classes, `fx:id` fields and
+    /// `onAction="#handler"` methods -- as direct calls, the way
+    /// [AndroidRemapper] generates the `android:onClick` dispatcher. Same
+    /// contract as [#generateSwingEntryPoint], for the JavaFX layer.
+    void generateFxmlDispatch(List<String> appClasses) throws IOException {
+        // Deliberately empty: see the comment above.
+    }
+
+    /// Hook, not implemented yet: ships the FXML documents, stylesheets and
+    /// images a JavaFX application loads by name. Same contract as
+    /// [#generateSwingEntryPoint], for the JavaFX layer.
+    void generateJavaFxResources(List<String> appClasses) throws IOException {
+        // Deliberately empty: see the comment above.
+    }
+}

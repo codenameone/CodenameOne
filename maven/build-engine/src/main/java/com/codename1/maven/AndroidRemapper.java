@@ -104,6 +104,7 @@ public final class AndroidRemapper {
     private final List<File> handlerDirs = new ArrayList<File>();
     private final List<File> supportJars = new ArrayList<File>();
     private ClassRelocator relocator = ANDROID;
+    private List<String> applicationClasses = new ArrayList<String>();
 
     public AndroidRemapper(File classesDir, File compatJar, File onClickNames, Log log) {
         this.classesDir = classesDir;
@@ -162,9 +163,16 @@ public final class AndroidRemapper {
         return ANDROID.remap(in);
     }
 
+    /// The internal names of the application's classes as the last [#run]
+    /// left them, for a caller that goes on to generate for other layers.
+    List<String> applicationClasses() {
+        return applicationClasses;
+    }
+
     public void run() throws BuildException {
         try {
             List<String> appClasses = new ArrayList<String>();
+            applicationClasses = appClasses;
             relocator.remapDirectory(classesDir, appClasses, log);
             if (!shipRuntime) {
                 log.info("Relocated " + appClasses.size() + " application classes");

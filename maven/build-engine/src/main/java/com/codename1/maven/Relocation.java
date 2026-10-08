@@ -133,6 +133,18 @@ public final class Relocation {
         return null;
     }
 
+    /// Whether `internalName`, as an application is compiled against it, is
+    /// part of the API this layer provides. Unlike [#relocate] this leaves the
+    /// bridge package out: that one is the layer's own, never an API name.
+    boolean owns(String internalName) {
+        for (String p : prefixes) {
+            if (internalName.startsWith(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// The name the application was compiled against, when `relocated` is one
     /// this layer produced from a prefix, else null. Build messages use it:
     /// a developer knows `javax.swing.JTable`, not where it ships.

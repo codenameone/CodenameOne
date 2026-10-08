@@ -31,7 +31,10 @@ import com.codename1.build.ProjectHost;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.FieldVisitor;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -97,6 +100,8 @@ public class BytecodeCompliance {
 
     private Set<String> pendingProjectClasses = Collections.emptySet();
 
+    private List<Relocation> activeLayers;
+
     /// A check of the project `host` describes.
     public BytecodeCompliance(ProjectHost host) {
         this.host = host;
@@ -124,6 +129,22 @@ public class BytecodeCompliance {
         this.pendingProjectClasses = internalNames == null ? Collections.<String>emptySet()
                 : new HashSet<String>(internalNames);
         return this;
+    }
+
+    /// The compatibility layers the checked classes were relocated by. Left
+    /// unset, [#execute] works them out from the project's dependencies
+    /// ([CompatLayers#active]), which is right for every build; a caller that
+    /// already knows them can say so. They decide two things: a reference
+    /// into a layer's packages is reported under the name the application was
+    /// compiled against, and it is looked for in more places (see
+    /// `ComplianceScanner`).
+    public BytecodeCompliance activeLayers(List<Relocation> layers) {
+        this.activeLayers = layers == null ? null : new ArrayList<Relocation>(layers);
+        return this;
+    }
+
+    private List<Relocation> layers() {
+        return activeLayers == null ? Collections.<Relocation>emptyList() : activeLayers;
     }
 
     private boolean isPendingProjectClass(String owner) {
@@ -319,6 +340,9 @@ public class BytecodeCompliance {
         Map<String, ClassMetadata> allowedIndex = buildClassIndex(Arrays.asList(getJavaRuntimeJar(), getCodenameOneJar()));
         Map<String, ClassMetadata> projectAndDependencyIndex = buildClassIndexWithOutput(outputDir, dependencyJars);
         projectAndDependencyIndex.putAll(buildClassIndex(siblingClassRoots));
+        if (activeLayers == null) {
+            activeLayers = CompatLayers.active(dependencyJars);
+        }
 
         List<Violation> violations = scanProjectClasses(outputDir, allowedIndex, projectAndDependencyIndex);
         if (!violations.isEmpty()) {
@@ -1008,15 +1032,21 @@ public class BytecodeCompliance {
                         continue;
                     }
                     ClassMetadata metadata = readClassMetadata(new ByteArrayInputStream(bytes), sourcePrefix + "!" + entryName);
-                    if (metadata != null) {
+                    ClassMetadata moved = null;
+                    if (relocated) {
+                        moved = readClassMetadata(new ByteArrayInputStream(CompatLayers.EVERY.remap(bytes)),
+                                sourcePrefix + "!" + entryName);
+                    }
+                    // A runtime authored under the names it ships with (the
+                    // Swing layer's) keeps its name through relocation. It is
+                    // then one class, not two, and the relocated reading is
+                    // the one to keep: its members name the JDK classes the
+                    // device has, as the application's relocated calls do.
+                    if (metadata != null && (moved == null || !metadata.name.equals(moved.name))) {
                         index.put(metadata.name, metadata);
                     }
-                    if (relocated) {
-                        ClassMetadata moved = readClassMetadata(new ByteArrayInputStream(CompatLayers.EVERY.remap(bytes)),
-                                sourcePrefix + "!" + entryName);
-                        if (moved != null) {
-                            index.put(moved.name, moved);
-                        }
+                    if (moved != null) {
+                        index.put(moved.name, moved);
                     }
                 } else if (isClassArchiveName(entryName)) {
                     indexArchiveStream(new ByteArrayInputStream(bytes), sourcePrefix + "!" + entryName, index);
@@ -1222,13 +1252,58 @@ public class BytecodeCompliance {
         Set<String> fields = new HashSet<String>();
     }
 
+    /// Reports every reference a class makes that the device could not link.
+    ///
+    /// A project with no compatibility layer is checked at its method, field
+    /// and type instructions, and each failing instruction is one violation.
+    ///
+    /// A reference into an ACTIVE layer's relocated packages is held to more,
+    /// because for the Swing layer this check is the only compiler there is:
+    /// the application compiled against the real JDK, so javac accepted every
+    /// call the JDK has, and nothing before this point knows which of them
+    /// the layer provides. Such a reference is therefore also looked for in
+    /// the superclass and interfaces, the types of declared fields and
+    /// methods, declared `throws`, `catch` types, class constants, array
+    /// types, and the three parts of an `invokedynamic` -- which is what every
+    /// lambda and method reference compiles to: the functional interface in
+    /// its descriptor, the bootstrap method types, and the method handle's
+    /// target. It is reported under the name the developer wrote
+    /// (`javax.swing.JTable.setAutoCreateRowSorter(boolean)`), once per source
+    /// line, with a missing class reported as the class rather than as each
+    /// of its members.
+    ///
+    /// None of the additional places is examined for any other reference, so
+    /// the result for a project with no layer is what it always was.
+    ///
+    /// #### What it cannot see
+    ///
+    /// An application class that overrides or implements a method the JDK
+    /// type declares but the layer's type does not -- `paintComponent` on a
+    /// component whose compat class never calls it, a listener method the
+    /// compat interface lacks -- passes. The override is an ordinary method
+    /// of the application's own class; nothing in the class file says which
+    /// inherited method it was written against, and telling would need the
+    /// JDK's own signatures to compare the layer with. The method is then
+    /// simply never called on a device. Only an explicit `super.method()`
+    /// call, which is a method instruction like any other, is caught.
     private final class ComplianceScanner extends ClassVisitor {
         private final File classFile;
         private final File outputDir;
         private final Map<String, ClassMetadata> allowedIndex;
         private final Map<String, ClassMetadata> projectAndDependencyIndex;
         private final List<Violation> violations;
+        private final List<Relocation> layers = layers();
+        private final ClassRelocator layerNames = new ClassRelocator(layers);
+        /// Layer symbols already reported for this class: `symbol` alone, and
+        /// `symbol@line` for each line it was reported at.
+        private final Set<String> reportedLayerSymbols = new HashSet<String>();
+        /// Layer symbols missing from a declaration, which has no line of its
+        /// own. Reported at the end, and only when no instruction reported
+        /// the same symbol with a line.
+        private final Map<String, DeclaredSymbol> declaredLayerSymbols = new LinkedHashMap<String, DeclaredSymbol>();
         private String className;
+        private String sourceFile;
+        private int currentLine;
 
         private ComplianceScanner(File classFile,
                                   File outputDir,
@@ -1246,12 +1321,57 @@ public class BytecodeCompliance {
         @Override
         public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
             className = name;
+            if (layers.isEmpty()) {
+                return;
+            }
+            List<DeclaredSymbol> declared = new ArrayList<DeclaredSymbol>();
+            checkLayerType("(extends)", superName, declared);
+            if (interfaces != null) {
+                for (String iface : interfaces) {
+                    checkLayerType("(implements)", iface, declared);
+                }
+            }
+        }
+
+        @Override
+        public void visitSource(String source, String debug) {
+            sourceFile = source;
+        }
+
+        @Override
+        public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+            if (!layers.isEmpty()) {
+                checkLayerDescriptor("(field " + name + ")", descriptor, new ArrayList<DeclaredSymbol>());
+            }
+            return null;
         }
 
         @Override
         public MethodVisitor visitMethod(int access, final String name, final String descriptor, String signature, String[] exceptions) {
             final String sourceMethod = name + descriptor;
+            currentLine = 0;
+            // What the method's own declaration is missing. It has no line, so
+            // it is given the method's first one when the code turns up.
+            final List<DeclaredSymbol> declared = new ArrayList<DeclaredSymbol>();
+            if (!layers.isEmpty()) {
+                checkLayerDescriptor(sourceMethod, descriptor, declared);
+                if (exceptions != null) {
+                    for (String thrown : exceptions) {
+                        checkLayerType(sourceMethod, thrown, declared);
+                    }
+                }
+            }
             return new MethodVisitor(Opcodes.ASM9) {
+                @Override
+                public void visitLineNumber(int line, Label start) {
+                    if (currentLine == 0) {
+                        for (DeclaredSymbol d : declared) {
+                            d.line = line;
+                        }
+                    }
+                    currentLine = line;
+                }
+
                 @Override
                 public void visitMethodInsn(int opcode, String owner, String memberName, String memberDescriptor, boolean isInterface) {
                     checkMethodReference(className, sourceMethod, owner, memberName, memberDescriptor);
@@ -1266,43 +1386,312 @@ public class BytecodeCompliance {
                 public void visitTypeInsn(int opcode, String type) {
                     checkTypeReference(className, sourceMethod, type);
                 }
+
+                @Override
+                public void visitMultiANewArrayInsn(String arrayDescriptor, int dimensions) {
+                    if (!layers.isEmpty()) {
+                        checkLayerType(sourceMethod, arrayDescriptor, null);
+                    }
+                }
+
+                @Override
+                public void visitTryCatchBlock(Label start, Label end, Label handler, String type) {
+                    // Visited before the code it covers, so before any line:
+                    // it is a declaration of the method, like its throws.
+                    if (!layers.isEmpty() && type != null) {
+                        checkLayerType(sourceMethod, type, declared);
+                    }
+                }
+
+                @Override
+                public void visitLdcInsn(Object value) {
+                    if (!layers.isEmpty()) {
+                        checkLayerConstant(sourceMethod, value);
+                    }
+                }
+
+                @Override
+                public void visitInvokeDynamicInsn(String indyName, String indyDescriptor, Handle bootstrap,
+                                                   Object... bootstrapArguments) {
+                    if (layers.isEmpty()) {
+                        return;
+                    }
+                    int before = violations.size();
+                    checkLayerDescriptor(sourceMethod, indyDescriptor, null);
+                    for (Object argument : bootstrapArguments) {
+                        checkLayerConstant(sourceMethod, argument);
+                    }
+                    if (violations.size() == before) {
+                        // Only when every class it names exists: a missing
+                        // parameter type already explains a missing method.
+                        checkFunctionalInterfaceMethod(sourceMethod, indyName, indyDescriptor, bootstrap,
+                                bootstrapArguments);
+                    }
+                }
             };
+        }
+
+        @Override
+        public void visitEnd() {
+            for (Map.Entry<String, DeclaredSymbol> e : declaredLayerSymbols.entrySet()) {
+                if (reportedLayerSymbols.add(e.getKey())) {
+                    DeclaredSymbol d = e.getValue();
+                    violations.add(new Violation(className, d.sourceMethod, d.message, null, relativePath(),
+                            sourceFile, d.line));
+                }
+            }
         }
 
         private void checkMethodReference(String sourceClass, String sourceMethod, String owner, String memberName, String memberDescriptor) {
             if (shouldAllowMethod(owner, memberName, memberDescriptor)) {
                 return;
             }
-            addViolation(sourceClass, sourceMethod, owner + "#" + memberName + memberDescriptor);
+            if (reportLayerMember(sourceMethod, owner, memberName, memberDescriptor, true)) {
+                return;
+            }
+            addViolation(sourceClass, sourceMethod, owner, owner + "#" + memberName + memberDescriptor);
         }
 
         private void checkFieldReference(String sourceClass, String sourceMethod, String owner, String memberName, String memberDescriptor) {
             if (shouldAllowField(owner, memberName, memberDescriptor)) {
                 return;
             }
-            addViolation(sourceClass, sourceMethod, owner + "#" + memberName + ":" + memberDescriptor);
+            if (reportLayerMember(sourceMethod, owner, memberName, memberDescriptor, false)) {
+                return;
+            }
+            addViolation(sourceClass, sourceMethod, owner, owner + "#" + memberName + ":" + memberDescriptor);
         }
 
         private void checkTypeReference(String sourceClass, String sourceMethod, String owner) {
             if (isArrayDescriptor(owner)) {
+                // An array of a layer's class is still a reference to the
+                // class; of anything else it was never examined.
+                if (!layers.isEmpty()) {
+                    checkLayerType(sourceMethod, owner, null);
+                }
                 return;
             }
             if (isInternalRewriteHelper(owner)) {
                 return;
             }
-            if (projectAndDependencyIndex.containsKey(owner) || allowedIndex.containsKey(owner)
-                    || isPendingProjectClass(owner)) {
+            if (isKnownClass(owner)) {
                 return;
             }
-            addViolation(sourceClass, sourceMethod, owner + " (type)");
+            Relocation layer = layerOf(owner);
+            if (layer != null) {
+                reportLayerSymbol(sourceMethod, layer, owner, javaName(owner), null);
+                return;
+            }
+            addViolation(sourceClass, sourceMethod, owner, owner + " (type)");
         }
 
-        private void addViolation(String sourceClass, String sourceMethod, String referencedMember) {
+        private boolean isKnownClass(String internalName) {
+            return projectAndDependencyIndex.containsKey(internalName) || allowedIndex.containsKey(internalName)
+                    || isPendingProjectClass(internalName);
+        }
+
+        private String relativePath() {
             String relativePath = classFile.getAbsolutePath().replace(outputDir.getAbsolutePath(), "");
             if (relativePath.startsWith(File.separator)) {
                 relativePath = relativePath.substring(1);
             }
-            violations.add(new Violation(sourceClass, sourceMethod, referencedMember, replacementFor(referencedMember), relativePath));
+            return relativePath;
+        }
+
+        private void addViolation(String sourceClass, String sourceMethod, String owner, String referencedMember) {
+            violations.add(new Violation(sourceClass, sourceMethod, referencedMember,
+                    replacementFor(referencedMember, owner, layers), relativePath(), sourceFile, currentLine));
+        }
+
+        /// The active layer whose relocated packages `internalName` is in, or
+        /// null: the references the wider scan applies to.
+        private Relocation layerOf(String internalName) {
+            if (internalName == null) {
+                return null;
+            }
+            for (Relocation layer : layers) {
+                if (layer.original(internalName) != null) {
+                    return layer;
+                }
+            }
+            return null;
+        }
+
+        /// Records that `api` is missing from `layer`. `declared` is non-null
+        /// for a reference made by a declaration rather than by an
+        /// instruction; such a reference is held in `declaredLayerSymbols`.
+        private void reportLayerSymbol(String sourceMethod, Relocation layer, String symbol, String api,
+                                       List<DeclaredSymbol> declared) {
+            String message = api + " is not supported by the Codename One " + layer.name() + " compatibility layer";
+            if (declared != null) {
+                if (!declaredLayerSymbols.containsKey(symbol)) {
+                    DeclaredSymbol d = new DeclaredSymbol(sourceMethod, message);
+                    declaredLayerSymbols.put(symbol, d);
+                    declared.add(d);
+                }
+                return;
+            }
+            if (!reportedLayerSymbols.add(symbol + "@" + currentLine)) {
+                return;
+            }
+            reportedLayerSymbols.add(symbol);
+            violations.add(new Violation(className, sourceMethod, message, null, relativePath(), sourceFile,
+                    currentLine));
+        }
+
+        /// Reports an unresolved member whose owner is a layer's class, and
+        /// answers whether it was one. A class the layer lacks altogether is
+        /// reported as the class: its constructor and every method called on
+        /// it would otherwise each say the same thing.
+        private boolean reportLayerMember(String sourceMethod, String owner, String memberName, String memberDescriptor,
+                                          boolean method) {
+            Relocation layer = layerOf(owner);
+            if (layer == null) {
+                return false;
+            }
+            if (!isKnownClass(owner)) {
+                reportLayerSymbol(sourceMethod, layer, owner, javaName(owner), null);
+            } else {
+                reportLayerSymbol(sourceMethod, layer, owner + "#" + memberName + (method ? "" : ":") + memberDescriptor,
+                        javaMember(owner, memberName, memberDescriptor, method), null);
+            }
+            return true;
+        }
+
+        /// `type` is an internal name or an array descriptor.
+        private void checkLayerType(String sourceMethod, String type, List<DeclaredSymbol> declared) {
+            if (type == null) {
+                return;
+            }
+            String name = type;
+            if (isArrayDescriptor(type)) {
+                Type element = Type.getType(type).getElementType();
+                if (element.getSort() != Type.OBJECT) {
+                    return;
+                }
+                name = element.getInternalName();
+            }
+            Relocation layer = layerOf(name);
+            if (layer != null && !isKnownClass(name)) {
+                reportLayerSymbol(sourceMethod, layer, name, javaName(name), declared);
+            }
+        }
+
+        /// Every class a field or method descriptor names.
+        private void checkLayerDescriptor(String sourceMethod, String descriptor, List<DeclaredSymbol> declared) {
+            Type type = Type.getType(descriptor);
+            if (type.getSort() == Type.METHOD) {
+                for (Type argument : type.getArgumentTypes()) {
+                    checkLayerValueType(sourceMethod, argument, declared);
+                }
+                checkLayerValueType(sourceMethod, type.getReturnType(), declared);
+            } else {
+                checkLayerValueType(sourceMethod, type, declared);
+            }
+        }
+
+        private void checkLayerValueType(String sourceMethod, Type type, List<DeclaredSymbol> declared) {
+            Type element = type.getSort() == Type.ARRAY ? type.getElementType() : type;
+            if (element.getSort() == Type.OBJECT) {
+                checkLayerType(sourceMethod, element.getInternalName(), declared);
+            }
+        }
+
+        /// A constant-pool value an instruction loads: a class, a method type,
+        /// a method handle or a dynamic constant. Anything else names no class.
+        private void checkLayerConstant(String sourceMethod, Object value) {
+            if (value instanceof Type) {
+                checkLayerDescriptor(sourceMethod, ((Type) value).getDescriptor(), null);
+            } else if (value instanceof Handle) {
+                checkLayerHandle(sourceMethod, (Handle) value);
+            } else if (value instanceof ConstantDynamic) {
+                ConstantDynamic constant = (ConstantDynamic) value;
+                checkLayerDescriptor(sourceMethod, constant.getDescriptor(), null);
+                for (int i = 0; i < constant.getBootstrapMethodArgumentCount(); i++) {
+                    checkLayerConstant(sourceMethod, constant.getBootstrapMethodArgument(i));
+                }
+            }
+        }
+
+        /// A method handle is a call or field access spelled as a constant:
+        /// `JTable::setAutoCreateRowSorter` reaches the method through one and
+        /// through no method instruction.
+        private void checkLayerHandle(String sourceMethod, Handle handle) {
+            String owner = handle.getOwner();
+            boolean method = handle.getTag() >= Opcodes.H_INVOKEVIRTUAL;
+            if (!isArrayDescriptor(owner) && layerOf(owner) != null
+                    && !resolveMember(owner, memberKey(handle.getName(), handle.getDesc()), method)) {
+                reportLayerMember(sourceMethod, owner, handle.getName(), handle.getDesc(), method);
+            }
+            checkLayerDescriptor(sourceMethod, handle.getDesc(), null);
+        }
+
+        /// A lambda implements one method of the interface its `invokedynamic`
+        /// returns. The interface existing is not enough: the layer's version
+        /// has to declare that method, or the lambda can never be called.
+        private void checkFunctionalInterfaceMethod(String sourceMethod, String methodName, String indyDescriptor,
+                                                    Handle bootstrap, Object[] bootstrapArguments) {
+            if (!"java/lang/invoke/LambdaMetafactory".equals(bootstrap.getOwner()) || bootstrapArguments.length == 0
+                    || !(bootstrapArguments[0] instanceof Type)) {
+                return;
+            }
+            Type functional = Type.getReturnType(indyDescriptor);
+            Type implemented = (Type) bootstrapArguments[0];
+            if (functional.getSort() != Type.OBJECT || implemented.getSort() != Type.METHOD) {
+                return;
+            }
+            String owner = functional.getInternalName();
+            if (layerOf(owner) != null && isKnownClass(owner)
+                    && !resolveMember(owner, memberKey(methodName, implemented.getDescriptor()), true)) {
+                reportLayerMember(sourceMethod, owner, methodName, implemented.getDescriptor(), true);
+            }
+        }
+
+        /// `javax.swing.JTable` for the internal name the class ships under.
+        private String javaName(String internalName) {
+            String original = layerNames.original(internalName);
+            if (original.startsWith(Relocation.JDK_PACKAGE)) {
+                for (String[] shim : Relocation.JDK_SHIMS) {
+                    if (shim[1].equals(original)) {
+                        original = shim[0];
+                        break;
+                    }
+                }
+            }
+            return original.replace('/', '.').replace('$', '.');
+        }
+
+        private String javaTypeName(Type type) {
+            if (type.getSort() == Type.ARRAY) {
+                StringBuilder sb = new StringBuilder(javaTypeName(type.getElementType()));
+                for (int i = 0; i < type.getDimensions(); i++) {
+                    sb.append("[]");
+                }
+                return sb.toString();
+            }
+            return type.getSort() == Type.OBJECT ? javaName(type.getInternalName()) : type.getClassName();
+        }
+
+        /// The member as its documentation spells it:
+        /// `javax.swing.JTable.setAutoCreateRowSorter(boolean)`,
+        /// `new javax.swing.JTable(int, int)`, `javax.swing.JTable.AUTO_RESIZE_OFF`.
+        private String javaMember(String owner, String memberName, String memberDescriptor, boolean method) {
+            String ownerName = javaName(owner);
+            if (!method) {
+                return ownerName + "." + memberName;
+            }
+            StringBuilder sb = new StringBuilder();
+            if ("<init>".equals(memberName)) {
+                sb.append("new ").append(ownerName);
+            } else {
+                sb.append(ownerName).append('.').append(memberName);
+            }
+            sb.append('(');
+            Type[] arguments = Type.getArgumentTypes(memberDescriptor);
+            for (int i = 0; i < arguments.length; i++) {
+                sb.append(i == 0 ? "" : ", ").append(javaTypeName(arguments[i]));
+            }
+            return sb.append(')').toString();
         }
 
         private boolean shouldAllowMethod(String owner, String name, String descriptor) {
@@ -1372,19 +1761,35 @@ public class BytecodeCompliance {
         return JDK_API_REWRITE_HELPER_INTERNAL_NAME.equals(owner);
     }
 
-    private static String replacementFor(String referencedMember) {
+    /// The advice printed beside a violation, or null. `owner` is the class
+    /// the reference names. A class of a compatibility layer's API that
+    /// arrives here unrelocated belongs to a project that has not switched
+    /// the layer on; the wording for that is [CompatLayers#enableHint].
+    private static String replacementFor(String referencedMember, String owner, List<Relocation> active) {
         String direct = SUGGESTED_REPLACEMENTS.get(referencedMember);
         if (direct != null) {
             return direct;
         }
-        int hashPos = referencedMember.indexOf('#');
-        if (hashPos > 0) {
-            String ownerOnly = referencedMember.substring(0, hashPos);
-            if (ownerOnly.startsWith("java/awt/") || ownerOnly.startsWith("javax/swing/")) {
-                return "Codename One does not support AWT/Swing APIs. Use com.codename1.ui components for UI logic.";
+        if (owner != null) {
+            Relocation layer = CompatLayers.owning(owner);
+            if (layer != null && !active.contains(layer)) {
+                return CompatLayers.enableHint(layer);
             }
         }
         return null;
+    }
+
+    /// A reference missing from a declaration, held back until the class has
+    /// been read; see `ComplianceScanner`.
+    private static final class DeclaredSymbol {
+        private final String sourceMethod;
+        private final String message;
+        private int line;
+
+        private DeclaredSymbol(String sourceMethod, String message) {
+            this.sourceMethod = sourceMethod;
+            this.message = message;
+        }
     }
 
     private static final class Violation {
@@ -1393,19 +1798,43 @@ public class BytecodeCompliance {
         private final String referencedMember;
         private final String suggestion;
         private final String sourcePath;
+        /// The source file the class was compiled from and the line of the
+        /// reference, when the class carries debug information: null and 0
+        /// otherwise, each on its own.
+        private final String sourceFile;
+        private final int line;
 
         private Violation(String sourceClass, String sourceMethod, String referencedMember, String suggestion, String sourcePath) {
+            this(sourceClass, sourceMethod, referencedMember, suggestion, sourcePath, null, 0);
+        }
+
+        private Violation(String sourceClass, String sourceMethod, String referencedMember, String suggestion, String sourcePath,
+                          String sourceFile, int line) {
             this.sourceClass = sourceClass;
             this.sourceMethod = sourceMethod;
             this.referencedMember = referencedMember;
             this.suggestion = suggestion;
             this.sourcePath = sourcePath;
+            this.sourceFile = sourceFile;
+            this.line = line;
+        }
+
+        /// `Foo.java:123`, `Foo.java` when only the file is known, else null.
+        private String location() {
+            if (sourceFile == null || sourceFile.isEmpty()) {
+                return null;
+            }
+            return line > 0 ? sourceFile + ":" + line : sourceFile;
         }
 
         private String render() {
             StringBuilder sb = new StringBuilder();
             sb.append("Source class: ").append(sourceClass).append("\n");
             sb.append("Source method: ").append(sourceMethod).append("\n");
+            String location = location();
+            if (location != null) {
+                sb.append("Source location: ").append(location).append("\n");
+            }
             sb.append("Source bytecode file: ").append(sourcePath).append("\n");
             sb.append("Forbidden reference: ").append(referencedMember);
             if (suggestion != null && !suggestion.isEmpty()) {
@@ -1419,6 +1848,10 @@ public class BytecodeCompliance {
             sb.append(sourceClass).append("#").append(sourceMethod)
                     .append(" -> ").append(referencedMember)
                     .append(" (").append(sourcePath).append(")");
+            String location = location();
+            if (location != null) {
+                sb.append(" at ").append(location);
+            }
             if (suggestion != null && !suggestion.isEmpty()) {
                 sb.append(" Suggestion: ").append(suggestion);
             }
