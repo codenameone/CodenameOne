@@ -134,26 +134,6 @@
      }
     }
    },
-   "objectAllocation": {
-    "all": {
-     "from": {
-      "memory": 0.363,
-      "time": 5.571,
-      "tolerance": {
-       "memory": 0.3,
-       "time": 0.5
-      }
-     },
-     "memory": 0.34,
-     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
-     "runs": 1,
-     "time": 5.703,
-     "tolerance": {
-      "memory": 0.3,
-      "time": 0.5
-     }
-    }
-   },
    "quicksort": {
     "all": {
      "from": {
@@ -207,67 +187,6 @@
       "time": 0.2
      }
     }
-   },
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.539,
-      "time": 0.495,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.496,
-     "reason": "PR #5883: linux-x64 AMD EPYC 9V45 calibrated from this branch's runs, measured with its VM changes",
-     "runs": 1,
-     "time": 0.492,
-     "tolerance": {
-      "time": 0.2
-     }
-    }
-   }
-  },
-  "windows-x64@amd64-family-25-model-1-authenticamd": {
-   "hello": {
-    "all": {
-     "from": {
-      "memory": 0.803,
-      "time": 1.228,
-      "tolerance": {
-       "time": 0.25
-      }
-     },
-     "memory": 0.806,
-     "reason": "PR #5883: hello RAM on this CPU recalibrated from all 11 of its CI runs (this branch's and master's), time left alone. The JDK 25 reference's RAM is bimodal on this runner -- run 37108550136 measured it at 948-1801 MB across rounds while ParparVM stayed at 794-872 MB -- so a run's median ratio lands anywhere from 0.555x to 0.907x with unchanged VM code, and the global 15% tolerance around 0.803x failed that run as IMPROVED at 0.565x.",
-     "runs": 11,
-     "time": 1.228,
-     "tolerance": {
-      "memory": 0.5,
-      "time": 0.25
-     }
-    }
-   }
-  },
-  "windows-x64@amd64-family-26-model-2-authenticamd": {
-   "objectAllocation": {
-    "all": {
-     "from": {
-      "memory": 0.26,
-      "time": 5.86,
-      "tolerance": {
-       "memory": 0.3,
-       "time": 0.5
-      }
-     },
-     "memory": 0.331,
-     "reason": "PR #5883: objectAllocation RAM on this CPU is bimodal because the JDK 25 reference's RSS is, not ours. Every run on record: 0.26x (the original single-run calibration of #5903's code), 0.403x (this branch, run 36818059323: ParparVM 251-259 MB, JDK 579-719 MB), 0.402x (another branch on master's VM code, run 37130456164: ParparVM 248-260 MB, JDK 575-671 MB) and 0.245x (this branch, run 37138061955: ParparVM 248-284 MB flat, JDK 557-1669 MB across its rounds). ParparVM's footprint is the same in all of them, so the row is recalibrated from the four run medians: their median 0.331x with a tolerance from their spread (40%), which passes both modes. This branch's objectAllocation RAM is in master's range on every CPU with runs of both (Windows AMD Family 25 Model 1 0.370x-0.462x against 0.362x-0.428x; Neoverse-N2 0.226x-0.252x against 0.197x-0.243x). Time is left alone: 7.37x in run 37138061955 (ParparVM 53-58 ms, then 43.4 ms in round 5 of the same binary) and 5.99x in run 37130456164 both sit inside the existing 5.86x +/-50% row.",
-     "runs": 4,
-     "time": 5.86,
-     "tolerance": {
-      "memory": 0.4,
-      "time": 0.5
-     }
-    }
    }
   },
   "windows-x64@intel64-family-6-model-106-genuineintel": {
@@ -287,26 +206,6 @@
      "tolerance": {
       "memory": 0.55,
       "time": 0.4
-     }
-    }
-   }
-  },
-  "windows-x64@intel64-family-6-model-207-genuineintel": {
-   "recursion": {
-    "all": {
-     "from": {
-      "memory": 0.059,
-      "time": 1.204,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.059,
-     "reason": "PR #5883: recursion time on this CPU re-measured with this branch's VM (ReachabilityCull, inline threshold, type-aware RTA); Bench.java is unchanged. Run 37132788847 read 0.944x (rounds 1.025, 0.944, 0.946, 0.933, 0.942: ParparVM 161.6-163.3 ms after a 192.5 ms first round, JDK 25 172.6-173.3 ms) against 1.204x, a row taken from one run of #5903's code whose logs and artifacts have expired; it is the only run of this CPU still on record, so no master-VM run here remains to compare. The direction is a real effect of this branch: on Windows x64 AMD Family 25 Model 1 its 8 runs read 1.378x-1.383x against 1.488x-1.491x on 8 runs of master's VM code (master and the #5930 branch), ParparVM 182.5-182.8 ms against 197.0-197.5 ms with JDK 25 at 132.1-132.6 ms in both; on Family 25 Model 17 it did not move (1.379x-1.381x against 1.381x-1.382x). The -21.6% magnitude on this CPU rests on one run per side and is unverified.",
-     "runs": 1,
-     "time": 0.944,
-     "tolerance": {
-      "time": 0.2
      }
     }
    }
