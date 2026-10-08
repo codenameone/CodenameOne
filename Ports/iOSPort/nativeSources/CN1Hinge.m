@@ -37,15 +37,16 @@
 //  comparison, because it answers the question actually being asked -- does this
 //  SDK declare the API -- and keeps working when Apple renumbers.
 //
-//  watchOS needs no special case: UIHinge is API_UNAVAILABLE(watchos) and the
-//  header is absent from the watch SDK, so the same guard compiles the whole
-//  implementation out there and leaves the "no hinge" answers behind.
+//  The watch SDK can contain the header even though its UIKit types are
+//  API_UNAVAILABLE(watchos). Exclude watchOS explicitly as well as checking
+//  for the header; watchOS retains the "no hinge" answers.
 //
 
 #import "CodenameOne_GLViewController.h"
 #import "CN1Hinge.h"
+#import <TargetConditionals.h>
 
-#if __has_include(<UIKit/UIHingeInteraction.h>)
+#if !TARGET_OS_WATCH && __has_include(<UIKit/UIHingeInteraction.h>)
 #define CN1_HAS_HINGE_SDK 1
 #import <UIKit/UIKit.h>
 #import <UIKit/UIHinge.h>
