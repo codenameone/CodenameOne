@@ -245,6 +245,8 @@ include::Working-With-Javascript.asciidoc[]
 
 include::Android-Interop.asciidoc[]
 
+include::Desktop-Interop.asciidoc[]
+
 include::Working-with-Mac-OS-X.asciidoc[]
 
 include::Working-with-Mac-Catalyst.asciidoc[]
