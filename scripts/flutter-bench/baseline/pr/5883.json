@@ -124,25 +124,25 @@
      "from": {
       "value": 12910326
      },
-     "reason": "+460 bytes for the lifecycle fix fe482ff7e8, then +15,693 code bytes (+0.12%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7).",
+     "reason": "+460 bytes (fe482ff7e8 lifecycle fix), +15,693 (1f97b4f6da, 358604f9b7 const collections and typed fields), then master merge 6ebf543f41 (JavaScript text selection and startup #5952, classic Android apps #5941, backend security #5961): +148,467 code bytes (+1.16%) in the shared JavaScript port and core; run 37824086148",
      "runs": 1,
-     "value": 12836795
+     "value": 12985262
     },
     "install_bytes": {
      "from": {
       "value": 110000963
      },
-     "reason": "+460 bytes for the lifecycle fix fe482ff7e8, then +15,693 code bytes (+0.12%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7).",
+     "reason": "+460 bytes (fe482ff7e8 lifecycle fix), +15,693 (1f97b4f6da, 358604f9b7 const collections and typed fields), then master merge 6ebf543f41 (JavaScript text selection and startup #5952, classic Android apps #5941, backend security #5961): +148,467 code bytes (+1.16%) in the shared JavaScript port and core; run 37824086148",
      "runs": 1,
-     "value": 108123092
+     "value": 108271844
     },
     "wire_bytes": {
      "from": {
       "value": 80610118
      },
-     "reason": "+460 bytes for the lifecycle fix fe482ff7e8, then +15,693 code bytes (+0.12%) for frozen const collections, Directionality/locale resolution (1f97b4f6da) and typed fields for untyped collection literals (358604f9b7).",
+     "reason": "+460 bytes (fe482ff7e8 lifecycle fix), +15,693 (1f97b4f6da, 358604f9b7 const collections and typed fields), then master merge 6ebf543f41 (JavaScript text selection and startup #5952, classic Android apps #5941, backend security #5961): +148,467 code bytes (+1.16%) in the shared JavaScript port and core; run 37824086148",
      "runs": 1,
-     "value": 79717445
+     "value": 79744971
     }
    }
   },
