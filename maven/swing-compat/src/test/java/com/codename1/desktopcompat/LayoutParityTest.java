@@ -38,6 +38,7 @@ import com.codename1.desktopcompat.javax.swing.JComponent;
 import com.codename1.desktopcompat.javax.swing.border.EmptyBorder;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /// Lays the same component tree out twice -- once with the JDK's own layout
 /// managers and once with this layer's -- and requires identical results.
@@ -90,6 +91,7 @@ public class LayoutParityTest {
         float ax = 0.5f;
         float ay = 0.5f;
         boolean hidden;
+        int base = -1;
         int[] layout;
         int[] border;
         int[] colW;
@@ -123,6 +125,13 @@ public class LayoutParityTest {
 
         Node hide() {
             hidden = true;
+            return this;
+        }
+
+        /// Gives the leaf a baseline that many pixels from its top,
+        /// whatever its size.
+        Node base(int b) {
+            base = b;
             return this;
         }
 
@@ -236,9 +245,17 @@ public class LayoutParityTest {
         private final float ax;
         private final float ay;
 
-        RealLeaf(float ax, float ay) {
+        private final int base;
+
+        RealLeaf(float ax, float ay, int base) {
             this.ax = ax;
             this.ay = ay;
+            this.base = base;
+        }
+
+        @Override
+        public int getBaseline(int width, int height) {
+            return base;
         }
 
         @Override
@@ -255,7 +272,7 @@ public class LayoutParityTest {
     private static java.awt.Component real(Node n) {
         switch (n.kind) {
             case LEAF: {
-                java.awt.Component c = new RealLeaf(n.ax, n.ay);
+                java.awt.Component c = new RealLeaf(n.ax, n.ay, n.base);
                 c.setPreferredSize(new java.awt.Dimension(n.pw, n.ph));
                 c.setMinimumSize(new java.awt.Dimension(n.minw, n.minh));
                 if (n.maxw >= 0) {
@@ -385,9 +402,17 @@ public class LayoutParityTest {
         private final float ax;
         private final float ay;
 
-        OurLeaf(float ax, float ay) {
+        private final int base;
+
+        OurLeaf(float ax, float ay, int base) {
             this.ax = ax;
             this.ay = ay;
+            this.base = base;
+        }
+
+        @Override
+        public int getBaseline(int width, int height) {
+            return base;
         }
 
         @Override
@@ -404,7 +429,7 @@ public class LayoutParityTest {
     private static Component ours(Node n) {
         switch (n.kind) {
             case LEAF: {
-                Component c = new OurLeaf(n.ax, n.ay);
+                Component c = new OurLeaf(n.ax, n.ay, n.base);
                 c.setPreferredSize(new Dimension(n.pw, n.ph));
                 c.setMinimumSize(new Dimension(n.minw, n.minh));
                 if (n.maxw >= 0) {
@@ -923,6 +948,248 @@ public class LayoutParityTest {
             }
             check("random grid bag " + round, p, 200 + rnd.nextInt(500), 150 + rnd.nextInt(400), rnd.nextInt(250),
                     rnd.nextInt(200));
+        }
+    }
+
+    @Test
+    public void overlayLayout() {
+        check("corners",
+                panel(OVERLAY).add(leaf(40, 20).align(0f, 0f)).add(leaf(70, 35).align(1f, 1f))
+                        .add(leaf(30, 50).align(0f, 1f)).add(leaf(60, 10).align(1f, 0f)),
+                300, 200, 110, 85, 60, 40, 0, 0);
+        check("centred, growing to the maximum",
+                panel(OVERLAY).add(leaf(40, 20).max(1000, 1000)).add(leaf(70, 35).max(90, 500))
+                        .add(leaf(30, 50).max(30, 50)).add(leaf(60, 10)),
+                300, 200, 70, 50, 20, 20);
+        check("shrinking to the minimum",
+                panel(OVERLAY).border(2, 4, 6, 8).add(leaf(140, 120).min(10, 10).align(0.25f, 0.75f))
+                        .add(leaf(170, 135).min(60, 20).align(0.75f, 0.25f)).add(leaf(90, 90).min(90, 90).align(1f, 0f)),
+                400, 400, 200, 150, 100, 60, 12, 8);
+        check("hidden children still take part",
+                panel(OVERLAY).add(leaf(40, 20).align(0f, 0f)).add(leaf(170, 135).hide().align(1f, 1f))
+                        .add(leaf(30, 50).hide()),
+                300, 200, 50, 50);
+        check("one child", panel(OVERLAY).border(1, 2, 3, 4).add(leaf(40, 20).max(45, 300).align(0.3f, 0.6f)), 300,
+                200, 10, 10);
+        check("empty overlay", panel(OVERLAY).border(1, 2, 3, 4), 50, 50);
+        check("nested overlays",
+                panel(OVERLAY).border(3, 3, 3, 3)
+                        .add(panel(OVERLAY).add(leaf(40, 20).align(0f, 0f)).add(leaf(20, 60).align(1f, 0.5f)))
+                        .add(panel(BOX, 1).add(leaf(30, 30).max(90, 40)).add(filler(VGLUE, 0, 0)).add(leaf(50, 20)))
+                        .add(panel(FLOW, 1, 5, 5).add(leaf(33, 12)).add(leaf(44, 12))).add(leaf(10, 10).max(900, 900)),
+                400, 300, 120, 90, 30, 30);
+        check("an overlay inside other layouts",
+                panel(BORDER, 2, 2).add(panel(OVERLAY).add(leaf(40, 20).align(0f, 1f)).add(leaf(70, 35)), "North")
+                        .add(panel(OVERLAY).border(1, 1, 1, 1).add(leaf(55, 44).max(60, 400).align(1f, 0f))
+                                .add(leaf(22, 66).min(5, 5)), "West")
+                        .add(panel(OVERLAY).add(leaf(10, 10).max(5000, 5000)).add(leaf(80, 80).max(80, 80)), "Center"),
+                500, 400, 100, 100);
+    }
+
+    @Test
+    public void overlayLayoutRandom() {
+        Random rnd = new Random(551177L);
+        float[] aligns = {0f, 0.5f, 1f, 0.25f, 0.7f, 0.1f, 0.9f};
+        for (int round = 0; round < 400; round++) {
+            Node p = panel(OVERLAY);
+            if (rnd.nextInt(3) == 0) {
+                p.border(rnd.nextInt(6), rnd.nextInt(6), rnd.nextInt(6), rnd.nextInt(6));
+            }
+            int count = rnd.nextInt(6);
+            for (int i = 0; i < count; i++) {
+                int w = 5 + rnd.nextInt(90);
+                int h = 5 + rnd.nextInt(90);
+                Node n = leaf(w, h).min(rnd.nextInt(w + 1), rnd.nextInt(h + 1)).align(
+                        aligns[rnd.nextInt(aligns.length)], aligns[rnd.nextInt(aligns.length)]);
+                if (rnd.nextInt(3) != 0) {
+                    n.max(w + rnd.nextInt(200), h + rnd.nextInt(200));
+                }
+                if (rnd.nextInt(9) == 0) {
+                    n.hide();
+                }
+                p.add(n);
+            }
+            check("random overlay " + round, p, rnd.nextInt(500), rnd.nextInt(400), rnd.nextInt(120),
+                    rnd.nextInt(120), 0, 0);
+        }
+    }
+
+    /// The anchors that are relative to the baseline of a row, with
+    /// components that have a baseline and components that have none.
+    @Test
+    public void gridBagBaselineAnchors() {
+        int[] anchors = {0x100, 0x200, 0x300, 0x400, 0x500, 0x600, 0x700, 0x800, 0x900};
+        Node none = panel(GRIDBAG);
+        Node some = panel(GRIDBAG).border(2, 3, 4, 5);
+        Node filled = panel(GRIDBAG);
+        for (int i = 0; i < anchors.length; i++) {
+            none.add(leaf(20 + i, 10 + 3 * i), g().at(i % 3, i / 3).weight(1, 1).anchor(anchors[i]));
+            some.add(leaf(20 + i, 14 + 3 * i).base(4 + 2 * i), g().at(i % 3, i / 3).weight(1, 1).anchor(anchors[i])
+                    .insets(1, 2, 3, i));
+            filled.add(leaf(20 + i, 14 + 3 * i).base(i % 2 == 0 ? 5 + i : -1),
+                    g().at(i % 4, i / 4).weight(i % 2, 1).anchor(anchors[i]).fill(i % 4).ipad(i, 2));
+        }
+        check("baseline anchors without baselines", none, 400, 300, 90, 70, 30, 20);
+        check("baseline anchors", some, 400, 300, 401, 299, 90, 70, 30, 20);
+        check("baseline anchors with fill", filled, 400, 300, 120, 80);
+        check("a row on one baseline",
+                panel(GRIDBAG).add(leaf(40, 20).base(15), g().at(0, 0).anchor(0x100))
+                        .add(leaf(60, 30).base(22), g().at(1, 0).anchor(0x200).weight(1, 0))
+                        .add(leaf(30, 12).base(3), g().at(2, 0).anchor(0x300))
+                        .add(leaf(30, 40), g().at(3, 0).anchor(0x100))
+                        .add(leaf(30, 16).base(8), g().at(0, 1).anchor(0x400))
+                        .add(leaf(35, 26).base(20), g().at(1, 1).anchor(0x100))
+                        .add(leaf(30, 16).base(8), g().at(2, 1).anchor(0x700).weight(0, 1)),
+                400, 300, 200, 80, 50, 30);
+    }
+
+    /// Grid bag cases the other tests leave out: fractional and uneven
+    /// weights, negative padding, spans that reach past the last occupied
+    /// cell, and vertical runs placed relatively.
+    @Test
+    public void gridBagLayoutMore() {
+        check("uneven weights",
+                panel(GRIDBAG).add(leaf(50, 20), g().at(0, 0).weight(0.1, 0.3).fill(1))
+                        .add(leaf(30, 20), g().at(1, 0).weight(0.25, 0).fill(1))
+                        .add(leaf(40, 30), g().at(2, 0).weight(0.65, 0.7).fill(1))
+                        .add(leaf(40, 30), g().at(0, 1).span(3, 1).weight(7, 0.05).fill(2)),
+                400, 300, 403, 307, 997, 601, 121, 51, 50, 20);
+        check("weight on a spanning component only",
+                panel(GRIDBAG).add(leaf(50, 20), g().at(0, 0)).add(leaf(30, 20), g().at(1, 0))
+                        .add(leaf(40, 30), g().at(2, 0))
+                        .add(leaf(200, 30), g().at(0, 1).span(2, 1).weight(1, 1).fill(1))
+                        .add(leaf(10, 90), g().at(2, 1).span(1, 2).weight(0, 2).fill(3))
+                        .add(leaf(20, 20), g().at(0, 2)),
+                500, 400, 250, 140, 100, 60);
+        check("negative padding and insets",
+                panel(GRIDBAG).border(1, 1, 1, 1).add(leaf(50, 20), g().at(0, 0).ipad(-10, -4))
+                        .add(leaf(30, 20), g().at(1, 0).ipad(-40, 3).insets(-2, -3, 4, 5).fill(1).weight(1, 1))
+                        .add(leaf(40, 30).min(4, 4), g().at(0, 1).span(2, 1).insets(9, -5, -5, 9).fill(2)),
+                300, 200, 80, 40, 20, 10);
+        check("spans past the grid",
+                panel(GRIDBAG).add(leaf(50, 20), g().at(0, 0).span(4, 1).fill(2).weight(1, 0))
+                        .add(leaf(30, 20), g().at(1, 1).span(1, 5).fill(3).weight(0, 1))
+                        .add(leaf(40, 30), g().at(6, 3).anchor(14)),
+                300, 200, 100, 60);
+        check("a column placed relatively",
+                panel(GRIDBAG).add(leaf(30, 20), g().at(0, -1)).add(leaf(31, 21), g().at(0, -1))
+                        .add(leaf(32, 22), g().at(0, -1).span(1, 0))
+                        .add(leaf(33, 23), g().at(1, -1).span(1, -1).fill(3).weight(0, 1))
+                        .add(leaf(34, 24), g().at(1, -1).span(1, 0))
+                        .add(leaf(35, 25), g().at(-1, -1).span(0, 0).weight(1, 0).fill(1)),
+                400, 300, 120, 100);
+        check("hidden components leave their cells",
+                panel(GRIDBAG).add(leaf(50, 20), g().at(0, 0)).add(leaf(300, 200).hide(), g().at(1, 0).weight(5, 5))
+                        .add(leaf(40, 30), g().at(2, 0).weight(1, 0)).add(leaf(40, 30).hide(), g())
+                        .add(leaf(41, 31), g().span(0, 1)).add(leaf(42, 32), g()),
+                400, 300, 60, 40);
+        check("nested grid bags",
+                panel(GRIDBAG).border(2, 2, 2, 2)
+                        .add(panel(GRIDBAG).add(leaf(30, 20), g().at(0, 0).weight(1, 0).fill(2))
+                                .add(leaf(31, 21), g().at(1, 0)), g().at(0, 0).weight(1, 0).fill(2))
+                        .add(panel(GRIDBAG).border(1, 1, 1, 1).add(leaf(60, 40).min(6, 4), g().weight(1, 1).fill(1)),
+                                g().at(0, 1).weight(1, 1).fill(1).insets(3, 3, 3, 3))
+                        .add(panel(OVERLAY).add(leaf(20, 20)).add(leaf(44, 12)), g().at(1, 0).span(1, 2).anchor(11)),
+                500, 400, 130, 80, 40, 30);
+    }
+
+    @Test
+    public void gridBagLayoutRandomWide() {
+        Random rnd = new Random(4410882L);
+        int rejected = 0;
+        int[] anchors = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 0x100, 0x200, 0x300,
+            0x400, 0x500, 0x600, 0x700, 0x800, 0x900};
+        for (int round = 0; round < 500; round++) {
+            Node p = panel(GRIDBAG);
+            if (rnd.nextInt(3) == 0) {
+                p.border(rnd.nextInt(8), rnd.nextInt(8), rnd.nextInt(8), rnd.nextInt(8));
+            }
+            if (rnd.nextInt(6) == 0) {
+                p.colW = new int[1 + rnd.nextInt(4)];
+                for (int i = 0; i < p.colW.length; i++) {
+                    p.colW[i] = rnd.nextInt(60);
+                }
+            }
+            if (rnd.nextInt(6) == 0) {
+                p.rowH = new int[1 + rnd.nextInt(4)];
+                for (int i = 0; i < p.rowH.length; i++) {
+                    p.rowH[i] = rnd.nextInt(40);
+                }
+            }
+            if (rnd.nextInt(6) == 0) {
+                p.colWt = new double[1 + rnd.nextInt(4)];
+                for (int i = 0; i < p.colWt.length; i++) {
+                    p.colWt[i] = rnd.nextInt(5) * 0.3;
+                }
+            }
+            if (rnd.nextInt(6) == 0) {
+                p.rowWt = new double[1 + rnd.nextInt(4)];
+                for (int i = 0; i < p.rowWt.length; i++) {
+                    p.rowWt[i] = rnd.nextInt(5) * 0.7;
+                }
+            }
+            int count = 1 + rnd.nextInt(9);
+            int mode = rnd.nextInt(3);
+            for (int i = 0; i < count; i++) {
+                int w = 5 + rnd.nextInt(90);
+                int h = 5 + rnd.nextInt(60);
+                Node n = leaf(w, h).min(rnd.nextInt(w + 1), rnd.nextInt(h + 1));
+                if (rnd.nextInt(3) == 0) {
+                    n.base(rnd.nextInt(h));
+                }
+                if (rnd.nextInt(10) == 0) {
+                    n.hide();
+                }
+                G c = g();
+                if (mode == 0) {
+                    c.at(rnd.nextInt(3) == 0 ? rnd.nextInt(4) : -1, rnd.nextInt(5) == 0 ? rnd.nextInt(4) : -1);
+                    c.span(rnd.nextInt(4) == 0 ? rnd.nextInt(3) - 1 : 1, rnd.nextInt(9) == 0 ? rnd.nextInt(3) - 1 : 1);
+                } else if (mode == 1) {
+                    // Columns filled downwards.
+                    c.at(rnd.nextInt(3), -1);
+                    c.span(1, rnd.nextInt(4) == 0 ? rnd.nextInt(3) - 1 : 1);
+                } else {
+                    c.at(rnd.nextInt(6), rnd.nextInt(6));
+                    c.span(1 + rnd.nextInt(4), 1 + rnd.nextInt(4));
+                }
+                if (rnd.nextInt(2) == 0) {
+                    c.weight(rnd.nextInt(7) * 0.17, rnd.nextInt(7) * 0.31);
+                }
+                c.anchor(anchors[rnd.nextInt(anchors.length)]).fill(rnd.nextInt(4));
+                if (rnd.nextInt(3) == 0) {
+                    c.insets(rnd.nextInt(8) - 2, rnd.nextInt(8) - 2, rnd.nextInt(8) - 2, rnd.nextInt(8) - 2);
+                }
+                if (rnd.nextInt(4) == 0) {
+                    c.ipad(rnd.nextInt(14) - 5, rnd.nextInt(14) - 5);
+                }
+                p.add(n, c);
+            }
+            int[] sizes = {200 + rnd.nextInt(500), 150 + rnd.nextInt(400), rnd.nextInt(250), rnd.nextInt(200), 0, 0};
+            if (!realLaysOut(p, sizes)) {
+                rejected++;
+                continue;
+            }
+            check("random wide grid bag " + round, p, sizes);
+        }
+        assertTrue(rejected + " of 500 random grids were rejected by the JDK", rejected < 50);
+    }
+
+    /// Whether the JDK lays the tree out at all. Its grid bag layout indexes
+    /// past its per-row baseline arrays when a relatively placed component
+    /// lands beyond the rows it counted first and something in the grid is
+    /// anchored to a baseline; this layer lays such a grid out, and there
+    /// is nothing to compare it with.
+    private static boolean realLaysOut(Node tree, int[] sizes) {
+        java.awt.Component r = real(tree);
+        try {
+            for (int i = 0; i < sizes.length; i += 2) {
+                r.setSize(sizes[i], sizes[i + 1]);
+                layout(r);
+                dump(r);
+            }
+            return true;
+        } catch (ArrayIndexOutOfBoundsException e) {
+            return false;
         }
     }
 
