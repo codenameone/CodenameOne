@@ -204,6 +204,16 @@ final class AppSupport {
                 com.codename1.gradle.tasks.CompileDesktopResourcesTask::getResourcesDirectory));
         main.getJava().srcDir(com.codename1.maven.DesktopSources.javaDir(desktopDir));
         main.getResources().srcDir(com.codename1.maven.DesktopSources.resourcesDir(desktopDir));
+        // A desktop resource in a directory ships under a flat name, which
+        // the remap writes into the classes directory (CompatResources). It
+        // also removes the nested copy, which Maven's resources step put in
+        // that same directory; Gradle copies resources to a directory of
+        // their own that the remap never sees, so the nested copies are left
+        // out here. Without this every upload carried each of them twice, and
+        // not the files Maven's carried.
+        project.getTasks().named(main.getProcessResourcesTaskName(), org.gradle.api.tasks.Copy.class, copy ->
+                copy.exclude(new NestedDesktopResource(desktopResources,
+                        new File(layout.buildDir(), "generated/resources/cn1-desktop"))));
         final File desktopEntry = com.codename1.maven.DesktopSources.entryRecord(desktopDir);
         // The class a desktop application's entry point is generated as.
         final String desktopMain = applicationMain(settings);
@@ -1013,5 +1023,38 @@ final class AppSupport {
             return null;
         }
         return pkg.length() == 0 ? main : pkg + "." + main;
+    }
+
+    /// Selects the desktop resources that sit in a directory, and those
+    /// directories: what the remap ships under a flat name instead. A file
+    /// at the root of a desktop resource directory keeps its name and is
+    /// copied as any resource is.
+    static final class NestedDesktopResource
+            implements org.gradle.api.specs.Spec<org.gradle.api.file.FileTreeElement>, java.io.Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private final String[] roots;
+
+        NestedDesktopResource(File... roots) {
+            this.roots = new String[roots.length];
+            for (int i = 0; i < roots.length; i++) {
+                this.roots[i] = roots[i].getAbsolutePath() + File.separator;
+            }
+        }
+
+        @Override
+        public boolean isSatisfiedBy(org.gradle.api.file.FileTreeElement element) {
+            if (!element.isDirectory() && element.getRelativePath().getSegments().length < 2) {
+                return false;
+            }
+            String path = element.getFile().getAbsolutePath();
+            for (String root : roots) {
+                if (path.startsWith(root)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }
