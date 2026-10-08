@@ -60,6 +60,23 @@ public abstract class Toolkit {
         return createImage(imagedata, 0, imagedata.length);
     }
 
+    /// Always empty: the size a window gets is already the room it has.
+    public Insets getScreenInsets(GraphicsConfiguration gc) {
+        return new Insets(0, 0, 0, 0);
+    }
+
+    /// The control key everywhere. Menu accelerators given with it are
+    /// shown with the platform's own primary modifier in a native menu.
+    public int getMenuShortcutKeyMask() {
+        return com.codename1.desktopcompat.java.awt.event.InputEvent.CTRL_MASK;
+    }
+
+    /// Whether a frame can be put in a state; true for the normal state
+    /// everywhere, and for the others where there is a window manager.
+    public boolean isFrameStateSupported(int state) {
+        return state == Frame.NORMAL || com.codename1.ui.Desktop.isSupported();
+    }
+
     protected abstract EventQueue getSystemEventQueueImpl();
 
     public final EventQueue getSystemEventQueue() {

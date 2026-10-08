@@ -28,90 +28,107 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
-import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
-import java.util.ArrayList;
 import java.util.List;
 
-/// The form that shows a window: the window's peer fills it, and the
-/// form's pointer and key input becomes the window's AWT events.
+/// A Codename One dialog that shows an AWT dialog, or any window that is
+/// not a frame, floating over the current form.
 ///
-/// A form shown over another gets a back command, which asks the window
-/// to close the way the close box of a desktop window does. The commands
-/// that stand for the window's menu bar go to the overflow menu of the
-/// form's toolbar, from where Codename One publishes them to the native
-/// menu bar on the ports that have one.
-public final class FrameForm extends Form implements WindowHost {
+/// The dialog takes the size the window has -- the one it was packed or
+/// set to -- no larger than the display allows; the position the
+/// application asked for is ignored and the dialog is centered. It is
+/// shown without blocking: a modal AWT dialog blocks its caller itself.
+/// The back command asks the window to close. A menu bar of such a window
+/// is shown as a row of menus, not as commands.
+public final class DialogForm extends com.codename1.ui.Dialog implements WindowHost {
 
     private final Window window;
-    private final ArrayList<Command> commands = new ArrayList<Command>();
-    private Form previous;
+    private final com.codename1.ui.Component peer;
+    private final int wantedWidth;
+    private final int wantedHeight;
+    private boolean open;
+    private boolean opening;
+    private boolean closeAsked;
 
-    public FrameForm(Window w) {
+    public DialogForm(Window w) {
         super(w.cn1Title(), new BorderLayout());
         window = w;
+        // Read before the peer is laid out in this dialog, which resizes
+        // the window to whatever room the dialog has at that moment.
+        int ww = w.getWidth();
+        int wh = w.getHeight();
+        if (ww <= 0 || wh <= 0) {
+            com.codename1.desktopcompat.java.awt.Dimension d = w.getPreferredSize();
+            ww = d.width;
+            wh = d.height;
+        }
+        wantedWidth = ww;
+        wantedHeight = wh;
         setScrollable(false);
+        setAutoDispose(false);
+        setDisposeWhenPointerOutOfBounds(false);
         setEnableCursors(true);
-        com.codename1.ui.Component p = w.cn1Peer();
-        p.remove();
-        add(BorderLayout.CENTER, p);
-        WindowHosts.listenWheel(w, p);
+        peer = w.cn1Peer();
+        peer.remove();
+        add(BorderLayout.CENTER, peer);
+        WindowHosts.listenWheel(w, peer);
+        setBackCommand(new Command("") {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                window.cn1Closing();
+            }
+        });
     }
 
-    /// The window this form shows.
+    /// The window this dialog shows.
     public Window window() {
         return window;
     }
 
-    /// The commands that stand for the window's menu bar at the moment.
-    public List<Command> cn1Commands() {
-        return new ArrayList<Command>(commands);
-    }
-
-    /// Shows the form, over the current one if there is one, and lays the
-    /// window out.
-    public void cn1Show() {
-        Form current = Display.getInstance().getCurrent();
-        if (current != this) {
-            if (current != null) {
-                previous = current;
-                setBackCommand(new Command("Back") {
-                    @Override
-                    public void actionPerformed(ActionEvent evt) {
-                        window.cn1Closing();
-                    }
-                });
-            }
-            show();
-        }
-        revalidate();
-    }
-
-    /// Goes back to the form of the window below this one, or the form
-    /// this one was shown over, if this form is the one showing.
-    public void cn1Hide() {
-        if (Display.getInstance().getCurrent() == this) {
-            Form below = WindowHosts.formBelow(window, previous);
-            if (below != null) {
-                below.showBack();
-            }
-        }
-    }
-
     @Override
     public void open() {
-        cn1Show();
+        if (open) {
+            return;
+        }
+        open = true;
+        Display d = Display.getInstance();
+        int dw = Math.min(Units.toDevice(wantedWidth), d.getDisplayWidth() * 9 / 10);
+        int dh = Math.min(Units.toDevice(wantedHeight), d.getDisplayHeight() * 8 / 10);
+        peer.setPreferredSize(new Dimension(Math.max(1, dw), Math.max(1, dh)));
+        // Showing a dialog first runs what is waiting on the event
+        // dispatch thread, and that may already hide this window again:
+        // the request is kept until the dialog is on the screen.
+        opening = true;
+        try {
+            showPacked(BorderLayout.CENTER, false);
+        } finally {
+            opening = false;
+        }
+        if (closeAsked) {
+            closeAsked = false;
+            open = true;
+            close();
+        }
     }
 
     @Override
     public void close() {
-        cn1Hide();
+        if (opening) {
+            closeAsked = true;
+            return;
+        }
+        if (open) {
+            open = false;
+            dispose();
+            peer.remove();
+        }
     }
 
     @Override
     public void release() {
-        previous = null;
+        close();
     }
 
     @Override
@@ -140,31 +157,12 @@ public final class FrameForm extends Form implements WindowHost {
     }
 
     @Override
-    public void commands(List<Command> list) {
-        Toolbar tb = getToolbar();
-        if (tb == null) {
-            if (list.isEmpty()) {
-                return;
-            }
-            tb = new Toolbar();
-            setToolbar(tb);
-            setTitle(window.cn1Title());
-        }
-        for (int i = 0; i < commands.size(); i++) {
-            tb.removeOverflowCommand(commands.get(i));
-        }
-        commands.clear();
-        for (int i = 0; i < list.size(); i++) {
-            Command c = list.get(i);
-            commands.add(c);
-            tb.addCommandToOverflowMenu(c);
-        }
-        revalidate();
+    public void commands(List<Command> commands) {
     }
 
     @Override
     public boolean takesCommands() {
-        return true;
+        return false;
     }
 
     @Override
@@ -174,12 +172,12 @@ public final class FrameForm extends Form implements WindowHost {
 
     @Override
     public boolean fillsDisplay() {
-        return true;
+        return false;
     }
 
     @Override
     public boolean reusable() {
-        return true;
+        return false;
     }
 
     @Override

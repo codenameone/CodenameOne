@@ -28,37 +28,32 @@ import com.codename1.desktopcompat.java.awt.Container;
 import com.codename1.desktopcompat.java.awt.Frame;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.LayoutManager;
-import com.codename1.desktopcompat.java.awt.event.WindowEvent;
-import com.codename1.desktopcompat.rt.WindowHosts;
+import com.codename1.desktopcompat.java.awt.Window;
 
-/// The Swing frame: a frame whose single child is a root pane, so that
-/// adding to the frame adds to its content pane.
-///
-/// A request to close the frame -- the back command of its form, the
-/// close box of its window, the platform ending the application -- runs
-/// the default close operation after the window listeners:
-/// `HIDE_ON_CLOSE` (the default) hides it, `DISPOSE_ON_CLOSE` disposes of
-/// it, `DO_NOTHING_ON_CLOSE` leaves it to the listeners and
-/// `EXIT_ON_CLOSE` exits the application.
-public class JFrame extends Frame implements WindowConstants, RootPaneContainer {
-
-    public static final int EXIT_ON_CLOSE = 3;
+/// A Swing window without a title bar: a splash screen, a custom popup.
+/// Shown first it fills a form like a frame; shown over another window it
+/// floats over it like a dialog, or is an undecorated window where there
+/// is a window manager.
+public class JWindow extends Window implements RootPaneContainer {
 
     protected JRootPane rootPane;
     protected boolean rootPaneCheckingEnabled;
 
-    private int defaultCloseOperation = HIDE_ON_CLOSE;
-
-    public JFrame() {
-        this("");
+    public JWindow() {
+        this((Frame) null);
     }
 
-    public JFrame(String title) {
-        super(title);
-        frameInit();
+    public JWindow(Frame owner) {
+        super(owner);
+        windowInit();
     }
 
-    protected void frameInit() {
+    public JWindow(Window owner) {
+        super(owner);
+        windowInit();
+    }
+
+    protected void windowInit() {
         setRootPane(createRootPane());
         setRootPaneCheckingEnabled(true);
     }
@@ -118,15 +113,6 @@ public class JFrame extends Frame implements WindowConstants, RootPaneContainer 
         rootPane.setGlassPane(glassPane);
     }
 
-    public JMenuBar getJMenuBar() {
-        return rootPane.getJMenuBar();
-    }
-
-    /// Sets the menu bar; see `JRootPane.setJMenuBar` for how it shows.
-    public void setJMenuBar(JMenuBar menubar) {
-        rootPane.setJMenuBar(menubar);
-    }
-
     protected boolean isRootPaneCheckingEnabled() {
         return rootPaneCheckingEnabled;
     }
@@ -165,40 +151,5 @@ public class JFrame extends Frame implements WindowConstants, RootPaneContainer 
     @Override
     public void update(Graphics g) {
         paint(g);
-    }
-
-    public int getDefaultCloseOperation() {
-        return defaultCloseOperation;
-    }
-
-    public void setDefaultCloseOperation(int operation) {
-        if (operation != DO_NOTHING_ON_CLOSE && operation != HIDE_ON_CLOSE && operation != DISPOSE_ON_CLOSE
-                && operation != EXIT_ON_CLOSE) {
-            throw new IllegalArgumentException("defaultCloseOperation must be one of: DO_NOTHING_ON_CLOSE, "
-                    + "HIDE_ON_CLOSE, DISPOSE_ON_CLOSE, or EXIT_ON_CLOSE");
-        }
-        int old = defaultCloseOperation;
-        defaultCloseOperation = operation;
-        firePropertyChange("defaultCloseOperation", old, operation);
-    }
-
-    @Override
-    protected void processWindowEvent(WindowEvent e) {
-        super.processWindowEvent(e);
-        if (e.getID() == WindowEvent.WINDOW_CLOSING) {
-            switch (defaultCloseOperation) {
-                case HIDE_ON_CLOSE:
-                    setVisible(false);
-                    break;
-                case DISPOSE_ON_CLOSE:
-                    dispose();
-                    break;
-                case EXIT_ON_CLOSE:
-                    WindowHosts.exit();
-                    break;
-                default:
-                    break;
-            }
-        }
     }
 }

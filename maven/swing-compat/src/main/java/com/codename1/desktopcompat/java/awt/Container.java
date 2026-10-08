@@ -39,6 +39,7 @@ public class Container extends Component {
 
     private final ArrayList<Component> children = new ArrayList<Component>();
     private LayoutManager layoutMgr;
+    private FocusTraversalPolicy focusPolicy;
     private ArrayList<ContainerListener> containerListeners;
 
     public Container() {
@@ -394,6 +395,41 @@ public class Container extends Component {
 
     public Component findComponentAt(Point p) {
         return findComponentAt(p.x, p.y);
+    }
+
+    @Override
+    public void setCursor(Cursor cursor) {
+        super.setCursor(cursor);
+        cursorChanged();
+    }
+
+    private void cursorChanged() {
+        for (int i = 0; i < children.size(); i++) {
+            Component c = children.get(i);
+            if (!c.isCursorSet()) {
+                c.cn1ApplyCursor();
+                if (c instanceof Container) {
+                    ((Container) c).cursorChanged();
+                }
+            }
+        }
+    }
+
+    /// The order the tab key walks this container's components in, or
+    /// `null` when none was set and the keyboard focus manager's default
+    /// applies. Only the policy of a window is consulted.
+    public FocusTraversalPolicy getFocusTraversalPolicy() {
+        return focusPolicy;
+    }
+
+    public void setFocusTraversalPolicy(FocusTraversalPolicy policy) {
+        FocusTraversalPolicy old = focusPolicy;
+        focusPolicy = policy;
+        firePropertyChange("focusTraversalPolicy", old, policy);
+    }
+
+    public boolean isFocusTraversalPolicySet() {
+        return focusPolicy != null;
     }
 
     public boolean isAncestorOf(Component c) {
