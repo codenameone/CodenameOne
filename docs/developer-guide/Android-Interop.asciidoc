@@ -331,6 +331,9 @@ the gallery and automated tests cover a subset of those behaviors.
   existing activities. Already-inflated text and layouts can retain the old
   script until the activity is recreated. Automatic handling of this live
   configuration change is deferred.
+* Configuration changes don't call `Application.onConfigurationChanged()`.
+  Refresh shared resource-dependent state from an activity's
+  `onConfigurationChanged()` callback, or from `onResume()` after recreation.
 * The application's own code must avoid the JDK classes Codename One doesn't
   provide; the build's bytecode check reports them. The runtime provides the
   `java.io` classes Android code uses most (`File`, the file streams, readers

@@ -113,6 +113,27 @@ public class BroadcastFilterMatchTest {
     }
 
     @Test
+    public void unregisteringBeforeDeliveryDropsTheOldRegistration() {
+        Context c = AndroidTestSupport.context();
+        Recorder receiver = new Recorder();
+        IntentFilter filter = new IntentFilter("com.codename1.test.PING");
+        c.registerReceiver(receiver, filter);
+        c.sendBroadcast(new Intent("com.codename1.test.PING"));
+        c.unregisterReceiver(receiver);
+        // A new registration of the same object must not revive the old send.
+        c.registerReceiver(receiver, filter);
+        try {
+            MainThreadRule.drain();
+            assertEquals(0, receiver.seen.size());
+            c.sendBroadcast(new Intent("com.codename1.test.PING"));
+            MainThreadRule.drain();
+            assertEquals(1, receiver.seen.size());
+        } finally {
+            c.unregisterReceiver(receiver);
+        }
+    }
+
+    @Test
     public void mutableExtrasAreCapturedWhenTheBroadcastIsSent() {
         Context c = AndroidTestSupport.context();
         final int[] received = {-1, -1};

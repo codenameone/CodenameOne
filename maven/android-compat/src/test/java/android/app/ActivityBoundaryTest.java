@@ -183,6 +183,16 @@ public class ActivityBoundaryTest {
         assertEquals(1, fresh.permissionResults);
     }
 
+    @Test public void permissionResultUsesTheRequestedNamesSnapshot() {
+        AndroidTestSupport.TestActivity a = startRoot();
+        String[] names = {"camera", "microphone"};
+        a.requestPermissions(names, 9);
+        names[0] = "changed";
+        MainThreadRule.drain();
+        assertArrayEquals(new String[]{"camera", "microphone"}, a.lastPermissions);
+        assertEquals(2, a.lastPermissionGrants.length);
+    }
+
     @Test public void permissionResultIsDroppedAfterFinish() {
         AndroidTestSupport.TestActivity old = startRoot();
         old.requestPermissions(new String[]{"camera"}, 8);

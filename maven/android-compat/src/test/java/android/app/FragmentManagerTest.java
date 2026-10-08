@@ -408,4 +408,20 @@ public class FragmentManagerTest {
         a.getFragmentManager().executePendingTransactions(); assertTrue(queued.isAdded());
     }
 
+    @Test public void commitNowAfterDestroyHonorsStateLossPolicy() {
+        Activity a = resumedActivity();
+        a.mFragments.dispatchDestroy();
+
+        Fragment dropped = new Fragment();
+        a.getFragmentManager().beginTransaction().add(dropped, "dropped").commitNowAllowingStateLoss();
+        assertFalse(dropped.isAdded());
+
+        try {
+            a.getFragmentManager().beginTransaction().add(new Fragment(), "late").commitNow();
+            org.junit.Assert.fail("commitNow after destruction must throw");
+        } catch (IllegalStateException expected) {
+            assertEquals("Activity has been destroyed", expected.getMessage());
+        }
+    }
+
 }

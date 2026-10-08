@@ -986,6 +986,12 @@ public final class FragmentManagerImpl extends FragmentManager implements Layout
         if (!allowStateLoss) {
             checkStateLoss();
         }
+        if (mDestroyed || mActivity == null) {
+            if (allowStateLoss) {
+                return;
+            }
+            throw new IllegalStateException("Activity has been destroyed");
+        }
         if (mExecutingActions) {
             throw new IllegalStateException("FragmentManager is already executing transactions");
         }

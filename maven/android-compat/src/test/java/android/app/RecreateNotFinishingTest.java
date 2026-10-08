@@ -32,6 +32,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /// A recreated activity is destroyed with `isFinishing()` false and
@@ -77,5 +78,33 @@ public class RecreateNotFinishingTest {
         assertEquals(Boolean.FALSE, old.finishingWhenDestroyed);
         assertEquals("a real finish still reports finishing", Boolean.TRUE,
                 ((AndroidTestSupport.TestActivity) seen[1]).finishingWhenDestroyed);
+    }
+
+    @Test
+    public void finishDuringDestroyAbortsTheRelaunch() {
+        final Context app = AndroidTestSupport.context().getApplicationContext();
+        final Throwable[] failure = new Throwable[1];
+        final AndroidTestSupport.FinishingActivity[] old = new AndroidTestSupport.FinishingActivity[1];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    app.startActivity(new Intent(app, AndroidTestSupport.FinishingActivity.class)
+                            .putExtra("finishAt", "destroy")
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    old[0] = AndroidTestSupport.FinishingActivity.last;
+                    old[0].recreate();
+                    assertNull(ActivityThread.getTopActivity());
+                } catch (Throwable t) {
+                    failure[0] = t;
+                } finally {
+                    ActivityThread.finishAllActivities();
+                }
+            }
+        });
+        if (failure[0] != null) {
+            throw new RuntimeException(failure[0]);
+        }
+        assertEquals(1, java.util.Collections.frequency(old[0].events, "destroy"));
     }
 }

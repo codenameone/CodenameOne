@@ -69,6 +69,7 @@ public final class ActivityThread {
         MenuImpl menu;
         boolean started;
         boolean resumed;
+        boolean destroying;
         boolean menuCreated;
         /// Set once the activity has been stopped, so the next start is a
         /// restart.
@@ -95,6 +96,7 @@ public final class ActivityThread {
 
     private static final ArrayList<Record> STACK = new ArrayList<Record>();
     private static boolean appForeground = true;
+    private static int pendingLaunches;
 
     private ActivityThread() {
     }
@@ -404,23 +406,31 @@ public final class ActivityThread {
             throw new ActivityNotFoundException(info.className);
         }
         Record prev = top();
-        if (prev != null && prev.resumed) {
-            pause(prev);
-        }
         Record r = new Record();
-        r.activity = a;
-        r.caller = requestCode >= 0 ? callerActivity : null;
-        r.requestCode = requestCode;
-        r.info = info;
-        // The manifest's android:noHistory and the launch flag mean the same.
-        r.noHistory = info.noHistory || (intent.getFlags() & Intent.FLAG_ACTIVITY_NO_HISTORY) != 0;
-        attach(r, intent);
-        if (STACK.isEmpty() && recreated == null) {
-            // The first activity of an application hosted inside a Codename
-            // One app: remember the host's form to return to.
-            AndroidRuntime.getInstance().noteHostForm(com.codename1.ui.Display.getInstance().getCurrent());
+        // onPause may finish the last activity. Keep this launch pending until
+        // the destination is on the stack so that finish() doesn't close the
+        // task in the middle of navigation.
+        pendingLaunches++;
+        try {
+            if (prev != null && prev.resumed) {
+                pause(prev);
+            }
+            r.activity = a;
+            r.caller = requestCode >= 0 ? callerActivity : null;
+            r.requestCode = requestCode;
+            r.info = info;
+            // The manifest's android:noHistory and the launch flag mean the same.
+            r.noHistory = info.noHistory || (intent.getFlags() & Intent.FLAG_ACTIVITY_NO_HISTORY) != 0;
+            attach(r, intent);
+            if (STACK.isEmpty() && recreated == null) {
+                // The first activity of an application hosted inside a Codename
+                // One app: remember the host's form to return to.
+                AndroidRuntime.getInstance().noteHostForm(com.codename1.ui.Display.getInstance().getCurrent());
+            }
+            STACK.add(r);
+        } finally {
+            pendingLaunches--;
         }
-        STACK.add(r);
         if (clearTask) {
             // Keep the new record on the stack while disposing the old task,
             // before any launch callbacks can finish or redirect this launch.
@@ -705,6 +715,10 @@ public final class ActivityThread {
 
     private static void destroy(Record r, boolean relaunching) {
         Activity a = r.activity;
+        if (r.destroying || a.mDestroyed) {
+            return;
+        }
+        r.destroying = true;
         // Finishing from the first callback on, as on Android: isFinishing()
         // is true in onPause, and stop() skips the state save. A relaunch is
         // not finishing (isFinishing() stays false, isChangingConfigurations()
@@ -763,7 +777,7 @@ public final class ActivityThread {
                 }
             }
             destroy(r, false);
-            if (wasLast && STACK.isEmpty()) {
+            if (wasLast && STACK.isEmpty() && pendingLaunches == 0) {
                 AndroidRuntime.getInstance().onLastActivityFinished();
             }
         } else {
@@ -902,6 +916,9 @@ public final class ActivityThread {
             return null;
         }
         destroy(r, true);
+        if (index >= STACK.size() || STACK.get(index) != r || a.mFinished) {
+            return null;
+        }
         Activity fresh = AndroidRuntime.getInstance().getApp().createActivity(r.info.type);
         fresh.mLastNonConfigurationInstance = nonConfig;
         fresh.mLastRetainedFragments = retained;
@@ -1075,13 +1092,14 @@ public final class ActivityThread {
     }
 
     static void requestPermissions(final Activity a, final String[] permissions, final int requestCode) {
+        final String[] requested = permissions.clone();
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
                 Activity target = currentInstance(a);
                 if (target != null) {
-                    int[] grants = new int[permissions.length];
-                    target.onRequestPermissionsResult(requestCode, permissions, grants);
+                    int[] grants = new int[requested.length];
+                    target.onRequestPermissionsResult(requestCode, requested, grants);
                 }
             }
         });

@@ -472,16 +472,18 @@ public final class AndroidRuntime {
         if (extras != null) {
             snapshot.replaceExtras(extras.deepCopy());
         }
-        CN.callSerially(new Broadcast(new ArrayList<Object[]>(receivers), from, snapshot));
+        CN.callSerially(new Broadcast(this, new ArrayList<Object[]>(receivers), from, snapshot));
     }
 
     /// Delivers one broadcast to the receivers registered when it was sent.
     private static final class Broadcast implements Runnable {
+        private final AndroidRuntime runtime;
         private final List<Object[]> receivers;
         private final Context from;
         private final Intent intent;
 
-        Broadcast(List<Object[]> receivers, Context from, Intent intent) {
+        Broadcast(AndroidRuntime runtime, List<Object[]> receivers, Context from, Intent intent) {
+            this.runtime = runtime;
             this.receivers = receivers;
             this.from = from;
             this.intent = intent;
@@ -499,7 +501,11 @@ public final class AndroidRuntime {
                 return;
             }
             for (Object[] r : receivers) {
-                if (r[1] instanceof IntentFilter && r[0] instanceof BroadcastReceiver
+                // The copied entry identifies this registration, not merely
+                // its receiver. Unregistering and re-registering before this
+                // runnable runs must not revive an older broadcast.
+                if (runtime.receivers.contains(r)
+                        && r[1] instanceof IntentFilter && r[0] instanceof BroadcastReceiver
                         && ((IntentFilter) r[1]).match(action, intent.getType(), intent.getScheme(),
                         intent.getData(), intent.getCategories(), null) >= 0) {
                     ((BroadcastReceiver) r[0]).onReceive(from, intent);

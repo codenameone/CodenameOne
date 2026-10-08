@@ -33,6 +33,7 @@ import com.codename1.ui.animations.CommonTransitions;
 import org.junit.Test;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -42,6 +43,16 @@ import static org.junit.Assert.assertTrue;
 /// device: a screenshot test bound its timer to the departing form and never
 /// fired, and the runtime attached frame callbacks, overlays and popups there.
 public class HostedActivityTransitionTest {
+
+    private static final class ReturningHost extends Form {
+        int returns;
+
+        @Override
+        public void showBack() {
+            returns++;
+            super.showBack();
+        }
+    }
 
     @org.junit.Before
     public void startClean() {
@@ -94,6 +105,41 @@ public class HostedActivityTransitionTest {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         app.startActivity(intent);
         return ActivityThread.getTopActivity();
+    }
+
+    @Test
+    public void finishingTheLastActivityDuringPauseDoesNotReturnToHostBeforeDestination() throws Exception {
+        final Context app = AndroidTestSupport.context().getApplicationContext();
+        final ReturningHost host = new ReturningHost();
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                host.show();
+            }
+        });
+        awaitTransitionEnd();
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                app.startActivity(new Intent(app, AndroidTestSupport.FinishingActivity.class)
+                        .putExtra("finishAt", "pause").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            }
+        });
+        awaitTransitionEnd();
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                app.startActivity(new Intent(app, AndroidTestSupport.TestActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                try {
+                    assertEquals(0, host.returns);
+                    assertTrue(ActivityThread.getTopActivity() instanceof AndroidTestSupport.TestActivity);
+                } finally {
+                    ActivityThread.finishAllActivities();
+                }
+            }
+        });
+        assertEquals(1, host.returns);
     }
 
     @Test

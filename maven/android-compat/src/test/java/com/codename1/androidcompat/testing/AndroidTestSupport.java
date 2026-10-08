@@ -56,6 +56,8 @@ public final class AndroidTestSupport {
         public int resultCode;
         public android.content.Intent resultData;
         public int permissionResults;
+        public String[] lastPermissions;
+        public int[] lastPermissionGrants;
         public int xmlClickCount;
 
         public void xmlClick(View view) {
@@ -131,6 +133,8 @@ public final class AndroidTestSupport {
         @Override
         public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grants) {
             permissionResults++;
+            lastPermissions = permissions;
+            lastPermissionGrants = grants;
         }
 
         @Override
