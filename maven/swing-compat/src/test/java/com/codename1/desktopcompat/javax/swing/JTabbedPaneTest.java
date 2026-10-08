@@ -40,20 +40,11 @@ import com.codename1.desktopcompat.rt.TabbedPanePeer;
 import com.codename1.desktopcompat.rt.Units;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 /// The tabbed pane: its tab bookkeeping and change events against the
 /// JDK's own, and its strip, pages and touch selection on a display.
 public class JTabbedPaneTest extends KernelTestBase {
-
-    /// The click count of the layer is kept for the whole process and by
-    /// time alone, so the presses made here would be counted into the
-    /// first click of whichever test runs next.
-    @AfterClass
-    public static void letTheClicksLapse() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     private static JPanel page(String name, int w, int h) {
         JPanel p = new JPanel(null);

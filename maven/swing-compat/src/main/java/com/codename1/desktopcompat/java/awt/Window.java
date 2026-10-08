@@ -23,27 +23,47 @@
 package com.codename1.desktopcompat.java.awt;
 
 import com.codename1.desktopcompat.java.awt.event.WindowEvent;
+import com.codename1.desktopcompat.java.awt.event.WindowFocusListener;
 import com.codename1.desktopcompat.java.awt.event.WindowListener;
+import com.codename1.desktopcompat.java.awt.event.WindowStateListener;
 import com.codename1.desktopcompat.rt.EventBridge;
 import com.codename1.desktopcompat.rt.FrameForm;
+import com.codename1.desktopcompat.rt.MenuBridge;
 import com.codename1.desktopcompat.rt.Units;
-import com.codename1.ui.Display;
+import com.codename1.desktopcompat.rt.WindowHost;
+import com.codename1.desktopcompat.rt.WindowHosts;
 import java.util.ArrayList;
 
-/// A top level window, shown as a Codename One form that it fills.
+/// A top level window.
 ///
-/// The size and position an application sets are recorded, but the window
-/// is given the size of the form once it shows. Showing a second window
-/// puts its form on top; hiding or disposing it goes back to the one
-/// before. Windows start hidden.
+/// What shows a window depends on the device; see
+/// [com.codename1.desktopcompat.rt.WindowHosts]. In short: the first
+/// window fills a form; where there is a window manager the others are
+/// windows of their own with the bounds the application set; on a phone
+/// a further frame is a form over the one before it, the size of the
+/// screen whatever was asked for, and a dialog floats over the current
+/// form. Windows start hidden.
+///
+/// The window on top is the active and the focused one. Showing a window
+/// puts it on top; `toBack` does nothing. `getWindows()` answers the
+/// windows that were shown or packed and not disposed of since -- there
+/// are no weak references to tell which of the others are still in use.
 public class Window extends Container {
 
     private final Window owner;
+    private final ArrayList<Image> icons = new ArrayList<Image>();
+    private ArrayList<Window> owned;
     private ArrayList<WindowListener> windowListeners;
-    private FrameForm form;
+    private ArrayList<WindowFocusListener> windowFocusListeners;
+    private ArrayList<WindowStateListener> windowStateListeners;
+    private WindowHost host;
+    private Component lastFocus;
     private boolean visible;
     private boolean opened;
-    private Image iconImage;
+    private boolean alwaysOnTop;
+    private boolean locationByPlatform;
+    private boolean focusableWindowState = true;
+    private boolean autoRequestFocus = true;
 
     public Window(Frame owner) {
         this((Window) owner);
@@ -51,17 +71,57 @@ public class Window extends Container {
 
     public Window(Window owner) {
         this.owner = owner;
+        if (owner != null) {
+            if (owner.owned == null) {
+                owner.owned = new ArrayList<Window>();
+            }
+            owner.owned.add(this);
+        }
         setLayout(new BorderLayout());
     }
 
-    /// The form showing this window, `null` until it is shown.
+    // ------------------------------------------------------------ host
+
+    /// The form showing this window when a form of its own does, else
+    /// `null`: before it is shown, for a dialog, and for a window of the
+    /// window manager.
     public FrameForm cn1Form() {
-        return form;
+        return host instanceof FrameForm ? (FrameForm) host : null;
     }
 
-    /// The title the form carries; frames and dialogs answer theirs.
+    /// What shows this window, `null` until it is shown and with no
+    /// display.
+    public WindowHost cn1Host() {
+        return host;
+    }
+
+    /// The Codename One form this window is in -- its own form or the
+    /// dialog that floats it -- or `null`.
+    public com.codename1.ui.Form cn1HostForm() {
+        return host == null ? null : host.form();
+    }
+
+    /// The title the host carries; frames and dialogs answer theirs.
     public String cn1Title() {
         return "";
+    }
+
+    /// Whether the user may resize the window; frames and dialogs answer
+    /// theirs.
+    protected boolean cn1Resizable() {
+        return true;
+    }
+
+    /// Whether the window has a title bar and a frame; a plain window has
+    /// neither.
+    protected boolean cn1Decorated() {
+        return false;
+    }
+
+    /// The extended state the window should be shown in; frames answer
+    /// theirs.
+    protected int cn1State() {
+        return Frame.NORMAL;
     }
 
     /// Runs what a user's request to close the window runs.
@@ -69,12 +129,64 @@ public class Window extends Container {
         dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING));
     }
 
+    /// The window became, or stopped being, the active one. Called by the
+    /// window registry; delivers the activation and window focus events
+    /// and moves the keyboard focus out of, or back into, the window.
+    public void cn1Activated(boolean active, Window opposite) {
+        if (active) {
+            dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_ACTIVATED, opposite));
+            dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_GAINED_FOCUS, opposite));
+            Component f = lastFocus;
+            lastFocus = null;
+            if (f != null && isAncestorOf(f) && f.isDisplayable()) {
+                f.requestFocusInWindow();
+            }
+        } else {
+            Component f = EventBridge.focusOwner();
+            if (f != null && (f == this || isAncestorOf(f))) {
+                lastFocus = f;
+                EventBridge.setFocusOwner(null, false);
+            }
+            dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_LOST_FOCUS, opposite));
+            dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_DEACTIVATED, opposite));
+        }
+    }
+
+    /// The window was minimized or restored, or the application went to
+    /// the background or came back.
+    public void cn1Iconified(boolean iconified) {
+        dispatchEvent(new WindowEvent(this, iconified ? WindowEvent.WINDOW_ICONIFIED
+                : WindowEvent.WINDOW_DEICONIFIED));
+    }
+
     @Override
     public void cn1SyncPeerBounds() {
     }
 
+    // ------------------------------------------------------------ windows
+
     public Window getOwner() {
         return owner;
+    }
+
+    public Window[] getOwnedWindows() {
+        return owned == null ? new Window[0] : owned.toArray(new Window[owned.size()]);
+    }
+
+    /// The windows that were shown or packed and not disposed of since.
+    public static Window[] getWindows() {
+        return WindowHosts.windows();
+    }
+
+    public static Window[] getOwnerlessWindows() {
+        Window[] all = WindowHosts.windows();
+        ArrayList<Window> l = new ArrayList<Window>();
+        for (int i = 0; i < all.length; i++) {
+            if (all[i].owner == null) {
+                l.add(all[i]);
+            }
+        }
+        return l.toArray(new Window[l.size()]);
     }
 
     @Override
@@ -131,18 +243,64 @@ public class Window extends Container {
         super.paint(g);
     }
 
-    /// Sizes the window to its preferred size where it has none yet and
-    /// lays it out. Once shown the window keeps the size of its form.
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        WindowHosts.registered(this);
+    }
+
+    // ------------------------------------------------------------ bounds
+
+    /// Sizes the window to its preferred size and lays it out. A window
+    /// that fills a form keeps the size of the form.
     public void pack() {
         if (!isDisplayable()) {
             addNotify();
         }
-        if (form == null) {
+        if (host == null || !host.fillsDisplay()) {
             Dimension d = getPreferredSize();
             setSize(d.width, d.height);
         }
         validate();
     }
+
+    @Override
+    public void setBounds(int x, int y, int width, int height) {
+        super.setBounds(x, y, width, height);
+        if (host != null) {
+            host.bounds();
+        }
+    }
+
+    /// Centers the window over `c`, or on the screen when `c` is `null`
+    /// or not showing. It has an effect only on a window of the window
+    /// manager; the others are placed by their host.
+    public void setLocationRelativeTo(Component c) {
+        if (host != null && host.fillsDisplay()) {
+            return;
+        }
+        Dimension s = getToolkit().getScreenSize();
+        int cx = s.width / 2;
+        int cy = s.height / 2;
+        if (c != null && c.isShowing()) {
+            Point p = c.getLocationOnScreen();
+            cx = p.x + c.getWidth() / 2;
+            cy = p.y + c.getHeight() / 2;
+        }
+        setLocation(Math.max(0, cx - getWidth() / 2), Math.max(0, cy - getHeight() / 2));
+    }
+
+    public boolean isLocationByPlatform() {
+        return locationByPlatform;
+    }
+
+    /// Recorded only: a window of the window manager that was never
+    /// moved is centered, whatever this says.
+    public void setLocationByPlatform(boolean locationByPlatform) {
+        this.locationByPlatform = locationByPlatform;
+    }
+
+    // ------------------------------------------------------------ showing
 
     @Override
     public void setVisible(boolean b) {
@@ -154,11 +312,22 @@ public class Window extends Container {
             if (!isDisplayable()) {
                 addNotify();
             }
-            if (Display.isInitialized()) {
-                if (form == null) {
-                    form = new FrameForm(this);
+            host = WindowHosts.open(this, host);
+            if (host != null) {
+                host.title(cn1Title());
+                host.icon(icons.isEmpty() ? null : icons.get(0).cn1Image());
+                host.resizable(cn1Resizable());
+                host.decorated(cn1Decorated());
+                WindowHost opening = host;
+                opening.open();
+                if (!visible || host != opening) {
+                    // Hidden again by something that ran while it opened.
+                    return;
                 }
-                form.cn1Show();
+                if (cn1State() != Frame.NORMAL) {
+                    host.state(cn1State());
+                }
+                MenuBridge.windowShown(this);
             } else {
                 validate();
             }
@@ -166,37 +335,58 @@ public class Window extends Container {
                 opened = true;
                 dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_OPENED));
             }
-            dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_ACTIVATED));
+            WindowHosts.shown(this);
         } else {
-            if (form != null) {
-                form.cn1Hide();
+            WindowHost h = host;
+            if (h != null) {
+                if (!h.reusable()) {
+                    host = null;
+                }
+                h.close();
             }
-            dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_DEACTIVATED));
+            WindowHosts.hidden(this);
         }
     }
 
-    /// Hides the window and releases its form.
+    /// Hides the window, disposes of the windows it owns and releases
+    /// what showed it. The window can be shown again.
     public void dispose() {
         boolean was = isDisplayable();
+        if (owned != null) {
+            Window[] ws = getOwnedWindows();
+            for (int i = 0; i < ws.length; i++) {
+                ws[i].dispose();
+            }
+        }
         setVisible(false);
         if (was) {
+            if (host != null) {
+                host.release();
+                host = null;
+            }
             removeNotify();
-            form = null;
+            opened = false;
+            WindowHosts.released(this);
             dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSED));
         }
     }
 
+    /// Puts the window on top of the others and makes it the active one.
     public void toFront() {
-        if (visible && form != null) {
-            form.cn1Show();
+        if (visible) {
+            if (host != null) {
+                host.open();
+            }
+            WindowHosts.shown(this);
         }
     }
 
+    /// Does nothing.
     public void toBack() {
     }
 
     public boolean isActive() {
-        return visible && form != null && Display.isInitialized() && Display.getInstance().getCurrent() == form;
+        return visible && WindowHosts.active() == this;
     }
 
     public boolean isFocused() {
@@ -208,21 +398,71 @@ public class Window extends Container {
         return c != null && (c == this || isAncestorOf(c)) ? c : null;
     }
 
-    /// Does nothing: a window fills its form.
-    public void setLocationRelativeTo(Component c) {
+    public Component getMostRecentFocusOwner() {
+        Component c = getFocusOwner();
+        return c != null ? c : lastFocus;
     }
 
+    public boolean isAlwaysOnTop() {
+        return alwaysOnTop;
+    }
+
+    /// Recorded only.
+    public final void setAlwaysOnTop(boolean alwaysOnTop) {
+        this.alwaysOnTop = alwaysOnTop;
+    }
+
+    public boolean getFocusableWindowState() {
+        return focusableWindowState;
+    }
+
+    /// Recorded only.
+    public void setFocusableWindowState(boolean focusableWindowState) {
+        this.focusableWindowState = focusableWindowState;
+    }
+
+    public boolean isAutoRequestFocus() {
+        return autoRequestFocus;
+    }
+
+    /// Recorded only: a window that shows always becomes the active one.
+    public void setAutoRequestFocus(boolean autoRequestFocus) {
+        this.autoRequestFocus = autoRequestFocus;
+    }
+
+    // ------------------------------------------------------------ icon
+
+    /// Sets the icon of the window. Only a window of the window manager
+    /// shows one.
     public void setIconImage(Image image) {
-        iconImage = image;
+        icons.clear();
+        if (image != null) {
+            icons.add(image);
+        }
+        if (host != null) {
+            host.icon(image == null ? null : image.cn1Image());
+        }
+    }
+
+    public void setIconImages(java.util.List<? extends Image> icons) {
+        this.icons.clear();
+        if (icons != null) {
+            for (int i = 0; i < icons.size(); i++) {
+                if (icons.get(i) != null) {
+                    this.icons.add(icons.get(i));
+                }
+            }
+        }
+        if (host != null) {
+            host.icon(this.icons.isEmpty() ? null : this.icons.get(0).cn1Image());
+        }
     }
 
     public java.util.List<Image> getIconImages() {
-        ArrayList<Image> l = new ArrayList<Image>();
-        if (iconImage != null) {
-            l.add(iconImage);
-        }
-        return l;
+        return new ArrayList<Image>(icons);
     }
+
+    // ------------------------------------------------------------ events
 
     public void addWindowListener(WindowListener l) {
         if (l != null) {
@@ -244,10 +484,57 @@ public class Window extends Container {
                 : windowListeners.toArray(new WindowListener[windowListeners.size()]);
     }
 
+    public void addWindowFocusListener(WindowFocusListener l) {
+        if (l != null) {
+            if (windowFocusListeners == null) {
+                windowFocusListeners = new ArrayList<WindowFocusListener>();
+            }
+            windowFocusListeners.add(l);
+        }
+    }
+
+    public void removeWindowFocusListener(WindowFocusListener l) {
+        if (windowFocusListeners != null) {
+            windowFocusListeners.remove(l);
+        }
+    }
+
+    public WindowFocusListener[] getWindowFocusListeners() {
+        return windowFocusListeners == null ? new WindowFocusListener[0]
+                : windowFocusListeners.toArray(new WindowFocusListener[windowFocusListeners.size()]);
+    }
+
+    public void addWindowStateListener(WindowStateListener l) {
+        if (l != null) {
+            if (windowStateListeners == null) {
+                windowStateListeners = new ArrayList<WindowStateListener>();
+            }
+            windowStateListeners.add(l);
+        }
+    }
+
+    public void removeWindowStateListener(WindowStateListener l) {
+        if (windowStateListeners != null) {
+            windowStateListeners.remove(l);
+        }
+    }
+
+    public WindowStateListener[] getWindowStateListeners() {
+        return windowStateListeners == null ? new WindowStateListener[0]
+                : windowStateListeners.toArray(new WindowStateListener[windowStateListeners.size()]);
+    }
+
     @Override
     protected void processEvent(AWTEvent e) {
         if (e instanceof WindowEvent) {
-            processWindowEvent((WindowEvent) e);
+            int id = e.getID();
+            if (id == WindowEvent.WINDOW_GAINED_FOCUS || id == WindowEvent.WINDOW_LOST_FOCUS) {
+                processWindowFocusEvent((WindowEvent) e);
+            } else if (id == WindowEvent.WINDOW_STATE_CHANGED) {
+                processWindowStateEvent((WindowEvent) e);
+            } else {
+                processWindowEvent((WindowEvent) e);
+            }
         } else {
             super.processEvent(e);
         }
@@ -281,6 +568,24 @@ public class Window extends Container {
                 default:
                     break;
             }
+        }
+    }
+
+    protected void processWindowFocusEvent(WindowEvent e) {
+        WindowFocusListener[] ls = getWindowFocusListeners();
+        for (int i = 0; i < ls.length; i++) {
+            if (e.getID() == WindowEvent.WINDOW_GAINED_FOCUS) {
+                ls[i].windowGainedFocus(e);
+            } else {
+                ls[i].windowLostFocus(e);
+            }
+        }
+    }
+
+    protected void processWindowStateEvent(WindowEvent e) {
+        WindowStateListener[] ls = getWindowStateListeners();
+        for (int i = 0; i < ls.length; i++) {
+            ls[i].windowStateChanged(e);
         }
     }
 }

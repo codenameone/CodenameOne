@@ -22,13 +22,37 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
-/// A titled window owned by another. It is shown as a form like any
-/// window, and a modal dialog does not block: `setVisible(true)` returns at
-/// once.
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
+
+/// A titled window owned by another.
+///
+/// **A modal dialog blocks.** `setVisible(true)` on a modal dialog, called
+/// on the event dispatch thread, returns only once the dialog was hidden
+/// or disposed of. Meanwhile the event dispatch thread keeps running
+/// events -- painting, input, timers, `invokeLater` -- from inside that
+/// call, exactly as a nested event loop does on the desktop. The three
+/// modal modality types behave the same: other windows get no input.
+///
+/// Called on another thread, with no display, or on a modeless dialog,
+/// `setVisible(true)` returns at once.
 public class Dialog extends Window {
 
+    /// How a dialog keeps input from other windows. Everything but
+    /// `MODELESS` blocks the caller of `setVisible(true)`.
+    public enum ModalityType {
+        MODELESS,
+        DOCUMENT_MODAL,
+        APPLICATION_MODAL,
+        TOOLKIT_MODAL
+    }
+
+    public static final ModalityType DEFAULT_MODALITY_TYPE = ModalityType.APPLICATION_MODAL;
+
+    private static final Runnable PAUSE = new Pause();
+
     private String title;
-    private boolean modal;
+    private ModalityType modality;
     private boolean resizable = true;
     private boolean undecorated;
 
@@ -45,9 +69,7 @@ public class Dialog extends Window {
     }
 
     public Dialog(Frame owner, String title, boolean modal) {
-        super(owner);
-        this.title = title == null ? "" : title;
-        this.modal = modal;
+        this((Window) owner, title, modal ? DEFAULT_MODALITY_TYPE : ModalityType.MODELESS);
     }
 
     public Dialog(Dialog owner) {
@@ -59,14 +81,40 @@ public class Dialog extends Window {
     }
 
     public Dialog(Dialog owner, String title, boolean modal) {
-        super((Window) owner);
+        this((Window) owner, title, modal ? DEFAULT_MODALITY_TYPE : ModalityType.MODELESS);
+    }
+
+    public Dialog(Window owner) {
+        this(owner, "", ModalityType.MODELESS);
+    }
+
+    public Dialog(Window owner, String title) {
+        this(owner, title, ModalityType.MODELESS);
+    }
+
+    public Dialog(Window owner, ModalityType modalityType) {
+        this(owner, "", modalityType);
+    }
+
+    public Dialog(Window owner, String title, ModalityType modalityType) {
+        super(owner);
         this.title = title == null ? "" : title;
-        this.modal = modal;
+        this.modality = modalityType == null ? ModalityType.MODELESS : modalityType;
     }
 
     @Override
     public String cn1Title() {
         return title;
+    }
+
+    @Override
+    protected boolean cn1Resizable() {
+        return resizable;
+    }
+
+    @Override
+    protected boolean cn1Decorated() {
+        return !undecorated;
     }
 
     public String getTitle() {
@@ -76,19 +124,41 @@ public class Dialog extends Window {
     public void setTitle(String title) {
         String old = this.title;
         this.title = title == null ? "" : title;
-        if (cn1Form() != null) {
-            cn1Form().setTitle(this.title);
+        if (cn1Host() != null) {
+            cn1Host().title(this.title);
         }
         firePropertyChange("title", old, this.title);
     }
 
     public boolean isModal() {
-        return modal;
+        return modality != ModalityType.MODELESS;
     }
 
-    /// Recorded only; see the class description.
+    /// Takes effect the next time the dialog is shown.
     public void setModal(boolean modal) {
-        this.modal = modal;
+        modality = modal ? DEFAULT_MODALITY_TYPE : ModalityType.MODELESS;
+    }
+
+    public ModalityType getModalityType() {
+        return modality;
+    }
+
+    /// Takes effect the next time the dialog is shown.
+    public void setModalityType(ModalityType type) {
+        modality = type == null ? ModalityType.MODELESS : type;
+    }
+
+    /// Shows or hides the dialog. Showing a modal dialog blocks; see the
+    /// class description.
+    @Override
+    public void setVisible(boolean b) {
+        boolean was = isVisible();
+        super.setVisible(b);
+        if (b && !was && isModal() && Display.isInitialized() && Display.getInstance().isEdt()) {
+            while (isVisible()) {
+                Display.getInstance().invokeAndBlock(PAUSE);
+            }
+        }
     }
 
     public boolean isResizable() {
@@ -97,13 +167,27 @@ public class Dialog extends Window {
 
     public void setResizable(boolean resizable) {
         this.resizable = resizable;
+        if (cn1Host() != null) {
+            cn1Host().resizable(resizable);
+        }
     }
 
     public boolean isUndecorated() {
         return undecorated;
     }
 
+    /// Takes effect the next time the dialog is shown.
     public void setUndecorated(boolean undecorated) {
         this.undecorated = undecorated;
+    }
+
+    /// What the blocked caller waits in between two looks at whether the
+    /// dialog is still showing; the event dispatch thread runs events
+    /// meanwhile.
+    private static final class Pause implements Runnable {
+        @Override
+        public void run() {
+            Util.sleep(15);
+        }
     }
 }

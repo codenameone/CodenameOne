@@ -714,11 +714,9 @@ public final class URL implements java.io.Serializable {
             return new FileInputStream(new File(percentDecode(path)));
         }
         if ("cn1res".equals(protocol)) {
-            String name = percentDecode(path);
-            if (!name.startsWith("/")) {
-                name = "/" + name;
-            }
-            InputStream in = URL.class.getResourceAsStream(name);
+            // Through Resources, which knows the flat name the build shipped
+            // the resource under; the path here is the one it had on a desktop.
+            InputStream in = Resources.open(percentDecode(path));
             if (in == null) {
                 throw new FileNotFoundException(toExternalForm());
             }

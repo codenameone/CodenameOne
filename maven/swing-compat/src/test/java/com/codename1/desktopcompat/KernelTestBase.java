@@ -26,6 +26,7 @@ import com.codename1.compat.testing.HeadlessImplementation;
 import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.javax.swing.JFrame;
+import com.codename1.desktopcompat.rt.EventBridge;
 import com.codename1.desktopcompat.rt.Units;
 import com.codename1.ui.Image;
 import java.util.ArrayList;
@@ -63,6 +64,7 @@ public abstract class KernelTestBase {
         HeadlessImplementation.recordText = false;
         HeadlessImplementation.drawnText.clear();
         Units.setScale(0);
+        EventBridge.resetClickCount();
     }
 
     /// Shows the frame and remembers to dispose of it.

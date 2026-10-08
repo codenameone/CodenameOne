@@ -55,9 +55,9 @@ import java.util.ArrayList;
 /// its peer; they are not part of the desktop API.
 ///
 /// Not supported: `getGraphics()` answers `null` (paint from `paint` or
-/// `paintComponent` and ask for it with `repaint`), there is no component
-/// orientation, no drag and drop, no input methods and no focus traversal
-/// policy.
+/// `paintComponent` and ask for it with `repaint`), the component
+/// orientation is recorded and nothing more, and there is no drag and
+/// drop and no input methods.
 public abstract class Component implements ImageObserver {
 
     public static final float TOP_ALIGNMENT = 0.0f;
@@ -84,6 +84,8 @@ public abstract class Component implements ImageObserver {
     private Color background;
     private Font font;
     private Cursor cursor;
+    private boolean focusTraversalKeys = true;
+    private ComponentOrientation orientation = ComponentOrientation.UNKNOWN;
     private Dimension prefSize;
     private Dimension minSize;
     private Dimension maxSize;
@@ -202,8 +204,35 @@ public abstract class Component implements ImageObserver {
         return l != null && !l.isEmpty();
     }
 
+    /// The configuration of the one screen.
+    public GraphicsConfiguration getGraphicsConfiguration() {
+        return GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+    }
+
     void cn1SetParent(Container p) {
         parent = p;
+    }
+
+    /// Whether the tab key stops at this component: it is shown by a
+    /// Codename One widget that takes the focus, or has a key or a focus
+    /// listener. Swing components add their own key bindings to that.
+    public boolean cn1FocusTraversable() {
+        if (notEmpty(keyListeners) || notEmpty(focusListeners)) {
+            return true;
+        }
+        return peer instanceof Peer && ((Peer) peer).nativeLook() && peer.isFocusable();
+    }
+
+    /// Gives the peer the pointer shape this component has, its own or
+    /// the one it inherits. Nothing happens on a port that cannot change
+    /// the pointer's shape, and for a custom cursor.
+    public void cn1ApplyCursor() {
+        if (peer != null && com.codename1.ui.Display.isInitialized()
+                && com.codename1.ui.Component.isSetCursorSupported()) {
+            int type = getCursor().getType();
+            peer.setCursor(type >= Cursor.DEFAULT_CURSOR && type <= Cursor.MOVE_CURSOR ? type
+                    : Cursor.DEFAULT_CURSOR);
+        }
     }
 
     // ------------------------------------------------------------ basics
@@ -352,9 +381,31 @@ public abstract class Component implements ImageObserver {
         return font != null;
     }
 
-    /// Recorded only; the pointer's shape does not change.
+    /// Sets the pointer's shape over this component and the children that
+    /// set none of their own. The shape changes where the port can change
+    /// it -- the desktop ports -- and is only recorded elsewhere; a custom
+    /// cursor shows as the default one.
     public void setCursor(Cursor cursor) {
         this.cursor = cursor;
+        cn1ApplyCursor();
+    }
+
+    public ComponentOrientation getComponentOrientation() {
+        return orientation;
+    }
+
+    /// Recorded only: layout does not mirror for right to left.
+    public void setComponentOrientation(ComponentOrientation o) {
+        ComponentOrientation old = orientation;
+        orientation = o;
+        firePropertyChange("componentOrientation", old, o);
+    }
+
+    public void applyComponentOrientation(ComponentOrientation orientation) {
+        if (orientation == null) {
+            throw new NullPointerException();
+        }
+        setComponentOrientation(orientation);
     }
 
     public Cursor getCursor() {
@@ -598,6 +649,9 @@ public abstract class Component implements ImageObserver {
     /// Called when the component joins a tree that is shown.
     public void addNotify() {
         displayable = true;
+        if (getCursor().getType() != Cursor.DEFAULT_CURSOR) {
+            cn1ApplyCursor();
+        }
     }
 
     public void removeNotify() {
@@ -608,7 +662,10 @@ public abstract class Component implements ImageObserver {
     // ------------------------------------------------------------ paint
 
     /// Always `null`: a component is painted only from `paint`, with the
-    /// graphics it is handed.
+    /// graphics it is handed. Codename One paints a screen in one pass
+    /// from the event dispatch thread and has no surface to draw on
+    /// between passes, so code that draws from `getGraphics()` must move
+    /// that drawing into `paint` or `paintComponent` and call `repaint()`.
     public Graphics getGraphics() {
         return null;
     }
@@ -698,6 +755,28 @@ public abstract class Component implements ImageObserver {
 
     public boolean isFocusOwner() {
         return EventBridge.focusOwner() == this;
+    }
+
+    /// Moves the focus to the next component in the traversal order of
+    /// this component's window.
+    public void transferFocus() {
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().focusNextComponent(this);
+    }
+
+    public void transferFocusBackward() {
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().focusPreviousComponent(this);
+    }
+
+    /// Whether the tab key moves the focus away from this component
+    /// instead of only reaching its key listeners.
+    public boolean getFocusTraversalKeysEnabled() {
+        return focusTraversalKeys;
+    }
+
+    public void setFocusTraversalKeysEnabled(boolean focusTraversalKeysEnabled) {
+        boolean old = focusTraversalKeys;
+        focusTraversalKeys = focusTraversalKeysEnabled;
+        firePropertyChange("focusTraversalKeysEnabled", old, focusTraversalKeysEnabled);
     }
 
     public boolean hasFocus() {

@@ -196,7 +196,7 @@ public final class PeerSupport {
     /// Repaints a rectangle of `c`, given in its logical coordinates.
     public static void repaint(Component c, int x, int y, int width, int height) {
         com.codename1.ui.Component p = c.cn1PeerOrNull();
-        if (p == null || p.getComponentForm() == null) {
+        if (p == null || p.getTopLevelContainer() == null) {
             return;
         }
         com.codename1.ui.Component rp = root(c).cn1PeerOrNull();
@@ -215,7 +215,7 @@ public final class PeerSupport {
             return;
         }
         com.codename1.ui.Component rp = root(c).cn1PeerOrNull();
-        if (rp instanceof com.codename1.ui.Container && rp.getComponentForm() != null) {
+        if (rp instanceof com.codename1.ui.Container && rp.getTopLevelContainer() != null) {
             ((com.codename1.ui.Container) rp).revalidateLater();
         }
     }

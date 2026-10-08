@@ -23,13 +23,21 @@
 package com.codename1.desktopcompat.javax.swing;
 
 import com.codename1.desktopcompat.java.awt.Color;
+import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Container;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Rectangle;
+import com.codename1.desktopcompat.java.awt.Window;
+import com.codename1.desktopcompat.java.awt.event.ActionEvent;
+import com.codename1.desktopcompat.java.awt.event.ActionListener;
+import com.codename1.desktopcompat.java.awt.event.KeyEvent;
+import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
 import com.codename1.desktopcompat.javax.swing.border.Border;
 import com.codename1.desktopcompat.javax.swing.event.EventListenerList;
+import com.codename1.desktopcompat.rt.EventBridge;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 /// The base of the Swing components.
@@ -39,9 +47,20 @@ import java.util.HashMap;
 /// One widget behind a component that has one (a button, a label) and
 /// otherwise fills the background of an opaque component; an override that
 /// does not call `super.paintComponent` therefore starts from what its
-/// parent painted. There are no UI delegates: `updateUI` does nothing, and
-/// key bindings (input and action maps), tool tips and client side
-/// scrolling are absent.
+/// parent painted. There are no UI delegates: `updateUI` does nothing.
+///
+/// Key bindings work as in Swing. A key event that no key listener
+/// consumed is looked up in the input map of the focused component
+/// (`WHEN_FOCUSED`), then in those of it and its ancestors
+/// (`WHEN_ANCESTOR_OF_FOCUSED_COMPONENT`), then in those every visible,
+/// enabled component of the window registered for the whole window
+/// (`WHEN_IN_FOCUSED_WINDOW`); the first enabled action found runs and
+/// the event is consumed. A component with a `WHEN_FOCUSED` binding is a
+/// stop of the tab key.
+///
+/// The tool tip is the tool tip of the Codename One widget behind the
+/// component, so a component without one shows none, and it appears
+/// only where the port has a pointer that hovers.
 public abstract class JComponent extends Container {
 
     public static final int WHEN_FOCUSED = 0;
@@ -58,6 +77,14 @@ public abstract class JComponent extends Container {
     private float alignmentY = -1;
     private String toolTipText;
     private HashMap<Object, Object> clientProperties;
+    private InputMap focusInputMap;
+    private InputMap ancestorInputMap;
+    private ComponentInputMap windowInputMap;
+    private ActionMap actionMap;
+    private JPopupMenu popupMenu;
+    private boolean inheritsPopupMenu;
+    private InputVerifier inputVerifier;
+    private boolean verifyInputWhenFocusTarget = true;
 
     public JComponent() {
     }
@@ -224,11 +251,27 @@ public abstract class JComponent extends Container {
 
     // ------------------------------------------------------------ misc
 
-    /// Recorded only; no tool tip is shown.
+    /// Sets the tool tip of the Codename One widget behind this
+    /// component.
     public void setToolTipText(String text) {
         String old = toolTipText;
         toolTipText = text;
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        if (p != null) {
+            p.setTooltip(text);
+        }
         firePropertyChange(TOOL_TIP_TEXT_KEY, old, text);
+    }
+
+    @Override
+    protected void cn1PeerCreated() {
+        super.cn1PeerCreated();
+        if (toolTipText != null) {
+            com.codename1.ui.Component p = cn1PeerOrNull();
+            if (p != null) {
+                p.setTooltip(toolTipText);
+            }
+        }
     }
 
     public String getToolTipText() {
@@ -283,5 +326,365 @@ public abstract class JComponent extends Container {
     @Override
     public void firePropertyChange(String propertyName, int oldValue, int newValue) {
         super.firePropertyChange(propertyName, oldValue, newValue);
+    }
+
+    // ------------------------------------------------------------ scroll
+
+    /// Scrolls the viewports this component is in, innermost first, so
+    /// that a rectangle of it is visible. Nothing happens outside a
+    /// viewport.
+    public void scrollRectToVisible(Rectangle aRect) {
+        JViewport.cn1ScrollRectToVisible(this, aRect);
+    }
+
+    // ------------------------------------------------------------ verifier
+
+    /// Sets what decides whether the focus may leave this component.
+    ///
+    /// It is asked when another Swing component requests the focus, and
+    /// the request is refused when it does not yield. It cannot hold the
+    /// focus against the platform: when the Codename One widget behind
+    /// this component loses the focus by itself, it is gone.
+    public void setInputVerifier(InputVerifier inputVerifier) {
+        InputVerifier old = this.inputVerifier;
+        this.inputVerifier = inputVerifier;
+        firePropertyChange("inputVerifier", old, inputVerifier);
+    }
+
+    public InputVerifier getInputVerifier() {
+        return inputVerifier;
+    }
+
+    /// Whether the input verifier of the focus owner is asked before
+    /// this component takes the focus; true unless set otherwise, and
+    /// false is what a cancel button wants.
+    public void setVerifyInputWhenFocusTarget(boolean verifyInputWhenFocusTarget) {
+        boolean old = this.verifyInputWhenFocusTarget;
+        this.verifyInputWhenFocusTarget = verifyInputWhenFocusTarget;
+        firePropertyChange("verifyInputWhenFocusTarget", old, verifyInputWhenFocusTarget);
+    }
+
+    public boolean getVerifyInputWhenFocusTarget() {
+        return verifyInputWhenFocusTarget;
+    }
+
+    /// Takes the focus unless the input verifier of the component that
+    /// has it objects.
+    @Override
+    public boolean requestFocusInWindow() {
+        Component owner = EventBridge.focusOwner();
+        if (verifyInputWhenFocusTarget && owner != this && owner instanceof JComponent) {
+            JComponent from = (JComponent) owner;
+            InputVerifier v = from.getInputVerifier();
+            if (v != null && !v.shouldYieldFocus(from)) {
+                return false;
+            }
+        }
+        return super.requestFocusInWindow();
+    }
+
+    // ------------------------------------------------------------ popup
+
+    /// Sets the popup menu that opens on the popup trigger over this
+    /// component: a press of the secondary mouse button, or a long press
+    /// of a finger.
+    public void setComponentPopupMenu(JPopupMenu popup) {
+        JPopupMenu old = popupMenu;
+        popupMenu = popup;
+        firePropertyChange("componentPopupMenu", old, popup);
+    }
+
+    public JPopupMenu getComponentPopupMenu() {
+        if (!inheritsPopupMenu || popupMenu != null) {
+            return popupMenu;
+        }
+        for (Container p = getParent(); p != null; p = p.getParent()) {
+            if (p instanceof JComponent) {
+                return ((JComponent) p).getComponentPopupMenu();
+            }
+            if (p instanceof Window) {
+                break;
+            }
+        }
+        return null;
+    }
+
+    public void setInheritsPopupMenu(boolean value) {
+        boolean old = inheritsPopupMenu;
+        inheritsPopupMenu = value;
+        firePropertyChange("inheritsPopupMenu", old, value);
+    }
+
+    public boolean getInheritsPopupMenu() {
+        return inheritsPopupMenu;
+    }
+
+    // ------------------------------------------------------------ keys
+
+    public final InputMap getInputMap() {
+        return getInputMap(WHEN_FOCUSED);
+    }
+
+    /// The input map of a condition, created on first use.
+    public final InputMap getInputMap(int condition) {
+        switch (condition) {
+            case WHEN_FOCUSED:
+                if (focusInputMap == null) {
+                    focusInputMap = new InputMap();
+                }
+                return focusInputMap;
+            case WHEN_ANCESTOR_OF_FOCUSED_COMPONENT:
+                if (ancestorInputMap == null) {
+                    ancestorInputMap = new InputMap();
+                }
+                return ancestorInputMap;
+            case WHEN_IN_FOCUSED_WINDOW:
+                if (windowInputMap == null) {
+                    windowInputMap = new ComponentInputMap(this);
+                }
+                return windowInputMap;
+            default:
+                throw new IllegalArgumentException("condition must be one of JComponent.WHEN_IN_FOCUSED_WINDOW, "
+                        + "JComponent.WHEN_FOCUSED or JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT");
+        }
+    }
+
+    public final void setInputMap(int condition, InputMap map) {
+        switch (condition) {
+            case WHEN_FOCUSED:
+                focusInputMap = map;
+                break;
+            case WHEN_ANCESTOR_OF_FOCUSED_COMPONENT:
+                ancestorInputMap = map;
+                break;
+            case WHEN_IN_FOCUSED_WINDOW:
+                if (map == null) {
+                    windowInputMap = null;
+                } else if (map instanceof ComponentInputMap) {
+                    windowInputMap = (ComponentInputMap) map;
+                } else {
+                    throw new IllegalArgumentException(
+                            "WHEN_IN_FOCUSED_WINDOW InputMaps must be of type ComponentInputMap");
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("condition must be one of JComponent.WHEN_IN_FOCUSED_WINDOW, "
+                        + "JComponent.WHEN_FOCUSED or JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT");
+        }
+    }
+
+    private InputMap inputMapOrNull(int condition) {
+        return condition == WHEN_FOCUSED ? focusInputMap
+                : condition == WHEN_ANCESTOR_OF_FOCUSED_COMPONENT ? ancestorInputMap
+                : condition == WHEN_IN_FOCUSED_WINDOW ? windowInputMap : null;
+    }
+
+    public final ActionMap getActionMap() {
+        if (actionMap == null) {
+            actionMap = new ActionMap();
+        }
+        return actionMap;
+    }
+
+    public final void setActionMap(ActionMap am) {
+        actionMap = am;
+    }
+
+    public void registerKeyboardAction(ActionListener anAction, String aCommand, KeyStroke aKeyStroke,
+            int aCondition) {
+        InputMap im = getInputMap(aCondition);
+        Standin standin = new Standin(anAction, aCommand);
+        im.put(aKeyStroke, standin);
+        getActionMap().put(standin, standin);
+    }
+
+    public void registerKeyboardAction(ActionListener anAction, KeyStroke aKeyStroke, int aCondition) {
+        registerKeyboardAction(anAction, null, aKeyStroke, aCondition);
+    }
+
+    public void unregisterKeyboardAction(KeyStroke aKeyStroke) {
+        for (int c = WHEN_FOCUSED; c <= WHEN_IN_FOCUSED_WINDOW; c++) {
+            InputMap im = inputMapOrNull(c);
+            if (im != null) {
+                Object key = im.get(aKeyStroke);
+                if (key != null && actionMap != null) {
+                    actionMap.remove(key);
+                }
+                im.remove(aKeyStroke);
+            }
+        }
+    }
+
+    public KeyStroke[] getRegisteredKeyStrokes() {
+        ArrayList<KeyStroke> l = new ArrayList<KeyStroke>();
+        for (int c = WHEN_FOCUSED; c <= WHEN_IN_FOCUSED_WINDOW; c++) {
+            InputMap im = inputMapOrNull(c);
+            KeyStroke[] ks = im == null ? null : im.allKeys();
+            if (ks != null) {
+                for (int i = 0; i < ks.length; i++) {
+                    l.add(ks[i]);
+                }
+            }
+        }
+        return l.toArray(new KeyStroke[l.size()]);
+    }
+
+    public int getConditionForKeyStroke(KeyStroke aKeyStroke) {
+        for (int c = WHEN_FOCUSED; c <= WHEN_IN_FOCUSED_WINDOW; c++) {
+            InputMap im = inputMapOrNull(c);
+            if (im != null && im.get(aKeyStroke) != null) {
+                return c;
+            }
+        }
+        return UNDEFINED_CONDITION;
+    }
+
+    public ActionListener getActionForKeyStroke(KeyStroke aKeyStroke) {
+        if (actionMap == null) {
+            return null;
+        }
+        for (int c = WHEN_FOCUSED; c <= WHEN_IN_FOCUSED_WINDOW; c++) {
+            InputMap im = inputMapOrNull(c);
+            Object key = im == null ? null : im.get(aKeyStroke);
+            Action a = key == null ? null : actionMap.get(key);
+            if (a != null) {
+                return a instanceof Standin ? ((Standin) a).listener : a;
+            }
+        }
+        return null;
+    }
+
+    public void resetKeyboardActions() {
+        for (int c = WHEN_FOCUSED; c <= WHEN_IN_FOCUSED_WINDOW; c++) {
+            InputMap im = inputMapOrNull(c);
+            if (im != null) {
+                im.clear();
+            }
+        }
+        if (actionMap != null) {
+            actionMap.clear();
+        }
+    }
+
+    /// Runs the action bound to a key stroke under one condition, if this
+    /// component is enabled and has one. Answers whether an action ran.
+    protected boolean processKeyBinding(KeyStroke ks, KeyEvent e, int condition, boolean pressed) {
+        InputMap im = inputMapOrNull(condition);
+        if (im == null || actionMap == null || !isEnabled()) {
+            return false;
+        }
+        Object key = im.get(ks);
+        Action a = key == null ? null : actionMap.get(key);
+        return a != null && SwingUtilities.notifyAction(a, ks, e, this, e.getModifiers());
+    }
+
+    /// After the key listeners, looks the event up in the key bindings.
+    @Override
+    protected void processKeyEvent(KeyEvent e) {
+        super.processKeyEvent(e);
+        if (!e.isConsumed()) {
+            cn1KeyBindings(this, e);
+        }
+    }
+
+    /// A stop of the tab key also when it has `WHEN_FOCUSED` bindings.
+    @Override
+    public boolean cn1FocusTraversable() {
+        return super.cn1FocusTraversable() || (focusInputMap != null && focusInputMap.size() > 0);
+    }
+
+    /// Looks a key event up in the key bindings that apply to `target`,
+    /// the component it is for, and consumes it when an action ran.
+    public static boolean cn1KeyBindings(Component target, KeyEvent e) {
+        KeyStroke ks = KeyStroke.getKeyStrokeForEvent(e);
+        if (ks == null) {
+            return false;
+        }
+        boolean pressed = e.getID() == KeyEvent.KEY_PRESSED;
+        boolean done = target instanceof JComponent
+                && ((JComponent) target).processKeyBinding(ks, e, WHEN_FOCUSED, pressed);
+        Component top = target;
+        for (Component c = target; c != null && !done; c = c.getParent()) {
+            top = c;
+            if (c instanceof Window) {
+                break;
+            }
+            if (c instanceof JComponent) {
+                done = ((JComponent) c).processKeyBinding(ks, e, WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, pressed);
+            }
+        }
+        if (!done) {
+            done = windowBindings(top, ks, e, pressed);
+        }
+        if (done) {
+            e.consume();
+        }
+        return done;
+    }
+
+    private static boolean windowBindings(Component c, KeyStroke ks, KeyEvent e, boolean pressed) {
+        if (!c.isVisible() || !c.isEnabled()) {
+            return false;
+        }
+        if (c instanceof JComponent
+                && ((JComponent) c).processKeyBinding(ks, e, WHEN_IN_FOCUSED_WINDOW, pressed)) {
+            return true;
+        }
+        if (c instanceof Container) {
+            Component[] cs = ((Container) c).getComponents();
+            for (int i = 0; i < cs.length; i++) {
+                if (windowBindings(cs[i], ks, e, pressed)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// The action a listener registered with `registerKeyboardAction`
+    /// becomes: it runs the listener with the command it was given.
+    private static final class Standin implements Action {
+
+        final ActionListener listener;
+        private final String command;
+
+        Standin(ActionListener listener, String command) {
+            this.listener = listener;
+            this.command = command;
+        }
+
+        @Override
+        public Object getValue(String key) {
+            if (ACTION_COMMAND_KEY.equals(key)) {
+                return command;
+            }
+            return listener instanceof Action ? ((Action) listener).getValue(key) : null;
+        }
+
+        @Override
+        public void putValue(String key, Object value) {
+        }
+
+        @Override
+        public void setEnabled(boolean b) {
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return listener != null && (!(listener instanceof Action) || ((Action) listener).isEnabled());
+        }
+
+        @Override
+        public void addPropertyChangeListener(PropertyChangeListener l) {
+        }
+
+        @Override
+        public void removePropertyChangeListener(PropertyChangeListener l) {
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent ae) {
+            listener.actionPerformed(ae);
+        }
     }
 }

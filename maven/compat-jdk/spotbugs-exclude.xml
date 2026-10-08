@@ -63,4 +63,36 @@
         <Field name="source"/>
         <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
     </Match>
+
+    <!--
+        java.util.Properties is handed its defaults table and consults that
+        very object from then on: a later change to the defaults is visible
+        through every table built on them. A copy would break that.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Properties"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+        java.util.Properties does not override equals either: two tables are
+        equal when their own entries are, whatever their defaults, which is
+        what Hashtable.equals already answers.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Properties"/>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+    </Match>
+
+    <!--
+        Thread.setContextClassLoader exists to remember the loader it is
+        given, so that getContextClassLoader hands the same object back. A
+        ClassLoader cannot be copied.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.Resources"/>
+        <Method name="setContextClassLoader"/>
+        <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+    </Match>
 </FindBugsFilter>

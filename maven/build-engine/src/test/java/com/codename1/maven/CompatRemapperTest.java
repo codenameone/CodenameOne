@@ -59,7 +59,7 @@ public class CompatRemapperTest {
     @Rule
     public TemporaryFolder tmp = new TemporaryFolder();
 
-    private static final com.codename1.build.Log LOG = new com.codename1.build.Log() {
+    static final com.codename1.build.Log LOG = new com.codename1.build.Log() {
         public void debug(CharSequence c) { }
         public void debug(CharSequence c, Throwable e) { }
         public void debug(Throwable e) { }

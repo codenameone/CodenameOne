@@ -23,6 +23,7 @@
 package com.codename1.desktopcompat.java.awt;
 
 import com.codename1.ui.Display;
+import java.lang.reflect.InvocationTargetException;
 
 /// The event dispatch thread, which is Codename One's own.
 public class EventQueue {
@@ -45,14 +46,35 @@ public class EventQueue {
     }
 
     /// Runs `runnable` on the event dispatch thread and returns when it
-    /// has. Called on that thread it simply runs it, where the desktop
-    /// throws an error; an exception the runnable throws propagates as it
-    /// is.
-    public static void invokeAndWait(Runnable runnable) throws InterruptedException {
+    /// has.
+    ///
+    /// Called from another thread it is the desktop's: whatever the
+    /// runnable throws comes back wrapped in an
+    /// `InvocationTargetException`. Called on the event dispatch thread
+    /// -- where the desktop throws an error, and where a `main` method
+    /// runs in this layer -- it simply runs the runnable, and an exception
+    /// propagates as it is.
+    public static void invokeAndWait(final Runnable runnable)
+            throws InterruptedException, InvocationTargetException {
         if (!Display.isInitialized() || Display.getInstance().isEdt()) {
             runnable.run();
-        } else {
-            Display.getInstance().callSeriallyAndWait(runnable);
+            return;
+        }
+        final Throwable[] failure = new Throwable[1];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    runnable.run();
+                } catch (RuntimeException e) {
+                    failure[0] = e;
+                } catch (Error e) {
+                    failure[0] = e;
+                }
+            }
+        });
+        if (failure[0] != null) {
+            throw new InvocationTargetException(failure[0]);
         }
     }
 

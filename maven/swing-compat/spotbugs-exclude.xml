@@ -248,4 +248,107 @@
     </Match>
 
     <!-- END table-tree slice -->
+
+    <!-- BEGIN windows-menus slice -->
+
+    <!-- The JDK documents null, not an empty array, as the answer of these
+         when there is no key, nothing selected, or no option set, and
+         callers test for it. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.ActionMap"/>
+                <Method name="keys"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.InputMap"/>
+                <Method name="keys"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JCheckBoxMenuItem"/>
+                <Method name="getSelectedObjects"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JOptionPane"/>
+                <Or>
+                    <Method name="getOptions"/>
+                    <Method name="getSelectionValues"/>
+                </Or>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- Created on first use by the event dispatch thread, the only thread
+         that touches them; the layer takes no locks. Creating them when the
+         class loads would have a superclass initializer create its own
+         subclass, and JOptionPane a frame no application asked for. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.GraphicsEnvironment"/>
+                <Method name="getLocalGraphicsEnvironment"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.KeyboardFocusManager"/>
+                <Method name="getCurrentKeyboardFocusManager"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JOptionPane"/>
+                <Method name="getRootFrame"/>
+            </And>
+        </Or>
+        <Bug pattern="LI_LAZY_INIT_STATIC"/>
+    </Match>
+
+    <!-- Each of these is one object for the whole application by the
+         JDK's contract: the caller gets THE focus manager, THE menu
+         selection manager, THE root frame, and sets the root frame it is
+         given. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.KeyboardFocusManager"/>
+                <Method name="getCurrentKeyboardFocusManager"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.MenuSelectionManager"/>
+                <Method name="defaultManager"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JOptionPane"/>
+                <Or>
+                    <Method name="getRootFrame"/>
+                    <Method name="setRootFrame"/>
+                </Or>
+            </And>
+        </Or>
+        <Or>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The form a dialog floats in exists to hold the window it shows. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.DialogForm"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- AWT's Window constructor sets its layout through the overridable
+         setLayout, and JWindow builds its root pane through the overridable
+         windowInit, as JFrame and JDialog do; applications override them
+         counting on that. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.java.awt.Window"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JWindow"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- END windows-menus slice -->
 </FindBugsFilter>

@@ -66,6 +66,8 @@ public final class Relocation {
         {"java/util/PropertyResourceBundle", JDK_PACKAGE + "PropertyResourceBundle"},
         {"java/util/ListResourceBundle", JDK_PACKAGE + "ListResourceBundle"},
         {"java/util/MissingResourceException", JDK_PACKAGE + "MissingResourceException"},
+        {"java/util/Properties", JDK_PACKAGE + "Properties"},
+        {"java/util/UUID", JDK_PACKAGE + "UUID"},
         // java.util.concurrent. The device has the atomics and
         // ThreadLocalRandom; these it does not. None of them synchronizes:
         // application code is confined to one thread.
@@ -81,6 +83,12 @@ public final class Relocation {
         // callers name it in the method descriptor.
         {"java/util/concurrent/ConcurrentHashMap$KeySetView", JDK_PACKAGE + "ConcurrentHashMap$KeySetView"},
         {"java/util/concurrent/CopyOnWriteArrayList", JDK_PACKAGE + "CopyOnWriteArrayList"},
+        // Executors run their tasks on Codename One background threads,
+        // never on the event dispatch thread.
+        {"java/util/concurrent/Executor", JDK_PACKAGE + "Executor"},
+        {"java/util/concurrent/ExecutorService", JDK_PACKAGE + "ExecutorService"},
+        {"java/util/concurrent/Executors", JDK_PACKAGE + "Executors"},
+        {"java/util/concurrent/RejectedExecutionException", JDK_PACKAGE + "RejectedExecutionException"},
         // java.text. The device has Format, DateFormat, SimpleDateFormat,
         // DateFormatSymbols and ParseException, and those stay its own.
         {"java/text/NumberFormat", JDK_PACKAGE + "NumberFormat"},
@@ -141,6 +149,13 @@ public final class Relocation {
     /// Whether `jarName` is a build of this layer's runtime artifact.
     public boolean isRuntimeJar(String jarName) {
         return jarName.startsWith(artifactId + "-") && jarName.endsWith(".jar");
+    }
+
+    /// Whether this is a desktop layer: one whose applications are compiled
+    /// against a full JDK, and so name members of JDK classes that the device
+    /// has under the same name with fewer members ([CompatRewrites]).
+    boolean isDesktop() {
+        return !AndroidResourceRunner.COMPAT_ARTIFACT.equals(artifactId);
     }
 
     /// The name `internalName` ships under when it is one of this layer's

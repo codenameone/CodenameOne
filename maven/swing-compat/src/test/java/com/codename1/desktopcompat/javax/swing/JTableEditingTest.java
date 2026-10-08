@@ -33,20 +33,11 @@ import com.codename1.desktopcompat.java.awt.BorderLayout;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.event.KeyEvent;
 import com.codename1.desktopcompat.javax.swing.table.DefaultTableModel;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 /// Editing a table cell: the editor's component over the cell, committing
 /// and cancelling, and the editors chosen by column class.
 public class JTableEditingTest extends KernelTestBase {
-
-    /// The kernel counts clicks by time alone and keeps the count between
-    /// tests, so the taps made here would reach the next test class as
-    /// one long multiple click. Wait the count out.
-    @AfterClass
-    public static void letTheClickCountRunOut() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     private static final class Sheet extends DefaultTableModel {
         Sheet() {
