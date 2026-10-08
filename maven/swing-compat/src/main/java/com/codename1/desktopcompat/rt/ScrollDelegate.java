@@ -40,7 +40,30 @@ import com.codename1.desktopcompat.javax.swing.JViewport;
 /// its selection alone and hands the events on with [#forward].
 public final class ScrollDelegate {
 
+    /// How thick the scroll bars of a scroll pane are on a desktop port.
+    private static final int DESKTOP_BAR = 14;
+
+    private static int forcedBar = -1;
+
     private ScrollDelegate() {
+    }
+
+    /// How much room a scroll bar of a scroll pane takes, in logical
+    /// pixels: a bar to drag with the mouse on a desktop port, and none on
+    /// a touch device, where the content itself is dragged and Codename
+    /// One draws an indicator over it.
+    public static int barThickness() {
+        if (forcedBar >= 0) {
+            return forcedBar;
+        }
+        return com.codename1.ui.Display.isInitialized() && com.codename1.ui.Display.getInstance().isDesktop()
+                ? DESKTOP_BAR : 0;
+    }
+
+    /// Fixes the answer of [#barThickness]; a negative value lets the
+    /// device decide again. For tests.
+    public static void setBarThickness(int thickness) {
+        forcedBar = thickness;
     }
 
     /// The nearest scroll pane around `c`, or `null`.

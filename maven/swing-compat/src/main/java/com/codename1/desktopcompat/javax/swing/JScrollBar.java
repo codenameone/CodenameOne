@@ -35,12 +35,14 @@ import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 
 /// A scroll bar over a [BoundedRangeModel].
 ///
-/// Used on its own it is a track with a thumb, drawn here, that the user
-/// drags; a press on the track moves the value by a block. The scroll bars
-/// of a [JScrollPane] are these too but are not shown: there the user
-/// scrolls the content itself and Codename One draws its own scroll
-/// indicator, while the bar's model still follows and steers the view.
-/// There are no arrow buttons.
+/// A track with a thumb, drawn here, that the user drags; a press on the
+/// track moves the value by a block. There are no arrow buttons.
+///
+/// The scroll bars of a [JScrollPane] are these too. A desktop port gives
+/// them room beside the viewport; on a touch device they have no size,
+/// the user scrolls the content itself and Codename One draws its own
+/// scroll indicator, while the bar's model still follows and steers the
+/// view.
 public class JScrollBar extends JComponent implements Adjustable {
 
     private static final int THICKNESS = 12;
