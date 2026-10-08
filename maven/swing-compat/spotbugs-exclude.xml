@@ -179,4 +179,73 @@
 
     <!-- END widgets slice -->
 
+    <!-- BEGIN table-tree slice -->
+
+    <!-- The JDK builds a table, its header, a column model and a tree
+         editor through protected factory and setter methods
+         (createDefaultColumnModel, setColumnModel, createDefaultRenderers,
+         createTreeCellEditor, ...) called from the constructor, and
+         applications override them counting on that. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.JTable"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.table.JTableHeader"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.table.DefaultTableColumnModel"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultTreeCellEditor"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The JDK documents null, not an empty array, as the answer of
+         these: no selection, no rows between two indexes, a structure event
+         that names no children, a path of no node. Callers test for it. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.JTree"/>
+                <Or>
+                    <Method name="getSelectionPaths"/>
+                    <Method name="getPathBetweenRows"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultTreeSelectionModel"/>
+                <Method name="getSelectionPaths"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.event.TreeModelEvent"/>
+                <Or>
+                    <Method name="getChildIndices"/>
+                    <Method name="getChildren"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultMutableTreeNode"/>
+                <Method name="getPathToRoot"/>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- Object.clone() answers null for anything but an array on a device,
+         so these two copy themselves field by field instead of calling
+         super.clone(). -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultMutableTreeNode"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.tree.DefaultTreeSelectionModel"/>
+        </Or>
+        <Method name="clone"/>
+        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
+    </Match>
+
+    <!-- noFocusBorder is "protected static Border", not final, in the JDK,
+         and subclasses of the renderer assign it. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.table.DefaultTableCellRenderer"/>
+        <Field name="noFocusBorder"/>
+        <Bug pattern="MS_SHOULD_BE_FINAL"/>
+    </Match>
+
+    <!-- END table-tree slice -->
 </FindBugsFilter>
