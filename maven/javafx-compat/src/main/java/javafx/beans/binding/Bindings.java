@@ -358,9 +358,11 @@ public final class Bindings {
     public static BooleanBinding createBooleanBinding(final Callable<Boolean> func, final Observable... dependencies) {
         return new Fn.BooleanFn(() -> {
             try {
-                Boolean value = func.call();
-                if (value != null) {
-                    return value.booleanValue();
+                // Read as an Object and tested: the function's type is erased,
+                // and a failed cast is not an exception on every target.
+                Object value = ((Callable<?>) func).call();
+                if (value instanceof Boolean) {
+                    return ((Boolean) value).booleanValue();
                 }
             } catch (Exception failure) {
                 Diagnostics.report(failure);
@@ -374,9 +376,11 @@ public final class Bindings {
     public static DoubleBinding createDoubleBinding(final Callable<Double> func, final Observable... dependencies) {
         return new Fn.DoubleFn(() -> {
             try {
-                Double value = func.call();
-                if (value != null) {
-                    return value.doubleValue();
+                // Read as an Object and tested: the function's type is erased,
+                // and a failed cast is not an exception on every target.
+                Object value = ((Callable<?>) func).call();
+                if (value instanceof Double) {
+                    return ((Double) value).doubleValue();
                 }
             } catch (Exception failure) {
                 Diagnostics.report(failure);
@@ -390,9 +394,11 @@ public final class Bindings {
     public static FloatBinding createFloatBinding(final Callable<Float> func, final Observable... dependencies) {
         return new Fn.FloatFn(() -> {
             try {
-                Float value = func.call();
-                if (value != null) {
-                    return value.floatValue();
+                // Read as an Object and tested: the function's type is erased,
+                // and a failed cast is not an exception on every target.
+                Object value = ((Callable<?>) func).call();
+                if (value instanceof Float) {
+                    return ((Float) value).floatValue();
                 }
             } catch (Exception failure) {
                 Diagnostics.report(failure);
@@ -406,9 +412,11 @@ public final class Bindings {
     public static IntegerBinding createIntegerBinding(final Callable<Integer> func, final Observable... dependencies) {
         return new Fn.IntegerFn(() -> {
             try {
-                Integer value = func.call();
-                if (value != null) {
-                    return value.intValue();
+                // Read as an Object and tested: the function's type is erased,
+                // and a failed cast is not an exception on every target.
+                Object value = ((Callable<?>) func).call();
+                if (value instanceof Integer) {
+                    return ((Integer) value).intValue();
                 }
             } catch (Exception failure) {
                 Diagnostics.report(failure);
@@ -422,9 +430,11 @@ public final class Bindings {
     public static LongBinding createLongBinding(final Callable<Long> func, final Observable... dependencies) {
         return new Fn.LongFn(() -> {
             try {
-                Long value = func.call();
-                if (value != null) {
-                    return value.longValue();
+                // Read as an Object and tested: the function's type is erased,
+                // and a failed cast is not an exception on every target.
+                Object value = ((Callable<?>) func).call();
+                if (value instanceof Long) {
+                    return ((Long) value).longValue();
                 }
             } catch (Exception failure) {
                 Diagnostics.report(failure);
@@ -451,7 +461,9 @@ public final class Bindings {
     public static StringBinding createStringBinding(final Callable<String> func, final Observable... dependencies) {
         return new Fn.StringFn(() -> {
             try {
-                return func.call();
+                // As above: the type is erased, so it is tested, not cast.
+                Object value = ((Callable<?>) func).call();
+                return value instanceof String ? (String) value : null;
             } catch (Exception failure) {
                 Diagnostics.report(failure);
                 return "";

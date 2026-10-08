@@ -25,18 +25,18 @@ package com.codename1.desktopcompat.javax.swing;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Graphics;
 import com.codename1.desktopcompat.java.awt.Image;
-import com.codename1.desktopcompat.java.awt.Toolkit;
 import com.codename1.desktopcompat.java.awt.image.ImageObserver;
+import com.codename1.desktopcompat.rt.ImageLoader;
 import com.codename1.desktopcompat.rt.NativeImage;
-import com.codename1.ui.Display;
-import java.io.IOException;
-import java.io.InputStream;
+import java.net.URL;
 
 /// An icon that paints an image, drawn at one logical pixel per image
 /// pixel.
 ///
-/// A file name is looked up among the application's resources by its last
-/// path element, since an application has no file tree of its own.
+/// A file name is read as a file when there is one, and is otherwise
+/// looked up among the application's resources by its last path element:
+/// the pictures a desktop application keeps beside it are resources once
+/// it is built for a device. A URL is read before the constructor returns.
 public class ImageIcon implements Icon {
 
     private Image image;
@@ -58,7 +58,7 @@ public class ImageIcon implements Icon {
     }
 
     public ImageIcon(byte[] imageData) {
-        setImage(Toolkit.getDefaultToolkit().createImage(imageData));
+        cn1Loaded(imageData == null ? null : ImageLoader.decode(imageData, 0, imageData.length));
     }
 
     public ImageIcon(byte[] imageData, String description) {
@@ -70,26 +70,28 @@ public class ImageIcon implements Icon {
         this(filename, filename);
     }
 
+    /// The image a path names: the file when there is one, else the
+    /// application's resource of the path's last name.
     public ImageIcon(String filename, String description) {
         this.description = description;
-        if (filename != null && Display.isInitialized()) {
-            String name = filename;
-            int cut = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
-            if (cut >= 0) {
-                name = name.substring(cut + 1);
-            }
-            InputStream in = Display.getInstance().getResourceAsStream(null, "/" + name);
-            if (in != null) {
-                try {
-                    try {
-                        setImage(new NativeImage(com.codename1.ui.Image.createImage(in)));
-                    } finally {
-                        in.close();
-                    }
-                } catch (IOException e) {
-                    image = null;
-                }
-            }
+        cn1Loaded(ImageLoader.fromPath(filename));
+    }
+
+    /// The image a URL names, read before the constructor returns.
+    public ImageIcon(URL location) {
+        this(location, location == null ? null : location.toExternalForm());
+    }
+
+    public ImageIcon(URL location, String description) {
+        this.description = description;
+        cn1Loaded(ImageLoader.fromUrl(location));
+    }
+
+    /// An icon whose image could not be read has no image, and a width and
+    /// height of -1.
+    private void cn1Loaded(com.codename1.ui.Image decoded) {
+        if (decoded != null) {
+            setImage(new NativeImage(decoded));
         }
     }
 

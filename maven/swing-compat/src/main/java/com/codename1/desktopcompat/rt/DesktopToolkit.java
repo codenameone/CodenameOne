@@ -28,12 +28,15 @@ import com.codename1.desktopcompat.java.awt.Font;
 import com.codename1.desktopcompat.java.awt.FontMetrics;
 import com.codename1.desktopcompat.java.awt.Image;
 import com.codename1.desktopcompat.java.awt.Toolkit;
+import com.codename1.desktopcompat.java.awt.datatransfer.Clipboard;
+import java.net.URL;
 import com.codename1.ui.Display;
 
 /// The one toolkit there is.
 public final class DesktopToolkit extends Toolkit {
 
     private final EventQueue queue = new EventQueue();
+    private Clipboard clipboard;
 
     @Override
     public Dimension getScreenSize() {
@@ -64,7 +67,35 @@ public final class DesktopToolkit extends Toolkit {
 
     @Override
     public Image createImage(byte[] imagedata, int imageoffset, int imagelength) {
-        return new NativeImage(com.codename1.ui.Image.createImage(imagedata, imageoffset, imagelength));
+        return ImageLoader.wrap(ImageLoader.decode(imagedata, imageoffset, imagelength));
+    }
+
+    @Override
+    public Image getImage(String filename) {
+        return ImageLoader.wrap(ImageLoader.fromPath(filename));
+    }
+
+    @Override
+    public Image getImage(URL url) {
+        return ImageLoader.wrap(ImageLoader.fromUrl(url));
+    }
+
+    @Override
+    public Image createImage(String filename) {
+        return getImage(filename);
+    }
+
+    @Override
+    public Image createImage(URL url) {
+        return getImage(url);
+    }
+
+    @Override
+    public Clipboard getSystemClipboard() {
+        if (clipboard == null) {
+            clipboard = new SystemClipboard();
+        }
+        return clipboard;
     }
 
     @Override

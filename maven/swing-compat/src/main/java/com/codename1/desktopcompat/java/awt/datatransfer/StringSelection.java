@@ -20,42 +20,41 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.rt;
+package com.codename1.desktopcompat.java.awt.datatransfer;
 
-import com.codename1.desktopcompat.java.awt.Graphics;
-import com.codename1.desktopcompat.java.awt.Image;
-import com.codename1.desktopcompat.java.awt.image.ImageObserver;
+import java.io.IOException;
 
-/// An AWT image that is a Codename One image: one decoded from a file or a
-/// resource, or the result of scaling another. One made of `null` is an
-/// image that could not be read: it has no pixels, and its width and
-/// height are -1, which is how the desktop reports one.
-public final class NativeImage extends Image {
+/// A string to put on a clipboard, offered as [DataFlavor#stringFlavor].
+///
+/// What differs from the desktop: the deprecated plain text flavor, which
+/// hands the string over as a reader, is not offered.
+public class StringSelection implements Transferable, ClipboardOwner {
 
-    private final com.codename1.ui.Image image;
+    private final String data;
 
-    public NativeImage(com.codename1.ui.Image image) {
-        this.image = image;
+    public StringSelection(String data) {
+        this.data = data;
     }
 
     @Override
-    public int getWidth(ImageObserver observer) {
-        return image == null ? -1 : image.getWidth();
+    public DataFlavor[] getTransferDataFlavors() {
+        return new DataFlavor[]{DataFlavor.stringFlavor};
     }
 
     @Override
-    public int getHeight(ImageObserver observer) {
-        return image == null ? -1 : image.getHeight();
-    }
-
-    /// Only an image created to be drawn into has a graphics, as in AWT.
-    @Override
-    public Graphics getGraphics() {
-        throw new UnsupportedOperationException("getGraphics() is only valid for images created off screen");
+    public boolean isDataFlavorSupported(DataFlavor flavor) {
+        return DataFlavor.stringFlavor.equals(flavor);
     }
 
     @Override
-    public com.codename1.ui.Image cn1Image() {
-        return image;
+    public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
+        if (!DataFlavor.stringFlavor.equals(flavor)) {
+            throw new UnsupportedFlavorException(flavor);
+        }
+        return data;
+    }
+
+    @Override
+    public void lostOwnership(Clipboard clipboard, Transferable contents) {
     }
 }

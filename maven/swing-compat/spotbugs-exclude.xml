@@ -492,4 +492,46 @@
     </Match>
 
     <!-- END swingx slice -->
+
+    <!-- BEGIN hardening slice -->
+
+    <!-- UIManager.getDefaults() and getLookAndFeelDefaults() answer THE
+         table: an application writes its defaults into what they return,
+         so a copy would lose every put. The table is static because the
+         JDK's methods are. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.UIManager"/>
+        <Or>
+            <Method name="getDefaults"/>
+            <Method name="getLookAndFeelDefaults"/>
+            <Method name="getLookAndFeel"/>
+        </Or>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!-- The JDK's BasicComboBoxEditor makes its text field through the
+         protected createEditorComponent() from its constructor, and a
+         subclass overrides exactly that to supply its own field. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.plaf.basic.BasicComboBoxEditor"/>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The combo box peer calls its owner back when the popup opens and
+         closes; holding the watcher is the point of setting it. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.ComboPeer"/>
+        <Method name="setPopupWatcher"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Toolkit.getSystemClipboard() answers the one system clipboard;
+         a copy would be a clipboard nothing else reads. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.DesktopToolkit"/>
+        <Method name="getSystemClipboard"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- END hardening slice -->
 </FindBugsFilter>

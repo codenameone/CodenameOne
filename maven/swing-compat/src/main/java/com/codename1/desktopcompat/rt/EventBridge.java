@@ -34,6 +34,7 @@ import com.codename1.desktopcompat.java.awt.event.MouseEvent;
 import com.codename1.desktopcompat.java.awt.event.MouseWheelEvent;
 import com.codename1.desktopcompat.javax.swing.JComponent;
 import com.codename1.desktopcompat.javax.swing.JPopupMenu;
+import com.codename1.desktopcompat.javax.swing.JScrollPane;
 import com.codename1.desktopcompat.javax.swing.MenuSelectionManager;
 import com.codename1.desktopcompat.javax.swing.SwingUtilities;
 import com.codename1.ui.Display;
@@ -430,18 +431,23 @@ public final class EventBridge {
     }
 
     /// Delivers a wheel movement at a display position: `rotation` clicks,
-    /// positive toward the user.
-    public static void wheel(Window w, int deviceX, int deviceY, int rotation) {
-        wheel(w, deviceX, deviceY, rotation, 0);
+    /// positive toward the user. Answers whether a listener received it.
+    public static boolean wheel(Window w, int deviceX, int deviceY, int rotation) {
+        return wheel(w, deviceX, deviceY, rotation, 0);
     }
 
     /// As [#wheel(Window, int, int, int)] with extra extended modifiers,
     /// which is how a horizontal movement is told apart: it carries
     /// `SHIFT_DOWN_MASK`, as it does on the desktop.
-    public static void wheel(Window w, int deviceX, int deviceY, int rotation, int extraModifiers) {
+    ///
+    /// The event goes to the nearest component from the one under the
+    /// pointer up that has a `MouseWheelListener`. The answer is `true`
+    /// when there was one, enabled or not: the wheel is that component's
+    /// then, and nothing else may act on it.
+    public static boolean wheel(Window w, int deviceX, int deviceY, int rotation, int extraModifiers) {
         com.codename1.ui.Component rp = w.cn1PeerOrNull();
         if (rp == null || rotation == 0) {
-            return;
+            return false;
         }
         int x = Units.toLogical(deviceX - rp.getAbsoluteX());
         int y = Units.toLogical(deviceY - rp.getAbsoluteY());
@@ -449,24 +455,59 @@ public final class EventBridge {
         while (target != null && target.getMouseWheelListeners().length == 0) {
             target = target.getParent();
         }
-        if (target != null && target.isEnabled()) {
+        if (target == null) {
+            return false;
+        }
+        if (target.isEnabled()) {
             int[] p = local(w, target, x, y);
             target.dispatchEvent(new MouseWheelEvent(target, MouseEvent.MOUSE_WHEEL, System.currentTimeMillis(),
                     both(input.modifiers() | extraModifiers), p[0], p[1], 0, false,
                     MouseWheelEvent.WHEEL_UNIT_SCROLL, 3, rotation));
         }
+        return true;
+    }
+
+    /// Whether the wheel at a display position is over a scroll pane that
+    /// was told not to scroll with it.
+    private static boolean wheelScrollingOff(Window w, int deviceX, int deviceY) {
+        com.codename1.ui.Component rp = w.cn1PeerOrNull();
+        if (rp == null) {
+            return false;
+        }
+        Component hit = w.findComponentAt(Units.toLogical(deviceX - rp.getAbsoluteX()),
+                Units.toLogical(deviceY - rp.getAbsoluteY()));
+        for (Component c = hit; c != null; c = c.getParent()) {
+            if (c instanceof JScrollPane) {
+                return !((JScrollPane) c).isWheelScrollingEnabled();
+            }
+        }
+        return false;
     }
 
     /// Delivers a Codename One wheel event. Codename One's vertical delta
     /// is positive when the wheel turned away from the user, the opposite
     /// of AWT's rotation, and so is its horizontal delta.
+    ///
+    /// Codename One fires its wheel listeners before it scrolls anything,
+    /// and scrolls the nearest scrollable container itself when nobody
+    /// consumed the event. So the event is consumed here exactly when the
+    /// scrolling must not happen: a `MouseWheelListener` of the application
+    /// received it -- on the desktop such a listener replaces the scroll
+    /// pane's own handling, and an application that zooms with the wheel
+    /// must not see the content scroll as well -- or the scroll pane under
+    /// the pointer has wheel scrolling turned off. Left alone, the wheel
+    /// scrolls the viewport once.
     public static void wheel(Window w, com.codename1.ui.events.WheelEvent we) {
         int dy = we.getDeltaY();
         int dx = we.getDeltaX();
+        boolean taken = false;
         if (dy != 0) {
-            wheel(w, we.getX(), we.getY(), dy > 0 ? -1 : 1, 0);
+            taken = wheel(w, we.getX(), we.getY(), dy > 0 ? -1 : 1, 0);
         } else if (dx != 0) {
-            wheel(w, we.getX(), we.getY(), dx > 0 ? -1 : 1, InputEvent.SHIFT_DOWN_MASK);
+            taken = wheel(w, we.getX(), we.getY(), dx > 0 ? -1 : 1, InputEvent.SHIFT_DOWN_MASK);
+        }
+        if (taken || wheelScrollingOff(w, we.getX(), we.getY())) {
+            we.consume();
         }
     }
 

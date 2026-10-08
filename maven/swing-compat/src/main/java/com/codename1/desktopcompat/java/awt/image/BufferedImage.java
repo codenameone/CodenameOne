@@ -38,7 +38,7 @@ import com.codename1.desktopcompat.rt.G2D;
 /// when the other side has changed and is then read, so a program that only
 /// calls `setRGB`, or only draws, never pays for the copy. There are no
 /// rasters, color models or sample models.
-public class BufferedImage extends Image implements Transparency {
+public class BufferedImage extends Image implements RenderedImage, Transparency {
 
     public static final int TYPE_CUSTOM = 0;
     public static final int TYPE_INT_RGB = 1;
@@ -88,12 +88,24 @@ public class BufferedImage extends Image implements Transparency {
         return type;
     }
 
+    @Override
     public int getWidth() {
         return width;
     }
 
+    @Override
     public int getHeight() {
         return height;
+    }
+
+    @Override
+    public int getMinX() {
+        return 0;
+    }
+
+    @Override
+    public int getMinY() {
+        return 0;
     }
 
     @Override

@@ -20,13 +20,18 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.javax.swing;
+package com.codename1.desktopcompat.java.awt.image;
 
-/// An editor pane for styled text. Styled documents are not part of this
-/// layer, so it behaves as the [JEditorPane] it extends: plain text, or a
-/// formatted page with the content type `text/html`.
-public class JTextPane extends JEditorPane {
+/// An image whose pixels can be read, the kind `ImageIO.write` takes.
+/// [BufferedImage] is the one implementation; the raster and colour model
+/// of the desktop's interface are not here.
+public interface RenderedImage {
 
-    public JTextPane() {
-    }
+    int getWidth();
+
+    int getHeight();
+
+    int getMinX();
+
+    int getMinY();
 }

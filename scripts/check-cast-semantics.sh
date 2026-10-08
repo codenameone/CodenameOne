@@ -25,7 +25,9 @@ TRANSLATOR="$REPO_ROOT/vm/ByteCodeTranslator/target/classes"
 # sees maven/core, maven/ios and vm/JavaAPI, and -- in an application with
 # Android sources -- maven/android-compat, whose runtime the build relocates into
 # the application's own classes, with the JDK classes of maven/compat-jdk beside
-# it. Nothing else of ours.
+# it. An application with Swing, SwingX or JavaFX sources gets the same
+# treatment from maven/swing-compat and maven/javafx-compat: their classes are
+# relocated into the application and translated with it.
 # Deliberately NOT covered, for the one reason: the code runs on a VM whose
 # CHECKCAST does throw, so its catch(ClassCastException) handlers are live and
 # correct and demanding an instanceof there buys nothing.
@@ -39,6 +41,8 @@ DEFAULT_ROOTS=(
   "maven/ios/target/classes"
   "maven/android-compat/target/classes"
   "maven/compat-jdk/target/classes"
+  "maven/swing-compat/target/classes"
+  "maven/javafx-compat/target/classes"
 )
 
 write_baseline=0

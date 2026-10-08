@@ -22,11 +22,27 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
-/// An editor pane for styled text. Styled documents are not part of this
-/// layer, so it behaves as the [JEditorPane] it extends: plain text, or a
-/// formatted page with the content type `text/html`.
-public class JTextPane extends JEditorPane {
+import com.codename1.desktopcompat.java.awt.Component;
+import com.codename1.desktopcompat.java.awt.event.ActionListener;
 
-    public JTextPane() {
-    }
+/// The editor of an editable [JComboBox]: a component the user types
+/// into, and the item that text stands for.
+public interface ComboBoxEditor {
+
+    /// The component the combo box shows as its editing area.
+    Component getEditorComponent();
+
+    /// Shows an item; `null` clears the editor.
+    void setItem(Object anObject);
+
+    /// The item being edited.
+    Object getItem();
+
+    /// Selects everything in the editor.
+    void selectAll();
+
+    /// The listener hears when an edit is finished.
+    void addActionListener(ActionListener l);
+
+    void removeActionListener(ActionListener l);
 }

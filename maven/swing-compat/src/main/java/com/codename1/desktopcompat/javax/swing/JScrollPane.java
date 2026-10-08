@@ -27,22 +27,46 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Rectangle;
+import com.codename1.desktopcompat.java.awt.event.MouseWheelEvent;
 import com.codename1.desktopcompat.javax.swing.border.Border;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
+import com.codename1.desktopcompat.rt.ScrollDelegate;
 import java.util.HashMap;
 
 /// Shows a component larger than itself and lets the user scroll it.
 ///
 /// The view sits in a [JViewport] whose peer is a scrollable Codename One
 /// container, so the user scrolls by dragging and flinging the content --
-/// or with the mouse wheel on a desktop -- and Codename One draws its own
-/// scroll indicator. The two scroll bars exist and their models follow
-/// the view (`getVerticalScrollBar().setValue(n)` scrolls, and a listener
-/// on the bar hears the user scrolling), but they take no room and are not
-/// drawn. The policy "never" stops the user scrolling that axis;
-/// "always" and "as needed" are the same. Row and column header views are
-/// shown and follow the view; corners are recorded only.
+/// or with the mouse wheel on a desktop.
+///
+/// The two scroll bars are children of the pane and their models follow
+/// the view: `getVerticalScrollBar().setValue(n)` scrolls, and a listener
+/// on the bar hears the user scrolling. Where they are shown depends on
+/// the device:
+///
+///  - On a desktop port they take room beside the viewport and are dragged
+///    with the mouse. "As needed" shows a bar while the view is larger
+///    than the viewport, "always" shows it whatever the size of the view.
+///  - On a touch device they take no room and have no size. The user
+///    drags the content, and Codename One draws its own thin indicator
+///    over it while it moves.
+///
+/// The policy "never" stops the user scrolling that axis everywhere. Row
+/// and column header views are shown and follow the view. A corner
+/// component is shown in the corner it was set for whenever that corner
+/// exists; the upper trailing corner is also shown with no scroll bar
+/// below it, at its preferred width beside a column header, so that the
+/// column control of a table has a place on a touch device too.
+///
+/// A wheel movement scrolls the viewport natively, once. It is delivered
+/// as a `MouseWheelEvent` first to the nearest component under the
+/// pointer that has a `MouseWheelListener`, and when there is one the
+/// native scrolling does not happen -- as on the desktop, where a wheel
+/// listener on the view replaces the pane's scrolling. A listener that
+/// only wants some of the events passes the others on with
+/// `getParent().dispatchEvent(e)`; a wheel event that reaches this pane
+/// that way scrolls it.
 public class JScrollPane extends JComponent implements ScrollPaneConstants {
 
     protected int verticalScrollBarPolicy = VERTICAL_SCROLLBAR_AS_NEEDED;
@@ -112,6 +136,9 @@ public class JScrollPane extends JComponent implements ScrollPaneConstants {
         verticalScrollBarPolicy = policy;
         firePropertyChange("verticalScrollBarPolicy", old, policy);
         applyPolicies();
+        if (old != policy) {
+            revalidate();
+        }
     }
 
     public int getHorizontalScrollBarPolicy() {
@@ -131,6 +158,9 @@ public class JScrollPane extends JComponent implements ScrollPaneConstants {
         horizontalScrollBarPolicy = policy;
         firePropertyChange("horizontalScrollBarPolicy", old, policy);
         applyPolicies();
+        if (old != policy) {
+            revalidate();
+        }
     }
 
     private void applyPolicies() {
@@ -222,11 +252,14 @@ public class JScrollPane extends JComponent implements ScrollPaneConstants {
         JScrollBar old = this.verticalScrollBar;
         if (old != null) {
             old.getModel().removeChangeListener(follow);
+            remove(old);
         }
         this.verticalScrollBar = verticalScrollBar;
         if (verticalScrollBar != null) {
             verticalScrollBar.getModel().addChangeListener(follow);
+            add(verticalScrollBar);
         }
+        revalidate();
         firePropertyChange("verticalScrollBar", old, verticalScrollBar);
         syncBars();
     }
@@ -239,11 +272,14 @@ public class JScrollPane extends JComponent implements ScrollPaneConstants {
         JScrollBar old = this.horizontalScrollBar;
         if (old != null) {
             old.getModel().removeChangeListener(follow);
+            remove(old);
         }
         this.horizontalScrollBar = horizontalScrollBar;
         if (horizontalScrollBar != null) {
             horizontalScrollBar.getModel().addChangeListener(follow);
+            add(horizontalScrollBar);
         }
+        revalidate();
         firePropertyChange("horizontalScrollBar", old, horizontalScrollBar);
         syncBars();
     }
@@ -370,24 +406,79 @@ public class JScrollPane extends JComponent implements ScrollPaneConstants {
         return corners == null ? null : corners.get(key);
     }
 
-    /// Recorded only: with no scroll bars there are no corners to fill.
+    /// Puts a component in one of the four corners; `null` empties it.
+    /// See the class description for when a corner has room.
     public void setCorner(String key, Component corner) {
+        if (!LOWER_LEFT_CORNER.equals(key) && !LOWER_RIGHT_CORNER.equals(key) && !UPPER_LEFT_CORNER.equals(key)
+                && !UPPER_RIGHT_CORNER.equals(key) && !LOWER_LEADING_CORNER.equals(key)
+                && !LOWER_TRAILING_CORNER.equals(key) && !UPPER_LEADING_CORNER.equals(key)
+                && !UPPER_TRAILING_CORNER.equals(key)) {
+            throw new IllegalArgumentException("invalid corner key");
+        }
         if (corners == null) {
             corners = new HashMap<String, Component>();
         }
-        Component old = corners.put(key, corner);
+        Component old = corner == null ? corners.remove(key) : corners.put(key, corner);
+        if (old != null && old != corner) {
+            remove(old);
+        }
+        if (corner != null && old != corner) {
+            add(corner);
+        }
         firePropertyChange(key, old, corner);
+        revalidate();
+        repaint();
+    }
+
+    /// The component of a corner, by either of its two names: the layer
+    /// lays out left to right, so leading is left and trailing is right.
+    private Component corner(String side, String edge) {
+        if (corners == null) {
+            return null;
+        }
+        Component c = corners.get(side);
+        return c != null ? c : corners.get(edge);
     }
 
     public boolean isWheelScrollingEnabled() {
         return wheelScrollState;
     }
 
-    /// Recorded only; the wheel scrolls the content natively.
+    /// With `false` a wheel movement over the pane scrolls nothing.
     public void setWheelScrollingEnabled(boolean handleWheel) {
         boolean old = wheelScrollState;
         wheelScrollState = handleWheel;
         firePropertyChange("wheelScrollingEnabled", old, handleWheel);
+    }
+
+    /// Scrolls for a wheel event that was sent to the pane itself: one
+    /// that a listener on the view passed on, or one that arrived because
+    /// the pane has a wheel listener of its own. The wheel over a pane
+    /// nobody listens on never comes here; Codename One scrolls for it.
+    @Override
+    protected void processMouseWheelEvent(MouseWheelEvent e) {
+        super.processMouseWheelEvent(e);
+        if (e.isConsumed() || !wheelScrollState || !isEnabled() || e.getWheelRotation() == 0) {
+            return;
+        }
+        JScrollBar bar = verticalScrollBar;
+        boolean vertical = bar != null && verticalScrollBarPolicy != VERTICAL_SCROLLBAR_NEVER && !e.isShiftDown()
+                && bar.getMaximum() - bar.getVisibleAmount() > bar.getMinimum();
+        if (!vertical) {
+            bar = horizontalScrollBarPolicy == HORIZONTAL_SCROLLBAR_NEVER ? null : horizontalScrollBar;
+        }
+        if (bar == null) {
+            return;
+        }
+        int direction = e.getWheelRotation() < 0 ? -1 : 1;
+        int step;
+        if (e.getScrollType() == MouseWheelEvent.WHEEL_BLOCK_SCROLL) {
+            step = bar.getBlockIncrement(direction) * direction;
+        } else {
+            step = bar.getUnitIncrement(direction) * e.getUnitsToScroll();
+        }
+        bar.setValue(bar.getValue() + step);
+        e.consume();
     }
 
     // ------------------------------------------------------------ layout
@@ -409,8 +500,53 @@ public class JScrollPane extends JComponent implements ScrollPaneConstants {
         return v != null && v.isVisible() && v.getView() != null;
     }
 
-    @Override
-    public void doLayout() {
+    /// Which bars to show, as `{vertical, horizontal}`, for bars `t`
+    /// thick. `laidOut` reads the size the view has now instead of the
+    /// one it would like, which is the only way to know how high a view
+    /// is whose height follows its width.
+    private boolean[] barsFor(int t, boolean laidOut) {
+        if (t <= 0) {
+            return new boolean[]{false, false};
+        }
+        boolean v = verticalScrollBarPolicy == VERTICAL_SCROLLBAR_ALWAYS;
+        boolean h = horizontalScrollBarPolicy == HORIZONTAL_SCROLLBAR_ALWAYS;
+        Component view = viewport == null ? null : viewport.getView();
+        if (view == null) {
+            return new boolean[]{v, h};
+        }
+        Insets in = space();
+        int availW = Math.max(0, getWidth() - in.left - in.right)
+                - (has(rowHeader) ? rowHeader.getPreferredSize().width : 0);
+        int availH = Math.max(0, getHeight() - in.top - in.bottom)
+                - (has(columnHeader) ? columnHeader.getPreferredSize().height : 0);
+        boolean tracksW = false;
+        boolean tracksH = false;
+        if (view instanceof Scrollable) {
+            tracksW = ((Scrollable) view).getScrollableTracksViewportWidth();
+            tracksH = ((Scrollable) view).getScrollableTracksViewportHeight();
+        }
+        Dimension size = laidOut ? view.getSize() : view.getPreferredSize();
+        boolean vAsNeeded = verticalScrollBarPolicy == VERTICAL_SCROLLBAR_AS_NEEDED && !tracksH;
+        boolean hAsNeeded = horizontalScrollBarPolicy == HORIZONTAL_SCROLLBAR_AS_NEEDED && !tracksW;
+        if (vAsNeeded) {
+            v = size.height > availH;
+        }
+        if (hAsNeeded) {
+            h = size.width > availW - (v ? t : 0);
+        }
+        if (vAsNeeded && !v && h) {
+            v = size.height > availH - t;
+        }
+        return new boolean[]{v, h};
+    }
+
+    private static void bounds(Component c, int x, int y, int w, int h) {
+        if (c != null) {
+            c.setBounds(x, y, Math.max(0, w), Math.max(0, h));
+        }
+    }
+
+    private void place(boolean vsb, boolean hsb, int t) {
         Insets in = space();
         int x = in.left;
         int y = in.top;
@@ -418,14 +554,41 @@ public class JScrollPane extends JComponent implements ScrollPaneConstants {
         int h = Math.max(0, getHeight() - in.top - in.bottom);
         int headH = has(columnHeader) ? Math.min(h, columnHeader.getPreferredSize().height) : 0;
         int headW = has(rowHeader) ? Math.min(w, rowHeader.getPreferredSize().width) : 0;
-        if (columnHeader != null) {
-            columnHeader.setBounds(x + headW, y, w - headW, headH);
+        int barW = vsb ? Math.min(t, w - headW) : 0;
+        int barH = hsb ? Math.min(t, h - headH) : 0;
+        Component upperRight = corner(UPPER_RIGHT_CORNER, UPPER_TRAILING_CORNER);
+        int cornerW = barW;
+        if (barW == 0 && upperRight != null && headH > 0) {
+            // No bar to sit above: the corner takes its room from the end
+            // of the column header instead.
+            cornerW = Math.max(0, Math.min(upperRight.getPreferredSize().width, (w - headW) / 2));
         }
-        if (rowHeader != null) {
-            rowHeader.setBounds(x, y + headH, headW, h - headH);
-        }
-        if (viewport != null) {
-            viewport.setBounds(x + headW, y + headH, w - headW, h - headH);
+        bounds(columnHeader, x + headW, y, w - headW - cornerW, headH);
+        bounds(rowHeader, x, y + headH, headW, h - headH - barH);
+        bounds(viewport, x + headW, y + headH, w - headW - barW, h - headH - barH);
+        bounds(verticalScrollBar, x + w - barW, y + headH, barW, barW == 0 ? 0 : h - headH - barH);
+        bounds(horizontalScrollBar, x + headW, y + h - barH, barH == 0 ? 0 : w - headW - barW, barH);
+        bounds(upperRight, x + w - cornerW, y, cornerW, cornerW == 0 ? 0 : headH);
+        bounds(corner(UPPER_LEFT_CORNER, UPPER_LEADING_CORNER), x, y, headW, headW == 0 ? 0 : headH);
+        bounds(corner(LOWER_LEFT_CORNER, LOWER_LEADING_CORNER), x, y + h - barH, headW, headW == 0 ? 0 : barH);
+        bounds(corner(LOWER_RIGHT_CORNER, LOWER_TRAILING_CORNER), x + w - barW, y + h - barH, barW,
+                barW == 0 ? 0 : barH);
+    }
+
+    @Override
+    public void doLayout() {
+        int t = ScrollDelegate.barThickness();
+        boolean[] bars = barsFor(t, false);
+        place(bars[0], bars[1], t);
+        if (t > 0 && viewport != null && viewport.getView() != null) {
+            // The view is laid out now, so that a view whose height follows
+            // its width is measured at the width it really got.
+            viewport.validate();
+            boolean[] measured = barsFor(t, true);
+            if (measured[0] != bars[0] || measured[1] != bars[1]) {
+                place(measured[0], measured[1], t);
+                viewport.validate();
+            }
         }
     }
 

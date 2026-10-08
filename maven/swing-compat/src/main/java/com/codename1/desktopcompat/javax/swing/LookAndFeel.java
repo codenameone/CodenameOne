@@ -20,42 +20,49 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.rt;
+package com.codename1.desktopcompat.javax.swing;
 
-import com.codename1.desktopcompat.java.awt.Graphics;
-import com.codename1.desktopcompat.java.awt.Image;
-import com.codename1.desktopcompat.java.awt.image.ImageObserver;
+/// The type of a look and feel, so that code which names one, asks
+/// [UIManager] for the current one or passes its own compiles and runs.
+///
+/// The widgets of the layer are drawn by Codename One with its theme, and
+/// no look and feel changes that: one that is set is remembered and handed
+/// back, and is never asked to install anything.
+public abstract class LookAndFeel {
 
-/// An AWT image that is a Codename One image: one decoded from a file or a
-/// resource, or the result of scaling another. One made of `null` is an
-/// image that could not be read: it has no pixels, and its width and
-/// height are -1, which is how the desktop reports one.
-public final class NativeImage extends Image {
+    public LookAndFeel() {
+    }
 
-    private final com.codename1.ui.Image image;
+    public abstract String getName();
 
-    public NativeImage(com.codename1.ui.Image image) {
-        this.image = image;
+    public abstract String getID();
+
+    public abstract String getDescription();
+
+    public abstract boolean isNativeLookAndFeel();
+
+    public abstract boolean isSupportedLookAndFeel();
+
+    /// Never called by the layer.
+    public void initialize() {
+    }
+
+    /// Never called by the layer.
+    public void uninitialize() {
+    }
+
+    /// The defaults of this look and feel; `null` unless a subclass has
+    /// some. The layer does not read them.
+    public UIDefaults getDefaults() {
+        return null;
+    }
+
+    public boolean getSupportsWindowDecorations() {
+        return false;
     }
 
     @Override
-    public int getWidth(ImageObserver observer) {
-        return image == null ? -1 : image.getWidth();
-    }
-
-    @Override
-    public int getHeight(ImageObserver observer) {
-        return image == null ? -1 : image.getHeight();
-    }
-
-    /// Only an image created to be drawn into has a graphics, as in AWT.
-    @Override
-    public Graphics getGraphics() {
-        throw new UnsupportedOperationException("getGraphics() is only valid for images created off screen");
-    }
-
-    @Override
-    public com.codename1.ui.Image cn1Image() {
-        return image;
+    public String toString() {
+        return "[" + getDescription() + " - " + getClass().getName() + "]";
     }
 }

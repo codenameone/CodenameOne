@@ -20,13 +20,13 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.javax.swing;
-
-/// An editor pane for styled text. Styled documents are not part of this
-/// layer, so it behaves as the [JEditorPane] it extends: plain text, or a
-/// formatted page with the content type `text/html`.
-public class JTextPane extends JEditorPane {
-
-    public JTextPane() {
-    }
-}
+/// The clipboard: these classes stand in for the JDK's
+/// `java.awt.datatransfer` package once an application has been relocated
+/// onto the layer.
+///
+/// `Toolkit.getDefaultToolkit().getSystemClipboard()` answers a
+/// [Clipboard] over the device's clipboard. It carries text: a
+/// [StringSelection] put on it can be pasted elsewhere, and text copied
+/// elsewhere is read from it with `getData(DataFlavor.stringFlavor)`.
+/// Drag and drop, flavor maps and flavor listeners are not here.
+package com.codename1.desktopcompat.java.awt.datatransfer;
