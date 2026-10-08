@@ -63,8 +63,8 @@ public abstract class SingleSelectionModel<T> extends SelectionModel<T> {
     }
 
     /// Selects the first index holding the item. An item that is not
-    /// among the items becomes the selected item all the same, with the
-    /// selected index left as it was; `null` clears the selection.
+    /// among the items becomes the selected item all the same, on no
+    /// index (-1); `null` clears the selection.
     @Override
     public void select(T obj) {
         if (obj == null) {
@@ -80,6 +80,7 @@ public abstract class SingleSelectionModel<T> extends SelectionModel<T> {
                 return;
             }
         }
+        setSelectedIndex(-1);
         setSelectedItem(obj);
     }
 

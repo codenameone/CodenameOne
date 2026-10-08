@@ -98,8 +98,26 @@ package com.codename1.fxcompat.runtime;
 ///   `-fx-graphic-text-gap` (`Number`), `-fx-content-display`
 ///   (`ContentDisplay` or its name)
 ///
-/// Other node families document their own names where they implement
-/// `cn1StyleValue` and `cn1SetStyleValue`.
+/// - text input controls (`TextField`, `PasswordField`, `TextArea`):
+///   `-fx-text-fill`, `-fx-prompt-text-fill` (`Paint`), and the font
+///   names of `Labeled`
+/// - `ScrollPane`: `-fx-fit-to-width`, `-fx-fit-to-height`,
+///   `-fx-pannable` (`Boolean`), `-fx-hbar-policy`, `-fx-vbar-policy`
+///   (`ScrollPane.ScrollBarPolicy`, or `"never"`, `"always"`,
+///   `"as-needed"`)
+/// - `Shape` and everything below it: `-fx-fill`, `-fx-stroke` (`Paint`;
+///   here `null` cannot mean "no paint", since it restores),
+///   `-fx-stroke-width`, `-fx-stroke-miter-limit`,
+///   `-fx-stroke-dash-offset` (`Number`), `-fx-stroke-line-cap`,
+///   `-fx-stroke-line-join`, `-fx-stroke-type` (the enum or its keyword),
+///   `-fx-smooth` (`Boolean`)
+/// - `Text`, besides the shape names: the font names of `Labeled`,
+///   `-fx-text-alignment`, `-fx-text-origin` (`VPos` or its keyword),
+///   `-fx-underline`, `-fx-strikethrough` (`Boolean`),
+///   `-fx-line-spacing` (`Number`)
+///
+/// A class that takes names of its own repeats them in its description,
+/// where it overrides `cn1StyleValue` and `cn1SetStyleValue`.
 public interface StyleTarget {
 
     /// Sets, or with a `null` value restores, one styleable attribute.
