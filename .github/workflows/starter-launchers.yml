@@ -15,7 +15,8 @@ jobs:
   launchers:
     strategy:
       matrix:
-        os: [ubuntu-24.04, windows-latest]
+        # macOS: its bash 3.2 and BSD tools run build.sh too.
+        os: [ubuntu-24.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:

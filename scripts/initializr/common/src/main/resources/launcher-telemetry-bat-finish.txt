@@ -1,17 +1,21 @@
 :finish
 set "CN1_EXIT_CODE=%errorlevel%"
-REM Why it stopped. build.sh reads Maven's output for this; cmd cannot tee it
-REM without hiding it from you, so here the class comes from what was checked
-REM before the build: no JDK, or one older than this project's Java level, are
-REM the two failures a first build hits most and both are known without the
-REM log. Anything else is reported as build_failed. cmd cannot trap Ctrl+C
-REM either, so an interrupted build sends no exit report.
+REM Why it stopped: from the copy of Maven's output when there is one (see the
+REM launch block), the same words build.sh reports; otherwise from what was
+REM checked before the build -- no JDK, or one older than this project's Java
+REM level -- and anything else is build_failed. cmd cannot trap Ctrl+C, so an
+REM interrupted build sends no exit report.
+set "CN1_REASON="
+if defined CN1_LOG if exist "%CN1_LOG%" call :cn1_log_reason
+if defined CN1_LOG del "%CN1_LOG%" >nul 2>&1
+if defined CN1_REASON goto :cn1_report
 set "CN1_REASON=build_failed"
 if "%CN1_JAVA%"=="none" set "CN1_REASON=no_jdk"
 set "CN1_JMAJ=0"
 set /a CN1_JMAJ=%CN1_JAVA% >nul 2>&1
 if not "%CN1_JAVA%"=="none" if %CN1_JMAJ% GTR 0 if %CN1_JMAJ% LSS %CN1_MIN_JAVA% set "CN1_REASON=java_too_old"
 if "%CN1_EXIT_CODE%"=="0" set "CN1_REASON=ok"
+:cn1_report
 set "CN1_SECS="
 if defined CN1_START call :cn1_now
 if defined CN1_START if defined CN1_NOW set /a "CN1_SECS=CN1_NOW-CN1_START"
@@ -27,6 +31,46 @@ REM would otherwise read as octal; a leading space in the hour becomes a zero.
 set "CN1_NOW="
 for /f "tokens=1-3 delims=:.," %%a in ("%TIME: =0%") do set /a "CN1_NOW=(1%%a-100)*3600+(1%%b-100)*60+(1%%c-100)" 2>nul
 goto :eof
+
+REM The reason from Maven's output, in build.sh's order (see cn1_reason there):
+REM TLS before downloads, the build client's own refusals before a generic
+REM failure. Leaves CN1_REASON unset when the output says nothing specific. A
+REM clean exit is not always a submitted build: the free plan's size limit
+REM returns normally, and so does a cloud build that never confirmed.
+:cn1_log_reason
+if not "%CN1_EXIT_CODE%"=="0" goto :cn1_log_failed
+call :cn1_seen "Jar size limit reached" "Quota size limit reached" && set "CN1_REASON=size_limit" && goto :eof
+call :cn1_seen "Your build was submitted" && set "CN1_REASON=ok" && goto :eof
+call :cn1_seen "Sending build request to the server" && set "CN1_REASON=not_submitted" && goto :eof
+set "CN1_REASON=ok"
+goto :eof
+:cn1_log_failed
+call :cn1_seen "JAVA_HOME environment variable is not defined correctly" "java/javac command does not exist" "No compiler is provided in this environment" && set "CN1_REASON=no_jdk" && goto :eof
+call :cn1_seen "invalid target release" "UnsupportedClassVersionError" "class file version" && set "CN1_REASON=java_too_old" && goto :eof
+findstr /r /c:"release version [0-9]* not supported" "%CN1_LOG%" >nul 2>&1 && set "CN1_REASON=java_too_old" && goto :eof
+call :cn1_seen "Browser login timed out" && set "CN1_REASON=login_timeout" && goto :eof
+call :cn1_seen "Browser login failed" "Could not complete browser login" "Cannot authenticate a non-interactive build" "Account login failed" && set "CN1_REASON=login_failed" && goto :eof
+call :cn1_seen "COMPILATION ERROR" && set "CN1_REASON=compile" && goto :eof
+call :cn1_seen "PKIX path building failed" "unable to find valid certification path" "SSLHandshakeException" && set "CN1_REASON=tls" && goto :eof
+call :cn1_seen "Could not resolve dependencies" "Could not transfer artifact" "Could not download" "Could not find artifact" "Could not resolve plugin" "PluginResolutionException" "Non-resolvable parent POM" "UnknownHostException" "Connection timed out" "Failed to fetch" && set "CN1_REASON=maven_download" && goto :eof
+call :cn1_seen "Jar size limit reached" "Quota size limit reached" "exceeds 50MB in size" "exceeds 100MB in size" && set "CN1_REASON=size_limit" && goto :eof
+call :cn1_seen "certificate from Apple with the appropriate password is required" "App id for an iOS build MUST be defined" "Error reading the certificate file" "Error reading the provisioning profile" && set "CN1_REASON=no_certificate" && goto :eof
+call :cn1_seen "can't be empty" "The icon must be a 512x512" "Error reading the icon" && set "CN1_REASON=project_config" && goto :eof
+call :cn1_seen "Error connecting to s3" "Failed to upload to server" "General network error occured" && set "CN1_REASON=upload_failed" && goto :eof
+call :cn1_seen "Server Detailed Error Message" "Error! Server response code" && set "CN1_REASON=server_refused" && goto :eof
+goto :eof
+
+REM Whether the output copy contains any of the given strings (literal, case-sensitive).
+:cn1_seen
+set "CN1_FS="
+:cn1_seen_next
+if "%~1"=="" goto :cn1_seen_run
+set CN1_FS=%CN1_FS% /c:"%~1"
+shift
+goto :cn1_seen_next
+:cn1_seen_run
+findstr %CN1_FS% "%CN1_LOG%" >nul 2>&1
+exit /b %errorlevel%
 
 REM Fire-and-forget: three seconds at most, and a failure is never an error.
 :cn1_event

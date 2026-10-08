@@ -149,20 +149,29 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         assert 'launch' in steps and 'exit' in steps, events
         assert all(len(e.get('pkg', '')) == 64 for e in events), events
         assert any(e.get('step') == 'exit' and e.get('exit') == '37' for e in events), events
+        # The one-word reason, from the output of real failures. Each case is what
+        # Maven or the build client actually prints, and the reason the funnel
+        # needs to tell it apart from the others -- on Windows too, where
+        # build.bat copies the output through .mvn/Cn1Capture.java.
+        output_file = parent / 'maven-output.txt'
+        script = project / ('build.bat' if windows else 'build.sh')
+        for text, exit_code, expected_reason in REASON_CASES:
+            output_file.write_text(text)
+            events.clear()
+            command = [str(script), 'javascript_cloud']
+            if windows:
+                command = ('"' + os.environ.get('COMSPEC', 'cmd.exe') + '" /d /s /c ""' + str(script)
+                           + '" javascript_cloud"')
+            result = subprocess.run(command, cwd=parent,
+                                    env=dict(env, CN1_TEST_EXIT=str(exit_code), CN1_TEST_OUTPUT_FILE=str(output_file)),
+                                    text=True, capture_output=True, timeout=60)
+            assert result.returncode == exit_code, (text, result.returncode, result.stdout, result.stderr)
+            # Copying the output for the reason must not keep it from the console.
+            assert text.splitlines()[0] in result.stdout, (text, result.stdout)
+            reasons = [e.get('reason') for e in events if e.get('step') == 'exit']
+            assert reasons == [expected_reason], (text, exit_code, expected_reason, events, result.stdout,
+                                                  result.stderr)
         if not windows:
-            # The one-word reason, from the output of real failures. Each case is
-            # what Maven or the build client actually prints, and the reason the
-            # funnel needs to tell it apart from the others.
-            output_file = parent / 'maven-output.txt'
-            for text, exit_code, expected_reason in REASON_CASES:
-                output_file.write_text(text)
-                events.clear()
-                result = subprocess.run([str(project / 'build.sh'), 'javascript_cloud'], cwd=parent,
-                                        env=dict(env, CN1_TEST_EXIT=str(exit_code), CN1_TEST_OUTPUT_FILE=str(output_file)),
-                                        text=True, capture_output=True, timeout=30)
-                assert result.returncode == exit_code, (text, result.returncode, result.stderr)
-                reasons = [e.get('reason') for e in events if e.get('step') == 'exit']
-                assert reasons == [expected_reason], (text, exit_code, expected_reason, events)
             # Reporting must never change the build itself. A TMPDIR that does
             # not exist leaves no room for the reason log: the build still
             # returns Maven's own status. And Maven's stderr stays on stderr.
