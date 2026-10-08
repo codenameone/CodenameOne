@@ -1,62 +1,6 @@
 {
   "skip_reasons": [
     {
-      "test": "BackendAuthTest",
-      "reason": "This authorization code and PKCE sign-in fixture submits credentials, reads redirects and manages cookies directly. The JavaScript port leaves those operations to the browser, so BackendAuthTestBase skips this fixture there.",
-      "platform_support": "This skip applies to the direct HTTP authentication fixture on JavaScript. It does not verify browser sign-in, and it does not permit the fixture to be skipped on another port.",
-      "verification": "Run BackendAuthTest against the CI backend on non-browser ports. Browser sign-in needs a separate browser-driven flow; this skipped fixture provides no evidence for it.",
-      "reason_codes": [
-        {
-          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
-          "ports": [
-            "javascript"
-          ]
-        }
-      ]
-    },
-    {
-      "test": "BackendDeviceGrantTest",
-      "reason": "This device authorization fixture submits credentials, reads redirects and manages cookies directly. The JavaScript port leaves those operations to the browser, so BackendAuthTestBase skips this fixture there.",
-      "platform_support": "This skip applies to the direct HTTP authentication fixture on JavaScript. It does not verify browser sign-in, and it does not permit the fixture to be skipped on another port.",
-      "verification": "Run BackendDeviceGrantTest against the CI backend on non-browser ports. Browser sign-in needs a separate browser-driven flow; this skipped fixture provides no evidence for it.",
-      "reason_codes": [
-        {
-          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
-          "ports": [
-            "javascript"
-          ]
-        }
-      ]
-    },
-    {
-      "test": "BackendTokenRefreshTest",
-      "reason": "This refresh-token rotation fixture submits credentials, reads redirects and manages cookies directly. The JavaScript port leaves those operations to the browser, so BackendAuthTestBase skips this fixture there.",
-      "platform_support": "This skip applies to the direct HTTP authentication fixture on JavaScript. It does not verify browser sign-in, and it does not permit the fixture to be skipped on another port.",
-      "verification": "Run BackendTokenRefreshTest against the CI backend on non-browser ports. Browser sign-in needs a separate browser-driven flow; this skipped fixture provides no evidence for it.",
-      "reason_codes": [
-        {
-          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
-          "ports": [
-            "javascript"
-          ]
-        }
-      ]
-    },
-    {
-      "test": "BackendTotpTest",
-      "reason": "This one-time-code sign-in fixture submits credentials, reads redirects and manages cookies directly. The JavaScript port leaves those operations to the browser, so BackendAuthTestBase skips this fixture there.",
-      "platform_support": "This skip applies to the direct HTTP authentication fixture on JavaScript. It does not verify browser sign-in, and it does not permit the fixture to be skipped on another port.",
-      "verification": "Run BackendTotpTest against the CI backend on non-browser ports. Browser sign-in needs a separate browser-driven flow; this skipped fixture provides no evidence for it.",
-      "reason_codes": [
-        {
-          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
-          "ports": [
-            "javascript"
-          ]
-        }
-      ]
-    },
-    {
       "test": "CameraApiTest",
       "reason": "The unattended runner cannot respond to operating-system camera permission prompts or provide stable physical-camera input, and some ports have no camera backend at all to open a session with. The test therefore avoids opening a real session on those targets, where doing so could hang CI or produce nondeterministic frames.",
       "platform_support": "A skipped camera test does not mean the Codename One port is unsupported. Every listed target remains a supported port; camera availability is a separate runtime capability and depends on the device, permissions, and camera backend.",
@@ -346,6 +290,62 @@
             "mac-catalyst",
             "tvos",
             "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "BackendAuthTest",
+      "reason": "The backend sign-in flows send credentials, read the server's redirects and keep its session cookie by hand, the way OidcClient does minus the system browser. In a browser those three belong to the browser itself: it follows redirects without showing them, withholds the Location header, and owns the cookie jar, so the test cannot observe the steps it asserts on.",
+      "platform_support": "A skipped backend sign-in test does not mean sign-in is unsupported in the browser. A web app signs in through the browser's own redirect flow, which is what OidcClient uses there.",
+      "verification": "The same flows run against the test server on every other port in this table; the networking half of the backend suite (BackendRestTest, BackendConnectionRequestTest and the rest) runs in the browser too.",
+      "reason_codes": [
+        {
+          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
+          "ports": [
+            "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "BackendDeviceGrantTest",
+      "reason": "The backend sign-in flows send credentials, read the server's redirects and keep its session cookie by hand, the way OidcClient does minus the system browser. In a browser those three belong to the browser itself: it follows redirects without showing them, withholds the Location header, and owns the cookie jar, so the test cannot observe the steps it asserts on.",
+      "platform_support": "A skipped backend sign-in test does not mean sign-in is unsupported in the browser. A web app signs in through the browser's own redirect flow, which is what OidcClient uses there.",
+      "verification": "The same flows run against the test server on every other port in this table; the networking half of the backend suite (BackendRestTest, BackendConnectionRequestTest and the rest) runs in the browser too.",
+      "reason_codes": [
+        {
+          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
+          "ports": [
+            "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "BackendTokenRefreshTest",
+      "reason": "The backend sign-in flows send credentials, read the server's redirects and keep its session cookie by hand, the way OidcClient does minus the system browser. In a browser those three belong to the browser itself: it follows redirects without showing them, withholds the Location header, and owns the cookie jar, so the test cannot observe the steps it asserts on.",
+      "platform_support": "A skipped backend sign-in test does not mean sign-in is unsupported in the browser. A web app signs in through the browser's own redirect flow, which is what OidcClient uses there.",
+      "verification": "The same flows run against the test server on every other port in this table; the networking half of the backend suite (BackendRestTest, BackendConnectionRequestTest and the rest) runs in the browser too.",
+      "reason_codes": [
+        {
+          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
+          "ports": [
+            "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "BackendTotpTest",
+      "reason": "The backend sign-in flows send credentials, read the server's redirects and keep its session cookie by hand, the way OidcClient does minus the system browser. In a browser those three belong to the browser itself: it follows redirects without showing them, withholds the Location header, and owns the cookie jar, so the test cannot observe the steps it asserts on.",
+      "platform_support": "A skipped backend sign-in test does not mean sign-in is unsupported in the browser. A web app signs in through the browser's own redirect flow, which is what OidcClient uses there.",
+      "verification": "The same flows run against the test server on every other port in this table; the networking half of the backend suite (BackendRestTest, BackendConnectionRequestTest and the rest) runs in the browser too.",
+      "reason_codes": [
+        {
+          "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
+          "ports": [
+            "javascript"
           ]
         }
       ]
