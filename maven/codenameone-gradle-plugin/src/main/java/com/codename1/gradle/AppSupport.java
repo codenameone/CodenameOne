@@ -193,8 +193,9 @@ final class AppSupport {
         // nested copy shipped a second time under a name nothing reads. It is
         // left out here instead: a directory of the desktop resource root is
         // not copied, and the files at the root, which keep their names, are.
-        project.getTasks().named(main.getProcessResourcesTaskName(), org.gradle.api.tasks.Copy.class,
-                t -> t.exclude(new NestedDesktopResources(desktopResources)));
+        // The filter is the source set's, so it holds for whatever reads the
+        // resources; it matches nothing outside that one root.
+        main.getResources().exclude(new NestedDesktopResources(desktopResources));
         final File desktopEntry = com.codename1.maven.DesktopSources.entryRecord(desktopDir);
         // The class a desktop application's entry point is generated as.
         final String desktopMain = applicationMain(settings);
@@ -991,7 +992,7 @@ final class AppSupport {
     }
 
     /// Matches the directories directly inside the desktop resource root, so
-    /// that `processResources` leaves everything nested in it alone: those
+    /// that the main resources leave everything nested in it alone: those
     /// resources ship under flat names the relocation step writes. A class of
     /// its own rather than a lambda so that the configuration cache can store
     /// it.

@@ -125,5 +125,55 @@ for sample_dir in "$SAMPLES"/*/; do
   done
 done
 
+# An Android application and a desktop one in the SAME project. A project has
+# one main class and each layer's build generates it, so the two cannot both
+# start: with the entry record in place the build has to stop and say so --
+# never pick one silently -- and without the record the Android application
+# starts while the desktop classes ship beside it, relocated like any library
+# the Android code could call. Staged for one target; the relocation is the
+# same for all of them and the loop above covers the rest.
+ANDROID_SAMPLE="$SCRIPTPATH/../../scripts/android-compat-samples/gallery"
+SWING_SAMPLE="$SAMPLES/swing-gallery"
+if [ -d "$ANDROID_SAMPLE" ] && [ -d "$SWING_SAMPLE" ]; then
+  echo "== both layers (android gallery + swing-gallery)"
+  W="$WORKDIR/both-layers"
+  mkdir -p "$W"
+  compat_generate_app both "$W" com.acme.both BothApp
+  MAPP="$W/app"
+  (cd "$MAPP" && mvn_local "com.codenameone:codenameone-maven-plugin:$CN1_VERSION:import-android-project" \
+      "-Dcn1.android.import=$ANDROID_SAMPLE") > "$W/import-android.log" 2>&1 \
+    || { tail -40 "$W/import-android.log"; fail "both: import-android-project"; }
+  (cd "$MAPP" && mvn_local "com.codenameone:codenameone-maven-plugin:$CN1_VERSION:import-desktop-project" \
+      "-Dcn1.desktop.import=$SWING_SAMPLE") > "$W/import-desktop.log" 2>&1 \
+    || { tail -40 "$W/import-desktop.log"; fail "both: import-desktop-project"; }
+  if (cd "$MAPP" && JAVA_HOME="$GRADLE_JDK" mvn_local install -DskipTests -pl common -am) > "$W/mvn-conflict.log" 2>&1; then
+    fail "both: two applications built as if one of them had been chosen"
+  fi
+  grep -q 'This project holds an Android application (src/main/android) and a desktop application' "$W/mvn-conflict.log" \
+    || { tail -40 "$W/mvn-conflict.log"; fail "both: the build failed without naming the two applications"; }
+  echo "   with the entry record: the build stops and names both applications"
+
+  rm -f "$MAPP/common/src/main/desktop/cn1-desktop.properties"
+  compat_build_common both "$W" "$MAPP"
+  (cd "$MAPP" && JAVA_HOME="$GRADLE_JDK" mvn_local package -DskipTests -Dopen=false -Dcodename1.platform=ios \
+      -Dcodename1.buildTarget=ios-device -Dcodename1.stageOnly=true < /dev/null) > "$W/maven-ios-device.log" 2>&1 \
+    || { tail -40 "$W/maven-ios-device.log"; fail "both: Maven staging ios-device"; }
+  staged=$(compat_staged_jar "$W/maven-ios-device.log")
+  [ -f "$staged" ] || fail "both: no staged jar"
+  assert_zip_has "$staged" '^com/acme/both/BothApp\.class$'
+  assert_zip_has "$staged" '^com/codename1/generated/android/AndroidAppImpl\.class$'
+  assert_zip_has "$staged" '^com/codename1/androidcompat/android/app/Activity\.class$'
+  assert_zip_has "$staged" '^com/codename1/desktopcompat/javax/swing/JFrame\.class$'
+  assert_zip_has "$staged" '^com/example/gallery/GalleryApp\.class$'
+  bad=$(compat_unrelocated "$staged" "$TOOLKITS|android|androidx|com/google/android/material")
+  if [ -n "$bad" ]; then
+    echo "FAIL: both: classes still name a toolkit of either layer:"
+    echo "$bad" | head -20
+    FAILED=1
+  fi
+  echo "   without it: the Android application starts, both runtimes ship relocated"
+  desktop_shipped_size "ios-device (both layers)" "$staged"
+fi
+
 [ $FAILED -eq 0 ] || exit 1
 echo "desktop-compat-test: OK"

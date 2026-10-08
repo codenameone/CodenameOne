@@ -459,13 +459,21 @@ public class DesktopEntryPointsTest {
     /// Android application starts and the desktop classes ship beside it.
     @Test
     public void anAndroidApplicationInTheSameProjectIsNamedAsTheConflict() throws Exception {
-        String lifecycle = "package com.codename1.androidcompat.runtime;\n"
+        // The Android remap has run by the time a real build gets here, so
+        // the lifecycle is in the package that remap moves it to; the name it
+        // had before is recognized too.
+        androidAndDesktop("rt");
+        androidAndDesktop("runtime");
+    }
+
+    private void androidAndDesktop(String pkg) throws Exception {
+        String lifecycle = "package com.codename1.androidcompat." + pkg + ";\n"
                 + "public class AndroidLifecycle extends com.codename1.system.Lifecycle {\n"
                 + "    public void runApp() { }\n}\n";
         String droid = "package com.acme;\n"
-                + "public class MyApp extends com.codename1.androidcompat.runtime.AndroidLifecycle { }\n";
+                + "public class MyApp extends com.codename1.androidcompat." + pkg + ".AndroidLifecycle { }\n";
         File classes = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/MyApp.java", droid,
-                "com/codename1/androidcompat/runtime/AndroidLifecycle.java", lifecycle);
+                "com/codename1/androidcompat/" + pkg + "/AndroidLifecycle.java", lifecycle);
         try {
             remapper(classes, record("mainClass=com.acme.swingapp.Main", "kind=swing"), "com.acme.MyApp").run();
             fail("Two applications cannot both be the one a target starts");
@@ -479,9 +487,9 @@ public class DesktopEntryPointsTest {
         }
 
         File kept = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/MyApp.java", droid,
-                "com/codename1/androidcompat/runtime/AndroidLifecycle.java", lifecycle);
+                "com/codename1/androidcompat/" + pkg + "/AndroidLifecycle.java", lifecycle);
         assertTrue(remapper(kept, null, "com.acme.MyApp").run());
-        assertEquals("com.codename1.androidcompat.runtime.AndroidLifecycle",
+        assertEquals("com.codename1.androidcompat." + pkg + ".AndroidLifecycle",
                 load(kept, "com.acme.MyApp").getSuperclass().getName());
         assertTrue("The desktop runtime still ships",
                 new File(kept, "com/codename1/desktopcompat/javax/swing/JFrame.class").isFile());

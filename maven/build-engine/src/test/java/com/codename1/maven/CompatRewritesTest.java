@@ -151,7 +151,7 @@ public class CompatRewritesTest {
         for (String gone : new String[] {"java/lang/Class.getResource", "java/lang/Class.getResourceAsStream",
             "java/lang/ClassLoader.getResource", "java/lang/ClassLoader.getResourceAsStream",
             "java/lang/ClassLoader.getResources", "java/lang/ClassLoader.getSystemResource",
-            "java/lang/Thread.getContextClassLoader", "java/util/Objects.isNull", "java/util/Objects.requireNonNull",
+            "java/lang/ClassLoader.loadClass", "java/lang/Thread.getContextClassLoader", "java/util/Objects.isNull", "java/util/Objects.requireNonNull",
             "java/util/Locale.FRANCE", "java/util/Locale.UK", "java/util/Locale.CANADA_FRENCH",
             "java/util/Locale.equals", "java/util/Locale.hashCode", "java/util/Locale.toString",
             "java/util/Locale.forLanguageTag", "java/util/Locale.toLanguageTag", "java/util/Locale.getVariant"}) {
@@ -166,7 +166,8 @@ public class CompatRewritesTest {
             // Left exactly as written: what the device has, and what it
             // lacks and nothing stands in for.
             "java/util/Locale.<init>", "java/util/Locale.getLanguage", "java/lang/Class.getClassLoader",
-            "java/lang/ClassLoader.loadClass"}) {
+            // Asking the one loader for a class by name is Class.forName.
+            jdk + "Resources.loadClass"}) {
             assertTrue(there + " is missing: " + after, after.contains(there));
         }
         // A second pass finds nothing left to do.
