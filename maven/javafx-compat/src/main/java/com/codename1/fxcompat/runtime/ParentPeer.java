@@ -92,6 +92,7 @@ public class ParentPeer extends Container implements FxPeer {
         if (m != null) {
             PeerPaint.widenClip(g, this);
         }
+        boolean clipped = PeerPaint.pushClip(g, node, getX(), getY());
         // Codename One paints the children translated by this peer's origin.
         childClipX = g.getClipX() - getX();
         childClipY = g.getClipY() - getY();
@@ -102,6 +103,9 @@ public class ParentPeer extends Container implements FxPeer {
         super.paint(g);
         if (saved != null) {
             g.setTransform(saved);
+        }
+        if (clipped) {
+            g.popClip();
         }
         if (m != null) {
             g.setClip(cx, cy, cw, ch);

@@ -23,6 +23,7 @@
 package javafx.scene;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import com.codename1.fxcompat.runtime.EventHandlerManager;
 import com.codename1.fxcompat.runtime.SceneHost;
@@ -46,7 +47,11 @@ import javafx.event.EventHandler;
 import javafx.event.EventTarget;
 import javafx.event.EventType;
 import javafx.scene.input.ContextMenuEvent;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
@@ -93,6 +98,7 @@ public class Scene implements EventTarget {
     private final double initialWidth;
     private final double initialHeight;
     private ObservableMap<Object, Object> properties;
+    private ObservableMap<KeyCombination, Runnable> accelerators;
     private Object userData;
     private SceneHost host;
 
@@ -309,6 +315,79 @@ public class Scene implements EventTarget {
             properties = FXCollections.observableHashMap();
         }
         return properties;
+    }
+
+    /// Returns the key combinations of this scene and what each runs. One
+    /// is run when a hardware keyboard sends the combination and nothing
+    /// in the scene consumed the key press. The accelerators of the items
+    /// of a `MenuBar` in the scene are not listed here; they are found in
+    /// the menus when a key is pressed, after the ones of this map.
+    public ObservableMap<KeyCombination, Runnable> getAccelerators() {
+        if (accelerators == null) {
+            accelerators = FXCollections.observableHashMap();
+        }
+        return accelerators;
+    }
+
+    private boolean runAccelerator(KeyEvent event) {
+        if (accelerators != null && !accelerators.isEmpty()) {
+            ArrayList<KeyCombination> keys = new ArrayList<KeyCombination>(accelerators.keySet());
+            for (int i = 0; i < keys.size(); i++) {
+                KeyCombination key = keys.get(i);
+                Runnable run = key == null ? null : accelerators.get(key);
+                if (run != null && key.match(event)) {
+                    run.run();
+                    return true;
+                }
+            }
+        }
+        Parent top = getRoot();
+        return top != null && runMenuAccelerator(top, event);
+    }
+
+    private static boolean runMenuAccelerator(Node node, KeyEvent event) {
+        if (!node.isVisible() || node.isDisabled()) {
+            return false;
+        }
+        if (node instanceof MenuBar) {
+            List<Menu> menus = ((MenuBar) node).getMenus();
+            for (int i = 0; i < menus.size(); i++) {
+                if (runItemAccelerator(menus.get(i), event)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (node instanceof Parent) {
+            List<Node> children = ((Parent) node).getChildrenUnmodifiable();
+            for (int i = 0; i < children.size(); i++) {
+                if (runMenuAccelerator(children.get(i), event)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean runItemAccelerator(MenuItem item, KeyEvent event) {
+        if (item == null || item.isDisable() || !item.isVisible()) {
+            return false;
+        }
+        if (item instanceof Menu) {
+            List<MenuItem> items = ((Menu) item).getItems();
+            for (int i = 0; i < items.size(); i++) {
+                if (runItemAccelerator(items.get(i), event)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        KeyCombination key = item.getAccelerator();
+        if (key != null && key.match(event)) {
+            item.fire();
+            return true;
+        }
+        return false;
     }
 
     /// Returns whether [#getProperties()] holds anything.
@@ -666,6 +745,9 @@ public class Scene implements EventTarget {
         final boolean[] handled = new boolean[1];
         if (deliverable(target)) {
             handled[0] = cn1FireAndReport(target, event);
+        }
+        if (kind == KeyEvent.KEY_PRESSED && !handled[0] && runAccelerator(event)) {
+            return EventHandlerManager.wasConsumedByFilter();
         }
         if (kind == KeyEvent.KEY_PRESSED && code == KeyCode.TAB && !handled[0]) {
             traverse(SceneInput.shiftDown());

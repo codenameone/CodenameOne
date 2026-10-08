@@ -6,6 +6,7 @@ com.codename1.fxcompat.runtime.Dirty$Owner#cn1Invalidated
 com.codename1.fxcompat.runtime.StyleTarget#cn1ApplyStyle
 javafx.scene.Cursor#cn1Code
 javafx.scene.Node#CN1_NO_STYLE
+javafx.scene.Node#cn1ClipPath
 javafx.scene.Node#cn1ComputeBoundsInLocal
 javafx.scene.Node#cn1ComputeLayoutBounds
 javafx.scene.Node#cn1CreatePeer

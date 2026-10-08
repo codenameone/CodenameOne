@@ -22,16 +22,19 @@
  */
 package javafx.scene.control;
 
+import java.util.Comparator;
 import java.util.HashSet;
 
 import com.codename1.fxcompat.runtime.EventHandlerManager;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleWrapper;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.beans.value.ChangeListener;
@@ -42,8 +45,11 @@ import javafx.collections.ObservableMap;
 import javafx.collections.ObservableSet;
 import javafx.css.PseudoClass;
 import javafx.css.Styleable;
+import javafx.event.Event;
 import javafx.event.EventDispatchChain;
+import javafx.event.EventHandler;
 import javafx.event.EventTarget;
+import javafx.event.EventType;
 
 /// What the columns of the table controls share: a header text, a width
 /// between a minimum and a maximum, and whether the column is shown.
@@ -54,6 +60,26 @@ import javafx.event.EventTarget;
 /// graphic and the column context menu are not part of this layer.
 public abstract class TableColumnBase<S, T> implements EventTarget, Styleable {
 
+    /// Orders the values of a column that names no comparator of its own:
+    /// `null` first, numbers by value, values of one comparable class by
+    /// `compareTo`, anything else by its `toString()`.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static final Comparator DEFAULT_COMPARATOR = new Comparator() {
+        @Override
+        public int compare(Object a, Object b) {
+            if (a == null || b == null) {
+                return a == b ? 0 : (a == null ? -1 : 1);
+            }
+            if (a instanceof Number && b instanceof Number) {
+                return Double.compare(((Number) a).doubleValue(), ((Number) b).doubleValue());
+            }
+            if (a instanceof Comparable && a.getClass() == b.getClass()) {
+                return ((Comparable) a).compareTo(b);
+            }
+            return a.toString().compareTo(b.toString());
+        }
+    };
+
     static final double DEFAULT_WIDTH = 80;
     static final double DEFAULT_MIN_WIDTH = 10;
     static final double DEFAULT_MAX_WIDTH = 5000;
@@ -62,6 +88,10 @@ public abstract class TableColumnBase<S, T> implements EventTarget, Styleable {
     private final BooleanProperty visible = new SimpleBooleanProperty(this, "visible", true);
     private final BooleanProperty resizable = new SimpleBooleanProperty(this, "resizable", true);
     private final BooleanProperty sortable = new SimpleBooleanProperty(this, "sortable", true);
+    private final BooleanProperty editable = new SimpleBooleanProperty(this, "editable", true);
+    @SuppressWarnings("unchecked")
+    private final ObjectProperty<Comparator<T>> comparator = new SimpleObjectProperty<Comparator<T>>(this,
+            "comparator", DEFAULT_COMPARATOR);
     private final DoubleProperty minWidth = new SimpleDoubleProperty(this, "minWidth", DEFAULT_MIN_WIDTH);
     private final DoubleProperty prefWidth = new SimpleDoubleProperty(this, "prefWidth", DEFAULT_WIDTH);
     private final DoubleProperty maxWidth = new SimpleDoubleProperty(this, "maxWidth", DEFAULT_MAX_WIDTH);
@@ -293,6 +323,55 @@ public abstract class TableColumnBase<S, T> implements EventTarget, Styleable {
     /// Returns whether [#getProperties()] holds anything.
     public boolean hasProperties() {
         return properties != null && !properties.isEmpty();
+    }
+
+    /// Sets whether the cells of this column may be edited.
+    public final void setEditable(boolean value) {
+        editable.set(value);
+    }
+
+    /// Returns whether the cells of this column may be edited.
+    public final boolean isEditable() {
+        return editable.get();
+    }
+
+    /// Whether the cells of this column may be edited; true by default,
+    /// and in effect only in an editable table.
+    public final BooleanProperty editableProperty() {
+        return editable;
+    }
+
+    /// Sets what orders the values of this column when the table is
+    /// sorted by it.
+    public final void setComparator(Comparator<T> value) {
+        comparator.set(value);
+    }
+
+    /// Returns what orders the values of this column.
+    public final Comparator<T> getComparator() {
+        return comparator.get();
+    }
+
+    /// What orders the values of this column; [#DEFAULT_COMPARATOR]
+    /// unless the application sets another.
+    public final ObjectProperty<Comparator<T>> comparatorProperty() {
+        return comparator;
+    }
+
+    /// The handlers of this column.
+    final EventHandlerManager events() {
+        return events;
+    }
+
+    /// Adds a handler for the events of this column, the edit events of
+    /// a table column among them.
+    public <E extends Event> void addEventHandler(EventType<E> eventType, EventHandler<E> eventHandler) {
+        events.addEventHandler(eventType, eventHandler);
+    }
+
+    /// Removes a handler added by `addEventHandler`.
+    public <E extends Event> void removeEventHandler(EventType<E> eventType, EventHandler<E> eventHandler) {
+        events.removeEventHandler(eventType, eventHandler);
     }
 
     /// Returns the value this column shows for a row, or `null`.

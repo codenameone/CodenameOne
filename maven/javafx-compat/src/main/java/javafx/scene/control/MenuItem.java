@@ -45,6 +45,7 @@ import javafx.event.EventHandler;
 import javafx.event.EventTarget;
 import javafx.event.EventType;
 import javafx.scene.Node;
+import javafx.scene.input.KeyCombination;
 
 /// One entry of a menu. It is not a node: a [ContextMenu] or a [Menu]
 /// that holds it shows it as a row.
@@ -54,10 +55,12 @@ import javafx.scene.Node;
 /// menu that holds them. A disabled item is shown greyed and cannot be
 /// chosen, an invisible one is left out.
 ///
-/// The graphic is recorded and not drawn. Accelerators need
-/// `KeyCombination`, which this layer does not have, and mnemonics are
-/// not parsed; `accelerator`, `mnemonicParsing` and the menu validation
-/// event are absent.
+/// The graphic is recorded and not drawn. The accelerator of an item in
+/// a [MenuBar] of the scene fires the item when a hardware keyboard
+/// sends the combination and nothing in the scene consumed the key; it
+/// is not shown beside the text, and the items of a context menu have
+/// none in effect. Mnemonics are not parsed; `mnemonicParsing` and the
+/// menu validation event are absent.
 public class MenuItem implements EventTarget, Styleable {
 
     private final StringProperty id = new SimpleStringProperty(this, "id");
@@ -66,6 +69,8 @@ public class MenuItem implements EventTarget, Styleable {
     private final StringProperty text = new SimpleStringProperty(this, "text");
     private final ObjectProperty<Node> graphic = new SimpleObjectProperty<Node>(this, "graphic");
     private final BooleanProperty disable = new SimpleBooleanProperty(this, "disable", false);
+    private final ObjectProperty<KeyCombination> accelerator = new SimpleObjectProperty<KeyCombination>(this,
+            "accelerator");
     private final BooleanProperty visible = new SimpleBooleanProperty(this, "visible", true);
     private final ReadOnlyObjectWrapper<Menu> parentMenu = new ReadOnlyObjectWrapper<Menu>(this, "parentMenu");
     private final ReadOnlyObjectWrapper<ContextMenu> parentPopup = new ReadOnlyObjectWrapper<ContextMenu>(this,
@@ -89,6 +94,21 @@ public class MenuItem implements EventTarget, Styleable {
         this.text.set(text);
         this.graphic.set(graphic);
         styleClass.add("menu-item");
+    }
+
+    /// Sets the key combination that fires this item.
+    public final void setAccelerator(KeyCombination value) {
+        accelerator.set(value);
+    }
+
+    /// Returns the key combination that fires this item, or `null`.
+    public final KeyCombination getAccelerator() {
+        return accelerator.get();
+    }
+
+    /// The key combination that fires this item.
+    public final ObjectProperty<KeyCombination> acceleratorProperty() {
+        return accelerator;
     }
 
     /// Sets the id a style sheet matches.

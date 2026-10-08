@@ -30,6 +30,9 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.scene.image.Image;
 import javafx.scene.Scene;
 
 /// The top level container of a JavaFX application.
@@ -41,8 +44,9 @@ import javafx.scene.Scene;
 /// command that asks the stage to close.
 ///
 /// Full screen, iconified and maximized are recorded and, where the
-/// stage is a desktop window, not otherwise acted on; the icon list of
-/// JavaFX is not part of this layer.
+/// stage is a desktop window, not otherwise acted on. The icons are
+/// recorded and not shown: the icon of an application is the one its
+/// Codename One project is built with.
 public class Stage extends Window {
 
     private final StringProperty title = new SimpleStringProperty(this, "title", "");
@@ -51,6 +55,7 @@ public class Stage extends Window {
     private final BooleanProperty maximized = new SimpleBooleanProperty(this, "maximized", false);
     private final BooleanProperty iconified = new SimpleBooleanProperty(this, "iconified", false);
     private final BooleanProperty alwaysOnTop = new SimpleBooleanProperty(this, "alwaysOnTop", false);
+    private final ObservableList<Image> icons = FXCollections.observableArrayList();
     private StageStyle style;
     private Modality modality = Modality.NONE;
     private Window owner;
@@ -175,6 +180,12 @@ public class Stage extends Window {
     /// Returns the window this stage belongs to, or `null`.
     public final Window getOwner() {
         return owner;
+    }
+
+    /// Returns the icons of the window. They are recorded; the icon shown
+    /// for the application is the one the project is built with.
+    public final ObservableList<Image> getIcons() {
+        return icons;
     }
 
     /// Returns the title.

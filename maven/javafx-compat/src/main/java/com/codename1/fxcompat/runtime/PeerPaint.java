@@ -95,8 +95,7 @@ public final class PeerPaint {
         return saved;
     }
 
-    /// Draws what a node draws itself, for a peer at a position.
-    static void paintNode(Graphics g, Node node, int x, int y, boolean matrixInstalled) {
+    private static Renderer renderer(Graphics g, Node node, int x, int y, boolean matrixInstalled) {
         Renderer r = new Renderer(g, x, y);
         Bounds lb = node.getLayoutBounds();
         r.translate(-lb.getMinX(), -lb.getMinY());
@@ -106,6 +105,34 @@ public final class PeerPaint {
                 r.concat(m[0], m[1], m[2], m[3], m[4], m[5]);
             }
         }
+        return r;
+    }
+
+    /// Restricts the graphics to the clip of a node, for a peer at a
+    /// position; answers whether a clip was pushed, which the caller
+    /// then pops with `Graphics.popClip()`. The clip is pushed after any
+    /// widening, so it is the node's clip that holds for its children.
+    static boolean pushClip(Graphics g, Node node, int x, int y) {
+        FxPath clip = node.cn1ClipPath();
+        if (clip == null) {
+            return false;
+        }
+        renderer(g, node, x, y, false).clip(clip);
+        return true;
+    }
+
+    /// Draws what a node draws itself, for a peer at a position, inside
+    /// the node's clip if it has one.
+    static void paintNode(Graphics g, Node node, int x, int y, boolean matrixInstalled) {
+        Renderer r = renderer(g, node, x, y, matrixInstalled);
+        FxPath clip = node.cn1ClipPath();
+        if (clip != null) {
+            r.save();
+            r.clip(clip);
+        }
         node.cn1Paint(r);
+        if (clip != null) {
+            r.restore();
+        }
     }
 }

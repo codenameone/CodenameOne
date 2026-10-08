@@ -27,9 +27,11 @@ import com.codename1.fxcompat.runtime.Units;
 import com.codename1.ui.Component;
 import com.codename1.ui.plaf.Style;
 
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -54,8 +56,9 @@ import javafx.scene.paint.Color;
 /// translucent highlight. The pseudo-class states `empty`, `filled` and
 /// `selected` follow the cell, and `focused` the control.
 ///
-/// Editing (`startEdit`, `commitEdit`, `cancelEdit`, `editable`,
-/// `editing`) is not part of this layer.
+/// A cell can be edited: [#startEdit()], [#commitEdit(Object)] and
+/// [#cancelEdit()] move it in and out of the editing state, and a
+/// subclass that edits overrides them to swap what it shows.
 ///
 /// Styled through `cn1ApplyStyle` with the `Labeled` and `Region` names
 /// listed in `com.codename1.fxcompat.runtime.StyleTarget`; a cell adds no
@@ -70,6 +73,8 @@ public class Cell<T> extends Labeled {
     private final ObjectProperty<T> item = new SimpleObjectProperty<T>(this, "item");
     private final ReadOnlyBooleanWrapper empty = new ReadOnlyBooleanWrapper(this, "empty", true);
     private final ReadOnlyBooleanWrapper selected = new ReadOnlyBooleanWrapper(this, "selected", false);
+    private final BooleanProperty editable = new SimpleBooleanProperty(this, "editable", true);
+    private final ReadOnlyBooleanWrapper editing = new ReadOnlyBooleanWrapper(this, "editing", false);
     private int basePadding = -1;
 
     /// Creates an empty cell.
@@ -205,6 +210,56 @@ public class Cell<T> extends Labeled {
     /// Returns whether the row of this cell is selected.
     public final boolean isSelected() {
         return selected.get();
+    }
+
+    /// Whether this cell may be edited; true unless the application says
+    /// otherwise.
+    public final BooleanProperty editableProperty() {
+        return editable;
+    }
+
+    /// Sets whether this cell may be edited.
+    public final void setEditable(boolean value) {
+        editable.set(value);
+    }
+
+    /// Returns whether this cell may be edited.
+    public final boolean isEditable() {
+        return editable.get();
+    }
+
+    /// Whether this cell is being edited.
+    public final ReadOnlyBooleanProperty editingProperty() {
+        return editing.getReadOnlyProperty();
+    }
+
+    /// Returns whether this cell is being edited.
+    public final boolean isEditing() {
+        return editing.get();
+    }
+
+    /// Starts editing, if the cell is editable, shows an item and is not
+    /// edited already. An override calls the super implementation and
+    /// then asks [#isEditing()] whether the edit began.
+    public void startEdit() {
+        if (isEditable() && !isEditing() && !isEmpty()) {
+            editing.set(true);
+        }
+    }
+
+    /// Ends the edit without a new value.
+    public void cancelEdit() {
+        if (isEditing()) {
+            editing.set(false);
+        }
+    }
+
+    /// Ends the edit with a new value. The cell does not keep the value;
+    /// the view it belongs to tells whoever owns the data.
+    public void commitEdit(T newValue) {
+        if (isEditing()) {
+            editing.set(false);
+        }
     }
 
     /// Gives the cell another item to show. An override calls the super

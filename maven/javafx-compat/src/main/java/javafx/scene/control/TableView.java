@@ -23,12 +23,17 @@
 package javafx.scene.control;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import com.codename1.ui.Component;
 
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ChangeListener;
@@ -36,6 +41,7 @@ import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.SortedList;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
@@ -50,6 +56,7 @@ import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Polygon;
 
 /// A table: one row per item, one [TableCell] per row and column, under
 /// a row of column headers.
@@ -62,9 +69,20 @@ import javafx.scene.paint.Color;
 ///
 /// Selection is by row. A press selects the row under it, and with
 /// `SelectionMode.MULTIPLE` the shortcut key and Shift work as in a list.
-/// Cell selection (`TablePosition`, `TableSelectionModel`), row nodes
-/// (`TableRow`, `rowFactory`), sorting, column resize policies, editing
-/// and the focus model of JavaFX are not part of this layer.
+///
+/// A press on the header of a sortable column sorts by it: ascending,
+/// then descending, then not at all, and with Shift held the column is
+/// added to the ones already sorted by. The order is a comparator of
+/// the items, [#comparatorProperty()]. Items in a `SortedList` are
+/// sorted by binding its comparator to the table's; any other list is
+/// sorted in place. `sortPolicy` and `onSort` are absent.
+///
+/// In an editable table a double click on a cell edits it, if its
+/// column is editable and its cell factory makes cells that edit.
+///
+/// Cell selection (`TableSelectionModel`), row nodes (`TableRow`,
+/// `rowFactory`), column resize policies and the focus model of JavaFX
+/// are not part of this layer.
 ///
 /// The control has no native component. It starts with a white
 /// background and a thin grey border, which the `Region` style names
@@ -81,7 +99,22 @@ public class TableView<S> extends Control {
     private final RowFlow flow;
     private final Region header = new Region();
     private final ArrayList<Label> headerLabels = new ArrayList<Label>();
+    private final ArrayList<Polygon> headerArrows = new ArrayList<Polygon>();
+    private final ObservableList<TableColumn<S, ?>> sortOrder = FXCollections.observableArrayList();
+    private final ReadOnlyObjectWrapper<Comparator<S>> comparator = new ReadOnlyObjectWrapper<Comparator<S>>(this,
+            "comparator");
+    private final BooleanProperty editable = new SimpleBooleanProperty(this, "editable", false);
+    private final ReadOnlyObjectWrapper<TablePosition<S, ?>> editingCell =
+            new ReadOnlyObjectWrapper<TablePosition<S, ?>>(this, "editingCell");
+    private boolean sorting;
     private int anchor = -1;
+
+    private final ChangeListener<Object> sortListener = new ChangeListener<Object>() {
+        @Override
+        public void changed(ObservableValue<? extends Object> observable, Object oldValue, Object newValue) {
+            sort();
+        }
+    };
 
     private final ListChangeListener<S> itemsListener = new ListChangeListener<S>() {
         @Override
@@ -204,6 +237,18 @@ public class TableView<S> extends Control {
                 pressed(event);
             }
         });
+        flow.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                clicked(event);
+            }
+        });
+        sortOrder.addListener(new ListChangeListener<TableColumn<S, ?>>() {
+            @Override
+            public void onChanged(Change<? extends TableColumn<S, ?>> change) {
+                sort();
+            }
+        });
         selectionModel.set(new Model<S>(this));
         this.items.set(items);
     }
@@ -223,6 +268,9 @@ public class TableView<S> extends Control {
         column.widthProperty().addListener(widthListener);
         column.cellFactoryProperty().addListener(columnListener);
         column.cellValueFactoryProperty().addListener(columnListener);
+        column.sortTypeProperty().addListener(sortListener);
+        column.sortableProperty().addListener(sortListener);
+        column.comparatorProperty().addListener(sortListener);
     }
 
     private void detach(TableColumn<S, ?> column) {
@@ -235,6 +283,10 @@ public class TableView<S> extends Control {
         column.widthProperty().removeListener(widthListener);
         column.cellFactoryProperty().removeListener(columnListener);
         column.cellValueFactoryProperty().removeListener(columnListener);
+        column.sortTypeProperty().removeListener(sortListener);
+        column.sortableProperty().removeListener(sortListener);
+        column.comparatorProperty().removeListener(sortListener);
+        sortOrder.remove(column);
     }
 
     /// The columns, their widths or what they show changed: the headers
@@ -244,16 +296,36 @@ public class TableView<S> extends Control {
             cn1Children().remove(headerLabels.get(i));
         }
         headerLabels.clear();
+        for (int i = 0; i < headerArrows.size(); i++) {
+            cn1Children().remove(headerArrows.get(i));
+        }
+        headerArrows.clear();
         for (int i = 0; i < columns.size(); i++) {
-            TableColumn<S, ?> column = columns.get(i);
+            final TableColumn<S, ?> column = columns.get(i);
             Label label = new Label(column.getText());
             label.getStyleClass().add("column-header");
             label.setManaged(false);
             label.setVisible(column.isVisible());
+            label.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
+                @Override
+                public void handle(MouseEvent event) {
+                    if (event.getButton() == MouseButton.PRIMARY) {
+                        headerClicked(column, event.isShiftDown());
+                    }
+                }
+            });
             headerLabels.add(label);
             cn1Children().add(label);
+            Polygon arrow = new Polygon();
+            arrow.setManaged(false);
+            arrow.setMouseTransparent(true);
+            arrow.setFill(Color.rgb(90, 90, 90));
+            arrow.setVisible(false);
+            headerArrows.add(arrow);
+            cn1Children().add(arrow);
         }
         flow.rebuild();
+        syncArrows();
         requestLayout();
     }
 
@@ -290,6 +362,184 @@ public class TableView<S> extends Control {
                 event.isShiftDown(), row, anchor);
     }
 
+    private void clicked(MouseEvent event) {
+        if (!isEditable() || event.getButton() != MouseButton.PRIMARY || event.getClickCount() < 2) {
+            return;
+        }
+        int row = flow.rowAt(event);
+        if (row < 0) {
+            return;
+        }
+        double x = flow.sceneToLocal(event.getSceneX(), event.getSceneY()).getX();
+        double at = 0;
+        for (int i = 0; i < columns.size(); i++) {
+            TableColumn<S, ?> column = columns.get(i);
+            if (!column.isVisible()) {
+                continue;
+            }
+            if (x >= at && x < at + column.getWidth()) {
+                edit(row, column);
+                return;
+            }
+            at += column.getWidth();
+        }
+    }
+
+    /// A header was pressed: the column is sorted ascending, then
+    /// descending, then not at all. Alone, unless it is added to the
+    /// columns already sorted by.
+    private void headerClicked(TableColumn<S, ?> column, boolean add) {
+        if (!column.isSortable()) {
+            return;
+        }
+        boolean sorted = sortOrder.contains(column);
+        sorting = true;
+        if (!sorted) {
+            column.setSortType(TableColumn.SortType.ASCENDING);
+            if (!add) {
+                sortOrder.clear();
+            }
+            sortOrder.add(column);
+        } else if (column.getSortType() == TableColumn.SortType.ASCENDING) {
+            column.setSortType(TableColumn.SortType.DESCENDING);
+            if (!add && sortOrder.size() > 1) {
+                sortOrder.setAll(java.util.Collections.<TableColumn<S, ?>>singletonList(column));
+            }
+        } else {
+            sortOrder.remove(column);
+        }
+        sorting = false;
+        sort();
+    }
+
+    private static <S, T> int compareBy(TableColumn<S, T> column, S a, S b) {
+        Comparator<T> by = column.getComparator();
+        if (by == null) {
+            return 0;
+        }
+        int c = by.compare(column.getCellData(a), column.getCellData(b));
+        return column.getSortType() == TableColumn.SortType.DESCENDING ? -c : c;
+    }
+
+    /// Sorts the items by the columns of the sort order. With none the
+    /// comparator is `null`: a `SortedList` bound to it returns to the
+    /// order of its source, any other list stays as it is.
+    public void sort() {
+        if (sorting) {
+            return;
+        }
+        final ArrayList<TableColumn<S, ?>> by = new ArrayList<TableColumn<S, ?>>();
+        for (int i = 0; i < sortOrder.size(); i++) {
+            TableColumn<S, ?> column = sortOrder.get(i);
+            if (column != null && column.isSortable() && !by.contains(column)) {
+                by.add(column);
+            }
+        }
+        Comparator<S> order = by.isEmpty() ? null : new Comparator<S>() {
+            @Override
+            public int compare(S a, S b) {
+                for (int i = 0; i < by.size(); i++) {
+                    int c = compareBy(by.get(i), a, b);
+                    if (c != 0) {
+                        return c;
+                    }
+                }
+                return 0;
+            }
+        };
+        sorting = true;
+        comparator.set(order);
+        ObservableList<S> list = getItems();
+        // A sorted list takes the comparator through its own property.
+        if (order != null && list != null && !(list instanceof SortedList)) {
+            FXCollections.sort(list, order);
+        }
+        sorting = false;
+        syncArrows();
+        requestLayout();
+    }
+
+    private void syncArrows() {
+        for (int i = 0; i < headerArrows.size() && i < columns.size(); i++) {
+            TableColumn<S, ?> column = columns.get(i);
+            Polygon arrow = headerArrows.get(i);
+            boolean shown = column.isVisible() && column.isSortable() && sortOrder.contains(column);
+            arrow.setVisible(shown);
+            if (shown) {
+                boolean up = column.getSortType() != TableColumn.SortType.DESCENDING;
+                arrow.getPoints().setAll(0.0, up ? 6.0 : 0.0, 8.0, up ? 6.0 : 0.0, 4.0, up ? 0.0 : 6.0);
+            }
+        }
+    }
+
+    final void editing(TablePosition<S, ?> cell) {
+        editingCell.set(cell);
+    }
+
+    /// Starts editing the cell of a row in a column, when the table and
+    /// the column are editable and the row is in view; a row of -1 or a
+    /// `null` column cancels the edit in progress.
+    public void edit(int row, TableColumn<S, ?> column) {
+        TablePosition<S, ?> now = editingCell.get();
+        if (now != null) {
+            IndexedCell<?> cell = flow.cell(now.getRow(), now.getColumn());
+            if (cell != null && cell.isEditing()) {
+                cell.cancelEdit();
+            }
+            editingCell.set(null);
+        }
+        int at = column == null ? -1 : columns.indexOf(column);
+        if (row < 0 || at < 0 || !isEditable() || !column.isEditable()) {
+            return;
+        }
+        IndexedCell<?> cell = flow.cell(row, at);
+        if (cell != null) {
+            cell.startEdit();
+        }
+    }
+
+    /// Returns the cell being edited, or `null`.
+    public final TablePosition<S, ?> getEditingCell() {
+        return editingCell.get();
+    }
+
+    /// The cell being edited.
+    public final ReadOnlyObjectProperty<TablePosition<S, ?>> editingCellProperty() {
+        return editingCell.getReadOnlyProperty();
+    }
+
+    /// Sets whether the cells of this table may be edited.
+    public final void setEditable(boolean value) {
+        editable.set(value);
+    }
+
+    /// Returns whether the cells of this table may be edited.
+    public final boolean isEditable() {
+        return editable.get();
+    }
+
+    /// Whether the cells of this table may be edited; false by default.
+    public final BooleanProperty editableProperty() {
+        return editable;
+    }
+
+    /// Returns the columns the table is sorted by, the first one first.
+    public final ObservableList<TableColumn<S, ?>> getSortOrder() {
+        return sortOrder;
+    }
+
+    /// The order of the items the sort order asks for, `null` with no
+    /// sort order. A `SortedList` shown by the table binds its own
+    /// comparator to this one.
+    public final ReadOnlyObjectProperty<Comparator<S>> comparatorProperty() {
+        return comparator.getReadOnlyProperty();
+    }
+
+    /// Returns the order of the items the sort order asks for, or `null`.
+    public final Comparator<S> getComparator() {
+        return comparator.get();
+    }
+
     private double headerHeight() {
         double h = 0;
         for (int i = 0; i < headerLabels.size(); i++) {
@@ -315,6 +565,13 @@ public class TableView<S> extends Control {
             double cw = Math.max(0, Math.min(column.getWidth(), w - x));
             label.setVisible(cw > 0);
             label.resizeRelocate(in.getLeft() + x, in.getTop(), cw, hh);
+            if (i < headerArrows.size()) {
+                Polygon arrow = headerArrows.get(i);
+                if (cw < 16) {
+                    arrow.setVisible(false);
+                }
+                arrow.relocate(in.getLeft() + x + cw - 12, in.getTop() + (hh - 6) / 2);
+            }
             x += column.getWidth();
         }
         Node empty = getPlaceholder();

@@ -32,6 +32,7 @@ import com.codename1.fxcompat.runtime.EventHandlerManager;
 import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.fxcompat.runtime.FxDouble;
 import com.codename1.fxcompat.runtime.FxObject;
+import com.codename1.fxcompat.runtime.FxPath;
 import com.codename1.fxcompat.runtime.FxString;
 import com.codename1.fxcompat.runtime.Matrix2D;
 import com.codename1.fxcompat.runtime.NodePeer;
@@ -100,7 +101,8 @@ import javafx.scene.transform.Transform;
 ///
 /// #### Not part of this layer
 ///
-/// Effects, clipping by a node, blend modes, caching hints, snapshots,
+/// Effects, clipping to the outline of a node (a clip is the box around
+/// the clip node, see [#setClip(Node)]), blend modes, caching hints, snapshots,
 /// three dimensional transforms, accessibility attributes and drag and
 /// drop.
 public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty.Owner {
@@ -153,6 +155,7 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     private final DoubleProperty rotate = new FxDouble(this, "rotate", 0, Dirty.BOUNDS);
 
     private ObservableList<Transform> transforms;
+    private ObjectProperty<Node> clip;
     private ObjectProperty<Cursor> cursor;
     private Object userData;
     private ObservableMap<Object, Object> properties;
@@ -1032,6 +1035,44 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
 
     // ---------------------------------------------------------- geometry
 
+    /// The node this one is clipped by, in this node's coordinates.
+    ///
+    /// What is clipped to is the box around the clip node, its
+    /// `getBoundsInParent()`: a rectangle clips exactly, any other shape
+    /// clips to its bounds. The clip limits what is drawn, of this node
+    /// and of its children, and what a pointer can hit. It is read when
+    /// the node is drawn; after changing the clip node itself, set it
+    /// again or change anything else that repaints.
+    public final ObjectProperty<Node> clipProperty() {
+        if (clip == null) {
+            clip = new FxObject<Node>(this, "clip", null, Dirty.PAINT);
+        }
+        return clip;
+    }
+
+    /// Sets the node this one is clipped by; `null` removes the clip.
+    public final void setClip(Node value) {
+        clipProperty().set(value);
+    }
+
+    /// Returns the node this one is clipped by, or `null`.
+    public final Node getClip() {
+        return clip == null ? null : clip.get();
+    }
+
+    /// Returns the area this node is clipped to as a path in its own
+    /// coordinates, or `null` when it has no clip.
+    public final FxPath cn1ClipPath() {
+        Node by = getClip();
+        if (by == null) {
+            return null;
+        }
+        Bounds b = by.getBoundsInParent();
+        FxPath path = new FxPath();
+        path.addRect(b.getMinX(), b.getMinY(), Math.max(0, b.getWidth()), Math.max(0, b.getHeight()));
+        return path;
+    }
+
     /// Returns the opacity, 0 to 1.
     public final double getOpacity() {
         return opacity.get();
@@ -1361,6 +1402,10 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
             return null;
         }
         Point2D local = parentToLocal(parentX, parentY);
+        Node by = getClip();
+        if (by != null && !by.getBoundsInParent().contains(local.getX(), local.getY())) {
+            return null;
+        }
         return cn1PickLocal(local.getX(), local.getY());
     }
 

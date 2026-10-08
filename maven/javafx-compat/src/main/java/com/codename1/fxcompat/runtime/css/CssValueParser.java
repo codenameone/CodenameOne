@@ -387,6 +387,13 @@ public final class CssValueParser {
 
     /// A number with a length unit, a percentage when `percent` allows it.
     private static CssValue length(String term, boolean percent) {
+        // "-fx-max-width: infinity" is how a style sheet lets a control grow.
+        if ("infinity".equalsIgnoreCase(term)) {
+            return CssValue.number(Double.MAX_VALUE, CssValue.UNIT_PX);
+        }
+        if ("-infinity".equalsIgnoreCase(term)) {
+            return CssValue.number(-Double.MAX_VALUE, CssValue.UNIT_PX);
+        }
         int[] end = new int[1];
         double v = numberPrefix(term, end);
         if (v != v) {
