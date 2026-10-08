@@ -326,6 +326,21 @@ public class OidcClientTest extends UITestBase {
     }
 
     @Test
+    void invalidExpiryCompletesWithAnErrorWithoutPersistingTokens() {
+        for (String expiry : new String[] {"-1", "9223372036854775807", "1.5", "\"bad\""}) {
+            MemoryTokenStore store = new MemoryTokenStore();
+            OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+            mock(TOKEN_EP, 200, "{\"access_token\":\"AT\",\"token_type\":\"Bearer\",\"expires_in\":"
+                    + expiry + "}");
+            Outcome<OidcTokens> result = await(c.refresh("RT"));
+            assertNull(result.value);
+            assertInstanceOf(OidcException.class, result.error);
+            assertEquals(OidcException.INVALID_RESPONSE, ((OidcException) result.error).getError());
+            assertNull(store.saved);
+        }
+    }
+
+    @Test
     void aSuccessWithoutAnAccessTokenIsNotASession() {
         MemoryTokenStore store = new MemoryTokenStore();
         OidcClient c = configuredClient(fullConfig()).setTokenStore(store);

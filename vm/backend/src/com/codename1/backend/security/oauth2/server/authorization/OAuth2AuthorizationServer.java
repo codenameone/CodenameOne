@@ -781,13 +781,21 @@ public final class OAuth2AuthorizationServer {
                     "A scope asked for is not one the client was registered with");
         }
         scopes.remove("openid");
-        return issue(request, client, null, client.getClientId(), "client_credentials", scopes,
-                now, null, resources(client, OAuth2Parameters.values(form(request), RESOURCE)));
+        List<String> resources = resources(client, OAuth2Parameters.values(form(request), RESOURCE));
+        Map<String, Object> attributes = new LinkedHashMap<String, Object>();
+        attributes.put(RESOURCE, new ArrayList<String>(resources));
+        OAuth2Authorization authorization = new OAuth2Authorization(OAuth2Parameters.random(16),
+                client.getId(), client.getClientId(), AuthorizationGrantType.CLIENT_CREDENTIALS.getValue(),
+                scopes, OAuth2Authorization.ACTIVE, attributes, now,
+                now + client.getTokenSettings().getAccessTokenTimeToLive() * 1000L);
+        authorizations.save(authorization);
+        return issue(request, client, authorization, client.getClientId(), "client_credentials", scopes,
+                now, null, resources);
     }
 
     /// Signs what a grant yields and answers with it.
     ///
-    /// @param authorization the grant, or null for `client_credentials`
+    /// @param authorization the stored grant
     /// @param keptRefreshToken the refresh token to hand back unchanged, or
     /// null to issue a new one where the client may have one
     private Map<String, Object> issue(HttpServer.Request request, RegisteredClient client,
@@ -957,7 +965,8 @@ public final class OAuth2AuthorizationServer {
         }
         String refreshToken = null;
         long expiresAt = now + settings.getAccessTokenTimeToLive() * 1000L;
-        if (client.getAuthorizationGrantTypes().contains(AuthorizationGrantType.REFRESH_TOKEN)) {
+        if (!AuthorizationGrantType.CLIENT_CREDENTIALS.getValue().equals(grantType)
+                && client.getAuthorizationGrantTypes().contains(AuthorizationGrantType.REFRESH_TOKEN)) {
             expiresAt = now + settings.getRefreshTokenTimeToLive() * 1000L;
             refreshToken = keptRefreshToken == null ? OAuth2Parameters.random(32) : keptRefreshToken;
         }
@@ -1097,6 +1106,8 @@ public final class OAuth2AuthorizationServer {
         String grant = grantOf(token);
         OAuth2Authorization authorization = grant == null ? null : authorizations.findById(grant);
         if (!issuer(request).equals(token.getIssuer()) || authorization == null
+                || AuthorizationGrantType.CLIENT_CREDENTIALS.getValue().equals(
+                        authorization.getAuthorizationGrantType())
                 || !OAuth2Authorization.ACTIVE.equals(authorization.getStatus())
                 || !authorization.getPrincipalName().equals(token.getSubject())) {
             // Another issuer's token, or one whose grant was revoked.

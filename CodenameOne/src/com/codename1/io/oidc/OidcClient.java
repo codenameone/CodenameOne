@@ -1108,7 +1108,13 @@ public final class OidcClient {
                             "Token endpoint response must use the Bearer token_type"));
                     return;
                 }
-                OidcTokens received = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);
+                OidcTokens received;
+                try {
+                    received = OidcTokens.fromTokenResponse(parsed, refreshTokenFallback);
+                } catch (IllegalArgumentException invalid) {
+                    out.error(new OidcException(OidcException.INVALID_RESPONSE, invalid.getMessage(), invalid));
+                    return;
+                }
                 final OidcTokens tokens = received.getIdToken() == null && previous != null
                         ? received.withIdentityFrom(previous) : received;
                 if (refreshTokenFallback == null && requestsOpenId() && tokens.getIdToken() == null) {

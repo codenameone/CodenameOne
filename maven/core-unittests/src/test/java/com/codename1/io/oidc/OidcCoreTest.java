@@ -40,6 +40,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class OidcCoreTest extends UITestBase {
 
     @Test
+    void accessTokenExpiryMustBeAnIntegralRepresentableDuration() {
+        Map<String, Object> json = new HashMap<String, Object>();
+        json.put("access_token", "access");
+        for (Object invalid : new Object[] {-1L, Long.MAX_VALUE, Double.NaN,
+                Double.POSITIVE_INFINITY, 1.5, "-1", "9223372036854775807", "1.5", "bad", true}) {
+            json.put("expires_in", invalid);
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> OidcTokens.fromTokenResponse(json, null), String.valueOf(invalid));
+        }
+        for (Object valid : new Object[] {0L, 3600L, 10000000.0, "3600"}) {
+            json.put("expires_in", valid);
+            long before = System.currentTimeMillis();
+            long seconds = valid instanceof Number ? ((Number) valid).longValue()
+                    : Long.parseLong((String) valid);
+            long expiry = OidcTokens.fromTokenResponse(json, null).getExpiresAt().getTime();
+            assertTrue(expiry >= before + seconds * 1000L);
+            assertTrue(expiry <= System.currentTimeMillis() + seconds * 1000L);
+        }
+        json.remove("expires_in");
+        assertNull(OidcTokens.fromTokenResponse(json, null).getExpiresAt());
+    }
+
+    @Test
     public void pkceVerifierAndChallengeAreDistinctAndUrlSafe() {
         PkceChallenge p = PkceChallenge.generate();
         assertNotNull(p.getVerifier());

@@ -363,6 +363,23 @@ public final class MigrationEngine {
 
     // ------------------------------------------------------------------ commands
 
+    /// Checks and initializes this set's history without applying migrations.
+    /// Used before library sets create objects in the application's database.
+    public void prepareHistory() throws IOException {
+        resolve(false);
+        resolve(true);
+        try {
+            lock();
+            try {
+                ensureHistory();
+            } finally {
+                unlock();
+            }
+        } finally {
+            target.done();
+        }
+    }
+
     /// Applies every pending migration.
     public MigrateResult migrate() throws IOException {
         List<MigrationEntry> versioned = resolve(false);

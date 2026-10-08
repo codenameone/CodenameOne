@@ -620,7 +620,7 @@ public final class HttpServer {
         /// | Property | Meaning |
         /// |---|---|
         /// | `cn1.server.forwardHeaders` | `true` to read the forwarding headers at all; `false` unless set. |
-        /// | `cn1.server.trustedProxies` | The proxies, as addresses and CIDR ranges separated by commas. Unless set: loopback and the private ranges -- 10/8, 172.16/12, 192.168/16, 169.254/16, 127/8, ::1, fc00::/7 and fe80::/10. |
+        /// | `cn1.server.trustedProxies` | The proxies, as addresses and CIDR ranges separated by commas. Unless explicitly listed, no peer is trusted, including loopback and private addresses. |
         ///
         /// IPv4 is dotted, IPv6 is eight groups of hexadecimal without `::`, and
         /// an IPv4 address carried in IPv6 is written as IPv4 -- one spelling

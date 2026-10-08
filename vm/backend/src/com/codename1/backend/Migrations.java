@@ -169,6 +169,10 @@ public final class Migrations {
     ///     does not match this build
     /// @throws IOException if the database fails
     public static int migrate(DataSource pool, Config config) throws IOException {
+        MigrationSet application = MigrationRegistry.find(MigrationSet.DEFAULT_NAME);
+        if (application != null) {
+            configure(of(pool, application), config).prepareHistory();
+        }
         int ran = 0;
         for (MigrationSet set : MigrationRegistry.sets()) {
             if (SECURITY_SCHEMA_SET.equals(set.getName())

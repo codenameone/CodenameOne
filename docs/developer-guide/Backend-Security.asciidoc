@@ -766,8 +766,9 @@ include::../demos/common/src/main/snippets/developer-guide/backend-security.prop
 ----
 
 `cn1.server.forwardHeaders` is `false` unless set. `cn1.server.trustedProxies`
-is a list of addresses and CIDR ranges. Unless it's set, the trusted proxies
-are loopback and the private ranges. `X-Forwarded-For` is read from the right,
+is a list of addresses and CIDR ranges. An omitted or empty list trusts no
+peers, including loopback and private addresses. List only the deployment's
+actual reverse proxies. `X-Forwarded-For` is read from the right,
 past every trusted proxy, so what a client wrote at the left end is never
 reached.
 
@@ -1016,6 +1017,18 @@ grant is removed, a refresh request can't recreate it. Custom stores must
 implement `OAuth2AuthorizationService.issueTokens`: check the active grant,
 record or extend the refresh token, and extend the grant in one operation
 that's atomic with `remove`. The default implementation refuses issuance.
+
+Client-credentials access tokens also have independent stored grants. Their
+owner can remove a grant through `/oauth2/revoke`; revoking one token doesn't
+revoke tokens issued by other client-credentials requests. They never include
+refresh tokens, even when the client also supports the refresh grant.
+
+A resource server that must reject revoked JWTs immediately needs access to
+the same authorization store. Add `OAuth2AuthorizationValidator(store, issuer)`
+to its decoder's `JwtValidators.createDefaultWithValidators(...)`, alongside
+its audience validator. This checks the grant on each request after signature
+verification. A resource server that verifies JWTs offline continues accepting
+them until expiry; fetching public keys alone doesn't convey revocation state.
 
 Device polling uses `OAuth2AuthorizationService.pollToken` to check the last
 accepted poll and claim the next interval atomically. Custom stores must
@@ -1537,6 +1550,10 @@ Secrets aren't stored as they are. Passwords are stored as their encoder wrote
 them. Recovery codes use salted PBKDF2 password hashes; checking one still ends
 with an atomic removal, so concurrent requests can't use it twice. Recovery
 codes from earlier builds that stored plain SHA-256 digests must be regenerated.
+Verification allows at most four concurrent requests per process and one per
+username across service instances. Excess attempts fail immediately without
+queuing hash work or consuming a code; a completed or failed check releases
+its slot.
 API keys, remembered sign-in tokens, authorization codes, refresh tokens and
 device codes are stored as SHA-256 hashes. Authenticator secrets are sealed under
 `cn1.security.mfa.encryptionKey`.
@@ -1723,8 +1740,8 @@ read by the build, because it decides what's linked into the server.
   proxy. `false` unless set.
 
 | `cn1.server.trustedProxies`
-| The proxies, as addresses and CIDR ranges separated by commas. Loopback and
-  the private ranges unless set.
+| The proxies, as addresses and CIDR ranges separated by commas. No trusted
+  peers unless explicitly listed.
 |===
 
 [[backend-security-differences]]

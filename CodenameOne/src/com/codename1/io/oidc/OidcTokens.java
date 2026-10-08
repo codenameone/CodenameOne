@@ -90,26 +90,21 @@ public final class OidcTokens {
         String scope = stringOrNull(json.get("scope"));
         Date expiresAt = null;
         Object expiresIn = json.get("expires_in");
-        if (expiresIn instanceof Number) {
-            // Not through the text form: a Double of ten million seconds or more prints as
-            // "1.0E7", which read up to its dot is one second.
-            expiresAt = new Date(System.currentTimeMillis()
-                    + ((Number) expiresIn).longValue() * 1000L);
-        } else if (expiresIn != null) {
+        if (expiresIn != null) {
+            long seconds;
             try {
-                String raw = expiresIn.toString().trim();
-                int dot = raw.indexOf('.');
-                if (dot >= 0) {
-                    raw = raw.substring(0, dot);
-                }
-                long seconds = Long.parseLong(raw);
-                expiresAt = new Date(System.currentTimeMillis() + seconds * 1000L);
-            } catch (NumberFormatException ignored) {
-                // Provider returned a non-numeric `expires_in`; treat the
-                // expiry as unknown rather than failing the whole token
-                // response. `expiresAt` stays null and callers fall back to
-                // a 401 retry.
+                seconds = expiresIn instanceof Number ? ((Number) expiresIn).longValue()
+                        : Long.parseLong(expiresIn.toString().trim());
+            } catch (NumberFormatException invalid) {
+                throw new IllegalArgumentException("expires_in must be a nonnegative integer", invalid);
             }
+            long now = System.currentTimeMillis();
+            if (seconds < 0 || seconds > (Long.MAX_VALUE - now) / 1000L
+                    || (expiresIn instanceof Number
+                    && ((Number) expiresIn).doubleValue() != (double) seconds)) {
+                throw new IllegalArgumentException("expires_in must have a representable millisecond expiry");
+            }
+            expiresAt = new Date(now + seconds * 1000L);
         }
         Map<String, Object> claims = idToken != null ? decodeIdTokenClaims(idToken) : null;
         return new OidcTokens(accessToken, idToken, refreshToken, tokenType, scope,

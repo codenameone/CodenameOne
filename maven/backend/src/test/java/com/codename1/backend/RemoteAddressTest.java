@@ -93,7 +93,7 @@ class RemoteAddressTest {
     }
 
     @Test
-    @DisplayName("Proxies: the private ranges unless listed, and exactly the list when it is")
+    @DisplayName("Proxies: no trusted addresses unless explicitly listed")
     void trustedRanges() throws Exception {
         Properties settings = new Properties();
         assertNull(ForwardedHeaders.fromConfig(Config.of(settings, "test")),
@@ -104,7 +104,7 @@ class RemoteAddressTest {
             "172.31.255.255", "192.168.1.1", "169.254.10.10", "::1", "fd00::1", "fc00::1",
             "fe80::1", "febf::1", "::ffff:10.0.0.1"};
         for (String address : trusted) {
-            assertTrue(internal.trusts(ForwardedHeaders.parse(address)), address);
+            assertFalse(internal.trusts(ForwardedHeaders.parse(address)), address);
         }
         String[] untrusted = {"8.8.8.8", "11.0.0.1", "9.255.255.255", "172.15.255.255", "172.32.0.1",
             "192.169.0.1", "128.0.0.1", "::2", "2001:db8::1", "fec0::1", "fb00::1", "fe00::1"};
@@ -241,11 +241,30 @@ class RemoteAddressTest {
     }
 
     @Test
+    void enablingForwardingWithoutProxyAddressesDoesNotTrustLoopbackClients() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(ForwardedHeaders.ENABLED, "true");
+        for (String list : new String[] {null, "", "  "}) {
+            if (list != null) {
+                settings.setProperty(ForwardedHeaders.TRUSTED, list);
+            }
+            Backend backend = start(settings);
+            try {
+                assertEquals("127.0.0.1|127.0.0.1|false", ask(backend.getServer().getPort(),
+                        "X-Forwarded-For: 203.0.113.7", "X-Forwarded-Proto: https"));
+            } finally {
+                backend.stop();
+            }
+        }
+    }
+
+    @Test
     @DisplayName("Behind a trusted proxy the forwarding headers are the client; behind none, not")
     void behindAProxy() throws Exception {
         Properties settings = new Properties();
         settings.setProperty(ForwardedHeaders.ENABLED, "true");
-        // Loopback is a proxy by default, and the test connects from it.
+        // This deployment explicitly trusts its proxy hops.
+        settings.setProperty(ForwardedHeaders.TRUSTED, "127.0.0.1,10.0.0.0/8");
         Backend backend = start(settings);
         try {
             int port = backend.getServer().getPort();

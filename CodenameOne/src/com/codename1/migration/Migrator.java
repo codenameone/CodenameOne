@@ -163,6 +163,14 @@ public final class Migrator {
         return new MigrationEngine(target, set, options);
     }
 
+    /// Initializes the application's history before registered library sets run.
+    /// Does not apply migrations or adopt a nonempty schema unless configured to.
+    /// @throws IOException if the history cannot be initialized
+    /// @hidden
+    public void prepareHistory() throws IOException {
+        engine().prepareHistory();
+    }
+
     /// Applies every migration that has not run yet, in version order, then every repeatable
     /// migration whose script changed.
     /// @return what ran

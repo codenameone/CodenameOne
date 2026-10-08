@@ -38,7 +38,7 @@ import java.util.List;
 /// | Property | Meaning |
 /// |---|---|
 /// | `cn1.server.forwardHeaders` | `true` to read the headers at all; `false` unless set. |
-/// | `cn1.server.trustedProxies` | The proxies, as addresses and CIDR ranges separated by commas. Unless set: loopback and the private ranges -- 10/8, 172.16/12, 192.168/16, 169.254/16, 127/8, ::1, fc00::/7 and fe80::/10. |
+/// | `cn1.server.trustedProxies` | The proxies, as addresses and CIDR ranges separated by commas. Unless explicitly listed, no peer is trusted, including loopback and private addresses. |
 ///
 /// `X-Forwarded-For` is read from the right: each proxy appends the address it
 /// heard from, so the rightmost entry is the one this server's own proxy
@@ -50,9 +50,6 @@ final class ForwardedHeaders {
     static final String ENABLED = "cn1.server.forwardHeaders";
     /// Whose word is taken for them.
     static final String TRUSTED = "cn1.server.trustedProxies";
-
-    private static final String INTERNAL = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,"
-            + "127.0.0.0/8,::1,fc00::/7,fe80::/10";
 
     /// {address bytes, prefix bits as a one-element array}, per trusted range.
     private final byte[][] networks;
@@ -69,7 +66,7 @@ final class ForwardedHeaders {
             return null;
         }
         String listed = config.get(TRUSTED);
-        return of(listed == null || listed.trim().length() == 0 ? INTERNAL : listed);
+        return of(listed == null ? "" : listed);
     }
 
     /// A policy trusting these addresses and CIDR ranges.

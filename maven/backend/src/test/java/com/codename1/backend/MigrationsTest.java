@@ -78,6 +78,34 @@ class MigrationsTest {
         MigrationRegistry.unregister("library");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void registeredLibraryTablesNeedNoNamingConvention(String engine) throws Exception {
+        DataSource pool = open(engine);
+        Migrations.register(MigrationSet.builder("library")
+                .sql("1", "library", "CREATE TABLE mig_tags (id INT PRIMARY KEY)").build());
+        Migrations.register(MigrationSet.builder("default")
+                .sql("1", "app", "CREATE TABLE mig_notes (id INT REFERENCES mig_tags(id))").build());
+        assertEquals(2, Migrations.migrate(pool, Config.of(new Properties(), "test")));
+        assertEquals(0, Migrations.migrate(pool, Config.of(new Properties(), "test")));
+        assertEquals(1, count(pool, "flyway_schema_history"));
+        assertEquals(1, count(pool, "cn1_library_schema_history"));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void preexistingSchemaIsRefusedBeforeLibraryMigrations(String engine) throws Exception {
+        DataSource pool = open(engine);
+        pool.execute("CREATE TABLE mig_existing (id INT)", null);
+        Migrations.register(MigrationSet.builder("library")
+                .sql("1", "library", "CREATE TABLE mig_tags (id INT)").build());
+        Migrations.register(MigrationSet.builder("default").sql("1", "app", "CREATE TABLE mig_notes (id INT)").build());
+        MigrationException error = assertThrows(MigrationException.class,
+                () -> Migrations.migrate(pool, Config.of(new Properties(), "test")));
+        assertEquals(MigrationException.NON_EMPTY_SCHEMA, error.getCode());
+        assertThrows(IOException.class, () -> pool.query("SELECT * FROM mig_tags", null));
+    }
+
     private static final String[] TABLES = {"mig_notes", "mig_tags", "mig_half", "cn1_mig_lib", "mig_existing",
         "flyway_schema_history", "cn1_library_schema_history", "mig_history"};
 

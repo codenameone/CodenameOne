@@ -23,11 +23,14 @@
 package com.codename1.backend.security.mfa;
 
 import com.codename1.backend.Crypto;
+import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.security.crypto.Pbkdf2Sha256PasswordEncoder;
 import com.codename1.backend.security.crypto.PasswordEncoder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /// Recovery codes: what signs a user in when their authenticator app is gone.
 ///
@@ -39,6 +42,11 @@ public final class RecoveryCodeService {
     /// How many codes [#generate] makes.
     public static final int COUNT = 10;
     private static final char[] ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789".toCharArray();
+
+    // Shared across service instances: a caller cannot multiply expensive verification
+    // work by opening more sessions or using another client network.
+    private static final Set<String> VERIFYING = new HashSet<String>();
+    private static final int MAX_VERIFYING = 4;
 
     private final RecoveryCodeRepository repository;
     private final PasswordEncoder encoder = new Pbkdf2Sha256PasswordEncoder();
@@ -95,7 +103,9 @@ public final class RecoveryCodeService {
         return codes;
     }
 
-    /// Uses a code up.
+    /// Uses a code up. At most four verifications run in this process, and at most
+    /// one per username (case insensitive). A busy verifier returns false immediately;
+    /// it does not consume a code or queue password-hashing work.
     ///
     /// @return whether `code` was one of `username`'s unused codes
     public boolean consume(String username, String code) {
@@ -103,14 +113,25 @@ public final class RecoveryCodeService {
         if (username == null || plain == null) {
             return false;
         }
-        for (String hash : repository.findHashes(username)) {
-            if (encoder.matches(plain, hash)) {
-                // Only the atomic removal decides success: another request may
-                // have verified the same snapshot while this one was hashing.
-                return repository.consume(username, hash);
+        String user = SecuritySchema.usernameKey(username);
+        synchronized (VERIFYING) {
+            if (VERIFYING.size() >= MAX_VERIFYING || !VERIFYING.add(user)) {
+                return false;
             }
         }
-        return false;
+        try {
+            for (String hash : repository.findHashes(username)) {
+                if (encoder.matches(plain, hash)) {
+                    // Only the atomic removal decides success across server processes.
+                    return repository.consume(username, hash);
+                }
+            }
+            return false;
+        } finally {
+            synchronized (VERIFYING) {
+                VERIFYING.remove(user);
+            }
+        }
     }
 
     /// Whether `code` is written as a recovery code is: ten letters and digits,

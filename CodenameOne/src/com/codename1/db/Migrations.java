@@ -102,6 +102,10 @@ public final class Migrations {
     ///     does not match this build
     /// @throws IOException if the database fails
     public static MigrateResult migrate(Database db) throws IOException {
+        MigrationSet application = MigrationRegistry.find(MigrationSet.DEFAULT_NAME);
+        if (application != null) {
+            of(db, application).prepareHistory();
+        }
         List<String> applied = new ArrayList<String>();
         List<String> warnings = new ArrayList<String>();
         String initial = null;

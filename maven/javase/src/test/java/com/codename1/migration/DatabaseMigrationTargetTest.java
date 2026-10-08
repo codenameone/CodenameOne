@@ -33,6 +33,24 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DatabaseMigrationTargetTest {
+    @Test
+    void registeredLibraryMigrationsPrecedeAppWithoutBlockingItsHistory() throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            SEDatabase db = new SEDatabase(connection);
+            com.codename1.db.Migrations.register(MigrationSet.builder("library")
+                    .sql("1", "library", "CREATE TABLE library_items (id INT PRIMARY KEY)").build());
+            com.codename1.db.Migrations.register(MigrationSet.builder("default")
+                    .sql("1", "app", "CREATE TABLE app_items (id INT REFERENCES library_items(id))").build());
+            try {
+                assertEquals(2, com.codename1.db.Migrations.migrate(db).getMigrationsExecuted());
+                assertEquals(0, com.codename1.db.Migrations.migrate(db).getMigrationsExecuted());
+            } finally {
+                com.codename1.impl.migration.MigrationRegistry.unregister("default");
+                com.codename1.impl.migration.MigrationRegistry.unregister("library");
+            }
+        }
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
     void cleanDropsReferencedTablesAndRestoresForeignKeys(boolean enabled) throws Exception {

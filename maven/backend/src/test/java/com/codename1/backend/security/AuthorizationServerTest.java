@@ -981,6 +981,90 @@ class AuthorizationServerTest {
         }
     }
 
+    @Test
+    void clientCredentialsTokensHaveIndependentlyRevocableGrants() throws Exception {
+        try (SecuredServer server = start()) {
+            String basic = OAuth2Testing.basic("service", "service-secret");
+            Map first = json(server.call("POST", "/oauth2/token", form("grant_type",
+                    "client_credentials", "scope", "api"), FORM, "Authorization", basic));
+            Map second = json(server.call("POST", "/oauth2/token", form("grant_type",
+                    "client_credentials", "scope", "api"), FORM, "Authorization", basic));
+            String token = (String) first.get("access_token");
+            Jwt jwt = OAuth2Testing.verify(token, server.get("/oauth2/jwks").body);
+            Jwt other = OAuth2Testing.verify((String) second.get("access_token"),
+                    server.get("/oauth2/jwks").body);
+            assertTrue(jwt.getId().contains("."), "access tokens must identify their stored grant");
+            String id = jwt.getId().substring(0, jwt.getId().indexOf('.'));
+            String otherId = other.getId().substring(0, other.getId().indexOf('.'));
+            assertNotEquals(id, otherId);
+            assertNotNull(grants.findById(id));
+            assertEquals(200, server.call("POST", "/oauth2/revoke", form("token", token), FORM,
+                    "Authorization", OAuth2Testing.basic("web", "web-secret")).status);
+            assertNotNull(grants.findById(id), "another client cannot revoke the token");
+            assertEquals(200, server.call("POST", "/oauth2/revoke", form("token", token), FORM,
+                    "Authorization", basic).status);
+            assertNull(grants.findById(id));
+            assertNotNull(grants.findById(otherId));
+            assertEquals(200, server.call("POST", "/oauth2/revoke", form("token", token), FORM,
+                    "Authorization", basic).status);
+            Map web = json(token(server, "grant_type", "client_credentials", "client_id", "web",
+                    "client_secret", "web-secret"));
+            assertNull(web.get("refresh_token"), "client credentials never yield a refresh token");
+        }
+    }
+
+    @Test
+    void resourceServerRejectsRevokedClientCredentialsTokens() throws Exception {
+        int port = OAuth2Testing.freePort();
+        String issuer = "http://127.0.0.1:" + port;
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(AuthorizationServerSettings.ISSUER, issuer);
+        Jwk key = AuthorizationServerKeys.usable(Jwk.ofPrivateKey(KeyFiles.privateKey(
+                KeyFixtures.RSA_PKCS8_PEM)), "test");
+        JwkSource keys = () -> java.util.Collections.singletonList(key);
+        com.codename1.backend.security.oauth2.jwt.DefaultJwtDecoder decoder =
+                com.codename1.backend.security.oauth2.jwt.DefaultJwtDecoder.withJwkSource(keys).build();
+        com.codename1.backend.security.oauth2.server.authorization.OAuth2AuthorizationValidator live =
+                new com.codename1.backend.security.oauth2.server.authorization.OAuth2AuthorizationValidator(
+                        grants, issuer);
+        live.setClock(clock);
+        decoder.setJwtValidator(com.codename1.backend.security.oauth2.jwt.JwtValidators
+                .createDefaultWithValidators(live,
+                        new com.codename1.backend.security.oauth2.jwt.JwtAudienceValidator(issuer)));
+        try (SecuredServer server = SecuredServer.start(settings, "test", users(), APP,
+                http -> http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                        .oauth2ResourceServer(resource -> resource.jwt(jwt -> jwt.decoder(decoder)))
+                        .authorizationServer(as -> as.registeredClientRepository(clients())
+                                .authorizationService(grants).jwkSource(keys)
+                                .clientSecretEncoder(OAuth2Testing.PLAIN).clock(clock)).build())) {
+            String basic = OAuth2Testing.basic("service", "service-secret");
+            String token = (String) json(server.call("POST", "/oauth2/token", form("grant_type",
+                    "client_credentials", "scope", "api"), FORM, "Authorization", basic)).get("access_token");
+            assertEquals(200, server.get("/api", "Authorization", "Bearer " + token).status);
+            Jwt jwt = decoder.decode(token);
+            Map<String, Object> changed = new LinkedHashMap<String, Object>(jwt.getClaims());
+            changed.put("iss", "https://other.example.com");
+            assertTrue(live.validate(new Jwt(token, jwt.getHeaders(), changed)).hasErrors());
+            changed.put("iss", issuer);
+            changed.put("sub", "somebody-else");
+            assertTrue(live.validate(new Jwt(token, jwt.getHeaders(), changed)).hasErrors());
+            changed.put("sub", jwt.getSubject());
+            changed.remove("jti");
+            assertTrue(live.validate(new Jwt(token, jwt.getHeaders(), changed)).hasErrors());
+            long now = clock.now;
+            clock.now += 3600000;
+            assertTrue(live.validate(jwt).hasErrors(), "expired grants are refused");
+            clock.now = now;
+            assertFalse(live.validate(jwt).hasErrors());
+            assertEquals(200, server.call("POST", "/oauth2/revoke", form("token", token), FORM,
+                    "Authorization", basic).status);
+            Reply denied = server.get("/api", "Authorization", "Bearer " + token);
+            assertEquals(401, denied.status);
+            assertTrue(denied.header("WWW-Authenticate").contains("invalid_token"));
+        }
+    }
+
     // ------------------------------------------------------ refresh tokens
 
     @Test

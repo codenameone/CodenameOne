@@ -193,6 +193,67 @@ class MfaTest {
     }
 
     @Test
+    void recoveryVerificationHasSharedGlobalAndPerUserWorkBounds() throws Exception {
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(4);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger reads = new java.util.concurrent.atomic.AtomicInteger();
+        com.codename1.backend.security.mfa.RecoveryCodeRepository repository =
+                new com.codename1.backend.security.mfa.RecoveryCodeRepository() {
+            public void replace(String user, List<String> hashes) { }
+            public int count(String user) { return 0; }
+            public boolean consume(String user, String hash) { return false; }
+            public List<String> findHashes(String user) {
+                reads.incrementAndGet();
+                entered.countDown();
+                if (user.equals("extra") || user.equals("USER0")) {
+                    throw new AssertionError("Rejected work reached the repository");
+                }
+                try {
+                    if (!release.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new AssertionError("Worker did not release");
+                    }
+                } catch (InterruptedException error) {
+                    throw new IllegalStateException(error);
+                }
+                return java.util.Collections.emptyList();
+            }
+        };
+        java.util.concurrent.ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(4);
+        List<java.util.concurrent.Future<Boolean>> answers = new java.util.ArrayList<>();
+        try {
+            for (int i = 0; i < 4; i++) {
+                final String user = "user" + i;
+                answers.add(workers.submit(() -> new RecoveryCodeService(repository)
+                        .consume(user, "abcde-fghjk")));
+                if (i == 0) {
+                    long until = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+                    while (reads.get() == 0 && System.nanoTime() < until) {
+                        Thread.yield();
+                    }
+                    assertEquals(1, reads.get());
+                    assertFalse(new RecoveryCodeService(repository).consume("USER0", "abcde-fghjk"));
+                }
+            }
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertFalse(new RecoveryCodeService(repository).consume("extra", "abcde-fghjk"));
+            assertEquals(4, reads.get());
+        } finally {
+            release.countDown();
+            for (java.util.concurrent.Future<Boolean> answer : answers) {
+                assertFalse(answer.get(5, java.util.concurrent.TimeUnit.SECONDS));
+            }
+            workers.shutdownNow();
+        }
+        assertFalse(new RecoveryCodeService(repository).consume("user0", "abcde-fghjk"));
+        assertEquals(5, reads.get(), "released slots can be used again");
+        for (int i = 0; i < 2; i++) {
+            assertThrows(AssertionError.class,
+                    () -> new RecoveryCodeService(repository).consume("extra", "abcde-fghjk"));
+        }
+        assertEquals(7, reads.get(), "exceptions also release the work slot");
+    }
+
+    @Test
     void recoveryCodesUseSaltedPasswordHashesAndStillConsumeAtomically() throws Exception {
         InMemoryRecoveryCodeRepository repository = new InMemoryRecoveryCodeRepository();
         RecoveryCodeService service = new RecoveryCodeService(repository);
@@ -420,6 +481,7 @@ class MfaTest {
     private SecuredServer startBehindProxy() throws Exception {
         java.util.Properties settings = SecuredServer.settings();
         settings.setProperty("cn1.server.forwardHeaders", "true");
+        settings.setProperty("cn1.server.trustedProxies", "127.0.0.1");
         InMemoryUserDetailsManager users = new InMemoryUserDetailsManager(
                 User.withUsername("ada").password("{noop}ada-pw").roles("USER").build());
         assertTrue(totp.isEnabled("ada") || enrol("ada"));

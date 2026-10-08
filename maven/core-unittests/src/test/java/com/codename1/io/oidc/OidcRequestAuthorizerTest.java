@@ -279,14 +279,10 @@ public class OidcRequestAuthorizerTest extends UITestBase {
 
     /** A token set that expires {@code seconds} from now. */
     private static OidcTokens expiring(String access, String refresh, int seconds) {
-        java.util.Map<String, Object> json = new java.util.HashMap<String, Object>();
-        json.put("access_token", access);
-        json.put("token_type", "Bearer");
-        json.put("expires_in", Integer.valueOf(seconds));
-        if (refresh != null) {
-            json.put("refresh_token", refresh);
-        }
-        return OidcTokens.fromTokenResponse(json, null);
+        // A previously stored token may now be expired; a token endpoint may not
+        // issue a negative expires_in to manufacture that state.
+        return new OidcTokens(access, null, refresh, "Bearer", null,
+                new java.util.Date(System.currentTimeMillis() + seconds * 1000L), null, null);
     }
 
     @Test
