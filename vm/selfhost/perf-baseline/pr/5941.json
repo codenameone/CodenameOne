@@ -200,6 +200,26 @@
      }
     }
    }
+  },
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.059,
+      "time": 0.943,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.059,
+     "reason": "On Intel64 Family 6 Model 207 Stepping 2, Windows x64 runs 37636203630/job 112842974451 and 37716655700/job 113114738618 measured five paired recursion time ratios each: 1.20956, 1.20790, 1.20812, 1.21658, 1.20803 and 1.22005, 1.21493, 1.20382, 1.21029, 1.21662 (run medians 1.208 and 1.215, pooled 1.212). The benchmark and native flags are unchanged since #5940; its two-run 0.943 calibration disagrees with these ten tight rounds and with the earlier 1.204 baseline. The cause of the 0.943 discrepancy is unknown. Rebaseline only this CPU and timing row to repeated measurement, retaining the 20% tolerance and RAM baseline.",
+     "runs": 2,
+     "time": 1.212,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
   }
  }
 }
