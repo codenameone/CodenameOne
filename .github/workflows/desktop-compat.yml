@@ -99,6 +99,18 @@ jobs:
       - name: Unit tests
         working-directory: maven
         run: xvfb-run -a mvn -B -Plocal-dev-javase -pl compat-jdk,compat-testing,swing-compat,javafx-compat,fxml-compiler,build-engine test
+      # The JavaFX sample has to stay what it claims to be: a JavaFX project
+      # that builds on its own, against OpenJFX, with nothing of the layer on
+      # its class path. Everything else here compiles it against the layer,
+      # which would also accept a sample written to the layer's shape. JDK 17
+      # because OpenJFX 17 is; the Swing sample needs no such step, the JDK
+      # that compiles it in the unit tests is the toolkit.
+      - name: The JavaFX sample compiles against OpenJFX
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: JAVA_HOME="$GRADLE_JAVA_HOME" bash scripts/ci/retry.sh mvn -B -f scripts/desktop-compat-samples/javafx-gallery/pom.xml compile
       - name: Refresh archetype catalog
         run: |
           cd maven

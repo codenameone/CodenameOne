@@ -104,7 +104,7 @@ public class SwingGallerySampleTest {
                 + new File("").getAbsolutePath());
     }
 
-    private static void sources(File dir, String rel, List<String> out) throws Exception {
+    static void sources(File dir, String rel, List<String> out) throws Exception {
         File[] files = dir.listFiles();
         assertNotNull(dir.toString(), files);
         Arrays.sort(files);
@@ -118,7 +118,7 @@ public class SwingGallerySampleTest {
         }
     }
 
-    private static void copy(File from, File to) throws Exception {
+    static void copy(File from, File to) throws Exception {
         File[] files = from.listFiles();
         assertNotNull(from.toString(), files);
         for (File f : files) {
@@ -243,11 +243,11 @@ public class SwingGallerySampleTest {
         }
     }
 
-    private static Object call(Object target, String name, Object... args) throws Exception {
+    static Object call(Object target, String name, Object... args) throws Exception {
         return invoke(target.getClass(), target, name, args);
     }
 
-    private static Object invoke(Class<?> type, Object target, String name, Object... args) throws Exception {
+    static Object invoke(Class<?> type, Object target, String name, Object... args) throws Exception {
         for (Method m : type.getMethods()) {
             if (m.getName().equals(name) && m.getParameterTypes().length == args.length) {
                 m.setAccessible(true);
@@ -269,7 +269,7 @@ public class SwingGallerySampleTest {
     }
 
     /// Runs `work` on the event dispatch thread and rethrows what it threw.
-    private static void onEdt(Object display, final ThrowingRunnable work) throws Exception {
+    static void onEdt(Object display, final ThrowingRunnable work) throws Exception {
         final Throwable[] failure = new Throwable[1];
         call(display, "callSeriallyAndWait", new Runnable() {
             @Override
@@ -291,7 +291,7 @@ public class SwingGallerySampleTest {
 
     /// Paints `form` into an image the size of the display and answers every
     /// string that was drawn.
-    private static List<String> paint(ClassLoader loader, Object form) throws Exception {
+    static List<String> paint(ClassLoader loader, Object form) throws Exception {
         Class<?> headless = loader.loadClass("com.codename1.compat.testing.HeadlessImplementation");
         // Every string a paint draws, as {text, x, y}, while recordText is set.
         List<?> drawn = (List<?>) headless.getField("drawnText").get(null);
@@ -334,7 +334,7 @@ public class SwingGallerySampleTest {
         return null;
     }
 
-    private interface ThrowingRunnable {
+    interface ThrowingRunnable {
         void run() throws Exception;
     }
 
