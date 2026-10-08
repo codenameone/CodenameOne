@@ -26,6 +26,7 @@ import com.codename1.ui.Desktop;
 import com.codename1.ui.Display;
 
 import javafx.stage.Modality;
+import javafx.stage.PopupWindow;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -39,6 +40,8 @@ import javafx.stage.Window;
 ///   [StageDialog], and any other window a form shown on top of the
 ///   current one, whose back command asks the window to close and returns
 ///   to the form below.
+/// - A popup (menu, tooltip) is never a window of its own: it is a
+///   [StagePopup], a layer over the form of its owner.
 public final class StageHosts {
 
     private static Runnable exitHook;
@@ -48,6 +51,9 @@ public final class StageHosts {
 
     /// Creates the host of a window that is about to be shown.
     public static StageHost create(Window window) {
+        if (window instanceof PopupWindow) {
+            return new StagePopup((PopupWindow) window);
+        }
         boolean primary = window instanceof Stage && ((Stage) window).cn1IsPrimary();
         if (!primary && Display.isInitialized() && Desktop.isSupported()) {
             return new StageWindow(window);

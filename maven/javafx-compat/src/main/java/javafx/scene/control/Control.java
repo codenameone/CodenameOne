@@ -29,7 +29,14 @@ import com.codename1.ui.Container;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.geom.Dimension;
 
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
+import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.layout.Region;
 
 /// The base of the controls.
@@ -53,14 +60,77 @@ import javafx.scene.layout.Region;
 /// JavaFX are not part of this layer, and a control looks as the Codename
 /// One theme makes the native component look. The region's own background
 /// and border are drawn behind it.
+///
+/// #### Context menu and tooltip
+///
+/// A control with a context menu opens it where a context menu is asked
+/// for, a secondary click or a long press, and consumes that event. A
+/// tooltip is installed with `Tooltip.install`, which hands its text to
+/// the native component.
 public abstract class Control extends Region {
 
+    private final ObjectProperty<ContextMenu> contextMenu = new SimpleObjectProperty<ContextMenu>(this,
+            "contextMenu");
+    private final ObjectProperty<Tooltip> tooltip = new SimpleObjectProperty<Tooltip>(this, "tooltip");
     private Component nativeComponent;
     private boolean creating;
 
     /// Creates a control.
     protected Control() {
         setFocusTraversable(true);
+        addEventHandler(ContextMenuEvent.CONTEXT_MENU_REQUESTED, new EventHandler<ContextMenuEvent>() {
+            @Override
+            public void handle(ContextMenuEvent event) {
+                ContextMenu menu = getContextMenu();
+                if (menu != null && !event.isConsumed()) {
+                    Point2D p = sceneToLocal(event.getSceneX(), event.getSceneY());
+                    Point2D at = com.codename1.fxcompat.runtime.StagePopup.anchor(Control.this, p.getX(), p.getY());
+                    menu.show(Control.this, at.getX(), at.getY());
+                    event.consume();
+                }
+            }
+        });
+        tooltip.addListener(new ChangeListener<Tooltip>() {
+            @Override
+            public void changed(ObservableValue<? extends Tooltip> observable, Tooltip oldValue, Tooltip newValue) {
+                if (oldValue != null) {
+                    Tooltip.uninstall(Control.this, oldValue);
+                }
+                if (newValue != null) {
+                    Tooltip.install(Control.this, newValue);
+                }
+            }
+        });
+    }
+
+    /// Sets the menu opened where a context menu is asked for.
+    public final void setContextMenu(ContextMenu value) {
+        contextMenu.set(value);
+    }
+
+    /// Returns the menu opened where a context menu is asked for.
+    public final ContextMenu getContextMenu() {
+        return contextMenu.get();
+    }
+
+    /// The menu opened where a context menu is asked for.
+    public final ObjectProperty<ContextMenu> contextMenuProperty() {
+        return contextMenu;
+    }
+
+    /// Sets the tooltip of this control.
+    public final void setTooltip(Tooltip value) {
+        tooltip.set(value);
+    }
+
+    /// Returns the tooltip of this control.
+    public final Tooltip getTooltip() {
+        return tooltip.get();
+    }
+
+    /// The tooltip of this control.
+    public final ObjectProperty<Tooltip> tooltipProperty() {
+        return tooltip;
     }
 
     /// Creates the Codename One component this control shows, or `null`

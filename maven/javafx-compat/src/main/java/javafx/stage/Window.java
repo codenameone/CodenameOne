@@ -264,7 +264,8 @@ public class Window implements EventTarget {
             closing.close();
         }
         fireEvent(new WindowEvent(this, WindowEvent.WINDOW_HIDDEN));
-        if (WINDOWS.isEmpty()) {
+        // A popup going away is never the application's last window closing.
+        if (WINDOWS.isEmpty() && !(this instanceof PopupWindow)) {
             StageHosts.lastWindowHidden();
         }
     }

@@ -42,6 +42,9 @@ import javafx.scene.input.MouseEvent;
 /// the native component under the pointer never sees it. An event consumed
 /// by a handler in the bubbling phase still reaches the native component:
 /// a button pressed is a button pressed.
+///
+/// An open popup under the pointer takes the event before the scene of
+/// the host does; see [StagePopup].
 public final class SceneInput {
 
     private SceneInput() {
@@ -102,35 +105,53 @@ public final class SceneInput {
 
     /// A pointer went down at a display position.
     public static boolean pressed(Scene scene, Component root, int x, int y) {
+        if (StagePopup.pointer(MouseEvent.MOUSE_PRESSED, x, y, button())) {
+            return true;
+        }
         return scene != null && root != null
                 && scene.cn1Pointer(MouseEvent.MOUSE_PRESSED, sceneX(root, x), sceneY(root, y), button());
     }
 
     /// A pointer moved while down.
     public static boolean dragged(Scene scene, Component root, int x, int y) {
+        if (StagePopup.pointer(MouseEvent.MOUSE_DRAGGED, x, y, button())) {
+            return true;
+        }
         return scene != null && root != null
                 && scene.cn1Pointer(MouseEvent.MOUSE_DRAGGED, sceneX(root, x), sceneY(root, y), button());
     }
 
     /// A pointer came up.
     public static boolean released(Scene scene, Component root, int x, int y) {
+        if (StagePopup.pointer(MouseEvent.MOUSE_RELEASED, x, y, button())) {
+            return true;
+        }
         return scene != null && root != null
                 && scene.cn1Pointer(MouseEvent.MOUSE_RELEASED, sceneX(root, x), sceneY(root, y), button());
     }
 
     /// A mouse moved with no button down.
     public static boolean hover(Scene scene, Component root, int x, int y) {
+        if (StagePopup.pointer(MouseEvent.MOUSE_MOVED, x, y, MouseButton.NONE)) {
+            return true;
+        }
         return scene != null && root != null
                 && scene.cn1Pointer(MouseEvent.MOUSE_MOVED, sceneX(root, x), sceneY(root, y), MouseButton.NONE);
     }
 
     /// A touch was held in place: a context menu request.
     public static boolean longPress(Scene scene, Component root, int x, int y) {
+        if (StagePopup.covers(x, y)) {
+            return true;
+        }
         return scene != null && root != null && scene.cn1ContextMenu(sceneX(root, x), sceneY(root, y));
     }
 
     /// The wheel turned; deltas in display pixels.
     public static boolean wheel(Scene scene, Component root, int x, int y, int deltaX, int deltaY) {
+        if (StagePopup.wheel(x, y, deltaX, deltaY)) {
+            return true;
+        }
         return scene != null && root != null && scene.cn1Wheel(sceneX(root, x), sceneY(root, y),
                 Units.toLogical(deltaX), Units.toLogical(deltaY));
     }
