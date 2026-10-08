@@ -19,6 +19,7 @@
 <module>common</module>
 <module>backend</module>
 <module>android-interop</module>
+<module>desktop-interop</module>
 </modules>
   <properties>
     <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
