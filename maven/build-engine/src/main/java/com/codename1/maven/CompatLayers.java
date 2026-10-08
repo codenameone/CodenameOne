@@ -58,7 +58,8 @@ public final class CompatLayers {
     /// relocating its jar changes no class name.
     public static final Relocation SWING = new Relocation("Swing", "codenameone-swing-compat",
             "com/codename1/desktopcompat/",
-            new String[] {"java/awt/", "javax/swing/", "java/beans/", "javax/accessibility/", "org/jdesktop/"},
+            new String[] {"java/awt/", "javax/swing/", "java/beans/", "javax/accessibility/", "javax/imageio/",
+                "org/jdesktop/"},
             Relocation.JDK_SHIMS, null, null);
 
     /// The JavaFX layer, authored under `javafx.*` and relocated like the

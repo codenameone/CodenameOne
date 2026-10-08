@@ -22,7 +22,9 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
+import com.codename1.desktopcompat.java.awt.datatransfer.Clipboard;
 import com.codename1.desktopcompat.rt.DesktopToolkit;
+import java.net.URL;
 
 /// The few toolkit services this layer has: screen metrics, font metrics,
 /// image decoding and the event queue.
@@ -55,6 +57,23 @@ public abstract class Toolkit {
 
     /// Decodes an encoded image (PNG, JPEG) at once.
     public abstract Image createImage(byte[] imagedata, int imageoffset, int imagelength);
+
+    /// The image a path names: the file, or else the application's
+    /// resource of the path's last name. It is read here and now; an image
+    /// that cannot be read has a width and height of -1.
+    public abstract Image getImage(String filename);
+
+    /// The image a URL names, read here and now.
+    public abstract Image getImage(URL url);
+
+    /// As [#getImage(String)]; no image is shared between callers either
+    /// way.
+    public abstract Image createImage(String filename);
+
+    public abstract Image createImage(URL url);
+
+    /// The device's clipboard. It carries text.
+    public abstract Clipboard getSystemClipboard();
 
     public Image createImage(byte[] imagedata) {
         return createImage(imagedata, 0, imagedata.length);
