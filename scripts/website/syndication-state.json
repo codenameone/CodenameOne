@@ -2593,6 +2593,22 @@
         "id": 4814077,
         "url": "https://dev.to/codenameone/your-push-request-succeeded-the-device-key-is-dead-4hej",
         "syndicated_at": "2026-10-07T19:19:40+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/e068d407279d/edit",
+        "syndicated_at": "2026-10-08T00:01:22+00:00"
+      }
+    },
+    "desktop-theme-real-settings-app": {
+      "hashnode": {
+        "url": "https://debugagent.com/native-desktop-themes-for-production-apps",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ac6dd5efab85f84722d0af7",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-08T00:02:31+00:00"
       }
     }
   }
