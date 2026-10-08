@@ -333,6 +333,14 @@ public class CN1CSSCLI {
     }
 
     private static boolean isUpToDate(File css, Options options) {
+        if (options.noRaster || options.nativeThemeUnits) {
+            // Modification times cannot tell which mode an existing output
+            // was built in. -no-raster is a check as much as a compile, and
+            // skipping it would report a stylesheet clean without looking;
+            // -native-theme-units changes the numbers in the result. Both
+            // belong to the native theme build, which always compiles.
+            return false;
+        }
         File output = options.outputFile;
         if (!output.exists()) {
             return false;

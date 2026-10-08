@@ -379,6 +379,33 @@ public class CSSTheme {
             if (d instanceof LinearGradient) {
                 spec.type(GradientSpec.Type.LINEAR);
                 spec.angleDeg(((LinearGradient) d).getAngleDegrees());
+                // `to top right` is not 45 degrees: it is the angle that puts
+                // the 50% line through the other two corners, which depends
+                // on the shape of the box. The descriptor holds a fixed
+                // angle, so the corner is read from the declaration again.
+                ScaledUnit to = (ScaledUnit) background.getParameters();
+                if (to != null && isIdentLike(to) && "to".equals(identValue(to))) {
+                    int cornerX = 0;
+                    int cornerY = 0;
+                    int words = 0;
+                    for (ScaledUnit side = (ScaledUnit) to.getNextLexicalUnit();
+                            side != null && isIdentLike(side) && words < 2;
+                            side = (ScaledUnit) side.getNextLexicalUnit(), words++) {
+                        String name = identValue(side);
+                        if ("left".equals(name)) {
+                            cornerX = -1;
+                        } else if ("right".equals(name)) {
+                            cornerX = 1;
+                        } else if ("top".equals(name)) {
+                            cornerY = -1;
+                        } else if ("bottom".equals(name)) {
+                            cornerY = 1;
+                        }
+                    }
+                    if (cornerX != 0 && cornerY != 0) {
+                        spec.toCorner(true).cornerX(cornerX).cornerY(cornerY);
+                    }
+                }
             } else if (d instanceof RadialGradient) {
                 RadialGradient rg = (RadialGradient) d;
                 spec.type(GradientSpec.Type.RADIAL);
@@ -4629,24 +4656,22 @@ public class CSSTheme {
                     .top(top).right(right).bottom(bottom).left(left)
                     .radii(radii);
 
-            LexicalUnit background = styles.get("background");
-            while (background != null) {
-                if (isGradient(background)) {
-                    // Lengths and percentages in a gradient are measured in
-                    // the padding box, where the rasterizer positions it.
-                    double[] borderWidths = com.codename1.designer.css.raster.BorderPainter.effectiveWidths(
-                            new BorderSide[] {top, right, bottom, left}, boxWidth, boxHeight);
-                    double gradientWidth = boxWidth - borderWidths[1] - borderWidths[3];
-                    double gradientHeight = boxHeight - borderWidths[0] - borderWidths[2];
-                    if (gradientWidth < 1 || gradientHeight < 1) {
-                        gradientWidth = boxWidth;
-                        gradientHeight = boxHeight;
-                    }
-                    box.gradient(CN1Gradient.describeForRaster((ScaledUnit) background,
-                            (int) gradientWidth, (int) gradientHeight));
-                    break;
-                }
-                background = background.getNextLexicalUnit();
+            // Backgrounds are sized and positioned in the padding box, the
+            // initial background-origin: that is what a percentage size or a
+            // gradient's lengths are measured in. A box that is all border
+            // has none and falls back to the border box.
+            double[] borderWidths = com.codename1.designer.css.raster.BorderPainter.effectiveWidths(
+                    new BorderSide[] {top, right, bottom, left}, boxWidth, boxHeight);
+            double paintWidth = boxWidth - borderWidths[1] - borderWidths[3];
+            double paintHeight = boxHeight - borderWidths[0] - borderWidths[2];
+            if (paintWidth < 1 || paintHeight < 1) {
+                paintWidth = boxWidth;
+                paintHeight = boxHeight;
+            }
+
+            LexicalUnit gradient = styles.get("background");
+            while (gradient != null && !isGradient(gradient)) {
+                gradient = gradient.getNextLexicalUnit();
             }
 
             // Only the first url() of background-image is a layer here. A
@@ -4656,7 +4681,34 @@ public class CSSTheme {
             // the first image. Painting the rest would change images that
             // already ship.
             LexicalUnit bgImage = styles.get("background-image");
-            if (bgImage != null && bgImage.getLexicalUnitType() == LexicalUnit.SAC_URI) {
+            if (bgImage != null && bgImage.getLexicalUnitType() != LexicalUnit.SAC_URI) {
+                bgImage = null;
+            }
+            if (gradient != null && bgImage != null && !sameShorthand(styles.get("background"), bgImage)) {
+                // A gradient is a background image, so `background` and
+                // `background-image` set the same thing and the one declared
+                // later replaces the other. The style map keeps the order the
+                // properties were declared in.
+                boolean imageDeclaredLater = false;
+                for (String key : styles.keySet()) {
+                    if ("background".equals(key)) {
+                        imageDeclaredLater = true;
+                        break;
+                    }
+                    if ("background-image".equals(key)) {
+                        break;
+                    }
+                }
+                if (imageDeclaredLater) {
+                    gradient = null;
+                } else {
+                    bgImage = null;
+                }
+            }
+            if (gradient != null) {
+                box.gradient(CN1Gradient.describeForRaster((ScaledUnit) gradient, (int) paintWidth, (int) paintHeight));
+            }
+            if (bgImage != null) {
                 String url = bgImage.getStringValue();
                 String unpaintable = unpaintableReason(url);
                 if (unpaintable != null) {
@@ -4670,7 +4722,7 @@ public class CSSTheme {
                             + " generated for this rule. Use a PNG or JPEG, or drop the border, shadow or"
                             + " size that needs a generated image, to keep it.");
                 } else {
-                    box.backgroundImage(rasterBackgroundImage(styles, bgImage, boxWidth, boxHeight));
+                    box.backgroundImage(rasterBackgroundImage(styles, bgImage, paintWidth, paintHeight));
                 }
             }
 
@@ -4697,6 +4749,20 @@ public class CSSTheme {
             return isNone(value) ? null : value;
         }
 
+        /// Whether the url() `image` was written inside the `background`
+        /// shorthand `shorthand`, as opposed to in a declaration of its own.
+        private boolean sameShorthand(LexicalUnit shorthand, LexicalUnit image) {
+            String url = image.getStringValue();
+            for (LexicalUnit u = shorthand; u != null; u = u.getNextLexicalUnit()) {
+                if (u.getLexicalUnitType() == LexicalUnit.SAC_URI && url != null && url.equals(u.getStringValue())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// `boxWidth` and `boxHeight` are those of the padding box, which a
+        /// percentage `background-size` is a fraction of.
         private BackgroundImage rasterBackgroundImage(Map<String, LexicalUnit> styles, LexicalUnit bgImage,
                 double boxWidth, double boxHeight) {
             BufferedImage image = readRasterImage(bgImage.getStringValue());
@@ -4704,7 +4770,20 @@ public class CSSTheme {
             LexicalUnit repeatUnit = styles.get("background-repeat");
             if (repeatUnit != null && repeatUnit.getStringValue() != null) {
                 String keyword = repeatUnit.getStringValue();
-                if ("no-repeat".equals(keyword)) {
+                LexicalUnit vertical = repeatUnit.getNextLexicalUnit();
+                String second = vertical == null ? null : vertical.getStringValue();
+                // `space` and `round` are painted as `repeat`. They are not
+                // values a theme can hold either -- the native background
+                // types are tile, scale and align -- so a rule using one
+                // looks the same with a generated image as without.
+                if (second != null) {
+                    // Two keywords: horizontal, then vertical.
+                    boolean x = !"no-repeat".equals(keyword);
+                    boolean y = !"no-repeat".equals(second);
+                    repeat = x && y ? BackgroundImage.Repeat.REPEAT
+                            : x ? BackgroundImage.Repeat.REPEAT_X
+                            : y ? BackgroundImage.Repeat.REPEAT_Y : BackgroundImage.Repeat.NO_REPEAT;
+                } else if ("no-repeat".equals(keyword)) {
                     repeat = BackgroundImage.Repeat.NO_REPEAT;
                 } else if ("repeat-x".equals(keyword)) {
                     repeat = BackgroundImage.Repeat.REPEAT_X;

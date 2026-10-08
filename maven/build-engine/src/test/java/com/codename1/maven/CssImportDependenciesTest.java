@@ -61,6 +61,24 @@ class CssImportDependenciesTest {
     }
 
     @Test
+    void findsTheAssetsAnOutsideImportNames(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "@import \"../shared/base.css\";\nA { background-image: url(img/in.png); }\n");
+        write(new File(css, "img/in.png"), "x");
+        File base = write(new File(dir, "shared/base.css"),
+                "B { background-image: url('img/out.png'); }\nC { background: url(http://x/y.png); }\n"
+                        + "D { background: url(data:image/png;base64,AAAA); }\nE { background: url(img/missing.png); }\n");
+        File out = write(new File(dir, "shared/img/out.png"), "x");
+
+        Set<File> found = CssImportDependencies.outside(css);
+
+        assertEquals(2, found.size(), found.toString());
+        assertTrue(found.contains(base.getCanonicalFile()));
+        assertTrue(found.contains(out.getCanonicalFile()));
+    }
+
+    @Test
     void anEditToAnOutsideImportMovesTheModificationTime(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File css = new File(dir, "css");

@@ -34,7 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /// Finds the stylesheets a CSS directory pulls in with `@import` from
-/// outside itself.
+/// outside itself, and the images and fonts named from outside it.
 ///
 /// A build decides whether `theme.res` is stale from the files under
 /// `src/main/css`. A stylesheet there may import one that lives elsewhere --
@@ -53,11 +53,15 @@ public final class CssImportDependencies {
     private static final Pattern IMPORT = Pattern.compile(
             "@import\\s+(?:url\\(\\s*)?[\"']?([^\"')\\s;]+)", Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern URL = Pattern.compile(
+            "url\\(\\s*[\"']?([^\"')]+?)[\"']?\\s*\\)", Pattern.CASE_INSENSITIVE);
+
     private CssImportDependencies() {
     }
 
     /// Every file imported, directly or through another import, by a
-    /// stylesheet under `cssDir`, that is not itself under `cssDir`.
+    /// stylesheet under `cssDir`, and every file one of those stylesheets
+    /// names in a `url()`, that is not itself under `cssDir`.
     public static Set<File> outside(File cssDir) {
         Set<File> out = new LinkedHashSet<File>();
         if (cssDir == null || !cssDir.isDirectory()) {
@@ -80,22 +84,20 @@ public final class CssImportDependencies {
             } catch (IOException ex) {
                 continue;
             }
-            Matcher m = IMPORT.matcher(COMMENT.matcher(text).replaceAll(""));
+            text = COMMENT.matcher(text).replaceAll("");
+            // An image or a font the stylesheet names from outside the
+            // directory is compiled into the theme just as an import is.
+            Matcher asset = URL.matcher(text);
+            while (asset.find()) {
+                File file = resolve(css, asset.group(1));
+                if (file != null && !file.toPath().startsWith(root.toPath())) {
+                    out.add(file);
+                }
+            }
+            Matcher m = IMPORT.matcher(text);
             while (m.find()) {
-                String target = m.group(1);
-                if (target.contains("://")) {
-                    continue;
-                }
-                File file = new File(target);
-                if (!file.isAbsolute()) {
-                    file = new File(css.getParentFile(), target);
-                }
-                try {
-                    file = file.getCanonicalFile();
-                } catch (IOException ex) {
-                    continue;
-                }
-                if (!file.isFile() || !seen.add(file)) {
+                File file = resolve(css, m.group(1));
+                if (file == null || !seen.add(file)) {
                     continue;
                 }
                 pending.addLast(file);
@@ -105,6 +107,24 @@ public final class CssImportDependencies {
             }
         }
         return out;
+    }
+
+    /// The existing file `target` names from the stylesheet `css`, or null
+    /// when it is remote, a `data:` URI, or not there.
+    private static File resolve(File css, String target) {
+        if (target.contains(":") && !new File(target).isAbsolute()) {
+            return null;
+        }
+        File file = new File(target);
+        if (!file.isAbsolute()) {
+            file = new File(css.getParentFile(), target);
+        }
+        try {
+            file = file.getCanonicalFile();
+        } catch (IOException ex) {
+            return null;
+        }
+        return file.isFile() ? file : null;
     }
 
     /// The newest modification time among [#outside(File)], or 0 when there

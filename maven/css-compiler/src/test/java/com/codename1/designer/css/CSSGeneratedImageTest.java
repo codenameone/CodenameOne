@@ -287,6 +287,26 @@ class CSSGeneratedImageTest {
                 "the medium density tile fills the box");
     }
 
+    @Test
+    void theLaterOfBackgroundAndBackgroundImageReplacesTheOther(@TempDir Path dir) throws Exception {
+        png(new File(dir.toFile(), "img/clear.png"), 4, 4, 0x00000000);
+        String box = "background-color: #ffffff; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.5);";
+        String red = "background: linear-gradient(#ff0000, #ff0000);";
+        String image = "background-image: url(img/clear.png);";
+
+        Compiled imageLast = compile(dir, "Card { " + box + red + image + " }");
+        BufferedImage center = stored(imageLast.res, "CardCenter_1.png", Display.DENSITY_HD);
+        assertEquals(0xffffffff, center.getRGB(center.getWidth() / 2, center.getHeight() / 2),
+                "the image replaced the gradient, so the colour shows through it");
+
+        Path other = Files.createDirectory(dir.resolve("other"));
+        png(new File(other.toFile(), "img/clear.png"), 4, 4, 0x00000000);
+        Compiled gradientLast = compile(other, "Card { " + box + image + red + " }");
+        center = stored(gradientLast.res, "CardCenter_1.png", Display.DENSITY_HD);
+        assertEquals(0xffff0000, center.getRGB(center.getWidth() / 2, center.getHeight() / 2),
+                "the gradient replaced the image");
+    }
+
     // ---- gradients that used to hang the compiler ----
 
     private static void assertCompilesPromptly(Path dir, String css) {
