@@ -33,6 +33,7 @@ import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.fxcompat.runtime.FxDouble;
 import com.codename1.fxcompat.runtime.FxObject;
 import com.codename1.fxcompat.runtime.FxString;
+import com.codename1.fxcompat.runtime.Matrix2D;
 import com.codename1.fxcompat.runtime.NodePeer;
 import com.codename1.fxcompat.runtime.Renderer;
 import com.codename1.fxcompat.runtime.StyleEngine;
@@ -68,6 +69,7 @@ import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
+import javafx.scene.transform.Transform;
 
 /// The base of everything in a scene graph.
 ///
@@ -149,6 +151,7 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     private final DoubleProperty scaleY = new FxDouble(this, "scaleY", 1, Dirty.BOUNDS);
     private final DoubleProperty rotate = new FxDouble(this, "rotate", 0, Dirty.BOUNDS);
 
+    private ObservableList<Transform> transforms;
     private ObjectProperty<Cursor> cursor;
     private Object userData;
     private ObservableMap<Object, Object> properties;
@@ -226,8 +229,10 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         double y = getLayoutY() + getTranslateY() + lb.getMinY() - plb.getMinY();
         int x1 = Units.toPixels(x);
         int y1 = Units.toPixels(y);
-        int x2 = Units.toPixels(x + lb.getWidth());
-        int y2 = Units.toPixels(y + lb.getHeight());
+        // Empty bounds, as of a shape with neither fill nor stroke, have a
+        // negative size.
+        int x2 = Units.toPixels(x + Math.max(0, lb.getWidth()));
+        int y2 = Units.toPixels(y + Math.max(0, lb.getHeight()));
         if (peer.getX() != x1 || peer.getY() != y1 || peer.getWidth() != x2 - x1 || peer.getHeight() != y2 - y1) {
             peer.setX(x1);
             peer.setY(y1);
@@ -246,11 +251,38 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     /// between the node's own coordinates and its translated position in
     /// the parent. Answers `null` when there is none, the common case.
     public double[] cn1PaintMatrix() {
+        double[] own = new double[6];
+        if (!scaleAndRotation(own)) {
+            own = null;
+        }
+        if (transforms == null || transforms.isEmpty()) {
+            return own;
+        }
+        // JavaFX's order: the list first, outermost first, then the
+        // node's own rotation and scale about its centre.
+        double[] m = null;
+        for (int i = 0; i < transforms.size(); i++) {
+            Transform t = transforms.get(i);
+            if (t == null || t.isIdentity()) {
+                continue;
+            }
+            double[] tm = {t.getMxx(), t.getMyx(), t.getMxy(), t.getMyy(), t.getTx(), t.getTy()};
+            m = m == null ? tm : Matrix2D.multiply(m, tm);
+        }
+        if (m == null) {
+            return own;
+        }
+        return own == null ? m : Matrix2D.multiply(m, own);
+    }
+
+    /// Writes the node's own scale and rotation about its centre into a
+    /// matrix; answers `false`, writing nothing, when it has neither.
+    private boolean scaleAndRotation(double[] out) {
         double sx = getScaleX();
         double sy = getScaleY();
         double r = getRotate();
         if (sx == 1 && sy == 1 && r == 0) {
-            return null;
+            return false;
         }
         Bounds lb = getLayoutBounds();
         double px = lb.getMinX() + lb.getWidth() / 2;
@@ -262,7 +294,13 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         double b = sin * sx;
         double c = -sin * sy;
         double d = cos * sy;
-        return new double[] {a, b, c, d, px - a * px - c * py, py - b * px - d * py};
+        out[0] = a;
+        out[1] = b;
+        out[2] = c;
+        out[3] = d;
+        out[4] = px - a * px - c * py;
+        out[5] = py - b * px - d * py;
+        return true;
     }
 
     private double[] localToParentMatrix() {
@@ -1089,6 +1127,43 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     /// The rotation about the centre.
     public final DoubleProperty rotateProperty() {
         return rotate;
+    }
+
+    /// Returns the transforms applied to this node, the first one
+    /// outermost: a point of the node goes through the last transform
+    /// first. They take effect between the node's position (`layoutX/Y`
+    /// plus `translateX/Y`) and its own `rotate` and `scaleX/Y`, and are
+    /// part of every conversion between this node's coordinates and its
+    /// parent's, of `getBoundsInParent()`, of picking and of painting.
+    /// They do not change the layout bounds.
+    public final ObservableList<Transform> getTransforms() {
+        if (transforms == null) {
+            transforms = FXCollections.observableArrayList();
+            transforms.addListener(new ListChangeListener<Transform>() {
+                @Override
+                public void onChanged(Change<? extends Transform> change) {
+                    while (change.next()) {
+                        java.util.List<? extends Transform> removed = change.getRemoved();
+                        for (int i = 0; i < removed.size(); i++) {
+                            Transform t = removed.get(i);
+                            if (t != null) {
+                                t.cn1Detach(Node.this);
+                            }
+                        }
+                    }
+                    // A transform may be in the list twice; attaching is
+                    // idempotent, so attach whatever is there now.
+                    for (int i = 0; i < transforms.size(); i++) {
+                        Transform t = transforms.get(i);
+                        if (t != null) {
+                            t.cn1Attach(Node.this);
+                        }
+                    }
+                    cn1Invalidated(Dirty.BOUNDS);
+                }
+            });
+        }
+        return transforms;
     }
 
     /// Computes the layout bounds; overridden by every node with a size.

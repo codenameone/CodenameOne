@@ -23,6 +23,7 @@
 package com.codename1.fxcompat.runtime;
 
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.util.MathUtil;
 
 /// A path in logical coordinates: the one geometry every shape, canvas
 /// call, background and border is reduced to before it is drawn.
@@ -243,6 +244,30 @@ public final class FxPath {
         closePath();
     }
 
+    /// Adds a closed rectangle whose four corners are quarters of one
+    /// ellipse with the given radii, each at most half the side it lies
+    /// on. A radius that is not positive gives square corners.
+    public void addRoundRect(double x, double y, double w, double h, double radiusX, double radiusY) {
+        double rx = Math.min(Math.max(0, radiusX), w / 2);
+        double ry = Math.min(Math.max(0, radiusY), h / 2);
+        if (!(rx > 0) || !(ry > 0)) {
+            addRect(x, y, w, h);
+            return;
+        }
+        double kx = rx * (1 - KAPPA);
+        double ky = ry * (1 - KAPPA);
+        moveTo(x + rx, y);
+        lineTo(x + w - rx, y);
+        curveTo(x + w - kx, y, x + w, y + ky, x + w, y + ry);
+        lineTo(x + w, y + h - ry);
+        curveTo(x + w, y + h - ky, x + w - kx, y + h, x + w - rx, y + h);
+        lineTo(x + rx, y + h);
+        curveTo(x + kx, y + h, x, y + h - ky, x, y + h - ry);
+        lineTo(x, y + ry);
+        curveTo(x, y + ky, x + kx, y, x + rx, y);
+        closePath();
+    }
+
     private static double shrink(double factor, double available, double wanted) {
         if (wanted > available && wanted > 0) {
             return Math.min(factor, available / wanted);
@@ -301,6 +326,108 @@ public final class FxPath {
                     cy + ry * (sinB - t * cosB), cx + rx * cosB, cy + ry * sinB);
             a = b;
         }
+    }
+
+    /// Adds an elliptical arc from the current point to an end point, in
+    /// the form SVG path data and `ArcTo` give it: two radii, the
+    /// rotation of the ellipse's x axis in degrees, whether the larger of
+    /// the two possible arcs is meant and whether it is drawn in the
+    /// direction of growing angles (clockwise on a screen). The arc is
+    /// converted to cubic curves of at most a quarter turn each.
+    ///
+    /// As SVG specifies: an arc to the current point adds nothing, a zero
+    /// radius gives a straight line, and radii too small to reach the end
+    /// point are scaled up until they do.
+    public void arcTo(double radiusX, double radiusY, double xAxisRotationDegrees, boolean largeArc, boolean sweep,
+            double x, double y) {
+        if (commandCount == 0) {
+            moveTo(x, y);
+            return;
+        }
+        double x0 = lastX;
+        double y0 = lastY;
+        if (Double.compare(x0, x) == 0 && Double.compare(y0, y) == 0) {
+            return;
+        }
+        double rx = Math.abs(radiusX);
+        double ry = Math.abs(radiusY);
+        if (!(rx > 0) || !(ry > 0)) {
+            lineTo(x, y);
+            return;
+        }
+        double phi = Math.toRadians(xAxisRotationDegrees);
+        double cosPhi = Math.cos(phi);
+        double sinPhi = Math.sin(phi);
+        double dx2 = (x0 - x) / 2;
+        double dy2 = (y0 - y) / 2;
+        double x1 = cosPhi * dx2 + sinPhi * dy2;
+        double y1 = -sinPhi * dx2 + cosPhi * dy2;
+        double lambda = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry);
+        if (lambda > 1) {
+            double grow = Math.sqrt(lambda);
+            rx *= grow;
+            ry *= grow;
+        }
+        double numerator = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1;
+        double denominator = rx * rx * y1 * y1 + ry * ry * x1 * x1;
+        double factor = denominator > 0 && numerator > 0 ? Math.sqrt(numerator / denominator) : 0;
+        if (largeArc == sweep) {
+            factor = -factor;
+        }
+        double cx1 = factor * (rx * y1 / ry);
+        double cy1 = factor * -(ry * x1 / rx);
+        double cx = cosPhi * cx1 - sinPhi * cy1 + (x0 + x) / 2;
+        double cy = sinPhi * cx1 + cosPhi * cy1 + (y0 + y) / 2;
+        double ux = (x1 - cx1) / rx;
+        double uy = (y1 - cy1) / ry;
+        double vx = (-x1 - cx1) / rx;
+        double vy = (-y1 - cy1) / ry;
+        double theta = MathUtil.atan2(uy, ux);
+        double delta = MathUtil.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+        if (!sweep && delta > 0) {
+            delta -= 2 * Math.PI;
+        } else if (sweep && delta < 0) {
+            delta += 2 * Math.PI;
+        }
+        int pieces = (int) Math.ceil(Math.abs(delta) / (Math.PI / 2) - 1e-9);
+        if (pieces < 1) {
+            pieces = 1;
+        }
+        double step = delta / pieces;
+        double t = 4.0 / 3.0 * Math.tan(step / 4);
+        double a = theta;
+        for (int i = 0; i < pieces; i++) {
+            double b = a + step;
+            double cosA = Math.cos(a);
+            double sinA = Math.sin(a);
+            double cosB = Math.cos(b);
+            double sinB = Math.sin(b);
+            // Points and tangents on the unrotated ellipse, then rotated.
+            double p1x = rx * (cosA - t * sinA);
+            double p1y = ry * (sinA + t * cosA);
+            double p2x = rx * (cosB + t * sinB);
+            double p2y = ry * (sinB - t * cosB);
+            double ex = i == pieces - 1 ? x : cx + cosPhi * rx * cosB - sinPhi * ry * sinB;
+            double ey = i == pieces - 1 ? y : cy + sinPhi * rx * cosB + cosPhi * ry * sinB;
+            curveTo(cx + cosPhi * p1x - sinPhi * p1y, cy + sinPhi * p1x + cosPhi * p1y,
+                    cx + cosPhi * p2x - sinPhi * p2y, cy + sinPhi * p2x + cosPhi * p2y, ex, ey);
+            a = b;
+        }
+    }
+
+    /// Returns a copy of this path.
+    public FxPath copy() {
+        return transformed(new double[] {1, 0, 0, 1, 0, 0});
+    }
+
+    /// Returns the x the current sub path started at.
+    public double startX() {
+        return startX;
+    }
+
+    /// Returns the y the current sub path started at.
+    public double startY() {
+        return startY;
     }
 
     /// Appends every segment of another path.

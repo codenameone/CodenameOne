@@ -61,9 +61,9 @@ public final class Renderer {
 
     /// Receives every drawing operation, for tests.
     public interface Trace {
-        /// Called for each operation: `fill`, `stroke`, `text` or `image`,
-        /// with the device bounds `{minX, minY, maxX, maxY}` of what was
-        /// drawn, its paint and, for text, the string.
+        /// Called for each operation: `fill`, `stroke`, `text`, `image` or
+        /// `clip`, with the device bounds `{minX, minY, maxX, maxY}` of
+        /// what was drawn, its paint and, for text, the string.
         void drawn(String operation, double[] deviceBounds, Paint paint, String text);
     }
 
@@ -73,6 +73,7 @@ public final class Renderer {
     private double[] m;
     private final ArrayList<double[]> saved = new ArrayList<double[]>();
     private double opacity = 1;
+    private int clipDepth;
 
     /// Creates a renderer whose logical origin is at a device position of
     /// the graphics and whose scale is the display's.
@@ -102,12 +103,12 @@ public final class Renderer {
         m = new double[] {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]};
     }
 
-    /// Remembers the matrix and the opacity.
+    /// Remembers the matrix, the opacity and the clip.
     public void save() {
-        saved.add(new double[] {m[0], m[1], m[2], m[3], m[4], m[5], opacity});
+        saved.add(new double[] {m[0], m[1], m[2], m[3], m[4], m[5], opacity, clipDepth});
     }
 
-    /// Returns to the matrix and opacity of the matching [#save()].
+    /// Returns to the matrix, opacity and clip of the matching [#save()].
     public void restore() {
         if (saved.isEmpty()) {
             return;
@@ -115,6 +116,48 @@ public final class Renderer {
         double[] s = saved.remove(saved.size() - 1);
         m = new double[] {s[0], s[1], s[2], s[3], s[4], s[5]};
         opacity = s[6];
+        int depth = (int) s[7];
+        while (clipDepth > depth) {
+            g.popClip();
+            clipDepth--;
+        }
+    }
+
+    /// Restricts everything drawn until the matching [#restore()] to the
+    /// inside of a path, in addition to the clip already in force. Call
+    /// it between [#save()] and [#restore()].
+    ///
+    /// Answers `true` when the clip is exact. On a port that cannot clip
+    /// to a shape the clip is the bounding box of the path under the
+    /// current matrix and the answer is `false`; a caller for which a box
+    /// would be wrong asks [#canClipToShape()] first.
+    public boolean clip(FxPath path) {
+        if (path == null) {
+            return false;
+        }
+        double[] b = path.isEmpty() ? new double[] {0, 0, 0, 0} : deviceBounds(path, m);
+        boolean exact = g.isShapeClipSupported();
+        if (trace != null) {
+            trace.drawn("clip", b, null, null);
+        }
+        g.pushClip();
+        clipDepth++;
+        if (exact && !path.isEmpty()) {
+            int[] old = g.getClip();
+            g.setClip(path.toDevice(m));
+            g.clipRect(old[0], old[1], old[2], old[3]);
+        } else {
+            int x1 = (int) Math.floor(b[0]);
+            int y1 = (int) Math.floor(b[1]);
+            g.clipRect(x1, y1, (int) Math.ceil(b[2]) - x1, (int) Math.ceil(b[3]) - y1);
+        }
+        return exact;
+    }
+
+    /// Returns whether [#clip(FxPath)] clips to the path itself rather
+    /// than to its bounding box.
+    public boolean canClipToShape() {
+        return g.isShapeClipSupported();
     }
 
     /// Multiplies the opacity everything is drawn with.

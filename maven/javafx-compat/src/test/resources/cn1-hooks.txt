@@ -46,6 +46,7 @@ javafx.scene.Scene#cn1RequestPulse
 javafx.scene.Scene#cn1SetFocusOwner
 javafx.scene.Scene#cn1SetHost
 javafx.scene.Scene#cn1Wheel
+javafx.scene.canvas.GraphicsContext#CN1_MAX_RECORDED_CALLS
 javafx.scene.control.ButtonBase#cn1ActionBridge
 javafx.scene.control.Control#cn1CreateNative
 javafx.scene.control.Control#cn1Native
@@ -53,12 +54,16 @@ javafx.scene.control.Control#cn1NativeIfCreated
 javafx.scene.control.Control#cn1NativePreferredSize
 javafx.scene.control.Control#cn1NativeSizeChanged
 javafx.scene.control.Control#cn1SyncNative
+javafx.scene.image.Image#cn1Native
 javafx.scene.input.PickResult#cn1SceneX
 javafx.scene.input.PickResult#cn1SceneY
 javafx.scene.paint.Color#cn1Argb
+javafx.scene.shape.Shape#cn1CreatePath
 javafx.scene.text.Font#cn1Native
 javafx.scene.text.Font#cn1Posture
 javafx.scene.text.Font#cn1Weight
+javafx.scene.transform.Transform#cn1Attach
+javafx.scene.transform.Transform#cn1Detach
 javafx.stage.Stage#cn1IsPrimary
 javafx.stage.Stage#cn1MarkPrimary
 javafx.stage.Window#cn1Bounds
