@@ -3928,6 +3928,22 @@ public class CSSTheme {
         return (a << 24) | (getColorInt(value) & 0xffffff);
     }
 
+    /// Whether `url` names an SVG or Lottie asset, which the build-time
+    /// transcoders turn into classes and the compiler never decodes.
+    private static boolean isVectorAsset(String url) {
+        int end = url.length();
+        int query = url.indexOf('?');
+        if (query >= 0) {
+            end = query;
+        }
+        int fragment = url.indexOf('#');
+        if (fragment >= 0 && fragment < end) {
+            end = fragment;
+        }
+        String path = url.substring(0, end);
+        return endsWithIgnoreCase(path, ".svg") || endsWithIgnoreCase(path, ".json");
+    }
+
     private BufferedImage readRasterImage(String url) {
         try {
             URL imgURL = url.startsWith("http://") || url.startsWith("https://") ? new URL(url) : new URL(baseURL, url);
@@ -4566,9 +4582,28 @@ public class CSSTheme {
                 background = background.getNextLexicalUnit();
             }
 
+            // Only the first url() of background-image is a layer here. A
+            // comma separated list was never painted as a stack: the page
+            // these images used to be captured from was given the head of the
+            // value alone (one url()), and the theme's own bgImage is likewise
+            // the first image. Painting the rest would change images that
+            // already ship.
             LexicalUnit bgImage = styles.get("background-image");
             if (bgImage != null && bgImage.getLexicalUnitType() == LexicalUnit.SAC_URI) {
-                box.backgroundImage(rasterBackgroundImage(styles, bgImage, boxWidth, boxHeight));
+                String url = bgImage.getStringValue();
+                if (isVectorAsset(url)) {
+                    // An SVG or Lottie file is not decoded by the compiler at
+                    // all: outside a generated image it is a placeholder the
+                    // transcoded class replaces at runtime. There are no
+                    // pixels to paint here, so the layer is left out and the
+                    // rest of the box still gets its image, instead of one
+                    // background failing a build.
+                    System.out.println("CSS Warning: " + url + " is a vector image and is left out of the image"
+                            + " generated for this rule. Use a PNG or JPEG, or drop the border, shadow or"
+                            + " size that needs a generated image, to keep it.");
+                } else {
+                    box.backgroundImage(rasterBackgroundImage(styles, bgImage, boxWidth, boxHeight));
+                }
             }
 
             LexicalUnit shadowH = styles.get("cn1-box-shadow-h");
@@ -4630,8 +4665,13 @@ public class CSSTheme {
                     }
                 }
             }
-            // background-position is not a property the compiler keeps, so the
-            // image sits at the CSS initial position, the top left corner.
+            // The image sits at the CSS initial position, the top left
+            // corner, because no position ever reaches this point: the
+            // background-position longhand is not a property the compiler
+            // accepts (it is rejected as unsupported before it is stored),
+            // and the shorthand's position keywords are skipped. The page
+            // these images used to be captured from was built from the same
+            // stored properties, so it painted at the top left as well.
             BackgroundImage layer = new BackgroundImage(image).withRepeat(repeat).withPosition(0, true, 0, true);
             return size == BackgroundImage.Size.EXPLICIT ? layer.withSize(sizeW, sizeH) : layer.withSize(size);
         }

@@ -569,7 +569,7 @@ If you want more specific "slice" points, you can add the `border-image-slice` p
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-025,indent=0]
 ----
 
-The compiler also produces 9-piece borders on its own, for styles that have no native equivalent. See <<border,Border>> for which styles those are. It paints these images itself during the build, so they need no image file from you and no extra tool.
+The compiler also produces 9-piece borders on its own, for styles that have no native equivalent. See <<border,Border>> for which styles those are. It paints these images itself during the build, so they need no image file from you and no extra tool. A PNG or JPEG background is painted into the generated image. An SVG or Lottie background isn't: the compiler leaves it out and prints a warning that names the file.
 
 ==== Image backgrounds
 

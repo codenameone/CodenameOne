@@ -247,6 +247,22 @@ class CSSGeneratedImageTest {
         assertEquals(0xffcc0000, medium.getRGB(16, 8), "scaling a flat colour keeps it");
     }
 
+    @Test
+    void aVectorBackgroundIsLeftOutOfAGeneratedImageInsteadOfFailingTheBuild(@TempDir Path dir) throws Exception {
+        File svg = new File(dir.toFile(), "img/mark.svg");
+        svg.getParentFile().mkdirs();
+        Files.write(svg.toPath(), "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\"/>"
+                .getBytes(StandardCharsets.UTF_8));
+        Compiled c = compile(dir, "Card { background-color: #ffffff; border-radius: 4px;"
+                + " box-shadow: 0 2px 6px rgba(0,0,0,0.5); background-image: url(img/mark.svg); }");
+
+        assertTrue(c.keys.get("Card.border") instanceof com.codename1.ui.plaf.Border, "Card.border");
+        // The same slices as the rule without the image: the box is unchanged.
+        BufferedImage topLeft = stored(c.res, "CardTopL_1.png", Display.DENSITY_HD);
+        assertEquals(11, topLeft.getWidth());
+        assertEquals(11, topLeft.getHeight());
+    }
+
     // ---- gradients that used to hang the compiler ----
 
     private static void assertCompilesPromptly(Path dir, String css) {

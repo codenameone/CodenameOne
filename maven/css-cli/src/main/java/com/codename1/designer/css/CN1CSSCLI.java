@@ -605,6 +605,8 @@ public class CN1CSSCLI {
     /// merged file and its `url()`s are pointed there, so an image or font keeps
     /// resolving once the text has moved. An `@import` is expanded first, while
     /// the path it is relative to is still known.
+    /// What an imported stylesheet outside that directory refers to is copied
+    /// in beside it, see [#mirrorOutsideAssets].
     ///
     /// The file is rewritten only when its content changes. Its modification
     /// time is what decides whether the theme is stale, so it has to move when
@@ -624,6 +626,7 @@ public class CN1CSSCLI {
             syncDirectories(canonicalFile.getParentFile(), destDir);
             String contents = new String(Files.readAllBytes(f.toPath()), "UTF-8");
             contents = CssImports.inline(canonicalFile, contents, new LinkedHashSet<File>());
+            contents = mirrorOutsideAssets(contents, canonicalFile.getParentFile(), destDir);
             contents = prefixUrls(contents, "cn1-merged-files/"+md5+"/");
             buf.append("\n/* "+f.getAbsolutePath()+" */\n").append(contents).append("\n/* end "+f.getAbsolutePath()+"*/\n");
         }
@@ -635,6 +638,60 @@ public class CN1CSSCLI {
         try (FileOutputStream fos = new FileOutputStream(mergedFile)) {
             fos.write(merged);
         }
+    }
+
+    /// Where files from outside an input's directory are copied inside its
+    /// mirror. Named so that it cannot plausibly collide with a directory of
+    /// the stylesheet's own.
+    private static final String OUTSIDE_ASSETS_DIR = "cn1-imported-assets";
+
+    /// Copies into `mirrorDir` every file a `url()` of `contents` names that
+    /// lies outside `inputDir`, and points the `url()` at the copy.
+    ///
+    /// An input's directory is mirrored whole, which covers everything the
+    /// input and the stylesheets beside it refer to. A stylesheet imported
+    /// from somewhere else -- `@import "../shared/base.css"` -- brings
+    /// `url()`s that, once expressed relative to the input, climb out of that
+    /// directory, and so out of its mirror: prefixed with the mirror's path
+    /// they would name a file nothing copied. Each such file is copied on its
+    /// own, under a directory named for where it came from, so two imports
+    /// with an `img/logo.png` each do not overwrite one another.
+    ///
+    /// A `url()` naming something that does not exist is left as written, for
+    /// the compiler to report.
+    private static String mirrorOutsideAssets(String contents, File inputDir, final File mirrorDir)
+            throws IOException {
+        final java.nio.file.Path base = inputDir.getCanonicalFile().toPath();
+        return CssImports.rewriteUrls(contents, new CssImports.UrlRewriter() {
+            @Override
+            public String rewrite(String url) throws IOException {
+                if (!CssImports.isRelativeUrl(url)) {
+                    return url;
+                }
+                java.nio.file.Path target;
+                try {
+                    target = base.resolve(url).normalize();
+                } catch (java.nio.file.InvalidPathException ex) {
+                    return url;
+                }
+                if (target.startsWith(base) || !Files.isRegularFile(target)) {
+                    return url;
+                }
+                String origin = getMd5(target.getParent().toString());
+                File copy = new File(new File(new File(mirrorDir, OUTSIDE_ASSETS_DIR), origin),
+                        target.getFileName().toString());
+                File source = target.toFile();
+                if (!copy.isFile() || copy.lastModified() < source.lastModified()
+                        || copy.length() != source.length()) {
+                    File parent = copy.getParentFile();
+                    if (!parent.isDirectory() && !parent.mkdirs()) {
+                        throw new IOException("Could not create " + parent);
+                    }
+                    Files.copy(target, copy.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+                return OUTSIDE_ASSETS_DIR + "/" + origin + "/" + copy.getName();
+            }
+        });
     }
 
     /// The layout of the project containing `start`, or null when `start` is

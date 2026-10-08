@@ -186,13 +186,39 @@ public final class CssImports {
         return out.toString();
     }
 
+    /// Decides what one `url()` of a stylesheet becomes, for [#rewriteUrls].
+    public interface UrlRewriter {
+        /// Returns the replacement for `url`, the unquoted content of one
+        /// `url()`; returning `url` itself leaves it as written.
+        String rewrite(String url) throws IOException;
+    }
+
     /// Rewrites each relative `url()` in `text` from "relative to `fromDir`"
     /// to "relative to `toDir`". Absolute paths, URLs with a scheme and
     /// `data:` URIs are left alone.
-    static String rebaseUrls(String text, File fromDir, File toDir) throws IOException {
+    static String rebaseUrls(String text, final File fromDir, final File toDir) throws IOException {
         if (fromDir.getCanonicalFile().equals(toDir.getCanonicalFile())) {
             return text;
         }
+        return rewriteUrls(text, new UrlRewriter() {
+            @Override
+            public String rewrite(String url) throws IOException {
+                return rebase(url, fromDir, toDir);
+            }
+        });
+    }
+
+    /// Whether `url` is resolved against the stylesheet's own directory, as
+    /// opposed to an absolute path, a fragment, or anything with a scheme
+    /// (`http:`, `data:`).
+    public static boolean isRelativeUrl(String url) {
+        return url.length() > 0 && url.charAt(0) != '/' && url.charAt(0) != '#' && url.indexOf(':') <= 0;
+    }
+
+    /// Passes the content of every `url()` in `text` through `rewriter`,
+    /// skipping comments and string literals. Each `url()` is written back
+    /// double quoted.
+    public static String rewriteUrls(String text, UrlRewriter rewriter) throws IOException {
         StringBuilder out = new StringBuilder(text.length() + 32);
         int len = text.length();
         int i = 0;
@@ -210,7 +236,7 @@ public final class CssImports {
                     break;
                 }
                 String raw = unquote(text.substring(i + 4, close).trim());
-                out.append("url(\"").append(rebase(raw, fromDir, toDir)).append("\")");
+                out.append("url(\"").append(rewriter.rewrite(raw)).append("\")");
                 i = close + 1;
             } else if (c == '"' || c == '\'') {
                 int end = skipString(text, i);
@@ -225,7 +251,7 @@ public final class CssImports {
     }
 
     private static String rebase(String url, File fromDir, File toDir) throws IOException {
-        if (url.length() == 0 || url.charAt(0) == '/' || url.charAt(0) == '#' || url.indexOf(':') > 0) {
+        if (!isRelativeUrl(url)) {
             return url;
         }
         java.nio.file.Path base = toDir.getCanonicalFile().toPath();

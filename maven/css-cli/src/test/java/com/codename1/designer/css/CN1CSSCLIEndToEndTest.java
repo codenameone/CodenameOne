@@ -215,6 +215,28 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void aMergedBuildCarriesTheImagesOfAnImportFromOutsideTheInputDirectory(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        write(new File(dir, "shared/base.css"),
+                "SharedBadge { background-image: url(img/b.png); cn1-source-dpi: 160; }\n");
+        png(new File(dir, "shared/img/b.png"), 10, 4, 0xff993366);
+        File app = write(new File(dir, "app/css/theme.css"),
+                "@import \"../../shared/base.css\";\nLabel { color: #222222; }\n");
+        File merged = new File(dir, "work/theme.css.merged");
+        File res = new File(dir, "work/theme.res");
+
+        assertEquals(0, CN1CSSCLI.run(new String[]{"-input", app.getPath(),
+            "-output", res.getPath(), "-merge", merged.getPath()}), stderr());
+
+        String mergedText = new String(Files.readAllBytes(merged.toPath()), StandardCharsets.UTF_8);
+        assertFalse(mergedText.contains("../"), "no url() climbs out of the mirror, was: " + mergedText);
+        Resources r = open(res);
+        assertTrue(Arrays.asList(r.getImageResourceNames()).contains("b.png"),
+                "the imported stylesheet's image is in the theme: " + Arrays.toString(r.getImageResourceNames()));
+        assertEquals(10, r.getImage("b.png").getWidth(), "and it decodes to its real size");
+    }
+
+    @Test
     void anImportIsCompiledAndAnEditToItRecompiles(@TempDir Path tmp) throws Exception {
         File common = mavenProject(tmp.toFile());
         File css = write(new File(common, "src/main/css/theme.css"),
