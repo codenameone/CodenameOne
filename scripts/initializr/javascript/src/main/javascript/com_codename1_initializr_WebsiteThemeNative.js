@@ -154,33 +154,155 @@ var o = {};
         callback.complete(true);
     };
 
-    // Horizontal clearance (CSS px) the host page's Crisp chat launcher needs at
-    // the bottom-right, so the generate button can be nudged left of it. The
-    // default Crisp launcher bubble (~64px) sits ~24px from the page edge;
-    // CHAT_CLEARANCE_PX reserves enough to clear it with a small visual gap.
-    var CHAT_CLEARANCE_PX = 96;
+    // "Email me these steps" from the post-download panel. The embedding page
+    // (layouts/_default/initializr.html) forwards it to BuildCloud through
+    // cn1-initializr-beacon.js, which hashes the package name before it leaves
+    // the browser, and ANSWERS with cn1-initializr-steps-result carrying the
+    // same id and whether it actually issued the request. postMessage alone
+    // proves nothing: on localhost, a PR preview, a page without the beacon,
+    // or a browser without fetch/WebCrypto the host drops it, and the panel
+    // must not say "Check your inbox" for an email nobody asked for. No answer
+    // within STEPS_ACK_TIMEOUT_MS counts as not sent.
+    // Longer than the host page's own deadline for the request (15 s, see
+    // CONFIRM_TIMEOUT_MS in cn1-initializr-beacon.js), which aborts it and
+    // answers false. So this only fires when no host answers at all; it never
+    // reports "not sent" for a request that is still in flight.
+    var STEPS_ACK_TIMEOUT_MS = 20000;
+    var stepsSeq = 0;
 
-    function chatLauncherVisible() {
+    // The only pages allowed to receive an email address typed into the panel.
+    // /initializr-app/ is publicly reachable, so any site could frame it; a
+    // postMessage to "*" would hand that site every address. Reading
+    // window.parent.location throws for a cross-origin parent, so a frame whose
+    // parent is NOT this same Codename One origin gets null here, and the panel
+    // neither shows the email field nor sends anything.
+    var STEPS_PARENT_ORIGINS = {
+        "https://www.codenameone.com": true,
+        "https://codenameone.com": true
+    };
+
+    function trustedParentOrigin() {
+        try {
+            if (!window.parent || window.parent === window) {
+                return null;
+            }
+            var origin = window.parent.location.origin;
+            return STEPS_PARENT_ORIGINS[origin] ? origin : null;
+        } catch (crossOrigin) {
+            return null;
+        }
+    }
+
+    o.canRequestSteps_ = function(callback) {
+        // The host can only send a request it is able to cancel at its deadline
+        // (cn1-initializr-beacon.js declines otherwise), so do not offer the
+        // field in a browser without AbortController.
+        callback.complete(trustedParentOrigin() !== null && typeof AbortController === "function");
+    };
+
+    o.requestSteps__java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String = function(email, packageName, template, ide, build, callback) {
+        var done = false;
+        var id = "steps-" + (++stepsSeq) + "-" + new Date().getTime();
+        var parentOrigin = trustedParentOrigin();
+        var onAnswer = function(evt) {
+            if (!evt || evt.source !== window.parent || evt.origin !== parentOrigin || !evt.data
+                    || evt.data.type !== "cn1-initializr-steps-result" || evt.data.id !== id) {
+                return;
+            }
+            finish(evt.data.ok === true);
+        };
+        var finish = function(ok) {
+            if (done) {
+                return;
+            }
+            done = true;
+            try {
+                window.removeEventListener("message", onAnswer);
+            } catch (ignored) {
+                // Nothing to clean up.
+            }
+            callback.complete(ok);
+        };
+        try {
+            if (email && parentOrigin) {
+                window.addEventListener("message", onAnswer);
+                window.setTimeout(function() { finish(false); }, STEPS_ACK_TIMEOUT_MS);
+                window.parent.postMessage({
+                    type: "cn1-initializr-steps-request",
+                    id: id,
+                    email: String(email),
+                    packageName: packageName ? String(packageName) : "",
+                    template: template ? String(template) : "",
+                    ide: ide ? String(ide) : "",
+                    build: build ? String(build) : ""
+                }, parentOrigin);
+                return;
+            }
+        } catch (ignored) {
+            // Cross-origin or sandbox restrictions: report that nothing was sent.
+        }
+        finish(false);
+    };
+
+    // Horizontal clearance (CSS px) the host page's Crisp widget needs so the
+    // generate button can sit to its left. Measured, not assumed: the round
+    // launcher is ~64px, but a first-time visitor usually sees Crisp folded
+    // with a greeting/"chat with us" pill several times wider, and a fixed
+    // 96px reservation left the button underneath that, where the folded
+    // widget is also awkward to dismiss. So find every visible Crisp element
+    // that overlaps the bottom band of this frame (where the action bar is)
+    // and clear the leftmost of them. 0 when Crisp is absent, hidden, or not
+    // over the bar.
+    var CHAT_BAND_PX = 140;   // bottom strip of the frame that holds the action bar
+    var CHAT_GAP_PX = 16;     // visual gap between the widget and the button
+    var CHAT_MAX_FRACTION = 0.6; // never push the button past 60% of the width
+
+    function chatLauncherClearancePx() {
         try {
             var parentWindow = (window.parent && window.parent !== window) ? window.parent : window;
             var doc = parentWindow.document;
             var client = doc ? doc.querySelector(".crisp-client") : null;
-            if (!client) {
-                return false;
+            if (!client || !parentWindow.getComputedStyle) {
+                return 0;
             }
-            var cs = parentWindow.getComputedStyle ? parentWindow.getComputedStyle(client) : null;
-            if (cs && (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity || "1") === 0)) {
-                return false;
+            var hidden = function(el) {
+                var cs = parentWindow.getComputedStyle(el);
+                return !cs || cs.display === "none" || cs.visibility === "hidden"
+                    || parseFloat(cs.opacity || "1") === 0;
+            };
+            if (hidden(client)) {
+                return 0;
             }
-            return true;
+            var frame = window.frameElement && window.frameElement.getBoundingClientRect
+                ? window.frameElement.getBoundingClientRect()
+                : { left: 0, right: parentWindow.innerWidth, bottom: parentWindow.innerHeight };
+            var bandTop = frame.bottom - CHAT_BAND_PX;
+            var minLeft = Infinity;
+            var nodes = client.querySelectorAll("*");
+            for (var i = 0; i < nodes.length; i++) {
+                var r = nodes[i].getBoundingClientRect();
+                if (r.width < 1 || r.height < 1 || r.bottom <= bandTop || r.top >= frame.bottom
+                        || r.right <= frame.left || r.left >= frame.right || r.left >= minLeft) {
+                    continue;
+                }
+                if (!hidden(nodes[i])) {
+                    minLeft = r.left;
+                }
+            }
+            if (minLeft === Infinity) {
+                return 0;
+            }
+            var clearance = Math.ceil(frame.right - minLeft + CHAT_GAP_PX);
+            var max = Math.floor((frame.right - frame.left) * CHAT_MAX_FRACTION);
+            return Math.max(0, Math.min(clearance, max));
         } catch (ignored) {
             // Cross-origin / sandbox / missing widget: reserve nothing.
-            return false;
+            return 0;
         }
     }
 
     o.chatLauncherClearance_ = function(callback) {
-        callback.complete(chatLauncherVisible() ? CHAT_CLEARANCE_PX : 0);
+        callback.complete(chatLauncherClearancePx());
     };
 
     o.isSupported_ = function(callback) {

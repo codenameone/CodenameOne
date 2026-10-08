@@ -26,7 +26,7 @@ their own conventions; the canonical source of truth is `.agent-skills/`.
 - Native cloud builds use `mvn package -Dcodename1.platform=<ios|android|javascript|javase> -Dcodename1.buildTarget=...`
   from the project root. A platform with no module of its own is built from `common/`.
 - The server side, when the project has one, lives in `backend/` (Spring-style
-  `@RestController` / `@Service`, resolved at build time). Run it with
+  `@RestController` / `@Component`, resolved at build time). Run it with
   `CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend`; it then
   serves MCP tools at `http://127.0.0.1:8080/mcp` for inspecting and exercising it.
   See `.agent-skills/codename-one/references/backend.md`, and

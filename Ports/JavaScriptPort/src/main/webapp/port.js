@@ -998,11 +998,16 @@ if (typeof global.cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_Stri
 // through a ``function*`` boundary -- about 750k generator
 // allocations for a single theme.res load.
 //
-// The Java byte[] is a plain JS Array with index access; storing
-// the raw 0..255 Uint8Array value is fine because the existing
-// scalar ``read()`` path already returns the unsigned byte value
-// and the rest of the runtime treats negative bytes via ``& 0xff``
-// masking on the read side.
+// The Java byte[] is a plain JS Array with index access, and it must
+// hold SIGNED values (-128..127): BALOAD/BASTORE are emitted as plain
+// array reads and writes, so whatever number sits in the slot is what
+// Java code sees. Storing the raw 0..255 Uint8Array value made every
+// byte above 0x7f a value no Java byte can have -- ``b[i] == (byte) i``
+// was false for it, ``b[i] < 0`` never held, and a downloaded binary
+// file read back with the right length and the wrong contents. Each
+// value is therefore sign-extended on the way in, the same
+// ``v > 127 ? v - 256 : v`` conversion the crypto, vault, sqlite and
+// bluetooth bindings in this file already apply.
 bindNative([
   // Void return → no ``_R_void`` suffix; the int signature variant
   // is registered too in case future translator versions normalise it.
@@ -1025,7 +1030,7 @@ bindNative([
   // direct memory access. ``dst`` is a plain JS Array carrying Java
   // byte[] metadata, so indexed store is the same as for any array.
   for (let i = 0; i < n; i++) {
-    dst[dO + i] = raw[so + i];
+    dst[dO + i] = (raw[so + i] << 24) >> 24;
   }
   return null;
 });
@@ -1073,10 +1078,11 @@ bindNative([
   if (!bytes) {
     return jvm.wrapJsObject(new Uint8Array(0), "com_codename1_html5_js_typedarrays_Uint8Array");
   }
-  // ``bytes`` is the Java byte[] -- a plain JS Array of 0..255
-  // numbers with byte[] metadata stamped on. ``Uint8Array.from``
-  // accepts any iterable / array-like, so this is a single
-  // native-loop copy.
+  // ``bytes`` is the Java byte[] -- a plain JS Array of signed
+  // -128..127 numbers with byte[] metadata stamped on.
+  // ``Uint8Array.from`` accepts any iterable / array-like and stores
+  // each value modulo 256, so -1 lands as 255: a single native-loop
+  // copy that is also the signed-to-unsigned conversion.
   const u8 = Uint8Array.from(bytes);
   return jvm.wrapJsObject(u8, "com_codename1_html5_js_typedarrays_Uint8Array");
 });
@@ -3216,16 +3222,11 @@ bindCiFallback("BrowserDomRenderingBackend.createCrossOriginImageElement", [
 // "Only HTTP urls are supported!". The translated Display methods already
 // handle both the local-property map and the impl delegation.
 
-bindCiFallback("Display.addEdtErrorHandler", [
-  "cn1_com_codename1_ui_Display_addEdtErrorHandler_com_codename1_ui_events_ActionListener"
-], function*(__cn1ThisObject, listener) {
-  if (!__cn1ThisObject) {
-    return null;
-  }
-  const handlers = __cn1ThisObject.__cn1EdtErrorHandlers || (__cn1ThisObject.__cn1EdtErrorHandlers = []);
-  handlers.push(listener || null);
-  return null;
-});
+// Display.addEdtErrorHandler is deliberately NOT overridden here either. A
+// fallback once stored the listener in a JS-side array that nothing read, so
+// every handler a web application installed was silently dropped and the
+// default "internal application error" dialog showed instead. The translated
+// method registers the listener where Display's EDT error path reads it.
 
 bindCiFallback("Log.print", [
   "cn1_com_codename1_io_Log_print_java_lang_String_int"
@@ -5658,7 +5659,7 @@ function resolveBaseTestFromRunnable(runnable) {
 // The JS port runs in a Web Worker, which has no DOM but does have WebSocket.
 // Every screenshot funnels through emitCn1ssChunks(); rather than chunk the
 // PNG as base64 over the console (rate-limited, log-scraped on the host), we
-// ship it straight to Cn1ssScreenshotServer over a browser WebSocket -- the
+// ship it straight to the cn1ss test server over a browser WebSocket -- the
 // same single pipeline the native ports use via the core WebSocket. The
 // browser handles RFC6455 framing, so we just send a META text frame followed
 // by the binary PNG, matching what the server parses. The server replies with
@@ -5720,7 +5721,17 @@ function cn1ssWsConnect() {
   sock.onerror = function () { /* failures surface via onclose -> status=failed */ };
   sock.onclose = function () {
     emitDiagLine("CN1SS:WSJS:close priorStatus=" + cn1ssWs.status + " queued=" + cn1ssWs.queue.length);
-    if (cn1ssWs.status !== "open") {
+    if (cn1ssWs.socket !== sock) {
+      return;
+    }
+    cn1ssWs.socket = null;
+    if (cn1ssWs.status === "open") {
+      // A socket that was up and dropped is reconnected by the next send. Left
+      // "open", every later screenshot went to a closed socket, which drops a
+      // send without throwing, and the rest of the run produced none.
+      cn1ssWs.status = "idle";
+      cn1ssWs.pending = 0;
+    } else {
       cn1ssWs.status = "failed";
     }
   };
@@ -5738,11 +5749,11 @@ function cn1ssBase64ToBytes(base64) {
 
 function cn1ssWsSendNow(test, bytes) {
   const sock = cn1ssWs.socket;
-  if (!sock || cn1ssWs.status !== "open") {
+  if (!sock || cn1ssWs.status !== "open" || sock.readyState !== 1) {
     return false;
   }
   try {
-    // META is a JSON object (Cn1ssScreenshotServer.parseMeta expects JSON,
+    // META is a JSON object (the server's Cn1ssEndpoint parses it as JSON,
     // matching the native ports' Cn1ssWebSocketSink). The hash is omitted --
     // the server computes its own for dedup and only flags a mismatch when an
     // expected hash is supplied; png_bytes lets it catch a truncated transfer.
@@ -5785,7 +5796,7 @@ function cn1ssWsSend(base64, test) {
 }
 
 // Single screenshot transport for the JS port: ship the captured PNG to the
-// host-side Cn1ssScreenshotServer over the worker WebSocket. The function is
+// host-side cn1ss test server over the worker WebSocket. The function is
 // still named emitCn1ssChunks (and still takes a base64 PNG) because the DOM /
 // host-canvas capture paths -- emitCurrentFormScreenshotDom, emitChannelFastJs
 // -- feed it a base64 data-URL payload; we decode and send it as one binary

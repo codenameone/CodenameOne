@@ -27,7 +27,7 @@ import com.codename1.tools.translator.ByteCodeClass;
 import com.codename1.tools.translator.ByteCodeTranslator;
 import com.codename1.tools.translator.Parser;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class TypeInstruction extends Instruction {
     private String type;

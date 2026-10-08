@@ -600,7 +600,7 @@ public class JSONParser implements JSONParseCallback {
     /// Simple example of usage:
     ///
     /// ```java
-    /// `Map person = new LinkedHashMap<>();
+    /// Map person = new LinkedHashMap<>();
     /// person.put("firstName", "Paco");
     /// person.put("lastName", "Bellz");
     /// person.put("isAlive", true);
@@ -608,25 +608,25 @@ public class JSONParser implements JSONParseCallback {
     /// person.put("weight (kg)", 70.7);
     ///
     /// Log.p("--- mapToJson() test");
-    /// Log.p("\n" + mapToJson(person));`
+    /// Log.p("\n" + mapToJson(person));
     /// ```
     ///
     /// The output will be:
     ///
-    /// ```java
-    /// `{
+    /// ```json
+    /// {
     ///  "firstName": "Paco",
     ///  "lastName": "Bellz",
     ///  "isAlive": true,
     ///  "age": 35,
-    ///  "weight (kg)": 70.7`
+    ///  "weight (kg)": 70.7
     /// }
     /// ```
     ///
     /// More complex example of usage:
     ///
     /// ```java
-    /// `Map phoneNumber1 = new LinkedHashMap<>();
+    /// Map phoneNumber1 = new LinkedHashMap<>();
     /// phoneNumber1.put("home", "212 555-1234");
     /// Map phoneNumber2 = new LinkedHashMap<>();
     /// phoneNumber2.put("office", "646 555-4567");
@@ -677,13 +677,13 @@ public class JSONParser implements JSONParseCallback {
     /// firstPerson.put("friends", friends);
     ///
     /// Log.p("--- mapToJson() test");
-    /// Log.p("\n" + mapToJson(firstPerson));`
+    /// Log.p("\n" + mapToJson(firstPerson));
     /// ```
     ///
     /// The output will be:
     ///
-    /// ```java
-    /// `{
+    /// ```json
+    /// {
     ///  "firstName": "Paco",
     ///  "lastName": "Bellz",
     ///  "isAlive": true,
@@ -693,7 +693,8 @@ public class JSONParser implements JSONParseCallback {
     ///    "streetAddress": "53, London Street",
     ///    "city": "Paris",
     ///    "state": "FR",
-    ///    "postalCode": "54856"`,
+    ///    "postalCode": "54856"
+    ///  },
     ///  "partner": {
     ///    "firstName": "Gioia",
     ///    "lastName": "Mia",
@@ -721,7 +722,6 @@ public class JSONParser implements JSONParseCallback {
     ///    "Karl",
     ///    "Mary"
     ///  ]
-    /// }
     /// }
     /// ```
     ///

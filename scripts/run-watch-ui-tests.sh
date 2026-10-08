@@ -4,7 +4,7 @@
 #
 # The watch app is SwiftUI-rooted and renders Codename One through the Core
 # Graphics backend (no GL/Metal on watchOS). It streams each screenshot to the
-# host-side Cn1ssScreenshotServer over ws://127.0.0.1:8765 -- the same transport
+# host-side test server (scripts/hellocodenameone/backend) over ws://127.0.0.1:8765 -- the same transport
 # the iOS jobs use -- so the comparison/report tooling in scripts/lib/cn1ss.sh
 # is reused verbatim; only the build (watch target) and the simulator (a watch
 # device booted directly via simctl, since watchOS apps aren't launched through
@@ -159,7 +159,7 @@ APP_CONSOLE_PID=""
 cleanup() { cn1ss_stop_ws_server 2>/dev/null || true; [ -n "$APP_CONSOLE_PID" ] && kill "$APP_CONSOLE_PID" 2>/dev/null || true; xcrun simctl terminate "$WATCH_UDID" "$BUNDLE_ID" 2>/dev/null || true; }
 trap cleanup EXIT
 
-cn1ss_start_ws_server "$WS_RAW_DIR" || { rw_log "Failed to start Cn1ssScreenshotServer"; exit 6; }
+cn1ss_start_ws_server "$WS_RAW_DIR" || { rw_log "Failed to start the test server"; exit 6; }
 rw_log "WS sink on port ${CN1SS_WS_PORT:-8765} -> $WS_RAW_DIR"
 
 xcrun simctl terminate "$WATCH_UDID" "$BUNDLE_ID" 2>/dev/null || true

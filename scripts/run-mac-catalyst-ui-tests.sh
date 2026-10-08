@@ -68,8 +68,8 @@ CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" ]; then
-  rm_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" >&2
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/ProcessScreenshots.java" ]; then
+  rm_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/ProcessScreenshots.java" >&2
   exit 3
 fi
 cn1ss_log() { rm_log "$1"; }

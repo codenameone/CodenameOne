@@ -241,16 +241,51 @@ public class BackendPackager {
         }
         unzip(javaApiJar, javaApi, null);
 
+        prepareSources(work, runtimeVersion);
         compile(jdk, javaApi, runtimeSources, classes);
         generateControllers(classes, work);
+        afterGenerate(jdk, javaApi, classes, work);
         requireMainClass(classes);
         translate(jdk, compilerJar, javaApi, classes, nativeSources, translated,
                 dependencyClasses);
-        File binary = output != null ? output
-                : new File(host.buildDirectory().getPath(), binaryName());
+        File binary = binaryFile();
         link(translated, binary);
-        getLog().info("built " + binary);
+        afterLink(binary);
         return binary;
+    }
+
+    // ---- Where a packager built on this one adds to the steps above. ----
+    // BackendTestPackager uses them to compile a module's tests into the same
+    // translation and run the binary that comes out.
+
+    /// Source trees compiled beside the module's and the runtime's.
+    private final List<File> extraSources = new ArrayList<File>();
+
+    /// Adds a source tree to the compile.
+    protected void addSources(File dir) {
+        extraSources.add(dir);
+    }
+
+    /// Before the compile, with the runtime version resolved: unpack more sources
+    /// here and add them with [#addSources].
+    protected void prepareSources(File work, String runtimeVersion) throws BuildExecutionException {
+    }
+
+    /// After the routers and the wiring are generated into `classes`, before the
+    /// translator reads it.
+    protected void afterGenerate(File jdk, File javaApi, File classes, File work)
+            throws BuildExecutionException {
+    }
+
+    /// Where the binary goes.
+    protected File binaryFile() {
+        return output != null ? output
+                : new File(host.buildDirectory().getPath(), binaryName());
+    }
+
+    /// After the binary is linked.
+    protected void afterLink(File binary) throws BuildExecutionException {
+        getLog().info("built " + binary);
     }
 
     /**
@@ -342,6 +377,18 @@ public class BackendPackager {
             }
             throw new BuildExecutionException(sb.toString());
         }
+        // Written into the tree, as the process-annotations goal writes them into
+        // target/classes: the compiled test run reads the wiring record back.
+        for (Map.Entry<String, byte[]> resource : ctx.getEmittedResources().entrySet()) {
+            File file = new File(classes, resource.getKey());
+            try {
+                java.nio.file.Files.createDirectories(file.getParentFile().toPath());
+                java.nio.file.Files.write(file.toPath(), resource.getValue());
+            } catch (IOException err) {
+                throw new BuildExecutionException("Could not write " + file + ": "
+                        + err.getMessage(), err);
+            }
+        }
         byte[] generated = ctx.getEmittedResources()
                 .get(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE);
         if (generated == null) {
@@ -412,6 +459,9 @@ public class BackendPackager {
             collectJava(new File(String.valueOf(root)), sources);
         }
         collectJava(runtimeSources, sources);
+        for (File extra : extraSources) {
+            collectJava(extra, sources);
+        }
         if (sources.isEmpty()) {
             throw new BuildFailureException("No Java sources to compile");
         }
@@ -568,7 +618,7 @@ public class BackendPackager {
         }
     }
 
-    private List<String> compileClasspathWithoutRuntime() throws BuildExecutionException {
+    protected List<String> compileClasspathWithoutRuntime() throws BuildExecutionException {
         List<String> classpath = new ArrayList<String>();
         try {
             for (Object element : host.compileClasspathElements()) {
@@ -619,7 +669,7 @@ public class BackendPackager {
     }
 
     /** The resolved file of com.codenameone:codenameone-backend, or null. */
-    private File runtimeArtifactFile() {
+    protected File runtimeArtifactFile() {
         java.util.Collection<BuildArtifact> artifacts = host.artifacts();
         if (artifacts != null) {
             for (BuildArtifact artifact : artifacts) {
@@ -1071,7 +1121,7 @@ public class BackendPackager {
      * given, because the C belongs in the translator's source root rather than on
      * the Java source path.
      */
-    private void unzip(File jar, File javaTarget, File nativeTarget)
+    protected void unzip(File jar, File javaTarget, File nativeTarget)
             throws BuildExecutionException {
         unzip(jar, javaTarget, nativeTarget, false);
     }
@@ -1220,7 +1270,7 @@ public class BackendPackager {
         }
     }
 
-    private void copyDirectory(File from, File to) throws BuildExecutionException {
+    protected void copyDirectory(File from, File to) throws BuildExecutionException {
         File[] children = from.listFiles();
         if (children == null) {
             return;
@@ -1245,7 +1295,7 @@ public class BackendPackager {
         }
     }
 
-    private void collectJava(File dir, List<String> out) {
+    protected void collectJava(File dir, List<String> out) {
         File[] children = dir.listFiles();
         if (children == null) {
             return;
@@ -1259,7 +1309,7 @@ public class BackendPackager {
         }
     }
 
-    private void run(List<String> command, File directory, String what)
+    protected void run(List<String> command, File directory, String what)
             throws BuildExecutionException, BuildFailureException {
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
@@ -1300,7 +1350,7 @@ public class BackendPackager {
      * build ships the previous implementation and says nothing. Checking the
      * result rather than each delete catches every reason one can survive.
      */
-    private static void emptyDirs(File... dirs) throws BuildExecutionException {
+    protected static void emptyDirs(File... dirs) throws BuildExecutionException {
         for (File dir : dirs) {
             deleteTree(dir);
             if (dir == null || !dir.exists()) {
@@ -1333,7 +1383,7 @@ public class BackendPackager {
         file.delete();
     }
 
-    private static void mkdirs(File... dirs) {
+    protected static void mkdirs(File... dirs) {
         for (File dir : dirs) {
             if (dir != null && !dir.isDirectory()) {
                 dir.mkdirs();

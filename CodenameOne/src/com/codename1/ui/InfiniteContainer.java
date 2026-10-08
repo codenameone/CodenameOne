@@ -44,9 +44,10 @@ import com.codename1.ui.layouts.BoxLayout;
 ///     InfiniteContainer ic = new InfiniteContainer() {
 /// @Override
 ///         public Component[] fetchComponents(int index, int amount) {
-///             java.util.List> data = fetchPropertyData("Leeds");
+///             java.util.List<Map<String, Object>> data = fetchPropertyData("Leeds");
 ///             MultiButton[] cmps = new MultiButton[data.size()];
-///             for(int iter = 0 ; iter  currentListing = data.get(iter);
+///             for(int iter = 0 ; iter < cmps.length ; iter++) {
+///                 Map<String, Object> currentListing = data.get(iter);
 ///                 if(currentListing == null) {
 ///                     return null;
 ///                 }

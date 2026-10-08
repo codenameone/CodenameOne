@@ -38,7 +38,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /// Device-side helper that ships screenshots to the host over a single
-/// transport: a WebSocket to the host-side Cn1ssScreenshotServer. The device
+/// transport: a WebSocket to the host-side test server
+/// (scripts/hellocodenameone/backend). The device
 /// connects to ws://HOST:8765, sends a JSON META text frame followed by the
 /// binary PNG, and the host writes the file and echoes an ACK. Native ports
 /// use the blocking, ACK-paced sink (Cn1ssWebSocketSink.trySend); the JS port
@@ -48,8 +49,8 @@ import java.util.Map;
 /// unavailable the screenshot is simply absent and the host-side
 /// missing-screenshot guard flags it.
 interface Cn1ssDeviceRunnerHelper {
-    // Standard, fixed port the host-side Cn1ssScreenshotServer listens on
-    // (scripts/lib/cn1ss.sh starts it with --port 8765). The runner does not
+    // Standard, fixed port the host-side test server listens on
+    // (scripts/lib/cn1ss.sh starts it on 8765). The runner does not
     // inject the URL per-run; the device defaults to ws://HOST:8765 below so
     // no platform-specific env/property plumbing is needed. Keep this value in
     // sync with CN1SS_WS_PORT in scripts/lib/cn1ss.sh.
@@ -625,7 +626,7 @@ final class Cn1ssWebSocketSink {
         // A -Dcn1ss.websocket.url override still wins where the launcher can
         // set Display properties (e.g. the JavaSE simulator via the maven
         // plugin's -Dproperty=...). Everywhere else we don't inject anything:
-        // the host runs Cn1ssScreenshotServer on the fixed standard port and
+        // the host runs the test server on the fixed standard port and
         // the device defaults to ws://HOST:CN1SS_WS_DEFAULT_PORT. HOST is the
         // host loopback as seen from the app -- the Android emulator reaches
         // it via 10.0.2.2, every other target (iOS simulator, Mac Catalyst,

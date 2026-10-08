@@ -68,12 +68,16 @@ import java.util.Properties;
 ///
 /// 5. `application.properties`;
 ///
-/// 6. what the build compiled in from the settings annotations --
-///   `@ServerConfig`, `@SessionConfig` and the rest of
-///   `com.codename1.backend.annotations` -- so a file or the environment can
-///   still change anything the source says;
+/// 6. the module's `application.properties` as the build compiled it into the
+///   server, so a binary with no file beside it still has the committed
+///   settings, and a file or the environment can still change any of them;
 ///
 /// 7. the default the caller passed in.
+///
+/// A test started by `@BackendTest` adds one layer above all of these: the
+/// settings the test itself names. A test that asks for a free port or an
+/// in-memory database gets one even in a shell that exports `PORT` or
+/// `DATABASE_URL`.
 ///
 /// A value may reference an environment variable as `${NAME}` or
 /// `${NAME:fallback}`. That resolution happens when the value is READ
@@ -96,6 +100,9 @@ public final class Config {
 
     /// The port to listen on. Also read from PORT.
     public static final String SERVER_PORT = "cn1.server.port";
+    /// The address to listen on: `127.0.0.1` for this machine only. Unset, the
+    /// server listens on every interface.
+    public static final String SERVER_ADDRESS = "cn1.server.address";
     /// The listen backlog.
     public static final String SERVER_BACKLOG = "cn1.server.backlog";
     /// The size of the request thread pool.
@@ -168,8 +175,14 @@ public final class Config {
     private final Properties profileFile;
     private final Properties baseFile;
     private final Properties compiled;
+    private final Properties overrides;
     private final String profile;
     private final List loadedFrom;
+    /// Where load() read the files, or null for a configuration with none.
+    private String directory;
+    /// Whether the process or the base file named the profile; when neither did,
+    /// a compiled-in `cn1.profile` is the one that applies.
+    private boolean profileChosen = true;
 
     private Config(Properties baseFile, Properties profileFile, String profile, List loadedFrom) {
         this(baseFile, profileFile, new Properties(), profile, loadedFrom);
@@ -177,6 +190,12 @@ public final class Config {
 
     private Config(Properties baseFile, Properties profileFile, Properties compiled,
                    String profile, List loadedFrom) {
+        this(baseFile, profileFile, compiled, new Properties(), profile, loadedFrom);
+    }
+
+    private Config(Properties baseFile, Properties profileFile, Properties compiled,
+                   Properties overrides, String profile, List loadedFrom) {
+        this.overrides = overrides;
         this.baseFile = baseFile;
         this.profileFile = profileFile;
         this.compiled = compiled;
@@ -187,7 +206,7 @@ public final class Config {
     /// This configuration over a bottom layer of compiled-in values: pairs of
     /// key and value, in that order, which every other layer overrides. The
     /// generated entry point passes what the settings annotations say.
-    public Config withCompiledDefaults(String[] keysAndValues) {
+    Config withCompiledDefaults(String[] keysAndValues) throws IOException {
         if (keysAndValues == null || keysAndValues.length == 0) {
             return this;
         }
@@ -199,7 +218,28 @@ public final class Config {
         for (int iter = 0 ; iter < keysAndValues.length ; iter += 2) {
             merged.setProperty(keysAndValues[iter], keysAndValues[iter + 1]);
         }
-        return new Config(baseFile, profileFile, merged, profile, loadedFrom);
+        String active = profile;
+        Properties activeFile = profileFile;
+        String compiledProfile = merged.getProperty(PROFILE);
+        if (!profileChosen && compiledProfile != null) {
+            // The packaged server's committed application.properties names the
+            // profile, and nothing above it does: no CN1_PROFILE, no file beside
+            // the binary. load() had already settled on "default" by then, so the
+            // binary ran -- @Profile beans, datasource defaults, management -- as a
+            // profile its own settings never asked for. Expanded against the
+            // compiled layer, as a file's value is against its file.
+            String named = new Config(baseFile, new Properties(), merged, overrides, "default",
+                    new ArrayList()).expand(compiledProfile, PROFILE, 0);
+            if (named.length() > 0 && !named.equals(profile)) {
+                active = named;
+                activeFile = directory == null ? new Properties()
+                        : read(directory, "application-" + named + ".properties", loadedFrom);
+            }
+        }
+        Config out = new Config(baseFile, activeFile, merged, overrides, active, loadedFrom);
+        out.directory = directory;
+        out.profileChosen = profileChosen;
+        return out;
     }
 
     /// Reads the configuration for this process: the active profile, then the two
@@ -217,6 +257,7 @@ public final class Config {
         // file gets a vote: a project whose default is development says so once,
         // in the file, rather than in every developer's shell.
         String profile = fromProcess(PROFILE);
+        boolean chosen = profile != null || base.getProperty(PROFILE) != null;
         if (profile == null) {
             profile = base.getProperty(PROFILE);
             if (profile != null) {
@@ -241,7 +282,10 @@ public final class Config {
         }
         Properties profileFile = read(directory, "application-" + profile + ".properties",
                 loadedFrom);
-        return new Config(base, profileFile, profile, loadedFrom);
+        Config out = new Config(base, profileFile, profile, loadedFrom);
+        out.directory = directory;
+        out.profileChosen = chosen;
+        return out;
     }
 
     /// A configuration with no files behind it, holding exactly what it is given.
@@ -250,6 +294,19 @@ public final class Config {
     public static Config of(Properties values, String profile) {
         Properties empty = new Properties();
         return new Config(values == null ? empty : values, empty,
+                profile == null || profile.length() == 0 ? "default" : profile,
+                new ArrayList());
+    }
+
+    /// A configuration whose `values` win over every other layer, the process
+    /// environment included: what a test names for itself. Reached through
+    /// `BackendAccess` by the test support, and by nothing a server runs.
+    static Config overriding(Properties values, String profile) {
+        Properties top = new Properties();
+        if (values != null) {
+            top.putAll(values);
+        }
+        return new Config(new Properties(), new Properties(), new Properties(), top,
                 profile == null || profile.length() == 0 ? "default" : profile,
                 new ArrayList());
     }
@@ -398,6 +455,10 @@ public final class Config {
         while (e.hasMoreElements()) {
             names.add(e.nextElement());
         }
+        e = overrides.propertyNames();
+        while (e.hasMoreElements()) {
+            names.add(e.nextElement());
+        }
         e = baseFile.propertyNames();
         while (e.hasMoreElements()) {
             names.add(e.nextElement());
@@ -409,9 +470,40 @@ public final class Config {
         return new ArrayList(names);
     }
 
+    /// Whether `key` has a value: false when no layer sets it, or when what is set
+    /// refers to a variable this process does not have and gives no fallback.
+    ///
+    /// For a setting the server consults only to learn whether it was asked for --
+    /// the database, when no handler and no entity needs one. The committed
+    /// application.properties names production's database as `${DATABASE_URL}`,
+    /// and the build compiles that file into the binary; a server that needs no
+    /// database must still start where that variable is unset. Code that DOES
+    /// read the value gets the loud failure from [#get(String)], as before.
+    boolean resolves(String key) throws IOException {
+        if (raw(key) == null) {
+            return false;
+        }
+        try {
+            return get(key) != null;
+        } catch (UnsetReference unset) {
+            return false;
+        }
+    }
+
+    /// A `${NAME}` with no fallback whose variable is not set.
+    private static final class UnsetReference extends IOException {
+        UnsetReference(String message) {
+            super(message);
+        }
+    }
+
     /// The value as written, before any ${} in it is resolved.
     private String raw(String key) {
-        String value = fromProcess(key);
+        String value = overrides.getProperty(key);
+        if (value != null) {
+            return value;
+        }
+        value = fromProcess(key);
         if (value != null) {
             return value;
         }
@@ -527,7 +619,7 @@ public final class Config {
                     // LOUDLY. Left alone, the caller opens a database named
                     // "${DATABASE_URL}" -- or, worse, a SQLite file by that name,
                     // which succeeds and is empty.
-                    throw new IOException(key + " refers to ${" + reference + "}, which is "
+                    throw new UnsetReference(key + " refers to ${" + reference + "}, which is "
                             + "not set in the environment or the configuration. Set it, or "
                             + "give it a fallback as ${" + reference + ":value}.");
                 }

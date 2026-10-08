@@ -59,6 +59,13 @@ public interface XMLHttpRequest extends JSObject {
     void setOnLoad(Object handler);
     void setOnError(Object handler);
     void setOnProgress(Object handler);
+    /**
+     * Do not call this on the ParparVM JavaScript port: the JSO bridge maps
+     * a no-argument {@code getXxx()} to a read of the property {@code xxx},
+     * so this reads {@code allResponseHeaders}, which does not exist, and
+     * always answers null. Use NetworkConnection.responseHeaders(xhr), a
+     * {@code @JSBody} that invokes the method.
+     */
     String getAllResponseHeaders();
     String getResponseHeader(String name);
 }

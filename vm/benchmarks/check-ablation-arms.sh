@@ -8,7 +8,7 @@
 # WHY THIS EXISTS. ParparVM's runtime carries around thirty compile-time arms: QA
 # instruments (CN1_GC_VERIFY, CN1_ALLOC_CENSUS), and ablations that exist so a gate
 # can prove it is able to FAIL (GcSteadyStateIntegrationTest rebuilds with
-# -DCN1_SATB_LOG_FRESH and REQUIRES its assertions to fail). They are not user-facing
+# -DCN1_PACING_NO_RESERVE and REQUIRES its assertions to fail). They are not user-facing
 # options and must never become any; they are negative controls and instruments.
 #
 # The failure mode they have is silent rot. An arm nothing builds stops building, and

@@ -44,6 +44,36 @@ class JavascriptTargetIntegrationTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void keepsHostOnlyAnimationFrameCallbacks(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+        Path sources = Files.createTempDirectory("js-animation-callback-src");
+        Path classes = Files.createTempDirectory("js-animation-callback-classes");
+        Path api = Files.createTempDirectory("js-animation-callback-api");
+        Path callbackDir = sources.resolve("com/codename1/html5/js/browser");
+        Files.createDirectories(callbackDir);
+        // Like the real JSFunctor, this interface does NOT extend JSObject.
+        Files.write(callbackDir.resolve("AnimationFrameCallback.java"),
+                ("package com.codename1.html5.js.browser; public interface AnimationFrameCallback {"
+                        + " void onAnimationFrame(double time); }").getBytes(StandardCharsets.UTF_8));
+        Files.write(sources.resolve("JsAnimationFrameApp.java"),
+                ("import com.codename1.html5.js.browser.AnimationFrameCallback;"
+                        + "public class JsAnimationFrameApp { public static AnimationFrameCallback callback;"
+                        + " public static int frames; public static void main(String[] args) {"
+                        + " callback = new AnimationFrameCallback() { public void onAnimationFrame(double time) {"
+                        + " frames += (int) time; } }; } }").getBytes(StandardCharsets.UTF_8));
+        compileAgainstJavaApi(config, sources, classes, api);
+        Path output = Files.createTempDirectory("js-animation-callback-output");
+        runJavascriptTranslator(classes, output, "JsAnimationFrameApp");
+        String bundle = new String(Files.readAllBytes(output.resolve("dist/JsAnimationFrameApp-js/translated_app.js")),
+                StandardCharsets.UTF_8);
+        // No Java invocation references this SAM. Both its body and dispatch slot
+        // must survive a CLOSED-world build for the browser's rAF bridge to call it.
+        assertTrue(bundle.contains("cn1_s_onAnimationFrame_double:cn1_JsAnimationFrameApp_1_onAnimationFrame_double"),
+                "Host-only animation callback must retain its concrete virtual dispatch entry");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void generatesBrowserBundleForJavascriptTarget(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 
@@ -128,9 +158,13 @@ class JavascriptTargetIntegrationTest {
                 "Translated bundle should not emit generic fallback stubs for DateFormat natives");
         assertTrue(!translatedApp.contains("__args.unshift(stack.pop())"),
                 "Translated invoke paths should avoid array unshift-based argument packing");
-        assertTrue(!translatedApp.contains("cn1_java_io_File_")
-                        || translatedApp.contains("java.io.File native filesystem access is not supported in javascript backend"),
-                "Unsupported filesystem natives should fail with an explicit JS-mode message when translated");
+        // java.io.File is bound by the runtime over a host-supplied jvm.fileSystem, so the
+        // bundle carries no per-native stub; with no file system installed the runtime
+        // binding throws the explicit JS-mode message instead.
+        assertTrue(runtime.contains("java.io.File native filesystem access is not supported in javascript backend"),
+                "Filesystem natives should fail with an explicit JS-mode message when no file system is installed");
+        assertTrue(!translatedApp.contains("cn1_java_io_File_existsImpl_java_lang_String_R_boolean = function*"),
+                "Runtime-bound filesystem natives should not get a generated fallback stub");
         assertTrue(worker.contains("importScripts('parparvm_runtime.js');"),
                 "Worker bootstrap should load the runtime first");
         assertTrue(worker.contains("importScripts('port.js');"),

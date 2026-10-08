@@ -31,8 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Label;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class LabelInstruction extends Instruction {
     private Label parent;
@@ -46,6 +46,16 @@ public class LabelInstruction extends Instruction {
     private static Map<Label, List<Pair>> tryBeginLabels = new HashMap<Label, List<Pair>>();
     private static Map<Label, Integer> tryEndLabels = new HashMap<Label, Integer>();    
     private static Map<Label, Integer> labelCatchDepth = new HashMap<Label, Integer>();
+    /*
+     * The entry labels of this method's catch handlers. A handler is entered by
+     * longjmp from throwException, which pops only the try block that MATCHED: a try
+     * statement with several catch clauses registers one block per clause, and the
+     * other clauses' blocks stayed registered. An exception thrown from the handler --
+     * `catch (IOException e) { throw e; } catch (Exception e) {}` -- was then caught
+     * by its own sibling, on every native target. So each handler entry resets
+     * tryBlockOffset to the depth at its label, exactly as JUMP_TO does for a jump.
+     */
+    private static Map<Label, Label> handlerLabels = new HashMap<Label, Label>();
     // [ddyer 4/2017] convert this from a tree of strings to use the label itself
     // this fixes the problem of mysterious "statement expected" errors from builds,
     // caused because labels created by the assembler are not globally unique.
@@ -108,6 +118,7 @@ public class LabelInstruction extends Instruction {
     	tryBeginLabels.clear();
     	tryEndLabels.clear();
     	labelCatchDepth.clear();
+    	handlerLabels.clear();
     	usedLabels.clear();
     	labelNames.clear();
     	catchDepthInstructions = null;
@@ -142,7 +153,7 @@ public class LabelInstruction extends Instruction {
     public static void setCatchDepthInstructions(List<Instruction> inst) {
         catchDepthInstructions = inst;
     }
-    public LabelInstruction(org.objectweb.asm.Label parent) {
+    public LabelInstruction(com.codename1.tools.translator.classfile.Label parent) {
         super(-1);
         this.parent = parent;
     }
@@ -193,6 +204,12 @@ public class LabelInstruction extends Instruction {
         ll.add(new Pair(exception, counter));
     }
     
+    /** Marks {@code l} as the entry of a catch handler; see handlerLabels. */
+    public static void addHandlerLabel(Label l) {
+        handlerLabels.put(l, l);
+        labelIsUsed(l);
+    }
+
     public static void addTryEndLabel(Label l) {
         Integer i = tryEndLabels.get(l);
         if(i == null) {
@@ -240,6 +257,12 @@ public class LabelInstruction extends Instruction {
         b.append("\nlabel_"); 
         b.append(labelName(parent)); 
         b.append(":\n");
+        if (handlerLabels.get(parent) != null && catchDepthInstructions != null) {
+            // Only the try blocks that enclose the handler's own code stay registered:
+            // its try statement's other clauses are not around it.
+            b.append("threadStateData->tryBlockOffset = methodBlockOffset + ")
+                    .append(getLabelCatchDepth(parent, catchDepthInstructions)).append(";\n");
+        }
         Integer tryCount = tryEndLabels.get(parent);
         if(tryCount != null) {
             // NOTE: Oct. 19, 2020

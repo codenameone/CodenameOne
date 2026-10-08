@@ -24,11 +24,15 @@ package java.util.stream;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public interface Stream<T> extends BaseStream<T, Stream<T>> {
     Stream<T> filter(Predicate<? super T> predicate);
@@ -59,8 +63,43 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
 
     boolean noneMatch(Predicate<? super T> predicate);
 
+    <R> Stream<R> flatMap(Function<? super T, ? extends Stream<? extends R>> mapper);
+
+    Stream<T> peek(Consumer<? super T> action);
+
+    Stream<T> sorted(Comparator<? super T> comparator);
+
+    Optional<T> findFirst();
+
+    Optional<T> findAny();
+
+    Optional<T> min(Comparator<? super T> comparator);
+
+    Optional<T> max(Comparator<? super T> comparator);
+
+    Optional<T> reduce(BinaryOperator<T> accumulator);
+
+    <R> R collect(Supplier<R> supplier, BiConsumer<R, ? super T> accumulator, BiConsumer<R, R> combiner);
+
+    /**
+     * The elements as an unmodifiable list.
+     *
+     * @return the list
+     */
+    List<T> toList();
+
     static <T> Stream<T> empty() {
         return new StreamImpl<T>(new ArrayList<T>());
+    }
+
+    /**
+     * The single-element overload the JDK has: code compiled against the JDK binds a
+     * one-argument Stream.of to it, so without it that call fails to link here.
+     */
+    static <T> Stream<T> of(T value) {
+        List<T> one = new ArrayList<T>();
+        one.add(value);
+        return new StreamImpl<T>(one);
     }
 
     static <T> Stream<T> of(T... values) {

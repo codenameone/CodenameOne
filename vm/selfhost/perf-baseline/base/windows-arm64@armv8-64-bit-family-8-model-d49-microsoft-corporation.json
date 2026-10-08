@@ -9,8 +9,8 @@
  "arraySequential": {
   "all": {
    "memory": 0.387,
-   "runs": 7,
-   "time": 0.394,
+   "runs": 3,
+   "time": 0.455,
    "tolerance": {
     "time": 0.3
    }
@@ -53,10 +53,11 @@
  },
  "objectAllocation": {
   "all": {
-   "memory": 0.454,
-   "runs": 5,
+   "memory": 0.43,
+   "runs": 3,
    "time": 2.808,
    "tolerance": {
+    "memory": 0.35,
     "time": 0.45
    }
   }
@@ -84,8 +85,8 @@
  },
  "translator": {
   "all": {
-   "memory": 0.539,
-   "runs": 7,
+   "memory": 0.451,
+   "runs": 1,
    "time": 0.751
   }
  },

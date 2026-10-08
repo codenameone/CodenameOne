@@ -137,7 +137,7 @@ jobs:
         run: |
           cd maven
           JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
-            mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
+            mvn -B -pl codenameone-maven-plugin,cn1-ads-mock,backend,backend-test -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       - name: Build hellocodenameone-common (JDK 17)
@@ -152,12 +152,26 @@ jobs:
           bash scripts/ci/retry.sh \
             mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
 
+      # The CI test server (scripts/hellocodenameone/backend) as a runnable copy the
+      # suite jobs run with plain java (CN1SS_SERVER_DIST). Built here, where the
+      # plugin and the backend runtime were just installed: the musl job's container
+      # has neither, and building them there -- every port, through the plugin's
+      # dependencies -- outlasted the suite's wait for the server.
+      - name: Build the test server
+        env:
+          CN1SS_BACKEND_SKIP_INSTALL: '1'
+        run: |
+          set -e
+          JAVA17_HOME="$JDK_17_HOME" scripts/hellocodenameone/backend/server.sh dist "$GITHUB_WORKSPACE/artifacts/cn1ss-server"
+          test -f artifacts/cn1ss-server/classes/META-INF/cn1-backend-main
+
       - name: Package suite classes
         run: |
           set -e
           tar czf suite-classes.tgz \
             scripts/hellocodenameone/common/target/classes \
-            maven/cn1-ads-mock/target/classes
+            maven/cn1-ads-mock/target/classes \
+            artifacts/cn1ss-server
       - name: Upload suite classes
         uses: actions/upload-artifact@v4
         with:
@@ -245,9 +259,16 @@ jobs:
       - name: Install zig toolchain (portable old-glibc build)
         run: |
           set -e
-          ZV=0.13.0
+          # 0.14.1 is built on LLVM 19, matching the LLVM 19 toolchain the cloud
+          # builders provision next to zig. 0.13.0 (LLVM 18) silently dropped
+          # -fprofile-generate, and its instrumentation cannot link against LLVM 19's
+          # profile runtime ("version mismatch: expected 10, but get 9"), so it could
+          # not build profile-guided-optimized binaries. This leg is the coverage that
+          # the production zig can be moved to 0.14.1 for every Linux build.
+          # 0.14 renamed the release tarballs from zig-linux-<arch> to zig-<arch>-linux.
+          ZV=0.14.1
           A=$(uname -m)
-          curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZV}/zig-linux-${A}-${ZV}.tar.xz"
+          curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZV}/zig-${A}-linux-${ZV}.tar.xz"
           sudo mkdir -p /opt/zig && sudo tar -xf /tmp/zig.tar.xz -C /opt/zig --strip-components=1
           sudo ln -sf /opt/zig/zig /usr/local/bin/zig
           sudo tee /usr/local/bin/cn1-zig-cc >/dev/null << 'WRAP'
@@ -271,6 +292,8 @@ jobs:
         working-directory: vm
         env:
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}/artifacts/linux-port/raw
+          # The test server prepare-suite built (see "Build the test server" there).
+          CN1SS_SERVER_DIST: ${{ github.workspace }}/artifacts/cn1ss-server
           # Full app stdout/stderr -- the only evidence when the suite wedges
           # mid-run (uploaded with the screenshot artifact below).
           CN1_APP_LOG_TEE: ${{ github.workspace }}/artifacts/linux-port/raw/app-output.log
@@ -506,6 +529,7 @@ jobs:
             -e CN1_SHOT_OUTPUT_DIR=/cn1/artifacts/linux-port/raw-musl \
             -e CN1_APP_LOG_TEE=/cn1/artifacts/linux-port/raw-musl/app-output.log \
             -e CN1_REQUIRE_SUITE=true \
+            -e CN1SS_SERVER_DIST=/cn1/artifacts/cn1ss-server \
             -e LIBGL_ALWAYS_SOFTWARE=1 \
             -e RETRY_ONLY_MATCHING \
             docker.io/library/alpine:3.20 sh -ec '

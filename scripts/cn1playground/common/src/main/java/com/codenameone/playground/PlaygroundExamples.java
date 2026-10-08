@@ -311,7 +311,7 @@ final class PlaygroundExamples {
             SpanLabel output = new SpanLabel("Tap load to fetch XML as text via RequestBuilder.");
             Button load = new Button("Load codenameone.com");
             FontImage.setMaterialIcon(load, FontImage.MATERIAL_CLOUD_DOWNLOAD);
-            load.addActionListener(() -> {
+            load.addActionListener(e -> {
                 RequestBuilder builder = Rest.get("https://www.codenameone.com/feed.xml");
                 builder.fetchAsString(response -> {
                     String text = response.getResponseData();
@@ -339,7 +339,7 @@ final class PlaygroundExamples {
             // for camera permission; a secure context (HTTPS or localhost) is
             // required. Camera.open() must originate from a tap.
             Form form = new Form("Camera", new BorderLayout());
-            Label status = new Label("Tap 'Start Camera'");
+            SpanLabel status = new SpanLabel("Tap 'Start Camera'");
             Button start = new Button("Start Camera");
             FontImage.setMaterialIcon(start, FontImage.MATERIAL_VIDEOCAM);
             Button snap = new Button("Take Photo");
@@ -364,7 +364,7 @@ final class PlaygroundExamples {
                     return;
                 }
                 try {
-                    CameraSession session = Camera.open(info, new CameraSessionOptions());
+                    CameraSession session = Camera.open(info, new CameraSessionOptions().captureAudio(false));
                     sessionHolder[0] = session;
                     CameraView view = session.createView();
                     form.add(BorderLayout.CENTER, view);
@@ -393,7 +393,8 @@ final class PlaygroundExamples {
                         Dialog dlg = new Dialog("Captured Photo");
                         dlg.setLayout(new BorderLayout());
                         dlg.add(BorderLayout.CENTER,
-                                new Label(img.scaledWidth(Display.getInstance().getDisplayWidth() - 80)));
+                                new Label(img.scaledSmallerRatio(Display.getInstance().getDisplayWidth() - 80,
+                                        Display.getInstance().getDisplayHeight() - 160)));
                         Button done = new Button("Close");
                         done.addActionListener(e2 -> dlg.dispose());
                         dlg.add(BorderLayout.SOUTH, done);
@@ -417,24 +418,25 @@ final class PlaygroundExamples {
             // A tiny game loop: balls fall under gravity and bounce off the
             // walls and floor. Position / velocity live in parallel float[]
             // arrays; the loop runs from a UITimer and the scene is drawn through
-            // GameScripting.canvas, which bridges a (Graphics, Component) lambda
-            // to a paintable Component (bsh can't subclass Component to override
-            // paint() on the ahead-of-time-compiled JavaScript port).
+            // GameScripting.canvas, which turns a drawing lambda into a paintable
+            // Component (a Component subclass overriding paint() works too).
             float[] x = { 40f, 78f, 116f, 154f, 192f, 230f, 268f };
             float[] y = { 40f, 70f, 100f, 40f, 70f, 100f, 40f };
             float[] vx = { 2.4f, -2.0f, 2.8f, -2.6f, 2.2f, -2.4f, 2.0f };
             float[] vy = { 0f, 0f, 0f, 0f, 0f, 0f, 0f };
             int[] col = { 0x5fd0d6, 0xf2b134, 0xe8615f, 0x9b8cf2, 0x6fcf6b, 0xf28cc8, 0x7aa7ff };
 
+            Component[] canvas = new Component[1];
             Component view = GameScripting.canvas(320, 480, g -> {
                 g.setColor(0x10182a);
-                g.fillRect(0, 0, 320, 480);
+                g.fillRect(0, 0, canvas[0].getWidth(), canvas[0].getHeight());
                 for (int i = 0; i < x.length; i++) {
                     g.setColor(col[i]);
                     g.fillArc((int) x[i] - 16, (int) y[i] - 16, 32, 32, 0, 360);
                 }
             });
 
+            canvas[0] = view;
             Form form = new Form("Bouncing Balls", new BorderLayout());
             form.add(BorderLayout.CENTER, view);
             UITimer.timer(16, true, form, () -> {
@@ -443,8 +445,10 @@ final class PlaygroundExamples {
                     x[i] += vx[i];
                     y[i] += vy[i];
                     if (x[i] < 16f) { x[i] = 16f; vx[i] = -vx[i]; }
-                    if (x[i] > 304f) { x[i] = 304f; vx[i] = -vx[i]; }
-                    if (y[i] > 464f) { y[i] = 464f; vy[i] = -vy[i] * 0.78f; }
+                    float right = Math.max(16f, view.getWidth() - 16f);
+                    float floor = Math.max(16f, view.getHeight() - 16f);
+                    if (x[i] > right) { x[i] = right; vx[i] = -Math.abs(vx[i]); }
+                    if (y[i] > floor) { y[i] = floor; vy[i] = -Math.abs(vy[i]) * 0.78f; }
                 }
                 view.repaint();
             });
@@ -470,7 +474,7 @@ final class PlaygroundExamples {
             Material[] material = new Material[1];
             float[] angle = { 0f };
 
-            RenderView view = new RenderView(GpuScripting.renderer(
+            RenderView view = new RenderView(GpuScripting.renderer(camera,
                 device -> {
                     cube[0] = Primitives.cube(device, 1f);
                     material[0] = new Material(Material.Type.PHONG).setColor(0xff3399ff);

@@ -26,12 +26,6 @@ package com.codename1.tools.translator;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -225,8 +219,7 @@ final class JavascriptBundleWriter {
         for (String id : dispatchIds) {
             out.append(id).append('\n');
         }
-        Files.write(new File(outputDirectory, "jso-bridge-dispatch-ids.txt").toPath(),
-                out.toString().getBytes(StandardCharsets.UTF_8));
+        Util.writeUtf8(new File(outputDirectory, "jso-bridge-dispatch-ids.txt"), out.toString());
     }
 
     private static boolean isJsoBridgeClass(ByteCodeClass cls, Map<String, ByteCodeClass> byName) {
@@ -354,8 +347,7 @@ final class JavascriptBundleWriter {
         int leadCount = chunkStrings.size() - 1;
         for (int i = 0; i < leadCount; i++) {
             String suffix = leadCount >= 10 ? String.format("_%02d", i + 1) : String.format("_%d", i + 1);
-            Files.write(new File(outputDirectory, "translated_app" + suffix + ".js").toPath(),
-                    minifyJs(hoistStringConstants(chunkStrings.get(i), aliasCounter)).getBytes(StandardCharsets.UTF_8));
+            Util.writeUtf8(new File(outputDirectory, "translated_app" + suffix + ".js"), minifyJs(hoistStringConstants(chunkStrings.get(i), aliasCounter)));
             // Once a chunk is on disk nothing reads it again, so release it
             // rather than keeping the entire bundle resident until the last
             // write. hoistStringConstants and minifyJs each materialise another
@@ -363,8 +355,7 @@ final class JavascriptBundleWriter {
             // is at its most memory-hungry.
             chunkStrings.set(i, null);
         }
-        Files.write(new File(outputDirectory, "translated_app.js").toPath(),
-                minifyJs(hoistStringConstants(chunkStrings.get(chunkStrings.size() - 1), aliasCounter)).getBytes(StandardCharsets.UTF_8));
+        Util.writeUtf8(new File(outputDirectory, "translated_app.js"), minifyJs(hoistStringConstants(chunkStrings.get(chunkStrings.size() - 1), aliasCounter)));
     }
 
     /**
@@ -388,11 +379,11 @@ final class JavascriptBundleWriter {
         if (System.getProperty("parparvm.js.minify.idents.off") != null) {
             return;
         }
-        java.util.regex.Pattern defPattern = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern defPattern = com.codename1.tools.translator.regex.Pattern.compile(
                 "function\\*?\\s+(cn1_[A-Za-z0-9_]+)\\s*\\(");
         java.util.TreeSet<String> defs = new java.util.TreeSet<String>();
         for (String chunk : chunkStrings) {
-            java.util.regex.Matcher m = defPattern.matcher(chunk);
+            com.codename1.tools.translator.regex.Matcher m = defPattern.matcher(chunk);
             while (m.find()) {
                 String name = m.group(1);
                 // Constructors / class initialisers are reconstructed by string at
@@ -433,6 +424,14 @@ final class JavascriptBundleWriter {
         // protected base name; otherwise a renamed static-native body bypasses its
         // override and returns its placeholder (e.g. null) -> NPE.
         java.util.Set<String> excluded = new java.util.HashSet<String>(stringTokens);
+        // Open world: code translated later calls kept classes' functions by name.
+        if (JavascriptOpenWorld.isEnabled()) {
+            for (String d : defs) {
+                if (JavascriptOpenWorld.keepsFunction(d)) {
+                    excluded.add(d);
+                }
+            }
+        }
         for (String t : stringTokens) {
             excluded.add(t + "__impl");
         }
@@ -542,10 +541,10 @@ final class JavascriptBundleWriter {
             return;
         }
         // 1. Collect every quoted cn1_s_* literal across the chunks.
-        java.util.regex.Pattern lit = java.util.regex.Pattern.compile("\"(cn1_s_[A-Za-z0-9_]+)\"");
+        com.codename1.tools.translator.regex.Pattern lit = com.codename1.tools.translator.regex.Pattern.compile("\"(cn1_s_[A-Za-z0-9_]+)\"");
         Map<String, Integer> counts = new HashMap<String, Integer>();
         for (String chunk : chunkStrings) {
-            java.util.regex.Matcher m = lit.matcher(chunk);
+            com.codename1.tools.translator.regex.Matcher m = lit.matcher(chunk);
             while (m.find()) {
                 String id = m.group(1);
                 Integer c = counts.get(id);
@@ -637,14 +636,14 @@ final class JavascriptBundleWriter {
             map.put('"' + w + '"', "\"$s" + base26(idx++) + '"');
         }
         // 3. Rewrite quoted occurrences across every chunk in one scan.
-        java.util.regex.Pattern any = java.util.regex.Pattern.compile("\"cn1_s_[A-Za-z0-9_]+\"");
+        com.codename1.tools.translator.regex.Pattern any = com.codename1.tools.translator.regex.Pattern.compile("\"cn1_s_[A-Za-z0-9_]+\"");
         for (int i = 0; i < chunkStrings.size(); i++) {
             String chunk = chunkStrings.get(i);
-            java.util.regex.Matcher m = any.matcher(chunk);
+            com.codename1.tools.translator.regex.Matcher m = any.matcher(chunk);
             StringBuffer sb = new StringBuffer(chunk.length());
             while (m.find()) {
                 String repl = map.get(m.group());
-                m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(repl != null ? repl : m.group()));
+                m.appendReplacement(sb, com.codename1.tools.translator.regex.Matcher.quoteReplacement(repl != null ? repl : m.group()));
             }
             m.appendTail(sb);
             chunkStrings.set(i, sb.toString());
@@ -696,11 +695,11 @@ final class JavascriptBundleWriter {
         // and installNativeBindings refreshes the alias when the real
         // implementation lands. Aliased call sites only execute once the
         // app runs, which is strictly after bindings install.
-        java.util.regex.Pattern defPattern = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern defPattern = com.codename1.tools.translator.regex.Pattern.compile(
                 "function\\*?\\s+(cn1_[A-Za-z0-9_]+)\\s*\\(");
         java.util.Set<String> defs = new java.util.HashSet<String>();
         for (String chunk : chunkStrings) {
-            java.util.regex.Matcher m = defPattern.matcher(chunk);
+            com.codename1.tools.translator.regex.Matcher m = defPattern.matcher(chunk);
             while (m.find()) {
                 defs.add(m.group(1));
             }
@@ -737,7 +736,7 @@ final class JavascriptBundleWriter {
         java.util.Map<String, String> aliasMap = new java.util.LinkedHashMap<String, String>();
         int idx = 0;
         // Bisection knob: cap how many (saving-ranked) names alias.
-        int aliasMax = Integer.getInteger("parparvm.js.alias.max", Integer.MAX_VALUE);
+        int aliasMax = Util.integerProperty("parparvm.js.alias.max", Integer.MAX_VALUE);
         for (String w : winners) {
             if (idx >= aliasMax) {
                 break;
@@ -855,14 +854,14 @@ final class JavascriptBundleWriter {
         // as code identifiers, so a string-literal match is exact and
         // cannot collide with method-id / class-name tokens (those carry a
         // signature suffix the field-prop set never contains).
-        java.util.regex.Pattern any = java.util.regex.Pattern.compile("\"cn1_[A-Za-z0-9_]+\"");
+        com.codename1.tools.translator.regex.Pattern any = com.codename1.tools.translator.regex.Pattern.compile("\"cn1_[A-Za-z0-9_]+\"");
         for (int i = 0; i < chunkStrings.size(); i++) {
             String chunk = chunkStrings.get(i);
-            java.util.regex.Matcher m = any.matcher(chunk);
+            com.codename1.tools.translator.regex.Matcher m = any.matcher(chunk);
             StringBuffer sb = new StringBuffer(chunk.length());
             while (m.find()) {
                 String repl = map.get(m.group());
-                m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(repl != null ? repl : m.group()));
+                m.appendReplacement(sb, com.codename1.tools.translator.regex.Matcher.quoteReplacement(repl != null ? repl : m.group()));
             }
             m.appendTail(sb);
             chunkStrings.set(i, sb.toString());
@@ -1641,7 +1640,7 @@ final class JavascriptBundleWriter {
         imports.append("importScripts('translated_app.js');\n");
 
         String worker = loadResource("worker.js").replace("/*__IMPORTS__*/", imports.toString().trim());
-        Files.write(new File(outputDirectory, "worker.js").toPath(), worker.getBytes(StandardCharsets.UTF_8));
+        Util.writeUtf8(new File(outputDirectory, "worker.js"), worker);
     }
 
     private static void writeIndex(File outputDirectory) throws IOException {
@@ -1653,9 +1652,9 @@ final class JavascriptBundleWriter {
         index = index.replace("<!--__NATIVE_INTERFACE_STUBS__-->", stubs.toString().trim());
         index = applyPageSettings(index,
                 System.getProperty(PAGE_TITLE_PROPERTY),
-                Boolean.parseBoolean(System.getProperty(ALLOW_TRANSLATION_PROPERTY, "false")),
-                !"false".equalsIgnoreCase(System.getProperty(DARKREADER_LOCK_PROPERTY, "true")));
-        Files.write(new File(outputDirectory, "index.html").toPath(), index.getBytes(StandardCharsets.UTF_8));
+                Boolean.parseBoolean(Util.systemProperty(ALLOW_TRANSLATION_PROPERTY, "false")),
+                !"false".equalsIgnoreCase(Util.systemProperty(DARKREADER_LOCK_PROPERTY, "true")));
+        Util.writeUtf8(new File(outputDirectory, "index.html"), index);
     }
 
     /// The application's display name, which becomes the page title. The builders pass the
@@ -1752,7 +1751,7 @@ final class JavascriptBundleWriter {
             return false;
         }
         try {
-            String content = new String(Files.readAllBytes(jsFile.toPath()), StandardCharsets.UTF_8);
+            String content = Util.readUtf8(jsFile);
             return content.contains("cn1_get_native_interfaces");
         } catch (IOException ex) {
             return false;
@@ -1855,7 +1854,7 @@ final class JavascriptBundleWriter {
             }
             sawTranslatedOutput = true;
             try {
-                String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+                String text = Util.readUtf8(file);
                 if (text.indexOf(marker) >= 0) {
                     return REFERENCE_PRESENT;
                 }
@@ -1869,75 +1868,44 @@ final class JavascriptBundleWriter {
     }
 
     private static void copyJavaScriptPortWebAppAssets(File outputDirectory) throws IOException {
-        Path webApp = locateJavaScriptPortWebApp();
+        File webApp = locateJavaScriptPortWebApp();
         if (webApp == null) {
             return;
         }
-        copyPathIfPresent(webApp.resolve("js"), outputDirectory.toPath().resolve("js"),
+        Set<String> none = Collections.<String>emptySet();
+        Util.copyIfPresent(new File(webApp, "js"), new File(outputDirectory, "js"),
                 optionalAssetsToSkip(outputDirectory));
-        copyPathIfPresent(webApp.resolve("css"), outputDirectory.toPath().resolve("css"));
-        copyPathIfPresent(webApp.resolve("assets"), outputDirectory.toPath().resolve("assets"));
-        copyPathIfPresent(webApp.resolve("style.css"), outputDirectory.toPath().resolve("style.css"));
-        copyPathIfPresent(webApp.resolve("progress.gif"), outputDirectory.toPath().resolve("progress.gif"));
-        copyPathIfPresent(webApp.resolve("manifest.json"), outputDirectory.toPath().resolve("manifest.json"));
-        copyPathIfPresent(webApp.resolve("sw.js"), outputDirectory.toPath().resolve("sw.js"));
-        copyPathIfPresent(webApp.resolve("port.js"), outputDirectory.toPath().resolve("port.js"));
+        Util.copyIfPresent(new File(webApp, "css"), new File(outputDirectory, "css"), none);
+        Util.copyIfPresent(new File(webApp, "assets"), new File(outputDirectory, "assets"), none);
+        Util.copyIfPresent(new File(webApp, "style.css"), new File(outputDirectory, "style.css"), none);
+        Util.copyIfPresent(new File(webApp, "progress.gif"), new File(outputDirectory, "progress.gif"), none);
+        Util.copyIfPresent(new File(webApp, "manifest.json"), new File(outputDirectory, "manifest.json"), none);
+        Util.copyIfPresent(new File(webApp, "sw.js"), new File(outputDirectory, "sw.js"), none);
+        Util.copyIfPresent(new File(webApp, "port.js"), new File(outputDirectory, "port.js"), none);
     }
 
-    private static Path locateJavaScriptPortWebApp() {
+    private static File locateJavaScriptPortWebApp() {
         String override = System.getProperty("codename1.javascriptport.webapp");
         if (override != null && !override.trim().isEmpty()) {
-            Path path = Paths.get(override.trim());
-            if (Files.isDirectory(path)) {
+            File path = new File(override.trim());
+            if (path.isDirectory()) {
                 return path;
             }
         }
 
-        Path current = Paths.get("").toAbsolutePath().normalize();
+        File current = new File("").getAbsoluteFile();
         while (current != null) {
-            Path candidate = current.resolve(Paths.get("Ports", "JavaScriptPort", "src", "main", "webapp"));
-            if (Files.isDirectory(candidate)) {
+            File candidate = new File(current, "Ports/JavaScriptPort/src/main/webapp");
+            if (candidate.isDirectory()) {
                 return candidate;
             }
-            current = current.getParent();
+            current = current.getParentFile();
         }
         return null;
     }
 
-    private static void copyPathIfPresent(Path source, Path target) throws IOException {
-        copyPathIfPresent(source, target, Collections.<String>emptySet());
-    }
-
-    private static void copyPathIfPresent(Path source, Path target, Set<String> skipNames)
-            throws IOException {
-        if (!Files.exists(source)) {
-            return;
-        }
-        if (Files.isDirectory(source)) {
-            Files.createDirectories(target);
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(source)) {
-                for (Path child : stream) {
-                    Path childName = child.getFileName();
-                    if (childName != null) {
-                        if (skipNames.contains(childName.toString())) {
-                            continue;
-                        }
-                        copyPathIfPresent(child, target.resolve(childName.toString()), skipNames);
-                    }
-                }
-            }
-            return;
-        }
-        Path parent = target.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
-    }
-
     private static void writeResource(File outputDirectory, String targetName, String resourceName) throws IOException {
-        Files.write(new File(outputDirectory, targetName).toPath(),
-                loadResource(resourceName).getBytes(StandardCharsets.UTF_8));
+        Util.writeUtf8(new File(outputDirectory, targetName), loadResource(resourceName));
     }
 
     private static String loadResource(String resourceName) throws IOException {
@@ -1946,13 +1914,9 @@ final class JavascriptBundleWriter {
             throw new IOException("Missing javascript backend resource " + resourceName);
         }
         try {
-            byte[] data = new byte[8192];
-            StringBuilder out = new StringBuilder();
-            int len;
-            while ((len = input.read(data)) > -1) {
-                out.append(new String(data, 0, len, StandardCharsets.UTF_8));
-            }
-            return out.toString();
+            // Decoded once, whole: decoding fixed-size chunks splits a multi-byte
+            // character that straddles a chunk boundary into two replacement chars.
+            return Util.utf8(Util.readFully(input));
         } finally {
             input.close();
         }
@@ -2033,28 +1997,28 @@ final class JavascriptBundleWriter {
             }
         }
         try {
-            Path webApp = locateJavaScriptPortWebApp();
+            File webApp = locateJavaScriptPortWebApp();
             if (webApp != null) {
-                Path portJs = webApp.resolve("port.js");
-                if (Files.exists(portJs)) {
-                    sources.add(new String(Files.readAllBytes(portJs), StandardCharsets.UTF_8));
+                File portJs = new File(webApp, "port.js");
+                if (portJs.exists()) {
+                    sources.add(Util.readUtf8(portJs));
                 }
             }
         } catch (IOException | RuntimeException portJsUnavailable) {
             // port.js unavailable -- skip (bridge-name protection degrades
             // to the in-bundle string scan only)
         }
-        java.util.regex.Pattern literal = java.util.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
-        java.util.regex.Pattern lookup = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern literal = com.codename1.tools.translator.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
+        com.codename1.tools.translator.regex.Pattern lookup = com.codename1.tools.translator.regex.Pattern.compile(
                 "resolveVirtual\\s*\\([^,()]*,\\s*[\"'](cn1_[A-Za-z0-9_]+)[\"']");
         Map<String, int[]> counts = new HashMap<String, int[]>();
         for (String src : sources) {
-            java.util.regex.Matcher m = literal.matcher(src);
+            com.codename1.tools.translator.regex.Matcher m = literal.matcher(src);
             while (m.find()) {
                 bump(counts, m.group(1), 0);
             }
             if (replacedOnly) {
-                java.util.regex.Matcher l = lookup.matcher(src);
+                com.codename1.tools.translator.regex.Matcher l = lookup.matcher(src);
                 while (l.find()) {
                     bump(counts, l.group(1), 1);
                 }
@@ -2184,20 +2148,20 @@ final class JavascriptBundleWriter {
             }
         }
         try {
-            Path webApp = locateJavaScriptPortWebApp();
+            File webApp = locateJavaScriptPortWebApp();
             if (webApp != null) {
-                Path portJs = webApp.resolve("port.js");
-                if (Files.exists(portJs)) {
-                    sources.add(new String(Files.readAllBytes(portJs), StandardCharsets.UTF_8));
+                File portJs = new File(webApp, "port.js");
+                if (portJs.exists()) {
+                    sources.add(Util.readUtf8(portJs));
                 }
             }
         } catch (IOException | RuntimeException portJsUnavailable) {
             // port.js unavailable -- skip
         }
-        java.util.regex.Pattern call = java.util.regex.Pattern.compile("bindNative\\s*\\(\\s*\\[");
-        java.util.regex.Pattern literal = java.util.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
+        com.codename1.tools.translator.regex.Pattern call = com.codename1.tools.translator.regex.Pattern.compile("bindNative\\s*\\(\\s*\\[");
+        com.codename1.tools.translator.regex.Pattern literal = com.codename1.tools.translator.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
         for (String src : sources) {
-            java.util.regex.Matcher m = call.matcher(src);
+            com.codename1.tools.translator.regex.Matcher m = call.matcher(src);
             while (m.find()) {
                 int bracket = m.end() - 1;                 // at '['
                 int close = src.indexOf(']', bracket);      // names list end (cn1_ tokens never contain ']')
@@ -2222,7 +2186,7 @@ final class JavascriptBundleWriter {
                 if (classifyBindNativeWrapper(src, close) != WrapperKind.PLAIN) {
                     continue;   // unknown, or a generator -> leave it suspending
                 }
-                java.util.regex.Matcher lit = literal.matcher(src.substring(bracket + 1, close));
+                com.codename1.tools.translator.regex.Matcher lit = literal.matcher(src.substring(bracket + 1, close));
                 while (lit.find()) {
                     tokens.add(lit.group(1));
                 }

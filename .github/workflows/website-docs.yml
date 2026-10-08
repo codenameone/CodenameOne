@@ -336,18 +336,55 @@ jobs:
           grep -Fq 'cn1-initializr-project-downloaded' \
             docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
           grep -Fq 'cn1-initializr-project-downloaded' docs/website/public/initializr/index.html
+          grep -Fq 'cn1-initializr-steps-request' \
+            docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
+          grep -Fq 'cn1-initializr-steps-request' docs/website/public/initializr/index.html
           node docs/website/scripts/test-initializr-download-bridge.mjs \
             docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
 
       - name: Validate website conversion telemetry
         run: |
           set -euo pipefail
-          node docs/website/scripts/test-signup-funnel.mjs docs/website/public
+          node docs/website/scripts/test-build-first-funnel.mjs docs/website/public
           node docs/website/scripts/test-cn1-crisp-events.mjs
           node docs/website/scripts/test-initializr-download-beacon.mjs
+          node docs/website/scripts/test-initializr-chat-clearance.mjs
 
       - name: Validate Playground JS bundle output
         run: test -f docs/website/public/playground-app/index.html
+
+      # Check the actual Hugo output before it can become a PR preview or a
+      # production deployment. Compilation alone missed a blank Retina 3D view.
+      - name: Test Playground rendering in website output
+        env:
+          PLAYGROUND_SOFTWARE_GL: "1"
+          PLAYGROUND_DEMO_FILTER: 3d-gpu
+          PLAYGROUND_BROWSER_ARTIFACT_DIR: ${{ runner.temp }}/website-playground
+        run: |
+          set -euo pipefail
+          cd scripts
+          npm install playwright
+          bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
+          npx playwright install-deps chromium firefox
+          npx playwright install chromium firefox
+          cd "$GITHUB_WORKSPACE"
+          python3 -m http.server 8793 --bind 127.0.0.1 --directory docs/website/public > /tmp/website-playground-server.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 50); do
+            if curl -fsS http://127.0.0.1:8793/playground/ >/dev/null; then break; fi
+            sleep 0.2
+          done
+          # Firefox needs an X display to initialize Mesa WebGL even in headless mode.
+          xvfb-run -a node scripts/cn1playground/tools/verify-playground-demos.mjs http://127.0.0.1:8793/playground/
+
+      - name: Upload website Playground rendering evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: website-playground-rendering
+          path: ${{ runner.temp }}/website-playground
+          if-no-files-found: ignore
 
       - name: Validate redirects against local Pages runtime
         run: |

@@ -23,14 +23,14 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.annotations.Component;
-import com.codename1.backend.annotations.SessionScope;
+import com.codename1.backend.annotations.Scope;
 
 import java.util.ArrayList;
 import java.util.List;
 
 // tag::backend-session-bean[]
 @Component
-@SessionScope
+@Scope("session")
 public class Cart {
     private final List<String> items = new ArrayList<String>();
 

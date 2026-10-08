@@ -109,6 +109,34 @@ final class BackendTestSupport {
                 + (log.length() > 3000 ? log.substring(log.length() - 3000) : log);
     }
 
+    /**
+     * Translates the CI test server, scripts/hellocodenameone/backend, through its
+     * own `server.sh build --native` -- the Maven plugin path an application takes --
+     * and copies the binary to `binary`. Returns null on success, or the reason.
+     */
+    static String buildCn1ssServer(Path binary) throws Exception {
+        Path app = Paths.get("..", "..", "scripts", "hellocodenameone", "backend")
+                .normalize().toAbsolutePath();
+        if (!Files.isRegularFile(app.resolve("server.sh"))) {
+            return "scripts/hellocodenameone/backend is not present";
+        }
+        ProcessBuilder build = new ProcessBuilder("bash", app.resolve("server.sh").toString(),
+                "build", "--native");
+        build.directory(app.toFile());
+        Cn1ssTestServer.serverShEnvironment(build.environment());
+        build.redirectErrorStream(true);
+        Process p = build.start();
+        boolean[] timedOut = new boolean[1];
+        String log = awaitOutput(p, 30, TimeUnit.MINUTES, timedOut);
+        Path built = app.resolve("target").resolve("hellocodenameone-backend");
+        if (!timedOut[0] && p.exitValue() == 0 && Files.isExecutable(built)) {
+            Files.copy(built, binary, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return null;
+        }
+        return "could not build the cn1ss test server:\n"
+                + (log.length() > 3000 ? log.substring(log.length() - 3000) : log);
+    }
+
     static Process start(Path binary, Map<String, String> env, Path logFile) throws IOException {
         ProcessBuilder run = new ProcessBuilder(binary.toString());
         run.environment().putAll(env);

@@ -22,14 +22,14 @@
  */
 package com.codename1.tools.translator;
 
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.LineNumberNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.TryCatchBlockNode;
-import org.objectweb.asm.tree.TypeInsnNode;
+import com.codename1.tools.translator.classfile.ClassReader;
+import com.codename1.tools.translator.classfile.Opcodes;
+import com.codename1.tools.translator.classfile.tree.AbstractInsnNode;
+import com.codename1.tools.translator.classfile.tree.ClassNode;
+import com.codename1.tools.translator.classfile.tree.LineNumberNode;
+import com.codename1.tools.translator.classfile.tree.MethodNode;
+import com.codename1.tools.translator.classfile.tree.TryCatchBlockNode;
+import com.codename1.tools.translator.classfile.tree.TypeInsnNode;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -239,7 +239,7 @@ public class CastSemanticsVerifier {
             }
             int opcode = insn.getOpcode();
             if (opcode == Opcodes.ASTORE) {
-                dropSlot(((org.objectweb.asm.tree.VarInsnNode) insn).var);
+                dropSlot(((com.codename1.tools.translator.classfile.tree.VarInsnNode) insn).var);
                 return;
             }
             if (opcode != Opcodes.IFEQ) {
@@ -254,11 +254,11 @@ public class CastSemanticsVerifier {
             if (load == null || load.getOpcode() != Opcodes.ALOAD) {
                 return;
             }
-            int end = method.instructions.indexOf(((org.objectweb.asm.tree.JumpInsnNode) insn).label);
+            int end = method.instructions.indexOf(((com.codename1.tools.translator.classfile.tree.JumpInsnNode) insn).label);
             if (end <= index) {
                 return; // backwards branch; not the if-shape we recognise
             }
-            ranges.add(new int[]{((org.objectweb.asm.tree.VarInsnNode) load).var, end});
+            ranges.add(new int[]{((com.codename1.tools.translator.classfile.tree.VarInsnNode) load).var, end});
             types.add(((TypeInsnNode) instanceOf).desc);
         }
 
@@ -276,7 +276,7 @@ public class CastSemanticsVerifier {
             if (load == null || load.getOpcode() != Opcodes.ALOAD) {
                 return false;
             }
-            int slot = ((org.objectweb.asm.tree.VarInsnNode) load).var;
+            int slot = ((com.codename1.tools.translator.classfile.tree.VarInsnNode) load).var;
             for (int iter = 0; iter < ranges.size(); iter++) {
                 if (ranges.get(iter)[0] == slot && types.get(iter).equals(type)) {
                     return true;

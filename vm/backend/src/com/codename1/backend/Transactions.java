@@ -61,13 +61,13 @@ import com.codename1.backend.orm.EntityManager;
 /// throws [TransactionException.UnexpectedRollback] rather than reporting
 /// a commit that did not happen.
 public final class Transactions {
-    public static final int REQUIRED = 0;
-    public static final int SUPPORTS = 1;
-    public static final int MANDATORY = 2;
-    public static final int REQUIRES_NEW = 3;
-    public static final int NOT_SUPPORTED = 4;
-    public static final int NEVER = 5;
-    public static final int NESTED = 6;
+    static final int REQUIRED = com.codename1.impl.backend.BackendAccess.REQUIRED;
+    static final int SUPPORTS = com.codename1.impl.backend.BackendAccess.SUPPORTS;
+    static final int MANDATORY = com.codename1.impl.backend.BackendAccess.MANDATORY;
+    static final int REQUIRES_NEW = com.codename1.impl.backend.BackendAccess.REQUIRES_NEW;
+    static final int NOT_SUPPORTED = com.codename1.impl.backend.BackendAccess.NOT_SUPPORTED;
+    static final int NEVER = com.codename1.impl.backend.BackendAccess.NEVER;
+    static final int NESTED = com.codename1.impl.backend.BackendAccess.NESTED;
 
     /// The physical transaction the thread is in, or null.
     private static final ThreadLocal CURRENT = new ThreadLocal();
@@ -120,7 +120,7 @@ public final class Transactions {
     /// What one call to [#begin] did, which the matching [#commit] or
     /// [#afterThrow] undoes. Opaque to the woven code, which only passes it
     /// back.
-    public static final class Transaction {
+    static final class Transaction {
         final int kind;
         final Physical physical;
         /// The transaction to restore when this one ends: REQUIRES_NEW, NOT_SUPPORTED.
@@ -141,7 +141,7 @@ public final class Transactions {
         }
 
         /// Whether this call began the physical transaction it runs in.
-        public boolean isNewTransaction() {
+        boolean isNewTransaction() {
             return kind == KIND_NEW;
         }
     }
@@ -200,7 +200,7 @@ public final class Transactions {
     /// - `readOnly`: the annotation's readOnly
     ///
     /// - `timeoutSeconds`: the annotation's timeout, zero or less for none
-    public static Transaction begin(int propagation, boolean readOnly, int timeoutSeconds) {
+    static Transaction begin(int propagation, boolean readOnly, int timeoutSeconds) {
         used = true;
         Transaction tx = open(propagation, readOnly, timeoutSeconds);
         if (tx.physical != null && (tx.kind == KIND_JOINED || tx.kind == KIND_SAVEPOINT)) {
@@ -286,7 +286,7 @@ public final class Transactions {
 
     /// Ends a call that returned normally. Commits when the call began the
     /// transaction, and does nothing more than restore state when it joined one.
-    public static void commit(Transaction tx) {
+    static void commit(Transaction tx) {
         if (tx == null || tx.completed) {
             return;
         }
@@ -335,7 +335,7 @@ public final class Transactions {
     /// A rollback that fails is reported on standard error and its connection
     /// closed, so the pool cannot hand out a session that is still inside a
     /// transaction.
-    public static void afterThrow(Transaction tx, boolean rollback) {
+    static void afterThrow(Transaction tx, boolean rollback) {
         if (tx == null || tx.completed) {
             return;
         }
@@ -513,7 +513,7 @@ public final class Transactions {
     /// The transaction's connection for `pool`, borrowing it and sending
     /// BEGIN the first time; null when the thread is not in a transaction or its
     /// transaction is on another database. Called by [DataSource#borrow].
-    public static Database joined(DataSource pool) throws IOException {
+    static Database joined(DataSource pool) throws IOException {
         if (!used) {
             return null;
         }
@@ -577,7 +577,7 @@ public final class Transactions {
     }
 
     /// Whether `db` is the connection of the calling thread's transaction on `pool`.
-    public static boolean isJoined(DataSource pool, Database db) {
+    static boolean isJoined(DataSource pool, Database db) {
         if (!used) {
             return false;
         }
@@ -586,7 +586,7 @@ public final class Transactions {
     }
 
     /// Whether the calling thread's transaction is on `pool`, or could be.
-    public static boolean isActiveOn(DataSource pool) {
+    static boolean isActiveOn(DataSource pool) {
         if (!used) {
             return false;
         }
@@ -601,7 +601,7 @@ public final class Transactions {
     /// This is what an injected `Session` delegates to. Outside a
     /// transaction there is no session to give, and the refusal says where one
     /// comes from.
-    public static com.codename1.orm.session.Session session(EntityManager entities) {
+    static com.codename1.orm.session.Session session(EntityManager entities) {
         Physical p = used ? (Physical) CURRENT.get() : null;
         if (p == null) {
             throw new TransactionException.IllegalState("The injected Session belongs to a "
@@ -639,14 +639,14 @@ public final class Transactions {
     /// transaction they are in cannot commit either.
     /// Marks the calling thread's transaction, whatever pool it is on, as
     /// unable to commit; nothing when there is none.
-    public static void markRollbackOnly() {
+    static void markRollbackOnly() {
         Physical p = used ? (Physical) CURRENT.get() : null;
         if (p != null) {
             p.rollbackOnly = true;
         }
     }
 
-    public static void markRollbackOnly(DataSource pool) {
+    static void markRollbackOnly(DataSource pool) {
         Physical p = used ? (Physical) CURRENT.get() : null;
         if (p != null && (p.pool == null || p.pool == pool)) { //NOPMD CompareObjectsWithEquals - pools and connections are compared by identity
             p.rollbackOnly = true;

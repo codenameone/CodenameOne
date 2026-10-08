@@ -28,8 +28,8 @@ package com.codename1.surfaces;
 /// operating system resolves natively (label, secondary label, background, accent).
 ///
 /// ```java
-/// SurfaceColor.rgb(0xff333333, 0xffeeeeee)   // dark text in light mode, light text in dark mode
-/// SurfaceColor.LABEL                         // whatever the OS considers primary label color
+/// SurfaceColor text = SurfaceColor.rgb(0xff333333, 0xffeeeeee);   // dark text in light mode, light text in dark mode
+/// SurfaceColor label = SurfaceColor.LABEL;                         // whatever the OS considers primary label color
 /// ```
 public final class SurfaceColor {
     /// The platform's primary label (body text) color.

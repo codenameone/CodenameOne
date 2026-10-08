@@ -127,6 +127,8 @@ include::Backend-Web.asciidoc[]
 
 include::Backend-Beans.asciidoc[]
 
+include::Backend-Testing.asciidoc[]
+
 include::Backend-Data.asciidoc[]
 
 include::Backend-Sessions.asciidoc[]
@@ -260,6 +262,8 @@ include::TVPlatforms.asciidoc[]
 = Under the hood
 
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
+
+include::Java-In-The-Browser.asciidoc[]
 
 include::Working-With-CodenameOne-Sources.asciidoc[]
 

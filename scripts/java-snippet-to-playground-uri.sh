@@ -2,12 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-BUILD_DIR="${TMPDIR:-/tmp}/cn1-snippet-cli"
-CLASSES_DIR="$BUILD_DIR/classes"
-LIBS_DIR="$BUILD_DIR/libs"
-SOURCES_FILE="$BUILD_DIR/sources.txt"
-STAMP_FILE="$BUILD_DIR/.compiled.ok"
-ZIPSUPPORT_SRC="$ROOT_DIR/scripts/cn1playground/cn1libs/ZipSupport/jars/main.zip"
+# Under this checkout's own build output: several clones share /tmp.
+BUILD_DIR="$ROOT_DIR/scripts/cn1playground/common/target/snippet-cli"
+CP_FILE="$BUILD_DIR/classpath.txt"
+STAMP_FILE="$BUILD_DIR/.built.ok"
 
 usage() {
   cat <<'USAGE'
@@ -69,68 +67,31 @@ else
   cat > "$TMP_INPUT"
 fi
 
-mkdir -p "$BUILD_DIR" "$CLASSES_DIR" "$LIBS_DIR"
+mkdir -p "$BUILD_DIR"
 
-# Unpack the ZipSupport cn1lib once so net.sf.zipme.* is on the classpath for
-# PlaygroundProjectExporter (and any other playground sources that depend on it).
-if [[ -f "$ZIPSUPPORT_SRC" ]] && [[ "$ZIPSUPPORT_SRC" -nt "$LIBS_DIR/.unpacked" ]]; then
-  rm -rf "$LIBS_DIR"
-  mkdir -p "$LIBS_DIR"
-  (cd "$LIBS_DIR" && unzip -q -o "$ZIPSUPPORT_SRC")
-  touch "$LIBS_DIR/.unpacked"
-fi
-
-# Build a javac source list from repository sources, excluding BeanShell desktop/classpath files
-# that are not needed by the CN1 playground runtime.
-: > "$SOURCES_FILE"
-while IFS= read -r src; do
-  case "$src" in
-    */bsh/classpath/*) continue ;;
-    */bsh/commands/dir.java) continue ;;
-    */bsh/util/ClassBrowser.java) continue ;;
-  esac
-  printf '%s\n' "$src" >> "$SOURCES_FILE"
-done < <(find \
-  "$ROOT_DIR/CodenameOne/src" \
-  "$ROOT_DIR/Factory/src" \
-  "$ROOT_DIR/scripts/cn1playground/common/src/main/java/com/codenameone/playground" \
-  "$ROOT_DIR/scripts/cn1playground/common/src/main/java/bsh" \
-  "$ROOT_DIR/scripts/cn1playground/common/src/main/java/bsh/cn1" \
-  "$ROOT_DIR/scripts/cn1playground/common/src/main/java/bsh/cn1/gen" \
-  -name '*.java' -print)
-
-printf '%s\n' "$ROOT_DIR/scripts/cn1playground/common/src/test/java/com/codenameone/playground/JavaSnippetToPlaygroundUriHarness.java" >> "$SOURCES_FILE"
-
+# The snippet is compiled exactly as the Playground compiles it: by the in-tree
+# Java compiler, against the API stub library the Playground build generates from
+# the framework and ParparVM's class library. Both come from the Maven build of
+# scripts/cn1playground/common, which needs the framework SNAPSHOT installed in the
+# local repository (scripts/setup-workspace.sh). The build and its classpath are
+# cached and redone only when a source under the playground or the compiler changes.
+# Extra Maven arguments (a -Dmaven.repo.local, say) go in SNIPPET_MVN_ARGS.
+PLAYGROUND_DIR="$ROOT_DIR/scripts/cn1playground"
 rebuild=true
-if [[ -f "$STAMP_FILE" ]]; then
-  rebuild=false
-  while IFS= read -r src; do
-    if [[ "$src" -nt "$STAMP_FILE" ]]; then
-      rebuild=true
-      break
-    fi
-  done < "$SOURCES_FILE"
+if [[ -f "$STAMP_FILE" && -f "$CP_FILE" ]]; then
+  if [[ -z "$(find "$PLAYGROUND_DIR/common/src" "$PLAYGROUND_DIR/common/pom.xml" \
+      "$ROOT_DIR/vm/JavaCompiler/src" -newer "$STAMP_FILE" -print -quit)" ]]; then
+    rebuild=false
+  fi
 fi
-
 if [[ "$rebuild" == "true" ]]; then
-  javac -encoding UTF-8 -cp "$LIBS_DIR" -d "$CLASSES_DIR" @"$SOURCES_FILE" >/dev/null 2>&1
+  # shellcheck disable=SC2086
+  mvn -q -B -nsu ${SNIPPET_MVN_ARGS:-} -f "$PLAYGROUND_DIR/common/pom.xml" -DskipTests test-compile >&2
+  # shellcheck disable=SC2086
+  mvn -q -B -nsu ${SNIPPET_MVN_ARGS:-} -f "$PLAYGROUND_DIR/common/pom.xml" dependency:build-classpath \
+    -Dmdep.includeScope=test -Dmdep.outputFile="$CP_FILE" >&2
   touch "$STAMP_FILE"
 fi
 
-# If a locally-built JavaSE port jar is available we prepend it to the classpath
-# so Display.init(null) can populate Display.impl. With impl bound, BeanShell
-# can detect undefined identifiers (e.g. setIcon(icon) when 'icon' is not
-# declared) instead of falling over on the first CN1 method call. Without the
-# jar we fall back to parse-only validation -- harmless for CI, useful locally.
-JAVASE_JAR=""
-JAVASE_JAR_GLOB="${HOME}/.m2/repository/com/codenameone/codenameone-javase/8.0-SNAPSHOT/codenameone-javase-8.0-SNAPSHOT.jar"
-if [[ -f "$JAVASE_JAR_GLOB" ]]; then
-  JAVASE_JAR="$JAVASE_JAR_GLOB"
-fi
-
-CP="$CLASSES_DIR:$LIBS_DIR"
-if [[ -n "$JAVASE_JAR" ]]; then
-  CP="$JAVASE_JAR:$CP"
-fi
-
+CP="$PLAYGROUND_DIR/common/target/test-classes:$PLAYGROUND_DIR/common/target/classes:$(cat "$CP_FILE")"
 java -Djava.awt.headless=true -cp "$CP" com.codenameone.playground.JavaSnippetToPlaygroundUriHarness --file "$TMP_INPUT"

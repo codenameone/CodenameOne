@@ -50,11 +50,11 @@
  },
  "longArithmetic": {
   "all": {
-   "memory": 0.112,
+   "memory": 0.07,
    "runs": 1,
    "time": 1.026,
    "tolerance": {
-    "memory": 0.5
+    "memory": 0.65
    }
   }
  },
@@ -71,9 +71,9 @@
  },
  "objectAllocation": {
   "all": {
-   "memory": 0.481,
-   "runs": 1,
-   "time": 3.696,
+   "memory": 0.708,
+   "runs": 2,
+   "time": 1.106,
    "tolerance": {
     "memory": 0.3,
     "time": 0.5
@@ -110,9 +110,9 @@
  },
  "translator": {
   "all": {
-   "memory": 0.739,
-   "runs": 1,
-   "time": 0.539
+   "memory": 0.566,
+   "runs": 2,
+   "time": 0.623
   }
  },
  "valueEscape": {

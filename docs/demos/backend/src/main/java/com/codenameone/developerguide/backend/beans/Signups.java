@@ -24,14 +24,14 @@ package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Autowired;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PostConstruct;
-import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.Transactional;
 
 import java.io.IOException;
 
 // tag::backend-bean-service[]
-@Service
+@Component
 public class Signups {
     private final DataSource db;
 

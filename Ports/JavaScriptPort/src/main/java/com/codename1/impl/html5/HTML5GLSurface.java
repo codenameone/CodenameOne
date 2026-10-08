@@ -31,8 +31,6 @@ import com.codename1.html5.js.browser.Window;
 import com.codename1.html5.js.dom.HTMLCanvasElement;
 import com.codename1.html5.js.webgl.WebGLRenderingContext;
 
-import static com.codename1.impl.html5.HTML5Implementation.scaleCoord;
-
 /// Browser peer that hosts an `HTMLCanvasElement` with a WebGL context and drives
 /// the application `Renderer`. The canvas is wrapped as a Codename One native
 /// peer (an `HTML5Peer`), participating in normal layout and z-ordering. The
@@ -193,15 +191,15 @@ class HTML5GLSurface extends HTML5Peer {
     }
 
     private void syncSize() {
-        int w = scaleCoord(getWidth());
-        int h = scaleCoord(getHeight());
+        int w = getWidth();
+        int h = getHeight();
         if (w <= 0 || h <= 0) {
             return;
         }
         if (w != lastW || h != lastH) {
             lastW = w;
             lastH = h;
-            // The canvas pixel size is the scaled component size, tracked Java-side
+            // The backing store uses CN1 device pixels, not DOM CSS pixels, tracked Java-side
             // via lastW/lastH; it is written (fire-and-forget) but never read back
             // off the canvas host-ref (that would be a worker<->host barrier read).
             canvas.setWidth(w);
@@ -218,8 +216,8 @@ class HTML5GLSurface extends HTML5Peer {
         if (contextLost || device == null) {
             return;
         }
-        int w = scaleCoord(getWidth());
-        int h = scaleCoord(getHeight());
+        int w = getWidth();
+        int h = getHeight();
         if (w <= 0 || h <= 0) {
             return;
         }
@@ -255,8 +253,8 @@ class HTML5GLSurface extends HTML5Peer {
         if (contextLost || device == null) {
             return;
         }
-        int w = scaleCoord(getWidth());
-        int h = scaleCoord(getHeight());
+        int w = getWidth();
+        int h = getHeight();
         if (w <= 0 || h <= 0) {
             return;
         }
@@ -266,12 +264,15 @@ class HTML5GLSurface extends HTML5Peer {
         // on top, the device bezel and neighbouring UI render correctly, and it
         // sits at its real on-screen position (g is translated so our content is
         // at getX(),getY()). The canvas itself is never shown as a DOM overlay.
+        // BufferedGraphics and its clip are in CN1 device pixels. Converting
+        // this blit to CSS pixels divides its position and size a second time
+        // on Retina displays, moving it outside the component clip entirely.
         renderFrame();
         BufferedGraphics bg = HTML5Implementation.getInstance().displayGraphics();
         if (bg != null) {
             bg.drawCanvas(canvas,
-                    scaleCoord(g.getTranslateX() + getX()),
-                    scaleCoord(g.getTranslateY() + getY()), w, h);
+                    g.getTranslateX() + getX(),
+                    g.getTranslateY() + getY(), w, h);
         }
     }
 

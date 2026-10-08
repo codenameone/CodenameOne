@@ -153,7 +153,7 @@ jobs:
           # this is the step that resolves the most from Central, and a single 502
           # on a plugin dependency (maven-shared-utils) failed the whole guide build.
           RETRY_ONLY_MATCHING=transient xvfb-run -a bash scripts/ci/retry.sh mvn -B -ntp -f maven/pom.xml \
-            -pl core,javase,android,css-compiler,codenameone-maven-plugin,backend \
+            -pl core,javase,android,css-compiler,codenameone-maven-plugin,backend,backend-test \
             -am install \
             -Plocal-dev-javase \
             -DskipTests \

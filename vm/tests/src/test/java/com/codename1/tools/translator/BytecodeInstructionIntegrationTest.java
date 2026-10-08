@@ -35,8 +35,8 @@ import com.codename1.tools.translator.bytecodes.VarOp;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.Label;
+import com.codename1.tools.translator.classfile.AnnotationVisitor;
+import com.codename1.tools.translator.classfile.Label;
 import org.objectweb.asm.Opcodes;
 
 import java.io.ByteArrayOutputStream;
@@ -461,7 +461,7 @@ class BytecodeInstructionIntegrationTest {
         assertDoesNotThrow(() -> wrapperWithNull.visitEnum("choice", "LExample;", "VALUE"));
 
         AtomicBoolean delegated = new AtomicBoolean(false);
-        AnnotationVisitor delegate = new AnnotationVisitor(Opcodes.ASM5) {
+        AnnotationVisitor delegate = new AnnotationVisitor() {
             @Override
             public AnnotationVisitor visitArray(String name) {
                 delegated.set(true);

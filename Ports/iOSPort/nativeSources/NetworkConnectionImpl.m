@@ -76,10 +76,23 @@ int connections = 0;
 
 - (void)connect {
 #if TARGET_OS_WATCH || TARGET_OS_TV
-    // NSURLConnection's synchronous delegate initializer is unavailable on
-    // watchOS (NSURLSession is the supported API). Networking via this legacy
-    // path is a no-op on the watch slice for now.
+    // NSURLConnection is unavailable on watchOS and tvOS, so these slices go
+    // through NSURLSession, with this object as the delegate and the same
+    // callbacks into Java the NSURLConnection path makes. This was a no-op, and
+    // every request on the watch and the TV waited forever for an answer.
+    //
+    // Ephemeral: no shared cookie store or cache. ConnectionRequest keeps its
+    // own cookies and sends them as headers (the request does not handle
+    // cookies), as it does on every other path.
     connection = nil;
+    NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    config.HTTPShouldSetCookies = NO;
+    config.URLCache = nil;
+    urlSession = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:nil];
+#ifndef CN1_USE_ARC
+    [urlSession retain];
+#endif
+    [[urlSession dataTaskWithRequest:request] resume];
 #else
     dispatch_sync(dispatch_get_main_queue(), ^{
          connection = [[NSURLConnection alloc] initWithRequest:request delegate:self startImmediately:YES];
@@ -166,6 +179,25 @@ int connections = 0;
 //- (void) connection: (NSURLConnection*)connection willSendRequestForAuthenticationChallenge: (NSURLAuthenticationChallenge*)challenge {
 -(void) connection: (NSURLConnection*)connection willSendRequestForAuthenticationChallenge:(nonnull NSURLAuthenticationChallenge *)challenge {
     SecTrustRef trustRef = [[challenge protectionSpace] serverTrust];
+    if (![self javaAcceptsTrust:trustRef]) {
+        // Java rejected the chain -- a per-request check or a guard pin mismatch.
+        // That veto applies to insecure requests too.
+        [challenge.sender cancelAuthenticationChallenge:challenge];
+        return;
+    }
+    if (insecure) {
+        // Accepted despite whatever the OS thinks of the chain, which is what the
+        // caller asked for by setting it insecure.
+        [[challenge sender] useCredential:[NSURLCredential credentialForTrust:trustRef] forAuthenticationChallenge:challenge];
+        return;
+    }
+    [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
+}
+
+/// Offers the server's chain to Java -- the per-request certificate check and the
+/// guard's pins -- and answers whether it accepted. Shared by the NSURLConnection
+/// and the NSURLSession paths, so pinning means the same on every slice.
+-(BOOL) javaAcceptsTrust:(SecTrustRef)trustRef {
     SecTrustEvaluate(trustRef, NULL);
     NSMutableString* certs = [NSMutableString string];
     // The chain is collected and offered to Java even for an insecure request. An
@@ -206,19 +238,7 @@ int connections = 0;
     [sslCertificates release];
     sslCertificates = [[NSString stringWithString:certs] retain];
 #endif
-    if (!com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
-        // Java rejected the chain -- a per-request check or a guard pin mismatch.
-        // That veto applies to insecure requests too.
-        [challenge.sender cancelAuthenticationChallenge:challenge];
-        return;
-    }
-    if (insecure) {
-        // Accepted despite whatever the OS thinks of the chain, which is what the
-        // caller asked for by setting it insecure.
-        [[challenge sender] useCredential:[NSURLCredential credentialForTrust:trustRef] forAuthenticationChallenge:challenge];
-        return;
-    }
-    [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
+    return com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId) ? YES : NO;
 }
 
 -(void)setConnectionId:(JAVA_INT)connId {
@@ -410,6 +430,63 @@ extern void connectionError(void* peer, NSString* message);
     connectionReceivedData((BRIDGE_CAST void*)self, data);
 }
 
+#if TARGET_OS_WATCH || TARGET_OS_TV
+// ---- The NSURLSession path, for the slices with no NSURLConnection. Each mirrors
+// the NSURLConnection callback of the same purpose above.
+
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask
+didReceiveResponse:(NSURLResponse *)response
+ completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
+    [self connection:nil didReceiveResponse:response];
+    completionHandler(NSURLSessionResponseAllow);
+}
+
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask
+    didReceiveData:(NSData *)data {
+    connectionReceivedData((BRIDGE_CAST void*)self, data);
+}
+
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
+willPerformHTTPRedirection:(NSHTTPURLResponse *)response newRequest:(NSURLRequest *)newRequest
+ completionHandler:(void (^)(NSURLRequest *))completionHandler {
+    // ConnectionRequest follows redirects itself, when asked to; see
+    // connection:willSendRequest:redirectResponse:.
+    completionHandler(nil);
+}
+
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
+didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+ completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential *))completionHandler {
+    if (![challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
+        completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
+        return;
+    }
+    SecTrustRef trustRef = [[challenge protectionSpace] serverTrust];
+    if (![self javaAcceptsTrust:trustRef]) {
+        completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, nil);
+        return;
+    }
+    if (insecure) {
+        completionHandler(NSURLSessionAuthChallengeUseCredential, [NSURLCredential credentialForTrust:trustRef]);
+        return;
+    }
+    completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
+}
+
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
+didCompleteWithError:(NSError *)error {
+    if (error != nil) {
+        connectionError((BRIDGE_CAST void*)self, [error localizedDescription]);
+    } else {
+        connectionComplete((BRIDGE_CAST void*)self);
+    }
+    connections--;
+    // A session holds its delegate strongly until it is invalidated, so this is
+    // also what lets this object go.
+    [session finishTasksAndInvalidate];
+}
+#endif
+
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection {
     connectionComplete((BRIDGE_CAST void*)self);
     connections--;
@@ -511,6 +588,10 @@ extern void connectionError(void* peer, NSString* message);
     if(connection != nil) {
         [connection release];
         connection = nil;
+    }
+    if(urlSession != nil) {
+        [urlSession release];
+        urlSession = nil;
     }
     if (sslCertificates != nil) {
        [sslCertificates release];

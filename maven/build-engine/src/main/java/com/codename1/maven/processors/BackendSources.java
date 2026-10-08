@@ -109,9 +109,8 @@ final class BackendSources {
                              boolean isVoid, String retType) {
         AnnotationValues tx = aspect.transactional;
         String propagation = BackendBeans.enumName(tx.get("propagation"), "REQUIRED");
-        sb.append("        com.codename1.backend.Transactions.Transaction cn1Tx =\n")
-          .append("                com.codename1.backend.Transactions.begin(")
-          .append("com.codename1.backend.Transactions.").append(propagation).append(", ")
+        sb.append("        Object cn1Tx = com.codename1.impl.backend.BackendAccess.get().begin(")
+          .append("com.codename1.impl.backend.BackendAccess.").append(propagation).append(", ")
           .append(tx.getBoolOrDefault("readOnly", false)).append(", ")
           .append(tx.getIntOrDefault("timeout", -1)).append(");\n");
         if (!isVoid) {
@@ -121,11 +120,11 @@ final class BackendSources {
         sb.append("            ").append(isVoid ? "" : "cn1Result = ").append(inner)
           .append(";\n");
         sb.append("        } catch (Throwable cn1Error) {\n");
-        sb.append("            com.codename1.backend.Transactions.afterThrow(cn1Tx, ")
+        sb.append("            com.codename1.impl.backend.BackendAccess.get().afterThrow(cn1Tx, ")
           .append(rollbackDecision(tx)).append(");\n");
         sb.append("            throw cn1Error;\n");
         sb.append("        }\n");
-        sb.append("        com.codename1.backend.Transactions.commit(cn1Tx);\n");
+        sb.append("        com.codename1.impl.backend.BackendAccess.get().commit(cn1Tx);\n");
         if (!isVoid) {
             sb.append("        return cn1Result;\n");
         }
@@ -276,8 +275,8 @@ final class BackendSources {
         // Looked up on every call, never cached in a static: the executor
         // belongs to the server the calling thread works for, and two servers
         // in one process -- or one started again -- each have their own.
-        String lookup = "com.codename1.backend.Tasks.executor(" + quote(executor)
-                + ", com.codename1.backend.Tasks." + thread + ")";
+        String lookup = "com.codename1.impl.backend.BackendAccess.get().executor("
+                + quote(executor) + ", com.codename1.impl.backend.BackendAccess." + thread + ")";
         sb.append("    static ").append(retType).append(' ').append(m.getName()).append('(')
           .append(params).append(") throws Throwable {\n");
         sb.append("        ").append(simple(aspect.asyncTaskBinary)).append(" cn1Task = new ")
@@ -298,7 +297,7 @@ final class BackendSources {
         StringBuilder sb = header(aspect.asyncTaskBinary, "@Async " + cls.getBinaryName() + "."
                 + m.getName());
         sb.append("final class ").append(name)
-          .append(" extends com.codename1.backend.AsyncTask {\n");
+          .append(" extends com.codename1.impl.backend.AsyncTask {\n");
         if (!isStatic) {
             sb.append("    private final ").append(owner).append(" self;\n");
         }
@@ -345,9 +344,9 @@ final class BackendSources {
                 + " bean " + b.name);
         sb.append("public final class ").append(name).append(" extends ").append(type)
           .append(" {\n");
-        sb.append("    private final com.codename1.backend.Wiring.Scope cn1Scope;\n\n");
+        sb.append("    private final com.codename1.impl.backend.Wiring.Scope cn1Scope;\n\n");
         sb.append("    public ").append(name)
-          .append("(com.codename1.backend.Wiring.Scope scope) {\n");
+          .append("(com.codename1.impl.backend.Wiring.Scope scope) {\n");
         sb.append("        super();\n        this.cn1Scope = scope;\n    }\n\n");
         sb.append("    private ").append(type).append(" cn1Target() {\n");
         sb.append("        return (").append(type).append(") cn1Scope.get(").append(b.slot)
@@ -415,7 +414,7 @@ final class BackendSources {
         StringBuilder sb = header(t.adapterBinary, "@McpTool " + b.cls.getBinaryName() + "."
                 + t.method.getName());
         sb.append("public final class ").append(name)
-          .append(" implements com.codename1.backend.mcp.McpTool {\n");
+          .append(" implements com.codename1.impl.backend.mcp.McpTool {\n");
         sb.append("    private final ").append(type).append(" target;\n\n");
         sb.append("    public ").append(name).append('(').append(type)
           .append(" target) {\n        this.target = target;\n    }\n\n");
@@ -431,7 +430,7 @@ final class BackendSources {
             String schema = t.paramSchema.get(i) != null ? t.paramSchema.get(i)
                     : jsonType(args[i]);
             sb.append("        properties.put(").append(quote(t.paramNames.get(i)))
-              .append(", com.codename1.backend.mcp.McpArgs.property(")
+              .append(", com.codename1.impl.backend.mcp.McpArgs.property(")
               .append(quote(schema)).append(", ")
               .append(quote(t.paramDescriptions.get(i))).append(", ")
               .append(enumConstants(args[i])).append("));\n");
@@ -442,7 +441,7 @@ final class BackendSources {
                 required.append(quote(t.paramNames.get(i)));
             }
         }
-        sb.append("        return com.codename1.backend.mcp.McpArgs.object(properties, ")
+        sb.append("        return com.codename1.impl.backend.mcp.McpArgs.object(properties, ")
           .append("new String[] {").append(required).append("});\n    }\n\n");
         sb.append("    public Object call(java.util.Map arguments) throws Exception {\n");
         for (int i = 0; i < args.length; i++) {
@@ -505,7 +504,7 @@ final class BackendSources {
     /// The expression reading one argument out of a map of arguments, converted.
     String convert(Type t, String map, String name, boolean required) {
         String args = map + ", " + quote(name) + ", " + required;
-        String helper = "com.codename1.backend.mcp.McpArgs.";
+        String helper = "com.codename1.impl.backend.mcp.McpArgs.";
         switch (t.getSort()) {
             case Type.BOOLEAN: return helper + "booleanValue(" + args + ")";
             case Type.CHAR: return helper + "charValue(" + args + ")";
@@ -630,7 +629,7 @@ final class BackendSources {
         String type = b.cls.getSourceName();
         StringBuilder sb = header(mg.adapterBinary, "@ManagedResource " + b.cls.getBinaryName());
         sb.append("public final class ").append(name)
-          .append(" implements com.codename1.backend.ManagedBean {\n");
+          .append(" implements com.codename1.impl.backend.ManagedBean {\n");
         sb.append("    private final ").append(type).append(" target;\n\n");
         sb.append("    public ").append(name).append('(').append(type)
           .append(" target) {\n        this.target = target;\n    }\n\n");
@@ -704,7 +703,7 @@ final class BackendSources {
         sb.append("            default: throw new IllegalArgumentException(\"No operation \" "
                 + "+ index);\n        }\n    }\n\n");
         sb.append("    /** Publishes the numeric attributes as gauges. */\n");
-        sb.append("    public void registerGauges(com.codename1.backend.Backend.Environment "
+        sb.append("    public void registerGauges(com.codename1.impl.backend.WiringEnvironment "
                 + "environment) {\n");
         sb.append("        final ").append(type).append(" bean = target;\n");
         for (int i = 0; i < mg.attributes.size(); i++) {
@@ -745,7 +744,7 @@ final class BackendSources {
                 if (n.startsWith("java/lang/") && (n.endsWith("Integer") || n.endsWith("Long")
                         || n.endsWith("Double") || n.endsWith("Float") || n.endsWith("Short")
                         || n.endsWith("Byte"))) {
-                    return "com.codename1.backend.mcp.McpArgs.toDouble(" + call + ")";
+                    return "com.codename1.impl.backend.mcp.McpArgs.toDouble(" + call + ")";
                 }
                 return null;
             default:

@@ -1,7 +1,27 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.playground;
 
-import bsh.cn1.CN1AccessRegistry;
-import bsh.cn1.GeneratedCN1Access;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -17,11 +37,9 @@ import com.codename1.ui.layouts.BorderLayout;
  *
  * <p>Phases:
  * <ol>
- *   <li>Registry first use — triggers GeneratedCN1Access
- *       {@code <clinit>} and the CLASS_INDEX holder build.</li>
- *   <li>First ui-package static field — lazy-loads
- *       {@code GeneratedAccess_com_codename1_ui}.</li>
- *   <li>First diagnostic — forces FIELD_INDEX holder to init.</li>
+ *   <li>API stub library load (the classes user code compiles against).</li>
+ *   <li>First completion lookup over the stubs.</li>
+ *   <li>First compile of a snippet (no run).</li>
  *   <li>CN1 Display init + Form/Container allocation — the simulator
  *       wiring the matrix harness uses.</li>
  *   <li>Full snippet round-trip via PlaygroundRunner — representative
@@ -31,25 +49,23 @@ import com.codename1.ui.layouts.BorderLayout;
 public final class PlaygroundColdStartHarness {
     public static void main(String[] args) throws Exception {
         long t0 = nanoTime();
-        Class<?> displayClass = CN1AccessRegistry.getInstance().findClass("com.codename1.ui.Display");
+        int classes = PlaygroundApi.library().size();
         long t1 = nanoTime();
-        report("1. registry.findClass Display (CLASS_INDEX)", t0, t1);
+        report("1. API stub library load (" + classes + " classes)", t0, t1);
 
         long t2 = nanoTime();
-        Object val = CN1AccessRegistry.getInstance()
-                .getStaticField(com.codename1.ui.Display.class, "PICKER_TYPE_DATE");
+        String[] names = PlaygroundApi.fieldNames("com.codename1.ui.Display");
         long t3 = nanoTime();
-        report("2. first ui-package getStaticField", t2, t3);
-        if (val == null) throw new IllegalStateException("PICKER_TYPE_DATE resolved to null");
+        report("2. first completion lookup (Display fields)", t2, t3);
 
         long t4 = nanoTime();
-        String[] names = ((GeneratedCN1Access) CN1AccessRegistry.getInstance())
-                .getFieldNames("com.codename1.ui.Display");
+        PlaygroundRunner.compile("Label l = new Label(\"x\");\nl;\n");
         long t5 = nanoTime();
-        report("3. first getFieldNames (FIELD_INDEX holder)", t4, t5);
+        report("3. first compile (no run)", t4, t5);
 
         long t6 = nanoTime();
         Display.init(null);
+        HarnessSupport.install();
         Form host = new Form("Host", new BorderLayout());
         Container preview = new Container(new BorderLayout());
         host.add(BorderLayout.CENTER, preview);

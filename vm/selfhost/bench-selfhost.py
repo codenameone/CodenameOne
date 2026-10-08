@@ -307,15 +307,6 @@ def main(args):
     javaapi = TARGET / 'javaapi-classes'
     if manifest['host_classes'] != digest(host) or manifest['javaapi'] != digest(javaapi):
         raise RuntimeError('Host/JavaAPI classes differ from the verified native build inputs')
-    asm_file = REPO / 'vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt'
-    if not asm_file.is_file():
-        # See verify-selfhost.sh: `mvn clean package` removes target/, and the
-        # gauntlet triggers one. Absent this file the bench prints no ratio line at
-        # all, which perf-guard then reports as a possible correctness failure.
-        raise SystemExit('missing %s -- run vm/selfhost/build-selfhost.sh -O3 first; '
-                         'mvn clean package removes target/ and it regenerates this.'
-                         % asm_file)
-    asm = asm_file.read_text().strip()
     refs = os.environ.get('SELFHOST_REF_JAVAS')
     if refs:
         javas = refs.split(',')
@@ -363,7 +354,7 @@ def main(args):
               'metric': 'peak phys_footprint' if system == 'Darwin' else 'peak RSS',
               'corpus': {str(p): digest(p) for p in corpus},
               'executables': {name: {'path': path, 'sha256': digest(path)} for name, path in arms},
-              'versions': versions, 'asm': {p: digest(p) for p in asm.split(os.pathsep)},
+              'versions': versions,
               'samples': [], 'complete': False}
     result_file = work / 'results.json'
 
@@ -383,7 +374,7 @@ def main(args):
                 command = [executable]
                 if name != 'parpar':
                     command += jdk_opts
-                    command += ['-cp', str(host) + os.pathsep + asm,
+                    command += ['-cp', str(host),
                                 'com.codename1.tools.translator.ByteCodeTranslator']
                 command += ['clean', ';'.join(map(str, [javaapi] + corpus)), str(out),
                             app, package, app, '1.0', 'clean', 'none']
@@ -409,7 +400,7 @@ def main(args):
             raise RuntimeError('Sources or native binary changed during benchmark')
         if manifest['host_classes'] != digest(host) or manifest['javaapi'] != digest(javaapi):
             raise RuntimeError('Host or JavaAPI classes changed during benchmark')
-        for group in ('corpus', 'asm'):
+        for group in ('corpus',):
             if any(digest(path) != sha for path, sha in report[group].items()):
                 raise RuntimeError(group + ' changed during benchmark')
         if any(digest(entry['path']) != entry['sha256'] for entry in report['executables'].values()):

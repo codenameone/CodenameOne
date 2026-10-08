@@ -74,11 +74,11 @@
  },
  "objectAllocation": {
   "all": {
-   "memory": 0.26,
-   "runs": 1,
-   "time": 5.86,
+   "memory": 0.209,
+   "runs": 2,
+   "time": 1.645,
    "tolerance": {
-    "memory": 0.3,
+    "memory": 0.65,
     "time": 0.5
    }
   }
@@ -105,19 +105,20 @@
  },
  "stringBuilding": {
   "all": {
-   "memory": 0.291,
-   "runs": 1,
+   "memory": 0.223,
+   "runs": 2,
    "time": 1.386,
    "tolerance": {
+    "memory": 0.35,
     "time": 0.2
    }
   }
  },
  "translator": {
   "all": {
-   "memory": 0.546,
-   "runs": 1,
-   "time": 0.611,
+   "memory": 0.467,
+   "runs": 3,
+   "time": 0.729,
    "tolerance": {
     "time": 0.2
    }

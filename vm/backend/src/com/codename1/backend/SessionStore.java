@@ -29,7 +29,7 @@ import java.io.IOException;
 /// Two are provided, chosen by `cn1.session.store`: `memory` (the
 /// default) and `db`, which keeps them in the server's database so any
 /// instance behind a load balancer can serve any client. Implement this for
-/// another -- a cache server -- and pass it to [Sessions#setStore].
+/// another -- a cache server -- and pass it to [Backend.Builder#sessionStore].
 public interface SessionStore {
     /// The session with this id, or null when there is none or it expired.
     HttpSession load(String id) throws IOException;

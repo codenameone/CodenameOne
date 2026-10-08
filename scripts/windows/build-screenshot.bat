@@ -2,7 +2,7 @@
 rem Build + run the native Windows port's WebSocket screenshot-capture test
 rem (CleanTargetIntegrationTest#capturesFormScreenshotOverWebSocket): renders the
 rem Contacts UI offscreen, PNG-encodes it, streams it over the cn1ss WebSocket to
-rem a local Cn1ssScreenshotServer, and writes cn1-windows-native.png. The PNG is
+rem the local test server (scripts\hellocodenameone\backend), and writes cn1-windows-native.png. The PNG is
 rem placed in CN1_SHOT_OUTPUT_DIR (default: the repo's developer-guide-windows-port).
 setlocal
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=arm64 -host_arch=arm64 -no_logo || exit /b 1

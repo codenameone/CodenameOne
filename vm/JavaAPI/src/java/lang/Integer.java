@@ -411,4 +411,37 @@ public final class Integer extends Number implements Comparable<Integer> {
         }
         return 32 - n - 1;
     }
+
+    /**
+     * {@code a + b}; a method reference target for reductions ({@code Integer::sum}).
+     *
+     * @param a an operand
+     * @param b an operand
+     * @return the sum
+     */
+    public static int sum(int a, int b) {
+        return a + b;
+    }
+
+    /**
+     * The greater of two values (Math.max), as a method reference target.
+     *
+     * @param a a value
+     * @param b a value
+     * @return the greater
+     */
+    public static int max(int a, int b) {
+        return Math.max(a, b);
+    }
+
+    /**
+     * The smaller of two values (Math.min), as a method reference target.
+     *
+     * @param a a value
+     * @param b a value
+     * @return the smaller
+     */
+    public static int min(int a, int b) {
+        return Math.min(a, b);
+    }
 }

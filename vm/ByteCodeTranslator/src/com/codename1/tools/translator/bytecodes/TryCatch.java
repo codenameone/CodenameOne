@@ -25,8 +25,8 @@ package com.codename1.tools.translator.bytecodes;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Label;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class TryCatch extends Instruction {
     private Label start;
@@ -108,6 +108,7 @@ public class TryCatch extends Instruction {
             cid = "cn1_class_id_" + type.replace('/', '_').replace('$', '_');
         } 
         LabelInstruction.addTryBeginLabel(start, cid, counter);
+        LabelInstruction.addHandlerLabel(handler);
         // VOLATILE is load-bearing: both variables are assigned at TRY-ENTRY,
         // i.e. AFTER the setjmp in DEFINE_CATCH_BLOCK, and read back in the
         // catch handler -- which runs after a longjmp. C11 7.13.2.1: non-volatile

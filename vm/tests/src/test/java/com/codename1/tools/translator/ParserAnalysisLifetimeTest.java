@@ -24,12 +24,14 @@ package com.codename1.tools.translator;
 
 import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.LabelInstruction;
+import com.codename1.tools.translator.classfile.Label;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
-import org.objectweb.asm.tree.LabelNode;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ParserAnalysisLifetimeTest {
@@ -51,14 +53,31 @@ class ParserAnalysisLifetimeTest {
                 for (Instruction instruction : method.getInstructions()) {
                     if (instruction instanceof LabelInstruction) {
                         labels++;
-                        assertFalse(((LabelInstruction) instruction).getLabel().info instanceof LabelNode,
-                                "A retained bytecode label still owns the linked ASM analysis tree");
+                        assertLabelCannotRetainATree(((LabelInstruction) instruction).getLabel());
                     }
                 }
             }
             assertTrue(labels >= 5, "Exercise branches and exception-handler labels");
         } finally {
             Parser.cleanup();
+        }
+    }
+
+    /**
+     * The analysis tree maps labels to nodes in a side table owned by the
+     * MethodNode, so a label the IR keeps cannot reach the tree. That holds only
+     * while a Label carries no object references of its own -- the old reader
+     * kept its label-to-node map IN the label, and the IR's labels then held
+     * every analyzed method's instruction tree alive.
+     */
+    private static void assertLabelCannotRetainATree(Label label) {
+        for (Class<?> type = label.getClass(); type != Object.class; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (!Modifier.isStatic(field.getModifiers())) {
+                    assertTrue(field.getType().isPrimitive(),
+                            "Label field " + field.getName() + " can retain an analysis tree");
+                }
+            }
         }
     }
 }

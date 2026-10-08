@@ -31,7 +31,7 @@ import com.codename1.tools.translator.SignatureSet;
 import com.codename1.tools.translator.Util;
 import java.util.ArrayList;
 import java.util.List;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 public class Invoke extends Instruction {
     private String owner;

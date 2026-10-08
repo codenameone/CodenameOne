@@ -46,9 +46,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import com.codename1.tools.translator.classfile.Label;
+import com.codename1.tools.translator.classfile.Opcodes;
+import com.codename1.tools.translator.classfile.Type;
 
 final class JavascriptMethodGenerator {
     /**
@@ -167,11 +167,12 @@ final class JavascriptMethodGenerator {
     }
 
     // Memoises classNeedsInitialization(); keyed on the sanitized class name.
-    // Cleared whenever classIndex changes so a stale run can't leak.
-    private static final Map<String, Boolean> classNeedsInitCache = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
+    // Cleared whenever classIndex changes so a stale run can't leak. Plain maps:
+    // the translator is single threaded.
+    private static final Map<String, Boolean> classNeedsInitCache = new java.util.HashMap<String, Boolean>();
 
     // Memoises classClinitCanSuspend(); keyed on the sanitized class name.
-    private static final Map<String, Boolean> classClinitSuspendCache = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
+    private static final Map<String, Boolean> classClinitSuspendCache = new java.util.HashMap<String, Boolean>();
 
     static void setClassIndex(List<ByteCodeClass> allClasses) {
         classNeedsInitCache.clear();
@@ -280,12 +281,13 @@ final class JavascriptMethodGenerator {
         // host-side dispatch lookup misses and the calling Java
         // thread deadlocks on the corresponding wait/notify pair.
         // Tag every method on a JSO bridge type as referenced so the
-        // entry survives. TimerHandler is also host-dispatched even though it
-        // is a @JSFunctor rather than a JSObject subtype, so retain its SAM
-        // dispatch slot for setTimeout/setInterval callbacks too.
+        // entry survives. TimerHandler and AnimationFrameCallback are also
+        // host-dispatched @JSFunctor interfaces rather than JSObject
+        // subtypes; retain their SAM slots for timers and requestAnimationFrame.
         for (ByteCodeClass c : allClasses) {
             if (c == null || (!isJsoBridgeType(c, index)
-                    && !"com_codename1_html5_js_browser_TimerHandler".equals(c.getClsName()))) continue;
+                    && !"com_codename1_html5_js_browser_TimerHandler".equals(c.getClsName())
+                    && !"com_codename1_html5_js_browser_AnimationFrameCallback".equals(c.getClsName()))) continue;
             for (BytecodeMethod m : c.getMethods()) {
                 if (m == null || m.isStatic()) continue;
                 String name = m.getMethodName();
@@ -298,6 +300,13 @@ final class JavascriptMethodGenerator {
         referencedStaticFields = fieldRefs;
         referencedInstanceFields = instanceRefs;
         referencedDispatchIds = dispatchRefs;
+        if (JavascriptOpenWorld.isEnabled() || JavascriptIncremental.isActive()) {
+            // Code translated later reads fields and dispatches ids nothing here does:
+            // emit every entry (null = no filtering).
+            referencedStaticFields = null;
+            referencedInstanceFields = null;
+            referencedDispatchIds = null;
+        }
         if (System.getProperty("parparvm.js.devirtdiag") != null) {
             emitDevirtDiagnostics(allClasses, index);
         }
@@ -316,7 +325,10 @@ final class JavascriptMethodGenerator {
             List<ByteCodeClass> allClasses, Map<String, ByteCodeClass> index) {
         java.util.Map<String, Boolean> suspendingByDispatchId = monomorphicSuspending;
         java.util.Map<String, String> result = new java.util.HashMap<String, String>();
-        if (System.getProperty("parparvm.js.devirt.off") != null) {
+        // "Declared exactly once program-wide" is unknowable when more of the program
+        // arrives later (open world), or when most of it is not in view (incremental).
+        if (System.getProperty("parparvm.js.devirt.off") != null || JavascriptOpenWorld.isEnabled()
+                || JavascriptIncremental.isActive()) {
             return result;
         }
         // Soundness requires the "declared exactly once program-wide"
@@ -1615,6 +1627,20 @@ final class JavascriptMethodGenerator {
      * (``.p(X.$F),.p(.q().$G)`` → ``.p(X.$F.$G)``).
      */
     /**
+     * {@code s.replaceAll(regex, replacement)} through the translator's own regex
+     * engine, which behaves the same on every host -- a self-hosted translator's
+     * class library has no regex.
+     */
+    private static String rx(String s, String regex, String replacement) {
+        return com.codename1.tools.translator.regex.Pattern.replaceAll(s, regex, replacement);
+    }
+
+    /** {@code s.split(regex)}, through the translator's own regex engine. */
+    private static String[] split(String s, String regex) {
+        return com.codename1.tools.translator.regex.Pattern.compile(regex).split(s);
+    }
+
+    /**
      * Applies a virtual-dispatch collapse rule in BOTH spellings: the
      * generator form ({@code yield* cn1_iv<N>(...)}) and the synchronous
      * form ({@code cn1_ivs<N>(...)}) that the emitter selects when the
@@ -1626,8 +1652,8 @@ final class JavascriptMethodGenerator {
      */
     private static String applyVirtualRule(String s, String pattern, String replacement) {
         // (1) suspending + (2) sync, quoted dispatch-id forms (_v* / _w*).
-        s = s.replaceAll(pattern, replacement);
-        s = s.replaceAll(
+        s = rx(s, pattern, replacement);
+        s = rx(s, 
                 pattern.replace("yield\\* _v", "_w"),
                 replacement.replace("yield* _v", "_w"));
         // (3) suspending + (4) sync, MONOMORPHIC-DEVIRT forms (_dv* / _dw*).
@@ -1648,11 +1674,11 @@ final class JavascriptMethodGenerator {
             String dvPattern = pattern
                     .replace("yield\\* _v", "yield\\* _dv")
                     .replace("\"([^\"]+)\"", "([\\w$]+)");
-            String dvReplacement = replacement
-                    .replace("yield* _v", "yield* _dv")
-                    .replaceAll("\"(\\$\\d+)\"", "$1");
-            s = s.replaceAll(dvPattern, dvReplacement);
-            s = s.replaceAll(
+            String dvReplacement = rx(replacement
+                    .replace("yield* _v", "yield* _dv"),
+                    "\"(\\$\\d+)\"", "$1");
+            s = rx(s, dvPattern, dvReplacement);
+            s = rx(s, 
                     dvPattern.replace("yield\\* _dv", "_dw"),
                     dvReplacement.replace("yield* _dv", "_dw"));
             // _dn is _dw without the generator drive; same argument shape.
@@ -1663,8 +1689,82 @@ final class JavascriptMethodGenerator {
         return s;
     }
 
+    /**
+     * Runs the text passes over a method body with the program's string literals
+     * held out of reach.
+     *
+     * <p>The passes are regex rewrites over the emitted JavaScript, and a Java
+     * string literal is emitted INSIDE that text as {@code _L("...")}. A literal
+     * whose content happens to look like emitted code -- the translator's own
+     * peephole patterns are exactly that, so self-hosting tripped on it first --
+     * was rewritten along with the code around it, silently changing the string
+     * the program sees. Each literal is replaced by {@code _L(n)}, an index into a
+     * per-method table, for the duration of the passes and restored afterwards.
+     * {@code _L(n)} is still a parenthesised call, so every pass treats it as the
+     * same kind of operand it treated the literal as.
+     */
     private static String applyMethodPeephole(CharSequence body) {
-        String s = body.toString();
+        List<String> literals = new ArrayList<String>();
+        String masked = maskStringLiterals(body, literals);
+        String rewritten = applyMethodPeepholeUnmasked(masked);
+        return literals.isEmpty() ? rewritten : unmaskStringLiterals(rewritten, literals);
+    }
+
+    private static final String LITERAL_OPEN = "_L(\"";
+
+    static String maskStringLiterals(CharSequence body, List<String> literals) {
+        String text = body.toString();
+        int at = text.indexOf(LITERAL_OPEN);
+        if (at < 0) {
+            return text;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        int copied = 0;
+        while (at >= 0) {
+            int i = at + LITERAL_OPEN.length();
+            // Find the closing quote, stepping over escapes; escapeJs never leaves a
+            // raw quote inside.
+            while (i < text.length() && text.charAt(i) != '"') {
+                i += text.charAt(i) == '\\' ? 2 : 1;
+            }
+            if (i + 1 >= text.length() || text.charAt(i + 1) != ')') {
+                // Not the shape the emitter writes; leave the rest untouched.
+                break;
+            }
+            out.append(text, copied, at).append("_L(").append(literals.size()).append(')');
+            literals.add(text.substring(at, i + 2));
+            copied = i + 2;
+            at = text.indexOf(LITERAL_OPEN, copied);
+        }
+        out.append(text, copied, text.length());
+        return out.toString();
+    }
+
+    static String unmaskStringLiterals(String text, List<String> literals) {
+        StringBuilder out = new StringBuilder(text.length() + 64);
+        int copied = 0;
+        int at = text.indexOf("_L(");
+        while (at >= 0) {
+            int i = at + 3;
+            int index = 0;
+            boolean digits = false;
+            while (i < text.length() && text.charAt(i) >= '0' && text.charAt(i) <= '9') {
+                index = index * 10 + (text.charAt(i) - '0');
+                digits = true;
+                i++;
+            }
+            if (digits && i < text.length() && text.charAt(i) == ')' && index < literals.size()) {
+                out.append(text, copied, at).append(literals.get(index));
+                copied = i + 1;
+            }
+            at = text.indexOf("_L(", at + 3);
+        }
+        out.append(text, copied, text.length());
+        return out.toString();
+    }
+
+    private static String applyMethodPeepholeUnmasked(String body) {
+        String s = body;
         // Safe-strip has already elided pc advances between adjacent
         // non-throwing instructions, so ALOAD + GETFIELD collapse to
         // two consecutive ``stack.p(...)`` expressions separated by
@@ -1696,7 +1796,7 @@ final class JavascriptMethodGenerator {
             // Chained field accesses collapse via iteration (the
             // rewritten form with ``X["F"]`` matches the pattern for
             // the next GETFIELD).
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(stack\\.q\\(\\)\\[\"([\\w\\$]+)\"\\]\\)",
                     "stack.p($1[\"$2\"])");
             // Rule 2: ALOAD + const + PUTFIELD → inline field store.
@@ -1705,47 +1805,47 @@ final class JavascriptMethodGenerator {
             // Value shape is conservative: simple identifier, literal
             // number, ``jvm.classes...`` expr, or another simple
             // identifier[prop] access.
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^,;(){}]+)\\);?\\s*\\{\\s*let v = stack\\.q\\(\\);\\s*stack\\.q\\(\\)\\[\"([\\w\\$]+)\"\\] = v;\\s*(pc = \\d+; break;)\\s*\\}",
                     "$1[\"$3\"] = $2; $4");
             // Rule 3: ALOAD + ASTORE → locals[M] = locals[N].
             //   stack.p(X); locals[N] = stack.q();
             //     → locals[N] = X;
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*)\\);?\\s*locals\\[(\\d+)\\] = stack\\.q\\(\\);",
                     "locals[$2] = $1;");
-            // Rule 4b: IMUL, which is Math.imul rather than a coerced multiply.
-            //   stack.p(X); stack.p(Y);
-            //   { let b = stack.q(); let a = stack.q(); stack.p(Math.imul(a, b)); }
-            //     -> stack.p(Math.imul(X, Y));
-            s = s.replaceAll(
-                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(Math\\.imul\\(a, b\\)\\);\\s*\\}",
-                    "stack.p(Math.imul($1, $2));");
-            // Rule 4: IADD/ISUB/IAND/IOR/IXOR with int-coercion.
+            // Rule 4: IADD/ISUB/IAND/IOR/IXOR with int-coercion (IMUL is Rule 4b).
             //   stack.p(X); stack.p(Y);
             //   { let b = stack.q(); let a = stack.q(); stack.p((a|0) OP (b|0)); }
             //     → stack.p(((X)|0) OP ((Y)|0));
             // Conservative X/Y shape to avoid runaway matches.
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(\\(a\\|0\\)\\s*([+\\-*&|\\^])\\s*\\(b\\|0\\)\\);\\s*\\}",
                     "stack.p(($1|0)$3($2|0));");
+            // Rule 4b: IMUL, the same fold for its Math.imul form.
+            //   stack.p(X); stack.p(Y);
+            //   { let b = stack.q(); let a = stack.q(); stack.p(Math.imul(a, b)); }
+            //     -> stack.p(Math.imul(X, Y));
+            s = rx(s,
+                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(Math\\.imul\\(a, b\\)\\);\\s*\\}",
+                    "stack.p(Math.imul($1, $2));");
             // Rule 5: LADD/LSUB/LMUL/FADD/FSUB/FMUL/DADD/DSUB/DMUL
             // plus LAND/LOR/LXOR (no int-coercion form).
             //   stack.p(X); stack.p(Y);
             //   { let b = stack.q(); let a = stack.q(); stack.p(a OP b); }
             //     → stack.p((X) OP (Y));
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(a\\s*([+\\-*&|\\^])\\s*b\\);\\s*\\}",
                     "stack.p(($1)$3($2));");
             // Rule 5b: ISHL/ISHR with (b & 31) shift-distance mask.
             //   stack.p(X); stack.p(Y);
             //   { let b=stack.q(); let a=stack.q(); stack.p((a|0) OP (b & 31)); }
             //     → stack.p(((X)|0) OP ((Y) & 31));
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(\\(a\\|0\\)\\s*(<<|>>)\\s*\\(b & 31\\)\\);\\s*\\}",
                     "stack.p(($1|0)$3(($2) & 31));");
             // Rule 5c: IUSHR with ((a >>> (b & 31)) | 0) canonicalisation.
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(\\(a >>> \\(b & 31\\)\\) \\| 0\\);\\s*\\}",
                     "stack.p((($1) >>> (($2) & 31)) | 0);");
             // Rule 6: DUP preceded by a push — duplicate the value.
@@ -1754,7 +1854,7 @@ final class JavascriptMethodGenerator {
             // Simpler yet: we can't do ``X`` twice if X has side
             // effects (e.g. a function call), so restrict to simple
             // identifiers and bracket accesses.
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(stack\\[stack\\.length - 1\\]\\);",
                     "stack.p($1); stack.p($1);");
             // Rule 7: inline 0-arg virtual dispatch when the target
@@ -1818,7 +1918,7 @@ final class JavascriptMethodGenerator {
             //   stack.p(T); stack.p(yield* $ctor(stack.q())); pc = N; break;
             //     → stack.p(yield* $ctor(T)); pc = N; break;
             // Also the sync (no yield*) variant.
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\((yield\\* )?([a-zA-Z_\\$][\\w\\$]*)\\(stack\\.q\\(\\)\\)\\);",
                     "stack.p($2$3($1));");
             // Rule 12: 0-arg INVOKESTATIC with inline arg.
@@ -1838,10 +1938,10 @@ final class JavascriptMethodGenerator {
             // (undefined) and throws "yield* undefined is not iterable" at
             // runtime -- this killed the invokeAndBlock thread-pool loop
             // (RunnableWrapper.run case 4) and wedged every waiter.
-            s = s.replaceAll(
+            s = rx(s, 
                     "(\\s+s(\\d+) = )(yield\\*? [^;]+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
                     "$1($3)$4;");
-            s = s.replaceAll(
+            s = rx(s, 
                     "(\\s+s(\\d+) = )((?:(?!yield)[^;])+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
                     "$1$3$4;");
             // Rule 14: straight-line slot-to-return chain.
@@ -1849,7 +1949,7 @@ final class JavascriptMethodGenerator {
             //     → return EXPR;
             // The trailing slot assignment is dead — the return
             // consumes the value directly.
-            s = s.replaceAll(
+            s = rx(s, 
                     "\\s+s(\\d+) = ([^;]+);\\s+return s\\1;",
                     "\n  return $2;");
             // Rule 14b: straight-line slot propagation into a same-slot
@@ -1863,7 +1963,7 @@ final class JavascriptMethodGenerator {
             // EXPR is conservatively a simple identifier / field
             // access / bracket path so we don't duplicate a call-site
             // or ``yield*`` across the substitution.
-            s = s.replaceAll(
+            s = rx(s, 
                     "(\\s+s(\\d+) = )([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\]|\\[\"[\\w\\$]+\"\\]|\\.\\$?[\\w]+)*);\\s+s\\2 = ((?:yield\\* )?[\\w\\$]+(?:\\.[\\w\\$]+)*)\\(s\\2((?:, [^)]*)?)\\);",
                     "$1$4($3$5);");
             // Rule 14c: same as 14b but the wrapping statement
@@ -1909,13 +2009,13 @@ final class JavascriptMethodGenerator {
             // expression (``b = yield* _v0(b, ...)``). This is the
             // single largest scaffolding pattern in the straight-line
             // emitter's output (one per non-void invocation).
-            s = s.replaceAll(
+            s = rx(s, 
                     "\\{\\s*let __result = ((?:yield\\* )?[^;]+);\\s*([\\w\\$]+(?:\\[\\d+\\])?) = __result;\\s*\\}",
                     "$2 = $1;");
             // Rule 18b: identity copy-pair.
             //   X = Y;  Y = X;     →  X = Y;
             // The second statement re-stores Y's own value.
-            s = s.replaceAll(
+            s = rx(s, 
                     "(\\s)([\\w\\$]+) = ([\\w\\$]+);\\s+\\3 = \\2;",
                     "$1$2 = $3;");
             // Rule 17: array load (AALOAD/IALOAD/BALOAD/CALOAD/SALOAD)
@@ -1924,7 +2024,7 @@ final class JavascriptMethodGenerator {
             //   { let idx=stack.q(); let arr=stack.q(); stack.p(_A(arr, idx)); pc=N; break; }
             //     → stack.p(_A(A, I)); pc=N; break;
             // _A can throw (AIOOBE / NPE) so we retain the pc advance.
-            s = s.replaceAll(
+            s = rx(s, 
                     "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let idx = stack\\.q\\(\\); let arr = stack\\.q\\(\\); stack\\.p\\(_A\\(arr, idx\\)\\); (pc = \\d+; break;) \\}",
                     "stack.p(_A($1, $2)); $3");
         } while (!prev.equals(s));
@@ -1941,7 +2041,7 @@ final class JavascriptMethodGenerator {
         // alongside the existing ``.p``/``.q`` push/pop helpers.
         // ~10 chars saved per occurrence; 3k+ occurrences in the
         // Initializr build = ~30 KiB raw.
-        s = s.replaceAll("stack\\[stack\\.length - 1\\]", "stack.t()");
+        s = rx(s, "stack\\[stack\\.length - 1\\]", "stack.t()");
         // Post-pass: strip ``case N:`` labels that aren't actually
         // jump targets (no ``pc=N`` writes them anywhere in the body
         // and they're not a try/catch handler / start / end pc, and
@@ -2011,7 +2111,7 @@ final class JavascriptMethodGenerator {
             // expectation and surfaces as a NullPointerException
             // deep in the resume path. Keep yields out of the
             // multi-arg push merge.
-            s = s.replaceAll("S\\.p\\(([^,(){}]+)\\)\\s*[;,]\\s*S\\.p\\(([^,(){}]+)\\)",
+            s = rx(s, "S\\.p\\(([^,(){}]+)\\)\\s*[;,]\\s*S\\.p\\(([^,(){}]+)\\)",
                     "S.p($1,$2)");
         } while (!prevS.equals(s));
         // Replace the locals frame array with named locals.
@@ -2052,7 +2152,7 @@ final class JavascriptMethodGenerator {
         // shorter ``return X`` directly.
         do {
             prevS = s;
-            s = s.replaceAll(
+            s = rx(s, 
                     "S\\.p\\(([^,(){}]+)\\)\\s*;\\s*return\\s+S\\.q\\(\\)",
                     "return $1");
         } while (!prevS.equals(s));
@@ -2063,7 +2163,7 @@ final class JavascriptMethodGenerator {
             // a Python script that runs AFTER the translator, so
             // at this point we always see the cn1_<long> form, but
             // accept either to be future-proof.
-            s = s.replaceAll(
+            s = rx(s, 
                     "S\\.p\\((yield\\*\\s*[\\w$]+\\((?:[^()]|\\([^()]*\\))*\\))\\)\\s*[,;]\\s*l(\\d+)\\s*=\\s*S\\.q\\(\\)",
                     "l$2=$1");
         } while (!prevS.equals(s));
@@ -2165,9 +2265,9 @@ final class JavascriptMethodGenerator {
      */
     private static String renameLocalsArrayToNamedLocals(String body) {
         // Try the _F prelude first: ``let L=_F(N, T, A1, A2, ...);``
-        java.util.regex.Pattern letL = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern letL = com.codename1.tools.translator.regex.Pattern.compile(
                 "let\\s+L\\s*=\\s*_F\\s*\\(\\s*(\\d+)\\s*((?:,[^,()]+)*)\\s*\\)\\s*;");
-        java.util.regex.Matcher m = letL.matcher(body);
+        com.codename1.tools.translator.regex.Matcher m = letL.matcher(body);
         if (!m.find()) {
             // Fall back to the _N prelude (long/double-arg methods):
             //   ``let L=_N(N); ...; L[0]=T; L[1]=A1; L[2]=null; L[3]=A2; ...``
@@ -2194,7 +2294,7 @@ final class JavascriptMethodGenerator {
         if (tail != null && !tail.isEmpty()) {
             // Skip leading comma, then split on `,` -- args are
             // captured as ``[^,()]`` so they have no commas/parens.
-            String[] parts = tail.substring(1).split(",");
+            String[] parts = split(tail.substring(1), ",");
             for (String p : parts) {
                 args.add(p.trim());
             }
@@ -2270,9 +2370,9 @@ final class JavascriptMethodGenerator {
      * Gracefully bails if the shape doesn't fully match.
      */
     private static String renameLocalsNPrelude(String body) {
-        java.util.regex.Pattern letN = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern letN = com.codename1.tools.translator.regex.Pattern.compile(
                 "let\\s+L\\s*=\\s*_N\\s*\\(\\s*(\\d+)\\s*\\)\\s*;");
-        java.util.regex.Matcher m = letN.matcher(body);
+        com.codename1.tools.translator.regex.Matcher m = letN.matcher(body);
         if (!m.find()) {
             return body;
         }
@@ -2290,18 +2390,18 @@ final class JavascriptMethodGenerator {
         // intervening ``let S=[];`` / ``let pc=0;`` lines).
         java.util.Map<Integer, String> initExprs = new java.util.HashMap<Integer, String>();
         int scanPos = m.end();
-        java.util.regex.Pattern lAssign = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern lAssign = com.codename1.tools.translator.regex.Pattern.compile(
                 "L\\[(\\d+)\\]\\s*=\\s*([^;]+);");
-        java.util.regex.Pattern letPrelude = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern letPrelude = com.codename1.tools.translator.regex.Pattern.compile(
                 "\\s*let\\s+S\\s*=\\s*\\[\\s*\\]\\s*;|\\s*let\\s+pc\\s*=\\s*0\\s*;|\\s+");
         while (scanPos < body.length()) {
-            java.util.regex.Matcher pre = letPrelude.matcher(body).region(scanPos, body.length());
+            com.codename1.tools.translator.regex.Matcher pre = letPrelude.matcher(body).region(scanPos, body.length());
             pre.useAnchoringBounds(true);
             if (pre.lookingAt()) {
                 scanPos = pre.end();
                 continue;
             }
-            java.util.regex.Matcher la = lAssign.matcher(body).region(scanPos, body.length());
+            com.codename1.tools.translator.regex.Matcher la = lAssign.matcher(body).region(scanPos, body.length());
             la.useAnchoringBounds(true);
             if (la.lookingAt()) {
                 int idx;
@@ -2625,14 +2725,23 @@ final class JavascriptMethodGenerator {
         // ``let pc=0`` so case 0 is always reachable.
         liveTargets.add("0");
         // Also scan ``__cn1TryCatch`` table from the prefix for
-        // {s:N,e:M,h:K,...} so handler / range pcs aren't dropped.
-        java.util.regex.Matcher tryRangesPrefix = java.util.regex.Pattern.compile(
-                "\\{s:(\\d+),e:(\\d+),h:(\\d+),").matcher(prefix);
+        // {s:N,e:M,h:K...} so handler / range pcs aren't dropped. The
+        // pattern must NOT require anything after the handler: a
+        // catch-any entry (every ``finally``) has no ``t:`` and ends
+        // ``h:K}``. Requiring ``h:K,`` once left those handlers to
+        // survive only by coincidence -- when the handler's first real
+        // instruction followed a no-op (a line number) its ``case K:``
+        // was stripped, ``_E`` dispatched to the switch's
+        // ``default:return``, and the exception passing through the
+        // finally vanished (Form.pointerReleased ate every exception an
+        // action listener threw).
+        com.codename1.tools.translator.regex.Matcher tryRangesPrefix = com.codename1.tools.translator.regex.Pattern.compile(
+                "\\{s:(\\d+),e:(\\d+),h:(\\d+)").matcher(prefix);
         while (tryRangesPrefix.find()) {
             liveTargets.add(tryRangesPrefix.group(3));
         }
-        java.util.regex.Matcher tryRanges = java.util.regex.Pattern.compile(
-                "\\{s:(\\d+),e:(\\d+),h:(\\d+),").matcher(region);
+        com.codename1.tools.translator.regex.Matcher tryRanges = com.codename1.tools.translator.regex.Pattern.compile(
+                "\\{s:(\\d+),e:(\\d+),h:(\\d+)").matcher(region);
         while (tryRanges.find()) {
             liveTargets.add(tryRanges.group(3));
         }
@@ -2647,12 +2756,12 @@ final class JavascriptMethodGenerator {
         // of the same expression (e.g. method args) is safe — it
         // just means we keep an unused case label, never strip a
         // live one.
-        java.util.regex.Matcher pcWrites = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Matcher pcWrites = com.codename1.tools.translator.regex.Pattern.compile(
                 "pc\\s*=\\s*([^;}]+)").matcher(region);
-        java.util.regex.Pattern digitRun = java.util.regex.Pattern.compile("\\d+");
+        com.codename1.tools.translator.regex.Pattern digitRun = com.codename1.tools.translator.regex.Pattern.compile("\\d+");
         while (pcWrites.find()) {
             String rhs = pcWrites.group(1);
-            java.util.regex.Matcher digits = digitRun.matcher(rhs);
+            com.codename1.tools.translator.regex.Matcher digits = digitRun.matcher(rhs);
             while (digits.find()) {
                 liveTargets.add(digits.group());
             }
@@ -2791,12 +2900,12 @@ final class JavascriptMethodGenerator {
         // ``S.q() == null`` don't truncate); then digit-run
         // extraction grabs every integer literal mentioned.
         java.util.Map<String, Integer> pcCount = new java.util.HashMap<String, Integer>();
-        java.util.regex.Matcher pcWrites = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Matcher pcWrites = com.codename1.tools.translator.regex.Pattern.compile(
                 "pc\\s*=\\s*([^;}]+)").matcher(region);
-        java.util.regex.Pattern digitRun = java.util.regex.Pattern.compile("\\d+");
+        com.codename1.tools.translator.regex.Pattern digitRun = com.codename1.tools.translator.regex.Pattern.compile("\\d+");
         while (pcWrites.find()) {
             String rhs = pcWrites.group(1);
-            java.util.regex.Matcher digits = digitRun.matcher(rhs);
+            com.codename1.tools.translator.regex.Matcher digits = digitRun.matcher(rhs);
             while (digits.find()) {
                 String num = digits.group();
                 Integer prev = pcCount.get(num);
@@ -2809,9 +2918,9 @@ final class JavascriptMethodGenerator {
         // we want to merge with the prior one, so we just replace
         // the whole stretch with ``;``. This collapses two case
         // bodies into one syntactically.
-        java.util.regex.Pattern pat = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern pat = com.codename1.tools.translator.regex.Pattern.compile(
                 "pc\\s*=\\s*(\\d+)\\s*;\\s*break\\s*;?\\s*\\}\\s*case\\s+(\\d+)\\s*:\\s*\\{");
-        java.util.regex.Matcher m = pat.matcher(region);
+        com.codename1.tools.translator.regex.Matcher m = pat.matcher(region);
         StringBuilder out = new StringBuilder(region.length());
         int last = 0;
         while (m.find()) {
@@ -2840,9 +2949,9 @@ final class JavascriptMethodGenerator {
      * rewrites, so one pass suffices.
      */
     private static String removeDeadLetDecls(String body) {
-        java.util.regex.Pattern declPattern = java.util.regex.Pattern.compile(
+        com.codename1.tools.translator.regex.Pattern declPattern = com.codename1.tools.translator.regex.Pattern.compile(
                 "  let ([sl]\\d+);\\n");
-        java.util.regex.Matcher m = declPattern.matcher(body);
+        com.codename1.tools.translator.regex.Matcher m = declPattern.matcher(body);
         StringBuilder out = new StringBuilder(body.length());
         int last = 0;
         while (m.find()) {
@@ -3024,7 +3133,7 @@ final class JavascriptMethodGenerator {
         //
         // Sync (non-generator) methods skip this -- they cannot yield.
         if (methodSuspending && !"__CLINIT__".equals(method.getMethodName())
-                && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))) {
+                && !"0".equals(Util.systemProperty("parparvm.js.preemptYield", "1"))) {
             out.append("  if(_Yc())yield _Yv;\n");
         }
         if (emitsMonitor(method)) {
@@ -3632,9 +3741,9 @@ final class JavascriptMethodGenerator {
                     System.err.println("[trydiag] MALFORMED " + cls.getClsName() + "." + method.getMethodName()
                             + method.getSignature());
                     try {
-                        java.nio.file.Files.write(
-                                java.nio.file.Paths.get("/tmp/cn1-malformed-" + cls.getClsName() + "." + method.getMethodName() + ".js"),
-                                instructionBody.toString().getBytes("UTF-8"));
+                        Util.writeUtf8(
+                                new java.io.File("/tmp/cn1-malformed-" + cls.getClsName() + "." + method.getMethodName() + ".js"),
+                                instructionBody.toString());
                     } catch (java.io.IOException | RuntimeException dumpFailure) {
                         // diagnostics only -- report and continue
                         System.err.println("[trydiag] dump failed: " + dumpFailure);
@@ -3646,10 +3755,10 @@ final class JavascriptMethodGenerator {
                 if (dump != null && !dump.isEmpty()
                         && (cls.getClsName() + "." + method.getMethodName()).contains(dump)) {
                     try {
-                        java.nio.file.Files.write(
-                                java.nio.file.Paths.get("/tmp/cn1-dump-" + cls.getClsName() + "." + method.getMethodName()
+                        Util.writeUtf8(
+                                new java.io.File("/tmp/cn1-dump-" + cls.getClsName() + "." + method.getMethodName()
                                         + "_" + Integer.toHexString(method.getSignature().hashCode()) + ".js"),
-                                instructionBody.toString().getBytes("UTF-8"));
+                                instructionBody.toString());
                     } catch (java.io.IOException | RuntimeException dumpFailure) {
                         // diagnostics only -- report and continue
                         System.err.println("[trydiag] dump failed: " + dumpFailure);
@@ -3687,7 +3796,7 @@ final class JavascriptMethodGenerator {
             // ``parparvm.js.preemptYield.allmethods=1`` restores the
             // emit-everywhere behaviour for comparison.
             if (method.isJavascriptSuspending() && !"__CLINIT__".equals(method.getMethodName())
-                    && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))
+                    && !"0".equals(Util.systemProperty("parparvm.js.preemptYield", "1"))
                     && (methodHasBackEdge(instructions, labelToIndex)
                         || "1".equals(System.getProperty("parparvm.js.preemptYield.allmethods")))) {
                 body.append("  if(_Yc())yield _Yv;\n");
@@ -3912,7 +4021,7 @@ final class JavascriptMethodGenerator {
         if (skip != null && !skip.isEmpty()) {
             String id = (currentEmissionClass != null ? currentEmissionClass.getClsName() : "?")
                     + "." + method.getMethodName();
-            for (String part : skip.split(",")) {
+            for (String part : split(skip, ",")) {
                 if (!part.isEmpty() && id.contains(part)) {
                     return _sb(method, instructions, "SKIP_KNOB");
                 }
@@ -3952,7 +4061,7 @@ final class JavascriptMethodGenerator {
         // CN1 methods sit around ~200 blocks); beyond that the
         // emission-time nesting checks get quadratic-ish and the
         // interpreter fallback is fine for the rare giant.
-        int structuredBudget = Integer.getInteger("parparvm.js.structured.maxblocks", 256);
+        int structuredBudget = Util.integerProperty("parparvm.js.structured.maxblocks", 256);
         if (structuredBudget <= 0 || blocks.size() > structuredBudget) {
             return _sb(method, instructions, "L2948");
         }
@@ -3982,7 +4091,7 @@ final class JavascriptMethodGenerator {
         }
         String swKeep = System.getProperty("parparvm.js.structured.switchkeep");
         if (hasSwitchInstr) {
-            Integer swMax = Integer.getInteger("parparvm.js.structured.switchmax");
+            Integer swMax = Util.integerProperty("parparvm.js.structured.switchmax");
             if (swMax != null) {
                 int ord = ++structuredSwitchOrdinal;
                 if (ord > swMax) {
@@ -3990,7 +4099,7 @@ final class JavascriptMethodGenerator {
                 }
                 System.err.println("[structured-switch-ordinal] " + ord + " " + method.getMethodName() + method.getSignature());
             }
-            if ("0".equals(System.getProperty("parparvm.js.structured.switch", "1"))) {
+            if ("0".equals(Util.systemProperty("parparvm.js.structured.switch", "1"))) {
                 return _sb(method, instructions, "L2985");
             }
             if (swKeep != null) {
@@ -4020,7 +4129,7 @@ final class JavascriptMethodGenerator {
             }
             System.err.println("[structured-loopkeep] " + method.getMethodName() + method.getSignature());
         }
-        int loopSpanBudget = Integer.getInteger("parparvm.js.structured.maxloopspan", 256);
+        int loopSpanBudget = Util.integerProperty("parparvm.js.structured.maxloopspan", 256);
         for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
             if (r.getValue() - r.getKey() + 1 > loopSpanBudget) {
                 return _sb(method, instructions, "L3017");
@@ -4915,10 +5024,11 @@ final class JavascriptMethodGenerator {
             case Opcodes.ISUB:
                 return emitBinary(out, ctx, "((%s|0) - (%s|0))");
             case Opcodes.IMUL:
-                // Math.imul, never (a|0) * (b|0): once the true product passes 2^53 a
-                // JavaScript multiply has already rounded it, so no |0 afterwards can
-                // recover the low 32 bits Java keeps. vm/benchmarks' intArithmetic and
-                // quicksortBench returned wrong checksums in the browser because of it.
+                // Math.imul, never (a|0) * (b|0): a product past 2^53 is rounded
+                // as a double before |0 truncates it, so 0x7fffffff * 0x7fffffff
+                // came out 0 instead of 1 -- every hash, PRNG and checksum that
+                // multiplies by a large constant diverged from the JVM. imul
+                // applies ToInt32 to its operands exactly as |0 did.
                 return emitBinary(out, ctx, "Math.imul(%s, %s)");
             case Opcodes.LADD:
                 return emitBinary(out, ctx, "_Ladd(%s, %s)");
@@ -5591,6 +5701,12 @@ final class JavascriptMethodGenerator {
         // ``yield*`` ceremony so the cooperative scheduler can interleave
         // them with other threads.
         String yieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
+        if (JavascriptIncremental.isExternal(JavascriptNameUtil.sanitizeClassName(methodOwner))) {
+            // Incremental translation: whether the host function is a generator is not
+            // known here; its adapter drives either kind (see JavascriptIncremental).
+            invokedName = JavascriptIncremental.adapterFor(methodId);
+            yieldPrefix = "yield* ";
+        }
         if (hasReturn && canDeferInvokeResult(instructions, index)) {
             StringBuilder callExpr = new StringBuilder();
             callExpr.append("(").append(yieldPrefix).append(invokedName).append("(");
@@ -6930,7 +7046,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) - (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IMUL:
-                // Math.imul: see the structured emitter's IMUL.
+                // Math.imul: see the structured IMUL above.
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.imul(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LADD:
@@ -7602,6 +7718,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 ? (isInvokeTargetNative(invoke) ? methodId : methodBodyId)
                 : methodId;
         String interpYieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
+        if (JavascriptIncremental.isExternal(JavascriptNameUtil.sanitizeClassName(methodOwner))) {
+            invokedName = JavascriptIncremental.adapterFor(methodId);
+            interpYieldPrefix = "yield* ";
+        }
         // Fast path for 0-arg + static invoke: eI(), call, push. No
         // arg bindings needed, no ``let __target`` (INVOKESTATIC
         // doesn't consume a receiver from the stack).
@@ -8571,7 +8691,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         if (paramListRaw.trim().isEmpty()) {
             return body;
         }
-        String[] paramsRaw = paramListRaw.split(",");
+        String[] paramsRaw = split(paramListRaw, ",");
         List<String> params = new ArrayList<String>();
         for (String pr : paramsRaw) {
             String t = pr.trim();
@@ -8581,7 +8701,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // Verify each is ``T`` or ``A\d+``. Other shapes mean we
             // already touched this method or the rename pass didn't
             // run; bail.
-            if (!t.equals("T") && !t.matches("A\\d+")) {
+            if (!t.equals("T") && !com.codename1.tools.translator.regex.Pattern.matches("A\\d+", t)) {
                 return body;
             }
             params.add(t);
@@ -8837,7 +8957,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         // past a budget: the few huge methods stay slightly larger but the translation
         // is an order of magnitude faster. Tunable via -Dparparvm.js.inlineFold.maxRegion
         // (chars; <=0 disables the cap and restores unconditional folding).
-        int foldMaxRegion = Integer.getInteger("parparvm.js.inlineFold.maxRegion", 4000);
+        int foldMaxRegion = Util.integerProperty("parparvm.js.inlineFold.maxRegion", 4000);
         if (foldMaxRegion > 0 && region.length() > foldMaxRegion) {
             return prefix + region + suffix;
         }

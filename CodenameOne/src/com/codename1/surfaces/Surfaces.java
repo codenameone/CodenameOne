@@ -42,7 +42,7 @@ import java.util.Map;
 /// Surfaces.registerWidgetKind(new WidgetKind("delivery_status")
 ///         .setDisplayName("Delivery").setDescription("Track your order"));
 /// Surfaces.setActionHandler(evt -> showOrder(evt.getParams()));
-/// ...
+/// // ...
 /// Surfaces.publish("delivery_status", new WidgetTimeline()
 ///         .setContent(layout).addEntry(new Date(), state));
 /// ```

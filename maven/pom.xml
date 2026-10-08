@@ -106,6 +106,7 @@
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
         <module>backend</module>
+        <module>backend-test</module>
         <module>javase</module>
         <module>javase-svg</module>
         <!-- Depends on javase (JavaSEPort/CN1Bootstrap for CEF rasterization),
@@ -117,6 +118,7 @@
         <module>windows</module>
         <module>linux</module>
         <module>parparvm</module>
+        <module>javac</module>
         <!-- The hardening engine builds before the plugin so the plugin's
              generate-resources step can embed its shaded standalone jar as a
              classpath resource. The engine is invoked as a forked process, never

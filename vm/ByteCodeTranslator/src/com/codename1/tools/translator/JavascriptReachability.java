@@ -28,7 +28,7 @@ import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.Invoke;
 import com.codename1.tools.translator.bytecodes.Ldc;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
-import org.objectweb.asm.Type;
+import com.codename1.tools.translator.classfile.Type;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,7 +39,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * JavaScript-target-only Rapid Type Analysis culler. The default
@@ -540,6 +540,14 @@ final class JavascriptReachability {
             if (cls.getUsedByNative() == ByteCodeClass.UsedByNativeResult.Used) {
                 markAllocated(cls.getClsName());
             }
+            // Open-world output: code translated later may instantiate any kept class
+            // and call any of its methods, so all of them are roots.
+            if (JavascriptOpenWorld.keepsClass(cls.getClsName())) {
+                markAllocated(cls.getClsName());
+                for (BytecodeMethod m : cls.getMethods()) {
+                    enqueue(m);
+                }
+            }
         }
         // Runtime roots that the translator always keeps alive.
         for (String root : RUNTIME_ROOT_CLASSES) {
@@ -559,6 +567,9 @@ final class JavascriptReachability {
         // callback edge is invisible to bytecode-only RTA. Keep concrete
         // onTimer implementations on instantiated handlers reachable.
         seedRuntimeDispatched("com_codename1_html5_js_browser_TimerHandler", "onTimer", "()V");
+        // AnimationFrameCallback is also a JSFunctor, not a JSObject. Its Java
+        // implementations are called only by the host requestAnimationFrame bridge.
+        seedRuntimeDispatched("com_codename1_html5_js_browser_AnimationFrameCallback", "onAnimationFrame", "(D)V");
         // JSO bridge methods are reachable via hand-written port.js
         // dispatch sites that the bytecode-only RTA can't see (e.g.
         // ``__nativeEventListener`` in port.js calls

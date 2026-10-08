@@ -64,7 +64,7 @@ import java.util.Vector;
 ///             throws ServletException, IOException {
 ///         Collection parts = req.getParts();
 ///         Part data = parts.iterator().next();
-///         try(InputStream is = data.getInputStream()) {}
+///         try(InputStream is = data.getInputStream()) {
 ///             // store or do something with the input stream
 ///         }
 ///     }

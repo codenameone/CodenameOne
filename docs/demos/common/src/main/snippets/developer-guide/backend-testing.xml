@@ -1,0 +1,44 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::backend-testing-xml-001[]
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-backend-test</artifactId>
+    <version>${cn1.version}</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>5.9.3</version>
+    <scope>test</scope>
+</dependency>
+// end::backend-testing-xml-001[]
+
+// tag::backend-testing-xml-002[]
+<execution>
+    <id>cn1-process-test-annotations</id>
+    <phase>process-test-classes</phase>
+    <goals>
+        <goal>process-test-annotations</goal>
+    </goals>
+</execution>
+<execution>
+    <id>cn1-compiled-tests</id>
+    <phase>test</phase>
+    <goals>
+        <goal>backend-test</goal>
+    </goals>
+</execution>
+// end::backend-testing-xml-002[]
+
+// tag::backend-testing-xml-003[]
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <version>3.0.0-M5</version>
+    <configuration>
+        <reuseForks>false</reuseForks>
+    </configuration>
+</plugin>
+// end::backend-testing-xml-003[]

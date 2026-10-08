@@ -27,12 +27,14 @@ import com.codename1.tools.translator.bytecodes.Field;
 import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.Ldc;
 import com.codename1.tools.translator.bytecodes.VarOp;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.objectweb.asm.Opcodes;
+import com.codename1.tools.translator.classfile.Opcodes;
 
 /**
  * Removes instance fields the program never reads.
@@ -119,7 +121,11 @@ final class DeadFieldElimination {
         if (dead.isEmpty()) {
             return;
         }
-        Set<BytecodeMethod> edited = new HashSet<BytecodeMethod>();
+        // BytecodeMethod equality compares signatures without the declaring class.
+        // Every edited method needs fresh plans, including same-signature
+        // constructors in different classes, so track the actual method objects.
+        Set<BytecodeMethod> edited = Collections.newSetFromMap(
+                new IdentityHashMap<BytecodeMethod, Boolean>());
         for (ByteCodeClass bc : classes) {
             for (BytecodeMethod m : bc.getMethods()) {
                 List<Instruction> ins = m.getInstructions();

@@ -86,7 +86,12 @@ final class NativeTraversal {
                 || "java_util_ArrayList".equals(owner) || "java_util_AbstractList".equals(owner)
                 || "java_util_AbstractSequentialList".equals(owner) || "java_util_LinkedList".equals(owner)
                 || "java_util_Vector".equals(owner) || "java_util_Stack".equals(owner));
-        unwrapSet = !listOnly && Parser.getClassObject("java_util_Collections_SetFromMap") != null;
+        // Only Collections.newSetFromMap creates a SetFromMap (nothing else in java.util does):
+        // with no caller of it the class is merely loaded -- named by code the cull will
+        // remove -- and keying on its presence would keep it, and the map views it calls,
+        // in every application.
+        unwrapSet = !listOnly && Parser.getClassObject("java_util_Collections_SetFromMap") != null
+                && Parser.hasCallers("java_util_Collections", "newSetFromMap");
         for (Layout layout : Layout.values()) {
             if (listOnly && layout != Layout.ARRAY) continue;
             if (Parser.getClassObject(layout.type) != null) layouts.add(layout);

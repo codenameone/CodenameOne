@@ -27,27 +27,25 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.Attribute;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.FieldVisitor;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.analysis.Analyzer;
-import org.objectweb.asm.tree.analysis.BasicInterpreter;
-import org.objectweb.asm.tree.analysis.BasicValue;
-import org.objectweb.asm.tree.analysis.Frame;
+import com.codename1.tools.translator.classfile.AnnotationVisitor;
+import com.codename1.tools.translator.classfile.ClassReader;
+import com.codename1.tools.translator.classfile.ClassVisitor;
+import com.codename1.tools.translator.classfile.FieldVisitor;
+import com.codename1.tools.translator.classfile.Handle;
+import com.codename1.tools.translator.classfile.Label;
+import com.codename1.tools.translator.classfile.MethodVisitor;
+import com.codename1.tools.translator.classfile.Opcodes;
+import com.codename1.tools.translator.classfile.Type;
+import com.codename1.tools.translator.classfile.tree.AbstractInsnNode;
+import com.codename1.tools.translator.classfile.tree.MethodNode;
+import com.codename1.tools.translator.classfile.analysis.Analyzer;
+import com.codename1.tools.translator.classfile.analysis.BasicInterpreter;
+import com.codename1.tools.translator.classfile.analysis.BasicValue;
+import com.codename1.tools.translator.classfile.analysis.Frame;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
-import org.objectweb.asm.TypePath;
-import org.objectweb.asm.commons.JSRInlinerAdapter;
+import com.codename1.tools.translator.classfile.tree.JsrInliner;
 
 import com.codename1.tools.translator.bytecodes.LabelInstruction;
 
@@ -504,6 +502,50 @@ public class Parser extends ClassVisitor {
         ByteCodeClass.cleanup();
         LabelInstruction.cleanup();
     }
+    /**
+     * Parses one class file from memory (incremental JavaScript translation, where
+     * nothing is on disk). Returns the class; lambda classes synthesized while
+     * reading it are added to the class list too.
+     */
+    static ByteCodeClass parseBytes(byte[] data) throws Exception {
+        BytecodeMethod.setDependencyGraph(dependencyGraph);
+        ClassReader r = new ClassReader(data);
+        Parser p = new Parser();
+        p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
+        p.cls = new ByteCodeClass(p.clsName, r.getClassName());
+        readingClassDepth++;
+        try {
+            r.accept(p, ClassReader.EXPAND_FRAMES);
+        } finally {
+            readingClassDepth--;
+        }
+        classes.add(p.cls);
+        return p.cls;
+    }
+
+    /** The parsed classes, in parse order (incremental JavaScript translation). */
+    static List<ByteCodeClass> parsedClasses() {
+        return classes;
+    }
+
+    /** Links each class to its base class and interfaces, as writeOutput does first. */
+    static void linkHierarchy() {
+        for (ByteCodeClass bc : classes) {
+            if (bc.getClsName().equals("java_lang_Object")) {
+                continue;
+            }
+            bc.setBaseClassObject(getClassByName(bc.getBaseClass()));
+            List<ByteCodeClass> lst = new ArrayList<>();
+            for (String s : bc.getBaseInterfaces()) {
+                ByteCodeClass c = getClassByName(s);
+                if (c != null) {
+                    lst.add(c);
+                }
+            }
+            bc.setBaseInterfacesObject(lst);
+        }
+    }
+
     public static void parse(File sourceFile) throws Exception {
         if(ByteCodeTranslator.verbose) {
             System.out.println("Parsing: " + sourceFile.getAbsolutePath());
@@ -913,6 +955,28 @@ public class Parser extends ClassVisitor {
             classIndexSize = classes.size();
         }
         return classIndexMap;
+    }
+
+    /**
+     * Whether any method in the program calls {@code cls.method} (by name, any
+     * signature). Answers before the cull too: a class that is merely loaded -- named
+     * by code that will itself be culled -- has no callers of its factory.
+     */
+    static boolean hasCallers(String cls, String method) {
+        ByteCodeClass c = getClassObject(cls);
+        if (c == null) {
+            return false;
+        }
+        for (BytecodeMethod m : c.getMethods()) {
+            if (method.equals(m.getMethodName()) && !m.isEliminated()) {
+                for (BytecodeMethod caller : dependencyGraph.getCallers(m.getLookupSignature())) {
+                    if (!caller.isEliminated() && caller != m) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public static ByteCodeClass getClassObject(String name) {
@@ -1508,6 +1572,9 @@ public class Parser extends ClassVisitor {
                 // Cones memoised earlier counted every class as instantiated.
                 cn1InvalidateDevirtMemo();
             }
+            // In open-world output RTA treats every kept class and method as a root
+            // (JavascriptReachability.seedRoots), so it still prunes the rest and still
+            // keeps what only JavaScript calls (JSO callbacks, timer handlers).
             if (BytecodeMethod.optimizerOn
                     && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
                     && System.getProperty("parparvm.js.rta.off") == null) {
@@ -1724,10 +1791,24 @@ public class Parser extends ClassVisitor {
         int nfound = 0;
         for(ByteCodeClass bc : classes) {
             bc.unmark();
-            if(bc.isIsInterface() || bc.getBaseClass() == null) {
+            // java.lang.Object (no base class) is the dispatch root and stays whole. An
+            // interface is culled like a class, but only for the methods with a body --
+            // default and static ones -- since an abstract method has nothing to remove.
+            // Skipping interfaces outright kept every default method alive, and through
+            // it everything the body references: a default Collection.stream() put the
+            // whole stream implementation into every native application.
+            if(bc.getBaseClass() == null && !bc.isIsInterface()) {
+                continue;
+            }
+            // Open-world output: every method of a kept class may be called by code
+            // translated later, which no call graph here can see.
+            if(JavascriptOpenWorld.keepsClass(bc.getClsName())) {
                 continue;
             }
             for(BytecodeMethod mtd : bc.getMethods()) {
+                if(bc.isIsInterface() && mtd.isAbstract() && !mtd.isStatic()) {
+                    continue;
+                }
                 // Pure-Java twins that the JS runtime's bindNative delegates call
                 // (getImpl/putImpl/toStringImpl/valueOfHeap...): no bytecode call
                 // site exists, so without this keep they would be culled and the
@@ -1910,7 +1991,7 @@ public class Parser extends ClassVisitor {
     }
     
     public Parser() {
-        super(Opcodes.ASM9);
+        super();
     }
 
     @Override
@@ -1924,15 +2005,15 @@ public class Parser extends ClassVisitor {
         cls.addMethod(mtd);
         // Tee the (post-JSR-inlined) bytecode into a MethodNode so visitEnd can run
         // ASM frame analysis to resolve category-2-aware DUP/POP2 forms. The wrapper
-        // sits INSIDE the JSRInlinerAdapter, so the MethodNode it feeds matches the
+        // sits INSIDE the JsrInliner, so the MethodNode it feeds matches the
         // instruction stream BytecodeMethod is built from. Parser's own ClassVisitor
         // has no delegate writer (super.visitMethod returns null), so routing the
         // MethodNode as the wrapper's delegate loses nothing.
-        MethodNode analysisNode = new MethodNode(Opcodes.ASM9, access, name, desc, signature, exceptions);
+        MethodNode analysisNode = new MethodNode(access, name, desc);
         MethodVisitorWrapper wrapper = new MethodVisitorWrapper(analysisNode, mtd);
         wrapper.dupAnalysisOwner = clsName;
         wrapper.dupAnalysisNode = analysisNode;
-        return new JSRInlinerAdapter(wrapper, access, name, desc, signature, exceptions);
+        return new JsrInliner(wrapper, access, name, desc);
     }
 
     // Category-sensitive stack opcodes: their correct operand-stack-ENTRY shuffle
@@ -1951,7 +2032,7 @@ public class Parser extends ClassVisitor {
      * (category-1-assuming) path -- i.e. no worse than before.
      */
     private static void resolveDupForms(String owner, MethodNode mn, BytecodeMethod mtd,
-            Frame<? extends org.objectweb.asm.tree.analysis.Value>[] existingFrames) {
+            Frame<? extends com.codename1.tools.translator.classfile.analysis.Value>[] existingFrames) {
         if (owner == null || mn == null || mn.instructions == null || mn.instructions.size() == 0) {
             return;
         }
@@ -1960,11 +2041,11 @@ public class Parser extends ClassVisitor {
             if (isCategorySensitiveStackOp(instruction.getOpcode())) { needsForms = true; break; }
         }
         if (!needsForms) return;
-        Frame<? extends org.objectweb.asm.tree.analysis.Value>[] frames = existingFrames;
+        Frame<? extends com.codename1.tools.translator.classfile.analysis.Value>[] frames = existingFrames;
         if (frames == null) {
             try {
                 frames = new Analyzer<BasicValue>(new BasicInterpreter()).analyze(owner, mn);
-            } catch (org.objectweb.asm.tree.analysis.AnalyzerException error) {
+            } catch (com.codename1.tools.translator.classfile.analysis.AnalyzerException error) {
                 return;
             }
         }
@@ -2005,7 +2086,7 @@ public class Parser extends ClassVisitor {
      * Returns null when the frame is unavailable (unreachable code).
      * ASM analysis frames model a long/double as ONE stack entry with size 2.
      */
-    private static int[] dupForm(int op, Frame<? extends org.objectweb.asm.tree.analysis.Value> f) {
+    private static int[] dupForm(int op, Frame<? extends com.codename1.tools.translator.classfile.analysis.Value> f) {
         if (f == null) {
             return null;
         }
@@ -2056,15 +2137,7 @@ public class Parser extends ClassVisitor {
         super.visitInnerClass(name, outerName, innerName, access); 
     }
 
-    @Override
-    public void visitAttribute(Attribute attr) {
-        super.visitAttribute(attr); 
-    }
 
-    @Override
-    public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
-        return new AnnotationVisitorWrapper(super.visitTypeAnnotation(typeRef, typePath, desc, visible)); 
-    }
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
@@ -2186,10 +2259,10 @@ public class Parser extends ClassVisitor {
         // call only becomes worth analysing once one has been seen in this method.
         // This keeps the dataflow off the overwhelming majority of methods.
         boolean sawLambdaIndy;
-        final java.util.Map<org.objectweb.asm.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke> flowInvokes =
-                new java.util.IdentityHashMap<org.objectweb.asm.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke>();
+        final java.util.Map<com.codename1.tools.translator.classfile.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke> flowInvokes =
+                new java.util.IdentityHashMap<com.codename1.tools.translator.classfile.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke>();
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
-            super(Opcodes.ASM9, mv);
+            super(mv);
             this.mtd = mtd;
         }
 
@@ -2199,20 +2272,10 @@ public class Parser extends ClassVisitor {
             // LEVER B: snapshot the plans that must be read off the RAW instruction
             // list now, before optimize() (run later, per-class) folds the PUTFIELDs.
             mtd.computeRawMethodPlans();
-            Frame<? extends org.objectweb.asm.tree.analysis.Value>[] flowFrames = BytecodeMethod.optimizerOn
+            Frame<? extends com.codename1.tools.translator.classfile.analysis.Value>[] flowFrames = BytecodeMethod.optimizerOn
                     ? LocalReceiverTypes.capture(dupAnalysisOwner, dupAnalysisNode, flowInvokes, mtd,
                             indyLambdas) : null;
             resolveDupForms(dupAnalysisOwner, dupAnalysisNode, mtd, flowFrames);
-            // MethodNode uses Label.info as its label-to-tree-node map. These
-            // Labels survive in our IR, so leaving that map installed retains
-            // the complete doubly linked ASM instruction tree after analysis.
-            // Both analyses have consumed it; code generation needs identity only.
-            for (Instruction instruction : mtd.getInstructions()) {
-                if (instruction instanceof LabelInstruction) {
-                    Label label = ((LabelInstruction) instruction).getLabel();
-                    if (label.info instanceof org.objectweb.asm.tree.LabelNode) label.info = null;
-                }
-            }
             flowInvokes.clear();
             indyLambdas.clear();
             sawLambdaIndy = false;
@@ -2231,10 +2294,6 @@ public class Parser extends ClassVisitor {
             super.visitLineNumber(line, start); 
         }
 
-        @Override
-        public AnnotationVisitor visitLocalVariableAnnotation(int typeRef, TypePath typePath, Label[] start, Label[] end, int[] index, String desc, boolean visible) {
-            return new AnnotationVisitorWrapper(super.visitLocalVariableAnnotation(typeRef, typePath, start, end, index, desc, visible));
-        }
 
         @Override
         public void visitLocalVariable(String name, String desc, String signature, Label start, Label end, int index) {
@@ -2242,10 +2301,6 @@ public class Parser extends ClassVisitor {
             super.visitLocalVariable(name, desc, signature, start, end, index); 
         }
 
-        @Override
-        public AnnotationVisitor visitTryCatchAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
-            return new AnnotationVisitorWrapper(super.visitTryCatchAnnotation(typeRef, typePath, desc, visible));
-        }
 
         @Override
         public void visitTryCatchBlock(Label start, Label end, Label handler, String type) {
@@ -2253,10 +2308,6 @@ public class Parser extends ClassVisitor {
             super.visitTryCatchBlock(start, end, handler, type); 
         }
 
-        @Override
-        public AnnotationVisitor visitInsnAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
-            return new AnnotationVisitorWrapper(super.visitInsnAnnotation(typeRef, typePath, desc, visible)); 
-        }
 
         @Override
         public void visitMultiANewArrayInsn(String desc, int dims) {
@@ -2314,7 +2365,7 @@ public class Parser extends ClassVisitor {
                 ("makeConcatWithConstants".equals(bsm.getName()) || "makeConcat".equals(bsm.getName()))) {
 
                 Type invokedType = Type.getMethodType(desc);
-                if (!Type.getType(String.class).equals(invokedType.getReturnType())) {
+                if (!Type.getObjectType("java/lang/String").equals(invokedType.getReturnType())) {
                     return;
                 }
 
@@ -2961,20 +3012,12 @@ public class Parser extends ClassVisitor {
             super.visitInsn(opcode); 
         }
 
-        @Override
-        public void visitFrame(int type, int nLocal, Object[] local, int nStack, Object[] stack) {
-            super.visitFrame(type, nLocal, local, nStack, stack); 
-        }
 
         @Override
         public void visitCode() {
             super.visitCode(); 
         }
 
-        @Override
-        public void visitAttribute(Attribute attr) {
-            super.visitAttribute(attr); 
-        }
 
         @Override
         public AnnotationVisitor visitParameterAnnotation(int parameter, String desc, boolean visible) {
@@ -2982,11 +3025,6 @@ public class Parser extends ClassVisitor {
             return new AnnotationVisitorWrapper(super.visitParameterAnnotation(parameter, desc, visible));
         }
 
-        @Override
-        public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
-            if (mv == null) return null;
-            return new AnnotationVisitorWrapper(super.visitTypeAnnotation(typeRef, typePath, desc, visible));
-        }
 
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
@@ -3019,7 +3057,7 @@ public class Parser extends ClassVisitor {
     static class FieldVisitorWrapper extends FieldVisitor {
 
         public FieldVisitorWrapper(FieldVisitor fv) {
-            super(Opcodes.ASM9, fv);
+            super(fv);
         }
 
         @Override
@@ -3027,15 +3065,7 @@ public class Parser extends ClassVisitor {
             super.visitEnd(); 
         }
 
-        @Override
-        public void visitAttribute(Attribute attr) {
-            super.visitAttribute(attr); 
-        }
 
-        @Override
-        public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
-            return super.visitTypeAnnotation(typeRef, typePath, desc, visible); 
-        }
 
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
@@ -3047,7 +3077,7 @@ public class Parser extends ClassVisitor {
     static class AnnotationVisitorWrapper extends AnnotationVisitor {
 
         public AnnotationVisitorWrapper(AnnotationVisitor av) {
-            super(Opcodes.ASM9, av);
+            super(av);
         }
 
         @Override
@@ -3087,7 +3117,7 @@ public class Parser extends ClassVisitor {
         private java.util.List<String> params = new java.util.ArrayList<>();
 
         public JSBodyAnnotationVisitor(BytecodeMethod method) {
-            super(Opcodes.ASM9);
+            super();
             this.method = method;
         }
 
@@ -3102,7 +3132,7 @@ public class Parser extends ClassVisitor {
         @Override
         public AnnotationVisitor visitArray(String name) {
             if ("params".equals(name)) {
-                return new AnnotationVisitor(Opcodes.ASM9) {
+                return new AnnotationVisitor() {
                     @Override
                     public void visit(String name, Object value) {
                         params.add((String) value);

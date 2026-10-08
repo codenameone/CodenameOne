@@ -295,11 +295,10 @@ def interleave(cores, rounds, arms, run_one, work, tag):
 
 def measure_translation(spec, cores, rounds, binary, java, work):
     host = REPO / 'vm/ByteCodeTranslator/target/classes'
-    asm = (REPO / 'vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt').read_text().strip()
     env = base_env(cores)
     arms = [('parpar', [str(binary)]),
             ('jdk25', [java] + jvm_cores(cores) + [
-                       '-cp', str(host) + os.pathsep + asm,
+                       '-cp', str(host),
                        'com.codename1.tools.translator.ByteCodeTranslator'])]
     out = work / ('out-' + spec['id'])
     system = platform.system()

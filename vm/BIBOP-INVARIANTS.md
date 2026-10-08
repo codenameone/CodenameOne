@@ -33,9 +33,16 @@ by the class pointer**.
 ### R1. Read `bumpIndex` with acquire, and never look at a slot at or above it.
 
 `bumpIndex` is the publication point for the whole page. The allocator writes the
-slot -- class pointer, heap position, zeroed body -- and only then stores
-`bumpIndex + 1` with release. A reader that takes a relaxed or stale `bumpIndex`
-can see a slot whose header has not been written yet.
+slot -- header, zeroed body -- and only then publishes `bumpIndex + 1`. A reader
+that takes a relaxed or stale `bumpIndex` can see a slot whose header has not been
+written yet.
+
+The inline paths publish with a STORE-STORE fence before a relaxed `bumpIndex` store
+(`CN1_BIBOP_PUBLISH_BUMP`), not with a release store: the property readers rely on is
+that the slot's stores are visible before the index that covers them, and a release
+store per object cost more than everything else in the allocation (22ms against 14ms
+for 8M objects on Apple silicon). The fence is `dmb ishst` on ARM and a compiler
+barrier on x86. Any new allocation path that bumps a page must publish the same way.
 
 ### R2. A freed or quarantined slot's first word is NOT a class pointer.
 
@@ -53,11 +60,15 @@ violation. A checker that crashes and cries wolf is worse than no checker.
 
 ### R3. Load the mark word before any other header field, with acquire.
 
-`cn1BibopInitSlot` release-stores the mark LAST, so the mark word is the single
-happens-before edge that publishes a freshly allocated object. A relaxed load
-here is how the parallel marker once observed an object's mark without observing
-its `parentClsReference` store, dereferenced a stale class pointer, and crashed
-at a wild PC on arm64 -- x86 masked it because every x86 load is already acquire.
+`cn1BibopInitSlot` (the out-of-line path) release-stores the mark LAST, so for a slot
+it initializes the mark word is the happens-before edge that publishes the object. A
+relaxed load here is how the parallel marker once observed an object's mark without
+observing its `parentClsReference` store, dereferenced a stale class pointer, and
+crashed at a wild PC on arm64 -- x86 masked it because every x86 load is already
+acquire.
+
+The inline bump paths write the whole 4-byte header in one store and are published by
+R1's fence instead; a reader that reached the slot through `bumpIndex` sees all of it.
 
 ### R4. `heapPosition` says which collector owns the slot, and there are three answers.
 
@@ -96,12 +107,20 @@ using must actually be retired. Leaving a full page installed and `owned` means
 it is never swept, its dead slots never return, and its epoch bookkeeping never
 advances.
 
-### R7. Any allocation into a page must set `gcAllocedSinceSweep`.
+### R7. A page that can be allocated into must carry `gcAllocedSinceSweep`.
 
-The grace pass slot-scans exactly the flagged pages. An allocation that does not
-flag its page leaves a `mark == -1` object the grace pass never traces, so an
-older object reachable only through it is freed while still referenced. The flag
-is cleared only by the sweep, never by a concurrent phase.
+The grace pass slot-scans exactly the flagged pages. A page holding an unflagged
+`mark == -1` object leaves an object the grace pass never traces, so an older object
+reachable only through it is freed while still referenced. The flag is cleared only
+by the sweep, never by a concurrent phase.
+
+The flag is raised when a thread TAKES a page with room in it (`cn1BibopOwnPage`), not
+on every allocation: only the owner allocates into a page (R5), the sweep only clears
+it on a page nobody owns (R6), and a page becomes owned only through that function.
+A FULL page is not flagged -- the sweep routinely returns full, all-graced pages to the
+partial pool, the allocator takes one, finds no room and retires it again, and flagging
+it cost every such page its O(1) sweep (measured: every page full-walked). The
+free-list paths still flag per object; they are out of line.
 
 ### R8. `classIndex`, `slotSize`, `slotCount` and `firstSlotOffset` are fixed at format time.
 
@@ -117,6 +136,15 @@ implies the other: `gcLastMarkedEpoch` covers slots marked by `gcMarkObject`,
 `gcGraceEpoch` covers slots the sweep itself promoted out of grace. Anything that
 changes who advances these fields, or how often, changes which pages are
 reclaimed wholesale.
+
+A stop-the-world MINOR has its own O(1) reset (`minorAllDead` in `cn1BibopSweep`): a
+page retired before the roots were scanned (`gcPreCycle`), never swept since it was
+formatted (`gcSweptBump == 0`, no free list), with nothing on it ever marked
+(`gcLastMarkedEpoch == 0` -- NOT "not marked this cycle", because an object marked in
+an earlier cycle is OLD and a minor keeps it without re-marking it), and no monitor,
+peer, adoption or finalizable object (`gcHasFinalizable`, set on every path that fills
+a slot). `CN1_GC_VERIFY` builds walk the page anyway and abort if the walk would have
+kept a slot.
 
 ---
 

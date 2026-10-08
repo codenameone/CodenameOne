@@ -32,6 +32,7 @@ package com.codename1.io.gzip;
 import java.io.IOException;
 import java.io.OutputStream;
 
+@com.codename1.impl.SharedWithBackend
 public class GZIPOutputStream extends DeflaterOutputStream {
 
     public GZIPOutputStream(OutputStream out) throws IOException {

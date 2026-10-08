@@ -75,8 +75,8 @@
  "objectAllocation": {
   "all": {
    "memory": 0.37,
-   "runs": 3,
-   "time": 5.011,
+   "runs": 1,
+   "time": 1.649,
    "tolerance": {
     "memory": 0.3,
     "time": 0.5
@@ -116,8 +116,8 @@
  "translator": {
   "all": {
    "memory": 0.519,
-   "runs": 3,
-   "time": 0.484,
+   "runs": 2,
+   "time": 0.515,
    "tolerance": {
     "time": 0.2
    }

@@ -77,14 +77,27 @@ final class BackendWiringWriter {
     /// the listing
     String write(String pkg, List<Router> routers, Map<String, String> sockets,
                  List<String[]> routes) {
+        return write(pkg, CLASS_NAME, routers, sockets, routes, false);
+    }
+
+    /// The class being written; [#CLASS_NAME] unless a test wiring is.
+    private String className = CLASS_NAME;
+
+    /// The same, under another name, and for a test also implementing
+    /// `com.codename1.impl.backend.test.TestBeans` so the test's fields can be
+    /// filled by name. The production wiring never has that lookup.
+    String write(String pkg, String name, List<Router> routers, Map<String, String> sockets,
+                 List<String[]> routes, boolean testBeans) {
+        className = name;
         StringBuilder sb = new StringBuilder();
         if (pkg.length() > 0) {
             sb.append("package ").append(pkg).append(";\n\n");
         }
         sb.append("// Generated from the beans of this module. Do not edit.\n");
         sb.append("@com.codename1.backend.annotations.Generated\n");
-        sb.append("public final class ").append(CLASS_NAME)
-          .append(" implements com.codename1.backend.Backend.Application {\n");
+        sb.append("public final class ").append(className)
+          .append(" implements com.codename1.impl.backend.BackendApplication")
+          .append(testBeans ? ", com.codename1.impl.backend.test.TestBeans" : "").append(" {\n");
         fields(sb);
         create(sb, routers);
         webSockets(sb, sockets);
@@ -96,14 +109,28 @@ final class BackendWiringWriter {
         sb.append("    public boolean tracksCurrentRequest() {\n        return ")
           .append(model.requestSlots + model.sessionSlots > 0).append(";\n    }\n\n");
         requestEnded(sb);
-        sb.append("    public com.codename1.backend.Scheduler getScheduler() {\n")
+        sb.append("    public com.codename1.impl.backend.Scheduler getScheduler() {\n")
           .append("        return scheduler;\n    }\n\n");
         describeBeans(sb);
         describeRoutes(sb, routes);
         scopes(sb);
         prototypes(sb);
+        if (testBeans) {
+            testBeans(sb);
+        }
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// `bean(name)` over the fields, for a test's injections. A prototype is built
+    /// anew, as an injection point would get it.
+    private void testBeans(StringBuilder sb) {
+        sb.append("    public Object bean(String name) {\n");
+        for (BackendBeans.Bean b : model.beans) {
+            sb.append("        if (").append(BackendSources.quote(b.name))
+              .append(".equals(name)) {\n            return ").append(reference(b)).append(";\n        }\n");
+        }
+        sb.append("        return null;\n    }\n\n");
     }
 
     // ----------------------------------------------------------------- fields
@@ -112,8 +139,8 @@ final class BackendWiringWriter {
         sb.append("    private com.codename1.backend.Config config;\n");
         sb.append("    private com.codename1.backend.DataSource dataSource;\n");
         sb.append("    private com.codename1.backend.orm.EntityManager entities;\n");
-        sb.append("    private com.codename1.backend.orm.TransactionSession transactionSession;\n");
-        sb.append("    private com.codename1.backend.Scheduler scheduler;\n");
+        sb.append("    private com.codename1.impl.backend.TransactionSession transactionSession;\n");
+        sb.append("    private com.codename1.impl.backend.Scheduler scheduler;\n");
         // The controllers and endpoints this start registered, by binary name,
         // for describeRoutes(): one whose condition is off serves nothing, and
         // listing its routes anyway sent an agent to endpoints that answer 404.
@@ -137,12 +164,12 @@ final class BackendWiringWriter {
         if (model.lazySlots > 0) {
             scopeField(sb, "lazyScope", "lazyBean");
         }
-        sb.append("\n    public ").append(CLASS_NAME).append("() {\n    }\n\n");
+        sb.append("\n    public ").append(className).append("() {\n    }\n\n");
     }
 
     private static void scopeField(StringBuilder sb, String field, String method) {
-        sb.append("    private final com.codename1.backend.Wiring.Scope ").append(field)
-          .append(" = new com.codename1.backend.Wiring.Scope() {\n")
+        sb.append("    private final com.codename1.impl.backend.Wiring.Scope ").append(field)
+          .append(" = new com.codename1.impl.backend.Wiring.Scope() {\n")
           .append("        public Object get(int slot) {\n")
           .append("            return ").append(method).append("(slot);\n")
           .append("        }\n    };\n");
@@ -152,7 +179,7 @@ final class BackendWiringWriter {
 
     private void create(StringBuilder sb, List<Router> routers) {
         sb.append("    public com.codename1.backend.HttpServer.Handler[] create(\n")
-          .append("            com.codename1.backend.Backend.Environment environment) "
+          .append("            com.codename1.impl.backend.WiringEnvironment environment) "
                   + "throws Exception {\n");
         // Every field back to null first. A builder started again reuses this
         // object, and a bean whose condition is off this time -- or a lazy one
@@ -175,7 +202,7 @@ final class BackendWiringWriter {
         sb.append("        dataSource = environment.getDataSource();\n");
         sb.append("        entities = environment.getEntityManager();\n");
         if (model.needsSession) {
-            sb.append("        transactionSession = new com.codename1.backend.orm."
+            sb.append("        transactionSession = new com.codename1.impl.backend."
                     + "TransactionSession(\n                com.codename1.backend.Backend."
                     + "requireEntities(entities, \"the injected Session\"));\n");
         }
@@ -286,7 +313,7 @@ final class BackendWiringWriter {
     private String condition(BackendBeans.Bean b) {
         List<String> parts = new ArrayList<String>();
         for (String[] group : b.profiles) {
-            StringBuilder p = new StringBuilder("com.codename1.backend.Wiring.profiles(config, "
+            StringBuilder p = new StringBuilder("com.codename1.impl.backend.Wiring.profiles(config, "
                     + "new String[] {");
             for (int i = 0; i < group.length; i++) {
                 if (i > 0) {
@@ -297,7 +324,7 @@ final class BackendWiringWriter {
             parts.add(p.append("})").toString());
         }
         for (String[] c : b.propertyConditions) {
-            parts.add("com.codename1.backend.Wiring.propertyMatches(config, "
+            parts.add("com.codename1.impl.backend.Wiring.propertyMatches(config, "
                     + BackendSources.quote(c[0]) + ", " + BackendSources.quote(c[1]) + ", "
                     + c[2] + ")");
         }
@@ -314,6 +341,11 @@ final class BackendWiringWriter {
     /// The expression that constructs a bean: `new`, the constructor's bridge, or
     /// the factory method.
     private String construct(BackendBeans.Bean b) {
+        if (b.mockType != null) {
+            // A test's @MockitoBean: the JVM test runtime asks Mockito for it.
+            return "((" + typeOf(b) + ") com.codename1.impl.backend.test.Mocks.create("
+                    + typeOf(b) + ".class))";
+        }
         StringBuilder args = new StringBuilder();
         for (int i = 0; i < b.constructorPoints.size(); i++) {
             if (i > 0) {
@@ -329,7 +361,7 @@ final class BackendWiringWriter {
             // Checked where it is produced: an injection point given the bean
             // directly would take the null without a word, and the server would
             // report ready and fail on first use, far from the factory at fault.
-            return "((" + typeOf(b) + ") com.codename1.backend.Wiring.produced(" + target + "."
+            return "((" + typeOf(b) + ") com.codename1.impl.backend.Wiring.produced(" + target + "."
                     + name + "(" + args + "), "
                     + BackendSources.quote("@Bean " + b.factoryOwnerClass.getSourceName() + "."
                     + b.factory.getName()) + "))";
@@ -427,7 +459,7 @@ final class BackendWiringWriter {
                     b.propertiesPrefix.length() == 0 ? kebab : b.propertiesPrefix + "." + kebab);
             Type t = Type.getArgumentTypes(setter.getDescriptor())[0];
             sb.append(inner).append("{\n").append(inner).append("    String value = ")
-              .append("com.codename1.backend.Wiring.property(config, ")
+              .append("com.codename1.impl.backend.Wiring.property(config, ")
               .append(BackendSources.quote(key)).append(", ").append(relaxed).append(");\n");
             sb.append(inner).append("    if (value != null) {\n").append(inner).append("        ")
               .append(ref).append('.').append(setter.getName()).append('(')
@@ -492,7 +524,7 @@ final class BackendWiringWriter {
     /// The expression one injection point receives.
     String point(BackendBeans.Point p) {
         if (p.value != null) {
-            return convert(p.type, "com.codename1.backend.Wiring.value(config, "
+            return convert(p.type, "com.codename1.impl.backend.Wiring.value(config, "
                     + BackendSources.quote(p.value) + ", " + BackendSources.quote(p.where) + ")",
                     p.where);
         }
@@ -515,7 +547,7 @@ final class BackendWiringWriter {
         }
         String type = types.typeName(p.type);
         if (p.list) {
-            StringBuilder sb = new StringBuilder("com.codename1.backend.Wiring.list(new Object[] {");
+            StringBuilder sb = new StringBuilder("com.codename1.impl.backend.Wiring.list(new Object[] {");
             for (int i = 0; i < p.candidates.size(); i++) {
                 if (i > 0) {
                     sb.append(", ");
@@ -529,7 +561,7 @@ final class BackendWiringWriter {
         }
         if (p.choice || (p.candidates.size() == 1 && p.candidates.get(0).isConditional())) {
             StringBuilder sb = new StringBuilder("(").append(type)
-                    .append(") com.codename1.backend.Wiring.")
+                    .append(") com.codename1.impl.backend.Wiring.")
                     .append(p.preferFirst ? "preferred" : "single").append("(new Object[] {");
             for (int i = 0; i < p.candidates.size(); i++) {
                 if (i > 0) {
@@ -554,7 +586,7 @@ final class BackendWiringWriter {
     /// Converts a configuration string to `t`.
     String convert(Type t, String expression, String where) {
         String w = BackendSources.quote(where);
-        String wiring = "com.codename1.backend.Wiring.";
+        String wiring = "com.codename1.impl.backend.Wiring.";
         switch (t.getSort()) {
             case Type.BOOLEAN: return wiring + "toBoolean(" + expression + ", " + w + ")";
             case Type.CHAR: return wiring + "toChar(" + expression + ", " + w + ")";
@@ -649,7 +681,7 @@ final class BackendWiringWriter {
         sb.append("    public void started(com.codename1.backend.Backend backend) "
                 + "throws Exception {\n");
         if (model.hasJobs()) {
-            sb.append("        scheduler = new com.codename1.backend.Scheduler(dataSource);\n");
+            sb.append("        scheduler = new com.codename1.impl.backend.Scheduler(dataSource);\n");
             // Before it starts: whether its runs are measured, and whose tracer
             // their spans go to, are this server's.
             sb.append("        scheduler.bind(backend);\n");
@@ -676,7 +708,7 @@ final class BackendWiringWriter {
     private void job(StringBuilder sb, BackendBeans.Job job, String target) {
         String where = BackendSources.quote("@Scheduled " + job.name);
         String executor = BackendSources.quote(job.executor);
-        String thread = "com.codename1.backend.Tasks." + job.thread;
+        String thread = "com.codename1.impl.backend.BackendAccess." + job.thread;
         String lock = job.lock.length() == 0 ? "null" : BackendSources.quote(job.lock);
         String body = "new Runnable() {\n"
                 + "                public void run() {\n"
@@ -694,13 +726,13 @@ final class BackendWiringWriter {
             String schedule;
             if (job.masks != null) {
                 CronCompiler c = job.masks;
-                schedule = "new com.codename1.backend.CronSchedule(" + c.seconds + "L, " + c.minutes
+                schedule = "new com.codename1.impl.backend.CronSchedule(" + c.seconds + "L, " + c.minutes
                         + "L, " + c.hours + "L, " + c.daysOfMonth + "L, " + c.months + "L, "
                         + c.daysOfWeek + "L, " + c.lastDayOfMonth + ", "
                         + BackendSources.quote(job.zone) + ", " + BackendSources.quote(job.cron) + ")";
             } else {
-                schedule = "com.codename1.backend.CronSchedule.parse("
-                        + "com.codename1.backend.Wiring.value(config, "
+                schedule = "com.codename1.impl.backend.CronSchedule.parse("
+                        + "com.codename1.impl.backend.Wiring.value(config, "
                         + BackendSources.quote(job.cron) + ", " + where + "), "
                         + BackendSources.quote(job.zone) + ")";
             }
@@ -721,7 +753,7 @@ final class BackendWiringWriter {
 
     private static String duration(long literal, String text, String where) {
         if (text != null) {
-            return "com.codename1.backend.Wiring.toLong(com.codename1.backend.Wiring.value("
+            return "com.codename1.impl.backend.Wiring.toLong(com.codename1.impl.backend.Wiring.value("
                     + "config, " + BackendSources.quote(text) + ", " + where + "), " + where + ")";
         }
         return literal + "L";
@@ -773,7 +805,7 @@ final class BackendWiringWriter {
     private static void destroyCall(StringBuilder sb, BackendBeans.Bean b, String call) {
         sb.append("            try {\n                ").append(call).append(";\n")
           .append("            } catch (Throwable err) {\n")
-          .append("                com.codename1.backend.Wiring.destroyFailed(")
+          .append("                com.codename1.impl.backend.Wiring.destroyFailed(")
           .append(BackendSources.quote(b.name)).append(", err);\n            }\n");
     }
 
@@ -965,9 +997,9 @@ final class BackendWiringWriter {
             sb.append("        com.codename1.backend.HttpServer.Request request =\n")
               .append("                com.codename1.backend.Backend.currentRequest();\n");
             sb.append("        if (request == null) {\n")
-              .append("            throw new IllegalStateException(\"A @RequestScope bean was "
+              .append("            throw new IllegalStateException(\"A request-scoped bean was "
                       + "used outside a request\");\n        }\n");
-            sb.append("        Object[] beans = request.scopedBeans(").append(model.requestSlots)
+            sb.append("        Object[] beans = com.codename1.impl.backend.BackendAccess.get().requestBeans(request, ").append(model.requestSlots)
               .append(");\n");
             sb.append("        if (beans[slot] == null) {\n            beans[slot] = "
                     + "createScoped(slot, request, true);\n        }\n");
@@ -978,15 +1010,15 @@ final class BackendWiringWriter {
             sb.append("        com.codename1.backend.HttpServer.Request request =\n")
               .append("                com.codename1.backend.Backend.currentRequest();\n");
             sb.append("        if (request == null) {\n")
-              .append("            throw new IllegalStateException(\"A @SessionScope bean was "
+              .append("            throw new IllegalStateException(\"A session-scoped bean was "
                       + "used outside a request\");\n        }\n");
             sb.append("        com.codename1.backend.HttpSession session = "
                     + "request.getSession(true);\n");
             // The session's shared lock, not the HttpSession: a database store
             // loads a separate copy per request, and locking one copy would let
             // two requests each build the bean.
-            sb.append("        synchronized (session.beanLock()) {\n");
-            sb.append("            Object[] beans = session.scopedBeans(").append(model.sessionSlots)
+            sb.append("        synchronized (com.codename1.impl.backend.BackendAccess.get().sessionBeanLock(session)) {\n");
+            sb.append("            Object[] beans = com.codename1.impl.backend.BackendAccess.get().sessionBeans(session, ").append(model.sessionSlots)
               .append(");\n");
             sb.append("            if (beans[slot] == null) {\n                beans[slot] = "
                     + "createScoped(slot, request, false);\n            }\n");

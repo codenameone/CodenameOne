@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+    SpotBugs exclusions for the in-tree Java compiler (vm/JavaCompiler). Each entry
+    is scoped to where its pattern lives and says why, so a new occurrence elsewhere
+    is still reported.
+    -->
+
+    <!-- Framework-wide conventions; see core-unittests/spotbugs-exclude.xml. -->
+    <Match><Bug pattern="EI_EXPOSE_REP" /></Match>
+    <Match><Bug pattern="EI_EXPOSE_REP2" /></Match>
+    <Match><Bug pattern="MS_EXPOSE_REP" /></Match>
+    <Match><Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS" /></Match>
+
+    <!--
+    Syntax-tree nodes and symbols are created empty and filled in by the parser and
+    the later phases (a node's children, a symbol's descriptor once its signature is
+    known), so their fields are deliberately not set in a constructor. The same goes
+    for the frame computer's per-method arrays and the parser's script settings,
+    which are set before use by the code that owns them.
+    -->
+    <Match>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR" />
+        <Or>
+            <Class name="~com\.codename1\.tools\.javac\.Tree\$.*" />
+            <Class name="com.codename1.tools.javac.Attr$VarRef" />
+            <Class name="com.codename1.tools.javac.MethodSymbol" />
+            <Class name="com.codename1.tools.javac.FrameComputer" />
+            <Class name="com.codename1.tools.javac.JavaSourceParser" />
+        </Or>
+    </Match>
+
+    <!-- Script-mode settings are public fields the embedding application assigns. -->
+    <Match>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD" />
+        <Class name="com.codename1.tools.javac.ScriptSpec" />
+    </Match>
+</FindBugsFilter>

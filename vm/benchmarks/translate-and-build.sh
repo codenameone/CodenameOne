@@ -46,11 +46,6 @@ if [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" 
     (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am clean package -DskipTests)
     printf '%s\n' "$TRANSLATOR_SHA" > "$TRANSLATOR_STAMP"
 fi
-ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/bench-asm-classpath.txt"
-if [ ! -f "$ASM_CP_FILE" ]; then
-    (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator dependency:build-classpath -Dmdep.outputFile=target/bench-asm-classpath.txt)
-fi
-ASM_CP="$(cat "$ASM_CP_FILE")"
 
 # 2. sync the C runtime resources the translator emits from its classpath
 for f in cn1_globals.h cn1_globals.m nativeMethods.m cn1_intrinsics.h; do
@@ -102,7 +97,7 @@ fi
 
 # 5. translate to C
 mkdir -p "$WORK/out"
-"$J8/bin/java" $CN1_BENCH_TRANSLATOR_OPTS -cp "$TRANSLATOR:$ASM_CP" com.codename1.tools.translator.ByteCodeTranslator \
+"$J8/bin/java" $CN1_BENCH_TRANSLATOR_OPTS -cp "$TRANSLATOR" com.codename1.tools.translator.ByteCodeTranslator \
     clean "$JAVAAPI;$WORK/classes" "$WORK/out" "$MAIN" com.bench "$MAIN" 1.0 clean none \
     > "$WORK/translate.log" 2>&1 || { echo "TRANSLATE FAILED"; tail -30 "$WORK/translate.log"; exit 1; }
 

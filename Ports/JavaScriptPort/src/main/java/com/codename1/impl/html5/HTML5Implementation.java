@@ -10571,6 +10571,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
         JavaScriptNetworkAdapter.setHeader((JavaScriptNetworkAdapter.Connection) connection, key, val);
     }
 
+    /// True: [#setReadTimeout(Object, int)] is honoured, so a caller that checks
+    /// this before setting one gets the timeout it asked for.
+    @Override
+    public boolean isReadTimeoutSupported() {
+        return true;
+    }
+
+    @Override
+    public void setReadTimeout(Object connection, int readTimeout) {
+        if (connection instanceof NetworkConnection) {
+            ((NetworkConnection) connection).setReadTimeout(readTimeout);
+        }
+    }
+
     @Override
     public void setHttpMethod(Object connection, String method) throws IOException {
         JavaScriptNetworkAdapter.setHttpMethod((JavaScriptNetworkAdapter.Connection) connection, method);
@@ -12493,7 +12507,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         Uint8Array responseBytes = toResponseBytes(req);
         if (responseBytes == null) {
-            System.out.println(req.getAllResponseHeaders());
+            System.out.println(NetworkConnection.responseHeaders(req));
             System.out.println(req.getStatusText());
             System.out.println("Failed to load resource "+url);
             System.out.println("Status code was "+req.getStatus());

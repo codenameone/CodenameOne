@@ -48,8 +48,8 @@ import org.objectweb.asm.Type;
 
 /// The backend's beans, resolved at build time.
 ///
-/// Every class carrying a stereotype -- `@Component`, `@Service`, `@Repository`,
-/// `@Configuration`, `@RestController`, `@WebSocketMapping` -- and every `@Bean`
+/// Every class carrying a stereotype -- `@Component`, `@Configuration`,
+/// `@RestController`, `@WebSocketMapping` -- and every `@Bean`
 /// method is a bean. This works out, for each one, which constructor the
 /// generated entry point calls and what it passes, which bean every `@Autowired`
 /// field and setter receives, in what order they are built, and which of their
@@ -71,8 +71,6 @@ final class BackendBeans {
 
     static final String PKG = "Lcom/codename1/backend/annotations/";
     static final String COMPONENT = PKG + "Component;";
-    static final String SERVICE = PKG + "Service;";
-    static final String REPOSITORY = PKG + "Repository;";
     static final String CONFIGURATION = PKG + "Configuration;";
     static final String BEAN = PKG + "Bean;";
     static final String AUTOWIRED = PKG + "Autowired;";
@@ -82,8 +80,6 @@ final class BackendBeans {
     static final String VALUE = PKG + "Value;";
     static final String CONFIG_PROPERTIES = PKG + "ConfigurationProperties;";
     static final String SCOPE = PKG + "Scope;";
-    static final String REQUEST_SCOPE = PKG + "RequestScope;";
-    static final String SESSION_SCOPE = PKG + "SessionScope;";
     static final String PROFILE = PKG + "Profile;";
     static final String ON_PROPERTY = PKG + "ConditionalOnProperty;";
     static final String ON_MISSING = PKG + "ConditionalOnMissingBean;";
@@ -105,14 +101,14 @@ final class BackendBeans {
 
     /// Every annotation this pass reads, for the processor's declared interest.
     static final Set<String> DESCRIPTORS = Collections.unmodifiableSet(
-            new LinkedHashSet<String>(java.util.Arrays.asList(COMPONENT, SERVICE, REPOSITORY,
+            new LinkedHashSet<String>(java.util.Arrays.asList(COMPONENT,
                     CONFIGURATION, BEAN, AUTOWIRED, VALUE, CONFIG_PROPERTIES, SCOPE,
-                    REQUEST_SCOPE, SESSION_SCOPE, PROFILE, ON_PROPERTY, ON_MISSING,
+                    PROFILE, ON_PROPERTY, ON_MISSING,
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
                     MCP_TOOL, REST_CONTROLLER, WEBSOCKET_MAPPING)));
 
-    private static final String[] STEREOTYPES = {COMPONENT, SERVICE, REPOSITORY, CONFIGURATION,
+    private static final String[] STEREOTYPES = {COMPONENT, CONFIGURATION,
             REST_CONTROLLER, WEBSOCKET_MAPPING};
 
     static final String CONFIG_TYPE = "com/codename1/backend/Config";
@@ -287,6 +283,9 @@ final class BackendBeans {
         int slot = -1;
         /// The generated stand-in class, for a request, session or lazy bean.
         String proxyBinary;
+        /// For a test's `@MockitoBean`: the internal name of the type mocked. Such a
+        /// bean has no class of its own to construct; the test wiring asks Mockito.
+        String mockType;
 
         boolean isConditional() {
             return !profiles.isEmpty() || !propertyConditions.isEmpty();
@@ -389,6 +388,15 @@ final class BackendBeans {
     int lazySlots;
     /// The package the entry point is written into.
     String entryPackage;
+
+    /// Test mode, set by [#forTests] and null in a normal build: the classes that
+    /// may become beans (the application's and the context's test
+    /// configurations), the test configurations themselves, the mocks as
+    /// {field, internal type}, and the classes this pass may rewrite.
+    private Set<String> testScope;
+    private Set<String> testConfigurations;
+    private List<String[]> testMocks;
+    private Set<String> testWeaveable;
     /// Sources this pass compiled, by binary name, so tests can read them.
     final Map<String, String> sources = new LinkedHashMap<String, String>();
 
@@ -428,6 +436,158 @@ final class BackendBeans {
             out.emit();
         }
         return out;
+    }
+
+    /// The beans of one test context: the application's, the context's
+    /// `@TestConfiguration` beans, and its mocks in place of the beans they
+    /// replace -- resolved like a build's, but woven only in `weaveable` (the
+    /// test classes) and with nothing generated beside them. The application's
+    /// classes were woven, and their stand-ins, adapters and aspects compiled, by
+    /// the main build; the names computed here are those same names, which the
+    /// rules below keep stable.
+    ///
+    /// @param entryPackage the main build's, from its wiring record
+    static BackendBeans forTests(ProcessorContext ctx, Set<String> scope,
+                                 Set<String> configurations, List<String[]> mocks,
+                                 Set<String> weaveable, String entryPackage)
+            throws ProcessingException {
+        BackendBeans out = new BackendBeans(ctx);
+        out.testScope = scope;
+        out.testConfigurations = configurations;
+        out.testMocks = mocks;
+        out.testWeaveable = weaveable;
+        out.discover();
+        if (entryPackage != null) {
+            out.entryPackage = entryPackage;
+        }
+        if (!ctx.hasErrors()) {
+            out.checkTestBeans();
+        }
+        if (!ctx.hasErrors()) {
+            out.applyMocks();
+        }
+        if (!ctx.hasErrors()) {
+            out.resolve();
+        }
+        if (!ctx.hasErrors()) {
+            out.plan();
+        }
+        if (!ctx.hasErrors()) {
+            out.nameAdapters();
+        }
+        return out;
+    }
+
+    /// Test beans are plain singletons. A scoped or lazy one would take a slot
+    /// and shift the application's, which the stand-ins compiled by the main
+    /// build have baked in; a woven one would need an aspect class nothing
+    /// generates in a test run.
+    private void checkTestBeans() {
+        for (Bean b : beans) {
+            AnnotatedClass declaring = b.factory != null ? b.factoryOwnerClass : b.cls;
+            if (declaring == null || !testConfigurations.contains(declaring.getInternalName())) {
+                continue;
+            }
+            if (!SINGLETON.equals(b.scope) || b.lazy) {
+                ctx.error(declaring, "Test bean " + b.describe() + " is " + (b.lazy ? "lazy"
+                        : "scoped " + b.scope) + "; a test bean is a plain singleton.");
+            }
+        }
+        for (String name : testConfigurations) {
+            AnnotatedClass cls = ctx.lookup(name);
+            if (cls == null) {
+                continue;
+            }
+            for (MethodInfo m : cls.getMethods()) {
+                if (m.getAnnotation(TRANSACTIONAL) != null || m.getAnnotation(ASYNC) != null
+                        || m.getAnnotation(TIMED) != null || m.getAnnotation(COUNTED) != null
+                        || m.getAnnotation(SCHEDULED) != null) {
+                    ctx.error(cls, "@TestConfiguration " + cls.getSourceName() + "."
+                            + m.getName() + " carries an annotation the build weaves; a test "
+                            + "configuration declares beans and nothing else.");
+                }
+            }
+        }
+    }
+
+    /// Replaces every bean assignable to a mocked type with one mock of it.
+    private void applyMocks() {
+        for (String[] mock : testMocks) {
+            String type = mock[1];
+            List<Bean> replaced = new ArrayList<Bean>();
+            for (Bean b : beans) {
+                if (b.mockType == null && b.types.contains(type)) {
+                    replaced.add(b);
+                }
+            }
+            for (Bean b : replaced) {
+                if (b.controller || b.webSocket) {
+                    ctx.error("@MockitoBean " + type.replace('/', '.') + " would replace "
+                            + b.describe() + ", which serves requests; mock what it calls "
+                            + "instead.");
+                    return;
+                }
+                if (!SINGLETON.equals(b.scope) || b.lazy) {
+                    ctx.error("@MockitoBean " + type.replace('/', '.') + " would replace "
+                            + b.describe() + ", which is " + (b.lazy ? "lazy" : "scoped "
+                            + b.scope) + "; only a singleton can be mocked.");
+                    return;
+                }
+            }
+            for (Bean b : replaced) {
+                beans.remove(b);
+                byName.remove(b.name);
+            }
+            // Factory beans of a configuration that was mocked away go with it.
+            for (int i = beans.size() - 1; i >= 0; i--) {
+                Bean b = beans.get(i);
+                if (b.owner != null && replaced.contains(b.owner)) {
+                    beans.remove(i);
+                    byName.remove(b.name);
+                }
+            }
+            Bean m = new Bean();
+            m.mockType = type;
+            m.type = type;
+            m.cls = ctx.lookup(type);
+            m.name = replaced.size() == 1 ? replaced.get(0).name : mock[0];
+            m.types.addAll(assignableTypes(type));
+            m.types.add(type);
+            add(m);
+        }
+    }
+
+    /// The adapter class names the wiring registers, as the main build named them.
+    private void nameAdapters() {
+        for (Bean b : beans) {
+            String pkg = RestClientAnnotationProcessor.packageOf(b.type.replace('/', '.'));
+            for (int i = 0; i < b.tools.size(); i++) {
+                b.tools.get(i).adapterBinary = qualify(pkg, baseName(b.type) + "Cn1Tool" + i);
+            }
+            if (b.managed != null) {
+                b.managed.adapterBinary = qualify(pkg, baseName(b.type) + "Cn1Managed");
+            }
+        }
+    }
+
+    /// Weaves the test classes this pass planned, and nothing else, each where its
+    /// class file is: a mixed Java and Kotlin test set has two output directories.
+    int weaveTests(File out, Map<String, AnnotatedClass> index) throws ProcessingException {
+        int woven = 0;
+        try {
+            for (BackendWeaver.Plan plan : plans.values()) {
+                AnnotatedClass cls = index.get(plan.internalName);
+                File file = cls != null && cls.getClassFile() != null ? cls.getClassFile()
+                        : new File(out, plan.internalName + ".class");
+                if (BackendWeaver.weaveFile(file, plan)) {
+                    woven++;
+                }
+            }
+        } catch (IOException err) {
+            throw new ProcessingException("Could not rewrite the test classes: "
+                    + err.getMessage(), err);
+        }
+        return woven;
     }
 
     private static boolean usesAnyAnnotation(ProcessorContext ctx) {
@@ -503,7 +663,11 @@ final class BackendBeans {
             if (!concerns(cls)) {
                 continue;
             }
-            if (!isStereotyped(cls)) {
+            if (testScope != null && !testScope.contains(cls.getInternalName())) {
+                continue;
+            }
+            if (!isStereotyped(cls) && !(testConfigurations != null
+                    && testConfigurations.contains(cls.getInternalName()))) {
                 continue;
             }
             if (cls.isInterface() || cls.isAbstract()) {
@@ -612,8 +776,8 @@ final class BackendBeans {
                     // the task calls the instance itself, destroyed or not.
                     String scope = REQUEST.equals(bean.scope) ? "request" : "session";
                     ctx.getLog().warn("cn1: @Async method " + cls.getSourceName() + "." + m.getName()
-                            + " is on a @" + (REQUEST.equals(bean.scope) ? "Request" : "Session")
-                            + "Scope bean, which is destroyed when its " + scope + " ends -- "
+                            + " is on a @Scope(\"" + scope + "\") bean, which is destroyed when "
+                            + "its " + scope + " ends -- "
                             + "possibly before the task runs. Move the method to a singleton "
                             + "and pass it what it needs.");
                     break;
@@ -808,12 +972,6 @@ final class BackendBeans {
                         + "this runtime has; use singleton, prototype, request or session.");
             }
             bean.scope = s;
-        }
-        if (annotations.get(REQUEST_SCOPE) != null) {
-            bean.scope = REQUEST;
-        }
-        if (annotations.get(SESSION_SCOPE) != null) {
-            bean.scope = SESSION;
         }
         bean.primary = annotations.get(PRIMARY) != null;
         AnnotationValues lazy = annotations.get(LAZY);
@@ -1306,7 +1464,7 @@ final class BackendBeans {
     /// Whether the bean has a method the build runs on an executor: `@Async` on
     /// the method, or on the class for its public instance methods.
     private boolean hasAsync(Bean b) {
-        if (b.cls == null) {
+        if (b.cls == null || b.mockType != null) {
             return false;
         }
         boolean onClass = b.cls.getClassAnnotation(ASYNC) != null;
@@ -1568,7 +1726,7 @@ final class BackendBeans {
                 tool.paramTypes.add(declared);
                 tool.paramSchema.add(declared == null ? null : codecs.schemaType(declared));
                 tool.paramRead.add(declared == null ? null : codecs.readStatements(declared,
-                        "j", "com.codename1.backend.JsonCodec.Path.ROOT",
+                        "j", "com.codename1.impl.backend.JsonCodec.Path.ROOT",
                         BackendJsonCodecs.javaString(paramName), "-1", "0", "target", ""));
             }
             Type returned = Type.getReturnType(m.getDescriptor());
@@ -1765,7 +1923,7 @@ final class BackendBeans {
             "java/util/concurrent/ScheduledFuture", "java/util/concurrent/RunnableScheduledFuture",
             "java/util/concurrent/FutureTask", "java/util/concurrent/CompletableFuture",
             "java/util/concurrent/ForkJoinTask", "com/codename1/backend/AsyncResult",
-            "com/codename1/backend/AsyncTask"));
+            "com/codename1/impl/backend/AsyncTask"));
 
     /// Whether `m` returns a Future: declared as one, or a type implementing it.
     private boolean returnsFuture(MethodInfo m) {
@@ -1998,7 +2156,7 @@ final class BackendBeans {
             if (!REQUEST.equals(owner.scope) && !SESSION.equals(owner.scope)) {
                 ctx.error(where, p.where + " asks for the current "
                         + (REQUEST_TYPE.equals(type) ? "request" : "session") + ", which only "
-                        + "a @RequestScope or @SessionScope bean has. Take it as a parameter of "
+                        + "a @Scope(\"request\") or @Scope(\"session\") bean has. Take it as a parameter of "
                         + "the handler method instead, or scope the bean.");
                 return;
             }
@@ -2057,7 +2215,7 @@ final class BackendBeans {
             if (p.required) {
                 ctx.error(where, p.where + " needs a " + p.type.getClassName() + ", and no "
                         + "bean has that type. Annotate the implementing class @Component, "
-                        + "@Service or @Repository, or declare a @Bean method returning one.");
+                        + "or declare a @Bean method returning one.");
             }
             return;
         }
@@ -2155,8 +2313,8 @@ final class BackendBeans {
     }
 
     private void checkProxyable(Bean b) {
-        String what = b.lazy ? "@Lazy" : "@" + (REQUEST.equals(b.scope) ? "Request" : "Session")
-                + "Scope";
+        String what = b.lazy ? "@Lazy" : "@Scope(\"" + (REQUEST.equals(b.scope) ? "request"
+                : "session") + "\")";
         AnnotatedClass where = ctx.lookup(b.type) != null ? b.cls : b.factoryOwnerClass;
         if (b.cls == null) {
             ctx.error(where, what + " bean " + b.describe() + " is reached through a class "
@@ -2618,6 +2776,9 @@ final class BackendBeans {
             if (!concerns(cls)) {
                 continue;
             }
+            if (testWeaveable != null && !testWeaveable.contains(cls.getInternalName())) {
+                continue;
+            }
             BackendWeaver.Plan plan = null;
             Aspects a = aspects.get(cls.getInternalName());
             String helper = a == null ? null : a.helperBinary.replace('.', '/');
@@ -2628,7 +2789,8 @@ final class BackendBeans {
                     plan.injectFields.put(f.getName(), f.getDescriptor());
                 }
             }
-            boolean stereotyped = isStereotyped(cls);
+            boolean stereotyped = isStereotyped(cls) || (testConfigurations != null
+                    && testConfigurations.contains(cls.getInternalName()));
             for (MethodInfo m : cls.getMethods()) {
                 if (m.isSynthetic()) {
                     continue;

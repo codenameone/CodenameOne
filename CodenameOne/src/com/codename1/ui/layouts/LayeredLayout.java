@@ -68,7 +68,7 @@ import java.util.Set;
 /// FontImage.setMaterialIcon(close, FontImage.MATERIAL_CLOSE);
 /// hi.add(LayeredLayout.encloseIn(settingsLabel,
 ///         FlowLayout.encloseRight(close)));
-/// ```*
+/// ```
 ///
 /// We are doing three distinct things here:
 ///
@@ -161,24 +161,24 @@ import java.util.Set;
 /// Adding a button to the top right of the parent:
 ///
 /// ```java
-/// `Container cnt = new Container(new LayeredLayout());
+/// Container cnt = new Container(new LayeredLayout());
 /// LayeredLayout ll = (LayeredLayout)cnt.getLayout();
 /// Button btn = new Button("My Button");
 /// cnt.add(btn);
 /// ll.setInsets(btn, "0 0 auto auto");
-///     // NOTE: Insets are expressed in same order as "margin" in CSS.  Clockwise starting on top.`
+///     // NOTE: Insets are expressed in same order as "margin" in CSS.  Clockwise starting on top.
 /// ```
 ///
 /// Changing top inset to 2mm, and right inset to 1mm:
 ///
 /// ```java
-/// `ll.setInsets(btn, "2mm 1mm auto auto");`
+/// ll.setInsets(btn, "2mm 1mm auto auto");
 /// ```
 ///
 /// Using percentage insets:
 ///
 /// ```java
-/// `ll.setInsets(btn, "25% 25% auto auto");`
+/// ll.setInsets(btn, "25% 25% auto auto");
 /// ```
 ///
 /// **NOTE:** When using percent units, the percentage is always in terms of the "reference box" of the component.
@@ -199,7 +199,7 @@ import java.util.Set;
 /// make the button's left inset "reference" the text field.  This would be achieved as follows:
 ///
 /// ```java
-/// `Container cnt = new Container(new LayeredLayout());
+/// Container cnt = new Container(new LayeredLayout());
 /// LayeredLayout ll = (LayeredLayout)cnt.getLayout();
 /// TextField searchField = new TextField();
 /// Button btn = new Button("Search");
@@ -208,7 +208,7 @@ import java.util.Set;
 ///   .setInsets(searchField, "1mm auto auto auto")
 ///   .setInsets(btn, "0 auto auto 0")
 ///   .setReferenceComponentLeft(btn, searchField, 1f)
-///   .setReferenceComponentTop(btn, searchField, 0);`
+///   .setReferenceComponentTop(btn, searchField, 0);
 /// ```
 ///
 /// In the above example we set the search field to be anchored to the top of its parent (1mm inset),

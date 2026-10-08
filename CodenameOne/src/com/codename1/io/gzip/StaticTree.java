@@ -34,6 +34,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
+@com.codename1.impl.SharedWithBackend
 final class StaticTree {
     // Bit length codes must not exceed MAX_BL_BITS bits
     static final int MAX_BL_BITS = 7;
