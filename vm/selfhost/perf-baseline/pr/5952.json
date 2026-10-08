@@ -1,0 +1,83 @@
+{
+ "pr": 5952,
+ "rebaseline": {
+  "linux-x64@amd-epyc-9v45-96-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.539,
+      "time": 0.641,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.414,
+     "reason": "Linux x64 CI run 37581971584 completed successfully and measured lower translator self all-core RAM (0.41x versus 0.54x); record the measured improvement.",
+     "runs": 1,
+     "time": 0.641,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "linux-x64@intel-xeon-platinum-8370c": {
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.075,
+      "time": 1.072,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.075,
+     "reason": "Refresh stale Xeon 8370C timing rows from completed CI run 37587913086 (five interleaved rounds). These rows predate the merged ParparVM collector/allocation changes; native compiler, runtime, and benchmark code in this PR match base master 758332a82d. Record the measured timings without widening tolerances.",
+     "runs": 1,
+     "time": 1.301,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.509,
+      "time": 0.434,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.509,
+     "reason": "Refresh stale Xeon 8370C timing rows from completed CI run 37587913086 (five interleaved rounds). These rows predate the merged ParparVM collector/allocation changes; native compiler, runtime, and benchmark code in this PR match base master 758332a82d. Record the measured timings without widening tolerances.",
+     "runs": 1,
+     "time": 0.531,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.803,
+      "time": 1.221,
+      "tolerance": {
+       "time": 0.45
+      }
+     },
+     "memory": 0.857,
+     "reason": "Recalibrate Windows x64 AMD Family 25 Model 1 hello RAM from three complete five-round reports: 37639644038, 37665970256, and 37720449000. Their paired median ratios are 0.819x, 0.857x, and 0.933x. Native/benchmark code is unchanged between the latter two commits (93845cc47c and f4fc7466c8); ParparVM median peak RAM changed only from 829.8 MB to 841.6 MB while JDK median peak RAM fell from 977.7 MB to 890.2 MB. Center on the three-run median without widening the 15% RAM tolerance or changing timing.",
+     "runs": 3,
+     "time": 1.221,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   }
+  }
+ }
+}

@@ -40,6 +40,14 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesCompactLatin1AndWideStrings(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsCompactStringApp.java", "JsCompactStringApp");
+        assertEquals(63, result.result, "Compact Latin-1 and UTF-16 must survive the browser boundary: " + result.rawMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesNativeCollectionStorageInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsNativeCollectionStorageApp.java", "JsNativeCollectionStorageApp");
         assertEquals(511, result.result, "Native storage handles, compact builders and the native HashSet must preserve JS semantics: " + result.errorMessage);

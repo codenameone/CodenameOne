@@ -175,6 +175,8 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     public static final int OP_TEXT_RUN_CSS = 93;  // 1 obj (element) + 1 str (cssText)
     public static final int OP_TEXT_CONTENT = 94;  // 1 obj (element) + 1 str (text)
     public static final int OP_TEXT_CLEAR = 95;    // 1 obj (container)
+    public static final int OP_TEXT_ORDER = 98; // 1 obj (clip) + 1 str (component/run order)
+    public static final int OP_TEXT_SCROLL = 97; // 1 obj (editor) + 1 str (scrollTop)
     public static final int OP_TEXT_DISPLAY = 96;  // 1 obj (container) + 1 str (display)
 
     private int[] ops = new int[64];

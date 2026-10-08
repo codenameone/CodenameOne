@@ -24,6 +24,71 @@
 package com.codename1.ui;
 
 public class Accessor {
+    /** Whether the browser may own text gestures without bypassing an app action. */
+    public static boolean allowsNativeTextSelection(Component c) {
+        // A Label subclass may override pointer handling without registering listeners
+        // (Slider is one example). The same applies to custom TextArea/TextField
+        // subclasses: only the known built-in editors are safe to promote.
+        if (c == null || c.isIgnorePointerEvents()) return false;
+        for (Component current = c; current != null; current = current.getParent()) {
+            if (current.isPaintLocked()) return false;
+        }
+        TopLevelContainer top = c.getTopLevelContainer();
+        if (top != null) {
+            Component owner = top.asContainer();
+            if (owner.getClass() != Form.class && owner.getClass() != Dialog.class && owner.getClass() != Window.class
+                    && hasCustomPointerHandlers(owner, owner instanceof Dialog ? 1 : owner instanceof Window ? 2 : 0)) return false;
+        }
+        for (Container parent = c.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent.isFocusable() || parent.isGrabsPointerEvents() || parent.isDraggable()) return false;
+        }
+        return (!(c instanceof Label) || c.getClass() == Label.class && !c.isFocusable())
+                && (!(c instanceof TextArea) || c.getClass() == TextArea.class || c.getClass() == TextField.class)
+                && !c.isDraggable() && !c.isCellRenderer()
+                && c.getLeadComponent() == null && !c.hasPointerInteractionListeners()
+                && (!(c instanceof TextArea) || !((TextArea) c).hasActionListeners());
+    }
+
+    // The worker checks actual virtual methods, allowing subclasses that only
+    // customize keys or layout. Legacy runtimes conservatively reserve gestures.
+    @com.codename1.html5.js.JSBody(params={"owner", "baseKind"}, script="return true;")
+    private static native boolean hasCustomPointerHandlers(Component owner, int baseKind);
+
+    /** Use the same traversal order and wrapping as the desktop key handler. */
+    public static void moveFocusByTab(Form form, boolean backwards) {
+        form.moveFocusByTab(backwards);
+    }
+
+    /** Reserved width from the actual CN1 row layout. */
+    public static int getNativeTextWrappingGap(TextArea ta) {
+        ta.getLines(); // Ensure the cached row layout and its reserved width are current.
+        return ta.textWrappingGap;
+    }
+
+    /** Whether a component painter may draw beyond its style background. */
+    public static boolean hasCustomBackgroundPainter(Component c) {
+        return !c.isDefaultBackgroundPainter(c.getStyle());
+    }
+
+    /** Reflect browser caret/selection scrolling in the CN1 text component. */
+    public static void setNativeTextScrollY(TextArea ta, int scrollY) {
+        if (ta.getScrollY() != scrollY) ta.setScrollY(scrollY);
+    }
+
+    /** Re-evaluate overlays after the current form's selection hint has been applied. */
+    public static void showNativeTextOverlay(Component c) {
+        c.showNativeOverlay();
+    }
+    /** Remove an obsolete overlay before rebuilding its native control. */
+    public static void hideNativeTextOverlay(Component c) {
+        c.hideNativeOverlay();
+    }
+
+    /** Bitmap fonts have no browser font representation. */
+    public static boolean isBitmapFont(Font font) {
+        return font instanceof CustomFont;
+    }
+
     public static int getActivePeerCount() {
         return Form.activePeerCount;
     }

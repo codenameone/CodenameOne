@@ -307,6 +307,15 @@ div#cn1-video-capture > video {
    (JavaScriptDesktopChrome). The port moves the body down by the chrome's height,
    so the canvas and every overlay positioned inside the body start below it. The
    heights are fixed so the port measures the chrome once. */
+.cn1-native-selection {
+    /* Vertical swipes are routed to CN1; long press and selection remain native. */
+    touch-action: pinch-zoom;
+}
+.cn1-native-selection::selection {
+    color: var(--cn1-selection-color, #ffffff);
+    background: var(--cn1-selection-background, #1967d2);
+}
+
 #cn1-desktop-chrome {
     position: fixed;
     left: 0;
