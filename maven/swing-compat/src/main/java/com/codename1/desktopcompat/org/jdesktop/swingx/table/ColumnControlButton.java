@@ -22,17 +22,29 @@
  */
 package com.codename1.desktopcompat.org.jdesktop.swingx.table;
 
+import com.codename1.desktopcompat.java.awt.event.ActionEvent;
+import com.codename1.desktopcompat.java.awt.event.ActionListener;
 import com.codename1.desktopcompat.javax.swing.Icon;
 import com.codename1.desktopcompat.javax.swing.JButton;
+import com.codename1.desktopcompat.javax.swing.JCheckBoxMenuItem;
+import com.codename1.desktopcompat.javax.swing.JMenuItem;
+import com.codename1.desktopcompat.javax.swing.JPopupMenu;
+import com.codename1.desktopcompat.javax.swing.table.TableColumn;
 import com.codename1.desktopcompat.org.jdesktop.swingx.JXTable;
+import java.util.List;
 
-/// The button a `JXTable` offers for its scroll pane's corner.
+/// The button a `JXTable` offers as its column control. A press opens
+/// a popup menu with a check box item per hideable column, which shows
+/// or hides that column, and below them items that pack all columns and
+/// switch horizontal scrolling.
 ///
-/// In SwingX it opens a popup menu that shows and hides columns. The
-/// layer has no popup menu, so this button opens nothing: it exists so
-/// that code which makes, keeps or replaces the column control compiles
-/// and runs. Hide and show columns with
-/// [TableColumnExt#setVisible(boolean)].
+/// The table records this button as the upper trailing corner of its
+/// scroll pane, but the layer's scroll pane shows no corners: put the
+/// button, which [JXTable#getColumnControl()] answers, into a tool bar
+/// or wherever the application has room for it.
+///
+/// The last visible column cannot be hidden from the menu. The menu's
+/// texts are English.
 public class ColumnControlButton extends JButton {
 
     public static final String COLUMN_CONTROL_MARKER = "column.";
@@ -40,6 +52,8 @@ public class ColumnControlButton extends JButton {
     public static final String COLUMN_CONTROL_BUTTON_MARGIN_KEY = "ColumnControlButton.margin";
 
     private final JXTable cn1Table;
+    private JPopupMenu cn1Popup;
+    private boolean cn1AdditionalActions = true;
 
     public ColumnControlButton(JXTable table) {
         this(table, null);
@@ -50,12 +64,105 @@ public class ColumnControlButton extends JButton {
         cn1Table = table;
         if (icon != null) {
             setIcon(icon);
+        } else {
+            setText("...");
         }
         setFocusable(false);
+        addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                togglePopup();
+            }
+        });
     }
 
-    /// Whether there is a table whose columns could be controlled.
+    /// Opens the menu under the button, or closes it when it is open.
+    public void togglePopup() {
+        if (cn1Popup != null && cn1Popup.isVisible()) {
+            cn1Popup.setVisible(false);
+            return;
+        }
+        if (!canControl()) {
+            return;
+        }
+        cn1Popup = cn1BuildPopup();
+        cn1Popup.show(this, 0, getHeight());
+    }
+
+    public boolean getAdditionalActionsVisible() {
+        return cn1AdditionalActions;
+    }
+
+    /// Whether the menu has the pack and scroll items below the columns.
+    public void setAdditionalActionsVisible(boolean additionalActionsVisible) {
+        boolean old = cn1AdditionalActions;
+        cn1AdditionalActions = additionalActionsVisible;
+        firePropertyChange("additionalActionsVisible", old, additionalActionsVisible);
+    }
+
+    /// Whether there is a table whose columns can be controlled.
     protected boolean canControl() {
         return cn1Table != null;
+    }
+
+    /// The menu as it would open now.
+    JPopupMenu cn1BuildPopup() {
+        JPopupMenu menu = new JPopupMenu();
+        List<TableColumn> columns = cn1Table.getColumns(true);
+        for (int i = 0; i < columns.size(); i++) {
+            TableColumn c = columns.get(i);
+            if (!(c instanceof TableColumnExt)) {
+                continue;
+            }
+            final TableColumnExt column = (TableColumnExt) c;
+            if (!column.isHideable()) {
+                continue;
+            }
+            String title = column.getTitle();
+            final JCheckBoxMenuItem item = new JCheckBoxMenuItem(title != null ? title : "", column.isVisible());
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    boolean show = item.getState();
+                    if (!show && column.isVisible() && cn1Table.getColumnCount() <= 1) {
+                        item.setState(true);
+                        return;
+                    }
+                    column.setVisible(show);
+                }
+            });
+            menu.add(item);
+        }
+        if (cn1AdditionalActions) {
+            if (menu.getComponentCount() > 0) {
+                menu.addSeparator();
+            }
+            final JCheckBoxMenuItem scroll = new JCheckBoxMenuItem("Horizontal Scroll",
+                    cn1Table.isHorizontalScrollEnabled());
+            scroll.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    cn1Table.setHorizontalScrollEnabled(scroll.getState());
+                }
+            });
+            menu.add(scroll);
+            JMenuItem packAll = new JMenuItem("Pack All Columns");
+            packAll.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    cn1Table.packAll();
+                }
+            });
+            menu.add(packAll);
+            JMenuItem packSelected = new JMenuItem("Pack Selected Column");
+            packSelected.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    cn1Table.packSelected();
+                }
+            });
+            menu.add(packSelected);
+        }
+        return menu;
     }
 }

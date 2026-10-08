@@ -24,15 +24,19 @@ package com.codename1.desktopcompat.org.jdesktop.swingx;
 
 import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Component;
+import com.codename1.desktopcompat.java.awt.Container;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Point;
 import com.codename1.desktopcompat.java.awt.Rectangle;
 import com.codename1.desktopcompat.java.beans.PropertyChangeEvent;
 import com.codename1.desktopcompat.javax.swing.JComponent;
+import com.codename1.desktopcompat.javax.swing.JScrollPane;
 import com.codename1.desktopcompat.javax.swing.JTable;
+import com.codename1.desktopcompat.javax.swing.JViewport;
 import com.codename1.desktopcompat.javax.swing.ListSelectionModel;
 import com.codename1.desktopcompat.javax.swing.RowFilter;
 import com.codename1.desktopcompat.javax.swing.RowSorter;
+import com.codename1.desktopcompat.javax.swing.ScrollPaneConstants;
 import com.codename1.desktopcompat.javax.swing.SortOrder;
 import com.codename1.desktopcompat.javax.swing.SwingConstants;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
@@ -104,7 +108,9 @@ import java.util.Vector;
 ///
 /// ## Not here
 ///
-/// Searching, the focus-lost editor hack, the look and feel hooks and
+/// The column control is a button with a popup menu; see
+/// [ColumnControlButton] for where it can be shown. Searching, the
+/// focus-lost editor hack, the look and feel hooks and
 /// column sequences are absent.
 public class JXTable extends JTable implements TableColumnModelExtListener {
 
@@ -255,12 +261,50 @@ public class JXTable extends JTable implements TableColumnModelExtListener {
         return cn1ColumnControlVisible;
     }
 
-    /// Records whether the column control is wanted. The layer's scroll
-    /// pane has no corner to put it in, so nothing is shown.
+    /// Makes the column control the upper trailing corner of the scroll
+    /// pane the table is in, or takes it out again. The layer's scroll
+    /// pane records its corners and shows none: see
+    /// [ColumnControlButton].
     public void setColumnControlVisible(boolean visible) {
         boolean old = cn1ColumnControlVisible;
+        if (old == visible) {
+            return;
+        }
         cn1ColumnControlVisible = visible;
+        cn1ConfigureColumnControl();
         firePropertyChange("columnControlVisible", old, visible);
+    }
+
+    private JScrollPane cn1ScrollPane() {
+        Container parent = getParent();
+        if (parent instanceof JViewport) {
+            Container pane = parent.getParent();
+            if (pane instanceof JScrollPane && ((JScrollPane) pane).getViewport() == parent) {
+                return (JScrollPane) pane;
+            }
+        }
+        return null;
+    }
+
+    private void cn1ConfigureColumnControl() {
+        JScrollPane pane = cn1ScrollPane();
+        if (pane == null) {
+            return;
+        }
+        if (cn1ColumnControlVisible) {
+            pane.setCorner(ScrollPaneConstants.UPPER_TRAILING_CORNER, getColumnControl());
+        } else if (cn1ColumnControl != null
+                && pane.getCorner(ScrollPaneConstants.UPPER_TRAILING_CORNER) == cn1ColumnControl) {
+            pane.setCorner(ScrollPaneConstants.UPPER_TRAILING_CORNER, null);
+        }
+    }
+
+    @Override
+    protected void configureEnclosingScrollPane() {
+        super.configureEnclosingScrollPane();
+        if (cn1Ready) {
+            cn1ConfigureColumnControl();
+        }
     }
 
     /// The column control, made on first use.
@@ -273,7 +317,12 @@ public class JXTable extends JTable implements TableColumnModelExtListener {
 
     public void setColumnControl(JComponent columnControl) {
         JComponent old = cn1ColumnControl;
+        JScrollPane pane = cn1ScrollPane();
+        if (pane != null && old != null && pane.getCorner(ScrollPaneConstants.UPPER_TRAILING_CORNER) == old) {
+            pane.setCorner(ScrollPaneConstants.UPPER_TRAILING_CORNER, null);
+        }
         cn1ColumnControl = columnControl;
+        cn1ConfigureColumnControl();
         firePropertyChange("columnControl", old, columnControl);
     }
 

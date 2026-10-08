@@ -29,7 +29,6 @@ import com.codename1.desktopcompat.javax.swing.table.TableCellRenderer;
 import com.codename1.desktopcompat.javax.swing.table.TableColumn;
 import com.codename1.desktopcompat.javax.swing.table.TableModel;
 import com.codename1.desktopcompat.org.jdesktop.swingx.JXTable;
-import java.util.List;
 
 /// Makes the columns of a `JXTable`, gives them their header from the
 /// model, sizes them from a prototype value and packs them to their
@@ -219,9 +218,5 @@ public class ColumnFactory {
 
     public void setDefaultPackMargin(int margin) {
         this.packMargin = margin;
-    }
-
-    static List<TableColumn> cn1Columns(JXTable table) {
-        return table.getColumns(true);
     }
 }
