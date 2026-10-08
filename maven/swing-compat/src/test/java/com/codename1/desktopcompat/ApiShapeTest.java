@@ -48,7 +48,8 @@ import static org.junit.Assert.fail;
 /// with the same descriptor once the package prefix is mapped back, the
 /// superclass must map to an ancestor of the JDK class and every interface
 /// to one the JDK class implements. Members named `cn1...` are the layer's
-/// own hooks and are exempt.
+/// own hooks and are exempt. "The JDK" in a message means the library
+/// the class was compared with, which for `org.jdesktop` is SwingX.
 ///
 /// The directory read is `target/classes`, or the `swingcompat.classes`
 /// system property.
@@ -74,6 +75,27 @@ public class ApiShapeTest {
             fail(sb.toString());
         }
         assertTrue("no classes found under " + base, checked > 0);
+    }
+
+    /// The same comparison for the SwingX subset under
+    /// `com.codename1.desktopcompat.org.jdesktop`, against the real SwingX
+    /// jar, which is a test dependency of this module for that purpose
+    /// alone.
+    @Test
+    public void everySwingXClassMatchesSwingX() throws Exception {
+        File root = new File(System.getProperty("swingcompat.classes", "target/classes"));
+        File base = new File(root, "com/codename1/desktopcompat");
+        Class.forName("org.jdesktop.swingx.JXTable", false, ClassLoader.getSystemClassLoader());
+        walk(new File(base, "org"), "com.codename1.desktopcompat.org");
+        if (!problems.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(problems.size()).append(" SwingX API shape problem(s):\n");
+            for (String p : problems) {
+                sb.append("  ").append(p).append('\n');
+            }
+            fail(sb.toString());
+        }
+        assertTrue("no classes found under " + base + "/org", checked > 0);
     }
 
     private void walk(File dir, String pkg) throws Exception {
