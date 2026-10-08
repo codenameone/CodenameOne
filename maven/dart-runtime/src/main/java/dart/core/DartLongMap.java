@@ -136,7 +136,27 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
     // --- primitive fast paths (transpiler targets these for Map<int, int>) ---
 
     /** Dart's m[key] = value; returns value so it composes in expression position. */
+    /// Set by {@link #constant} for a Dart {@code const} {@code <int, int>} literal.
+    private boolean readOnly;
+
+    /**
+     * Freezes a map the transpiler just built for a Dart {@code const} literal and
+     * returns it: every later write throws UnsupportedError, as Dart's does. In place,
+     * since the literal is fresh and nothing else holds it yet.
+     */
+    public static DartLongMap constant(DartLongMap map) {
+        map.readOnly = true;
+        return map;
+    }
+
+    private void checkWritable() {
+        if (readOnly) {
+            throw new UnsupportedError("Cannot modify unmodifiable map");
+        }
+    }
+
     public long putLong(long key, long value) {
+        checkWritable();
         int slot = hash(key) & mask;
         int firstDeleted = -1;
         while (true) {
@@ -246,6 +266,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
     }
 
     public long removeLong(long key) {
+        checkWritable();
         int slot = hash(key) & mask;
         while (true) {
             int e = index[slot];
@@ -271,6 +292,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
      * value, or null when the key was absent.
      */
     public Long removeDart(long key) {
+        checkWritable();
         int e = find(key);
         if (e < 0) {
             return null;
@@ -352,6 +374,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
     }
 
     public void removeWhere(Funcs.Func2<Long, Long, Boolean> test) {
+        checkWritable();
         // Collected first, then removed: this map's views do not support removal
         // through their iterators. A test that modifies the map breaks Dart's
         // contract; as in DartMap.removeWhere, detecting that is left to the JDK
@@ -451,6 +474,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     @Override
     public Long remove(Object key) {
+        checkWritable();
         Long boxed = asKey(key);
         if (boxed == null) {
             return null;
@@ -467,6 +491,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     @Override
     public void clear() {
+        checkWritable();
         version++;
         entryCount = 0;
         liveSize = 0;

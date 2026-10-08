@@ -243,6 +243,9 @@ public final class AstBuilder {
                     f.javaName = javaName;
                     if (ii.expr() != null) {
                         f.initializer = buildExpr(ii.expr());
+                        if (f.isConst) {
+                            markConstContext(f.initializer);
+                        }
                     }
                     lib.topLevelVars.add(f);
                 }
@@ -257,6 +260,9 @@ public final class AstBuilder {
                     f.isStatic = true;
                     f.javaName = javaName;
                     f.initializer = buildExpr(sf.expr());
+                    if (f.isConst) {
+                        markConstContext(f.initializer);
+                    }
                     lib.topLevelVars.add(f);
                 }
             }
@@ -573,6 +579,9 @@ public final class AstBuilder {
                     f.isLate = isLate;
                     if (ii.expr() != null) {
                         f.initializer = buildExpr(ii.expr());
+                        if (isConst) {
+                            markConstContext(f.initializer);
+                        }
                     }
                     cd.fields.add(f);
                 }
@@ -586,6 +595,9 @@ public final class AstBuilder {
                     f.isConst = isConst;
                     f.isStatic = isStatic;
                     f.initializer = buildExpr(sf.expr());
+                    if (isConst) {
+                        markConstContext(f.initializer);
+                    }
                     cd.fields.add(f);
                 }
             }
@@ -1387,8 +1399,12 @@ public final class AstBuilder {
         v.type = buildFinalConstVarOrType(di.finalConstVarOrType());
         v.isFinal = di.finalConstVarOrType().FINAL_() != null || di.finalConstVarOrType().CONST_() != null;
         v.isLate = di.finalConstVarOrType().LATE_() != null;
+        boolean constLocal = di.finalConstVarOrType().CONST_() != null;
         if (iv.expr() != null) {
             v.initializer = buildExpr(iv.expr());
+            if (constLocal) {
+                markConstContext(v.initializer);
+            }
         }
         if (iv.initializedIdentifier().isEmpty()) {
             return v;
@@ -1406,6 +1422,9 @@ public final class AstBuilder {
             extra.isLate = v.isLate;
             if (ii.expr() != null) {
                 extra.initializer = buildExpr(ii.expr());
+                if (constLocal) {
+                    markConstContext(extra.initializer);
+                }
             }
             group.decls.add(extra);
         }
@@ -2025,6 +2044,9 @@ public final class AstBuilder {
             }
         }
         buildArgs(args, cc.args);
+        if (isConst) {
+            markConstArgs(cc.args);
+        }
         return cc;
     }
 
@@ -2122,7 +2144,81 @@ public final class AstBuilder {
                 }
             }
         }
+        if (l.isConst) {
+            markConstContext(l);
+        }
         return l;
+    }
+
+    /**
+     * Marks every collection literal in a Dart CONST CONTEXT as const, as the language
+     * does implicitly: the elements of a const literal, the arguments of a const
+     * constructor call, and the initializer of a const variable. Only the outermost
+     * {@code const} is usually written -- {@code const xs = <int>[1]}, {@code const
+     * [[1]]}, {@code const Foo([1])} -- and the emitter makes a const literal
+     * unmodifiable, so an unmarked inner literal would have stayed growable. Collection
+     * literals are marked; constructor and function calls are only looked through, so
+     * their own emission is unchanged. A collection-if's condition is a bool, never a
+     * collection, and is left alone.
+     */
+    static void markConstContext(Expr e) {
+        if (e == null) {
+            return;
+        }
+        if (e instanceof ListLit) {
+            ListLit l = (ListLit) e;
+            l.isConst = true;
+            for (Expr x : l.elements) {
+                markConstContext(x);
+            }
+        } else if (e instanceof SetLit) {
+            SetLit st = (SetLit) e;
+            st.isConst = true;
+            for (Expr x : st.elements) {
+                markConstContext(x);
+            }
+        } else if (e instanceof MapLit) {
+            MapLit m = (MapLit) e;
+            m.isConst = true;
+            for (Expr x : m.keys) {
+                markConstContext(x);
+            }
+            for (Expr x : m.values) {
+                markConstContext(x);
+            }
+            for (Expr x : m.elements) {
+                markConstContext(x);
+            }
+        } else if (e instanceof Ast.MapEntry) {
+            markConstContext(((Ast.MapEntry) e).key);
+            markConstContext(((Ast.MapEntry) e).value);
+        } else if (e instanceof SpreadElement) {
+            markConstContext(((SpreadElement) e).expr);
+        } else if (e instanceof IfElement) {
+            markConstContext(((IfElement) e).thenElement);
+            markConstContext(((IfElement) e).elseElement);
+        } else if (e instanceof ParenExpr) {
+            markConstContext(((ParenExpr) e).inner);
+        } else if (e instanceof Conditional) {
+            markConstContext(((Conditional) e).thenExpr);
+            markConstContext(((Conditional) e).elseExpr);
+        } else if (e instanceof CtorCall) {
+            markConstArgs(((CtorCall) e).args);
+        } else if (e instanceof Call) {
+            markConstArgs(((Call) e).args);
+        }
+    }
+
+    private static void markConstArgs(Args args) {
+        if (args == null) {
+            return;
+        }
+        for (Expr x : args.positional) {
+            markConstContext(x);
+        }
+        for (NamedArg na : args.named) {
+            markConstContext(na.value);
+        }
     }
 
     /** One collection-literal element: plain expression, spread, if or for. */
@@ -2240,6 +2336,9 @@ public final class AstBuilder {
                     }
                 }
             }
+            if (s.isConst) {
+                markConstContext(s);
+            }
             return s;
         }
         MapLit m = new MapLit();
@@ -2270,6 +2369,9 @@ public final class AstBuilder {
                     }
                 }
             }
+            if (m.isConst) {
+                markConstContext(m);
+            }
             return m;
         }
         if (ctx.elements() != null) {
@@ -2281,6 +2383,9 @@ public final class AstBuilder {
                     unsupported(e, "E0204", "Map entries are only supported directly inside map literals");
                 }
             }
+        }
+        if (m.isConst) {
+            markConstContext(m);
         }
         return m;
     }

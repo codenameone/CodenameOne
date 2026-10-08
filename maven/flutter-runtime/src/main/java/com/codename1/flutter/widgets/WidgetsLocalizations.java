@@ -40,50 +40,93 @@ public abstract class WidgetsLocalizations {
     }
 
     /**
-     * Flutter's top-level {@code basicLocaleListResolution}: pick the best
-     * supported locale for the user's preferred list. This minimal
-     * implementation returns the first preferred locale whose language matches a
-     * supported locale (preferring an exact language+country match), falling
-     * back to the first supported locale.
+     * Flutter's top-level {@code basicLocaleListResolution}, in Flutter's order. For
+     * each preferred locale, best first: an exact match; then language and script; then
+     * language and country; then -- if an EARLIER preferred locale matched on language
+     * alone -- that match; then a language-only match, returned at once only for the
+     * first preferred locale and only when the next one does not share its language
+     * (which might match better). A country-only match is remembered as a later
+     * fallback. When nothing matched: the language-only match, else the country-only
+     * match, else the first supported locale.
+     *
+     * <p>{@link Locale} carries no script subtag here -- neither the device query nor the
+     * Dart surface can produce one -- so every key is formed with a null script, exactly
+     * as Flutter forms it for scriptless locales, and the language-and-script tier never
+     * applies.</p>
      */
     public static Locale basicLocaleListResolution(DartList<Locale> preferredLocales,
                                                    DartIterable<Locale> supportedLocales) {
         Locale firstSupported = null;
+        java.util.Map<String, Locale> all = new java.util.HashMap<String, Locale>();
+        java.util.Map<String, Locale> languageAndCountry = new java.util.HashMap<String, Locale>();
+        java.util.Map<String, Locale> languages = new java.util.HashMap<String, Locale>();
+        java.util.Map<String, Locale> countries = new java.util.HashMap<String, Locale>();
         if (supportedLocales != null) {
             for (Locale s : supportedLocales) {
+                if (s == null) {
+                    continue;
+                }
                 if (firstSupported == null) {
                     firstSupported = s;
-                    break;
                 }
+                // ??= in Flutter: the FIRST supported locale with each key wins.
+                putIfAbsent(all, s.languageCode() + "_null_" + s.countryCode(), s);
+                putIfAbsent(languageAndCountry, s.languageCode() + "_" + s.countryCode(), s);
+                putIfAbsent(languages, String.valueOf(s.languageCode()), s);
+                putIfAbsent(countries, String.valueOf(s.countryCode()), s);
             }
         }
         if (preferredLocales == null || preferredLocales.isEmpty()) {
             return firstSupported;
         }
-        for (int i = 0; i < preferredLocales.size(); i++) {
-            Locale preferred = preferredLocales.get(i);
-            if (preferred == null || supportedLocales == null) {
+        Locale matchesLanguageCode = null;
+        Locale matchesCountryCode = null;
+        int n = preferredLocales.size();
+        for (int i = 0; i < n; i++) {
+            Locale user = preferredLocales.get(i);
+            if (user == null) {
                 continue;
             }
-            Locale languageMatch = null;
-            for (Locale supported : supportedLocales) {
-                if (supported == null) {
-                    continue;
-                }
-                if (eq(preferred.languageCode(), supported.languageCode())) {
-                    if (eq(preferred.countryCode(), supported.countryCode())) {
-                        return supported;
-                    }
-                    if (languageMatch == null) {
-                        languageMatch = supported;
-                    }
+            if (all.containsKey(user.languageCode() + "_null_" + user.countryCode())) {
+                return user;
+            }
+            if (user.countryCode() != null) {
+                Locale match = languageAndCountry.get(user.languageCode() + "_" + user.countryCode());
+                if (match != null) {
+                    return match;
                 }
             }
-            if (languageMatch != null) {
-                return languageMatch;
+            if (matchesLanguageCode != null) {
+                return matchesLanguageCode;
+            }
+            Locale match = languages.get(String.valueOf(user.languageCode()));
+            if (match != null) {
+                matchesLanguageCode = match;
+                Locale next = i + 1 < n ? preferredLocales.get(i + 1) : null;
+                if (i == 0 && !(next != null && eq(next.languageCode(), user.languageCode()))) {
+                    return matchesLanguageCode;
+                }
+            }
+            if (matchesCountryCode == null && user.countryCode() != null) {
+                match = countries.get(user.countryCode());
+                if (match != null) {
+                    matchesCountryCode = match;
+                }
             }
         }
+        if (matchesLanguageCode != null) {
+            return matchesLanguageCode;
+        }
+        if (matchesCountryCode != null) {
+            return matchesCountryCode;
+        }
         return firstSupported != null ? firstSupported : preferredLocales.get(0);
+    }
+
+    private static void putIfAbsent(java.util.Map<String, Locale> map, String key, Locale value) {
+        if (!map.containsKey(key)) {
+            map.put(key, value);
+        }
     }
 
     private static boolean eq(String a, String b) {

@@ -1137,4 +1137,65 @@ public class DartCoreSemanticsTest {
         assertNull(DartUri.tryParse("http://a.com:0x10000000000000000/"));
         assertThrows(FormatException.class, () -> DartUri.parse("http://A.com:99999999999999999999/"));
     }
+
+    // --- RegExpMatch checks a group index as the Dart int it is -----------------
+
+    @Test
+    public void aGroupIndexPastIntRangeIsARangeErrorNotGroupZero() {
+        RegExpMatch m = new RegExp("(a)").firstMatch("xa");
+        assertEquals("a", m.group(0));
+        // (int) (1L << 32) is 0: narrowed before the check, this answered group 0.
+        assertThrows(RangeError.class, () -> m.group(1L << 32));
+        assertThrows(RangeError.class, () -> m.idx((1L << 32) + 1));
+        assertThrows(RangeError.class, () -> m.group(-1L));
+        assertThrows(RangeError.class, () -> m.group(2L));
+    }
+
+    // --- const collection literals refuse every write ---------------------------
+
+    @Test
+    public void aConstListRefusesWritesAndKeepsItsClass() {
+        DartList<String> xs = DartList.constant(DartList.of("a", "b"));
+        assertThrows(UnsupportedError.class, () -> xs.add("c"));
+        assertThrows(UnsupportedError.class, () -> xs.set(0, "z"));
+        assertThrows(UnsupportedError.class, () -> xs.removeAt(0));
+        assertThrows(UnsupportedError.class, () -> xs.sortDefault());
+        assertEquals("[a, b]", xs.toString());
+        DartLongList ints = DartList.constant(DartLongList.ofLongs(1, 2));
+        assertThrows(UnsupportedError.class, () -> ints.addLong(3));
+        assertThrows(UnsupportedError.class, () -> ints.setLong(0, 9));
+        assertEquals(2L, ints.getLong(1));
+    }
+
+    @Test
+    public void aConstSetRefusesWrites() {
+        DartSet<String> s = DartSet.constant(DartSet.of("a", "b"));
+        assertThrows(UnsupportedError.class, () -> s.add("c"));
+        assertThrows(UnsupportedError.class, () -> s.removeValue("a"));
+        assertThrows(UnsupportedError.class, () -> s.clear());
+        assertThrows(UnsupportedError.class, () -> s.removeWhere(e -> true));
+        assertThrows(UnsupportedError.class, () -> s.retainWhere(e -> false));
+        assertTrue(s.contains("a"));
+        assertEquals(2, s.size());
+        // An ordinary set is untouched by the flag.
+        DartSet<String> plain = DartSet.of("a");
+        plain.add("b");
+        plain.removeWhere(e -> e.equals("a"));
+        assertEquals("{b}", plain.toString());
+    }
+
+    @Test
+    public void aConstMapRefusesWrites() {
+        DartMap<String, Long> m = DartMap.constant(DartMap.<String, Long>of("a", 1L));
+        assertThrows(UnsupportedError.class, () -> m.idxSet("b", 2L));
+        assertThrows(UnsupportedError.class, () -> m.removeDart("a"));
+        assertThrows(UnsupportedError.class, () -> m.clear());
+        assertEquals(Long.valueOf(1L), m.idx("a"));
+        DartLongMap ints = DartLongMap.constant(DartLongMap.ofLongs(1, 2));
+        assertThrows(UnsupportedError.class, () -> ints.putLong(3, 4));
+        assertThrows(UnsupportedError.class, () -> ints.removeDart(1));
+        assertThrows(UnsupportedError.class, () -> ints.removeDart(99));
+        assertThrows(UnsupportedError.class, () -> ints.clear());
+        assertEquals(2L, ints.getLongOr(1, 0));
+    }
 }

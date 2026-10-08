@@ -59,6 +59,8 @@ public final class Localizations {
             return null;
         }
         if (value == null) {
+            // A delegate still loading answers later; make sure this reader hears it.
+            com.codename1.flutter.material.LocalizationsScope.rebuildWhenLoaded(context);
             report("Localizations.of(" + witness.getName() + ") found nothing; the app's "
                     + "localizationsDelegates produced no matching object");
         }

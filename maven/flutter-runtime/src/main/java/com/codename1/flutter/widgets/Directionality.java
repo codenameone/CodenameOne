@@ -24,48 +24,55 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.Element;
 import com.codename1.flutter.TextDirection;
-import com.codename1.flutter.Widget;
 
 /**
  * Establishes the reading direction for its subtree, mirroring Flutter's
- * {@code Directionality}. Layout-transparent in this runtime: it simply wraps
- * its child; the recorded {@link TextDirection} is available for later
- * bidi-aware rendering.
+ * {@code Directionality}: an inherited widget, so {@link #of} answers the
+ * NEAREST enclosing direction and a reader rebuilds when it changes.
+ * Layout-transparent -- it builds its child unchanged.
+ *
+ * <p>It used to be a plain wrapper whose {@code of} always answered LTR, so a
+ * {@code Directionality(textDirection: TextDirection.rtl)} subtree laid out
+ * {@code PositionedDirectional} and every other start/end consumer as if it
+ * were left-to-right. MaterialApp installs the root one from the app's
+ * resolved locale, as Flutter's WidgetsApp does through its Localizations.</p>
  */
-public class Directionality extends Widget {
+public class Directionality extends InheritedWidget {
 
     private TextDirection textDirection;
-    private Widget child;
 
     public void textDirection(TextDirection v) {
         this.textDirection = v;
-    }
-
-    public void child(Widget v) {
-        this.child = v;
     }
 
     public TextDirection getTextDirection() {
         return textDirection;
     }
 
-    public Widget getChild() {
-        return child;
-    }
-
     @Override
-    public Element createElement() {
-        return new DirectionalityRenderElement(this);
+    public boolean updateShouldNotify(InheritedWidget oldWidget) {
+        return !(oldWidget instanceof Directionality)
+                || ((Directionality) oldWidget).textDirection != textDirection;
     }
 
     /**
-     * Dart's {@code Directionality.of(context)}: the ambient text direction.
-     * This runtime does not scope directionality through the element tree, so
-     * the default LTR reading direction is reported.
+     * Dart's {@code Directionality.of(context)}: the text direction of the
+     * nearest enclosing Directionality, registering the caller to rebuild when
+     * it changes. Flutter asserts one exists; with none above (a bare widget
+     * mounted outside any app) this answers LTR, the direction of the default
+     * WidgetsLocalizations, rather than failing.
      */
     public static TextDirection of(BuildContext context) {
-        return TextDirection.ltr;
+        TextDirection d = maybeOf(context);
+        return d != null ? d : TextDirection.ltr;
+    }
+
+    /** Dart's {@code Directionality.maybeOf(context)}: null when none is above. */
+    public static TextDirection maybeOf(BuildContext context) {
+        Directionality d = context == null
+                ? null
+                : context.maybeDependOnInheritedWidgetOfExactType(Directionality.class);
+        return d == null ? null : d.textDirection;
     }
 }

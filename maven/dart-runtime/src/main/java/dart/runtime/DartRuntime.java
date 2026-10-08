@@ -868,8 +868,11 @@ public final class DartRuntime {
         String digits = toDecimal(v);
         StringBuilder sb = new StringBuilder();
         // Dart keeps the sign of a negative value that rounds to zero:
-        // (-0.001).toStringAsFixed(2) is -0.00.
-        if (d < 0) {
+        // (-0.001).toStringAsFixed(2) is -0.00. The SIGN BIT decides, not `d < 0`:
+        // negative zero compares equal to zero, so (-0.0).toStringAsFixed(2) printed
+        // 0.00 where Dart prints -0.00 (its double-conversion runs without
+        // UNIQUE_ZERO, as dart2js's explicit isNegative check does).
+        if (bits < 0) {
             sb.append('-');
         }
         if (n == 0) {

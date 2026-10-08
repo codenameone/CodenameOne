@@ -200,6 +200,16 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
     }
 
     /**
+     * The map for a Dart {@code const} map literal: every write throws UnsupportedError,
+     * as Dart's does. A copy into the read-only map Map.unmodifiable already uses, rather
+     * than a flag on every DartMap: put() is the hottest path a map has, and a const map
+     * literal is built once per evaluation.
+     */
+    public static <K, V> DartMap<K, V> constant(DartMap<K, V> map) {
+        return new DartUnmodifiableMap<K, V>(map);
+    }
+
+    /**
      * Dart's {@code Map.of(other)} / {@code Map.from(other)} — a new insertion-ordered
      * map holding a shallow copy of {@code other}'s entries. The fixed-arity overload
      * takes priority over the varargs {@link #of(Object...)} literal helper (a single

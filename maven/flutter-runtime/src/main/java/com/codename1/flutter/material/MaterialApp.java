@@ -357,8 +357,11 @@ public class MaterialApp extends StatelessWidget
         // widget calls Theme.of on every build, so the intended hash lookup was
         // never actually taken, and the diagnostic budget for genuinely missing
         // providers was spent on this one false alarm.
-        Widget app = wrapWithTheme(wrapWithLocalizations(
-                new com.codename1.flutter.navigation.Navigator.RootScope(content, rootApp)));
+        // The root Directionality sits between the localizations and the Navigator, as
+        // Flutter's WidgetsApp builds it from WidgetsLocalizations.textDirection, so a
+        // pushed route inherits it like everything else here.
+        Widget app = wrapWithTheme(wrapWithLocalizations(wrapWithDirectionality(
+                new com.codename1.flutter.navigation.Navigator.RootScope(content, rootApp))));
         // Outermost, so MaterialAppElement finds it as its child (see displaySizeChanged).
         return app == null ? null : com.codename1.flutter.MediaQuery.displayScope(app);
     }
@@ -417,6 +420,52 @@ public class MaterialApp extends StatelessWidget
      * Localizations widget above the app content; this mirrors that with a single
      * {@link LocalizationsScope} carrying every delegate's synchronously-loaded value.
      */
+    /**
+     * Installs the app's root {@link com.codename1.flutter.widgets.Directionality}, as
+     * Flutter's WidgetsApp does with the direction its WidgetsLocalizations report for
+     * the resolved locale. Without one, {@code Directionality.of} had nothing to find
+     * and every start/end consumer was laid out left-to-right whatever the locale.
+     */
+    private Widget wrapWithDirectionality(Widget content) {
+        if (content == null) {
+            return null;
+        }
+        com.codename1.flutter.widgets.Directionality d =
+                new com.codename1.flutter.widgets.Directionality();
+        d.textDirection(rootTextDirection());
+        d.child(content);
+        return d;
+    }
+
+    /**
+     * Flutter's rule: the direction comes from the WidgetsLocalizations the app loads.
+     * Without {@code GlobalWidgetsLocalizations.delegate} only the built-in default is
+     * there, and it is left-to-right for every locale -- so an app that never opted into
+     * localization stays LTR on an Arabic device, exactly as in Flutter. With it, the
+     * resolved locale's language decides, from the same five-language list Flutter's
+     * GlobalWidgetsLocalizations uses. The locale is resolved only in that case, so an
+     * app without localizations does no locale work while building.
+     */
+    private com.codename1.flutter.TextDirection rootTextDirection() {
+        boolean global = false;
+        if (localizationsDelegates instanceof Iterable) {
+            for (Object d : (Iterable<?>) localizationsDelegates) {
+                if (d == com.codename1.flutter.l10n.GlobalWidgetsLocalizations.delegate) {
+                    global = true;
+                    break;
+                }
+            }
+        }
+        if (!global) {
+            return com.codename1.flutter.TextDirection.ltr;
+        }
+        Locale l = effectiveLocale();
+        String lang = l == null ? null : l.languageCode();
+        boolean rtl = "ar".equals(lang) || "fa".equals(lang) || "he".equals(lang)
+                || "ps".equals(lang) || "ur".equals(lang);
+        return rtl ? com.codename1.flutter.TextDirection.rtl : com.codename1.flutter.TextDirection.ltr;
+    }
+
     private Widget wrapWithLocalizations(Widget content) {
         if (content == null) {
             return null;
@@ -429,18 +478,20 @@ public class MaterialApp extends StatelessWidget
         // meant no scope at all, so every `Foo.of(context)!` below died with
         // no clue why. Deferring makes the lookup ask when the answer is
         // knowable.
+        final LocalizationsScope[] self = new LocalizationsScope[1];
         LocalizationsScope scope = new LocalizationsScope(new Funcs.Func0<java.util.List<Object>>() {
             @Override
             public java.util.List<Object> call() {
-                return loadLocalizations();
+                return loadLocalizations(self[0]);
             }
         });
+        self[0] = scope;
         scope.reloadKey(locale, localizationsDelegates);
         scope.child(content);
         return scope;
     }
 
-    private java.util.List<Object> loadLocalizations() {
+    private java.util.List<Object> loadLocalizations(LocalizationsScope scope) {
         java.util.List<Object> out = new java.util.ArrayList<Object>();
         if (localizationsDelegates instanceof Iterable) {
             Locale loc = effectiveLocale();
@@ -456,6 +507,14 @@ public class MaterialApp extends StatelessWidget
                             logLoaded(d, v);
                         } else {
                             logLoaded(d, null);
+                            if (f != null && scope != null) {
+                                // Not loaded YET: a delegate whose load really is
+                                // asynchronous. Dropping it left the scope's list
+                                // without that resource for good, so Foo.of stayed null
+                                // after the load finished. The scope adds it when it
+                                // settles and rebuilds whoever looked it up meanwhile.
+                                scope.loadLater(f);
+                            }
                         }
                     } catch (Throwable err) {
                         // A delegate that fails contributes nothing, and the app
@@ -520,7 +579,11 @@ public class MaterialApp extends StatelessWidget
     /**
      * The locale the app runs in — Flutter's resolution order: an explicit {@code locale}
      * wins, otherwise the app's {@code localeListResolutionCallback} is asked to choose
-     * from the device's locales, otherwise the first supported locale.
+     * from the device's locales, otherwise Flutter's default,
+     * {@link com.codename1.flutter.widgets.WidgetsLocalizations#basicLocaleListResolution},
+     * matches the device's locales against the supported ones. That last step used to be
+     * "the first supported locale", which ignored the device entirely: a French device
+     * running an app that supports English and French got English.
      *
      * <p>Asking the callback is not optional politeness. It is where an app learns what the
      * device asked for: the gallery's records the device locale in a global that its own
@@ -537,11 +600,12 @@ public class MaterialApp extends StatelessWidget
         if (chosen != null) {
             return chosen;
         }
-        if (supportedLocales instanceof Iterable) {
-            for (Object l : (Iterable<?>) supportedLocales) {
-                if (l instanceof Locale) {
-                    return (Locale) l;
-                }
+        DartIterable<Locale> supported = supportedLocaleList();
+        if (supported.iterator().hasNext()) {
+            Locale basic = com.codename1.flutter.widgets.WidgetsLocalizations
+                    .basicLocaleListResolution(deviceLocales(), supported);
+            if (basic != null) {
+                return basic;
             }
         }
         return new Locale("en", null);
@@ -566,13 +630,21 @@ public class MaterialApp extends StatelessWidget
     private boolean resolutionAsked;
     private Locale resolvedByCallback;
 
-    /// What the platform reports, as Flutter's ordered preference list.
+    /// What the platform reports, as Flutter's ordered preference list. Codename One
+    /// reports one locale, not a list: its language and its country (L10NManager's
+    /// getLocale() is the ISO 3166 country code on every port). The country matters to
+    /// the resolution: it is what picks en_GB over en_US. Java's legacy language codes are
+    /// mapped to the ISO 639 ones Flutter and its ARB files use (a Hebrew device reports
+    /// "iw" on older Java platforms, and no app supports "iw").
     private DartList<Locale> deviceLocales() {
         DartList<Locale> out = new DartList<Locale>();
         try {
-            String lang = com.codename1.l10n.L10NManager.getInstance().getLanguage();
+            com.codename1.l10n.L10NManager l10n = com.codename1.l10n.L10NManager.getInstance();
+            String lang = l10n.getLanguage();
             if (lang != null && lang.length() > 0) {
-                out.add(new Locale(lang, null));
+                String country = l10n.getLocale();
+                out.add(new Locale(isoLanguage(lang),
+                        country == null || country.length() == 0 ? null : country));
             }
         } catch (Throwable ignore) {
             // headless
@@ -581,6 +653,19 @@ public class MaterialApp extends StatelessWidget
             out.add(new Locale("en", null));
         }
         return out;
+    }
+
+    private static String isoLanguage(String lang) {
+        if ("iw".equals(lang)) {
+            return "he";
+        }
+        if ("in".equals(lang)) {
+            return "id";
+        }
+        if ("ji".equals(lang)) {
+            return "yi";
+        }
+        return lang;
     }
 
     private DartIterable<Locale> supportedLocaleList() {

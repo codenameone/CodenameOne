@@ -64,10 +64,12 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     }
 
     private final ArrayList<E> impl;
-    private final boolean growable;
-    /// Set for List.unmodifiable and the lists Dart hands out read-only (Uri.pathSegments):
-    /// every write is refused, element stores as well as length changes.
-    private final boolean readOnly;
+    /// Not final: {@link #constant} freezes a freshly built literal in place.
+    private boolean growable;
+    /// Set for List.unmodifiable, the lists Dart hands out read-only (Uri.pathSegments)
+    /// and const literals: every write is refused, element stores as well as length
+    /// changes.
+    private boolean readOnly;
 
     public DartList() {
         this.impl = new ArrayList<>();
@@ -95,6 +97,20 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         this.impl = null;
         this.growable = growable && !readOnly;
         this.readOnly = readOnly;
+    }
+
+    /**
+     * Freezes a list the transpiler just built for a Dart {@code const} literal and
+     * returns it: {@code const xs = <int>[1]; xs.add(2);} must throw UnsupportedError,
+     * and a growable literal accepted the add. In place rather than a copy, because the
+     * literal is fresh and nothing else can hold it yet; generic in the list's own class
+     * so a {@code DartLongList} stays one.
+     */
+    public static <L extends DartList<?>> L constant(L list) {
+        DartList<?> l = list;
+        l.growable = false;
+        l.readOnly = true;
+        return list;
     }
 
     /** Refuses an element store on a read-only list; the primitive lists' setters call it too. */

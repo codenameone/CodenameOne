@@ -3491,13 +3491,16 @@ public final class JavaEmitter {
             return emitString((StringLit) e, ctx);
         }
         if (e instanceof ListLit) {
-            return emitListLit((ListLit) e, expected, ctx);
+            Out o = emitListLit((ListLit) e, expected, ctx);
+            return ((ListLit) e).isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof MapLit) {
-            return emitMapLit((MapLit) e, expected, ctx);
+            Out o = emitMapLit((MapLit) e, expected, ctx);
+            return ((MapLit) e).isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof SetLit) {
-            return emitSetLit((SetLit) e, expected, ctx);
+            Out o = emitSetLit((SetLit) e, expected, ctx);
+            return ((SetLit) e).isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof Ident) {
             return emitIdent((Ident) e, expected, ctx);
@@ -3819,6 +3822,20 @@ public final class JavaEmitter {
                 check = "DartRuntime.isOrNull(" + subject + ", " + erasedJavaType(t.type, ctx) + ".class)";
             } else {
                 // Erased: `x is List<String>` cannot name its arguments in a Java instanceof.
+                //
+                // DELIBERATE, and not "fixed" with runtime type witnesses. The transpiler's
+                // generics model is Java's: type arguments are erased, and `is`/`as` check
+                // the RAW type (and the storage class, so `is List<int>` does test for the
+                // primitive-backed list). `(<int>[1] as dynamic) is List<String>` is
+                // therefore true here where Dart says false. Reifying the arguments would
+                // mean a witness carried by EVERY generic value -- each list, map, set,
+                // future, stream and generic class instance, created and copied on every
+                // path -- which is a pervasive time and size cost on device for a check
+                // real Flutter code almost never depends on. A partial answer keyed on the
+                // storage class (a DartLongList is no List<String>) would be worse than
+                // none: whether it answered correctly would depend on how the list happened
+                // to be built (a List<int> from map().toList() is a boxed DartList), so the
+                // same test would flip between call sites. emitAsCast shares this model.
                 check = subject + " instanceof " + erasedJavaType(t.type, ctx);
             }
             return new Out(t.negated ? "!(" + check + ")" : "(" + check + ")", TypeRef.BOOL);
@@ -3897,7 +3914,9 @@ public final class JavaEmitter {
         }
         String call = "DartRuntime.as(" + operand + ", " + erased + ".class, " + target.nullable + ", "
                 + quote(target.toString()) + ")";
-        // The helper answers the erased class; a parameterized target narrows it unchecked.
+        // The helper answers the erased class; a parameterized target narrows it unchecked:
+        // type arguments are not reified, so `as List<String>` accepts any list (see the
+        // IsTest branch of emitExpr for why that is the design rather than an oversight).
         return new Out(jt.equals(erased) ? call : "((" + jt + ") " + call + ")", c.type);
     }
 
@@ -3933,6 +3952,47 @@ public final class JavaEmitter {
             // DartRuntime.str returns String, so + concatenation is already string-typed
         }
         return new Out(code, TypeRef.STRING);
+    }
+
+    /**
+     * A Dart {@code const} collection literal -- written {@code const [...]}, or a literal
+     * inside a const context, which AstBuilder marks -- is unmodifiable: {@code const xs =
+     * <int>[1]; xs.add(2);} throws UnsupportedError. Emitted growable, it accepted the add.
+     * The freshly built collection is frozen in place (lists, sets, int maps) or copied
+     * into the read-only map, keeping its static type.
+     *
+     * <p>NOT canonicalized: Dart makes {@code identical(const [1], const [1])} true, and
+     * this still builds the value on each evaluation. That is the model the emitter
+     * already uses for {@code const} constructor calls, which are not canonicalized either.
+     * Hoisting each literal into a static constant would change when its elements are
+     * evaluated relative to the lazily initialised statics they may name, and would cost
+     * a field per literal across a whole application; mutability is what a program can
+     * observe without calling identical().</p>
+     */
+    private Out constCollection(Out o, Ctx ctx) {
+        TypeRef t = o.type;
+        if (t == null) {
+            return o;
+        }
+        if (t.is("List")) {
+            ctx.importClass("dart.core.DartList");
+            return new Out("DartList.constant(" + o.code + ")", t, o.fromError);
+        }
+        if (t.is("Set")) {
+            ctx.importClass("dart.core.DartSet");
+            return new Out("DartSet.constant(" + o.code + ")", t, o.fromError);
+        }
+        if (t.is("Map")) {
+            // By what was built, not by the type: only the plain <int, int> literal is a
+            // DartLongMap; a structured one (if/for/spread) is built as a DartMap.
+            if (o.code.startsWith("DartLongMap.ofLongs(")) {
+                ctx.importClass("dart.core.DartLongMap");
+                return new Out("DartLongMap.constant(" + o.code + ")", t, o.fromError);
+            }
+            ctx.importClass("dart.core.DartMap");
+            return new Out("DartMap.constant(" + o.code + ")", t, o.fromError);
+        }
+        return o;
     }
 
     private Out emitListLit(ListLit l, TypeRef expected, Ctx ctx) {
@@ -9844,6 +9904,8 @@ public final class JavaEmitter {
             return "DartList<" + javaType(t.arg(0), true, ctx) + ">";
         }
         if (t.is("Map")) {
+            // By what was built, not by the type: only the plain <int, int> literal is a
+            // DartLongMap; a structured one (if/for/spread) is built as a DartMap.
             if (isPrimitiveLongMap(t)) {
                 ctx.importClass("dart.core.DartLongMap");
                 return "DartLongMap";

@@ -173,4 +173,13 @@ public class DartRuntimeTest {
         assertEquals(Long.valueOf(0), DartRuntime.dynBinary("<<", 1L, 64L));
         assertThrows(dart.core.ArgumentError.class, () -> DartRuntime.dynBinary("<<", 1L, -1L));
     }
+
+    @Test
+    public void negativeZeroKeepsItsSignInToStringAsFixed() {
+        // Dart: (-0.0).toStringAsFixed(2) is -0.00; `d < 0` is false for -0.0.
+        assertEquals("-0.00", DartRuntime.toStringAsFixed(-0.0, 2));
+        assertEquals("-0", DartRuntime.toStringAsFixed(-0.0, 0));
+        assertEquals("0.00", DartRuntime.toStringAsFixed(0.0, 2));
+        assertEquals("-0.00", DartRuntime.toStringAsFixed(-0.001, 2));
+    }
 }

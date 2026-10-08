@@ -116,6 +116,94 @@ public class LocalizationsScope extends SingleChildWidget implements InheritedVa
         return resources;
     }
 
+    /// Loads begun by the supplier that had not completed when it returned.
+    private int pendingLoads;
+    /// Readers whose lookup came up empty while a load was pending; rebuilt when it lands.
+    private List<com.codename1.flutter.Element> waiting;
+
+    /**
+     * Adopts a delegate's load that has not completed yet. When it does, its value joins
+     * the published resources and every reader that looked one up in the meantime is
+     * rebuilt, so {@code Foo.of(context)} answers once the load is done instead of
+     * staying null for the life of the scope.
+     *
+     * <p>Flutter's Localizations instead withholds its whole subtree until every load is
+     * in. This scope loads lazily, on the first lookup -- from inside the subtree's own
+     * build (see MaterialApp.wrapWithLocalizations for why) -- so by the time a load is
+     * known to be pending the subtree is already being built, and the readers are
+     * rebuilt instead. Delegates in this runtime almost always answer synchronously
+     * (a SynchronousFuture, or an async load whose awaits block), so this is the rare
+     * path.</p>
+     */
+    @SuppressWarnings("unchecked")
+    public void loadLater(dart.async.Future<?> load) {
+        pendingLoads++;
+        ((dart.async.Future<Object>) load).then(new dart.runtime.Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object value) {
+                settled(value);
+                return null;
+            }
+        }, new dart.runtime.Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object error) {
+                try {
+                    com.codename1.io.Log.p("Flutter runtime: a localizations delegate's load failed: "
+                            + error);
+                } catch (Throwable ignore) {
+                    // headless: Log has no storage backend
+                }
+                settled(null);
+            }
+        });
+    }
+
+    private void settled(Object value) {
+        pendingLoads--;
+        if (value != null) {
+            if (resources == null) {
+                resources = new java.util.ArrayList<Object>();
+            }
+            resources.add(value);
+        }
+        List<com.codename1.flutter.Element> readers = waiting;
+        if (pendingLoads == 0) {
+            waiting = null;
+        }
+        if (value == null || readers == null) {
+            return;
+        }
+        for (int i = 0; i < readers.size(); i++) {
+            com.codename1.flutter.Element e = readers.get(i);
+            if (e.isMounted()) {
+                e.didChangeDependencies();
+            }
+        }
+    }
+
+    /**
+     * Called by {@code Localizations.of} when a lookup found nothing: if the nearest
+     * scope still has a load in flight, the reader is rebuilt when it lands. A plain
+     * miss (no such delegate at all) costs one ancestor search, which the miss already
+     * pays for its diagnostic.
+     */
+    public static void rebuildWhenLoaded(com.codename1.flutter.BuildContext context) {
+        if (!(context instanceof com.codename1.flutter.Element)) {
+            return;
+        }
+        LocalizationsScope scope = context.findAncestorWidgetOfExactType(LocalizationsScope.class);
+        if (scope == null || scope.pendingLoads <= 0) {
+            return;
+        }
+        if (scope.waiting == null) {
+            scope.waiting = new java.util.ArrayList<com.codename1.flutter.Element>();
+        }
+        com.codename1.flutter.Element e = (com.codename1.flutter.Element) context;
+        if (!scope.waiting.contains(e)) {
+            scope.waiting.add(e);
+        }
+    }
+
     @Override
     public Object providedValueFor(Class<?> type) {
         List<Object> rs = resources();

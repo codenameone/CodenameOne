@@ -50,11 +50,14 @@ public final class RegExpMatch {
 
     /** Dart's {@code Match.group(index)} — null for an unmatched group. */
     public String group(long index) {
-        int i = (int) index;
-        if (i < 0 || i >= groups.length) {
+        // Checked as the Dart int it is, BEFORE narrowing: (int) (1 << 32) is 0, so a
+        // narrowed check let group(4294967296) answer group 0 instead of failing.
+        // DString and RegExp were swept for the same pattern; every other narrowing
+        // there is already preceded by a range check on the long.
+        if (index < 0 || index >= groups.length) {
             throw new RangeError("group index out of range: " + index);
         }
-        return groups[i];
+        return groups[(int) index];
     }
 
     /** Dart's {@code match[index]} operator. */

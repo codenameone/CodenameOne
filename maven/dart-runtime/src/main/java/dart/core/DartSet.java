@@ -87,8 +87,53 @@ public class DartSet<E> extends LinkedHashSet<E> {
         structure++;
     }
 
+    /// Set by {@link #constant} for a Dart {@code const} set literal: every write throws.
+    private boolean readOnly;
+
+    /**
+     * Freezes a set the transpiler just built for a Dart {@code const} literal and
+     * returns it. In place: the literal is fresh and nothing else holds it yet.
+     */
+    public static <S extends DartSet<?>> S constant(S set) {
+        ((DartSet<?>) set).readOnly = true;
+        return set;
+    }
+
+    private void checkWritable() {
+        if (readOnly) {
+            throw new UnsupportedError("Cannot change an unmodifiable set");
+        }
+    }
+
+    /// Only a frozen set pays for the wrapper; its remove() is refused, which covers
+    /// removeWhere, retainWhere and the inherited Java bulk removals.
+    @Override
+    public java.util.Iterator<E> iterator() {
+        final java.util.Iterator<E> it = super.iterator();
+        if (!readOnly) {
+            return it;
+        }
+        return new java.util.Iterator<E>() {
+            @Override
+            public boolean hasNext() {
+                return it.hasNext();
+            }
+
+            @Override
+            public E next() {
+                return it.next();
+            }
+
+            @Override
+            public void remove() {
+                checkWritable();
+            }
+        };
+    }
+
     @Override
     public boolean add(E e) {
+        checkWritable();
         boolean added = storedElement(e) == e && super.add(e);
         if (added) {
             structure++;
@@ -98,6 +143,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
 
     @Override
     public boolean remove(Object e) {
+        checkWritable();
         boolean removed = super.remove(storedElement(e));
         if (removed) {
             structure++;
@@ -107,6 +153,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
 
     @Override
     public void clear() {
+        checkWritable();
         if (!isEmpty()) {
             structure++;
         }
@@ -221,6 +268,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
     }
 
     public void removeWhere(Funcs.Func1<E, Boolean> test) {
+        checkWritable();
         java.util.Iterator<E> it = iterator();
         while (it.hasNext()) {
             if (Boolean.TRUE.equals(test.call(it.next()))) {
@@ -235,6 +283,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
      * declared it, so every Set call site failed to compile.
      */
     public void retainWhere(Funcs.Func1<E, Boolean> test) {
+        checkWritable();
         java.util.Iterator<E> it = iterator();
         while (it.hasNext()) {
             if (!Boolean.TRUE.equals(test.call(it.next()))) {
