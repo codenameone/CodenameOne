@@ -98,9 +98,12 @@ import java.util.Vector;
 ///  - Numbers and dates are shown by `toString`. A number cell is edited
 ///    as text and parsed for the column class; text that does not parse
 ///    keeps the editor open.
-///  - Keys are handled as plain key events: arrows, Home, End, Page Up
-///    and Down, Enter, Tab, Escape and F2. Typing over an editable cell
-///    starts editing with the typed character.
+///  - Keys are handled as plain key events: the arrows, Enter, Tab and
+///    Escape work on every port, and typing over an editable cell starts
+///    editing with the typed character. Home, End, Page Up, Page Down and
+///    F2 are handled when a key event carries them, which no port does
+///    today: `KeyMap` cannot tell them from the printable character whose
+///    code they share, so they arrive as that character.
 ///  - Printing, drag and drop and tool tips per cell are absent.
 public class JTable extends JComponent implements TableModelListener, Scrollable, TableColumnModelListener,
         ListSelectionListener, CellEditorListener, RowSorterListener {
