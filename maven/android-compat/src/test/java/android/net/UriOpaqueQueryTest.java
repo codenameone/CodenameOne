@@ -75,4 +75,30 @@ public class UriOpaqueQueryTest {
         assertEquals("a=1", u.getEncodedQuery());
         assertEquals("1", u.getQueryParameter("a"));
     }
+
+    @Test
+    public void decodedOpaquePartsCannotBecomeHierarchical() {
+        Uri fromParts = Uri.fromParts("x", "/path@host:part", null);
+        assertTrue(fromParts.isOpaque());
+        assertEquals("/path@host:part", fromParts.getSchemeSpecificPart());
+        assertEquals("x:%2Fpath%40host%3Apart", fromParts.toString());
+
+        Uri built = new Uri.Builder().scheme("x").opaquePart("/path@host:part").build();
+        assertTrue(built.isOpaque());
+        assertEquals(fromParts.toString(), built.toString());
+    }
+
+    @Test
+    public void fromPartsRejectsNullRequiredParts() {
+        try {
+            Uri.fromParts(null, "part", null);
+            fail("null scheme accepted");
+        } catch (NullPointerException expected) {
+        }
+        try {
+            Uri.fromParts("x", null, null);
+            fail("null scheme-specific part accepted");
+        } catch (NullPointerException expected) {
+        }
+    }
 }

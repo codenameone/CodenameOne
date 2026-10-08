@@ -171,4 +171,19 @@ public class IntentFilterMatchTest {
         assertEquals(IntentFilter.NO_MATCH_TYPE, f.match(Intent.ACTION_VIEW, "text/plain", "myapp",
                 Uri.parse("myapp:x"), null, null));
     }
+
+    @Test
+    public void anSspMissCanStillMatchTheAuthorityAndPath() {
+        IntentFilter f = new IntentFilter(Intent.ACTION_VIEW);
+        f.addDataScheme("myapp");
+        f.addDataSchemeSpecificPart("item:42", PatternMatcher.PATTERN_LITERAL);
+        f.addDataAuthority("example.com", null);
+        f.addDataPath("/items", PatternMatcher.PATTERN_PREFIX);
+        assertEquals(IntentFilter.MATCH_CATEGORY_PATH + IntentFilter.MATCH_ADJUSTMENT_NORMAL,
+                f.matchData(null, "myapp", Uri.parse("myapp://example.com/items/42")));
+        assertEquals(IntentFilter.MATCH_CATEGORY_SCHEME_SPECIFIC_PART + IntentFilter.MATCH_ADJUSTMENT_NORMAL,
+                f.matchData(null, "myapp", Uri.parse("myapp:item:42")));
+        assertEquals(IntentFilter.NO_MATCH_DATA,
+                f.matchData(null, "myapp", Uri.parse("myapp://other.example/items/42")));
+    }
 }

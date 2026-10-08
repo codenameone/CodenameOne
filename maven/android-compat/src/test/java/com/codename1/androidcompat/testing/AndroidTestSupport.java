@@ -42,6 +42,12 @@ public final class AndroidTestSupport {
     /// An empty activity the test application declares, for tests that run
     /// the activity stack.
     public static final class TestActivity extends Activity {
+        public interface ResultHandler {
+            void onResult(TestActivity activity, int requestCode);
+        }
+
+        public static ResultHandler resultHandler;
+
         /// Fills the options menu of the next activities started, or null.
         public static OptionsMenu optionsMenu;
 
@@ -128,6 +134,9 @@ public final class AndroidTestSupport {
             resultRequestCode = requestCode;
             this.resultCode = resultCode;
             this.resultData = data;
+            if (resultHandler != null) {
+                resultHandler.onResult(this, requestCode);
+            }
         }
 
         @Override

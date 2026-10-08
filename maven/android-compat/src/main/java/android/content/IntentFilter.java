@@ -234,10 +234,11 @@ public class IntentFilter {
             }
             match = MATCH_CATEGORY_SCHEME;
             if (schemeSpecificParts != null && data != null) {
-                if (!anyMatches(schemeSpecificParts, data.getSchemeSpecificPart())) {
+                if (anyMatches(schemeSpecificParts, data.getSchemeSpecificPart())) {
+                    match = MATCH_CATEGORY_SCHEME_SPECIFIC_PART;
+                } else if (authorities == null) {
                     return NO_MATCH_DATA;
                 }
-                match = MATCH_CATEGORY_SCHEME_SPECIFIC_PART;
             }
             if (match != MATCH_CATEGORY_SCHEME_SPECIFIC_PART && authorities != null) {
                 int auth = matchAuthority(data);

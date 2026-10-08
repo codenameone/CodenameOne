@@ -381,6 +381,10 @@ public final class SQLiteDatabase extends SQLiteClosable {
     public void beginTransactionWithListener(SQLiteTransactionListener transactionListener) {
         Database d = db();
         ArrayList<Transaction> stack = transactions();
+        if (!stack.isEmpty() && stack.get(stack.size() - 1).markedSuccessful) {
+            throw new IllegalStateException("Cannot perform this operation because the transaction has already "
+                    + "been marked successful.  The only thing you can do now is call endTransaction().");
+        }
         if (stack.isEmpty()) {
             Thread current = Thread.currentThread();
             if (!mTransactionOwner.compareAndSet(null, current)) {

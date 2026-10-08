@@ -105,6 +105,42 @@ public class OffStackResultAndFocusTest {
         });
     }
 
+    @Test
+    public void finishingDuringFirstQueuedResultStopsLaterResults() {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                final AndroidTestSupport.TestActivity a = startRoot();
+                final List<Integer> delivered = new ArrayList<Integer>();
+                AndroidTestSupport.TestActivity.resultHandler = new AndroidTestSupport.TestActivity.ResultHandler() {
+                    @Override
+                    public void onResult(AndroidTestSupport.TestActivity activity, int requestCode) {
+                        if (activity == a) {
+                            delivered.add(Integer.valueOf(requestCode));
+                            activity.finish();
+                        }
+                    }
+                };
+                try {
+                    a.startActivityForResult(new Intent(a, AndroidTestSupport.TestActivity.class), 1);
+                    Activity first = ActivityThread.getTopActivity();
+                    first.setResult(Activity.RESULT_OK);
+                    a.startActivityForResult(new Intent(a, AndroidTestSupport.TestActivity.class), 2);
+                    Activity second = ActivityThread.getTopActivity();
+                    second.setResult(Activity.RESULT_OK);
+                    a.finishActivity(1);
+                    assertTrue("the first result should wait while the caller is stopped", delivered.isEmpty());
+                    second.finish();
+                    assertEquals("a destroyed caller received a later queued result",
+                            "[1]", delivered.toString());
+                    assertTrue(a.isFinishing());
+                } finally {
+                    AndroidTestSupport.TestActivity.resultHandler = null;
+                }
+            }
+        });
+    }
+
     private static final class FocusView extends View {
         final List<Boolean> calls = new ArrayList<Boolean>();
 

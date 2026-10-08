@@ -174,6 +174,13 @@ public class SQLiteDatabaseTest {
         db.beginTransaction();
         db.setTransactionSuccessful();
         try {
+            db.beginTransaction();
+            fail("a successful transaction accepted another nested begin");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage().indexOf("already been marked successful") > 0);
+        }
+        assertTrue(db.inTransaction());
+        try {
             db.setTransactionSuccessful();
             fail();
         } catch (IllegalStateException expected) {

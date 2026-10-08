@@ -42,7 +42,10 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
     }
 
     public static Uri fromParts(String scheme, String ssp, String fragment) {
-        return new Uri(scheme + ":" + encode(ssp, "@:/") + (fragment == null ? "" : "#" + encode(fragment)));
+        if (scheme == null || ssp == null) {
+            throw new NullPointerException("scheme and scheme-specific part must not be null");
+        }
+        return new Uri(scheme + ":" + encode(ssp) + (fragment == null ? "" : "#" + encode(fragment)));
     }
 
     public static Uri withAppendedPath(Uri baseUri, String pathSegment) {
@@ -550,7 +553,7 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
         }
 
         public Builder opaquePart(String opaque) {
-            this.opaque = encode(opaque, ":/@");
+            this.opaque = encode(opaque);
             return this;
         }
 

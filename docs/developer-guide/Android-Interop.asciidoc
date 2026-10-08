@@ -344,6 +344,19 @@ the gallery and automated tests cover a subset of those behaviors.
   runtime would launch. It doesn't enumerate every matching handler and uses
   the default-category restriction even without `MATCH_DEFAULT_ONLY`. Apps
   that present their own handler chooser need an explicit application registry.
+* A stopped activity's attached views can still report `VISIBLE` from
+  `getWindowVisibility()`. Pause rendering and other view work from the
+  activity's `onStop()` callback, then resume it from `onStart()`, rather than
+  waiting for a window-visibility callback.
+* `BitmapFactory.Options.inBitmap` isn't used as a decode target. Decoding
+  allocates a new bitmap; applications that depend on bitmap pooling should
+  leave `inBitmap` unset and manage the old bitmap themselves.
+* Give sibling fragments of the same class stable, distinct IDs or tags when
+  using `registerForActivityResult()`. Their launcher keys otherwise collide,
+  and an outstanding result can be lost after activity recreation.
+* Register or unregister `SavedStateRegistry` providers outside a provider's
+  `saveState()` callback. Changing the registry during its save pass can abort
+  state collection.
 * Locale resources use exact region matches and language-only fallbacks.
   They don't rank translations from other regions. Ship a language-only
   directory, such as `values-fr`, for text shared across regions.

@@ -829,6 +829,9 @@ public final class ActivityThread {
         for (Object[] p : pending) {
             Intent data = p[2] instanceof Intent ? (Intent) p[2] : null;
             r.activity.dispatchActivityResult(((Integer) p[0]).intValue(), ((Integer) p[1]).intValue(), data);
+            if (!isLive(r)) {
+                return;
+            }
         }
     }
 
