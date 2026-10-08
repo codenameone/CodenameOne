@@ -39,8 +39,10 @@ import java.io.File;
 /// Copies the project's (or the named module's) `src/main/java`,
 /// `src/main/kotlin` and `src/main/resources` into
 /// `common/src/main/desktop`, records how the application starts in
-/// `cn1-desktop.properties` there, and lists the project's dependencies the
-/// desktop layers do and do not cover. Build and run as usual afterwards.
+/// `cn1-desktop.properties` there, sets the application's own main class
+/// source aside so that the build generates the one that starts the imported
+/// application, and lists what becomes of the project's dependencies. Build
+/// and run as usual afterwards.
 /// See [DesktopProjectImporter].
 @Mojo(name = "import-desktop-project", requiresProject = true, aggregator = true)
 public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
@@ -68,7 +70,9 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
         DesktopProjectImporter.Result r;
         try {
             wireDesktopCompat(common, DesktopProjectImporter.moduleDir(source, module));
-            r = new DesktopProjectImporter(MavenLog.of(getLog())).importProject(source, module, common, mainClass);
+            r = new DesktopProjectImporter(MavenLog.of(getLog())).importProject(source, module, common, mainClass,
+                    properties == null ? null : properties.getProperty("codename1.packageName"),
+                    properties == null ? null : properties.getProperty("codename1.mainName"));
         } catch (com.codename1.builders.BuildException e) {
             throw new MojoFailureException(e.getMessage(), e);
         }
@@ -82,8 +86,22 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
         for (String c : r.covered) {
             getLog().info("  supported: " + c);
         }
+        if (r.generatedMain != null) {
+            getLog().info("The build generates this application's main class, " + r.generatedMain
+                    + ", to start it on every target");
+        }
         for (String u : r.uncovered) {
-            getLog().warn("  NOT supplied by the desktop compatibility layers, and not copied: " + u);
+            if (DesktopProjectImporter.isToolkitModule(u)) {
+                getLog().warn("  NOT implemented by the desktop compatibility layers: " + u
+                        + ". Code that uses it is reported at build time.");
+                continue;
+            }
+            getLog().warn("  not part of the desktop compatibility layers: " + u + ". Add it to the common "
+                    + "module's dependencies (scope compile); it is then "
+                    + DesktopProjectImporter.BUNDLED_NOTE + ".");
+        }
+        for (String u : r.unresolved) {
+            getLog().warn("  " + u);
         }
     }
 

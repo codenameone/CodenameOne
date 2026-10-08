@@ -54,9 +54,24 @@ final class CompatFixtures {
     /// Compiles Java sources into `classesDir`. `nameThenSource` alternates
     /// a path (`p/Foo.java`) and the file's text.
     static void compile(File sourceDir, File classesDir, String... nameThenSource) throws IOException {
+        compileAgainst(null, sourceDir, classesDir, nameThenSource);
+    }
+
+    /// As [#compile], with `classpath` as the compile classpath: the jars a
+    /// fixture names beyond the JDK. Null leaves the compiler's default.
+    static void compileAgainst(List<File> classpath, File sourceDir, File classesDir, String... nameThenSource)
+            throws IOException {
         JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
         assertNotNull("These tests need a JDK, not a JRE", javac);
         List<String> args = new ArrayList<String>();
+        if (classpath != null) {
+            StringBuilder cp = new StringBuilder();
+            for (File f : classpath) {
+                cp.append(cp.length() == 0 ? "" : File.pathSeparator).append(f.getAbsolutePath());
+            }
+            args.add("-cp");
+            args.add(cp.toString());
+        }
         args.add("-d");
         args.add(classesDir.getAbsolutePath());
         args.add("-g");

@@ -62,9 +62,17 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         List<File> classpath = new ArrayList<File>();
+        // What the application ships, as opposed to what it is only compiled
+        // against: of these, the ones written against Swing or JavaFX are
+        // relocated with it. A provided jar never is.
+        List<File> libraries = new ArrayList<File>();
         for (Artifact artifact : project.getArtifacts()) {
             if (artifact.getFile() != null) {
                 classpath.add(artifact.getFile());
+                if (Artifact.SCOPE_COMPILE.equals(artifact.getScope()) && "jar".equals(artifact.getType())
+                        && !"com.codenameone".equals(artifact.getGroupId())) {
+                    libraries.add(artifact.getFile());
+                }
             }
         }
         // By the jars alone: whether a desktop layer is also used can only be
@@ -90,9 +98,26 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
                     .withResourceDirectories(desktopResources)
                     .withDesktopEntryRecord(desktopSourceDir == null ? null
                             : DesktopSources.entryRecord(desktopSourceDir))
+                    .withApplicationMain(applicationMain())
+                    .withApplicationLibraries(libraries)
                     .run();
         } catch (com.codename1.builders.BuildException ex) {
             throw new MojoFailureException(ex.getMessage(), ex);
         }
+    }
+
+    /// The project's main class, which the entry point of a desktop
+    /// application is generated as; null for a module that is not an
+    /// application's.
+    private String applicationMain() {
+        if (!isCN1ProjectDir()) {
+            return null;
+        }
+        String pkg = properties == null ? null : properties.getProperty("codename1.packageName");
+        String main = properties == null ? null : properties.getProperty("codename1.mainName");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        return pkg == null || pkg.trim().length() == 0 ? main.trim() : pkg.trim() + "." + main.trim();
     }
 }

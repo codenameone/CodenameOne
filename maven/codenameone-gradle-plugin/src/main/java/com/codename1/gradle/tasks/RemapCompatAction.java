@@ -53,7 +53,9 @@ public class RemapCompatAction implements Action<Task> {
     private final boolean relocateOnly;
     private final FileCollection handlerDirs;
     private File desktopEntry;
+    private String applicationMain;
     private FileCollection shipWhenEmpty;
+    private FileCollection libraries;
 
     public RemapCompatAction(File classesDir, FileCollection compileClasspath, File onClickNames,
                              boolean relocateOnly, FileCollection handlerDirs) {
@@ -69,6 +71,23 @@ public class RemapCompatAction implements Action<Task> {
     /// generators.
     public RemapCompatAction withDesktopEntryRecord(File record) {
         this.desktopEntry = record;
+        return this;
+    }
+
+    /// The project's main class (`codename1.packageName` and
+    /// `codename1.mainName`), which a desktop application's entry point is
+    /// generated as.
+    public RemapCompatAction withApplicationMain(String className) {
+        this.applicationMain = className;
+        return this;
+    }
+
+    /// The jars the application ships (`runtimeClasspath`), as opposed to
+    /// those it is only compiled against (`compileOnly`). The ones written
+    /// against Swing or JavaFX are unpacked into the classes directory and
+    /// relocated with the application.
+    public RemapCompatAction withApplicationLibraries(FileCollection jars) {
+        this.libraries = jars;
         return this;
     }
 
@@ -92,7 +111,17 @@ public class RemapCompatAction implements Action<Task> {
         }
         Log log = new GradleLog(task.getLogger());
         CompatRemapper r = new CompatRemapper(classesDir, classpath, onClickNames, log)
-                .withDesktopEntryRecord(desktopEntry);
+                .withDesktopEntryRecord(desktopEntry)
+                .withApplicationMain(applicationMain);
+        if (libraries != null) {
+            List<File> jars = new ArrayList<File>();
+            for (File f : libraries.getFiles()) {
+                if (f.isFile() && f.getName().endsWith(".jar")) {
+                    jars.add(f);
+                }
+            }
+            r.withApplicationLibraries(jars);
+        }
         if (relocateOnly && !(shipWhenEmpty != null && shipWhenEmpty.isEmpty())) {
             r.relocateOnly();
         } else if (handlerDirs != null) {

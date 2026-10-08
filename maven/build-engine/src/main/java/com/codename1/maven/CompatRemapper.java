@@ -63,6 +63,9 @@ public final class CompatRemapper {
     private final List<File> handlerDirs = new ArrayList<File>();
     private boolean shipRuntime = true;
     private File desktopEntry;
+    private String applicationMain;
+    private boolean entryGenerated;
+    private List<File> applicationLibraries;
     /// Null until [#withResourceDirectories] is called; see
     /// [#resourceDirectories()].
     private List<File> resourceDirs;
@@ -120,6 +123,16 @@ public final class CompatRemapper {
         return this;
     }
 
+    /// The project's main class, as `codename1.packageName` and
+    /// `codename1.mainName` name it (`com.example.MyApp`): the class the
+    /// entry point of a desktop application is generated as. Without it the
+    /// class is generated only for an application with an entry record, as
+    /// [DesktopEntryPoints#DEFAULT_MAIN].
+    public CompatRemapper withApplicationMain(String className) {
+        this.applicationMain = className;
+        return this;
+    }
+
     /// The directories holding the files a desktop application loads by
     /// name (`src/main/desktop/resources`, and wherever the build generates
     /// more of them). The files in a directory are flattened to the root of
@@ -163,6 +176,7 @@ public final class CompatRemapper {
     /// classes directory, or one of the handler directories, refers to it.
     public List<Relocation> activeLayers() throws BuildException {
         if (active == null) {
+            bundleLibraries();
             List<File> dirs = new ArrayList<File>();
             dirs.add(classesDir);
             dirs.addAll(handlerDirs);
@@ -178,6 +192,40 @@ public final class CompatRemapper {
             }
         }
         return active;
+    }
+
+    /// The dependency jars that are part of the application -- Maven's
+    /// `compile` scope, Gradle's `implementation` -- as opposed to the ones
+    /// something else provides. Those among them that are written against a
+    /// desktop layer are unpacked into the classes directory and relocated
+    /// with the application; see [CompatLibraries]. Jars that name no desktop
+    /// layer are left alone, so the whole list can be passed as it is.
+    public CompatRemapper withApplicationLibraries(List<File> jars) {
+        this.applicationLibraries = jars == null ? null : new ArrayList<File>(jars);
+        return this;
+    }
+
+    /// Unpacks the libraries written against a desktop layer, before the
+    /// classes directory is read for the layers it uses: a library's use of
+    /// Swing is the application's.
+    private void bundleLibraries() throws BuildException {
+        if (!shipRuntime || applicationLibraries == null || applicationLibraries.isEmpty()) {
+            return;
+        }
+        List<Relocation> desktop = new ArrayList<Relocation>();
+        java.util.Set<File> runtimes = new java.util.HashSet<File>();
+        for (Relocation layer : CompatLayers.active(classpath)) {
+            runtimes.add(CompatLayers.runtimeJar(layer, classpath));
+            if (layer.isDesktop()) {
+                desktop.add(layer);
+            }
+        }
+        runtimes.add(CompatLayers.jdkJar(classpath));
+        try {
+            CompatLibraries.bundle(classesDir, applicationLibraries, desktop, runtimes, log);
+        } catch (IOException e) {
+            throw new BuildException("Could not bundle the application's libraries: " + e.getMessage(), e);
+        }
     }
 
     /// Whether `layer` is among the active ones.
@@ -201,6 +249,7 @@ public final class CompatRemapper {
         try {
             jdkJar = CompatLayers.jdkJar(classpath);
             resourcesShipped = false;
+            entryGenerated = false;
             List<String> appClasses;
             int runtime = 0;
             boolean android = isActive(AndroidRemapper.RELOCATION);
@@ -259,15 +308,27 @@ public final class CompatRemapper {
         }
     }
 
-    /// Hook, not implemented yet: generates the class that starts a Swing
-    /// application -- the Codename One lifecycle class that calls the
-    /// application's `main`, since nothing on a device runs a `main` method.
-    /// `appClasses` are the application's relocated internal names. Called
-    /// after every runtime is in place, on a full (not relocate-only) run with
-    /// the Swing layer active. Whatever it writes must be written with
+    /// Generates the class that starts a Swing application -- the Codename
+    /// One lifecycle class that calls the application's `main`, since nothing
+    /// on a device runs a `main` method: [DesktopEntryPoints]. `appClasses`
+    /// are the application's relocated internal names. Called after every
+    /// runtime is in place, on a full (not relocate-only) run with the Swing
+    /// layer active. Whatever it writes must be written with
     /// [ClassRelocator#writeIfDifferent], to keep a second run a no-op.
-    void generateSwingEntryPoint(List<String> appClasses) throws IOException {
-        // Deliberately empty: see the comment above.
+    void generateSwingEntryPoint(List<String> appClasses) throws IOException, BuildException {
+        generateDesktopEntryPoint(appClasses);
+    }
+
+    /// The one main class of a desktop application, generated once per run
+    /// however many desktop layers are active: which of the two kinds it is
+    /// comes from the entry record, not from the layer that asked.
+    private void generateDesktopEntryPoint(List<String> appClasses) throws IOException, BuildException {
+        if (entryGenerated) {
+            return;
+        }
+        entryGenerated = true;
+        new DesktopEntryPoints(classesDir, handlerDirs, relocator, active, jdkJar != null, log)
+                .generate(DesktopEntryPoints.read(desktopEntry), applicationMain, appClasses);
     }
 
     /// Ships what a Swing application loads by name -- `Class.getResource`
@@ -307,12 +368,12 @@ public final class CompatRemapper {
         }
     }
 
-    /// Hook, not implemented yet: generates the class that starts a JavaFX
-    /// application, instantiating its `javafx.application.Application`
-    /// subclass with `new` rather than by reflection. Same contract as
+    /// Generates the class that starts a JavaFX application, instantiating
+    /// its `javafx.application.Application` subclass with `new` rather than
+    /// by reflection: [DesktopEntryPoints]. Same contract as
     /// [#generateSwingEntryPoint], for the JavaFX layer.
-    void generateJavaFxEntryPoint(List<String> appClasses) throws IOException {
-        // Deliberately empty: see the comment above.
+    void generateJavaFxEntryPoint(List<String> appClasses) throws IOException, BuildException {
+        generateDesktopEntryPoint(appClasses);
     }
 
     /// Hook, not implemented yet: generates what FXML resolves by name at

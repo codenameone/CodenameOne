@@ -95,4 +95,28 @@
         <Method name="setContextClassLoader"/>
         <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
     </Match>
+
+    <!--
+        InvocationTargetException exists to carry the exception it wraps and
+        hand that very object back; a Throwable cannot be copied.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.InvocationTargetException"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!--
+        A shutdown hook is a Thread only because Runtime.addShutdownHook
+        takes one. System.exit runs each hook's body in turn on the calling
+        thread, deliberately: the application is about to be closed by the
+        platform, and a hook started as a thread would race that.
+    -->
+    <Match>
+        <Class name="com.codename1.compat.jdk.JdkSystem"/>
+        <Method name="exit"/>
+        <Bug pattern="RU_INVOKE_RUN"/>
+    </Match>
 </FindBugsFilter>

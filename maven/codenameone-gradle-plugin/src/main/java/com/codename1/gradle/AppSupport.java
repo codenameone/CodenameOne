@@ -185,6 +185,8 @@ final class AppSupport {
         main.getJava().srcDir(com.codename1.maven.DesktopSources.javaDir(desktopDir));
         main.getResources().srcDir(com.codename1.maven.DesktopSources.resourcesDir(desktopDir));
         final File desktopEntry = com.codename1.maven.DesktopSources.entryRecord(desktopDir);
+        // The class a desktop application's entry point is generated as.
+        final String desktopMain = applicationMain(settings);
 
         TaskProvider<Cn1CssTask> css = project.getTasks().register("cn1Css", Cn1CssTask.class, t -> {
             common(t, project, layout, ext, userProperties);
@@ -246,6 +248,8 @@ final class AppSupport {
                 compile.getInputs().property("cn1DesktopToolkits", project.provider(
                         () -> com.codename1.maven.DesktopSources.toolkitsNamedIn(desktopDir)));
                 compile.getInputs().files(desktopEntry).withPropertyName("cn1DesktopEntry").optional();
+                // And so is the name it is generated under.
+                compile.getInputs().property("cn1DesktopMain", desktopMain == null ? "" : desktopMain);
             }
             compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
             processingInputs(compile, layout, userProperties);
@@ -263,7 +267,9 @@ final class AppSupport {
             compile.doLast("cn1RemapCompat", new com.codename1.gradle.tasks.RemapCompatAction(
                     compile.getDestinationDirectory().getAsFile().get(), main.getCompileClasspath(),
                     onClickNamesFile(androidState), false, main.getOutput().getClassesDirs())
-                    .withDesktopEntryRecord(desktopEntry));
+                    .withDesktopEntryRecord(desktopEntry).withApplicationMain(desktopMain)
+                    .withApplicationLibraries(desktopProject ? main.getRuntimeClasspath().filter(
+                            f -> f.getName().endsWith(".jar")) : null));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
@@ -334,7 +340,8 @@ final class AppSupport {
             registerKotlinRelocation(project.getTasks(), main.getCompileJavaTaskName(), main.getClassesTaskName(),
                     kotlinRelocation(t -> new com.codename1.gradle.tasks.RemapCompatAction(
                             kotlinDir.get(), compileClasspath, onClickNames, true, null)
-                            .withDesktopEntryRecord(desktopEntry).shippingWhenEmpty(javaSources).execute(t),
+                            .withDesktopEntryRecord(desktopEntry).withApplicationMain(desktopMain)
+                            .shippingWhenEmpty(javaSources).execute(t),
                             kotlinCompliance));
         });
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
@@ -972,4 +979,15 @@ final class AppSupport {
         }
     }
 
+
+    /// `codename1.packageName` and `codename1.mainName` as one class name,
+    /// or null when the settings name no main class.
+    private static String applicationMain(java.util.Properties settings) {
+        String pkg = settings.getProperty("codename1.packageName", "").trim();
+        String main = settings.getProperty("codename1.mainName", "").trim();
+        if (main.length() == 0) {
+            return null;
+        }
+        return pkg.length() == 0 ? main : pkg + "." + main;
+    }
 }

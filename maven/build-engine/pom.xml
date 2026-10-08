@@ -279,6 +279,21 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- The desktop layers' real runtimes: DesktopEntryPointsTest compiles a
+             Swing and a JavaFX fixture against them, remaps it and loads the
+             main class the remap generated. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-swing-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javafx-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

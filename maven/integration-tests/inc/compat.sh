@@ -9,20 +9,43 @@
 # worth reporting alongside the others, and call fail for one that leaves
 # nothing further to check.
 
-# compat_unrelocated <classes dir> <packages>
-#
-# Class files that still name one of <packages>, an ERE alternation of
-# slash-separated package names without the trailing slash
-# ("android|androidx"). A relocated name is preceded by "/"
-# (com/codename1/androidcompat/android/...), an unrelocated one by the constant
-# pool's length bytes or by the "L" of a descriptor.
-compat_unrelocated() {
-  local dir="$1" packages="$2"
-  find "$dir" -name '*.class' -print0 | while IFS= read -r -d '' f; do
-    if LC_ALL=C grep -aEq "(^|[^/a-zA-Z0-9_\$])L?($packages)/[A-Za-z]" "$f"; then
-      echo "${f#$dir/}"
-    fi
+# The classpath of the build engine's class checker: the engine's own jar and
+# the two ASM jars it reads classes with, at the version the reactor pins. All
+# three are in the local repository once the reactor is installed.
+compat_checker_classpath() {
+  local pom="$SCRIPTPATH/../pom.xml" asm
+  asm=$(sed -n '/<artifactId>asm-commons<\/artifactId>/{n;s/.*<version>\(.*\)<\/version>.*/\1/p;}' "$pom" | head -1)
+  [ -n "$asm" ] || fail "could not read the ASM version from $pom"
+  local engine="$CN1_REPO/com/codenameone/codenameone-build-engine/$CN1_VERSION/codenameone-build-engine-$CN1_VERSION.jar"
+  local core="$CN1_REPO/org/ow2/asm/asm/$asm/asm-$asm.jar"
+  local commons="$CN1_REPO/org/ow2/asm/asm-commons/$asm/asm-commons-$asm.jar"
+  local jar
+  for jar in "$engine" "$core" "$commons"; do
+    [ -f "$jar" ] || fail "the class checker needs $jar; install the reactor first"
   done
+  echo "$engine:$core:$commons"
+}
+
+# compat_unrelocated <classes dir or jar> <packages>
+#
+# Class files that still refer to a TYPE under one of <packages>, an ERE
+# alternation of slash-separated package names without the trailing slash
+# ("android|androidx"), one per line with the types named.
+#
+# Asked of com.codename1.maven.UnrelocatedTypes, which reads each class as the
+# relocation does: supertypes, descriptors, signatures, instruction operands.
+# A search of the bytes is not good enough -- an application may hold the text
+# "javax/swing/JTable" in a string, and the relocation rightly leaves it.
+compat_unrelocated() {
+  local dir="$1" packages="$2" cp status=0
+  cp=$(compat_checker_classpath) || exit 1
+  # Word splitting turns the alternation into the checker's arguments.
+  local IFS='|'
+  # shellcheck disable=SC2086
+  "$GRADLE_JDK/bin/java" -cp "$cp" com.codename1.maven.UnrelocatedTypes "$dir" $packages || status=$?
+  # 1 is "found some", and they are on stdout; anything above is a failure of
+  # the check itself, which must not read as a clean directory.
+  [ $status -le 1 ] || fail "the class checker failed on $dir (status $status)"
 }
 
 # The jar a build run with codename1.stageOnly=true reported in <log>.

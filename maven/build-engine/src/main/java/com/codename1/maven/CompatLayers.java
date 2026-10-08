@@ -188,6 +188,38 @@ public final class CompatLayers {
         }
     }
 
+    /// Whether a class of `jar` refers to one of `layers`: what makes a
+    /// dependency a library written against a desktop toolkit
+    /// ([CompatLibraries]).
+    static boolean jarRefersTo(File jar, List<Relocation> layers) throws IOException {
+        ReferenceScan scan = new ReferenceScan(layers);
+        java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jar);
+        try {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements() && scan.found.isEmpty()) {
+                java.util.zip.ZipEntry e = entries.nextElement();
+                if (e.isDirectory() || !e.getName().endsWith(".class") || e.getName().startsWith("META-INF/")) {
+                    continue;
+                }
+                java.io.InputStream in = zip.getInputStream(e);
+                try {
+                    new ClassReader(in).accept(new ClassRemapper(new ClassWriter(0), scan),
+                            ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                } catch (RuntimeException unreadable) {
+                    // A class file newer than this build reads names nothing
+                    // that can be relocated; the compliance check reports it
+                    // if it ever becomes part of the application.
+                    continue;
+                } finally {
+                    in.close();
+                }
+            }
+        } finally {
+            zip.close();
+        }
+        return !scan.found.isEmpty();
+    }
+
     /// Whether `rel` (a directory inside a classes directory, with its
     /// trailing slash) is where some layer's runtime, or the shared JDK
     /// classes, are extracted.

@@ -91,5 +91,14 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- The real SwingX, for SwingXApiShapeTest alone: the layer's
+             org.jdesktop classes are held to its signatures. Test scope on
+             purpose; nothing the module ships may name it. -->
+        <dependency>
+            <groupId>org.swinglabs.swingx</groupId>
+            <artifactId>swingx-all</artifactId>
+            <version>1.6.5-1</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
