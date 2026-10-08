@@ -71,6 +71,8 @@ public final class MiniHtml {
         0xffc0cb, 0xa9a9a9, 0xa9a9a9, 0xd3d3d3, 0xd3d3d3, 0xa52a2a
     };
 
+    private static final Color LINK = new Color(0x0000ee);
+
     private MiniHtml() {
     }
 
@@ -84,14 +86,26 @@ public final class MiniHtml {
         private final boolean underline;
         private final Color color;
         private final float scale;
+        private final String href;
 
         Run(String text, boolean bold, boolean italic, boolean underline, Color color, float scale) {
+            this(text, bold, italic, underline, color, scale, null);
+        }
+
+        Run(String text, boolean bold, boolean italic, boolean underline, Color color, float scale, String href) {
             this.text = text;
             this.bold = bold;
             this.italic = italic;
             this.underline = underline;
             this.color = color;
             this.scale = scale;
+            this.href = href;
+        }
+
+        /// What the `href` of the link this text is in says, or `null`
+        /// for text that is not in a link.
+        public String href() {
+            return href;
         }
 
         public String text() {
@@ -121,12 +135,13 @@ public final class MiniHtml {
         }
 
         Run withText(String t) {
-            return new Run(t, bold, italic, underline, color, scale);
+            return new Run(t, bold, italic, underline, color, scale, href);
         }
 
         boolean sameStyle(Run o) {
             return bold == o.bold && italic == o.italic && underline == o.underline && Float.compare(scale, o.scale) == 0
-                    && (color == null ? o.color == null : color.equals(o.color));
+                    && (color == null ? o.color == null : color.equals(o.color))
+                    && (href == null ? o.href == null : href.equals(o.href));
         }
 
         Font font(Font base) {
@@ -244,6 +259,7 @@ public final class MiniHtml {
         Color color;
         float scale = 1f;
         int align = ALIGN_DEFAULT;
+        String href;
 
         State copy(String forTag) {
             State s = new State();
@@ -254,6 +270,7 @@ public final class MiniHtml {
             s.color = color;
             s.scale = scale;
             s.align = align;
+            s.href = href;
             return s;
         }
     }
@@ -286,7 +303,7 @@ public final class MiniHtml {
                 if (line.runs.isEmpty()) {
                     line.alignment = s.align;
                 }
-                line.add(new Run(text.toString(), s.bold, s.italic, s.underline, s.color, s.scale));
+                line.add(new Run(text.toString(), s.bold, s.italic, s.underline, s.color, s.scale, s.href));
                 text.setLength(0);
             }
         }
@@ -546,6 +563,14 @@ public final class MiniHtml {
             s.italic = true;
         } else if ("u".equals(name)) {
             s.underline = true;
+        } else if ("a".equals(name)) {
+            String href = attribute(attrs, "href");
+            if (href != null) {
+                // A link looks like one, as it does on the desktop.
+                s.href = href;
+                s.underline = true;
+                s.color = LINK;
+            }
         } else if ("big".equals(name)) {
             s.scale *= 1.2f;
         } else if ("small".equals(name)) {
@@ -854,6 +879,57 @@ public final class MiniHtml {
         return out;
     }
 
+    /// The size the lines take when those wider than `width` are broken,
+    /// in logical pixels; a `width` of 0 or less breaks none.
+    public static Dimension wrappedSize(Document doc, Font font, int width) {
+        return preferredSize(wrap(doc, font, width), font);
+    }
+
+    /// The link at a point of a text that [#paint] drew with its top left
+    /// corner at the origin: the `href` of the run under `(px, py)`, or
+    /// `null` when there is no link there. `font`, `width` and
+    /// `alignment` are the ones the text was painted with.
+    public static String hrefAt(Document doc, Font font, int width, int alignment, int px, int py) {
+        Font base = base(font);
+        Document d = wrap(doc, base, width);
+        int top = 0;
+        for (int i = 0; i < d.lines.size(); i++) {
+            Line l = d.lines.get(i);
+            if (l.gapBefore) {
+                top += gap(base);
+            }
+            int height = lineHeight(l, base);
+            if (py >= top && py < top + height) {
+                int lx = lineStart(l, base, width, alignment);
+                for (int r = 0; r < l.runs.size(); r++) {
+                    Run run = l.runs.get(r);
+                    int rw = Fonts.metrics(run.font(base)).stringWidth(run.text);
+                    if (px >= lx && px < lx + rw) {
+                        return run.href;
+                    }
+                    lx += rw;
+                }
+                return null;
+            }
+            top += height;
+        }
+        return null;
+    }
+
+    /// Where a line starts, relative to the left edge of the text.
+    private static int lineStart(Line l, Font base, int width, int alignment) {
+        int align = l.alignment != ALIGN_DEFAULT ? l.alignment : alignment;
+        if (width > 0 && align != ALIGN_LEFT) {
+            int lw = lineWidth(l, base);
+            if (align == ALIGN_CENTER) {
+                return (width - lw) / 2;
+            } else if (align == ALIGN_RIGHT || align == ALIGN_TRAILING) {
+                return width - lw;
+            }
+        }
+        return 0;
+    }
+
     // ------------------------------------------------------------ painting
 
     /// Draws the lines with their top left corner at `(x, y)`, in the
@@ -874,16 +950,7 @@ public final class MiniHtml {
                 }
                 int height = lineHeight(l, base);
                 int baseline = top + lineAscent(l, base);
-                int align = l.alignment != ALIGN_DEFAULT ? l.alignment : alignment;
-                int lx = x;
-                if (width > 0 && align != ALIGN_LEFT) {
-                    int lw = lineWidth(l, base);
-                    if (align == ALIGN_CENTER) {
-                        lx = x + (width - lw) / 2;
-                    } else if (align == ALIGN_RIGHT || align == ALIGN_TRAILING) {
-                        lx = x + width - lw;
-                    }
-                }
+                int lx = x + lineStart(l, base, width, alignment);
                 for (int r = 0; r < l.runs.size(); r++) {
                     Run run = l.runs.get(r);
                     Font f = run.font(base);

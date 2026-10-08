@@ -20,13 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.javax.swing;
+package com.codename1.desktopcompat.javax.swing.event;
 
-/// An editor pane for styled text. Styled documents are not part of this
-/// layer, so it behaves as the [JEditorPane] it extends: plain text, or a
-/// formatted page with the content type `text/html`.
-public class JTextPane extends JEditorPane {
+import java.util.EventListener;
 
-    public JTextPane() {
-    }
+/// Hears about the links of an editor pane being used.
+public interface HyperlinkListener extends EventListener {
+
+    void hyperlinkUpdate(HyperlinkEvent e);
 }
