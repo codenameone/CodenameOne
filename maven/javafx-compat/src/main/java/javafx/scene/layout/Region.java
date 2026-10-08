@@ -671,6 +671,15 @@ public class Region extends Parent {
         position(child, areaX, areaY, areaWidth, areaHeight, areaBaselineOffset, 0, 0, 0, 0, halignment, valignment);
     }
 
+    /// Positions a child in an area less a margin without resizing it;
+    /// for the panes of this package.
+    void positionInMargin(Node child, double areaX, double areaY, double areaWidth, double areaHeight,
+            Insets margin, HPos halignment, VPos valignment) {
+        Insets m = margin == null ? Insets.EMPTY : margin;
+        position(child, areaX, areaY, areaWidth, areaHeight, 0, snapSpaceY(m.getTop()), snapSpaceX(m.getRight()),
+                snapSpaceY(m.getBottom()), snapSpaceX(m.getLeft()), halignment, valignment);
+    }
+
     private void position(Node child, double areaX, double areaY, double areaWidth, double areaHeight,
             double areaBaselineOffset, double top, double right, double bottom, double left, HPos hpos, VPos vpos) {
         Bounds lb = child.getLayoutBounds();

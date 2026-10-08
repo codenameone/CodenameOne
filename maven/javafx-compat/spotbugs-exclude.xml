@@ -185,4 +185,18 @@
         </Or>
         <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
     </Match>
+    <!--
+        JavaFX declares GridPane.isFillWidth(Node) and isFillHeight(Node) as
+        returning Boolean, and null is the documented answer for a child that
+        has no such constraint: the pane then asks the row or column. The
+        signature and the three states are the API.
+    -->
+    <Match>
+        <Class name="javafx.scene.layout.GridPane"/>
+        <Or>
+            <Method name="isFillWidth"/>
+            <Method name="isFillHeight"/>
+        </Or>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
 </FindBugsFilter>
