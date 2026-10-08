@@ -237,8 +237,9 @@ public class CN1CSSCLI {
             return watch(options);
         }
         try {
-            compileOnce(options);
-            System.out.println("CSS file successfully compiled.  " + options.outputFile);
+            if (compileOnce(options)) {
+                System.out.println("CSS file successfully compiled.  " + options.outputFile);
+            }
             return 0;
         } catch (Throwable t) {
             report(t);
@@ -392,8 +393,7 @@ public class CN1CSSCLI {
             // next poll instead of being absorbed into the baseline.
             PollingFileWatcher watcher = new PollingFileWatcher(watchedFiles(options), 1000);
             try {
-                compileOnce(options);
-                if (first) {
+                if (compileOnce(options) && first) {
                     System.out.println("CSS file successfully compiled.  " + options.outputFile);
                 }
             } catch (Throwable t) {
