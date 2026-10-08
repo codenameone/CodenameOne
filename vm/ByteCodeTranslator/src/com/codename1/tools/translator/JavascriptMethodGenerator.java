@@ -1682,7 +1682,7 @@ final class JavascriptMethodGenerator {
                     dvPattern.replace("yield\\* _dv", "_dw"),
                     dvReplacement.replace("yield* _dv", "_dw"));
             // _dn is _dw without the generator drive; same argument shape.
-            s = s.replaceAll(
+            s = rx(s,
                     dvPattern.replace("yield\\* _dv", "_dn"),
                     dvReplacement.replace("yield* _dv", "_dn"));
         }
