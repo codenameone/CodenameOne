@@ -28,7 +28,6 @@ import com.codename1.ui.Component;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -206,7 +205,15 @@ public final class HeadlessCssCompilerImplementation extends CodenameOneImplemen
         return toArgb(ImageIO.read(i));
     }
     @Override public Object createImage(String path) throws IOException {
-        InputStream in = new FileInputStream(path);
+        // A path here is the name of a resource in the jar, never a file: the
+        // compiler reads every image a stylesheet names itself, through a
+        // stream, so nothing reaches this with a location on disk and it
+        // must not open one.
+        InputStream in = HeadlessCssCompilerImplementation.class.getResourceAsStream(
+                path.startsWith("/") ? path : "/" + path);
+        if (in == null) {
+            throw new IOException("No such resource: " + path);
+        }
         try {
             return toArgb(ImageIO.read(in));
         } finally {
