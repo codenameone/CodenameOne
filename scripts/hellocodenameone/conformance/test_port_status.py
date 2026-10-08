@@ -509,6 +509,24 @@ class PortStatusTest(unittest.TestCase):
             problems,
         )
 
+    def test_authentication_skip_errata_only_cover_browser_owned_http_flows(self):
+        supplement = port_status.read_json(port_status.SUPPLEMENT)
+        tests = ("BackendAuthTest", "BackendDeviceGrantTest",
+                 "BackendTokenRefreshTest", "BackendTotpTest")
+        reason = "credentials-redirects-and-cookies-belong-to-the-browser"
+        for name in tests:
+            with self.subTest(test=name):
+                self.assertTrue(port_status.skip_is_documented(
+                    supplement, "javascript", name, [reason]))
+                for port in self.manifest["ports"]:
+                    if port["id"] != "javascript":
+                        self.assertFalse(port_status.skip_is_documented(
+                            supplement, port["id"], name, [reason]))
+                self.assertFalse(port_status.skip_is_documented(
+                    supplement, "javascript", name, ["backend-unreachable"]))
+                self.assertFalse(port_status.skip_is_documented(
+                    supplement, "javascript", name, []))
+
     def test_coverage_rejects_a_skip_reason_scoped_to_another_port(self):
         # Matching the test name alone would let any future skip of a named test read as
         # documented. CameraApiTest has errata, but the missing-webcam code is written about
