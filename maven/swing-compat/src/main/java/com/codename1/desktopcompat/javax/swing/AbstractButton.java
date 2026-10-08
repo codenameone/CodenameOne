@@ -30,17 +30,28 @@ import com.codename1.desktopcompat.java.awt.event.ItemEvent;
 import com.codename1.desktopcompat.java.awt.event.ItemListener;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
+import com.codename1.desktopcompat.rt.Align;
 import com.codename1.desktopcompat.rt.Icons;
+import com.codename1.desktopcompat.rt.MiniHtml;
+import com.codename1.desktopcompat.rt.Peer;
+import com.codename1.desktopcompat.rt.Units;
 
 /// The base of the buttons: text, icon, a button model and the action,
 /// item and change listeners.
 ///
 /// The peer is a Codename One button of some kind. A click on it runs
 /// `doClick()`, which drives the model exactly as a mouse click drives it
-/// on the desktop, so listeners see the same events in the same order. The
-/// margin, the mnemonic, the alignment and text position properties and the
-/// rollover, pressed and selected icons are recorded only; components
-/// added to a button are not shown.
+/// on the desktop, so listeners see the same events in the same order.
+///
+/// The pressed, disabled, rollover and selected icons, the alignment, the
+/// text position, the gap between icon and text and the margin are pushed
+/// to the Codename One button, each once the application sets it; until
+/// then the theme decides. Codename One places text on one of the four
+/// sides of the icon, so text centered over the icon is placed after it.
+/// A button that does not paint its border or fill its content area loses
+/// the theme's border and background. HTML text is shown without its
+/// tags, on one line. The mnemonic is recorded only, and components added
+/// to a button are not shown.
 public abstract class AbstractButton extends JComponent implements ItemSelectable, SwingConstants {
 
     protected ButtonModel model;
@@ -60,6 +71,22 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     private boolean focusPainted = true;
     private boolean contentAreaFilled = true;
     private boolean rolloverEnabled;
+    private Icon pressedIcon;
+    private Icon selectedIcon;
+    private Icon disabledIcon;
+    private Icon disabledSelectedIcon;
+    private Icon rolloverIcon;
+    private Icon rolloverSelectedIcon;
+    private int iconTextGap = 4;
+    private boolean iconTextGapSet;
+    private boolean horizontalAlignmentSet;
+    private boolean verticalAlignmentSet;
+    private boolean textPositionSet;
+    private int displayedMnemonicIndex = -1;
+    private boolean hideActionText;
+    private boolean restyled;
+    private final Icon[] iconKeys = new Icon[5];
+    private final com.codename1.ui.Image[] iconImages = new com.codename1.ui.Image[5];
 
     public AbstractButton() {
     }
@@ -88,6 +115,7 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
                         }
                     });
         }
+        restyle();
         sync();
     }
 
@@ -95,9 +123,28 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (p instanceof com.codename1.ui.Button) {
             com.codename1.ui.Button b = (com.codename1.ui.Button) p;
-            b.setText(text == null ? "" : text);
-            b.setIcon(Icons.toNative(icon, this));
+            b.setText(text == null ? "" : MiniHtml.singleLine(text));
             boolean selected = model != null && model.isSelected();
+            b.setIcon(nativeIcon(0, selected && selectedIcon != null ? selectedIcon : icon));
+            b.setPressedIcon(nativeIcon(1, pressedIcon));
+            b.setRolloverIcon(nativeIcon(2, selected && rolloverSelectedIcon != null ? rolloverSelectedIcon
+                    : rolloverIcon));
+            b.setDisabledIcon(nativeIcon(3, selected && disabledSelectedIcon != null ? disabledSelectedIcon
+                    : disabledIcon));
+            // A Codename One toggle shows this one while it is selected.
+            b.setRolloverPressedIcon(nativeIcon(4, selectedIcon));
+            if (horizontalAlignmentSet) {
+                b.getAllStyles().setAlignment(Align.horizontal(horizontalAlignment));
+            }
+            if (verticalAlignmentSet) {
+                b.setVerticalAlignment(Align.vertical(verticalAlignment));
+            }
+            if (textPositionSet) {
+                b.setTextPosition(Align.textPosition(horizontalTextPosition, verticalTextPosition));
+            }
+            if (iconTextGapSet) {
+                b.setGap(Units.toDevice(iconTextGap));
+            }
             if (p instanceof com.codename1.ui.CheckBox) {
                 ((com.codename1.ui.CheckBox) p).setSelected(selected);
             } else if (p instanceof com.codename1.ui.RadioButton) {
@@ -106,7 +153,67 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
         }
     }
 
+    /// The image of an icon, converted once for as long as the icon in
+    /// that slot stays the same.
+    private com.codename1.ui.Image nativeIcon(int slot, Icon i) {
+        if (i == null) {
+            iconKeys[slot] = null;
+            iconImages[slot] = null;
+            return null;
+        }
+        if (iconKeys[slot] != i || iconImages[slot] == null) {
+            iconKeys[slot] = i;
+            iconImages[slot] = Icons.toNative(i, this);
+        }
+        return iconImages[slot];
+    }
+
+    /// Pushes the margin and the border and content area switches to the
+    /// peer's styles, starting from the theme's whenever one was undone.
+    private void restyle() {
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        if (!(p instanceof com.codename1.ui.Button)) {
+            return;
+        }
+        com.codename1.ui.Button b = (com.codename1.ui.Button) p;
+        boolean checkMark = (p instanceof com.codename1.ui.CheckBox || p instanceof com.codename1.ui.RadioButton)
+                && !b.isToggle();
+        boolean noBorder = !borderPainted && !checkMark;
+        boolean noFill = !contentAreaFilled && !checkMark;
+        if (margin == null && !noBorder && !noFill && !restyled) {
+            return;
+        }
+        if (restyled) {
+            b.setUIID(b.getUIID());
+            if (p instanceof Peer) {
+                ((Peer) p).support().applyStyle();
+            }
+        }
+        restyled = margin != null || noBorder || noFill;
+        com.codename1.ui.plaf.Style s = b.getAllStyles();
+        if (margin != null) {
+            byte px = com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS;
+            s.setPaddingUnit(px, px, px, px);
+            s.setPadding(Units.toDevice(margin.top), Units.toDevice(margin.bottom), Units.toDevice(margin.left),
+                    Units.toDevice(margin.right));
+        }
+        com.codename1.ui.plaf.Border border = b.getUnselectedStyle().getBorder();
+        if (noBorder || (noFill && border != null && border.isBackgroundPainter())) {
+            s.setBorder(com.codename1.ui.plaf.Border.createEmpty());
+        }
+        if (noFill) {
+            s.setBgTransparency(0);
+        }
+    }
+
     private void changed() {
+        sync();
+        revalidate();
+        repaint();
+    }
+
+    private void styleChanged() {
+        restyle();
         sync();
         revalidate();
         repaint();
@@ -331,7 +438,12 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     }
 
     public void setMargin(Insets m) {
+        Insets old = margin;
         margin = m == null ? null : new Insets(m.top, m.left, m.bottom, m.right);
+        firePropertyChange("margin", old, margin);
+        if (old == null ? margin != null : !old.equals(margin)) {
+            styleChanged();
+        }
     }
 
     public boolean isBorderPainted() {
@@ -339,7 +451,12 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     }
 
     public void setBorderPainted(boolean b) {
+        boolean old = borderPainted;
         borderPainted = b;
+        firePropertyChange("borderPainted", old, b);
+        if (old != b) {
+            styleChanged();
+        }
     }
 
     public boolean isFocusPainted() {
@@ -355,7 +472,12 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     }
 
     public void setContentAreaFilled(boolean b) {
+        boolean old = contentAreaFilled;
         contentAreaFilled = b;
+        firePropertyChange("contentAreaFilled", old, b);
+        if (old != b) {
+            styleChanged();
+        }
     }
 
     public boolean isRolloverEnabled() {
@@ -371,7 +493,14 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     }
 
     public void setHorizontalAlignment(int alignment) {
+        if (alignment != LEFT && alignment != CENTER && alignment != RIGHT && alignment != LEADING && alignment != TRAILING) {
+            throw new IllegalArgumentException("horizontalAlignment");
+        }
+        int old = horizontalAlignment;
         horizontalAlignment = alignment;
+        horizontalAlignmentSet = true;
+        firePropertyChange("horizontalAlignment", old, alignment);
+        changed();
     }
 
     public int getVerticalAlignment() {
@@ -379,7 +508,14 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     }
 
     public void setVerticalAlignment(int alignment) {
+        if (alignment != TOP && alignment != CENTER && alignment != BOTTOM) {
+            throw new IllegalArgumentException("verticalAlignment");
+        }
+        int old = verticalAlignment;
         verticalAlignment = alignment;
+        verticalAlignmentSet = true;
+        firePropertyChange("verticalAlignment", old, alignment);
+        changed();
     }
 
     public int getHorizontalTextPosition() {
@@ -387,7 +523,14 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     }
 
     public void setHorizontalTextPosition(int textPosition) {
+        if (textPosition != LEFT && textPosition != CENTER && textPosition != RIGHT && textPosition != LEADING && textPosition != TRAILING) {
+            throw new IllegalArgumentException("horizontalTextPosition");
+        }
+        int old = horizontalTextPosition;
         horizontalTextPosition = textPosition;
+        textPositionSet = true;
+        firePropertyChange("horizontalTextPosition", old, textPosition);
+        changed();
     }
 
     public int getVerticalTextPosition() {
@@ -395,7 +538,140 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     }
 
     public void setVerticalTextPosition(int textPosition) {
+        if (textPosition != TOP && textPosition != CENTER && textPosition != BOTTOM) {
+            throw new IllegalArgumentException("verticalTextPosition");
+        }
+        int old = verticalTextPosition;
         verticalTextPosition = textPosition;
+        textPositionSet = true;
+        firePropertyChange("verticalTextPosition", old, textPosition);
+        changed();
+    }
+
+    public Icon getPressedIcon() {
+        return pressedIcon;
+    }
+
+    public void setPressedIcon(Icon pressedIcon) {
+        Icon old = this.pressedIcon;
+        this.pressedIcon = pressedIcon;
+        firePropertyChange("pressedIcon", old, pressedIcon);
+        if (old != pressedIcon) {
+            changed();
+        }
+    }
+
+    public Icon getSelectedIcon() {
+        return selectedIcon;
+    }
+
+    public void setSelectedIcon(Icon selectedIcon) {
+        Icon old = this.selectedIcon;
+        this.selectedIcon = selectedIcon;
+        firePropertyChange("selectedIcon", old, selectedIcon);
+        if (old != selectedIcon) {
+            changed();
+        }
+    }
+
+    public Icon getRolloverIcon() {
+        return rolloverIcon;
+    }
+
+    public void setRolloverIcon(Icon rolloverIcon) {
+        Icon old = this.rolloverIcon;
+        this.rolloverIcon = rolloverIcon;
+        firePropertyChange("rolloverIcon", old, rolloverIcon);
+        setRolloverEnabled(true);
+        if (old != rolloverIcon) {
+            changed();
+        }
+    }
+
+    public Icon getRolloverSelectedIcon() {
+        return rolloverSelectedIcon;
+    }
+
+    public void setRolloverSelectedIcon(Icon rolloverSelectedIcon) {
+        Icon old = this.rolloverSelectedIcon;
+        this.rolloverSelectedIcon = rolloverSelectedIcon;
+        firePropertyChange("rolloverSelectedIcon", old, rolloverSelectedIcon);
+        setRolloverEnabled(true);
+        if (old != rolloverSelectedIcon) {
+            changed();
+        }
+    }
+
+    /// The icon set with `setDisabledIcon`, or `null`: none is made from
+    /// the default icon, the Codename One button dims it.
+    public Icon getDisabledIcon() {
+        return disabledIcon;
+    }
+
+    public void setDisabledIcon(Icon disabledIcon) {
+        Icon old = this.disabledIcon;
+        this.disabledIcon = disabledIcon;
+        firePropertyChange("disabledIcon", old, disabledIcon);
+        if (old != disabledIcon) {
+            changed();
+        }
+    }
+
+    public Icon getDisabledSelectedIcon() {
+        return disabledSelectedIcon;
+    }
+
+    public void setDisabledSelectedIcon(Icon disabledSelectedIcon) {
+        Icon old = this.disabledSelectedIcon;
+        this.disabledSelectedIcon = disabledSelectedIcon;
+        firePropertyChange("disabledSelectedIcon", old, disabledSelectedIcon);
+        if (old != disabledSelectedIcon) {
+            changed();
+        }
+    }
+
+    public int getIconTextGap() {
+        return iconTextGap;
+    }
+
+    public void setIconTextGap(int iconTextGap) {
+        int old = this.iconTextGap;
+        this.iconTextGap = iconTextGap;
+        iconTextGapSet = true;
+        firePropertyChange("iconTextGap", old, iconTextGap);
+        if (old != iconTextGap) {
+            changed();
+        }
+    }
+
+    public int getDisplayedMnemonicIndex() {
+        return displayedMnemonicIndex;
+    }
+
+    /// Recorded only: no character is underlined.
+    public void setDisplayedMnemonicIndex(int index) {
+        int old = displayedMnemonicIndex;
+        if (index == -1) {
+            displayedMnemonicIndex = -1;
+        } else {
+            int length = text == null ? 0 : text.length();
+            if (index < -1 || index >= length) {
+                throw new IllegalArgumentException("index == " + index);
+            }
+            displayedMnemonicIndex = index;
+        }
+        firePropertyChange("displayedMnemonicIndex", old, index);
+    }
+
+    public boolean getHideActionText() {
+        return hideActionText;
+    }
+
+    /// Recorded only: `setAction` takes the action's name either way.
+    public void setHideActionText(boolean hideActionText) {
+        boolean old = this.hideActionText;
+        this.hideActionText = hideActionText;
+        firePropertyChange("hideActionText", old, hideActionText);
     }
 
     @Override

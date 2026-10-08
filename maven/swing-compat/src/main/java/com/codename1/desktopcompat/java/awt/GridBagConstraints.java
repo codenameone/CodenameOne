@@ -122,6 +122,14 @@ public class GridBagConstraints implements Cloneable {
     int minWidth;
     int minHeight;
 
+    // The baseline of the component at the size it was measured with,
+    // from the top of its display area, and what lies below it down to
+    // the bottom of the display area; -1 when it has no baseline or is
+    // not anchored to one.
+    int ascent = -1;
+
+    int descent;
+
     public GridBagConstraints() {
         gridx = RELATIVE;
         gridy = RELATIVE;

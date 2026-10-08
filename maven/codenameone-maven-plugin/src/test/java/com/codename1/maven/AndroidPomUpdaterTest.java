@@ -50,7 +50,7 @@ public class AndroidPomUpdaterTest {
         assertTrue(u.pom.contains("<goal>compile-android-res</goal>"));
         int remap = u.pom.indexOf(AndroidPomUpdater.REMAP_GOAL);
         int compliance = u.pom.indexOf("<goal>bytecode-compliance</goal>");
-        assertTrue(remap > 0 && remap < compliance, "remap-android must precede bytecode-compliance");
+        assertTrue(remap > 0 && remap < compliance, "remap-compat must precede bytecode-compliance");
         assertTrue(u.pom.indexOf("<profile>") >= 0 && u.pom.lastIndexOf("</profiles>") > u.pom.indexOf("<id>android-compat</id>"));
         // Wired once: a second import changes nothing.
         AndroidPomUpdater again = new AndroidPomUpdater(u.pom, false);
@@ -65,6 +65,19 @@ public class AndroidPomUpdaterTest {
         assertFalse(u.changed);
         assertTrue(u.manual.isEmpty(), u.manual.toString());
         assertEquals(current, u.pom);
+    }
+
+    /// A project generated while the goal was called remap-android is wired:
+    /// that goal relocates every layer, and its pom is not edited.
+    @Test
+    public void acceptsTheGoalUnderItsEarlierName() throws Exception {
+        String current = read("../cn1app-archetype/src/main/resources/archetype-resources/common/pom.xml");
+        String earlier = current.replace("<goal>remap-compat</goal>", "<goal>remap-android</goal>");
+        assertTrue(earlier.contains("<goal>remap-android</goal>"));
+        AndroidPomUpdater u = new AndroidPomUpdater(earlier, true);
+        assertFalse(u.changed);
+        assertTrue(u.manual.isEmpty(), u.manual.toString());
+        assertEquals(earlier, u.pom);
     }
 
     @Test

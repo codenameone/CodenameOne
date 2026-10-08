@@ -129,3 +129,22 @@ ASM is distributed under the BSD 3-Clause license:
   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
   THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+GroupLayout
+================================================================================
+
+The class com.codename1.desktopcompat.javax.swing.GroupLayout in
+maven/swing-compat is adapted from Codename One's own port of the group layout,
+CodenameOne/src/com/codename1/ui/layouts/GroupLayout.java, which is derived from
+the GroupLayout Oracle published for the Java platform. The adaptation gives the
+class the javax.swing API -- its method names, its Alignment enumeration and the
+LayoutStyle.ComponentPlacement gap types -- reads minimum and maximum sizes from
+the components, and retargets the layout at the Swing compatibility layer's own
+java.awt component classes. The original copyright and license notice is
+retained in the source file.
+
+The file is distributed under the GNU General Public License version 2 with the
+"Classpath" exception, the license of Codename One itself (see LICENSE):
+
+  Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.

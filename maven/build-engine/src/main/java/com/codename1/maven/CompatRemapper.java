@@ -35,7 +35,8 @@ import java.util.List;
 /// layers it has switched on, and ships their runtimes with it.
 ///
 /// The one entry point a build plugin needs: it works out the active layers
-/// from the compile classpath ([CompatLayers#active]), relocates by all of
+/// from the compile classpath and the compiled classes
+/// ([CompatLayers#active(Iterable, Iterable)]), relocates by all of
 /// their rules in a single pass ([ClassRelocator]) and extracts each runtime
 /// jar, and the shared JDK classes, exactly once. An application with no
 /// layer is left untouched, so the step can run unconditionally.
@@ -55,10 +56,13 @@ public final class CompatRemapper {
     private final List<File> classpath;
     private final File onClickNames;
     private final Log log;
-    private final List<Relocation> active;
-    private final ClassRelocator relocator;
+    /// Worked out on first use, from everything the caller configured by
+    /// then: the handler directories are examined too.
+    private List<Relocation> active;
+    private ClassRelocator relocator;
     private final List<File> handlerDirs = new ArrayList<File>();
     private boolean shipRuntime = true;
+    private File desktopEntry;
 
     /// `classesDir` is the application's output directory, rewritten in
     /// place. `classpath` is its compile classpath, which decides the active
@@ -77,8 +81,6 @@ public final class CompatRemapper {
         }
         this.onClickNames = onClickNames;
         this.log = log;
-        this.active = Collections.unmodifiableList(CompatLayers.active(this.classpath));
-        this.relocator = new ClassRelocator(active);
     }
 
     /// Only relocates the classes, without copying in any runtime or
@@ -102,26 +104,53 @@ public final class CompatRemapper {
         return this;
     }
 
+    /// The record of the desktop application's entry point
+    /// ([DesktopSources#entryRecord]), which the Swing and JavaFX entry point
+    /// generators read; null, or a file that does not exist, for an
+    /// application that has none.
+    public CompatRemapper withDesktopEntryRecord(File record) {
+        this.desktopEntry = record;
+        return this;
+    }
+
+    /// The file given to [#withDesktopEntryRecord], or null.
+    File desktopEntryRecord() {
+        return desktopEntry;
+    }
+
     /// The layers this application has switched on, in the order their rules
-    /// are tried; empty when it has none.
-    public List<Relocation> activeLayers() {
+    /// are tried; empty when it has none. A desktop layer counts only when the
+    /// classes directory, or one of the handler directories, refers to it.
+    public List<Relocation> activeLayers() throws BuildException {
+        if (active == null) {
+            List<File> dirs = new ArrayList<File>();
+            dirs.add(classesDir);
+            dirs.addAll(handlerDirs);
+            try {
+                active = Collections.unmodifiableList(CompatLayers.active(classpath, dirs));
+            } catch (IOException e) {
+                throw new BuildException("Could not read the compiled classes: " + e.getMessage(), e);
+            }
+            relocator = new ClassRelocator(active);
+        }
         return active;
     }
 
     /// Whether `layer` is among the active ones.
-    public boolean isActive(Relocation layer) {
-        return active.contains(layer);
+    public boolean isActive(Relocation layer) throws BuildException {
+        return activeLayers().contains(layer);
     }
 
     /// The relocator composed of every active layer's rules.
-    public ClassRelocator relocator() {
+    public ClassRelocator relocator() throws BuildException {
+        activeLayers();
         return relocator;
     }
 
     /// Relocates and ships. Answers false, having done nothing, when the
     /// application has no compatibility layer.
     public boolean run() throws BuildException {
-        if (active.isEmpty()) {
+        if (activeLayers().isEmpty()) {
             log.debug("No compatibility layer on the classpath; nothing to relocate");
             return false;
         }

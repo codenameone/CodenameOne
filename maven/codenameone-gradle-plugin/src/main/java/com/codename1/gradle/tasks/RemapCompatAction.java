@@ -25,7 +25,8 @@ package com.codename1.gradle.tasks;
 import com.codename1.build.Log;
 import com.codename1.builders.BuildException;
 import com.codename1.gradle.GradleLog;
-import com.codename1.maven.AndroidRemapper;
+import com.codename1.maven.CompatLayers;
+import com.codename1.maven.CompatRemapper;
 import org.gradle.api.Action;
 import org.gradle.api.GradleException;
 import org.gradle.api.Task;
@@ -34,21 +35,28 @@ import org.gradle.api.file.FileCollection;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
-/// Relocates Android code in a compiled class directory onto the
-/// compatibility runtime; see [AndroidRemapper]. Attached to the compile task
-/// before the compliance check, as the Maven build binds `remap-android`
-/// before `bytecode-compliance`.
-public class RemapAndroidAction implements Action<Task> {
+/// Relocates a compiled class directory onto whichever compatibility layers
+/// the application has switched on -- Android, Swing, JavaFX -- and ships
+/// their runtimes; see [CompatRemapper]. Attached to the compile task before
+/// the compliance check, as the Maven build binds `remap-compat` before
+/// `bytecode-compliance`.
+///
+/// For an application with only Android sources it does what the Android
+/// step alone does, file for file; `CompatRemapperTest` holds that.
+public class RemapCompatAction implements Action<Task> {
 
     private final File classesDir;
     private final FileCollection compileClasspath;
     private final File onClickNames;
     private final boolean relocateOnly;
     private final FileCollection handlerDirs;
+    private File desktopEntry;
+    private FileCollection shipWhenEmpty;
 
-    public RemapAndroidAction(File classesDir, FileCollection compileClasspath, File onClickNames,
-                              boolean relocateOnly, FileCollection handlerDirs) {
+    public RemapCompatAction(File classesDir, FileCollection compileClasspath, File onClickNames,
+                             boolean relocateOnly, FileCollection handlerDirs) {
         this.classesDir = classesDir;
         this.compileClasspath = compileClasspath;
         this.onClickNames = onClickNames;
@@ -56,23 +64,36 @@ public class RemapAndroidAction implements Action<Task> {
         this.handlerDirs = handlerDirs;
     }
 
+    /// The record of the desktop application's entry point
+    /// (`src/main/desktop/cn1-desktop.properties`), for the entry point
+    /// generators.
+    public RemapCompatAction withDesktopEntryRecord(File record) {
+        this.desktopEntry = record;
+        return this;
+    }
+
+    /// Makes a relocate-only action a full one when `javaSources` turns out
+    /// to be empty. Kotlin's directory is relocated only, because javac's
+    /// pass ships the runtimes and generates what has to be generated -- but
+    /// `compileJava` does nothing at all for a module with no Java source,
+    /// and then this directory is the only one there is to ship them in.
+    public RemapCompatAction shippingWhenEmpty(FileCollection javaSources) {
+        this.shipWhenEmpty = javaSources;
+        return this;
+    }
+
     @Override
     public void execute(Task task) {
-        File jar = null;
-        for (File f : compileClasspath.getFiles()) {
-            if (f.getName().startsWith(com.codename1.maven.AndroidResourceRunner.COMPAT_ARTIFACT + "-")
-                    && f.getName().endsWith(".jar")) {
-                jar = f;
-            }
-        }
-        if (jar == null || !classesDir.isDirectory()) {
+        Set<File> classpath = compileClasspath.getFiles();
+        // By the jars alone, as the first test: with none there is nothing to
+        // read the classes for.
+        if (CompatLayers.active(classpath).isEmpty() || !classesDir.isDirectory()) {
             return;
         }
         Log log = new GradleLog(task.getLogger());
-        AndroidRemapper r = new AndroidRemapper(classesDir, jar, onClickNames, log);
-        r.withSupportJars(java.util.Collections.singletonList(
-                com.codename1.maven.CompatLayers.jdkJar(compileClasspath.getFiles())));
-        if (relocateOnly) {
+        CompatRemapper r = new CompatRemapper(classesDir, classpath, onClickNames, log)
+                .withDesktopEntryRecord(desktopEntry);
+        if (relocateOnly && !(shipWhenEmpty != null && shipWhenEmpty.isEmpty())) {
             r.relocateOnly();
         } else if (handlerDirs != null) {
             List<File> dirs = new ArrayList<File>(handlerDirs.getFiles());

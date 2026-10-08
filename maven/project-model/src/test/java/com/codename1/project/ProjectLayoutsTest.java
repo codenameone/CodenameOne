@@ -125,6 +125,8 @@ class ProjectLayoutsTest {
         assertEquals(new File(root, "android/src/main/java"), l.nativeSourceDir(NativePlatform.ANDROID));
         assertEquals(new File(root, "ios/src/main/objectivec"), l.nativeSourceDir(NativePlatform.IOS));
         assertEquals(new File(root, "cn1libs"), l.legacyCn1libDir());
+        assertEquals(new File(common, "src/main/android"), l.androidSourceDir());
+        assertEquals(new File(common, "src/main/desktop"), l.desktopSourceDir());
         assertEquals(new File(common, "pom.xml"), l.dependencyFile());
         assertEquals(new File(root, "backend"), l.backendDir());
         assertEquals(new File(common, "target/css/theme.css.merged"), l.cssMergeFile(l.themeCss()));
@@ -389,6 +391,15 @@ class ProjectLayoutsTest {
         assertEquals(new File(root, "lib/impl/css"), l.libraryCssDir());
         assertEquals(new File(root, "css/theme.css.merged"), l.cssMergeFile(l.themeCss()));
         assertEquals(new File(root, "lib"), l.legacyCn1libDir());
+        assertEquals(new File(root, "desktop-src"), l.desktopSourceDir());
+    }
+
+    /// A Gradle application has no common module: the desktop sources sit
+    /// beside the application's own.
+    @Test
+    void gradleDesktopSourcesAreInTheProject() throws IOException {
+        File root = gradleApp().getCanonicalFile();
+        assertEquals(new File(root, "src/main/desktop"), ProjectLayouts.detect(root).desktopSourceDir());
     }
 
     @Test

@@ -22,17 +22,16 @@
  */
 package com.codename1.maven;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /// Wires Android compatibility into an existing application's common
 /// `pom.xml`, the way a new project from the archetype already is: the
-/// runtime dependency, `compile-android-res`, and `remap-android` ahead of
+/// runtime dependency, `compile-android-res`, and the remap goal ahead of
 /// `bytecode-compliance` (which must see the relocated classes).
 ///
 /// The pom is edited as text, at anchors every archetype-generated common pom
-/// has; a pom without them is reported with the snippets to add by hand
-/// rather than guessed at.
+/// has ([PomWiring]); a pom without them is reported with the snippets to add
+/// by hand rather than guessed at.
 final class AndroidPomUpdater {
 
     static final String PROFILE = "        <!-- Android compatibility, added by cn1:import-android-project. -->\n"
@@ -61,64 +60,33 @@ final class AndroidPomUpdater {
             + "                        </goals>\n"
             + "                    </execution>\n";
 
-    static final String REMAP_GOAL = "<goal>remap-android</goal>";
-    private static final String COMPLIANCE_GOAL = "<goal>bytecode-compliance</goal>";
-    private static final String PLUGIN = "<artifactId>codenameone-maven-plugin</artifactId>";
+    /// The goal a pom without one receives; one that binds the goal under its
+    /// earlier name, `remap-android`, is already wired.
+    static final String REMAP_GOAL = PomWiring.REMAP_GOAL;
 
     /// The updated pom, or the same text when it is already wired.
     final String pom;
     /// What could not be added automatically, each with the XML to add.
-    final List<String> manual = new ArrayList<String>();
-    boolean changed;
+    final List<String> manual;
+    final boolean changed;
 
     AndroidPomUpdater(String pom, boolean kotlin) {
-        String p = pom;
-        if (p.indexOf("<artifactId>codenameone-android-compat</artifactId>") < 0) {
-            int profiles = p.lastIndexOf("</profiles>");
-            if (profiles < 0) {
-                manual.add("the codenameone-android-compat dependency (scope provided), e.g. as this profile:\n" + PROFILE);
-            } else {
-                int lineStart = p.lastIndexOf('\n', profiles) + 1;
-                p = p.substring(0, lineStart) + PROFILE + p.substring(lineStart);
-                changed = true;
-            }
+        PomWiring w = new PomWiring(pom);
+        if (!w.has("<artifactId>codenameone-android-compat</artifactId>")) {
+            w.addProfile("the codenameone-android-compat dependency (scope provided), e.g. as this profile:\n"
+                    + PROFILE, PROFILE);
         }
-        if (p.indexOf("<goal>compile-android-res</goal>") < 0) {
-            int plugin = p.indexOf(PLUGIN);
-            // Only this plugin's own executions block: a later plugin's would
-            // otherwise receive a goal it does not have.
-            int pluginEnd = plugin < 0 ? -1 : p.indexOf("</plugin>", plugin);
-            int executions = pluginEnd < 0 ? -1 : p.indexOf("<executions>", plugin);
-            if (executions > pluginEnd) {
-                executions = -1;
-            }
-            if (executions < 0) {
-                manual.add("an execution of compile-android-res in the codenameone-maven-plugin:\n" + EXECUTION);
-            } else {
-                int at = executions + "<executions>".length();
-                p = p.substring(0, at) + "\n" + EXECUTION.substring(0, EXECUTION.length() - 1) + p.substring(at);
-                changed = true;
-            }
-        }
-        if (p.indexOf(REMAP_GOAL) < 0) {
-            int compliance = p.indexOf(COMPLIANCE_GOAL);
-            if (compliance < 0 || p.indexOf(COMPLIANCE_GOAL, compliance + 1) >= 0) {
-                manual.add("the remap-android goal, in the process-classes execution, before bytecode-compliance:\n"
-                        + "    " + REMAP_GOAL + "\n");
-            } else {
-                int lineStart = p.lastIndexOf('\n', compliance) + 1;
-                String indent = p.substring(lineStart, compliance);
-                p = p.substring(0, compliance) + REMAP_GOAL + "\n" + indent + p.substring(compliance);
-                changed = true;
-            }
-        }
-        if (kotlin && p.indexOf("src/main/android/java</sourceDir>") < 0) {
-            manual.add("the Android source directories in the Kotlin profile's compile execution, which must also "
+        w.addExecution("compile-android-res", EXECUTION);
+        w.addRemapGoal();
+        if (kotlin && !w.has("src/main/android/java</sourceDir>")) {
+            w.manual.add("the Android source directories in the Kotlin profile's compile execution, which must also "
                     + "run in the process-resources phase so it precedes javac:\n"
                     + "    <sourceDir>${project.basedir}/src/main/android/kotlin</sourceDir>\n"
                     + "    <sourceDir>${project.basedir}/src/main/android/java</sourceDir>\n"
                     + "    <sourceDir>${project.build.directory}/generated-sources/android</sourceDir>\n");
         }
-        this.pom = p;
+        this.pom = w.pom;
+        this.manual = w.manual;
+        this.changed = w.changed;
     }
 }

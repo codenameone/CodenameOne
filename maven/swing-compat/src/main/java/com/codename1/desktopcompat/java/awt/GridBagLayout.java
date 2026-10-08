@@ -29,9 +29,11 @@ import java.util.Hashtable;
 ///
 /// Every container is laid out left to right, so the relative anchors
 /// resolve as they do in that orientation (`LINE_START` is the west edge).
-/// The baseline anchors are treated as their plain counterparts: `BASELINE`
-/// as `CENTER`, `BASELINE_LEADING` as `LINE_START`, `ABOVE_BASELINE` as
-/// `PAGE_START`, `BELOW_BASELINE` as `PAGE_END` and so on.
+/// The baseline anchors line a row up on the baselines its components
+/// report through `getBaseline`; a component that reports none, or a row
+/// in which nothing does, is centred vertically. A component is asked for
+/// its baseline again at the size it ends up with, as one whose baseline
+/// follows no rule when it is resized.
 public class GridBagLayout implements LayoutManager2 {
 
     protected static final int MAXGRIDSIZE = 512;
@@ -62,6 +64,28 @@ public class GridBagLayout implements LayoutManager2 {
         int[] minHeight;
         double[] weightX;
         double[] weightY;
+        // Whether any component is anchored to its baseline, and per row
+        // the furthest a baseline lies from the top, the most that hangs
+        // below one, and whether the row has a baseline at all.
+        boolean anchored;
+        int[] maxAscent;
+        int[] maxDescent;
+        boolean[] baselineRow;
+    }
+
+    private static boolean onBaseline(int anchor) {
+        return anchor == GridBagConstraints.BASELINE || anchor == GridBagConstraints.BASELINE_LEADING
+                || anchor == GridBagConstraints.BASELINE_TRAILING;
+    }
+
+    private static boolean aboveBaseline(int anchor) {
+        return anchor == GridBagConstraints.ABOVE_BASELINE || anchor == GridBagConstraints.ABOVE_BASELINE_LEADING
+                || anchor == GridBagConstraints.ABOVE_BASELINE_TRAILING;
+    }
+
+    private static boolean belowBaseline(int anchor) {
+        return anchor == GridBagConstraints.BELOW_BASELINE || anchor == GridBagConstraints.BELOW_BASELINE_LEADING
+                || anchor == GridBagConstraints.BELOW_BASELINE_TRAILING;
     }
 
     private Grid lastGrid;
@@ -270,6 +294,17 @@ public class GridBagLayout implements LayoutManager2 {
             Dimension d = sizeflag == PREFERREDSIZE ? comp.getPreferredSize() : comp.getMinimumSize();
             gc.minWidth = d.width;
             gc.minHeight = d.height;
+            gc.ascent = -1;
+            if (onBaseline(gc.anchor)) {
+                // The padding is part of the component when it is asked.
+                int h = d.height + gc.ipady;
+                gc.ascent = comp.getBaseline(d.width + gc.ipadx, h);
+                if (gc.ascent >= 0) {
+                    gc.descent = h - gc.ascent + gc.insets.bottom;
+                    gc.ascent += gc.insets.top;
+                }
+                grid.anchored = true;
+            }
 
             if (gc.gridheight == 0 && gc.gridwidth == 0) {
                 curRow = -1;
@@ -293,6 +328,9 @@ public class GridBagLayout implements LayoutManager2 {
         grid.minHeight = new int[gridH];
         grid.weightX = new double[gridW];
         grid.weightY = new double[gridH];
+        grid.maxAscent = new int[gridH];
+        grid.maxDescent = new int[gridH];
+        grid.baselineRow = new boolean[gridH];
         if (columnWidths != null) {
             System.arraycopy(columnWidths, 0, grid.minWidth, 0, columnWidths.length);
         }
@@ -395,6 +433,26 @@ public class GridBagLayout implements LayoutManager2 {
             if (px > grid.minWidth.length || py > grid.minHeight.length) {
                 grow(grid, Math.max(px, grid.minWidth.length), Math.max(py, grid.minHeight.length));
             }
+            if (grid.anchored) {
+                Insets in = gc.insets;
+                if (onBaseline(gc.anchor)) {
+                    if (gc.ascent >= 0) {
+                        grid.maxAscent[cy] = Math.max(grid.maxAscent[cy], gc.ascent);
+                        if (ch == 1) {
+                            grid.maxDescent[cy] = Math.max(grid.maxDescent[cy], gc.descent);
+                        }
+                        grid.baselineRow[cy] = true;
+                    }
+                } else if (aboveBaseline(gc.anchor)) {
+                    // Its bottom edge sits on the baseline.
+                    grid.maxAscent[cy] = Math.max(grid.maxAscent[cy], gc.minHeight + in.top + gc.ipady);
+                    grid.maxDescent[cy] = Math.max(grid.maxDescent[cy], in.bottom);
+                } else if (belowBaseline(gc.anchor)) {
+                    // Its top edge sits on the baseline.
+                    grid.maxDescent[cy] = Math.max(grid.maxDescent[cy], gc.minHeight + in.bottom + gc.ipady);
+                    grid.maxAscent[cy] = Math.max(grid.maxAscent[cy], in.top);
+                }
+            }
             if (cw > longest) {
                 longest = cw;
             }
@@ -418,8 +476,23 @@ public class GridBagLayout implements LayoutManager2 {
                             gc.minWidth + gc.ipadx + in.left + in.right);
                 }
                 if (gc.tempHeight == span) {
-                    share(grid.minHeight, grid.weightY, gc.tempY, gc.tempY + span, gc.weighty,
-                            gc.minHeight + gc.ipady + in.top + in.bottom);
+                    int want = -1;
+                    if (grid.anchored) {
+                        if (onBaseline(gc.anchor)) {
+                            if (gc.ascent >= 0) {
+                                want = grid.maxAscent[gc.tempY]
+                                        + (span == 1 ? grid.maxDescent[gc.tempY] : gc.descent);
+                            }
+                        } else if (aboveBaseline(gc.anchor)) {
+                            want = in.top + gc.minHeight + gc.ipady + grid.maxDescent[gc.tempY];
+                        } else if (belowBaseline(gc.anchor)) {
+                            want = grid.maxAscent[gc.tempY] + gc.minHeight + in.bottom + gc.ipady;
+                        }
+                    }
+                    if (want == -1) {
+                        want = gc.minHeight + gc.ipady + in.top + in.bottom;
+                    }
+                    share(grid.minHeight, grid.weightY, gc.tempY, gc.tempY + span, gc.weighty, want);
                 }
             }
         }
@@ -433,6 +506,15 @@ public class GridBagLayout implements LayoutManager2 {
         int[] mh = new int[h];
         double[] wx = new double[w];
         double[] wy = new double[h];
+        int[] ma = new int[h];
+        int[] md = new int[h];
+        boolean[] br = new boolean[h];
+        System.arraycopy(grid.maxAscent, 0, ma, 0, grid.maxAscent.length);
+        System.arraycopy(grid.maxDescent, 0, md, 0, grid.maxDescent.length);
+        System.arraycopy(grid.baselineRow, 0, br, 0, grid.baselineRow.length);
+        grid.maxAscent = ma;
+        grid.maxDescent = md;
+        grid.baselineRow = br;
         System.arraycopy(grid.minWidth, 0, mw, 0, grid.minWidth.length);
         System.arraycopy(grid.minHeight, 0, mh, 0, grid.minHeight.length);
         System.arraycopy(grid.weightX, 0, wx, 0, grid.weightX.length);
@@ -572,7 +654,7 @@ public class GridBagLayout implements LayoutManager2 {
             for (int i = gc.tempY; i < gc.tempY + gc.tempHeight; i++) {
                 r.height += grid.minHeight[i];
             }
-            settle(gc, r);
+            settle(grid, comp, gc, r);
             if (r.x < 0) {
                 r.width += r.x;
                 r.x = 0;
@@ -590,10 +672,24 @@ public class GridBagLayout implements LayoutManager2 {
         }
     }
 
+    /// The baseline of a component at a size, from the top of its display
+    /// area, or -1. A cell squeezed to less than nothing leaves a size no
+    /// component can be asked about (the JDK's throw for it), so there the
+    /// baseline it was measured with stands in.
+    private static int baselineAt(Component comp, GridBagConstraints gc, int width, int height) {
+        if (width < 0 || height < 0) {
+            return gc.ascent;
+        }
+        int ascent = comp.getBaseline(width, height);
+        return ascent < 0 ? ascent : ascent + gc.insets.top;
+    }
+
     /// Shrinks a display area to the component's bounds: insets off, then
     /// the component's own size unless it fills, then the anchor.
-    private static void settle(GridBagConstraints gc, Rectangle r) {
+    private static void settle(Grid grid, Component comp, GridBagConstraints gc, Rectangle r) {
         Insets in = gc.insets;
+        int cellY = r.y;
+        int cellHeight = r.height;
         r.x += in.left;
         r.width -= in.left + in.right;
         r.y += in.top;
@@ -612,62 +708,90 @@ public class GridBagLayout implements LayoutManager2 {
             r.height = ownH;
         }
 
-        // 0 = start, 1 = middle, 2 = end, on each axis.
+        // 0 = start, 1 = middle, 2 = end, on each axis; 3 to 5 are on,
+        // above and below the baseline of the row.
         int h;
         int v;
         switch (gc.anchor) {
             case GridBagConstraints.NORTH:
             case GridBagConstraints.PAGE_START:
-            case GridBagConstraints.ABOVE_BASELINE:
                 h = 1;
                 v = 0;
                 break;
             case GridBagConstraints.NORTHEAST:
             case GridBagConstraints.FIRST_LINE_END:
-            case GridBagConstraints.ABOVE_BASELINE_TRAILING:
                 h = 2;
                 v = 0;
                 break;
             case GridBagConstraints.EAST:
             case GridBagConstraints.LINE_END:
-            case GridBagConstraints.BASELINE_TRAILING:
                 h = 2;
                 v = 1;
                 break;
             case GridBagConstraints.SOUTHEAST:
             case GridBagConstraints.LAST_LINE_END:
-            case GridBagConstraints.BELOW_BASELINE_TRAILING:
                 h = 2;
                 v = 2;
                 break;
             case GridBagConstraints.SOUTH:
             case GridBagConstraints.PAGE_END:
-            case GridBagConstraints.BELOW_BASELINE:
                 h = 1;
                 v = 2;
                 break;
             case GridBagConstraints.SOUTHWEST:
             case GridBagConstraints.LAST_LINE_START:
-            case GridBagConstraints.BELOW_BASELINE_LEADING:
                 h = 0;
                 v = 2;
                 break;
             case GridBagConstraints.WEST:
             case GridBagConstraints.LINE_START:
-            case GridBagConstraints.BASELINE_LEADING:
                 h = 0;
                 v = 1;
                 break;
             case GridBagConstraints.NORTHWEST:
             case GridBagConstraints.FIRST_LINE_START:
-            case GridBagConstraints.ABOVE_BASELINE_LEADING:
                 h = 0;
                 v = 0;
                 break;
             case GridBagConstraints.CENTER:
-            case GridBagConstraints.BASELINE:
                 h = 1;
                 v = 1;
+                break;
+            case GridBagConstraints.BASELINE:
+                h = 1;
+                v = 3;
+                break;
+            case GridBagConstraints.BASELINE_LEADING:
+                h = 0;
+                v = 3;
+                break;
+            case GridBagConstraints.BASELINE_TRAILING:
+                h = 2;
+                v = 3;
+                break;
+            case GridBagConstraints.ABOVE_BASELINE:
+                h = 1;
+                v = 4;
+                break;
+            case GridBagConstraints.ABOVE_BASELINE_LEADING:
+                h = 0;
+                v = 4;
+                break;
+            case GridBagConstraints.ABOVE_BASELINE_TRAILING:
+                h = 2;
+                v = 4;
+                break;
+            case GridBagConstraints.BELOW_BASELINE:
+                h = 1;
+                v = 5;
+                break;
+            case GridBagConstraints.BELOW_BASELINE_LEADING:
+                h = 0;
+                v = 5;
+                break;
+            case GridBagConstraints.BELOW_BASELINE_TRAILING:
+                h = 2;
+                v = 5;
                 break;
             default:
                 throw new IllegalArgumentException("illegal anchor value");
@@ -677,10 +801,56 @@ public class GridBagLayout implements LayoutManager2 {
         } else if (h == 2) {
             r.x += freeX;
         }
+        boolean tall = gc.fill == GridBagConstraints.VERTICAL || gc.fill == GridBagConstraints.BOTH;
+        boolean rowHasBaseline = grid.anchored && grid.baselineRow[gc.tempY];
         if (v == 1) {
             r.y += freeY / 2;
         } else if (v == 2) {
             r.y += freeY;
+        } else if (v == 3 && gc.ascent >= 0) {
+            // The baseline moves with the size in no known way, so the
+            // component is asked again at the size it is about to get.
+            int baseline = grid.maxAscent[gc.tempY];
+            boolean fits = false;
+            int ascent = baselineAt(comp, gc, r.width, r.height);
+            if (ascent >= 0 && ascent <= baseline) {
+                if (baseline + (r.height - ascent - in.top) <= cellHeight - in.bottom) {
+                    fits = true;
+                } else if (tall) {
+                    // It would hang out of the cell; try the height that
+                    // just reaches the bottom of it.
+                    int height = cellHeight - in.bottom - baseline + ascent;
+                    int ascent2 = baselineAt(comp, gc, r.width, height);
+                    if (ascent2 >= 0 && ascent2 <= ascent) {
+                        r.height = height;
+                        ascent = ascent2;
+                        fits = true;
+                    }
+                }
+            }
+            if (!fits) {
+                ascent = gc.ascent;
+                r.width = gc.minWidth;
+                r.height = gc.minHeight;
+            }
+            r.y = cellY + baseline - ascent + in.top;
+        } else if (v == 4 && rowHasBaseline) {
+            int bottom = cellY + grid.maxAscent[gc.tempY];
+            if (tall) {
+                r.y = cellY + in.top;
+                r.height = bottom - r.y;
+            } else {
+                r.height = gc.minHeight + gc.ipady;
+                r.y = bottom - r.height;
+            }
+        } else if (v == 5 && rowHasBaseline) {
+            r.y = cellY + grid.maxAscent[gc.tempY];
+            if (tall) {
+                r.height = cellY + cellHeight - r.y - in.bottom;
+            }
+        } else if (v >= 3 && !tall) {
+            // Anchored to a baseline that is not there.
+            r.y += Math.max(0, (cellHeight - in.top - in.bottom - gc.minHeight - gc.ipady) / 2);
         }
     }
 }

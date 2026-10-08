@@ -22,48 +22,15 @@
  */
 package com.codename1.maven;
 
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
-import java.io.File;
-
-/// Relocates the compiled Android code onto the compatibility runtime and
-/// ships the runtime with the application; see [AndroidRemapper]. Must run in
-/// `process-classes` before `bytecode-compliance`, which then checks the
-/// relocated runtime along with the application. A no-op for a project that
-/// does not depend on `codenameone-android-compat`.
+/// The name `remap-compat` had when Android was the only compatibility layer.
+/// It is the same goal: the poms of existing projects bind `remap-android`,
+/// and through it they relocate every layer the project switches on, without
+/// being edited. See [RemapCompatMojo].
 @Mojo(name = "remap-android", defaultPhase = LifecyclePhase.PROCESS_CLASSES,
         requiresDependencyResolution = ResolutionScope.COMPILE)
-public class RemapAndroidMojo extends AbstractCN1Mojo {
-
-    @Override
-    protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        File jar = CompileAndroidResMojo.compatJar(project.getArtifacts());
-        if (jar == null) {
-            return;
-        }
-        File classes = new File(project.getBuild().getOutputDirectory());
-        if (!classes.isDirectory()) {
-            return;
-        }
-        // Freshly compiled Kotlin (incremental compilation keeps its own
-        // output tree) must be in place before it is relocated.
-        copyKotlinIncrementalCompileOutputToOutputDir();
-        File onClick = AndroidResourceRunner.onClickNamesFile(new File(project.getBuild().getDirectory()));
-        try {
-            java.util.List<File> classpath = new java.util.ArrayList<File>();
-            for (org.apache.maven.artifact.Artifact artifact : project.getArtifacts()) {
-                if (artifact.getFile() != null) {
-                    classpath.add(artifact.getFile());
-                }
-            }
-            new AndroidRemapper(classes, jar, onClick, MavenLog.of(getLog()))
-                    .withSupportJars(java.util.Collections.singletonList(CompatLayers.jdkJar(classpath))).run();
-        } catch (com.codename1.builders.BuildException ex) {
-            throw new MojoFailureException(ex.getMessage(), ex);
-        }
-    }
+public class RemapAndroidMojo extends RemapCompatMojo {
 }

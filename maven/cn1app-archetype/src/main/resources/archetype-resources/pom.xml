@@ -66,6 +66,18 @@
                 <version>${cn1.version}</version>
                 <scope>provided</scope>
             </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-swing-compat</artifactId>
+                <version>${cn1.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-javafx-compat</artifactId>
+                <version>${cn1.version}</version>
+                <scope>provided</scope>
+            </dependency>
             <!--
               Optional desktop media binaries. BrowserComponent receives JCEF
               Maven transitively from codenameone-javase and downloads the native

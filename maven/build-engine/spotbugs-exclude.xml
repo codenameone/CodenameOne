@@ -291,4 +291,13 @@
         <Class name="com.codename1.maven.AndroidProjectImporter$Result" />
         <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
     </Match>
+    <!--
+    DesktopProjectImporter.Result, likewise: the Maven goal reports the
+    copied file count, the entry point and its kind, and whether the project
+    has Kotlin, and it lives in another module this analysis cannot see.
+    -->
+    <Match>
+        <Class name="com.codename1.maven.DesktopProjectImporter$Result" />
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
 </FindBugsFilter>

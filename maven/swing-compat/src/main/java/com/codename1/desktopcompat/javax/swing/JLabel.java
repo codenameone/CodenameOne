@@ -22,16 +22,36 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.java.awt.AWTEvent;
+import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Component;
+import com.codename1.desktopcompat.java.awt.Dimension;
+import com.codename1.desktopcompat.java.awt.Font;
+import com.codename1.desktopcompat.java.awt.Graphics;
+import com.codename1.desktopcompat.java.awt.Insets;
+import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.rt.Align;
+import com.codename1.desktopcompat.rt.Fonts;
 import com.codename1.desktopcompat.rt.Icons;
 import com.codename1.desktopcompat.rt.LabelPeer;
+import com.codename1.desktopcompat.rt.MiniHtml;
+import com.codename1.desktopcompat.rt.Units;
 
 /// A line of text, an icon, or both, shown by a Codename One label.
 ///
-/// The horizontal alignment is honoured; the vertical alignment and the
-/// text position relative to the icon are recorded and the label keeps
-/// Codename One's arrangement (icon before the text, centered vertically).
-/// HTML text is shown as it is written.
+/// The alignments and the text position relative to the icon are
+/// honoured, with one limit: Codename One places text on one of the four
+/// sides of the icon, so text centered over the icon is placed after it.
+/// A disabled label shows its disabled icon if it was given one.
+///
+/// A text that starts with `<html>` is drawn by the label itself from
+/// what [com.codename1.desktopcompat.rt.MiniHtml] makes of it: bold,
+/// italic, underline, colors, sizes, line breaks, paragraphs and
+/// centering. Its preferred size is that of its unwrapped lines; in a
+/// narrower label the lines wrap at spaces.
+///
+/// The displayed mnemonic is recorded only. A click on a label focuses
+/// the component it was made the label for.
 public class JLabel extends JComponent implements SwingConstants {
 
     private String text;
@@ -43,6 +63,9 @@ public class JLabel extends JComponent implements SwingConstants {
     private int verticalTextPosition = CENTER;
     private int iconTextGap = 4;
     private Component labelFor;
+    private int mnemonic;
+    private int mnemonicIndex = -1;
+    private MiniHtml.Document html;
 
     public JLabel(String text, Icon icon, int horizontalAlignment) {
         this.text = text;
@@ -86,11 +109,167 @@ public class JLabel extends JComponent implements SwingConstants {
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (p instanceof com.codename1.ui.Label) {
             com.codename1.ui.Label l = (com.codename1.ui.Label) p;
-            l.setText(text == null ? "" : text);
-            l.setIcon(Icons.toNative(icon, this));
+            boolean isHtml = MiniHtml.isHtml(text);
+            l.setText(text == null || isHtml ? "" : text);
+            l.setIcon(isHtml ? null : Icons.toNative(shownIcon(), this));
             l.setAlignment(nativeAlignment(horizontalAlignment));
-            l.setGap(com.codename1.desktopcompat.rt.Units.toDevice(iconTextGap));
+            l.setVerticalAlignment(Align.vertical(verticalAlignment));
+            l.setTextPosition(Align.textPosition(horizontalTextPosition, verticalTextPosition));
+            l.setGap(Units.toDevice(iconTextGap));
         }
+    }
+
+    private Icon shownIcon() {
+        return !isEnabled() && disabledIcon != null ? disabledIcon : icon;
+    }
+
+    // ------------------------------------------------------------ html
+
+    private MiniHtml.Document document() {
+        if (html == null) {
+            html = MiniHtml.parse(text);
+        }
+        return html;
+    }
+
+    private Font htmlFont() {
+        Font f = getFont();
+        return f != null ? f : Fonts.defaultFont();
+    }
+
+    /// The space around the content of an HTML label: the border's, and
+    /// the padding the theme gives a label, so that it lines up with the
+    /// labels Codename One draws.
+    private Insets htmlInsets() {
+        Insets in = getInsets();
+        Insets out = new Insets(in.top, in.left, in.bottom, in.right);
+        if (com.codename1.ui.Display.isInitialized()) {
+            com.codename1.ui.plaf.Style st = cn1Peer().getStyle();
+            out.top += Units.toLogicalCeil(st.getPaddingTop());
+            out.bottom += Units.toLogicalCeil(st.getPaddingBottom());
+            out.left += Units.toLogicalCeil(st.getPaddingLeftNoRTL());
+            out.right += Units.toLogicalCeil(st.getPaddingRightNoRTL());
+        }
+        return out;
+    }
+
+    private boolean iconBeside() {
+        return horizontalTextPosition != CENTER || verticalTextPosition == CENTER;
+    }
+
+    /// The size of the icon and the text together, given the text's.
+    private Dimension htmlContent(Dimension textSize) {
+        Icon ic = shownIcon();
+        if (ic == null) {
+            return textSize;
+        }
+        if (iconBeside()) {
+            return new Dimension(ic.getIconWidth() + iconTextGap + textSize.width,
+                    Math.max(ic.getIconHeight(), textSize.height));
+        }
+        return new Dimension(Math.max(ic.getIconWidth(), textSize.width),
+                ic.getIconHeight() + iconTextGap + textSize.height);
+    }
+
+    @Override
+    protected Dimension cn1NativePreferredSize() {
+        if (!MiniHtml.isHtml(text)) {
+            return super.cn1NativePreferredSize();
+        }
+        Dimension d = htmlContent(MiniHtml.preferredSize(document(), htmlFont()));
+        Insets in = htmlInsets();
+        return new Dimension(d.width + in.left + in.right, d.height + in.top + in.bottom);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        if (!MiniHtml.isHtml(text)) {
+            super.paintComponent(g);
+            return;
+        }
+        if (isOpaque()) {
+            Color bg = getBackground();
+            if (bg != null) {
+                g.setColor(bg);
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        }
+        Insets in = htmlInsets();
+        int availW = Math.max(0, getWidth() - in.left - in.right);
+        int availH = Math.max(0, getHeight() - in.top - in.bottom);
+        Font f = htmlFont();
+        Icon ic = shownIcon();
+        boolean beside = iconBeside();
+        int textAvail = ic != null && beside ? Math.max(1, availW - ic.getIconWidth() - iconTextGap) : availW;
+        MiniHtml.Document doc = MiniHtml.wrap(document(), f, textAvail);
+        Dimension textSize = MiniHtml.preferredSize(doc, f);
+        Dimension content = htmlContent(textSize);
+        int x = in.left;
+        int nativeAlign = nativeAlignment(horizontalAlignment);
+        if (nativeAlign == com.codename1.ui.Component.CENTER) {
+            x += (availW - content.width) / 2;
+        } else if (nativeAlign == com.codename1.ui.Component.RIGHT) {
+            x += availW - content.width;
+        }
+        int y = in.top;
+        if (verticalAlignment == CENTER) {
+            y += (availH - content.height) / 2;
+        } else if (verticalAlignment == BOTTOM) {
+            y += availH - content.height;
+        }
+        int textX = x;
+        int textY = y;
+        if (ic != null) {
+            int iconX = x;
+            int iconY = y;
+            if (beside) {
+                boolean textFirst = horizontalTextPosition == LEFT || horizontalTextPosition == LEADING;
+                if (textFirst) {
+                    iconX = x + textSize.width + iconTextGap;
+                } else {
+                    textX = x + ic.getIconWidth() + iconTextGap;
+                }
+                iconY = y + (content.height - ic.getIconHeight()) / 2;
+                textY = y + (content.height - textSize.height) / 2;
+            } else {
+                iconX = x + (content.width - ic.getIconWidth()) / 2;
+                textX = x + (content.width - textSize.width) / 2;
+                if (verticalTextPosition == TOP) {
+                    iconY = y + textSize.height + iconTextGap;
+                } else {
+                    textY = y + ic.getIconHeight() + iconTextGap;
+                }
+            }
+            ic.paintIcon(this, g, iconX, iconY);
+        }
+        g.setFont(f);
+        Color fg = getForeground();
+        if (!isEnabled()) {
+            fg = Color.GRAY;
+        }
+        if (fg != null) {
+            g.setColor(fg);
+        }
+        int lineAlign = nativeAlign == com.codename1.ui.Component.CENTER ? MiniHtml.ALIGN_CENTER
+                : nativeAlign == com.codename1.ui.Component.RIGHT ? MiniHtml.ALIGN_RIGHT : MiniHtml.ALIGN_LEFT;
+        MiniHtml.paint(g, doc, textX, textY, textSize.width, lineAlign);
+    }
+
+    @Override
+    public void setEnabled(boolean b) {
+        boolean old = isEnabled();
+        super.setEnabled(b);
+        if (old != b && disabledIcon != null) {
+            sync();
+        }
+    }
+
+    @Override
+    protected void processMouseEvent(MouseEvent e) {
+        if (e.getID() == MouseEvent.MOUSE_CLICKED && labelFor != null) {
+            labelFor.requestFocus();
+        }
+        super.processMouseEvent(e);
     }
 
     static int nativeAlignment(int alignment) {
@@ -118,7 +297,9 @@ public class JLabel extends JComponent implements SwingConstants {
     public void setText(String text) {
         String old = this.text;
         this.text = text;
+        html = null;
         firePropertyChange("text", old, text);
+        setDisplayedMnemonicIndex(findMnemonic(text, mnemonic));
         if (old == null ? text != null : !old.equals(text)) {
             changed();
         }
@@ -141,9 +322,14 @@ public class JLabel extends JComponent implements SwingConstants {
         return disabledIcon;
     }
 
-    /// Recorded only.
+    /// Shown in place of the icon while the label is disabled.
     public void setDisabledIcon(Icon disabledIcon) {
+        Icon old = this.disabledIcon;
         this.disabledIcon = disabledIcon;
+        firePropertyChange("disabledIcon", old, disabledIcon);
+        if (old != disabledIcon && !isEnabled()) {
+            changed();
+        }
     }
 
     public int getHorizontalAlignment() {
@@ -172,7 +358,13 @@ public class JLabel extends JComponent implements SwingConstants {
         if (alignment != TOP && alignment != CENTER && alignment != BOTTOM) {
             throw new IllegalArgumentException("verticalAlignment");
         }
-        verticalAlignment = alignment;
+        if (alignment != verticalAlignment) {
+            int old = verticalAlignment;
+            verticalAlignment = alignment;
+            firePropertyChange("verticalAlignment", old, alignment);
+            sync();
+            repaint();
+        }
     }
 
     public int getHorizontalTextPosition() {
@@ -180,7 +372,16 @@ public class JLabel extends JComponent implements SwingConstants {
     }
 
     public void setHorizontalTextPosition(int textPosition) {
+        if (textPosition != LEFT && textPosition != CENTER && textPosition != RIGHT && textPosition != LEADING
+                && textPosition != TRAILING) {
+            throw new IllegalArgumentException("horizontalTextPosition");
+        }
+        int old = horizontalTextPosition;
         horizontalTextPosition = textPosition;
+        firePropertyChange("horizontalTextPosition", old, textPosition);
+        if (old != textPosition) {
+            changed();
+        }
     }
 
     public int getVerticalTextPosition() {
@@ -188,7 +389,15 @@ public class JLabel extends JComponent implements SwingConstants {
     }
 
     public void setVerticalTextPosition(int textPosition) {
+        if (textPosition != TOP && textPosition != CENTER && textPosition != BOTTOM) {
+            throw new IllegalArgumentException("verticalTextPosition");
+        }
+        int old = verticalTextPosition;
         verticalTextPosition = textPosition;
+        firePropertyChange("verticalTextPosition", old, textPosition);
+        if (old != textPosition) {
+            changed();
+        }
     }
 
     public int getIconTextGap() {
@@ -206,8 +415,73 @@ public class JLabel extends JComponent implements SwingConstants {
         return labelFor;
     }
 
+    /// Remembers the component this label names; a click on the label
+    /// then moves the focus to it.
     public void setLabelFor(Component c) {
+        Component old = labelFor;
         labelFor = c;
+        if (c != null) {
+            enableEvents(AWTEvent.MOUSE_EVENT_MASK);
+        } else {
+            disableEvents(AWTEvent.MOUSE_EVENT_MASK);
+        }
+        firePropertyChange("labelFor", old, c);
+    }
+
+    public int getDisplayedMnemonic() {
+        return mnemonic;
+    }
+
+    /// Recorded only: no character is underlined and no key is bound.
+    public void setDisplayedMnemonic(int key) {
+        int old = mnemonic;
+        mnemonic = key;
+        firePropertyChange("displayedMnemonic", old, key);
+        setDisplayedMnemonicIndex(findMnemonic(text, key));
+    }
+
+    /// The first place the mnemonic's letter stands in the text, in either
+    /// case, or -1.
+    private static int findMnemonic(String text, int key) {
+        if (text == null || key <= 0 || key > 0xffff) {
+            return -1;
+        }
+        int upper = key >= 'a' && key <= 'z' ? key - ('a' - 'A') : key;
+        int lower = key >= 'A' && key <= 'Z' ? key + ('a' - 'A') : key;
+        int u = text.indexOf((char) upper);
+        int l = text.indexOf((char) lower);
+        if (u < 0) {
+            return l;
+        }
+        if (l < 0) {
+            return u;
+        }
+        return Math.min(u, l);
+    }
+
+    public void setDisplayedMnemonic(char aChar) {
+        int vk = aChar;
+        if (vk >= 'a' && vk <= 'z') {
+            vk -= 'a' - 'A';
+        }
+        setDisplayedMnemonic(vk);
+    }
+
+    public int getDisplayedMnemonicIndex() {
+        return mnemonicIndex;
+    }
+
+    /// Recorded only.
+    public void setDisplayedMnemonicIndex(int index) {
+        int old = mnemonicIndex;
+        if (index != -1) {
+            int length = text == null ? 0 : text.length();
+            if (index < -1 || index >= length) {
+                throw new IllegalArgumentException("index == " + index);
+            }
+        }
+        mnemonicIndex = index;
+        firePropertyChange("displayedMnemonicIndex", old, index);
     }
 
     @Override

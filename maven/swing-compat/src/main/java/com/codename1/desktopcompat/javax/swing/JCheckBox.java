@@ -58,6 +58,8 @@ public class JCheckBox extends JToggleButton {
 
     public JCheckBox(String text, Icon icon, boolean selected) {
         super(text, icon, selected);
+        setBorderPainted(false);
+        setHorizontalAlignment(LEADING);
     }
 
     @Override
