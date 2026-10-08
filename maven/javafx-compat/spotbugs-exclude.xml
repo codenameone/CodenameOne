@@ -2,4 +2,119 @@
 <!-- Intentional SpotBugs exceptions for this module. The report is a
      zero-findings gate, so every entry is scoped and explained. -->
 <FindBugsFilter>
+    <!--
+        Observable values and collections are shared by reference; that is the
+        API. A property keeps the very observable it is bound to, a list
+        property holds the list it was given, a change report names the
+        collection that changed, a transformation list answers getSource()
+        with its source, and a read-only wrapper hands out the one view it
+        keeps. Copying any of them would break the binding.
+    -->
+    <Match>
+        <Or>
+            <Class name="~javafx\.beans\.property\.[A-Za-z]+PropertyBase"/>
+            <Class name="~javafx\.beans\.property\.ReadOnly[A-Za-z]+Wrapper"/>
+            <Class name="~javafx\.collections\.(List|Map|Set)ChangeListener\$Change"/>
+            <Class name="~javafx\.collections\.transformation\.(TransformationList|FilteredList|SortedList)"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!--
+        The wrappers FXCollections hands out exist to wrap the collection they
+        are given (observableList(list) writes through by contract), the
+        unmodifiable views watch their source, and the change builder reports
+        on the list that owns it. The map wrapper returns its cached entry
+        view the way java.util maps do.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.fxcompat.runtime.ArrayObservableList"/>
+            <Class name="com.codename1.fxcompat.runtime.ConstantObservableList"/>
+            <Class name="com.codename1.fxcompat.runtime.ListChangeBuilder"/>
+            <Class name="com.codename1.fxcompat.runtime.ObservableMapWrapper"/>
+            <Class name="com.codename1.fxcompat.runtime.ObservableSetWrapper"/>
+            <Class name="~com\.codename1\.fxcompat\.runtime\.UnmodifiableViews\$Of(List|Map|Set)"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!--
+        The listener lists are copy on write: a list is never modified after
+        it was stored, which is what lets a listener add or remove listeners
+        while it is being notified. Handing the current list to the code that
+        fires is therefore safe, and copying it would allocate on every event.
+    -->
+    <Match>
+        <Class name="com.codename1.fxcompat.runtime.ListenerSet"/>
+        <Method name="changeListeners"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!--
+        A listener set has only static operations because the set is created
+        on the first listener and dropped (null) with the last one, so an
+        observable nobody listens to carries no object. It still holds state,
+        the two lists, so instantiating it is intended.
+    -->
+    <Match>
+        <Class name="com.codename1.fxcompat.runtime.ListenerSet"/>
+        <Or>
+            <Method name="addInvalidation"/>
+            <Method name="addChange"/>
+        </Or>
+        <Bug pattern="ISC_INSTANTIATE_STATIC_CLASS"/>
+    </Match>
+
+    <!--
+        The bound observable is null until bind() is called, by design, and
+        boundValue() is only reached behind an observable != null check in
+        get() and unbind().
+    -->
+    <Match>
+        <Class name="~javafx\.beans\.property\.(Boolean|Integer|Long|Float|Double|String|Object)PropertyBase"/>
+        <Method name="boundValue"/>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!--
+        set() skips the notification when the new value is the same number, as
+        JavaFX does. Exact comparison is the point: a tolerance would swallow
+        real changes, and NaN deliberately counts as a change every time.
+    -->
+    <Match>
+        <Or>
+            <Class name="javafx.beans.property.DoublePropertyBase"/>
+            <Class name="javafx.beans.property.FloatPropertyBase"/>
+        </Or>
+        <Method name="set"/>
+        <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+    </Match>
+
+    <!--
+        StringConverter<Boolean>.fromString answers null for empty text in
+        JavaFX; the boxed return type and its null are the API contract.
+    -->
+    <Match>
+        <Class name="javafx.util.converter.BooleanStringConverter"/>
+        <Method name="fromString"/>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+
+    <!--
+        Event.target is transient in JavaFX and a deserialized event has no
+        target there either. Nothing on a device serializes events; the class
+        is Serializable only because java.util.EventObject is.
+    -->
+    <Match>
+        <Class name="javafx.event.Event"/>
+        <Field name="target"/>
+        <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+    </Match>
 </FindBugsFilter>
