@@ -33,13 +33,30 @@ package com.codename1.compat.jdk;
 /// The placeholder registers nothing, which is the right answer wherever no
 /// build step ran: the tests of this module, and a compatibility layer's own
 /// tests. [Resources] then reads a resource under the path it was asked for.
-public final class CompatRegistry {
+///
+/// It has the SHAPE of the generated class -- the same constructor and the
+/// same two methods -- because the build's compliance check reads a class's
+/// members from this artifact's jar, and so checks the generated class's
+/// references to itself against what is declared here. What the generated
+/// class needs beyond these members it puts in classes of its own
+/// (`CompatRegistry$Part0`, ...), which only the application has.
+public final class CompatRegistry implements ResourceBundle.Cn1Factory {
 
-    private CompatRegistry() {
+    /// The generated class passes an instance of itself to
+    /// [ResourceBundle#cn1RegisterBundleClass(String, ResourceBundle.Cn1Factory, int)].
+    public CompatRegistry() {
+        // Nothing to set up: the class has no state.
     }
 
     /// Called once, by [CompatBoot#cn1Init()].
     public static void cn1Install() {
         // Deliberately empty: see the class description.
+    }
+
+    /// Creates the bundle class registered under `id`. The placeholder
+    /// registers none.
+    @Override
+    public ResourceBundle cn1Create(int id) {
+        return null;
     }
 }

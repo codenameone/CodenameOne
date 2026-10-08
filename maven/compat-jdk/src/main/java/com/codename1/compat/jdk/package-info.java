@@ -37,6 +37,15 @@
 /// `CopyOnWriteArrayList`, ...), and the number and message formats of
 /// `java.text` together with `java.net.URL`.
 ///
+/// A few classes are not stand-ins for a whole JDK class, because the device
+/// has the class and lacks only some of its members, or gives them another
+/// meaning. The remap step redirects single calls to these, when a desktop
+/// layer is active: `Resources` (the classpath lookups of `Class`,
+/// `ClassLoader` and `Thread`, answered from the flat application bundle),
+/// `JdkObjects` and `JdkLocale`. `ResourceNames` is the rule both the build
+/// and `Resources` use to name a nested resource in that bundle, and
+/// `CompatBoot` installs what the build recorded (`CompatRegistry`).
+///
 /// Codename One runs user interface code on one thread. The classes named
 /// after `java.util.concurrent` keep the API and the iteration guarantees of
 /// the originals and do not synchronize; see each class.
