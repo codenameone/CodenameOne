@@ -307,7 +307,9 @@ recognized and never reported. Note the rule is about the *cast*: a
 
 The scope is what a translation actually sees -- `maven/core`, `maven/ios`,
 `vm/JavaAPI` and `maven/android-compat`, whose runtime an application with
-Android sources ships relocated inside its own classes. **The Android port is not covered**, and adding it back would be a
+Android sources ships relocated inside its own classes, and `maven/compat-jdk`,
+`maven/swing-compat` and `maven/javafx-compat`, which are relocated into an
+application with desktop sources the same way. **The Android port is not covered**, and adding it back would be a
 mistake: ART implements `CHECKCAST` to spec, so a `catch (Throwable)` around a
 `(NotificationManager) getSystemService(...)` there is live, correct code, and
 `Ports/Android` is never translated. That is the same reason `Ports/CLDC11` is
