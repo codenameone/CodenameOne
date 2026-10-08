@@ -52,6 +52,13 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
     @Parameter(property = "cn1.desktop.sourceDir", defaultValue = "${project.basedir}/src/main/desktop")
     private File desktopSourceDir;
 
+    /// Where `prepare-desktop-sources` writes the resources it generates
+    /// from the desktop sources; they are flattened and indexed with the
+    /// application's own.
+    @Parameter(property = "cn1.desktop.resourcesOutputDir",
+            defaultValue = "${project.build.directory}/generated-resources/desktop")
+    private File desktopResourcesOutputDir;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         List<File> classpath = new ArrayList<File>();
@@ -73,8 +80,14 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
         // output tree) must be in place before it is relocated.
         copyKotlinIncrementalCompileOutputToOutputDir();
         File onClick = AndroidResourceRunner.onClickNamesFile(new File(project.getBuild().getDirectory()));
+        List<File> desktopResources = new ArrayList<File>();
+        if (desktopSourceDir != null) {
+            desktopResources.add(DesktopSources.resourcesDir(desktopSourceDir));
+        }
+        desktopResources.add(desktopResourcesOutputDir);
         try {
             new CompatRemapper(classes, classpath, onClick, MavenLog.of(getLog()))
+                    .withResourceDirectories(desktopResources)
                     .withDesktopEntryRecord(desktopSourceDir == null ? null
                             : DesktopSources.entryRecord(desktopSourceDir))
                     .run();
