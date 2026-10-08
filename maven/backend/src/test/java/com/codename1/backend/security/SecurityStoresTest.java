@@ -374,6 +374,44 @@ class SecurityStoresTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void replacedTotpEnrollmentRejectsPreviouslyVerifiedCodes(String engine) throws Exception {
+        DataSource pool = open(engine);
+        JdbcTotpRepository repo = new JdbcTotpRepository(pool, Crypto.sha256(new byte[] {1, 2, 3}));
+        MfaTest.checkReplacement(repo, true);
+        MfaTest.checkReplacement(repo, false);
+        byte[] secret = new byte[] {1, 2, 3, 4};
+        repo.save("ada", secret);
+        java.util.concurrent.ExecutorService callers = java.util.concurrent.Executors.newFixedThreadPool(8);
+        try {
+            for (boolean confirming : new boolean[] {true, false}) {
+                CountDownLatch start = new CountDownLatch(1);
+                List<java.util.concurrent.Future<Boolean>> answers = new ArrayList<>();
+                for (int i = 0; i < 8; i++) {
+                    // Independent repository instances exercise the shared database boundary.
+                    JdbcTotpRepository other = new JdbcTotpRepository(pool,
+                            Crypto.sha256(new byte[] {1, 2, 3}));
+                    answers.add(callers.submit(() -> {
+                        start.await();
+                        return confirming ? other.confirm("ADA", secret, 100)
+                                : other.advance("ADA", secret, 101);
+                    }));
+                }
+                start.countDown();
+                int accepted = 0;
+                for (java.util.concurrent.Future<Boolean> answer : answers) {
+                    if (answer.get(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                        accepted++;
+                    }
+                }
+                assertEquals(1, accepted, "one code must be consumed exactly once");
+            }
+        } finally {
+            callers.shutdownNow();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
     void secondFactors(String engine) throws Exception {
         DataSource pool = open(engine);
         byte[] key = Crypto.sha256("a key".getBytes("UTF-8"));

@@ -283,10 +283,18 @@ public final class BackendMigrationTarget implements MigrationTarget {
     @Override
     public void dropAllObjects() throws IOException {
         Object[] none = new Object[0];
+        boolean sqliteForeignKeys = "sqlite".equals(dialect.getName())
+                && answeredOne(query("PRAGMA foreign_keys", null));
         if (mysql) {
             db().execute("SET FOREIGN_KEY_CHECKS = 0", none);
         }
         try {
+            if (sqliteForeignKeys) {
+                db().execute("PRAGMA foreign_keys = OFF", none);
+                if (answeredOne(query("PRAGMA foreign_keys", null))) {
+                    throw new IOException("SQLite clean requires a connection outside a transaction");
+                }
+            }
             for (String name : names(true)) {
                 db().execute("DROP VIEW IF EXISTS " + dialect.quote(name) + (postgres ? " CASCADE" : ""), none);
             }
@@ -299,6 +307,8 @@ public final class BackendMigrationTarget implements MigrationTarget {
         } finally {
             if (mysql) {
                 db().execute("SET FOREIGN_KEY_CHECKS = 1", none);
+            } else if (sqliteForeignKeys) {
+                db().execute("PRAGMA foreign_keys = ON", none);
             }
         }
     }

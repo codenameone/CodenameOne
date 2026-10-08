@@ -77,9 +77,11 @@ public final class HistoryTable {
     }
 
     /// Refuses a table name that is not a plain identifier. The name is spliced into DDL, and a
-    /// plain identifier needs no escaping under any engine's quoting rules.
+    /// plain identifier needs no escaping under any engine's quoting rules. At most 53
+    /// characters leaves room for MySQL's `cn1_flyway_` lock prefix (64 characters)
+    /// and the `_s_idx` suffix within PostgreSQL's 63-character identifier limit.
     public static void checkName(String table) {
-        if (table == null || table.length() == 0 || table.length() > 60) {
+        if (table == null || table.length() == 0 || table.length() > 53) {
             throw new IllegalArgumentException("Invalid schema history table name: " + table);
         }
         for (int i = 0; i < table.length(); i++) {

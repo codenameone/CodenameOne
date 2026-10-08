@@ -24,6 +24,10 @@ package com.codename1.backend.security.mfa;
 
 /// Where the secrets of users' authenticator apps are kept. A user has one;
 /// names are compared without regard to the case of `A` to `Z`.
+///
+/// [TotpService] uses the secret-bound overloads of `confirm` and `advance`.
+/// Custom stores must implement their atomic comparison and update; the defaults
+/// refuse the operation rather than fall back to an unbound update.
 public interface TotpRepository {
     /// Stores a new, unconfirmed secret for `username`, replacing any other.
     void save(String username, byte[] secret);
@@ -45,6 +49,19 @@ public interface TotpRepository {
     ///
     /// @return whether this call recorded it
     boolean advance(String username, long step);
+
+    /// Confirms and consumes a code only if the current, unconfirmed credential
+    /// still has the secret that was verified. The comparison and both changes
+    /// must be atomic, including across servers sharing a database.
+    default boolean confirm(String username, byte[] expectedSecret, long step) {
+        throw new UnsupportedOperationException("Atomic secret-bound confirmation is required");
+    }
+
+    /// Consumes a sign-in code only if the confirmed credential still has the
+    /// verified secret and its last accepted step is lower. This is one atomic change.
+    default boolean advance(String username, byte[] expectedSecret, long step) {
+        throw new UnsupportedOperationException("Atomic secret-bound verification is required");
+    }
 
     /// Forgets the credential.
     ///

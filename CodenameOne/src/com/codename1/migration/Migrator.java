@@ -64,7 +64,7 @@ public final class Migrator {
     }
 
     /// Uses a history table other than the set's own.
-    /// @param table a plain identifier
+    /// @param table a plain identifier of at most 53 characters
     /// @return this migrator
     public Migrator table(String table) {
         HistoryTable.checkName(table);

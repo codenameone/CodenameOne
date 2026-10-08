@@ -1225,12 +1225,17 @@ public final class OidcClient {
         List<Map<String, Object>> known = jwks;
         long fetchedAt = jwksFetchedAt;
         List<Map<String, Object>> candidates = IdTokenVerifier.candidates(jwt, known);
-        if (!candidates.isEmpty() || (known != null
-                && System.currentTimeMillis() - fetchedAt < jwksRefetchMillis)) {
-            finishIdToken(jwt, candidates, accepted, out);
+        OidcException signatureFailure = IdTokenVerifier.verifySignature(jwt, candidates);
+        if (signatureFailure == null) {
+            accepted.run();
             return;
         }
-        // No key for this token yet: the first sign-in, or the provider has rotated.
+        if (known != null && System.currentTimeMillis() - fetchedAt < jwksRefetchMillis) {
+            out.error(signatureFailure);
+            return;
+        }
+        // Rotation may omit kid or reuse it. Failed cached verification can refetch
+        // after the same interval as an unknown kid; the fetched keys get one try.
         fetchJwks(new SuccessCallback<List<Map<String, Object>>>() {
             @Override
             public void onSucess(List<Map<String, Object>> fetched) {

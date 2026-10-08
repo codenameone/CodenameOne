@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.security.mfa;
 
+import com.codename1.backend.Crypto;
 import com.codename1.backend.security.SecuritySchema;
 import java.util.HashMap;
 import java.util.Map;
@@ -61,6 +62,28 @@ public final class InMemoryTotpRepository implements TotpRepository {
         }
         byUser.put(SecuritySchema.usernameKey(username), new TotpCredential(
                 current.getUsername(), current.getSecret(), current.isConfirmed(), step));
+        return true;
+    }
+
+    @Override
+    public synchronized boolean confirm(String username, byte[] expectedSecret, long step) {
+        return accept(username, expectedSecret, step, true);
+    }
+
+    @Override
+    public synchronized boolean advance(String username, byte[] expectedSecret, long step) {
+        return accept(username, expectedSecret, step, false);
+    }
+
+    private boolean accept(String username, byte[] expectedSecret, long step, boolean confirming) {
+        TotpCredential current = find(username);
+        if (current == null || current.isConfirmed() == confirming
+                || current.getLastUsedStep() >= step || expectedSecret == null
+                || !Crypto.equalsConstantTime(current.getSecret(), expectedSecret)) {
+            return false;
+        }
+        byUser.put(SecuritySchema.usernameKey(username), new TotpCredential(
+                current.getUsername(), current.getSecret(), true, step));
         return true;
     }
 

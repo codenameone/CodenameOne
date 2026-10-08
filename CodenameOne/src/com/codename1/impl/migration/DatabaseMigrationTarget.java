@@ -168,13 +168,26 @@ public final class DatabaseMigrationTarget implements MigrationTarget {
 
     @Override
     public void dropAllObjects() throws IOException {
-        for (String name : names("view")) {
-            db.execute("DROP VIEW IF EXISTS " + quote(name));
-        }
-        for (String name : names("table")) {
-            // SQLite's own bookkeeping tables cannot be dropped and are emptied with the rest.
-            if (!name.startsWith("sqlite_")) {
-                db.execute("DROP TABLE IF EXISTS " + quote(name));
+        boolean foreignKeys = "1".equals(query("PRAGMA foreign_keys", null).get(0)[0]);
+        try {
+            if (foreignKeys) {
+                db.execute("PRAGMA foreign_keys = OFF");
+                if ("1".equals(query("PRAGMA foreign_keys", null).get(0)[0])) {
+                    throw new IOException("SQLite clean requires a connection outside a transaction");
+                }
+            }
+            for (String name : names("view")) {
+                db.execute("DROP VIEW IF EXISTS " + quote(name));
+            }
+            for (String name : names("table")) {
+                // SQLite's own bookkeeping tables cannot be dropped.
+                if (!name.startsWith("sqlite_")) {
+                    db.execute("DROP TABLE IF EXISTS " + quote(name));
+                }
+            }
+        } finally {
+            if (foreignKeys) {
+                db.execute("PRAGMA foreign_keys = ON");
             }
         }
     }

@@ -354,6 +354,27 @@ public class OidcIdTokenTest extends UITestBase {
         refused(OidcException.INVALID_ID_TOKEN, "hold none for this ID token");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullSource
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"k-rsa"})
+    void rotatedSignaturesRefreshAfterTheCacheWindow(String kid) throws Exception {
+        idToken = sign("RS256", kid, rsa, claims());
+        assertNull(refresh().error);
+        assertEquals(1, jwksFetches);
+        idToken = sign("RS256", kid, rsaOther, claims());
+        assertNotNull(refresh().error);
+        assertEquals(1, jwksFetches, "bad signatures must respect the refetch interval");
+        client.jwksRefetchMillis = 0;
+        // Even after fetching, an untrusted key must still be refused, exactly once.
+        assertNotNull(refresh().error);
+        assertEquals(2, jwksFetches);
+        jwksBody = jwks(jwk("k-rsa", rsaOther));
+        assertNull(refresh().error, "rotation must recover without recreating the client");
+        assertEquals(3, jwksFetches);
+        assertNull(refresh().error);
+        assertEquals(3, jwksFetches, "a matching cached signature needs no fetch");
+    }
+
     @Test
     void keysThatCannotBeHadMeanATokenThatIsNotAccepted() throws Exception {
         idToken = sign("RS256", "k-rsa", rsa, claims());

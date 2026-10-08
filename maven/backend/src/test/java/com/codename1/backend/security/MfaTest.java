@@ -116,6 +116,38 @@ class MfaTest {
     }
 
     @Test
+    void replacementEnrollmentCannotBeConfirmedByTheOldSecret() {
+        checkReplacement(new InMemoryTotpRepository(), true);
+    }
+
+    @Test
+    void replacementEnrollmentCannotAcceptTheOldSignInCode() {
+        checkReplacement(new InMemoryTotpRepository(), false);
+    }
+
+    static void checkReplacement(final com.codename1.backend.security.mfa.TotpRepository repo,
+            boolean confirming) {
+        final byte[] first = Base32.decode("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+        final byte[] second = Base32.decode("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP");
+        final long now = 1700000000000L;
+        repo.save("ada", first);
+        if (!confirming) {
+            assertTrue(repo.confirm("ada"));
+        }
+        TotpService service = new TotpService(repo, "Acme");
+        // matchingStep asks the clock after reading A, precisely where B can replace it.
+        service.setClock(() -> { repo.save("ada", second); return now; });
+        String oldCode = Otp.totp(first, now, 30, 6, Hash.SHA1);
+        assertFalse(confirming ? service.confirmEnrollment("ADA", oldCode)
+                : service.verify("ADA", oldCode));
+        assertFalse(repo.find("ada").isConfirmed());
+        assertEquals(-1L, repo.find("ada").getLastUsedStep());
+        service.setClock(() -> now);
+        assertTrue(service.confirmEnrollment("ada", Otp.totp(second, now, 30, 6, Hash.SHA1)));
+        assertFalse(service.verify("ada", Otp.totp(second, now, 30, 6, Hash.SHA1)));
+    }
+
+    @Test
     @DisplayName("a code is good once, within one step of the clock either way")
     void replayAndDrift() {
         byte[] secret = Base32.decode(totp.beginEnrollment("ada").getSecret());

@@ -131,10 +131,7 @@ public final class TotpService {
             return false;
         }
         long step = matchingStep(credential, code);
-        if (step < 0 || !repository.advance(username, step)) {
-            return false;
-        }
-        return repository.confirm(username);
+        return step >= 0 && repository.confirm(username, credential.getSecret(), step);
     }
 
     /// Whether `username` has a confirmed second factor.
@@ -155,7 +152,7 @@ public final class TotpService {
         long step = matchingStep(credential, code);
         // The step is recorded by a statement that changes a row only when no
         // code of this step was accepted before; that count is the decision.
-        return step >= 0 && repository.advance(username, step);
+        return step >= 0 && repository.advance(username, credential.getSecret(), step);
     }
 
     /// Removes the second factor of `username`.

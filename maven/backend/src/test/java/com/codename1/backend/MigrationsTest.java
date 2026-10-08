@@ -121,6 +121,70 @@ class MigrationsTest {
     }
 
     @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void sqliteCleanDropsReferencedTablesAndRestoresForeignKeys(boolean enabled) throws Exception {
+        DataSource pool = open("SQLITE");
+        Database db = pool.borrow();
+        try {
+            db.execute("PRAGMA foreign_keys = " + (enabled ? "ON" : "OFF"), null);
+            db.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)", null);
+            db.execute("CREATE TABLE child (parent_id INTEGER REFERENCES parent(id))", null);
+            db.execute("INSERT INTO parent VALUES (1)", null);
+            db.execute("INSERT INTO child VALUES (1)", null);
+            Migrations.of(db, notes().build()).cleanDisabled(false).clean();
+            assertEquals(enabled ? 1L : 0L, ((Number) db.queryOne("PRAGMA foreign_keys", null)
+                    .get("foreign_keys")).longValue());
+            assertEquals(0L, ((Number) db.queryOne("SELECT COUNT(*) AS n FROM sqlite_master "
+                    + "WHERE type = 'table'", null).get("n")).longValue());
+        } finally {
+            pool.release(db);
+        }
+    }
+
+    @org.junit.jupiter.api.Test
+    void sqliteCleanRefusesAnActiveTransactionWithoutDroppingTables() throws Exception {
+        DataSource pool = open("SQLITE");
+        Database db = pool.borrow();
+        try {
+            db.execute("PRAGMA foreign_keys = ON", null);
+            db.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)", null);
+            db.beginTransaction();
+            try {
+                assertThrows(IOException.class,
+                        () -> Migrations.of(db, notes().build()).cleanDisabled(false).clean());
+                assertTrue(db.isInTransaction());
+                assertNotNull(db.queryOne("SELECT name FROM sqlite_master WHERE name = 'parent'", null));
+                assertEquals(1L, ((Number) db.queryOne("PRAGMA foreign_keys", null)
+                        .get("foreign_keys")).longValue());
+            } finally {
+                db.rollbackTransaction();
+            }
+        } finally {
+            pool.release(db);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    void historyNamesReserveSpaceForTheGeneratedIndexAndLock(String engine) throws Exception {
+        DataSource pool = open(engine);
+        String name = "history_" + new String(new char[45]).replace('\0', 'x');
+        assertEquals(53, name.length());
+        try {
+            assertEquals(2, Migrations.of(pool, notes().build()).table(name).migrate()
+                    .getMigrationsExecuted());
+            for (int extra = 1; extra <= 7; extra++) {
+                final String invalid = name + new String(new char[extra]).replace('\0', 'x');
+                assertThrows(IllegalArgumentException.class,
+                        () -> Migrations.of(pool, notes().build()).table(invalid));
+                assertFalse(exists(pool, invalid));
+            }
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS " + name, null);
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
     void migratesRecordsAndIsThenANoOp(String engine) throws Exception {
         DataSource pool = open(engine);

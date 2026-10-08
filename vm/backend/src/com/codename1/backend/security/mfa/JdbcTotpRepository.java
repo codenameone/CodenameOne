@@ -218,6 +218,45 @@ public final class JdbcTotpRepository implements TotpRepository {
     }
 
     @Override
+    public boolean confirm(String username, byte[] expectedSecret, long step) {
+        return accept(username, expectedSecret, step, true);
+    }
+
+    @Override
+    public boolean advance(String username, byte[] expectedSecret, long step) {
+        return accept(username, expectedSecret, step, false);
+    }
+
+    private boolean accept(String username, byte[] expectedSecret, long step, boolean confirming) {
+        if (username == null || expectedSecret == null) {
+            return false;
+        }
+        String user = SecuritySchema.usernameKey(username);
+        try {
+            Map row = dataSource.queryOne("SELECT secret, nonce FROM cn1_mfa_totp "
+                    + "WHERE username_key = ?", new Object[] {user});
+            if (row == null) {
+                return false;
+            }
+            String sealed = String.valueOf(row.get("secret"));
+            String nonce = String.valueOf(row.get("nonce"));
+            byte[] secret = Crypto.aesGcmDecrypt(key, Base64.decode(nonce), utf8(user),
+                    Base64.decode(sealed));
+            if (secret == null || !Crypto.equalsConstantTime(secret, expectedSecret)) {
+                return false;
+            }
+            // A concurrent save changes the sealed secret and nonce. The predicate
+            // binds this update to the row just checked, even on another server.
+            return dataSource.execute("UPDATE cn1_mfa_totp SET confirmed = 1, last_used_step = ? "
+                    + "WHERE username_key = ? AND secret = ? AND nonce = ? AND confirmed = ? "
+                    + "AND last_used_step < ?", new Object[] {Long.valueOf(step), user, sealed,
+                        nonce, Integer.valueOf(confirming ? 0 : 1), Long.valueOf(step)}) == 1;
+        } catch (IOException err) {
+            throw failed(err);
+        }
+    }
+
+    @Override
     public boolean delete(String username) {
         try {
             return dataSource.execute("DELETE FROM cn1_mfa_totp WHERE username_key = ?",
