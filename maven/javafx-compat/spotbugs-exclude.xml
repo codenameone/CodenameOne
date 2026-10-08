@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Intentional SpotBugs exceptions for this module. The report is a
+     zero-findings gate, so every entry is scoped and explained. -->
+<FindBugsFilter>
+</FindBugsFilter>

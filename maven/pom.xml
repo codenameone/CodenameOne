@@ -95,6 +95,8 @@
         <module>compat-jdk</module>
         <module>android-res-compiler</module>
         <module>android-compat</module>
+        <module>swing-compat</module>
+        <module>javafx-compat</module>
         <module>lottie-transcoder</module>
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
