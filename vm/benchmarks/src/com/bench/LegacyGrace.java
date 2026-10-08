@@ -114,6 +114,23 @@ public class LegacyGrace {
                 checksum += 3;
             }
         }
+        // Read every field. DeadFieldElimination (#5903) deletes instance fields nothing
+        // reads; these were write-only, so Payload lost its reference field and Filler its
+        // size. See GraceAudit, whose hazard vanished entirely the same way.
+        for (int i = 0; i < KEEP; i++) {
+            Object o = keep[i];
+            if (o instanceof Payload) {
+                Payload p = (Payload) o;
+                checksum += p.tag + (p.self == p ? 7 : 0);
+            }
+        }
+        for (int i = 0; i < 16; i++) {
+            Object o = sink[i];
+            if (o instanceof Filler) {
+                Filler f = (Filler) o;
+                checksum += f.a + f.b + f.c + f.d + f.e + f.f + f.g + f.h + f.i2 + f.j + f.k + f.l;
+            }
+        }
         System.out.println("LEGACY_GRACE_DRIVER_DONE checksum=" + checksum);
     }
 

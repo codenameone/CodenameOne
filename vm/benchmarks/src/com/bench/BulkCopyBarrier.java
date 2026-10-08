@@ -78,6 +78,12 @@ public class BulkCopyBarrier {
                 last = c;
             }
         }
+        // Read peer. DeadFieldElimination (#5903) deletes an instance field nothing reads,
+        // and peer was write-only, so the chain this loop builds for the collector to trace
+        // had become unconnected leaves.
+        if (last != null) {
+            sink = ((Content) last).peer;
+        }
         sink = last;
     }
 

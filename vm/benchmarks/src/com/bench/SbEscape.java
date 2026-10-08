@@ -70,6 +70,12 @@ public class SbEscape {
                 sink += block[round & 0xff];
             }
         }
-        System.out.println("SBESCAPE_DONE tag=" + holder.tag + " sink=" + (sink > 0));
+        // READ holder.ref. DeadFieldElimination (#5903) deletes an instance field nothing
+        // reads, and this one was write-only: the store that publishes the stack builder
+        // into the heap -- the whole hazard -- was deleted with it, and run-gc-verify.sh's
+        // self-test6 reported "NOTHING noticed" on every tree since, because there was
+        // nothing to notice.
+        System.out.println("SBESCAPE_DONE tag=" + holder.tag + " sink=" + (sink > 0)
+                + " held=" + (holder.ref != null));
     }
 }
