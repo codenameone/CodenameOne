@@ -76,7 +76,15 @@ def validate(root):
                 errors.add(('_redirects', source, f'expected 301 to {target}'))
     index_path = root / 'lunr-index.json'
     if index_path.exists():
-        indexed = {entry['url'] for entry in json.loads(index_path.read_text())['docs']}
+        # The index names the files its documents are in; see generate_lunr_index.py.
+        index = json.loads(index_path.read_text())
+        entries = list(index.get('docs', []))
+        for part in index.get('parts', []):
+            entries.extend(json.loads((root / part.lstrip('/')).read_text())['docs'])
+        if len(entries) != index.get('count', len(entries)):
+            errors.add(('lunr-index.json', str(len(entries)),
+                        f"the parts hold another number of documents than the {index.get('count')} it counts"))
+        indexed = {entry['url'] for entry in entries}
         chapters = {url.split('#')[0] for url in routes.values()} - {'/developer-guide/'}
         for url in chapters - indexed:
             errors.add(('lunr-index.json', url, 'chapter is not searchable'))

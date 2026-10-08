@@ -532,7 +532,69 @@ final class Placeholders {
                                         boolean dashCommentNeedsSpace,
                                         boolean bracketIdentifiers,
                                         int executableComments) throws IOException {
-        int at = 0;
+        int at = terminator(sql, 0, nestedComments, backslashEscapes, hashComments,
+                dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+        if (at < 0) {
+            return false;
+        }
+        int length = sql.length();
+        int after = skipBlanks(sql, at + 1, nestedComments, backslashEscapes,
+                hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                bracketIdentifiers, executableComments);
+        while (after < length && sql.charAt(after) == ';') {
+            after = skipBlanks(sql, after + 1, nestedComments, backslashEscapes,
+                    hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                    bracketIdentifiers, executableComments);
+        }
+        return after < length;
+    }
+
+    /// The statements of a script, in order, each without its terminator.
+    ///
+    /// A migration file is the one place a script is legitimate, and
+    /// [com.codename1.backend.Database] still runs one statement per call, so
+    /// the script is cut here -- by the scanner that decides everything else in
+    /// this class, which is what keeps a semicolon inside a literal, a comment, a
+    /// dollar-quoted function body or a trigger's BEGIN ... END from being read
+    /// as a boundary. A piece holding nothing but blanks and comments is dropped.
+    static String[] split(String sql, boolean nestedComments, boolean backslashEscapes,
+                          boolean hashComments, boolean dollarQuotedStrings,
+                          boolean dashCommentNeedsSpace, boolean bracketIdentifiers,
+                          int executableComments) throws IOException {
+        java.util.List<String> statements = new java.util.ArrayList<String>();
+        int start = 0;
+        int length = sql.length();
+        while (start < length) {
+            int at = terminator(sql, start, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+            String piece = sql.substring(start, at < 0 ? length : at);
+            // Comments on either side belong to the file, not to the statement: one
+            // left in front would hide the statement's first word from anything
+            // that asks what kind of statement this is.
+            int from = skipBlanks(piece, 0, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+            int end = endOfStatement(piece, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+            if (end > from) {
+                statements.add(piece.substring(from, end));
+            }
+            if (at < 0) {
+                break;
+            }
+            start = at + 1;
+        }
+        return statements.toArray(new String[statements.size()]);
+    }
+
+    /// The index of the semicolon that ends the statement beginning at `from`,
+    /// or -1 when the statement runs to the end of the text.
+    private static int terminator(String sql, int from, boolean nestedComments,
+                                  boolean backslashEscapes, boolean hashComments,
+                                  boolean dollarQuotedStrings,
+                                  boolean dashCommentNeedsSpace,
+                                  boolean bracketIdentifiers,
+                                  int executableComments) throws IOException {
+        int at = from;
         int blocks = 0;
         int cases = 0;
         int length = sql.length();
@@ -545,15 +607,7 @@ final class Placeholders {
             }
             char c = sql.charAt(at);
             if (c == ';' && blocks == 0) {
-                int after = skipBlanks(sql, at + 1, nestedComments, backslashEscapes,
-                        hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
-                        bracketIdentifiers, executableComments);
-                while (after < length && sql.charAt(after) == ';') {
-                    after = skipBlanks(sql, after + 1, nestedComments, backslashEscapes,
-                            hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
-                            bracketIdentifiers, executableComments);
-                }
-                return after < length;
+                return at;
             }
             if (isWord(sql, at, "begin")) {
                 // ONLY A BLOCK BEGIN COUNTS. "BEGIN;" and "BEGIN TRANSACTION;"
@@ -629,7 +683,7 @@ final class Placeholders {
             }
             at++;
         }
-        return false;
+        return -1;
     }
 
     /// Whether the statement updates an existing row when it conflicts --

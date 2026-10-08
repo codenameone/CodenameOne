@@ -30,7 +30,8 @@ import java.io.IOException;
 /// for authorization-server responses (e.g. `"access_denied"`, `"invalid_grant"`)
 /// and uses Codename One-specific values for transport or client-side problems
 /// (`"transport_error"`, `"state_mismatch"`, `"nonce_mismatch"`, `"user_cancelled"`,
-/// `"discovery_failed"`, `"invalid_id_token"`).
+/// `"discovery_failed"`, `"invalid_id_token"`, `"issuer_mismatch"`,
+/// `"storage_unavailable"`, `"invalid_response"`).
 ///
 public class OidcException extends IOException {
 
@@ -49,16 +50,39 @@ public class OidcException extends IOException {
     /// The discovery document could not be fetched or parsed.
     public static final String DISCOVERY_FAILED = "discovery_failed";
 
-    /// Token-endpoint response was missing or malformed.
+    /// The authorization grant or refresh token was rejected.
     public static final String INVALID_GRANT = "invalid_grant";
 
-    /// ID token failed structural validation (we do not currently verify the
-    /// signature -- treat the issuer as a trust anchor and use TLS to the
-    /// discovery URL).
+    /// The endpoint returned a missing, malformed or incomplete protocol response.
+    public static final String INVALID_RESPONSE = "invalid_response";
+
+    /// The ID token was not accepted: it is malformed, it is for another client or from
+    /// another issuer, it has expired, it does not belong to the access token it came
+    /// with, or its signature does not verify against the provider's keys -- which
+    /// includes a platform that cannot check a signature of that kind. See
+    /// [OidcClient#setVerifyIdTokenSignature(boolean)].
     public static final String INVALID_ID_TOKEN = "invalid_id_token";
 
-    /// Generic transport / network failure.
+    /// The authorization response names another issuer than the provider the request was
+    /// sent to, or none where the provider says it always names one (RFC 9207).
+    public static final String ISSUER_MISMATCH = "issuer_mismatch";
+
+    /// Generic transport / network failure: no answer, or an answer that is not an OAuth
+    /// one -- a status other than success with no OAuth `error` in its body.
     public static final String TRANSPORT_ERROR = "transport_error";
+
+    /// A [TokenStore] could not read, write or remove the tokens -- the platform has no
+    /// secure storage, or the store failed.
+    public static final String STORAGE_UNAVAILABLE = "storage_unavailable";
+
+    /// Device grant: the user has not finished approving the device yet. Polling continues.
+    public static final String AUTHORIZATION_PENDING = "authorization_pending";
+
+    /// Device grant: the device asked too often; it must wait longer between requests.
+    public static final String SLOW_DOWN = "slow_down";
+
+    /// Device grant: the device code ran out before the user approved it.
+    public static final String EXPIRED_TOKEN = "expired_token";
 
     private final String error;
     private final String errorDescription;

@@ -477,6 +477,43 @@ JAVA_INT com_codename1_backend_ServerSocket_boundPortImpl___int_R_int(CODENAME_O
 #endif
 }
 
+/*
+ * The address of a connection's other end, as its raw bytes: 4 for IPv4, 16 for
+ * IPv6. Null when the descriptor is not a connected internet socket.
+ *
+ * Asked of the descriptor when somebody wants to know, rather than captured at
+ * accept: most requests are never asked where they came from, and accept is the
+ * one call every connection pays for. Bytes rather than text, so the two
+ * runtimes cannot come to spell one address two ways -- the Java side formats.
+ */
+JAVA_OBJECT com_codename1_backend_ServerSocket_peerAddressImpl___int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_INT fd) {
+#ifdef _WIN32
+    (void)fd;
+    return JAVA_NULL;
+#else
+    struct sockaddr_storage addr;
+    socklen_t len = sizeof(addr);
+    const void* bytes;
+    int count;
+    JAVA_OBJECT out;
+    if(fd < 0 || getpeername(fd, (struct sockaddr*)&addr, &len) != 0) {
+        return JAVA_NULL;
+    }
+    if(addr.ss_family == AF_INET) {
+        bytes = &((struct sockaddr_in*)&addr)->sin_addr;
+        count = 4;
+    } else if(addr.ss_family == AF_INET6) {
+        bytes = &((struct sockaddr_in6*)&addr)->sin6_addr;
+        count = 16;
+    } else {
+        return JAVA_NULL;
+    }
+    out = allocArray(threadStateData, count, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)out), bytes, (size_t)count);
+    return out;
+#endif
+}
+
 /* -1 means "nothing waiting" (EAGAIN) as well as a real error; the caller is a
    poller that will be told again if there is more. */
 JAVA_INT com_codename1_backend_ServerSocket_acceptImpl___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT serverFd) {

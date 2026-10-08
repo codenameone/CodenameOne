@@ -33,8 +33,10 @@ project exporter uses.
 ### Demo behavior regressions
 
 `verify-playground-demos.mjs` exercises the unmodified Bouncing Balls, 3D / GPU,
-and Camera Capture samples. It is part of `run-playground-browser-tests.sh` and
-can also target an already-served bundle:
+and Camera Capture samples. A separate GPU lifecycle fixture initializes a peer
+before attachment, then verifies that continuous rendering resumes after it joins
+the displayed preview. The checker is part of `run-playground-browser-tests.sh`
+and can also target an already-served bundle:
 
 ```bash
 PLAYGROUND_BROWSER_ARTIFACT_DIR=/tmp/playground-demos \

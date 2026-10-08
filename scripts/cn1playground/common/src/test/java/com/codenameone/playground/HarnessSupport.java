@@ -27,6 +27,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.UIManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -66,17 +67,35 @@ final class HarnessSupport {
     static PlaygroundContext context(final List<String> log) {
         Display.init(null);
         install();
-        Form host = new Form("Host", new BorderLayout());
-        Container preview = new Container(new BorderLayout());
-        host.add(BorderLayout.CENTER, preview);
-        host.show();
-        return new PlaygroundContext(host, preview, null, new PlaygroundContext.Logger() {
-            public void log(String message) {
-                if (log != null) {
-                    log.add(message);
-                }
+        final PlaygroundContext[] result = new PlaygroundContext[1];
+        Runnable setup = () -> {
+            // These harnesses test preview ownership, not form transitions.
+            // show() otherwise queues work off the EDT, and an outgoing
+            // animation can keep the previous host current after it returns.
+            UIManager.getInstance().getLookAndFeel().setDefaultFormTransitionIn(null);
+            UIManager.getInstance().getLookAndFeel().setDefaultFormTransitionOut(null);
+            Form previous = Display.getInstance().getCurrent();
+            if (previous != null) {
+                previous.setTransitionOutAnimator(null);
             }
-        });
+            Form host = new Form("Host", new BorderLayout());
+            Container preview = new Container(new BorderLayout());
+            host.add(BorderLayout.CENTER, preview);
+            host.show();
+            result[0] = new PlaygroundContext(host, preview, null, new PlaygroundContext.Logger() {
+                public void log(String message) {
+                    if (log != null) {
+                        log.add(message);
+                    }
+                }
+            });
+        };
+        if (Display.getInstance().isEdt()) {
+            setup.run();
+        } else {
+            Display.getInstance().callSeriallyAndWait(setup);
+        }
+        return result[0];
     }
 
     static PlaygroundContext context() {

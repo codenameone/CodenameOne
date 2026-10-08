@@ -129,8 +129,11 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
         protected void buildRequestBody(OutputStream os) throws IOException {
             if (isPost()) {
                 if (docInfo.getParams() != null) {
-                    OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding());
+                    // Flushed for the reason ConnectionRequest.buildRequestBody gives: a
+                    // writer may keep what it was given, and this one is dropped here.
+                    OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding()); //NOPMD CloseResource
                     w.write(docInfo.getParams());
+                    w.flush();
                 }
             }
         }

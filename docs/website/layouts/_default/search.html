@@ -163,10 +163,27 @@
     renderResults(results, query);
   };
 
-  fetch("/lunr-index.json", { cache: "no-store" })
+  const loadJson = (url) => fetch(url, { cache: "no-store" })
     .then((r) => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
       return r.json();
+    });
+
+  // lunr-index.json names the files the documents are in: one file of every page's text
+  // outgrew what the host accepts for a single file. The parts are fetched together and
+  // joined in the order they are listed, which is the order the documents are ranked in.
+  loadJson("/lunr-index.json")
+    .then((index) => {
+      if (!Array.isArray(index.parts)) {
+        return index;
+      }
+      return Promise.all(index.parts.map(loadJson)).then((parts) => {
+        const all = [];
+        parts.forEach((part) => {
+          (Array.isArray(part.docs) ? part.docs : []).forEach((doc) => all.push(doc));
+        });
+        return { docs: all };
+      });
     })
     .then((payload) => {
       docs = Array.isArray(payload.docs) ? payload.docs : [];

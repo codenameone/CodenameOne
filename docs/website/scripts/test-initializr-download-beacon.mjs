@@ -167,9 +167,9 @@ for (const status of [400, 429, 503]) {
     requestStarted();
   }) });
   const pending = hanging.beacon.sendSteps("dev@example.org", "com.example.app", "", "", "maven");
-  // WebCrypto hashing completes asynchronously before the request starts. One
-  // event-loop tick does not guarantee it has finished on a busy CI runner.
-  await Promise.race([started, pending.then(() => assert.fail("request settled before fetch started"))]);
+  // WebCrypto may finish after the next timer turn. Wait for the request itself
+  // before inspecting its deadline, without depending on worker-pool timing.
+  await Promise.race([started, pending.then(() => assert.fail("the request must start before settling"))]);
   assert.equal(hanging.timers.length, 1, "a deadline is armed for the confirmed request");
   assert.ok(hanging.timers[0].ms < 20000, "shorter than the bridge's 20 s wait");
   hanging.timers[0].fn();

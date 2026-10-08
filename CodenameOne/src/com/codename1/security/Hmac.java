@@ -42,6 +42,7 @@ package com.codename1.security;
 ///
 /// Compare authentication tags with [#constantTimeEquals(byte[], byte[])] --
 /// using `java.util.Arrays.equals` or `==` opens you up to timing attacks.
+@com.codename1.impl.SharedWithBackend
 public final class Hmac {
 
     private final MessageDigestImpl hash;

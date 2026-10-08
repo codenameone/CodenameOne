@@ -186,7 +186,7 @@ class JavascriptNetworkBindingsTest {
                 "getBytes must sign-extend into the byte[]: " + out);
     }
 
-    private static String runNode(String body) throws Exception {
+    static String runNode(String body) throws Exception {
         assertTrue(Files.exists(RUNTIME), "ParparVM JavaScript runtime not found at " + RUNTIME);
         assertTrue(Files.exists(PORT_JS), "port.js not found at " + PORT_JS);
         Path harness = Files.createTempFile("js-network-bindings", ".js");

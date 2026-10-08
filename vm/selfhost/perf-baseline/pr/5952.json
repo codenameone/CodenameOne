@@ -22,26 +22,6 @@
    }
   },
   "linux-x64@intel-xeon-platinum-8370c": {
-   "objectAllocation": {
-    "all": {
-     "from": {
-      "memory": 0.504,
-      "time": 3.142,
-      "tolerance": {
-       "memory": 0.3,
-       "time": 0.5
-      }
-     },
-     "memory": 0.504,
-     "reason": "Refresh stale Xeon 8370C timing rows from completed CI run 37587913086 (five interleaved rounds). These rows predate the merged ParparVM collector/allocation changes; native compiler, runtime, and benchmark code in this PR match base master 758332a82d. Record the measured timings without widening tolerances.",
-     "runs": 1,
-     "time": 1.214,
-     "tolerance": {
-      "memory": 0.3,
-      "time": 0.5
-     }
-    }
-   },
    "recursion": {
     "all": {
      "from": {

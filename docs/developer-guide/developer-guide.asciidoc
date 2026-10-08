@@ -131,6 +131,8 @@ include::Backend-Data.asciidoc[]
 
 include::Backend-Sessions.asciidoc[]
 
+include::Backend-Security.asciidoc[]
+
 include::Backend-Scheduling.asciidoc[]
 
 include::Backend-Observability.asciidoc[]

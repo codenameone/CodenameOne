@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {scenePixels, changedPixels, sceneChecks} from './demo-pixels.mjs';
+import {scenePixels, changedPixels, sceneChecks, sampleScene} from './demo-pixels.mjs';
+import {gpuLifecycleScript} from './gpu-lifecycle-fixture.mjs';
 let chromium, firefox;
 try { ({chromium, firefox} = await import('playwright')); }
 catch { ({chromium, firefox} = await import('@playwright/test')); }
@@ -73,7 +74,7 @@ async function check(name, fn) {
   try { await fn(); results.push({name, ok: true}); console.log('PASS ' + name); }
   catch (error) { results.push({name, ok: false, error: error.message}); console.error('FAIL ' + name + ': ' + error.message); }
 }
-async function run(slug, title, width, exercise, caseName = slug) {
+async function run(slug, title, width, exercise, caseName = slug, script = null) {
   const name = browserName + '-' + caseName + '-' + width + 'x' + viewport.height + '-dpr' + deviceScaleFactor;
   if (process.env.PLAYGROUND_DEMO_FILTER && !name.includes(process.env.PLAYGROUND_DEMO_FILTER)) return;
   console.log('RUN ' + name);
@@ -105,6 +106,7 @@ async function run(slug, title, width, exercise, caseName = slug) {
   try {
     await check(name + ' interaction', async () => {
       const target = new URL(url); target.searchParams.set('sample', slug);
+      if (script !== null) target.searchParams.set('code', Buffer.from(script).toString('base64url'));
       await page.goto(target.href, {waitUntil: 'domcontentloaded', timeout: 90000});
       await page.waitForFunction(() => window.cn1Started === true || !!document.querySelector('iframe[title="Codename One Playground"]'));
       const embedded = await page.locator('iframe[title="Codename One Playground"]').elementHandles();
@@ -117,6 +119,14 @@ async function run(slug, title, width, exercise, caseName = slug) {
         await page.waitForTimeout(100);
       }
       assert.ok(log.some(m => m.text.startsWith('[playground] preview updated')), 'Sample did not initialize');
+      if (script === gpuLifecycleScript) {
+        // This fixture intentionally attaches after preview initialization. Its
+        // timer must finish before the rendering/animation observation window.
+        while (!log.some(m => m.text.includes('[gpu-lifecycle] attached')) && Date.now() < deadline) {
+          await page.waitForTimeout(100);
+        }
+        assert.ok(log.some(m => m.text.includes('[gpu-lifecycle] attached')), 'GPU fixture did not attach');
+      }
       const consent = page.getByRole('button', {name: 'Keep Crisp Disabled', exact: true});
       if (await consent.count()) await consent.click();
       const region = await preview(page, title);
@@ -145,28 +155,11 @@ async function run(slug, title, width, exercise, caseName = slug) {
   }
 }
 async function animatedScene(page, region, name, kind) {
-  // "preview updated" reports loaded user code, before the first painted frame
-  // (including WebGL shader setup). Wait for visible scene pixels, bounded by
-  // the normal interaction timeout, rather than sampling three startup blanks.
-  // Start as soon as content appears so the balls are still bouncing. Once
-  // sampling starts, every frame must remain visible and animation must advance.
-  const frames = [];
-  for (let i = 0; i < 3; i++) {
-    const screenshotPath = path.join(artifacts, name + '-frame-' + i + '.png');
-    let frame = await measure(page, region, kind, screenshotPath);
-    if (i === 0) {
-      const started = Date.now();
-      const deadline = started + 15000;
-      while (frame.foreground <= 150 && Date.now() < deadline) {
-        await page.waitForTimeout(100);
-        frame = await measure(page, region, kind, screenshotPath);
-      }
-      console.log(name + ' startup wait: ' + (Date.now() - started)
-        + 'ms; foreground pixels: ' + frame.foreground);
-    }
-    frames.push(frame);
-    await page.waitForTimeout(220);
-  }
+  // Start sampling promptly, while the balls still bounce. Compare only scene
+  // foreground pixels so editor carets, status text and other UI cannot pass this.
+  const frames = await sampleScene(
+    i => measure(page, region, kind, path.join(artifacts, name + '-frame-' + i + '.png')),
+    ms => page.waitForTimeout(ms), region, kind);
   for (const [behavior, ok] of Object.entries(sceneChecks(frames, region, kind))) {
     await check(name + ' ' + behavior, () => assert.ok(ok,
       JSON.stringify(frames.map(({mask, ...metrics}) => metrics))));
@@ -293,6 +286,8 @@ try {
         const width = viewport.width;
         await run('bouncing-balls', 'Bouncing Balls', width, (p, r, n) => animatedScene(p, r, n, 'balls'));
         await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'));
+        await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'),
+          'gpu-lifecycle', gpuLifecycleScript);
         await run('camera-capture', 'Camera', width, cameraDemo);
         await run('camera-capture', 'Camera', width, demoNavigation, 'demo-navigation');
       }

@@ -56,7 +56,10 @@ import java.lang.annotation.Target;
 /// THIS IS A BUILD-TIME SWITCH, and deliberately so. Without it the tracer is
 /// never referenced, so the translator leaves it out of the binary entirely. With
 /// it, the deployment still has the last word: `OTEL_SDK_DISABLED=true` turns
-/// tracing off at start-up without a rebuild.
+/// tracing off at start-up without a rebuild, and so does `cn1.otel.enabled=false`.
+/// The other way round cannot work: a server built without the tracer that finds
+/// `cn1.otel.enabled=true` at run time does not start, and says the key belongs in
+/// the module's `application.properties`.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface OpenTelemetry {

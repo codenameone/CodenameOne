@@ -374,6 +374,10 @@ public class GeneratorModel {
     private static final String LAUNCHER_TELEMETRY_SH = "/launcher-telemetry-sh.txt";
     private static final String LAUNCHER_TELEMETRY_BAT_START = "/launcher-telemetry-bat-start.txt";
     private static final String LAUNCHER_TELEMETRY_BAT_FINISH = "/launcher-telemetry-bat-finish.txt";
+    // build.bat's output copy (cmd cannot tee): a wrapper the launcher points
+    // MVNW at, and the single-source Java program it runs Maven through.
+    private static final String LAUNCHER_CAPTURE_CMD = "/launcher-capture-cmd.txt";
+    private static final String LAUNCHER_CAPTURE_JAVA = "/launcher-capture-java.txt";
     // The archetype launcher lines the reporting hooks onto. common.zip's
     // build.sh/build.bat are the archetype's (scripts/sync-initializr-launchers.py
     // holds them byte-identical), so a change there that moves these lines turns
@@ -405,7 +409,14 @@ public class GeneratorModel {
         }
         byte[] bat = entries.get("build.bat");
         if (bat != null) {
-            entries.put("build.bat", withBatchTelemetry(StringUtil.newString(bat)).getBytes("UTF-8"));
+            String withTelemetry = withBatchTelemetry(StringUtil.newString(bat));
+            entries.put("build.bat", withTelemetry.getBytes("UTF-8"));
+            if (!withTelemetry.equals(StringUtil.newString(bat))) {
+                // Only alongside a launcher that reports: build.bat runs Maven
+                // through these only when it can (Java 11+), and never otherwise.
+                entries.put(".mvn/cn1-capture.cmd", readResourceToString(LAUNCHER_CAPTURE_CMD).getBytes("UTF-8"));
+                entries.put(".mvn/Cn1Capture.java", readResourceToString(LAUNCHER_CAPTURE_JAVA).getBytes("UTF-8"));
+            }
         }
     }
 

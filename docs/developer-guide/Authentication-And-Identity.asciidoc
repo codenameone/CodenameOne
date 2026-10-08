@@ -42,7 +42,7 @@ That call:
 . Generates a PKCE pair (S256), a `state`, and a `nonce`.
 . Opens the OS system-browser sheet at the discovered authorization endpoint.
 . Exchanges the code for tokens on the discovered token endpoint.
-. Verifies `state` and `nonce`, decodes the ID token, and persists the tokens via the default `TokenStore`.
+. Verifies `state`, the issuer the response names, and the ID token, and persists the tokens via the default `TokenStore`.
 
 image::img/oidc-sign-in-flow.svg[The sign-in flow across the app the platform browser and the provider,scaledwidth=95%]
 
@@ -51,6 +51,25 @@ The token exchange is the leg worth noticing: it goes straight from your app to 
 Only the redirect URL crosses back from the browser, which is why Apple's non-iOS path needs a server in front of it: `AppleSignIn` asks for `response_mode=form_post`, so Apple POSTs `code` and `state` to your redirect URI rather than putting them in the query string, and `OidcClient` parses the URL alone. The page at that URI has to turn the POST into a redirect carrying the same parameters, or the sign-in fails with `STATE_MISMATCH`.
 
 Whether the token endpoint hands back a refresh token is up to the request: the quick start above asks for `openid`, `email` and `profile` and nothing more, so Google returns none and there is nothing for `refreshIfExpired` to renew. `GoogleConnect.signIn` adds `access_type=offline` and `prompt=consent` for exactly that reason.
+
+==== What's verified before you get the tokens
+
+`OidcClient` doesn't hand over tokens it hasn't checked. A sign-in that fails one of these checks fails with an `OidcException`, and nothing is stored.
+
+* **The authorization response.** Its `state` has to be the one the request carried. If the response names an issuer with the `iss` parameter, that issuer has to be the provider you configured. A provider whose discovery document sets `authorization_response_iss_parameter_supported` always names itself, so a response without `iss` is refused for that provider. The error is `issuer_mismatch`. This stops an answer from one provider being taken for another's when an app signs in with several.
+* **The ID token's claims.** `iss` is the provider, `aud` is your client ID, `exp` hasn't passed, and `nonce` is the one the request carried. When the token has an `at_hash`, it has to match the access token that came with it. The device's clock may be five minutes off, and `setIdTokenClockSkew` changes that.
+* **The ID token's signature.** The provider's keys are fetched from its `jwks_uri` once and kept. They're fetched again when a token names a key that isn't among them, but not more than once in 60 seconds. A token that names an unknown key within 60 seconds of the last fetch is refused without another request to the provider. `RS256`, `RS384`, `RS512`, `ES256` and `ES384` are accepted. An unsigned token is refused. A token signed with `HS256` or another shared-secret algorithm is refused too, because an app can't keep the secret that would verify it.
+
+A configuration you build by hand needs a `jwksUri` for the last check. `discover` fills it in.
+
+The signature check has no silent fallback. If the platform the app runs on can't verify a signature of the token's algorithm, the token is refused and the error says so. For a provider whose ID tokens can't be verified on a platform you ship to, or one that signs them with `HS256`, turn the check off explicitly. There is no other way to have such a token accepted:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-unverified,indent=0]
+----
+
+The claims are still checked then, but they're only as trustworthy as the TLS connection to the token endpoint. Don't make a decision on your server from an ID token the app forwards. Verify it there.
 
 ==== Picking a redirect URI
 
@@ -91,7 +110,16 @@ If the saved access token is within 60 seconds of expiring and a refresh token i
 
 ==== Encrypting tokens at rest
 
-The default token store uses `com.codename1.io.Storage`, which is sandboxed but not encrypted. For biometric-gated storage, implement `TokenStore` over `com.codename1.security.SecureStorage` (see the source of `DefaultStorageTokenStore` for the pattern -- swap the `Storage.writeObject` / `readObject` calls for `SecureStorage.set` / `get`).
+The default token store uses `com.codename1.io.Storage`, which is sandboxed but not encrypted. `SecureStorageTokenStore` keeps the tokens in the platform keychain or keystore instead, through `com.codename1.security.SecureStorage`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-store,indent=0]
+----
+
+The first form encrypts the tokens and reads them without asking the user. That's the one to use when a token goes out with every request. The second form puts them behind a biometric prompt. Load the tokens once when the app starts if you choose it, because every read prompts.
+
+A platform without secure storage isn't given a weaker store behind your back. Every operation fails there with an `OidcException` whose code is `storage_unavailable`. The third form is the opt-in: on such a platform, and only there, the tokens go to ordinary storage.
 
 === Sign in with Apple
 
@@ -286,6 +314,141 @@ Passkey support requires the *Identity Platform* tier of Firebase Auth (the upgr
 | `invalid_options`  | The options JSON received from the relying party couldn't be parsed.
 | `invalid_response` | The response returned by the authenticator couldn't be parsed.
 |===
+
+[[signing-in-against-a-codename-one-backend]]
+=== Signing in against a Codename One backend
+
+A Codename One backend can be its own identity provider. Its authorization server speaks OpenID Connect, so the app signs in with the same `OidcClient` it would use for any other provider. <<backend-security-authorization-server>> covers the server side. This section is the app's half.
+
+==== Signing in
+
+Register the app on the server as a public client: no secret, the authorization code and refresh token grants, and the exact redirect URI the app uses. Then discover the server and authorize:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-authorize,indent=0]
+----
+
+The issuer you pass to `discover` is the server's `cn1.security.authorizationserver.issuer`, without a trailing slash. The redirect URI has to match the registered one exactly. The server doesn't accept wildcards.
+
+The answer holds an access token, a refresh token and an ID token. The access token is a signed JWT that the server's resource chain verifies. Its `scope` claim becomes the caller's `SCOPE_` authorities there.
+
+==== Sending the token with every request
+
+`OidcRequestAuthorizer` adds the access token to the app's requests and renews it when it expires. Create one for the client, give it the base URL of your API, and load the session a previous run saved:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-authorizer,indent=0]
+----
+
+From then on every request under that base URL carries `Authorization: Bearer ...`. That includes requests made with `Rest`, with `ConnectionRequest`, and by a generated `@RestClient` client created for that base URL. Tokens the client obtains later reach the authorizer by themselves.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-call,indent=0]
+----
+
+The base URL is matched by origin and by whole path segments. The origin is the scheme, the host and the port. Scheme and host are compared without regard to case, and a port that's left out is the scheme's own, so `https://api.example.com` and `https://API.example.com:443` are the same base URL. The path is compared exactly and ends where a segment ends, so `/v1` covers `/v1/pets` and doesn't cover `/v10`. When two registrations cover a request, the one with the longer path wins.
+
+A token is never sent to another origin. That holds for a redirect too: a request the server redirects to another host, another port or plain `http` is sent there without the header. A request redirected to a path outside the base URL goes without it too. This is the behavior where Codename One follows the redirect itself. On iOS the system follows redirects before the app sees them, so don't have a token-protected API redirect to a host you don't control.
+
+The authorizer works on the event dispatch thread only. It puts the header on a request when you queue it, and the network thread sends what the request carries. A request you queue from another thread is passed to the event dispatch thread first and queued from there, without making your thread wait. Call the authorizer's own methods, such as `setTokens` and `signOut`, on the event dispatch thread. Called from another thread they wait for it, so don't call them from a thread the event dispatch thread is itself waiting for.
+
+==== Renewing before the token expires
+
+The authorizer renews a token before the server has a chance to refuse it. When you queue a request and the access token is within a minute of its expiry, the refresh token is exchanged first. The request is kept out of the queue until the exchange is done, and is then sent once with the new token. Requests queued in the meantime wait for the same exchange.
+
+Nothing blocks while this happens, because the request hasn't reached a network thread yet. Code that waits for the request gets the one final answer.
+
+Change the minute with `setRefreshLeeway`. A larger value suits a server whose clock runs ahead of the device's. A negative value turns renewing ahead of time off:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-leeway,indent=0]
+----
+
+If the server refuses that exchange, the session is over, as the next section describes, and the request is sent without a token so that it's answered `401`. If the exchange can't reach the server, the request is sent with the token it has, which might still be good.
+
+A token whose response carried no `expires_in` has no known expiry. It's renewed only when the server refuses it.
+
+==== What happens on a 401
+
+A token can still be refused: the server revoked it, restarted with new keys, or the device's clock is wrong. When the server answers `401` to a request that carried the authorizer's token, the app doesn't see that answer. The request is held, and the refresh token is exchanged for a new set of tokens. The request is then sent again with the new access token, and its answer is delivered as usual.
+
+A few rules keep this predictable:
+
+* A request is renewed once. If the second attempt is also refused, that `401` is delivered.
+* Requests refused at the same moment share one exchange. The server replaces the refresh token every time it's used, so a second exchange with the old one would fail.
+* Code that waits for a request waits until the end. `getAsString()` and the other blocking methods return the final answer, and so does `addToQueueAndWait`.
+* If the server refuses the refresh token, the session is over. The tokens are removed from memory and from the token store, the held requests deliver their `401`, and your sign-in listener runs so you can show the sign-in screen.
+* If the exchange fails because the server can't be reached, the tokens are kept. The held request delivers its `401`, and the next request tries again.
+
+When a renewal fails, the refused request is sent one more time as it was first sent. The `401` you receive is that second answer, handled by your error handlers like any other response.
+
+You can also choose the authorizer for one request:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-per-request,indent=0]
+----
+
+An `Authorization` header that's already on a request always wins. That's true for a header you set on the request and for a default header set with `NetworkManager.addDefaultHeader`. The authorizer isn't asked about such a request, and a `401` to it isn't renewed.
+
+To sign out, revoke the refresh token and clear the stored session:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-signout,indent=0]
+----
+
+==== The device grant
+
+A television, a watch or a kiosk has no browser to sign in with and no comfortable keyboard. The device grant lets the user approve such a device from a phone or a computer. The app asks for a code, shows it, and waits:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-device,indent=0]
+----
+
+The user opens the verification address on another device, signs in and types the code. `getVerificationUriComplete()` returns the same address with the code in it, which suits a QR code.
+
+`pollDeviceToken` asks the server at the interval the server chose. It waits five seconds longer each time the server answers `slow_down`. It stops with an `OidcException` when the user refuses (`access_denied`) or the code runs out (`expired_token`), and it stops when you cancel the resource it returned. The tokens are stored the same way `authorize()` stores them, so the authorizer picks them up.
+
+The client needs the `urn:ietf:params:oauth:grant-type:device_code` grant on the server. It needs no redirect URI for this flow.
+
+==== Passkeys
+
+A backend that declares `http.webAuthn(...)` serves the two WebAuthn ceremonies, and `WebAuthnClient` runs the device's side of each. <<backend-security-passkeys>> lists the endpoints.
+
+A signed-in user adds a passkey like this:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-passkey-register,indent=0]
+----
+
+A user who has one signs in with it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-passkey,indent=0]
+----
+
+Both requests of a ceremony have to reach the server with the same cookies, because the server keeps the challenge in the session. `ConnectionRequest` keeps cookies for you unless you turned them off.
+
+Two server settings matter to an app. The chain has to leave the passkey endpoints out of CSRF protection with `csrf.ignoringRequestMatchers("/webauthn/**", "/login/webauthn")`, because an app has no page to read a CSRF token from. An Android app's origin isn't a web address but `android:apk-key-hash:` followed by a hash of its signing certificate, and it has to be in the server's allowed origins.
+
+==== One-time codes
+
+A backend with a second factor expects a six-digit code after the password. The server uses the same `com.codename1.security.Otp` class your app has, so an authenticator screen in your app produces codes the server accepts:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/BackendSignInSnippets.java[tag=backend-signin-totp,indent=0]
+----
+
+A code is good once. The server refuses a code it has already accepted, even inside the same 30 seconds.
 
 [[migrating-from-oauth2]]
 === Migrating from `Oauth2`
