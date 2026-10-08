@@ -224,6 +224,12 @@ static int cn1GcFaultShouldFreeLive(JAVA_OBJECT o, int m) {
 // never reached it. "resumeescape" also skips the re-check -- the protocol every resume
 // site had before -- and the verifier must catch a thread that ran Java while a
 // stop-the-world cycle held it. Read at the first collection, like every fault here.
+// CN1_GC_FAULT=stalebump reads every OWNED page's bump one slot short in the verifier,
+// which is what an arm64 core can show it while the newest allocation's bump store is
+// still in flight (see cn1GcVerifyPublishedLate). It lets a host that keeps stores in
+// order exercise that path: the gate requires a run under it to stay clean AND to have
+// counted late publications.
+int cn1GcFaultStaleBump = 0;
 int cn1GcFaultResume = 0;
 long cn1GcFaultResumeCaught = 0;
 static int cn1GcFaultResumeUs = 300;
@@ -266,6 +272,9 @@ static void cn1GcFaultInit(void) {
     } else if(strcmp(f, "refnoclear") == 0) {
         cn1GcFaultRefClear = 1;
         fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
+    } else if(strcmp(f, "stalebump") == 0) {
+        cn1GcFaultStaleBump = 1;
+        fprintf(stderr, "[GC-FAULT] verifier reads owned pages' bump one slot short\n");
     } else if(strcmp(f, "resumewindow") == 0 || strcmp(f, "resumeescape") == 0) {
         { const char* e = getenv("CN1_GC_FAULT_RESUME_US");
           if(e != 0 && atoi(e) > 0) { cn1GcFaultResumeUs = atoi(e); } }
@@ -14395,6 +14404,60 @@ JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
  * and the program read a dead frame. */
 #define CN1_GC_VS_STACK_ESCAPE 6
 
+// A REFERENCE CAN BE SEEN BEFORE THE BUMP THAT COVERS IT. The verifier runs after the
+// collector has released the mutators, so it walks a heap they are still writing. The
+// allocator publishes a slot as `header; dmb ishst; bumpIndex = bi + 1` (see
+// CN1_BIBOP_PUBLISH_BUMP): the fence orders the header BEFORE the bump, and nothing
+// orders the bump before the mutator's NEXT store -- the one that puts the new object
+// into a field. On arm64 those two stores may become visible to another core in either
+// order, so a verifier reading that field can find the object and then read a bumpIndex
+// that does not cover it yet. Classified as a recycled slot, that is a dangling
+// reference that does not exist: an Object[] at the current epoch pointing at a fresh
+// (mark -1) object "above the bump cursor" on its owner's page. That exact report failed
+// GcHeapIntegrityIntegrationTest on Linux arm64 CI twice, on a heap with nothing wrong
+// with it, and never reproduced on hardware that keeps the two stores in order.
+//
+// Nothing outside the verifier needs the reverse order. The collector proper never
+// rejects a precisely traced field on bumpIndex, and every walk bounded by bumpIndex
+// already copes with slots allocated after it read the bound (they are on pages their
+// owner holds, which no sweep touches, and are fresh). So the verifier, not the
+// allocator's hot path, is what changes: an in-flight publication is recognised by every
+// property it must have, and anything else is still reported.
+//   * the page is OWNED -- a thread is allocating into it right now;
+//   * the slot holds what an allocation just wrote: mark -1, a registered class;
+//   * it is among the owner's newest slots (a store buffer holds a few, not a page);
+//   * and the owner's bump really does cover it within a bounded wait.
+// A slot a sweep reclaimed fails the first test (a reclaimed page goes to the pool
+// unowned) or the second (verify builds stamp FREE_MARK or poison every slot they
+// free), so this recognises late publications without excusing reclamation.
+// Counted, and the count is printed with the summary.
+static long cn1GcVerifyLatePublishes = 0;
+#define CN1_GC_LATE_PUBLISH_SLOTS 64
+static JAVA_BOOLEAN cn1GcVerifyPublishedLate(CN1BibopPage* p, int idx, int bump, JAVA_OBJECT o) {
+    if(!p->owned || idx - bump >= CN1_GC_LATE_PUBLISH_SLOTS) {
+        return JAVA_FALSE;
+    }
+    if(CN1_OBJ_MARK_LOAD(o, __ATOMIC_ACQUIRE) != -1) {
+        return JAVA_FALSE;
+    }
+    struct clazz* c = CN1_OBJ_CLASS(o);
+    if(c == 0 || !cn1ClazzRegistryContains((uintptr_t)c)) {
+        return JAVA_FALSE;
+    }
+    // Bounded: a store in flight is visible within nanoseconds; a millisecond is far
+    // beyond any store buffer and still nothing next to a verify pass.
+    long long deadline = cn1MonotonicNanos() + 1000000LL;
+    do {
+        __atomic_thread_fence(__ATOMIC_SEQ_CST);
+        if(atomic_load_explicit(&p->bumpIndex, memory_order_acquire) > idx) {
+            cn1GcVerifyLatePublishes++;
+            return JAVA_TRUE;
+        }
+        cn1CpuRelax();
+    } while(cn1MonotonicNanos() < deadline);
+    return JAVA_FALSE;
+}
+
 // Classify a reference WITHOUT dereferencing anything it has not first proven
 // to be mapped. BiBOP pages are never unmapped (the registry is grow-only) and
 // quarantined blocks are held allocated, so both are safe to read once the
@@ -14419,7 +14482,12 @@ static int cn1GcVerifyClassify(JAVA_OBJECT o, CN1BibopPage** outPage, int* outId
             if(outPage != 0) *outPage = p;
             if(outIdx != 0) *outIdx = idx;
             int bump = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
-            if(idx >= bump) return CN1_GC_VS_STALE_SLOT;
+            if(cn1GcFaultStaleBump && p->owned && bump > 0) {
+                bump--;   // CN1_GC_FAULT=stalebump: see cn1GcVerifyPublishedLate
+            }
+            if(idx >= bump && !cn1GcVerifyPublishedLate(p, idx, bump, o)) {
+                return CN1_GC_VS_STALE_SLOT;
+            }
             int m = CN1_OBJ_MARK_LOAD(o, __ATOMIC_ACQUIRE);
             if(m == CN1_BIBOP_FREE_MARK) return CN1_GC_VS_FREE_SLOT;
             if(m == CN1_BIBOP_QUAR_MARK) return CN1_GC_VS_FREE_SLOT;   // the catch
@@ -14676,6 +14744,8 @@ static void cn1GcVerifySummary(void) {
     fprintf(stderr, "[GC-VERIFY] SUMMARY passes=%ld refs=%ld violations=%ld earlyFreed=%ld resurrected=%ld resurrectedDangling=%ld\n",
             cn1GcVerifyPasses, cn1GcVerifyTotalRefs, cn1GcVerifyTotalViolations,
             cn1GcVerifyEarlyFreed, cn1GcResTotal, cn1GcResDangling);
+    fprintf(stderr, "[GC-VERIFY] LATEPUBLISH seen=%ld (references found before the bump covering them was visible)\n",
+            cn1GcVerifyLatePublishes);
     fflush(stderr);
 }
 

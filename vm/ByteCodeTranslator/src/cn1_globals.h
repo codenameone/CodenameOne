@@ -2257,9 +2257,9 @@ extern void cn1GcWaitUnblockedSlow(struct ThreadLocalData* ts);
 // thread's current pages as pre-cycle (cn1BibopRetireHeldThreadPages), takes the
 // remembered set and frees unmarked young objects on the premise that every held thread
 // is not running. A thread escaping the hold kept allocating into those pages and storing
-// young objects into old ones, and the minor freed them under a live parent:
-// GcHeapIntegrityIntegrationTest caught it on a CI runner as an Object[] holding a reclaimed
-// GcVerifyApp.Filler, and widening this window by 300us reproduced it in every run.
+// young objects into old ones, and the minor freed them under a live parent. Widening this
+// window by 300us (CN1_GC_FAULT=resumewindow / resumeescape) reproduced it in every run, on
+// master as well as on the branch it was found from: an Object[] holding a FREED Filler.
 //
 // So raising the flag is a Dekker handshake with the collector's store of the block: raise,
 // FULL fence, re-read the block. The collector stores the block, fences, then reads

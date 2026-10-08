@@ -273,14 +273,26 @@ alternates phases for the verifier and gauntlet. Each of these was measured to b
   `wait while threadBlockedByGC; threadActive = TRUE`. A thread preempted between the
   two let the collector raise the block, read `threadActive` as FALSE and hold the thread
   as parked while it ran Java -- allocating into pages the cycle had retired as pre-cycle
-  and storing young objects into old ones the minor never traced.
-  `GcHeapIntegrityIntegrationTest` caught it once on an oversubscribed arm64 runner (an
-  `Object[]` holding a reclaimed `Filler`); widening the window by 300us under
-  `CN1_GC_HYBRID_FORCE=1` reproduced it in 20 of 20 runs of a targeted driver (11 of 12
-  on master), and in 0 of 20 with the handshake, widened at every resume site. Every resume goes through `cn1GcTryResumeActive` (raise, seq_cst fence,
+  and storing young objects into old ones the minor never traced. Widening the window by
+  300us under `CN1_GC_HYBRID_FORCE=1` reproduced it in 20 of 20 runs of a targeted driver
+  (11 of 12 on master), always as a FREED slot, and 0 of 20 with the handshake. Every
+  resume goes through `cn1GcTryResumeActive` (raise, seq_cst fence,
   re-read the block, step back down if raised) and the collector fences
   (`CN1_GC_BLOCK_FENCE`) between raising the block and reading `threadActive`. A new
   resume site that stores `threadActive = JAVA_TRUE` directly reopens it.
+- **A "recycled slot" at mark -1 on an owned page is usually the verifier racing the
+  allocator, not the collector.** The verifier walks the heap after the mutators are
+  released. A slot is published as `header; dmb ishst; bumpIndex = bi + 1`, and nothing
+  orders that bump store before the mutator's next store, the one that puts the object in
+  a field, so an arm64 core can show the reference before the bump that covers it. Linux
+  arm64 CI reported that twice as an `Object[]` at the current epoch holding a fresh
+  `Filler` "above the bump cursor"; it never reproduced on Apple silicon (0 in 67,000
+  verify passes, and a 2.3-billion-read litmus of the same store pattern saw no
+  reordering). The collector itself never rejects a precise field on `bumpIndex`, so the
+  verifier is what changed: `cn1GcVerifyPublishedLate` accepts such a slot only on an
+  owned page, among the owner's newest slots, holding a fresh object of a registered
+  class, and only once the bump really covers it. `LATEPUBLISH seen=` in the summary
+  counts them; `CN1_GC_FAULT=stalebump` reproduces the stale view on any host.
 
 A test whose evidence names one collector's mechanism goes vacuous when the hybrid takes
 its workload. Fix the EVIDENCE, never pin the collector: `GcOverflowSpiralIntegrationTest`

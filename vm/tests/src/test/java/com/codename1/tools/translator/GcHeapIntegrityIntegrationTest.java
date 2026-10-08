@@ -144,6 +144,30 @@ class GcHeapIntegrityIntegrationTest {
                             + "half above proves nothing. Output: " + tail(escaped.output));
             assertTrue(escaped.exit != 0,
                     "A detected dangling reference must fail the process. Exit was 0.");
+
+            // A reference the verifier finds before the bump that covers it is visible --
+            // what an arm64 core shows it while the mutator's newest bump store is still in
+            // flight (cn1GcVerifyPublishedLate). Linux arm64 CI reported exactly that as a
+            // recycled slot twice on a sound heap; a host that keeps stores in order never
+            // shows it, so CN1_GC_FAULT=stalebump reads owned pages one slot short. Clean,
+            // and the path actually taken, or this half is not testing it.
+            Map<String, String> stale = new HashMap<String, String>(window);
+            stale.put("CN1_GC_FAULT", "stalebump");
+            Run late = run(built.executable, built.buildDir, stale);
+            assertTrue(late.output.contains("[GC-FAULT] verifier reads owned pages' bump one slot short"),
+                    "The stale-bump fault did not engage. Output: " + tail(late.output));
+            assertEquals(0, late.exit,
+                    "A reference to an object whose bump was not yet visible was reported as "
+                            + "reclaimed.\n" + violationExcerpt(late.output));
+            java.util.regex.Matcher seen = java.util.regex.Pattern
+                    .compile("LATEPUBLISH seen=(\\d+)").matcher(late.output);
+            assertTrue(seen.find(), "The verifier never reported late publications. Output: "
+                    + tail(late.output));
+            assertTrue(Long.parseLong(seen.group(1)) > 0,
+                    "No reference ever met a stale bump, so the run above did not exercise the "
+                            + "late-publication path: " + seen.group(0));
+            assertEquals(built.javaResult, extractLine(late.output, "RESULT="),
+                    "JavaSE and ParparVM should agree on the workload result");
         } finally {
             for (Path dir : tempDirs) {
                 deleteRecursively(dir);
