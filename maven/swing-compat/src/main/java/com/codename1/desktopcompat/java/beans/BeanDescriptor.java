@@ -20,23 +20,31 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk;
+package com.codename1.desktopcompat.java.beans;
 
-import java.io.DataOutput;
-import java.io.IOException;
+/// Describes a bean class as a whole: the class, and the customizer class a
+/// GUI builder would configure it with.
+public class BeanDescriptor extends FeatureDescriptor {
 
-/// `java.io.ObjectOutput` for the Codename One runtime: the stream an
-/// `Externalizable` class writes itself to.
-///
-/// The interface is what desktop code is compiled against, so it is here for
-/// classes that implement `writeExternal`. Nothing on a device implements it:
-/// Java serialization needs reflection to find the classes it writes.
-public interface ObjectOutput extends DataOutput, AutoCloseable {
+    private final Class<?> beanClass;
+    private final Class<?> customizerClass;
 
-    void writeObject(Object obj) throws IOException;
+    public BeanDescriptor(Class<?> beanClass) {
+        this(beanClass, null);
+    }
 
-    void flush() throws IOException;
+    public BeanDescriptor(Class<?> beanClass, Class<?> customizerClass) {
+        this.beanClass = beanClass;
+        this.customizerClass = customizerClass;
+        String full = beanClass.getName();
+        setName(full.substring(full.lastIndexOf('.') + 1));
+    }
 
-    @Override
-    void close() throws IOException;
+    public Class<?> getBeanClass() {
+        return beanClass;
+    }
+
+    public Class<?> getCustomizerClass() {
+        return customizerClass;
+    }
 }

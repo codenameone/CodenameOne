@@ -28,6 +28,7 @@ import com.codename1.build.BuildExecutionException;
 import com.codename1.build.BuildFailureException;
 import com.codename1.build.Log;
 import com.codename1.build.ProjectHost;
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -142,6 +143,13 @@ public class BytecodeCompliance {
         this.activeLayers = layers == null ? null : new ArrayList<Relocation>(layers);
         return this;
     }
+
+    /// The annotation that marks a layer class as there to be linked against
+    /// and nothing more (`com.codename1.compat.jdk.LinkOnly`).
+    private static final String LINK_ONLY_DESCRIPTOR = "L" + Relocation.JDK_PACKAGE + "LinkOnly;";
+
+    /// The jar each bundled library class came from, by internal name.
+    private Map<String, String> libraryOrigins = Collections.emptyMap();
 
     private List<Relocation> layers() {
         return activeLayers == null ? Collections.<Relocation>emptyList() : activeLayers;
@@ -358,11 +366,13 @@ public class BytecodeCompliance {
             activeLayers = CompatLayers.active(dependencyJars);
         }
 
+        // Read before the scan, which asks it whose class it is looking at.
+        Map<String, String> origins = CompatLibraries.classOrigins(outputDir);
+        libraryOrigins = origins;
         List<Violation> violations = scanProjectClasses(outputDir, allowedIndex, projectAndDependencyIndex);
         if (!violations.isEmpty()) {
             // The developer did not write a bundled library's classes: say
             // which jar a finding is in.
-            Map<String, String> origins = CompatLibraries.classOrigins(outputDir);
             if (!origins.isEmpty()) {
                 for (Violation v : violations) {
                     v.library = origins.get(v.sourceClass.replace('.', '/'));
@@ -1130,6 +1140,14 @@ public class BytecodeCompliance {
                 }
 
                 @Override
+                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                    if (LINK_ONLY_DESCRIPTOR.equals(descriptor)) {
+                        metadata.linkOnly = true;
+                    }
+                    return null;
+                }
+
+                @Override
                 public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
                     metadata.fields.add(memberKey(name, descriptor));
                     return null;
@@ -1272,6 +1290,9 @@ public class BytecodeCompliance {
         List<String> interfaces = Collections.emptyList();
         Set<String> methods = new HashSet<String>();
         Set<String> fields = new HashSet<String>();
+        /// Marked `@LinkOnly`: there for bundled libraries to link against,
+        /// and absent as far as the application's own classes go.
+        boolean linkOnly;
     }
 
     /// Reports every reference a class makes that the device could not link.
@@ -1508,8 +1529,21 @@ public class BytecodeCompliance {
         }
 
         private boolean isKnownClass(String internalName) {
-            return projectAndDependencyIndex.containsKey(internalName) || allowedIndex.containsKey(internalName)
-                    || isPendingProjectClass(internalName);
+            ClassMetadata project = projectAndDependencyIndex.get(internalName);
+            if (project != null) {
+                return !project.linkOnly || linksAgainstLinkOnly();
+            }
+            return allowedIndex.containsKey(internalName) || isPendingProjectClass(internalName);
+        }
+
+        /// Whether the class being scanned may name a `@LinkOnly` class: a
+        /// layer's own runtime, which declares them, and a library that was
+        /// bundled whole, which is who they exist for. The application's own
+        /// classes may not -- to them such a class is API that does not work,
+        /// and it is reported like any other the layer lacks.
+        private boolean linksAgainstLinkOnly() {
+            return className != null
+                    && (CompatLayers.isExtractedRuntime(className) || libraryOrigins.containsKey(className));
         }
 
         private String relativePath() {

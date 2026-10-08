@@ -23,6 +23,8 @@
 package com.example.gallery;
 
 import java.awt.GridLayout;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ResourceBundle;
@@ -30,6 +32,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 
+import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -74,6 +77,21 @@ public class ResourcesPanel extends JPanel {
         add(resetRow);
 
         add(new JLabel(messages.getString("resources.locale") + " " + messages.getLocale()));
+        add(new JLabel(describe("/icons/star.png")));
+    }
+
+    private String describe(String path) {
+        URL url = getClass().getResource(path);
+        if (url == null) {
+            return path + ": missing";
+        }
+        try {
+            BufferedImage image = ImageIO.read(url);
+            return path + ": " + image.getWidth() + " x " + image.getHeight();
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Cannot read " + path, e);
+            return path + ": unreadable";
+        }
     }
 
     private ImageIcon icon(String path) {

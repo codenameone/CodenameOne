@@ -20,23 +20,37 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk;
+package com.codename1.desktopcompat.java.beans;
 
-import java.io.DataOutput;
-import java.io.IOException;
-
-/// `java.io.ObjectOutput` for the Codename One runtime: the stream an
-/// `Externalizable` class writes itself to.
+/// The two environment questions of `java.beans.Beans`: whether the code is
+/// running inside a GUI builder, and whether it may show a user interface.
 ///
-/// The interface is what desktop code is compiled against, so it is here for
-/// classes that implement `writeExternal`. Nothing on a device implements it:
-/// Java serialization needs reflection to find the classes it writes.
-public interface ObjectOutput extends DataOutput, AutoCloseable {
+/// An application on a device is never inside a builder and always has a
+/// display, so those are the answers until something sets others. The bean
+/// instantiation half of the class (`instantiate`, `getInstanceOf`) loads
+/// classes by name and is not provided.
+public class Beans {
 
-    void writeObject(Object obj) throws IOException;
+    private static boolean designTime;
+    private static boolean guiAvailable = true;
 
-    void flush() throws IOException;
+    public Beans() {
+        // The JDK's class is instantiable, though all its members are static.
+    }
 
-    @Override
-    void close() throws IOException;
+    public static boolean isDesignTime() {
+        return designTime;
+    }
+
+    public static void setDesignTime(boolean isDesignTime) {
+        designTime = isDesignTime;
+    }
+
+    public static boolean isGuiAvailable() {
+        return guiAvailable;
+    }
+
+    public static void setGuiAvailable(boolean isGuiAvailable) {
+        guiAvailable = isGuiAvailable;
+    }
 }

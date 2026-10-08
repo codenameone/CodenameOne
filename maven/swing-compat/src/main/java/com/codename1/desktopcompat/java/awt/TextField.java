@@ -20,23 +20,24 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk;
+package com.codename1.desktopcompat.java.awt;
 
-import java.io.DataOutput;
-import java.io.IOException;
+import com.codename1.compat.jdk.LinkOnly;
 
-/// `java.io.ObjectOutput` for the Codename One runtime: the stream an
-/// `Externalizable` class writes itself to.
+/// AWT's heavyweight `TextField`, a one-line text field drawn by the desktop's own
+/// toolkit. There is no such widget here, and `javax.swing.JTextField` is the component
+/// to use.
 ///
-/// The interface is what desktop code is compiled against, so it is here for
-/// classes that implement `writeExternal`. Nothing on a device implements it:
-/// Java serialization needs reflection to find the classes it writes.
-public interface ObjectOutput extends DataOutput, AutoCloseable {
+/// The class exists for one reason: libraries written against Swing ask
+/// `component instanceof TextField` to tell the two families apart, and that
+/// question needs the type to exist. It is [LinkOnly], so the build accepts
+/// the reference from a bundled library and reports it from an application's
+/// own code. Nothing can construct one, which keeps the answer to that
+/// question `false` for every component there is.
+@LinkOnly
+public class TextField extends TextComponent {
 
-    void writeObject(Object obj) throws IOException;
-
-    void flush() throws IOException;
-
-    @Override
-    void close() throws IOException;
+    public TextField() {
+        throw new UnsupportedOperationException("java.awt.TextField is not available; use javax.swing.JTextField");
+    }
 }

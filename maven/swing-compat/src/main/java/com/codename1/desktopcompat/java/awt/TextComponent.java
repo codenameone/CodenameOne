@@ -20,23 +20,19 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk;
+package com.codename1.desktopcompat.java.awt;
 
-import java.io.DataOutput;
-import java.io.IOException;
+import com.codename1.compat.jdk.LinkOnly;
 
-/// `java.io.ObjectOutput` for the Codename One runtime: the stream an
-/// `Externalizable` class writes itself to.
-///
-/// The interface is what desktop code is compiled against, so it is here for
-/// classes that implement `writeExternal`. Nothing on a device implements it:
-/// Java serialization needs reflection to find the classes it writes.
-public interface ObjectOutput extends DataOutput, AutoCloseable {
+/// The base of AWT's heavyweight text widgets. Like [TextField] it exists so
+/// that `component instanceof TextComponent` links in a bundled library
+/// ([LinkOnly]); nothing extends it but [TextField], which cannot be
+/// constructed. The Swing text components descend from
+/// `javax.swing.text.JTextComponent` instead.
+@LinkOnly
+public class TextComponent extends Component {
 
-    void writeObject(Object obj) throws IOException;
-
-    void flush() throws IOException;
-
-    @Override
-    void close() throws IOException;
+    TextComponent() {
+        // Package-private, as the JDK's constructor is.
+    }
 }

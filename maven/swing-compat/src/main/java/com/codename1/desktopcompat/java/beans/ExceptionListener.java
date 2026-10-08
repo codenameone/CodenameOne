@@ -20,23 +20,10 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk;
+package com.codename1.desktopcompat.java.beans;
 
-import java.io.DataOutput;
-import java.io.IOException;
+/// Told about an exception something recovered from and carried on.
+public interface ExceptionListener {
 
-/// `java.io.ObjectOutput` for the Codename One runtime: the stream an
-/// `Externalizable` class writes itself to.
-///
-/// The interface is what desktop code is compiled against, so it is here for
-/// classes that implement `writeExternal`. Nothing on a device implements it:
-/// Java serialization needs reflection to find the classes it writes.
-public interface ObjectOutput extends DataOutput, AutoCloseable {
-
-    void writeObject(Object obj) throws IOException;
-
-    void flush() throws IOException;
-
-    @Override
-    void close() throws IOException;
+    void exceptionThrown(Exception e);
 }

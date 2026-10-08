@@ -24,6 +24,8 @@ package com.example.gallery;
 
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -31,6 +33,7 @@ import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
@@ -44,6 +47,7 @@ import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
+import javax.swing.event.HyperlinkEvent;
 
 /**
  * The basic controls: labels, buttons, text, choices and a progress bar.
@@ -61,6 +65,7 @@ public class ControlsPanel extends JPanel {
         add(text());
         add(choices());
         add(progress());
+        add(help());
         add(echo);
     }
 
@@ -111,7 +116,18 @@ public class ControlsPanel extends JPanel {
         fields.add(name);
         fields.add(new JLabel("Password:"));
         fields.add(password);
-        p.add(fields);
+
+        JButton copy = new JButton("Copy name");
+        copy.addActionListener(e -> {
+            StringSelection selection = new StringSelection(name.getText());
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+            echo.setText("Copied " + name.getText());
+        });
+        JPanel left = new JPanel();
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        left.add(fields);
+        left.add(copy);
+        p.add(left);
 
         JTextArea notes = new JTextArea(4, 20);
         notes.setLineWrap(true);
@@ -127,6 +143,11 @@ public class ControlsPanel extends JPanel {
         colors.setSelectedItem("Green");
         colors.addActionListener(e -> echo.setText("Color: " + colors.getSelectedItem()));
         p.add(colors);
+
+        JComboBox<String> fruit = new JComboBox<>(new String[] {"Apple", "Pear", "Plum"});
+        fruit.setEditable(true);
+        fruit.addActionListener(e -> echo.setText("Fruit: " + fruit.getEditor().getItem()));
+        p.add(fruit);
 
         JSpinner quantity = new JSpinner(new SpinnerNumberModel(3, 0, 10, 1));
         quantity.addChangeListener(e -> echo.setText("Quantity: " + quantity.getValue()));
@@ -162,6 +183,23 @@ public class ControlsPanel extends JPanel {
         });
         p.add(bar);
         p.add(toggle);
+        return p;
+    }
+
+    private JPanel help() {
+        JPanel p = new JPanel(new GridLayout(1, 1));
+        p.setBorder(BorderFactory.createTitledBorder("Help"));
+        JEditorPane html = new JEditorPane("text/html",
+                "<html><body><h3>Controls</h3><p>Every control on this tab reports what you did in the line"
+                + " at the bottom. See the <a href=\"https://docs.oracle.com/javase/tutorial/uiswing/\">Swing"
+                + " tutorial</a> for more.</p></body></html>");
+        html.setEditable(false);
+        html.addHyperlinkListener(e -> {
+            if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                echo.setText("Link: " + e.getURL());
+            }
+        });
+        p.add(new JScrollPane(html));
         return p;
     }
 
