@@ -194,9 +194,15 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     // problematic  maxSize = 20; //maximum size (number of characters) that can be stored in this TextField.
     private int widthForRowCalculations = -1;
+    // Width reserved by row layout, also used by native text rendering.
+    int textWrappingGap;
     private int rowsGap = 2;
     private boolean triggerClose;
     private EventDispatcher actionListeners = null;
+
+    boolean hasActionListeners() {
+        return actionListeners != null && actionListeners.hasListeners();
+    }
     private EventDispatcher bindListeners = null;
     private EventDispatcher closeListeners = null;
     private String lastTextValue = "";
@@ -220,7 +226,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// and remove it when we remove the textarea.
     ///
     /// Reference bug https://github.com/codenameone/CodenameOne/issues/2472
-    private final ActionListener formPressListener = new ActionListener() {
+    private final ActionListener formPressListener = new NativeTextSelectionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
             // The top level, not the form: this listener is registered on the window
@@ -576,7 +582,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
     /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
     public void setConstraint(int constraint) {
-        this.constraint = constraint;
+        if (this.constraint != constraint) {
+            this.constraint = constraint;
+            repaintTextSelection();
+        }
     }
 
     /// {@inheritDoc}
@@ -746,8 +755,17 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `b`: true is text are is editable; otherwise false
     public void setEditable(boolean b) {
-        editable = b;
-        updateCursor();
+        if (editable != b) {
+            editable = b;
+            updateCursor();
+            // Refresh native controls even when no other screen content changes.
+            TopLevelContainer top = getTopLevelContainer();
+            if (top != null) {
+                top.asContainer().repaint();
+            } else {
+                repaint();
+            }
+        }
     }
 
     @Override
@@ -777,7 +795,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `maxSize`: the maximum size of the text area
     public void setMaxSize(int maxSize) {
-        this.maxSize = maxSize;
+        if (this.maxSize != maxSize) {
+            this.maxSize = maxSize;
+            repaintTextSelection();
+        }
     }
 
     /// {@inheritDoc}
@@ -1102,6 +1123,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     private void initRowString() {
+        textWrappingGap = 0;
         if (!Display.getInstance().isEdt()) {
             if (rowStrings == null) {
                 rowStrings = new ArrayList();
@@ -1191,8 +1213,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         // if there is any possibility of a scrollbar we need to reduce the textArea
         // width to accommodate it
         if (textLength / minCharactersInRow > Math.max(2, rows)) {
-            textAreaWidth -= getUIManager().getLookAndFeel().getVerticalScrollWidth();
-            textAreaWidth -= charWidth / 2;
+            textWrappingGap = getUIManager().getLookAndFeel().getVerticalScrollWidth() + charWidth / 2;
+            textAreaWidth -= textWrappingGap;
         }
         String unsupported = getUnsupportedChars();
 
@@ -1392,7 +1414,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     @Override
     public void paint(Graphics g) {
 
-        if (Display.getInstance().isNativeEditorVisible(this)) {
+        if (Display.impl.isNativeEditorVisible(this, g)) {
             if (!Display.impl.nativeEditorPaintsHint()) {
                 paintHint(g);
             }
@@ -1405,7 +1427,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     @Override
     void paintHint(Graphics g) {
-        if (Display.getInstance().isNativeEditorVisible(this) && Display.impl.nativeEditorPaintsHint()) {
+        if (Display.impl.isNativeEditorVisible(this, g) && Display.impl.nativeEditorPaintsHint()) {
             return;
         }
         // For multi-row text areas, keep the hint vertically aligned with where
@@ -1453,6 +1475,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             actionListeners = new EventDispatcher();
         }
         actionListeners.addListener(a);
+        repaintTextSelection();
     }
 
     /// Removes an action listener
@@ -1469,6 +1492,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         if (!actionListeners.hasListeners()) {
             actionListeners = null;
         }
+        repaintTextSelection();
     }
 
     /// Checks to see if the action event is suppressed.
@@ -1648,7 +1672,15 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `singleLineTextArea`: set to true to force a single line text
     public void setSingleLineTextArea(boolean singleLineTextArea) {
-        this.singleLineTextArea = singleLineTextArea;
+        if (this.singleLineTextArea != singleLineTextArea) {
+            this.singleLineTextArea = singleLineTextArea;
+            TopLevelContainer top = getTopLevelContainer();
+            if (top != null) {
+                top.asContainer().repaint();
+            } else {
+                repaint();
+            }
+        }
     }
 
     /// Returns the alignment of the TextArea
@@ -1830,6 +1862,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - `hint`: the hint text to display
     public void setHint(String hint) {
         super.setHint(hint, getHintIcon());
+        repaintTextSelection();
     }
 
     /// Returns the hint icon
@@ -1863,6 +1896,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     @Override
     public void setHint(String hint, Image icon) {
         super.setHint(hint, icon);
+        repaintTextSelection();
     }
 
     /// Returns the hint label component that can be customized directly
@@ -2059,7 +2093,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `endsWith3Points`: true if text should add "..." at the end
     public void setEndsWith3Points(boolean endsWith3Points) {
-        this.endsWith3Points = endsWith3Points;
+        if (this.endsWith3Points != endsWith3Points) {
+            this.endsWith3Points = endsWith3Points;
+            repaintTextSelection();
+        }
     }
 
     /// Registers this TextArea as the current input device for the current form.
@@ -2279,6 +2316,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - `l`: the listener
     public void setDoneListener(ActionListener l) {
         doneListener = l;
+        repaintTextSelection();
     }
 
     /// Fire the done event to done listener
@@ -2377,6 +2415,13 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         this.textSelectionEnabled = enabled;
         this.textSelectionExplicit = true;
         updateCursor();
+        // Native text layers need the containing paint tree to refresh hit testing.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().repaint();
+        } else {
+            repaint();
+        }
     }
 
     /// {@inheritDoc}

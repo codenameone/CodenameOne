@@ -92,6 +92,7 @@ public final class JavaScriptTextLayer {
         // The stacking index this run carries. A repaint of part of the screen leaves it alone:
         // the run keeps the place in the order it already had.
         private int zIndex;
+        private int selectionOrder = -1;
         private int claimedPass;
         // Where the run landed, in Codename One pixels, and the draw order it was promoted at.
         // Both are needed to tell whether something drawn on the canvas afterwards covers it.
@@ -152,6 +153,9 @@ public final class JavaScriptTextLayer {
          * @param value the CSS declaration or text content, null for the other kinds
          */
         void record(int kind, Object target, Object child, String value);
+
+        /** Reports later canvas painting to persistent native editors too. */
+        default void canvasCover(Component painter, int pass, int x, int y, int w, int h, CoverTest test) { }
     }
 
     private final HTMLDocument document;
@@ -448,9 +452,8 @@ public final class JavaScriptTextLayer {
         run.clipY = useClipY;
         run.clipW = useClipW;
         run.clipH = useClipH;
-        // pointer-events stays off so the layer cannot intercept input destined for the canvas,
-        // which still owns all hit testing. Find-in-page and assistive technology do not depend
-        // on hit testing; drag-selection does, and is deliberately not enabled here.
+        // The clipping box must not capture the component's whole paint region.
+        // Only eligible glyph spans below opt into browser pointer selection.
         StringBuilder clipCss = new StringBuilder(
                 "position:absolute;overflow:hidden;pointer-events:none;");
         clipCss.append("left:").append(useClipX / scale).append("px;");
@@ -491,7 +494,25 @@ public final class JavaScriptTextLayer {
 
         // The run is positioned relative to its clip element, so the two move together and a
         // scroll only has to rewrite coordinates rather than restructure anything.
+        // The glyphs, not the clip: a component that draws text and then an image somewhere
+        // else inside the same clip would otherwise look like it had covered its own text, and
+        // the text would be dropped for nothing. The font measures worker-side from a cache, so
+        // asking costs nothing on the bridge.
+        int textWidth = font.stringWidth(str);
+        int textHeight = font.fontHeight();
+        int coverLeft = Math.max(x, useClipX);
+        int coverTop = Math.max(y, useClipY);
+        int coverRight = Math.min(x + textWidth, useClipX + useClipW);
+        int coverBottom = Math.min(y + textHeight, useClipY + useClipH);
+        boolean selectable = HTML5Implementation.nativeSelectionRequested()
+                && frame.component instanceof com.codename1.ui.Label
+                && com.codename1.ui.Accessor.allowsNativeTextSelection(frame.component)
+                && !HTML5Implementation.hasNativeTextOcclusion(frame.component, coverLeft, coverTop, coverRight, coverBottom)
+                && ((com.codename1.ui.Label) frame.component).isTextSelectionEnabled()
+                && frame.component.getComponentForm().getTextSelection().isEnabled();
         StringBuilder textCss = new StringBuilder("position:absolute;white-space:pre;");
+        textCss.append(selectable ? "pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:text;"
+                : "pointer-events:none;user-select:none;-webkit-user-select:none;");
         textCss.append("left:").append((x - useClipX) / scale).append("px;");
         textCss.append("top:").append((y - useClipY) / scale).append("px;");
         // The font shorthand carries its own line-height ("18.9px/1.0"), so it has to be
@@ -526,16 +547,6 @@ public final class JavaScriptTextLayer {
         }
         run.lastY = y;
         run.lastX = x;
-        // The glyphs, not the clip: a component that draws text and then an image somewhere
-        // else inside the same clip would otherwise look like it had covered its own text, and
-        // the text would be dropped for nothing. The font measures worker-side from a cache, so
-        // asking costs nothing on the bridge.
-        int textWidth = font.stringWidth(str);
-        int textHeight = font.fontHeight();
-        int coverLeft = Math.max(x, useClipX);
-        int coverTop = Math.max(y, useClipY);
-        int coverRight = Math.min(x + textWidth, useClipX + useClipW);
-        int coverBottom = Math.min(y + textHeight, useClipY + useClipH);
         run.coverX = coverLeft;
         run.coverY = coverTop;
         run.coverW = Math.max(0, coverRight - coverLeft);
@@ -564,6 +575,7 @@ public final class JavaScriptTextLayer {
      * @param form the form currently displayed, may be null
      */
     public void syncToForm(Form form) {
+        if (form != null) syncSelectionOrder(form, 0);
         for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
                 it.hasNext();) {
             Map.Entry<Component, ComponentRuns> entry = it.next();
@@ -589,6 +601,26 @@ public final class JavaScriptTextLayer {
                 it.remove();
             }
         }
+    }
+
+    private int syncSelectionOrder(Component component, int order) {
+        ComponentRuns componentRuns = byComponent.get(component);
+        if (componentRuns != null) {
+            for (Run run : componentRuns.runs) {
+                if (!run.attached) continue;
+                if (run.selectionOrder != order) {
+                    run.selectionOrder = order;
+                    sink.record(SurfaceCommandRecorder.OP_TEXT_ORDER, run.clip, null, "" + order);
+                }
+                order++;
+            }
+        }
+        if (component instanceof com.codename1.ui.Container) {
+            for (Component child : ((com.codename1.ui.Container)component).getChildrenAsList(false)) {
+                order = syncSelectionOrder(child, order);
+            }
+        }
+        return order;
     }
 
     /**
@@ -626,7 +658,7 @@ public final class JavaScriptTextLayer {
     }
 
     public void noteCanvasCover(int x, int y, int w, int h, CoverTest test) {
-        if (suspended || w <= 0 || h <= 0 || byComponent.isEmpty()) {
+        if (suspended || w <= 0 || h <= 0) {
             return;
         }
         // Who is drawing decides what the draw means for text already in the DOM. A component
@@ -636,6 +668,7 @@ public final class JavaScriptTextLayer {
         // on the form is, and that text has to go back to the canvas where it can be covered.
         Component painter = depth == 0 ? null : stack.get(depth - 1).component;
         int painterPass = depth == 0 ? -1 : stack.get(depth - 1).paintPass;
+        sink.canvasCover(painter, painterPass, x, y, w, h, test);
         List<Component> covered = null;
         for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
                 it.hasNext();) {
@@ -739,12 +772,23 @@ public final class JavaScriptTextLayer {
      * belongs to.</p>
      */
     private boolean isRegionNarrowing(Run run, int clipX, int clipY, int clipW, int clipH) {
-        int left = Math.max(run.clipX, frameDirtyX);
-        int top = Math.max(run.clipY, frameDirtyY);
-        long right = Math.min((long) run.clipX + run.clipW, (long) frameDirtyX + frameDirtyW);
-        long bottom = Math.min((long) run.clipY + run.clipH, (long) frameDirtyY + frameDirtyH);
+        return isRegionNarrowing(run.clipX, run.clipY, run.clipW, run.clipH, clipX, clipY, clipW, clipH);
+    }
+
+    boolean isRegionNarrowing(int oldX, int oldY, int oldW, int oldH, int clipX, int clipY, int clipW, int clipH) {
+        int left = Math.max(oldX, frameDirtyX);
+        int top = Math.max(oldY, frameDirtyY);
+        long right = Math.min((long) oldX + oldW, (long) frameDirtyX + frameDirtyW);
+        long bottom = Math.min((long) oldY + oldH, (long) frameDirtyY + frameDirtyH);
         return clipX == left && clipY == top
                 && (long) clipX + clipW == right && (long) clipY + clipH == bottom;
+    }
+
+    int currentPaintPass() { return depth == 0 ? -1 : stack.get(depth - 1).paintPass; }
+
+    void forceCanvas(Component component) {
+        canvasOnly.add(component);
+        reattachedThisFrame = true;
     }
 
     /**
@@ -800,6 +844,8 @@ public final class JavaScriptTextLayer {
         while (runs.runs.size() <= index) {
             HTMLElement clip = document.createElement("div");
             HTMLElement text = document.createElement("span");
+            text.setAttribute("class", "cn1-native-selection");
+            text.setAttribute("data-cn1-native-selection", "true");
             // Building the pair is not a frame mutation: neither element is in the document
             // yet, so nothing can be seen half-built and there is nothing to keep in step with
             // the canvas. It stays an immediate write, which is also what guarantees the pair

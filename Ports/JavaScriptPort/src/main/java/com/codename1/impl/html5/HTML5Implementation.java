@@ -81,6 +81,7 @@ import com.codename1.ui.AccessibilityColorVisionDeficiency;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.Button;
+import com.codename1.ui.Container;
 import com.codename1.ui.CN;
 import static com.codename1.ui.CN.invokeAndBlock;
 import com.codename1.ui.Component;
@@ -118,6 +119,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.util.Resources;
@@ -771,6 +773,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * Holds the DOM elements carrying the visible text that was promoted off the canvas.
      */
     private HTMLElement textLayerContainer;
+    private HTMLElement selectionEditorContainer;
 
     /**
      * Promotes text runs off the canvas into real DOM text. Non-null once {@code __init()} has
@@ -1126,6 +1129,574 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
+    // Persistent native controls are required for selection to begin in the browser's
+    // original event dispatch. Creating an editor after a worker round trip loses
+    // the first drag, right click and mobile long press.
+    private final Set<SelectionTextOverlay> selectionTextOverlays = new HashSet<SelectionTextOverlay>();
+
+    static boolean nativeSelectionRequested() {
+        return "true".equals(asciiLower(Display.getInstance().getProperty("javascript.textSelection", null)));
+    }
+
+    private boolean allowsSelectionOverlay(TextArea ta) {
+        return nativeSelectionRequested() && Accessor.allowsNativeTextSelection(ta) && hasOpaqueAncestors(ta)
+                && (!(ta instanceof TextField) || TextField.isUseNativeTextInput())
+                && ta.getDoneListener() == null
+                // The legacy editor owns virtual-keyboard resize/scroll compensation.
+                && (!ta.isEditable() || ta.getComponentForm() == null
+                    || !ta.getComponentForm().isFormBottomPaddingEditingMode())
+                && !ta.isEndsWith3Points()
+                && supportsSelectionStyle(ta.getStyle())
+                // Editing switches TextArea.getStyle() to the selected style.
+                // Reject unsupported states before focus can start an editor session.
+                && supportsSelectionStyle(ta.getUnselectedStyle())
+                && supportsSelectionStyle(ta.getSelectedStyle())
+                && (ta.getConstraint() & TextArea.PASSWORD) == 0
+                && (ta.isEditable() || ta.isTextSelectionEnabled() && ta.getComponentForm() != null
+                    && ta.getComponentForm().getTextSelection().isEnabled());
+    }
+
+    private boolean supportsSelectionStyle(Style style) {
+        return !Accessor.isBitmapFont(style.getFont())
+                && style.getTextDecoration() == Style.TEXT_DECORATION_NONE
+                && style.getOpacity() == 255;
+    }
+
+    // Canvas opacity is applied by the component paint stack, including animations.
+    // Keep faded fields in that stack instead of approximating its compositing in CSS.
+    private boolean hasOpaqueAncestors(Component c) {
+        for (; c != null; c = c.getParent()) {
+            if (c.getStyle().getOpacity() != 255) return false;
+        }
+        return true;
+    }
+
+    static HTMLElement visibleSelectionEditor(Component c) {
+        if (c != null && c.getNativeOverlay() instanceof SelectionTextOverlay) {
+            SelectionTextOverlay overlay = (SelectionTextOverlay) c.getNativeOverlay();
+            if (overlay.visible) return overlay.el;
+        }
+        return null;
+    }
+
+    private static boolean elevatedDescendantOverlaps(Component c, int left, int top, int right, int bottom) {
+        if (!c.isVisible() || c.isHidden()) return false;
+        if (c.getStyle().getElevation() > 0 && overlapsNativeText(c, left, top, right, bottom)) return true;
+        if (c instanceof Container) {
+            for (Component child : ((Container)c).getChildrenAsList(false)) {
+                if (elevatedDescendantOverlaps(child, left, top, right, bottom)) return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean hasNativeTextOcclusion(Component target, int left, int top, int right, int bottom) {
+        // Native text cannot punch holes around later canvas content or pointer
+        // responders. Editors use their viewport; labels use the clipped glyph run.
+        if (right <= left || bottom <= top) return false;
+        for (Component branch = target; branch.getParent() != null; branch = branch.getParent()) {
+            Container parent = branch.getParent();
+            // Form.getComponentIndex() redirects to its content pane; inspect the
+            // actual child list so the content pane cannot occlude its own fields.
+            List<Component> siblings = parent.getChildrenAsList(false);
+            int index = siblings.indexOf(branch);
+            for (int i = 0; i < siblings.size(); i++) {
+                Component sibling = siblings.get(i);
+                if (i == index) continue;
+                if ((i > index || sibling.getStyle().getElevation() > branch.getStyle().getElevation())
+                        && overlapsNativeText(sibling, left, top, right, bottom)) return true;
+                // Elevated descendants can paint above later branches even when
+                // their transparent parent has no elevation of its own.
+                if (elevatedDescendantOverlaps(sibling, left, top, right, bottom)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean overlapsNativeText(Component c, int left, int top, int right, int bottom) {
+        if (!c.isVisible() || c.isHidden()) return false;
+        left = Math.max(left, c.getAbsoluteX() + c.getScrollX());
+        top = Math.max(top, c.getAbsoluteY() + c.getScrollY());
+        right = Math.min(right, c.getAbsoluteX() + c.getScrollX() + c.getWidth());
+        bottom = Math.min(bottom, c.getAbsoluteY() + c.getScrollY() + c.getHeight());
+        if (right <= left || bottom <= top) return false;
+        // Hit testing includes transparent containers that scroll, focus, drag,
+        // or grab input. Their lack of canvas paint does not make them pass-through.
+        if (!(c instanceof Container) || c.respondsToPointerEvents()) return true;
+        Style style = c.getStyle();
+        if (Accessor.hasCustomBackgroundPainter(c) || style.getBgTransparency() != 0 || style.getBgImage() != null
+                || style.getBorder() != null && !style.getBorder().isEmptyBorder()) return true;
+        Container container = (Container) c;
+        for (int i = 0; i < container.getComponentCount(); i++) {
+            if (overlapsNativeText(container.getComponentAt(i), left, top, right, bottom)) return true;
+        }
+        return false;
+    }
+
+    private void noteNativeEditorCanvasCover(Component painter, int pass, int x, int y, int w, int h,
+            JavaScriptTextLayer.CoverTest test) {
+        // paintComponent() redraws ancestor backgrounds before opening a paint frame.
+        // Those prepare a repaint; only a known painter can establish later coverage.
+        if (painter == null) return;
+        for (SelectionTextOverlay overlay : selectionTextOverlays) {
+            if (!overlay.visible || painter == overlay.ta) continue;
+            boolean ancestorBackground = false;
+            if (pass >= 0 && overlay.paintedPass < pass) {
+                for (Container parent = overlay.ta.getParent(); parent != null; parent = parent.getParent()) {
+                    if (parent == painter) { ancestorBackground = true; break; }
+                }
+            }
+            if (ancestorBackground || overlay.coverRight <= x || x + w <= overlay.coverLeft
+                    || overlay.coverBottom <= y || y + h <= overlay.coverTop) continue;
+            int left = Math.max(x, overlay.coverLeft), top = Math.max(y, overlay.coverTop);
+            int right = Math.min(x + w, overlay.coverRight), bottom = Math.min(y + h, overlay.coverBottom);
+            if (test != null && !test.covers(left, top, right - left, bottom - top)) continue;
+            // Unlike a glyph run, an editor owns a whole pointer-active rectangle.
+            // Even partial coverage needs canvas fallback; it cannot punch holes.
+            textLayer.forceCanvas(overlay.ta);
+            overlay.coveredByCanvas = true;
+            overlay.paintContextSupported = false;
+            overlay.update();
+        }
+    }
+
+    private class SelectionTextOverlay extends NativeOverlay {
+        final TextArea ta;
+        final DataChangedListener changes;
+        final FocusListener focus;
+        boolean installed = true;
+        boolean browserEdit;
+        boolean focused;
+        boolean editingSession;
+        boolean visible;
+        boolean paintContextSupported;
+        boolean coveredByCanvas;
+        int paintClipX, paintClipY, paintClipW, paintClipH;
+        int paintX = Integer.MIN_VALUE, paintY;
+        int paintedPass = -1;
+        int coverLeft, coverTop, coverRight, coverBottom;
+        final boolean singleLine;
+        String lastValue;
+        String lastCss;
+        Boolean lastReadOnly;
+        int lastMaxSize = -1;
+        int lastConstraint = -1;
+        String lastAutocomplete;
+        String lastName;
+        String lastAccessibleName;
+        int lastScrollY = Integer.MIN_VALUE;
+        List<Runnable> stopCallbacks;
+
+        SelectionTextOverlay(final TextArea ta) {
+            super(ta);
+            this.ta = ta;
+            singleLine = ta.isSingleLineTextArea();
+            el = (HTMLInputElement) doc().createElement(ta.isSingleLineTextArea() ? "input" : "textarea");
+            el.setAttribute("class", "cn1-native-selection cn1-selection-editor");
+            el.setAttribute("data-cn1-native-selection", "true");
+            el.setAttribute("data-cn1-single-line", ta.isSingleLineTextArea() ? "true" : "false");
+            el.setAttribute("data-cn1-enter-next", isPhoneOrTablet_() ? "true" : "false");
+            el.setTabIndex(-1); // updated with visibility and CN1 focusability
+            updateConstraints();
+            el.getStyle().setProperty("display", "none");
+            selectionEditorContainer.appendChild(el);
+            selectionTextOverlays.add(this);
+            changes = new DataChangedListener() {
+                public void dataChanged(int type, int index) {
+                    if (!browserEdit) {
+                        updateNativeEditorText(ta.getText());
+                    }
+                }
+            };
+            ta.addDataChangedListener(changes);
+            focus = new FocusListener() {
+                public void focusGained(Component c) { }
+                public void focusLost(Component c) {
+                    if (focused) el.blur();
+                }
+            };
+            ta.addFocusListener(focus);
+            el.addEventListener("cn1-next", new EventListener() {
+                public void handleEvent(Event event) {
+                    callSerially(new Runnable() {
+                        public void run() {
+                            if (!installed) return;
+                            stopAfterBlur(new Runnable() {
+                                public void run() {
+                                    Form form = ta.getComponentForm();
+                                    if (form == null || form != getCurrentForm()) return;
+                                    final Component next = form.getNextComponent(ta);
+                                    if (next == null) return;
+                                    if (next instanceof TextArea) {
+                                        next.requestFocus();
+                                        next.startEditingAsync();
+                                    } else {
+                                        UITimer.timer(300, false, new Runnable() {
+                                            public void run() {
+                                                next.requestFocus();
+                                                next.startEditingAsync();
+                                                outputCanvas.focus();
+                                            }
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            el.addEventListener("keydown", new EventListener() {
+                public void handleEvent(Event event) {
+                    final KeyEvent key = (KeyEvent) event;
+                    if (key.getKeyCode() != 9) return;
+                    callSerially(new Runnable() {
+                        public void run() {
+                            if (!installed) return;
+                            Form form = ta.getComponentForm();
+                            if (form == null) return;
+                            el.blur();
+                            Accessor.moveFocusByTab(form, key.isShiftKey());
+                            Component next = form.getFocused();
+                            if (next == null) return;
+                            if (next.getNativeOverlay() instanceof SelectionTextOverlay) {
+                                SelectionTextOverlay overlay = (SelectionTextOverlay) next.getNativeOverlay();
+                                if (overlay.visible) overlay.el.focus();
+                            }
+                        }
+                    });
+                }
+            });
+            el.addEventListener("scroll", new EventListener() {
+                public void handleEvent(Event event) {
+                    if (singleLine) return;
+                    final int scrollY = unscaleCoord(el.getScrollTop());
+                    callSerially(new Runnable() {
+                        public void run() {
+                            if (!installed) return;
+                            // Caret movement and selection can scroll the browser editor too.
+                            lastScrollY = scrollY;
+                            Accessor.setNativeTextScrollY(ta, scrollY);
+                        }
+                    });
+                }
+            });
+            el.addEventListener("input", new EventListener() {
+                public void handleEvent(Event event) {
+                    final String value = el.getValue();
+                    callSerially(new Runnable() {
+                        public void run() { if (installed) commit(value); }
+                    });
+                }
+            });
+            el.addEventListener("focus", new EventListener() {
+                public void handleEvent(Event event) {
+                    callSerially(new Runnable() {
+                        public void run() {
+                            if (!installed) return;
+                            focused = true;
+                            if (ta.isEditable() && ta.isEnabled()) {
+                                // Close the previous virtual input device before acquiring
+                                // ownership, just as editStringImpl() does.
+                                ta.registerAsInputDevice();
+                                if (!installed) return;
+                                editingSession = true;
+                                currentEditingField = ta;
+                                currentInputField = el;
+                                isEditing = true;
+                                // Browser focus bypasses editStringImpl(), which normally
+                                // registers the session for form-level editing APIs.
+                                setFocusedEditingText(ta);
+                            }
+                            if (ta.isFocusable() && ta.isEnabled()) ta.requestFocus();
+                            ta.repaint();
+                        }
+                    });
+                }
+            });
+            el.addEventListener("blur", new EventListener() {
+                public void handleEvent(Event event) {
+                    final String value = el.getValue();
+                    callSerially(new Runnable() {
+                        public void run() {
+                            if (installed) completeBlur(value);
+                        }
+                    });
+                }
+            });
+        }
+
+        private void stopAfterBlur(Runnable onFinish) {
+            if (onFinish != null) {
+                if (stopCallbacks == null) stopCallbacks = new ArrayList<Runnable>();
+                stopCallbacks.add(onFinish);
+            }
+            el.blur();
+        }
+
+        private void completeBlur(String value) {
+            boolean wasEditing = editingSession;
+            editingSession = false;
+            focused = false;
+            releaseEditingOwnership();
+            if (wasEditing) {
+                commit(value, true);
+                Display.getInstance().onEditingComplete(ta, ta.getText());
+            }
+            ta.repaint();
+            List<Runnable> callbacks = stopCallbacks;
+            stopCallbacks = null;
+            if (callbacks != null) {
+                for (Runnable callback : callbacks) callback.run();
+            }
+        }
+
+        private void updateAccessibleName() {
+            String accessibleName = ta.getSemantics().getLabel();
+            if ((accessibleName == null || accessibleName.length() == 0) && ta.getLabelForComponent() != null) {
+                accessibleName = ta.getLabelForComponent().getText();
+            }
+            if (accessibleName == null || accessibleName.length() == 0) accessibleName = ta.getName();
+            if (accessibleName == null || accessibleName.length() == 0) accessibleName = ta.getHint();
+            if (accessibleName == null) accessibleName = "";
+            if (!accessibleName.equals(lastAccessibleName)) {
+                el.setAttribute("aria-label", accessibleName);
+                lastAccessibleName = accessibleName;
+            }
+        }
+
+        private void updateConstraints() {
+            updateAccessibleName();
+            Object autocomplete = ta.getClientProperty("cn1$autocomplete");
+            String override = autocomplete == null ? null : autocomplete.toString();
+            String name = ta.getName() == null ? "" : ta.getName();
+            if (lastConstraint != ta.getConstraint() || (override == null ? lastAutocomplete != null : !override.equals(lastAutocomplete))
+                    || !name.equals(lastName)) {
+                applyTextInputConstraints(el, ta, singleLine, true);
+                lastConstraint = ta.getConstraint();
+                lastAutocomplete = override;
+                lastName = name;
+            }
+        }
+
+        private boolean acceptsInput(String value) {
+            // A text input preserves arbitrary programmatic NUMERIC values, unlike
+            // type=number. Validate both DOM edits and canvas initiating characters.
+            if ((ta.getConstraint() & 0xffff) == TextArea.NUMERIC && !value.equals(ta.getText())) {
+                for (int i = 0; i < value.length(); i++) {
+                    char ch = value.charAt(i);
+                    if ((ch < '0' || ch > '9') && !(i == 0 && ch == '-')) return false;
+                }
+            }
+            return true;
+        }
+
+        private void appendInitiatingText(String suffix) {
+            String value = ta.getText() + suffix;
+            if (ta.isEditable() && ta.isEnabled() && acceptsInput(value)) ta.setText(value);
+        }
+
+        private void commit(String value) {
+            commit(value, false);
+        }
+
+        private void commit(String value, boolean completingSession) {
+            if (!completingSession && (!ta.isEditable() || !ta.isEnabled())) return;
+            // A lone sign is an unfinished numeric draft. Clear it on completion
+            // before validation, including when input already copied it to the model.
+            if (completingSession && (ta.getConstraint() & 0xffff) == TextArea.NUMERIC
+                    && "-".equals(value)) {
+                value = "";
+                el.setValue(value);
+            }
+            if (!acceptsInput(value)) {
+                el.setValue(ta.getText());
+                return;
+            }
+            browserEdit = true;
+            try {
+                lastValue = value;
+                if (!value.equals(ta.getText())) {
+                    ta.setText(value);
+                    ta.repaint(); // Native editing otherwise skips hint/alignment painting.
+                }
+            } finally {
+                browserEdit = false;
+            }
+        }
+
+        @Override
+        void updateNativeEditorText(String value) {
+            if (value == null) value = "";
+            if (!value.equals(lastValue)) {
+                el.setValue(value);
+                lastValue = value;
+                ta.repaint(); // Hints still belong to the canvas beneath this editor.
+            }
+        }
+
+        void recordPaintContext() {
+            // Sample inherited alpha before the component applies its own foreground
+            // alpha; that foreground alpha already has a CSS representation below.
+            paintContextSupported = graphics.supportsNativeTextOverlay() && graphics.getAlpha() == 255 && !coveredByCanvas;
+            int x = ta.getAbsoluteX(), y = ta.getAbsoluteY();
+            int cx = graphics.getClipX(), cy = graphics.getClipY();
+            int cw = graphics.getClipWidth(), ch = graphics.getClipHeight();
+            // A dirty-region repaint cannot discard the editor's untouched pixels.
+            // Preserve the previous clip only when the dirty region explains all narrowing.
+            if (paintX != x || paintY != y || !textLayer.isRegionNarrowing(
+                    paintClipX, paintClipY, paintClipW, paintClipH, cx, cy, cw, ch)) {
+                paintClipX = cx; paintClipY = cy; paintClipW = cw; paintClipH = ch;
+            }
+            paintX = x; paintY = y;
+        }
+
+        @Override
+        void updateIfMovedAndFocused() { update(); }
+
+        @Override
+        void update() {
+            Form form = ta.getComponentForm();
+            boolean wasVisible = visible;
+            visible = paintContextSupported && singleLine == ta.isSingleLineTextArea() && allowsSelectionOverlay(ta)
+                    // A legacy session keeps ownership until its final value is committed.
+                    && !(isEditing && currentEditingField == ta && currentInputField != el)
+                    && form != null && form == getCurrentForm()
+                    && Accessor.isDisplayable(ta) && !Display.getInstance().isInTransition()
+                    && !Accessor.paintsOverChildren(form) && Accessor.getActivePeerCount() == 0;
+            // Absolute coordinates include the component's own content scroll.
+            // The DOM viewport stays fixed; scrollTop moves its contents.
+            int x = ta.getAbsoluteX() + ta.getScrollX(), y = ta.getAbsoluteY() + ta.getScrollY();
+            int left = x, top = y, right = x + ta.getWidth(), bottom = y + ta.getHeight();
+            // CN1 paints and handles its own interactive scrollbar. Keep that
+            // strip on the canvas; content padding below also reserves the row-layout gap.
+            if (!singleLine && ta.getUIManager().getLookAndFeel().isInteractiveScroll() && ta.getSideGap() > 0) {
+                int border = ta.getStyle().getBorder() == null ? 0 : ta.getStyle().getBorder().getThickness();
+                if (ta.isRTL()) left += ta.getSideGap() + border;
+                else right -= ta.getSideGap() + border;
+            }
+            for (Container parent = ta.getParent(); parent != null; parent = parent.getParent()) {
+                // Match Component.paintComponent's ancestor content clip, including
+                // the strips reserved for the parent's scrollbars.
+                int parentLeft = parent.getAbsoluteX() + parent.getScrollX();
+                if (ta.isRTL()) parentLeft += parent.getSideGap();
+                left = Math.max(left, parentLeft);
+                top = Math.max(top, parent.getAbsoluteY() + parent.getScrollY());
+                right = Math.min(right, parentLeft + parent.getWidth() - parent.getSideGap());
+                bottom = Math.min(bottom, parent.getAbsoluteY() + parent.getScrollY()
+                        + parent.getHeight() - parent.getBottomGap());
+            }
+            left = Math.max(left, paintClipX);
+            top = Math.max(top, paintClipY);
+            right = Math.min(right, paintClipX + paintClipW);
+            bottom = Math.min(bottom, paintClipY + paintClipH);
+            coverLeft = left; coverTop = top; coverRight = right; coverBottom = bottom;
+            visible &= right > left && bottom > top;
+            if (visible && hasNativeTextOcclusion(ta, left, top, right, bottom)) visible = false;
+            if (visible) {
+                Component hit = form.getComponentAt((left + right) / 2, (top + bottom) / 2);
+                visible = hit == ta;
+            }
+            if (wasVisible != visible) {
+                com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidateAll();
+            }
+            if (!visible) {
+                if (lastCss != null) {
+                    graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_RUN_CSS, el, null, "display:none");
+                    lastCss = null;
+                    lastScrollY = Integer.MIN_VALUE;
+                }
+                return;
+            }
+            if (el.getParentNode() == null) selectionEditorContainer.appendChild(el);
+            updateConstraints();
+            Style style = ta.getStyle();
+            NativeFont font = resolveNativeFont(style.getFont().getNativeFont());
+            int pt = style.getPadding(Component.TOP), pb = style.getPadding(Component.BOTTOM);
+            if (ta.isSingleLineTextArea() && ta.getVerticalAlignment() == Component.CENTER) {
+                pt = Math.max(pt, (ta.getHeight() - font.fontHeight()) / 2);
+            } else if (ta.isSingleLineTextArea() && ta.getVerticalAlignment() == Component.BOTTOM) {
+                pt = Math.max(pt, ta.getHeight() - pb - font.fontHeight());
+            }
+            if (!ta.isSingleLineTextArea()) {
+                int lines = ta.getLines();
+                int contentHeight = font.fontHeight() * lines + ta.getRowsGap() * Math.max(0, lines - 1);
+                int remaining = Math.max(0, ta.getInnerHeight() - contentHeight);
+                if (lines > 0 && ta.getVerticalAlignment() == Component.CENTER) pt += remaining / 2;
+                else if (lines > 0 && ta.getVerticalAlignment() == Component.BOTTOM) pt += remaining;
+            }
+            int paddingLeft = style.getPadding(ta.isRTL(), Component.LEFT);
+            int paddingRight = style.getPadding(ta.isRTL(), Component.RIGHT);
+            int wrappingGap = singleLine ? 0 : Accessor.getNativeTextWrappingGap(ta);
+            if (ta.isRTL()) paddingLeft += wrappingGap;
+            else paddingRight += wrappingGap;
+            int alignment = DefaultLookAndFeel.reverseAlignForBidi(ta, style.getAlignment());
+            // Readback requires glyphs on the canvas. Keep the transparent control
+            // for browser selection, caret and editing without painting text twice.
+            String textColor = textLayerDisabledByReadback ? "transparent"
+                    : HTML5Graphics.colorWithAlpha((style.getFgAlpha() << 24) | (style.getFgColor() & 0xffffff));
+            String css = "position:absolute;box-sizing:border-box;border:0;margin:0;outline:0;resize:none;"
+                    + "background:transparent;overflow:hidden;pointer-events:auto;user-select:text;cursor:text;"
+                    + "z-index:2147483644;display:block;left:" + scaleCoord(x) + "px;top:" + scaleCoord(y)
+                    + "px;width:" + scaleCoord(ta.getWidth()) + "px;height:" + scaleCoord(ta.getHeight())
+                    + "px;padding:" + scaleCoord(pt) + "px " + scaleCoord(paddingRight)
+                    + "px " + scaleCoord(pb) + "px " + scaleCoord(paddingLeft)
+                    + "px;font:" + font.getScaledCSS() + ";line-height:" + scaleCoord(font.fontHeight() + ta.getRowsGap())
+                    + "px;color:" + textColor + ";caret-color:" + HTML5Graphics.color(style.getFgColor())
+                    + ";direction:" + (ta.isRTL() ? "rtl" : "ltr")
+                    + ";text-align:" + (alignment == Component.CENTER ? "center"
+                        : alignment == Component.RIGHT ? "right" : "left")
+                    + ";clip-path:inset(" + scaleCoord(top - y) + "px " + scaleCoord(x + ta.getWidth() - right)
+                    + "px " + scaleCoord(y + ta.getHeight() - bottom) + "px " + scaleCoord(left - x) + "px);";
+            if (!css.equals(lastCss)) {
+                graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_RUN_CSS, el, null, css);
+                lastCss = css;
+            }
+            el.setAttribute("aria-disabled", ta.isEnabled() ? "false" : "true");
+            el.setTabIndex(ta.isFocusable() && ta.isEnabled() ? 0 : -1);
+            boolean readOnly = !ta.isEditable() || !ta.isEnabled();
+            if (lastReadOnly == null || lastReadOnly.booleanValue() != readOnly) {
+                if (readOnly) el.setAttribute("readonly", "readonly");
+                else el.removeAttribute("readonly");
+                lastReadOnly = Boolean.valueOf(readOnly);
+            }
+            if (lastMaxSize != ta.getMaxSize()) {
+                lastMaxSize = ta.getMaxSize();
+                el.setAttribute("maxlength", "" + lastMaxSize);
+            }
+            updateNativeEditorText(ta.getText());
+            if (!singleLine && lastScrollY != ta.getScrollY()) {
+                lastScrollY = ta.getScrollY();
+                // Apply after CSS in the same paint batch, once the viewport has its size.
+                graphics.recordTextLayerOp(SurfaceCommandRecorder.OP_TEXT_SCROLL, el, null,
+                        "" + scaleCoord(lastScrollY));
+            }
+        }
+
+        private void releaseEditingOwnership() {
+            // A removed control may deliver blur after its replacement gains focus.
+            if (currentInputField == el) {
+                if (HTML5Implementation.super.isEditingText(ta)) setFocusedEditingText(null);
+                currentEditingField = null;
+                currentInputField = null;
+                isEditing = false;
+            }
+        }
+
+        @Override
+        void uninstall() {
+            if (!installed) return;
+            installed = false;
+            if (visible) com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidateAll();
+            visible = false;
+            completeBlur(el.getValue());
+            el.blur();
+            ta.removeDataChangedListener(changes);
+            ta.removeFocusListener(focus);
+            selectionTextOverlays.remove(this);
+            if (el.getParentNode() != null) el.getParentNode().removeChild(el);
+        }
+    }
+
     private class TextAreaNativeOverlay extends NativeOverlay {
         TextArea ta;
         FocusListener focusListener;
@@ -1465,10 +2036,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 && c.getWidth() >= displayWidth && c.getHeight() >= displayHeight) {
             paintCoversScreen = true;
         }
-        Object overlay = c.getNativeOverlay();
-        if (overlay != null) {
-            NativeOverlay no = (NativeOverlay)overlay;
-            no.updateIfMovedAndFocused();
+        if (isDisplayGraphics(g) && c.getNativeOverlay() instanceof SelectionTextOverlay
+                && ((SelectionTextOverlay) c.getNativeOverlay()).singleLine != ((TextArea) c).isSingleLineTextArea()) {
+            Accessor.hideNativeTextOverlay(c);
+        }
+        if (c instanceof TextArea && c.getNativeOverlay() == null && textLayerContainer != null
+                && isDisplayGraphics(g) && allowsSelectionOverlay((TextArea) c)) {
+            Accessor.showNativeTextOverlay(c);
         }
         if (textLayer != null && isDisplayGraphics(g)) {
             if (!textLayer.isPainting()) {
@@ -1483,6 +2057,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     graphics.getClipX(), graphics.getClipY(),
                     graphics.getClipWidth(), graphics.getClipHeight());
         }
+        Object overlay = c.getNativeOverlay();
+        if (overlay != null) {
+            NativeOverlay no = (NativeOverlay)overlay;
+            if (no instanceof SelectionTextOverlay) {
+                if (isDisplayGraphics(g)) {
+                    // Keep this decision until the next display paint. At flush time
+                    // the parent may already have restored its graphics state.
+                    ((SelectionTextOverlay) no).recordPaintContext();
+                    no.updateIfMovedAndFocused();
+                }
+            } else {
+                no.updateIfMovedAndFocused();
+            }
+        }
+
     }
 
     /**
@@ -1543,6 +2132,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // The display graphics reports its clip in absolute coordinates, which is the space
             // component bounds are in. Graphics.getClipX() subtracts the current translation, so
             // it would be component-local and the comparison would almost never hold.
+            if (c.getNativeOverlay() instanceof SelectionTextOverlay) {
+                ((SelectionTextOverlay)c.getNativeOverlay()).paintedPass = textLayer.currentPaintPass();
+            }
             textLayer.endComponent(c);
         }
     }
@@ -1580,6 +2172,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public Object createNativeOverlay(Component cmp) {
+        if (textLayerContainer != null && textLayerEnabled && cmp instanceof TextArea
+                && allowsSelectionOverlay((TextArea) cmp)) {
+            return new SelectionTextOverlay((TextArea) cmp);
+        }
         if (!useNativeOverlaysForTextFields()) {
             // we only do this for phones and tablets
             return null;
@@ -1837,28 +2433,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // visible text, so it is hidden from assistive technology -- the semantic tree is what
         // announces content, and without aria-hidden every label would be read twice.
         //
-        // It takes no pointer events, which means a drag across a label does not begin a native
-        // text selection. Review asked for that to change; it does not, and the reason is that
-        // the canvas owns hit testing here. Pointer routing decides between the canvas and the
-        // native peers behind it by probing canvas alpha, and every gesture the application
-        // reacts to -- a tap on a button, a drag that scrolls a list, a swipe that opens a side
-        // menu -- arrives as a pointer event on the canvas. A span that answered pointer events
-        // would swallow the gestures that land on text, which is most of the interactive surface
-        // of a Codename One form, and forwarding a synthesized copy to the canvas afterwards
-        // gives the application either a doubled gesture or none, depending on which event is
-        // cancelled to let the selection through.
-        //
-        // What the layer does deliver is real text in the document: find-in-page matches it,
-        // the browser reads it, assistive technology can select and copy through the semantic
-        // tree, and it rasterizes as text rather than as pixels. Pointer selection would need
-        // the port's input path to accept synthesized events and to tell a selection drag from
-        // an application drag before either has finished -- a change to input, not to this
-        // layer, and not one to make quietly at the end of a rendering change.
+        // The layer root does not capture input. Eligible text children opt into
+        // native selection; buttons and app-owned gestures continue to hit the canvas.
         textLayerContainer = (HTMLElement)document.createElement("div");
         textLayerContainer.setAttribute("id", "cn1-text-layer");
         textLayerContainer.setAttribute("aria-hidden", "true");
         textLayerContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
         outputCanvas.getParentNode().insertBefore(textLayerContainer, outputCanvas);
+        // Interactive editors must remain exposed to assistive technology when focused.
+        // Keep the duplicate, noninteractive glyph layer aria-hidden.
+        selectionEditorContainer = (HTMLElement)document.createElement("div");
+        selectionEditorContainer.setAttribute("id", "cn1-selection-editors");
+        selectionEditorContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
+        outputCanvas.getParentNode().insertBefore(selectionEditorContainer, outputCanvas);
         // ?cn1TextLayer=0 / ?cn1Semantics=0 turn the two DOM layers off at runtime. Both are
         // new behaviour layered onto a canvas renderer, so being able to take one out without
         // rebuilding is what makes a rendering or timing regression bisectable.
@@ -1869,6 +2456,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // graphics is built further down this method, after the layer exists.
             textLayer = new JavaScriptTextLayer(document, textLayerContainer,
                     new JavaScriptTextLayer.MutationSink() {
+                        @Override
+                        public void canvasCover(Component painter, int pass, int x, int y, int w, int h, JavaScriptTextLayer.CoverTest test) {
+                            noteNativeEditorCanvasCover(painter, pass, x, y, w, h, test);
+                        }
+
                         @Override
                         public void record(int kind, Object target, Object child, String value) {
                             if (graphics != null) {
@@ -3145,7 +3737,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                     //}
                                     return;
                                 }
-                                Display.getInstance().editString(cmp, ta.getMaxSize(), ta.getConstraint(), ta.getText(), charCode);
+                                if (ta.isEditable() && ta.isEnabled()) {
+                                    Display.getInstance().editString(cmp, ta.getMaxSize(), ta.getConstraint(), ta.getText(), charCode);
+                                }
                                 
                             } 
                             
@@ -4416,6 +5010,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void accessibilityTreeChanged(int changeType) {
+        // Semantic label setters need not repaint the component. Refresh the
+        // visible editor as well as the hidden semantic tree on these mutations.
+        for (SelectionTextOverlay overlay : selectionTextOverlays) overlay.updateAccessibleName();
         if (accessibilityContainer == null || !semanticOverlayEnabled) {
             return;
         }
@@ -4982,11 +5579,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
     //   way the Windows and Linux ports do.
     // ---------------------------------------------------------------------------------------
 
-    /// The `javascript.textSelection` build hint: read-only text becomes selectable and copyable
-    /// in every form, through the framework's own TextSelection -- the canvas owns pointer input,
-    /// so the browser's native selection cannot reach the text (see the text layer's comment in
-    /// __init). The trigger is TextSelection's platform default: a press-drag with a mouse, a
-    /// long press on a touch screen, so a swipe over text still scrolls.
+    /// Enables the native text controls and label selection, with the framework's
+    /// TextSelection retained for text that cannot be promoted out of the canvas.
     private void applyTextSelectionHint(Form f) {
         if (f == null || !"true".equals(asciiLower(Display.getInstance().getProperty("javascript.textSelection", null)))) {
             return;
@@ -6165,7 +6759,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
         });
     }
     
+    private SelectionTextOverlay currentSelectionEditor() {
+        Object overlay = currentEditingField == null ? null : currentEditingField.getNativeOverlay();
+        if (overlay instanceof SelectionTextOverlay && currentInputField == ((SelectionTextOverlay) overlay).el) {
+            return (SelectionTextOverlay) overlay;
+        }
+        return null;
+    }
+
     private void focusInputElement() {
+        // Persistent native editors already receive focus in the browser's own
+        // gesture. Refocusing the old editor after a canvas press races its blur.
+        if (currentSelectionEditor() != null) return;
         if (isEditing && currentInputField != null && !jQuery_is_(currentInputField, ":focus")) {
             currentInputField.focus();
         }
@@ -6178,6 +6783,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public boolean isEditingText(Component c) {
         NativeOverlay overlay = (NativeOverlay)c.getNativeOverlay();
+        if (overlay instanceof SelectionTextOverlay) {
+            // Canvas keys already queued before native focus still need editString.
+            // A synchronous DOM focus query would discard them before its callback.
+            return currentEditingField == c && isEditing
+                    && (currentInputField != overlay.el || ((SelectionTextOverlay) overlay).focused);
+        }
         if (overlay != null && jQuery_is_(overlay.el, ":focus")) {
             return true;
             
@@ -6191,8 +6802,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     @Override
+    public boolean nativeEditorPaintsHint() {
+        // Keep themed hint text and icons on the canvas beneath the transparent editor.
+        return false;
+    }
+
+    @Override
+    public boolean isNativeEditorVisible(Component c, Graphics g) {
+        if (c.getNativeOverlay() instanceof SelectionTextOverlay) {
+            SelectionTextOverlay overlay = (SelectionTextOverlay)c.getNativeOverlay();
+            if (isDisplayGraphics(g) && !graphics.supportsNativeTextOverlay()) {
+                overlay.paintContextSupported = false;
+                overlay.update();
+            }
+        }
+        if (c.getNativeOverlay() instanceof SelectionTextOverlay
+                && (textLayerDisabledByReadback || !((SelectionTextOverlay)c.getNativeOverlay()).paintContextSupported)
+                && !(isEditing && currentEditingField == c && currentInputField != ((NativeOverlay)c.getNativeOverlay()).el)) {
+            return false;
+        }
+        return isDisplayGraphics(g) && isNativeEditorVisible(c);
+    }
+
+    @Override
     public boolean isNativeEditorVisible(Component c) {
         NativeOverlay overlay = (NativeOverlay)c.getNativeOverlay();
+        if (overlay instanceof SelectionTextOverlay && ((SelectionTextOverlay) overlay).visible) return true;
         if (overlay != null && jQuery_is_(overlay.el, ":focus")) {
             return true;
         }
@@ -6227,6 +6862,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void resizeNativeEditor() {
+        // Persistent editors own their clipped bounds and alignment in the paint batch.
+        // The legacy editor's content-box sizing would overwrite that CSS after focus.
+        if (currentSelectionEditor() != null) return;
         if (isEditing && currentInputField != null && currentEditingField != null) {
             HTMLInputElement inputEl = currentInputField;
             TextArea ta = currentEditingField;
@@ -6590,7 +7228,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void stopTextEditing(Runnable onFinish) {
+        SelectionTextOverlay editor = currentSelectionEditor();
+        if (editor != null && isEditing) {
+            editor.stopAfterBlur(onFinish);
+        } else {
+            super.stopTextEditing(onFinish);
+        }
+    }
+
+    @Override
     public void stopTextEditing() {
+        SelectionTextOverlay editor = currentSelectionEditor();
+        if (editor != null && isEditing) {
+            editor.stopAfterBlur(null);
+            return;
+        }
         if (isEditing){
             if (currentEditingField != null) {
                 pendingTextChanges = currentEditingField.getText();
@@ -6632,8 +7285,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     private HTMLInputElement inputEl;
     private String text;
-    private DataChangedListener dataChangedListener;
     private Runnable editingCompleteCallback;
+    private final Map<Form, HTMLInputElement> legacyEditorPaddingOwners = new HashMap<Form, HTMLInputElement>();
+
+    private void restoreLegacyEditorPadding(Form form, HTMLInputElement owner) {
+        if (form != null && legacyEditorPaddingOwners.get(form) == owner) {
+            legacyEditorPaddingOwners.remove(form);
+            form.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+            form.forceRevalidate();
+        }
+    }
     private boolean nextEditPending, prevEditPending;
     
     
@@ -6673,6 +7334,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @return the resolved input type, "text" for anything without one of its own
      */
     static String applyTextInputConstraints(HTMLElement inputEl, TextArea ta, boolean singleLine) {
+        return applyTextInputConstraints(inputEl, ta, singleLine, false);
+    }
+
+    private static String applyTextInputConstraints(HTMLElement inputEl, TextArea ta, boolean singleLine, boolean persistent) {
         int constraint = ta.getConstraint();
         int base = constraint & 0xffff;
         boolean password = (constraint & TextArea.PASSWORD) != 0;
@@ -6685,7 +7350,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             resolvedType = "password";
         } else if (base == TextArea.EMAILADDR) {
             resolvedType = "email";
-        } else if (base == TextArea.NUMERIC) {
+        } else if (base == TextArea.NUMERIC && !persistent) {
+            // Persistent controls also render the model while unfocused. Constraints
+            // are enforced on user input; type=number would erase nonnumeric model text.
             resolvedType = "number";
         } else if (base == TextArea.PHONENUMBER) {
             resolvedType = "tel";
@@ -6777,11 +7444,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return resolvedType;
     }
 
+    private static boolean isEditingInitiatingCharacter(int keycode) {
+        return keycode > 47 && keycode < 58 || keycode == 32 || keycode == 13
+                || keycode > 64 && keycode < 91 || keycode > 95 && keycode < 112
+                || keycode > 185 && keycode < 193 || keycode > 218 && keycode < 223;
+    }
+
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, final String origText, int initiatingKeycode) {
-        if (cmp.getNativeOverlay() != null) {
+        if (cmp.getNativeOverlay() != null && (!(cmp.getNativeOverlay() instanceof SelectionTextOverlay)
+                || ((SelectionTextOverlay) cmp.getNativeOverlay()).visible)) {
             // If a native overlay exists then just use that native overlay
             NativeOverlay overlayEl = (NativeOverlay)cmp.getNativeOverlay();
+            if (overlayEl instanceof SelectionTextOverlay) {
+                TextArea ta = (TextArea) cmp;
+                // Canvas key events can arrive before the asynchronous DOM focus
+                // callback. Accumulate against the model, not the original snapshot.
+                if (initiatingKeycode == 10 || initiatingKeycode == 13) {
+                    if (ta.isSingleLineTextArea()) {
+                        Display.getInstance().onEditingComplete(cmp, ta.getText());
+                        return;
+                    }
+                    if (ta.getText().length() < maxSize) ((SelectionTextOverlay) overlayEl).appendInitiatingText("\n");
+                } else if (isEditingInitiatingCharacter(initiatingKeycode) && ta.getText().length() < maxSize) {
+                    ((SelectionTextOverlay) overlayEl).appendInitiatingText("" + (char) initiatingKeycode);
+                }
+                overlayEl.updateNativeEditorText(ta.getText());
+            }
             overlayEl.el.focus();
             return;
         }
@@ -7010,7 +7699,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             inputEl.getStyle().setProperty("display", "block");
             
             inputEl.setAttribute("maxlength", maxSize+"");
-            inputEl.getStyle().setProperty("font", ((NativeFont)cmp.getStyle().getFont().getNativeFont()).getScaledCSS());
+            inputEl.getStyle().setProperty("font", resolveNativeFont(cmp.getStyle().getFont().getNativeFont()).getScaledCSS());
             inputEl.getStyle().setProperty("color", HTML5Graphics.color(cmp.getStyle().getFgColor()));
 
             final Style taStyle = ta.getStyle();
@@ -7055,14 +7744,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
 
 
-            boolean valid = 
-                (initiatingKeycode > 47 && initiatingKeycode < 58)   || // number keys
-                initiatingKeycode == 32 || initiatingKeycode == 13   || // spacebar & return key(s) (if you want to allow carriage returns)
-                (initiatingKeycode > 64 && initiatingKeycode < 91)   || // letter keys
-                (initiatingKeycode > 95 && initiatingKeycode < 112)  || // numpad keys
-                (initiatingKeycode > 185 && initiatingKeycode < 193) || // ;=,-./` (in order)
-                (initiatingKeycode > 218 && initiatingKeycode < 223);   // [\]' (in order)
-            
+            boolean valid = isEditingInitiatingCharacter(initiatingKeycode);
+
             switch (initiatingKeycode) {
                 case 8 : { // backspace 
                     if (valid && text.length() > 0) {
@@ -7126,11 +7809,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
             
             
-            dataChangedListener = null;
-            
-            
             final HTMLInputElement el = inputEl;
-            dataChangedListener = new DataChangedListener() {
+            final DataChangedListener sessionDataChangedListener = new DataChangedListener() {
 
                 @Override
                 public void dataChanged(int i, int i1) {
@@ -7142,7 +7822,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
                 }
             };
-            ta.addDataChangedListener(dataChangedListener);
+            ta.addDataChangedListener(sessionDataChangedListener);
             
             
             ta.addFocusListener(focusListener);
@@ -7156,6 +7836,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             tabPrev = false;
             
             final HTMLInputElement finalInputEl = inputEl;
+            final Form editingForm = ta.getComponentForm();
             // We need to resize the canvas whenever the soft keyboard is shown
             
             //inputEl.blur();
@@ -7174,26 +7855,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // We detect the scroll position and then add appropriate
                     // padding to the bottom of the form... then scroll up to the
                     // top again to compensate.
+                    if (inputEl != finalInputEl || editingForm == null
+                            || editingForm != Display.getInstance().getCurrent()) return;
                     vkbHeight = getScrollY_();
-                    Form current = Display.getInstance().getCurrent();
+                    Form current = editingForm;
                     if (!current.isFormBottomPaddingEditingMode()) {
                         //We only re-layout the form if form bottom padding is enabled
                         return;
                     }
                     current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
                     current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, unscaleCoord(vkbHeight));
-
+                    legacyEditorPaddingOwners.put(editingForm, finalInputEl);
 
                     Display.getInstance().callSerially(new Runnable() {
 
                         @Override
                         public void run() {
-                            Display.getInstance().getCurrent().forceRevalidate();
+                            if (inputEl != finalInputEl || editingForm != Display.getInstance().getCurrent()) return;
+                            editingForm.forceRevalidate();
                             finalInputEl.getStyle().setProperty("top", scaleCoord(cmp.getAbsoluteY()+cmp.getScrollY())+"px");
                             finalInputEl.getStyle().setProperty("left", scaleCoord(cmp.getAbsoluteX()+cmp.getScrollX())+"px");
                             //safeSleep(100);
                             scrollToY(0);
-                            Display.getInstance().getCurrent().forceRevalidate();
+                            editingForm.forceRevalidate();
                         }
 
                     });
@@ -7278,25 +7962,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             editingCompleteCallback = new Runnable() {
                 public void run() {
                     try {     
-                        // Fix for https://github.com/shannah/cn1-teavm-port/issues/48
-                        // on iPad the invisible input field may retain focus and we can't
-                        // seem to return focus to the canvas.
-                        if (!usePreemptiveNativeTextFieldApproach() || (!nextEditPending && !prevEditPending)) {
-                            
-                            inputEl.blur();
-                            outputCanvas.focus();
-                        } else {
-                            nextEditPending = false;
-                            prevEditPending = false;
-                        }
-
                         // Remove all of the event listeners that we added to the input field
                         // and text field before blocking.
                         
-                        EventUtil.removeEventListener(inputEl, "input", inputHandle);
-                        //EventUtil.removeEventListener(inputEl, "blur", blurHandle);
-                        //EventUtil.removeEventListener(inputEl, "focus", focusHandle);
-                        //EventUtil.removeEventListener(inputEl, "click", clickHandle);
+                        EventUtil.removeEventListener(finalInputEl, "input", inputHandle);
+                        //EventUtil.removeEventListener(finalInputEl, "blur", blurHandle);
+                        //EventUtil.removeEventListener(finalInputEl, "focus", focusHandle);
+                        //EventUtil.removeEventListener(finalInputEl, "click", clickHandle);
                         EventUtil.removeEventListener(window, "resize", resizeHandle);
                         if (!intervalCleared[0]) {
                             intervalCleared[0] = true;
@@ -7304,30 +7976,51 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
 
                         ta.removeFocusListener(focusListener);
-                        if (dataChangedListener != null && ta instanceof TextField) {
-                            ((TextField)ta).removeDataChangeListener(dataChangedListener);
+                        ta.removeDataChangedListener(sessionDataChangedListener);
+
+                        // Release only this session's padding on its original form.
+                        // A newer layout on the same form owns its padding independently.
+                        restoreLegacyEditorPadding(editingForm, finalInputEl);
+
+                        // A delayed completion belongs to this session, even if a new
+                        // editor has already replaced the shared inputEl reference.
+                        if (inputEl != finalInputEl) {
+                            String completedText = finalInputEl.getValue();
+                            ta.setText(completedText);
+                            finalInputEl.getStyle().setProperty("display", "none");
+                            Display.getInstance().onEditingComplete(ta, completedText);
+                            ta.repaint();
+                            return;
+                        }
+                        // Fix for https://github.com/shannah/cn1-teavm-port/issues/48
+                        // on iPad the invisible input field may retain focus and we can't
+                        // seem to return focus to the canvas.
+                        if (!usePreemptiveNativeTextFieldApproach() || (!nextEditPending && !prevEditPending)) {
+
+                            finalInputEl.blur();
+                            outputCanvas.focus();
+                        } else {
+                            nextEditPending = false;
+                            prevEditPending = false;
                         }
 
                         //if (lastHTMLInputTime > lastCN1InputTime) {
-                            text = inputEl.getValue();
+                            text = finalInputEl.getValue();
                         //} else {
                         //    text = ta.getText();
                         //}
-
-
-                        Form current = Display.getInstance().getCurrent();
-                        current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                        current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
-                        current.forceRevalidate();
 
 
                         if (pendingTextChanges != null && !pendingTextChanges.equals(ta.getText())) {
                             pendingTextChanges = null;
                             text = ta.getText();
                         }
+                        // Async edit completion does not copy the value itself. Capture
+                        // the final DOM value even if the last input callback is pending.
+                        if (!text.equals(ta.getText())) ta.setText(text);
 
                     } finally {
-                        cleanup.run();
+                        if (inputEl == finalInputEl) cleanup.run();
                     }
                 }
             };
@@ -7463,6 +8156,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void finishTextEditing(){
+        SelectionTextOverlay selectionEditor = currentSelectionEditor();
+        if (selectionEditor != null) {
+            selectionEditor.el.blur();
+            return;
+        }
         if (!useNativeOverlaysForTextFields()) {
             if (editingCompleteCallback != null) {
                 Display.getInstance().callSerially(editingCompleteCallback);
@@ -7512,6 +8210,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
         displayFlushes++;
+        for (SelectionTextOverlay overlay : selectionTextOverlays) overlay.update();
+        if (outputCanvas != null) {
+            Form current = getCurrentForm();
+            outputCanvas.setAttribute("data-cn1-text-selection",
+                    current != null && current.getTextSelection().isEnabled() ? "true" : "false");
+        }
         if (textLayer != null) {
             // Releases runs whose component has been removed, hidden, or whose form is no longer
             // displayed; none of those ever paints again, so nothing else would clean them up.
@@ -7612,7 +8316,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             pendingReadbacks.add(callback);
             return;
         }
-        if (textLayer != null && !textLayer.isSuspended()) {
+        if (textLayer != null && !textLayerDisabledByReadback) {
             textLayer.setSuspended(true);
             textLayerDisabledByReadback = true;
             readbackRepaintPending = true;
@@ -10247,18 +10951,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
-        return ((NativeFont)nativeFont).stringWidth(new String(ch, offset, length));
+        return resolveNativeFont(nativeFont).stringWidth(new String(ch, offset, length));
     }
 
     @Override
     public int stringWidth(Object nativeFont, String str) {
         //return graphics.stringWidth(nativeFont, str);
-        return ((NativeFont)nativeFont).stringWidth(str);
+        return resolveNativeFont(nativeFont).stringWidth(str);
     }
 
     @Override
     public int charWidth(Object nativeFont, char ch) {
-        return ((NativeFont)nativeFont).charWidth(ch);
+        return resolveNativeFont(nativeFont).charWidth(ch);
         //return stringWidth(nativeFont, ch+"");
     }
     
@@ -10266,7 +10970,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int getHeight(Object nativeFont) {
-        return ((NativeFont)nativeFont).fontHeight();
+        return resolveNativeFont(nativeFont).fontHeight();
 
     }
 
@@ -10274,7 +10978,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public int getFontAscent(Object nativeFont) {
-        return g(graphics).getFontAscent(nativeFont);
+        return g(graphics).getFontAscent(resolveNativeFont(nativeFont));
     }
 
     @Override
@@ -10286,7 +10990,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int getFontDescent(Object nativeFont) {
-        return g(graphics).getFontDescent(nativeFont);
+        return g(graphics).getFontDescent(resolveNativeFont(nativeFont));
+    }
+
+    // Font.getDefaultFont() initially wraps null. Null is the platform's default
+    // font, including during native-theme initialization before a theme sets one.
+    // Android's ComboBox material icon measures it during startup (#5943).
+    private NativeFont resolveNativeFont(Object nativeFont) {
+        return nativeFont == null ? defaultFont : (NativeFont) nativeFont;
     }
 
     @Override

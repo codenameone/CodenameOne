@@ -641,7 +641,10 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// - `b`: true to enable false to disable
     public void setFormBottomPaddingEditingMode(boolean b) {
-        bottomPaddingMode = b;
+        if (bottomPaddingMode != b) {
+            bottomPaddingMode = b;
+            repaintTextSelection();
+        }
     }
 
     /// This method returns a rectangle defining the "safe" area of the display, which excludes

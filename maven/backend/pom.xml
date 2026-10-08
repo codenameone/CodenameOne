@@ -336,7 +336,7 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- Keep this after antrun so the package-phase source jar exists
+<!-- Keep this after antrun so the package-phase source jar exists
                  before attach-artifact runs. Maven requires one block per plugin. -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
