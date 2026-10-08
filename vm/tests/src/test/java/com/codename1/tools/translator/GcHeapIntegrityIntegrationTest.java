@@ -84,7 +84,88 @@ class GcHeapIntegrityIntegrationTest {
         }
     }
 
-    private void runGate(List<Path> tempDirs) throws Exception {
+    /**
+     * The stop-the-world hold cannot be escaped at a resume (cn1GcTryResumeActive).
+     *
+     * <p>Every resume site used to be "wait while threadBlockedByGC, then threadActive =
+     * TRUE". A thread preempted between the two let the collector raise the block, read
+     * threadActive as FALSE and hold the thread as parked while it ran -- and a
+     * stop-the-world cycle frees what such a thread allocates and stores. This gate caught
+     * it once on an oversubscribed arm64 runner, which is far too rare to guard against a
+     * regression, so this half opens the window on purpose: CN1_GC_FAULT=resumewindow
+     * sleeps inside every resume window, and CN1_GC_HYBRID_FORCE=1 makes most cycles
+     * stop-the-world so the hold is what is under test.</p>
+     *
+     * <p>The run with the handshake must stay clean AND must show the handshake doing
+     * work, or "clean" would only mean the window was never reached. The run with the
+     * re-check removed (resumeescape, the pre-fix protocol) must be caught, or this half
+     * proves nothing.</p>
+     */
+    @Test
+    void aThreadHeldByAStopTheWorldCycleNeverRunsThroughAResume() throws Exception {
+        Parser.cleanup();
+
+        List<Path> tempDirs = new ArrayList<>();
+        try {
+            VerifiedBuild built = buildVerified(tempDirs, "GcResumeWindowApp");
+
+            Map<String, String> window = new HashMap<String, String>();
+            window.put("CN1_GC_HYBRID_FORCE", "1");
+            window.put("CN1_GC_FAULT", "resumewindow");
+            Run held = run(built.executable, built.buildDir, window);
+            assertTrue(held.output.contains("[GC-FAULT] every resume window widened"),
+                    "The resume-window fault did not engage, so nothing was tested. Output: "
+                            + tail(held.output));
+            assertEquals(0, held.exit,
+                    "With the resume handshake, a widened resume window must not let a held "
+                            + "thread run.\n" + violationExcerpt(held.output)
+                            + "\n--- tail ---\n" + tail(held.output));
+            assertTrue(!held.output.contains("DANGLING REFERENCE"),
+                    "A held thread ran through a resume.\n" + violationExcerpt(held.output));
+            java.util.regex.Matcher caught = java.util.regex.Pattern
+                    .compile("resume handshake caught (\\d+) block").matcher(held.output);
+            assertTrue(caught.find(), "The handshake never reported. Output: " + tail(held.output));
+            assertTrue(Long.parseLong(caught.group(1)) > 0,
+                    "No block was ever raised inside a resume window, so the clean result above "
+                            + "did not exercise the hold: " + caught.group(0));
+            assertTrue(verifyPasses(held.output) > 0,
+                    "The verifier never ran. Output: " + tail(held.output));
+            assertEquals(built.javaResult, extractLine(held.output, "RESULT="),
+                    "JavaSE and ParparVM should agree on the workload result");
+
+            Map<String, String> escape = new HashMap<String, String>(window);
+            escape.put("CN1_GC_FAULT", "resumeescape");
+            Run escaped = run(built.executable, built.buildDir, escape);
+            assertTrue(escaped.output.contains("re-check skipped"),
+                    "The resume-escape fault did not engage. Output: " + tail(escaped.output));
+            assertTrue(escaped.output.contains("DANGLING REFERENCE"),
+                    "The verifier did NOT detect a thread running while a stop-the-world cycle "
+                            + "held it (the pre-handshake resume protocol, re-injected), so the "
+                            + "half above proves nothing. Output: " + tail(escaped.output));
+            assertTrue(escaped.exit != 0,
+                    "A detected dangling reference must fail the process. Exit was 0.");
+        } finally {
+            for (Path dir : tempDirs) {
+                deleteRecursively(dir);
+            }
+        }
+    }
+
+    /** A verified build of one fixture, and what the JVM says it computes. */
+    private static final class VerifiedBuild {
+        final Path executable;
+        final Path buildDir;
+        final String javaResult;
+
+        VerifiedBuild(Path executable, Path buildDir, String javaResult) {
+            this.executable = executable;
+            this.buildDir = buildDir;
+            this.javaResult = javaResult;
+        }
+    }
+
+    /** Compiles, runs on the JVM, translates and builds {@code appName} with -DCN1_GC_VERIFY. */
+    private VerifiedBuild buildVerified(List<Path> tempDirs, String appName) throws Exception {
         Path sourceDir = Files.createTempDirectory("gc-verify-sources");
         Path classesDir = Files.createTempDirectory("gc-verify-classes");
         Path javaApiDir = Files.createTempDirectory("gc-verify-javaapi");
@@ -92,8 +173,8 @@ class GcHeapIntegrityIntegrationTest {
         tempDirs.add(classesDir);
         tempDirs.add(javaApiDir);
 
-        Path source = sourceDir.resolve("GcVerifyApp.java");
-        Files.write(source, loadAppSource().getBytes(StandardCharsets.UTF_8));
+        Path source = sourceDir.resolve(appName + ".java");
+        Files.write(source, loadAppSource(appName).getBytes(StandardCharsets.UTF_8));
 
         CompilerHelper.CompilerConfig config = selectCompiler();
         if (config == null) {
@@ -122,9 +203,9 @@ class GcHeapIntegrityIntegrationTest {
         compileArgs.add(source.toString());
 
         assertEquals(0, CompilerHelper.compile(config.jdkHome, compileArgs),
-                "GcVerifyApp should compile. " + CompilerHelper.getLastErrorLog());
+                appName + " should compile. " + CompilerHelper.getLastErrorLog());
 
-        String javaOutput = runJavaMain(config, classesDir, javaApiDir);
+        String javaOutput = runJavaMain(config, classesDir, javaApiDir, appName);
         String javaResult = extractLine(javaOutput, "RESULT=");
         assertTrue(javaResult.startsWith("RESULT="),
                 "JavaSE should produce RESULT=. Output: " + javaOutput);
@@ -133,12 +214,12 @@ class GcHeapIntegrityIntegrationTest {
 
         Path outputDir = Files.createTempDirectory("gc-verify-output");
         tempDirs.add(outputDir);
-        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "GcVerifyApp");
+        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, appName);
 
         Path distDir = outputDir.resolve("dist");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
-        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, "GcVerifyApp-src");
+        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, appName + "-src");
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
@@ -157,8 +238,16 @@ class GcHeapIntegrityIntegrationTest {
         ), distDir);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
-        Path executable = buildDir.resolve("GcVerifyApp");
+        Path executable = buildDir.resolve(appName);
         assertTrue(Files.exists(executable), "ParparVM build should produce a runnable executable");
+        return new VerifiedBuild(executable, buildDir, javaResult);
+    }
+
+    private void runGate(List<Path> tempDirs) throws Exception {
+        VerifiedBuild built = buildVerified(tempDirs, "GcVerifyApp");
+        Path executable = built.executable;
+        Path buildDir = built.buildDir;
+        String javaResult = built.javaResult;
 
         // ---- 1. the gate ------------------------------------------------------
         Run clean = run(executable, buildDir, new HashMap<String, String>());
@@ -287,17 +376,17 @@ class GcHeapIntegrityIntegrationTest {
         return String.join("\n", Arrays.copyOfRange(lines, from, lines.length));
     }
 
-    private String loadAppSource() throws Exception {
+    private String loadAppSource(String appName) throws Exception {
         java.io.InputStream in = GcHeapIntegrityIntegrationTest.class
-                .getResourceAsStream("/com/codename1/tools/translator/GcVerifyApp.java");
-        assertNotNull(in, "GcVerifyApp.java test resource should exist");
+                .getResourceAsStream("/com/codename1/tools/translator/" + appName + ".java");
+        assertNotNull(in, appName + ".java test resource should exist");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             return reader.lines().collect(Collectors.joining("\n")) + "\n";
         }
     }
 
-    private String runJavaMain(CompilerHelper.CompilerConfig config, Path classesDir, Path javaApiDir)
-            throws Exception {
+    private String runJavaMain(CompilerHelper.CompilerConfig config, Path classesDir, Path javaApiDir,
+                               String appName) throws Exception {
         String javaExe = config.jdkHome.resolve("bin").resolve("java").toString();
         if (System.getProperty("os.name").toLowerCase().contains("win")) {
             javaExe += ".exe";
@@ -307,7 +396,7 @@ class GcHeapIntegrityIntegrationTest {
         // nor any reason to synchronize with one -- it exists only to say what the program
         // computes. The translated run below gets no argument and uses the handshake.
         ProcessBuilder pb = new ProcessBuilder(javaExe, "-cp",
-                classesDir + System.getProperty("path.separator") + javaApiDir, "GcVerifyApp",
+                classesDir + System.getProperty("path.separator") + javaApiDir, appName,
                 "reference");
         pb.redirectErrorStream(true);
         Process process = pb.start();

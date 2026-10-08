@@ -269,6 +269,18 @@ alternates phases for the verifier and gauntlet. Each of these was measured to b
   interval, halve below 1%, host memory / 8 at most): 3x fewer minors on objectAllocation.
   One minor is not enough to grow on -- a single OS-descheduled minor stepped a steady
   workload's heap up a third late in the run.
+- **Going active again is a handshake, not a store.** Every resume site was
+  `wait while threadBlockedByGC; threadActive = TRUE`. A thread preempted between the
+  two let the collector raise the block, read `threadActive` as FALSE and hold the thread
+  as parked while it ran Java -- allocating into pages the cycle had retired as pre-cycle
+  and storing young objects into old ones the minor never traced.
+  `GcHeapIntegrityIntegrationTest` caught it once on an oversubscribed arm64 runner (an
+  `Object[]` holding a reclaimed `Filler`); widening the window by 300us under
+  `CN1_GC_HYBRID_FORCE=1` reproduced it in 20 of 20 runs of a targeted driver (11 of 12
+  on master), and in 0 of 20 with the handshake, widened at every resume site. Every resume goes through `cn1GcTryResumeActive` (raise, seq_cst fence,
+  re-read the block, step back down if raised) and the collector fences
+  (`CN1_GC_BLOCK_FENCE`) between raising the block and reading `threadActive`. A new
+  resume site that stores `threadActive = JAVA_TRUE` directly reopens it.
 
 A test whose evidence names one collector's mechanism goes vacuous when the hybrid takes
 its workload. Fix the EVIDENCE, never pin the collector: `GcOverflowSpiralIntegrationTest`

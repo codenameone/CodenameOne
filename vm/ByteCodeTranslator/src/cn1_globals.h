@@ -2246,6 +2246,68 @@ extern void cn1GcWaitUnblockedSlow(struct ThreadLocalData* ts);
         } \
     } while(0)
 
+// THE OTHER HALF OF THE STOP HANDSHAKE: going active again. Every resume site used to be
+// `wait while threadBlockedByGC; threadActive = TRUE`, and that pair is a check-then-act.
+// The collector stops a thread by raising threadBlockedByGC and then reading threadActive,
+// so a thread that read the block as clear, and was then preempted (or merely had its
+// store sit in a store buffer) before it raised threadActive, let the collector read FALSE
+// and treat it as parked -- and it then raised the flag and ran Java while the collector
+// believed it was held. Under the concurrent collector that was mostly absorbed by SATB and
+// grace. A STOP-THE-WORLD cycle (cn1GcHybridDecide) is not so forgiving: it retires a held
+// thread's current pages as pre-cycle (cn1BibopRetireHeldThreadPages), takes the
+// remembered set and frees unmarked young objects on the premise that every held thread
+// is not running. A thread escaping the hold kept allocating into those pages and storing
+// young objects into old ones, and the minor freed them under a live parent:
+// GcHeapIntegrityIntegrationTest caught it on a CI runner as an Object[] holding a reclaimed
+// GcVerifyApp.Filler, and widening this window by 300us reproduced it in every run.
+//
+// So raising the flag is a Dekker handshake with the collector's store of the block: raise,
+// FULL fence, re-read the block. The collector stores the block, fences, then reads
+// threadActive (see the stop loops in codenameOneGCMark). With a seq_cst fence on both
+// sides at least one of the two sees the other's store: either the collector sees this
+// thread active and waits for it, or this thread sees the block, lowers the flag again and
+// goes back to waiting. A collector that sees the transient TRUE only waits a little
+// longer. The fence costs one barrier per resume, at sites that have just come back from a
+// blocking call.
+//
+// Returns JAVA_TRUE when the thread is active and may run Java. JAVA_FALSE means the
+// collector raised the block inside the window: threadActive has been lowered again and
+// the caller must wait the block out (in whatever way that site waits) and call this again.
+#ifdef CN1_GC_VERIFY
+// CN1_GC_FAULT=resumewindow / resumeescape (see cn1GcFaultInit): verifier builds only.
+extern int cn1GcFaultResume;
+extern long cn1GcFaultResumeCaught;
+extern void cn1GcFaultResumeWait(void);
+#endif
+static inline JAVA_BOOLEAN cn1GcTryResumeActive(struct ThreadLocalData* ts) {
+#ifdef CN1_GC_VERIFY
+    int cn1__fault = __atomic_load_n(&cn1GcFaultResume, __ATOMIC_RELAXED);
+    if(__builtin_expect(cn1__fault != 0, 0)) {
+        cn1GcFaultResumeWait();
+        if(cn1__fault == 2) {
+            __atomic_store_n(&ts->threadActive, JAVA_TRUE, __ATOMIC_RELAXED);
+            return JAVA_TRUE;
+        }
+    }
+#endif
+    __atomic_store_n(&ts->threadActive, JAVA_TRUE, __ATOMIC_RELAXED);
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+    if(!__atomic_load_n(&ts->threadBlockedByGC, __ATOMIC_RELAXED)) {
+        return JAVA_TRUE;
+    }
+    __atomic_store_n(&ts->threadActive, JAVA_FALSE, __ATOMIC_RELEASE);
+#ifdef CN1_GC_VERIFY
+    __atomic_fetch_add(&cn1GcFaultResumeCaught, 1, __ATOMIC_RELAXED);
+#endif
+    return JAVA_FALSE;
+}
+// The common resume: wait out any block, then go active through the handshake above.
+#define CN1_GC_RESUME_ACTIVE(ts) do { \
+        CN1_GC_WAIT_UNBLOCKED(ts); \
+    } while(!cn1GcTryResumeActive((ts)))
+// The collector's side: called between storing threadBlockedByGC and reading threadActive.
+#define CN1_GC_BLOCK_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
+
 #ifdef CN1_ON_DEVICE_DEBUG
 // One row of the variable side-table: a single (line, slot, typeCode) tuple.
 // typeCode is the JVM type descriptor first char (I/J/F/D/Z/B/S/C/L/[).
@@ -3143,8 +3205,10 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
    This is the same hang as the reverted cn1VirtualThreadResume change, reached by a
    different path, which is why removing that assignment alone did not close it.
    Virtual-thread roots do not depend on the flag: cn1GcScanParkedVirtualThreads
-   scans every registered virtual thread whether or not it is running. */
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } if(__cn1rts->gcPthreadValid) { __cn1rts->threadActive = JAVA_TRUE; } CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+   scans every registered virtual thread whether or not it is running.
+   Going active is cn1GcTryResumeActive's handshake, retried until the collector is not
+   holding this thread; see there for why a plain store of threadActive is not enough. */
+#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); do { while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } } while(__cn1rts->gcPthreadValid && !cn1GcTryResumeActive(__cn1rts)); CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
 
 extern struct ThreadLocalData* getThreadLocalData();
 

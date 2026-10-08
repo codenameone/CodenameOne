@@ -215,6 +215,26 @@ static int cn1GcFaultShouldFreeLive(JAVA_OBJECT o, int m) {
 }
 #define CN1_GC_FAULT_FREE_LIVE(o, m) cn1GcFaultShouldFreeLive(o, m)
 #endif
+// CN1_GC_FAULT=resumewindow / resumeescape: the mutator's half of the stop handshake
+// (cn1GcTryResumeActive in cn1_globals.h). Both widen EVERY resume window -- the gap
+// between a thread's last read of threadBlockedByGC and its store of threadActive -- by
+// CN1_GC_FAULT_RESUME_US (default 300us), standing in for the preemption that opened it on
+// an oversubscribed CI runner. "resumewindow" keeps the handshake and must stay clean, and
+// counts the blocks it caught inside the window so a clean run can be told from one that
+// never reached it. "resumeescape" also skips the re-check -- the protocol every resume
+// site had before -- and the verifier must catch a thread that ran Java while a
+// stop-the-world cycle held it. Read at the first collection, like every fault here.
+int cn1GcFaultResume = 0;
+long cn1GcFaultResumeCaught = 0;
+static int cn1GcFaultResumeUs = 300;
+void cn1GcFaultResumeWait(void) {
+    usleep((JAVA_INT)cn1GcFaultResumeUs);
+}
+static void cn1GcFaultResumeReport(void) {
+    fprintf(stderr, "[GC-FAULT] resume handshake caught %ld block(s) raised inside the window\n",
+            __atomic_load_n(&cn1GcFaultResumeCaught, __ATOMIC_RELAXED));
+    fflush(stderr);
+}
 long cn1GcFaultDropEvery = CN1_GC_FAULT_DROPMARK_EVERY;
 long cn1GcFaultDropsApplied = 0;
 void cn1GcFaultInitPublic(void);
@@ -246,6 +266,14 @@ static void cn1GcFaultInit(void) {
     } else if(strcmp(f, "refnoclear") == 0) {
         cn1GcFaultRefClear = 1;
         fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
+    } else if(strcmp(f, "resumewindow") == 0 || strcmp(f, "resumeescape") == 0) {
+        { const char* e = getenv("CN1_GC_FAULT_RESUME_US");
+          if(e != 0 && atoi(e) > 0) { cn1GcFaultResumeUs = atoi(e); } }
+        JAVA_BOOLEAN escape = strcmp(f, "resumeescape") == 0;
+        atexit(cn1GcFaultResumeReport);
+        fprintf(stderr, "[GC-FAULT] every resume window widened by %dus%s\n", cn1GcFaultResumeUs,
+                escape ? ", re-check skipped (the pre-handshake protocol)" : ", handshake intact");
+        __atomic_store_n(&cn1GcFaultResume, escape ? 2 : 1, __ATOMIC_RELEASE);
     } else {
         fprintf(stderr, "[GC-FAULT] unknown fault '%s'\n", f);
     }
@@ -5577,6 +5605,10 @@ void codenameOneGCMark() {
             }
         }
         unlockCriticalSection();
+        // Every block is raised before any threadActive is read: the collector's half of
+        // cn1GcTryResumeActive's handshake. The mutex release above does not order a
+        // store before a later load.
+        CN1_GC_BLOCK_FENCE();
         long long __pw0 = cn1MonotonicNanos();
         int __pwSleepUs = 50;
         for(;;) {
@@ -5830,6 +5862,12 @@ void codenameOneGCMark() {
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
                     t->threadBlockedByGC = JAVA_TRUE;
+                    // Full fence before the threadActive reads below: with the one in
+                    // cn1GcTryResumeActive, a thread going active either sees this block
+                    // and steps back down, or is seen active here and waited for. Without
+                    // it, both could read the other's flag stale and the thread would run
+                    // Java while this loop scanned and held it as parked.
+                    CN1_GC_BLOCK_FENCE();
                     /*
                      * CARRIER ASSOCIATION. Resolved once, before the wait, because
                      * it is a linear walk of the registry snapshot and has no
@@ -10522,15 +10560,14 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
                 // `volume > cap` true for longer, which is what made it reachable.
                 if(threadStateData->threadBlockedByGC) {
                     threadStateData->threadActive = JAVA_FALSE;
-                    {
+                    do {
                         int cn1__gcw = 0;
                         while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
                             if(!cn1VirtualThreadYieldIfVirtual()) {
                                 cn1GcHandshakeBackoff(&cn1__gcw);
                             }
                         }
-                    }
-                    threadStateData->threadActive = JAVA_TRUE;
+                    } while(!cn1GcTryResumeActive(threadStateData));
                 }
                 continue;
             }
@@ -10548,46 +10585,34 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             // mark functions on it -- underneath a scan in progress, which loses
             // reachable objects. Wait the block out first, exactly as the tail of
             // this function does.
-            {
+            do {
                 int cn1__gcw = 0;
                 while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
                     if(!cn1VirtualThreadYieldIfVirtual()) {
                         cn1GcHandshakeBackoff(&cn1__gcw);
                     }
                 }
-            }
-            threadStateData->threadActive = JAVA_TRUE;
+            } while(!cn1GcTryResumeActive(threadStateData));
         }
         threadStateData->threadActive = JAVA_FALSE;
-        {
+        do {
             int cn1__gcw = 0;
             while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
                 if(!cn1VirtualThreadYieldIfVirtual()) {
                     cn1GcHandshakeBackoff(&cn1__gcw);
                 }
             }
-        }
-        threadStateData->threadActive = JAVA_TRUE;
-        // This is CN1_RESUME_THREAD's handshake, deliberately, and NOT a stronger
-        // one. A review asked for an atomic block-check-and-reactivate here on the
-        // grounds that the collector can set threadBlockedByGC after this loop's
-        // last read but before the store above, observe threadActive already
-        // false, and scan a stack that is about to start moving. The window is
-        // real and the description is accurate.
-        //
-        // It is also not this function's window. CN1_RESUME_THREAD is exactly
-        // `while(threadBlockedByGC) wait; threadActive = TRUE;`, the collector
-        // stops threads by setting the flag and then waiting for threadActive to
-        // clear with no re-validation afterwards, and that pair is the protocol at
-        // every native boundary in the VM. Making this one site atomic would close
-        // nothing -- the same window stays open at thousands of others -- while
-        // leaving one function speaking a different protocol from the collector it
-        // has to agree with, which is how the last few defects here happened.
-        //
-        // So it is left matching the protocol on purpose. If the window is worth
-        // closing it needs a collector-side acknowledgement applied to every
-        // resume site at once, which is a change to the VM's thread protocol and
-        // not something to smuggle in through a pacing fix.
+        } while(!cn1GcTryResumeActive(threadStateData));
+        // This is CN1_RESUME_THREAD's handshake, deliberately: every resume site in
+        // the VM goes active through cn1GcTryResumeActive, and the collector fences
+        // between raising threadBlockedByGC and reading threadActive. A review once
+        // asked for an atomic block-check-and-reactivate at this one site, on the
+        // grounds that the collector could raise the block after the wait's last read
+        // but before threadActive went up, read it as FALSE, and scan a stack that was
+        // about to move. That window was real, and it was the same at every native
+        // boundary, so closing it here alone would have closed nothing. It was closed
+        // at all of them at once when stop-the-world cycles made it fatal rather than
+        // rare: see cn1GcTryResumeActive.
         CN1_STALL_ADD(__stallVol, CN1_STALL_PACING_VOLUME, threadStateData);
         return;
     }
@@ -10743,8 +10768,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // Honour a stop-the-world before resuming, exactly like every other park here: the
     // loop above can exit while a mark is still running and the collector believes this
     // thread is paused.
-    CN1_GC_WAIT_UNBLOCKED(threadStateData);
-    threadStateData->threadActive = JAVA_TRUE;
+    CN1_GC_RESUME_ACTIVE(threadStateData);
     CN1_STALL_ADD(__stallBudget, CN1_STALL_PACING_BUDGET, threadStateData);
 }
 
@@ -10778,8 +10802,7 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
         CN1_GC_PARK_CAPTURE(threadStateData);
         CN1_STALL_T0(__stallHs);
         threadStateData->threadActive = JAVA_FALSE;
-        CN1_GC_WAIT_UNBLOCKED(threadStateData);
-        threadStateData->threadActive = JAVA_TRUE;
+        CN1_GC_RESUME_ACTIVE(threadStateData);
         CN1_STALL_ADD(__stallHs, CN1_STALL_HANDSHAKE, threadStateData);
     }
     long __gcTrigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
@@ -15668,8 +15691,7 @@ cn1GcMallocRetry:
             if(throttle) {
                 usleep((JAVA_INT)(1000));
             }
-            CN1_GC_WAIT_UNBLOCKED(threadStateData);
-            threadStateData->threadActive = JAVA_TRUE;
+            CN1_GC_RESUME_ACTIVE(threadStateData);
             CN1_STALL_ADD(__stallLow, CN1_STALL_LOWMEM, threadStateData);
         }
     }
@@ -15776,7 +15798,7 @@ cn1GcMallocRetry:
         // Then honour the handshake, unbounded, exactly like every other park here.
         CN1_GC_WAIT_UNBLOCKED(threadStateData);
         invokedGC = NO;
-        threadStateData->threadActive = JAVA_TRUE;
+        CN1_GC_RESUME_ACTIVE(threadStateData);
         // Retry by LOOPING, not by recursing. This used to be
         // `return codenameOneGcMalloc(threadStateData, size, parent);`, and the tail call
         // it looks like is not one: CN1_GC_PARK_CAPTURE takes the address of a local, which
@@ -15814,8 +15836,7 @@ cn1GcMallocRetry:
             CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
             CN1_STALL_T0(__stallLegHs);
             threadStateData->threadActive = JAVA_FALSE;
-            CN1_GC_WAIT_UNBLOCKED(threadStateData);
-            threadStateData->threadActive = JAVA_TRUE;
+            CN1_GC_RESUME_ACTIVE(threadStateData);
             CN1_STALL_ADD(__stallLegHs, CN1_STALL_HANDSHAKE, threadStateData);
         }
         long maxHeapSize = CN1_MAX_HEAP_SIZE;
@@ -15856,15 +15877,17 @@ cn1GcMallocRetry:
             // another and wait for that one too.
             CN1_GC_PARK_CAPTURE(threadStateData);
             threadStateData->threadActive = JAVA_FALSE;
-            while(gcCurrentlyRunning) {
+            do {
+                while(gcCurrentlyRunning) {
 #ifdef CN1_GC_CONFORM
-                if(threadStateData->heapAllocationSize == 0) {
-                    atomic_fetch_add_explicit(&cn1PendingEmptyWaits, 1, memory_order_relaxed);
-                }
+                    if(threadStateData->heapAllocationSize == 0) {
+                        atomic_fetch_add_explicit(&cn1PendingEmptyWaits, 1, memory_order_relaxed);
+                    }
 #endif
-                usleep((JAVA_INT)(1000));
-            }
-            threadStateData->threadActive = JAVA_TRUE;
+                    usleep((JAVA_INT)(1000));
+                }
+                CN1_GC_WAIT_UNBLOCKED(threadStateData);
+            } while(!cn1GcTryResumeActive(threadStateData));
             if(threadStateData->heapAllocationSize > 0) {
                 threadStateData->nativeAllocationMode = JAVA_TRUE;
                 java_lang_System_gc__(threadStateData);
@@ -15920,7 +15943,7 @@ cn1GcMallocRetry:
             // Honour the stop-the-world before resuming, exactly like every other park.
             CN1_GC_WAIT_UNBLOCKED(threadStateData);
             invokedGC = NO;
-            threadStateData->threadActive = JAVA_TRUE;
+            CN1_GC_RESUME_ACTIVE(threadStateData);
             CN1_STALL_ADD(__stallPending, CN1_STALL_PENDING_FULL, threadStateData);
         }
         {
