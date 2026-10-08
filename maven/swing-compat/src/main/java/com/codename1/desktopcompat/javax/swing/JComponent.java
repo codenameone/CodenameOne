@@ -458,11 +458,14 @@ public abstract class JComponent extends Container {
                 ancestorInputMap = map;
                 break;
             case WHEN_IN_FOCUSED_WINDOW:
-                if (map != null && !(map instanceof ComponentInputMap)) {
+                if (map == null) {
+                    windowInputMap = null;
+                } else if (map instanceof ComponentInputMap) {
+                    windowInputMap = (ComponentInputMap) map;
+                } else {
                     throw new IllegalArgumentException(
                             "WHEN_IN_FOCUSED_WINDOW InputMaps must be of type ComponentInputMap");
                 }
-                windowInputMap = map instanceof ComponentInputMap ? (ComponentInputMap) map : null;
                 break;
             default:
                 throw new IllegalArgumentException("condition must be one of JComponent.WHEN_IN_FOCUSED_WINDOW, "

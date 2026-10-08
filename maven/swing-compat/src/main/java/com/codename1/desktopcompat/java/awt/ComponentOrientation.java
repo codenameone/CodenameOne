@@ -25,7 +25,7 @@ package com.codename1.desktopcompat.java.awt;
 /// The direction a component's content runs in. It is recorded on
 /// components; the layout managers of this layer place leading content on
 /// the left whatever it says.
-public final class ComponentOrientation implements java.io.Serializable {
+public final class ComponentOrientation {
 
     public static final ComponentOrientation LEFT_TO_RIGHT = new ComponentOrientation(true);
     public static final ComponentOrientation RIGHT_TO_LEFT = new ComponentOrientation(false);

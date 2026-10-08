@@ -140,7 +140,7 @@ public class JToolBar extends JComponent implements SwingConstants {
         JButton b = createActionComponent(a);
         b.addActionListener(a);
         PropertyChangeListener l = createActionChangeListener(b);
-        if (l != null && a != null) {
+        if (a != null) {
             a.addPropertyChangeListener(l);
         }
         add(b);

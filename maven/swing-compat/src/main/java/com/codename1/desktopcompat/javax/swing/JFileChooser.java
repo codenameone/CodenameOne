@@ -510,7 +510,7 @@ public class JFileChooser extends JComponent {
         File[] many = null;
         if (multi && listing != null) {
             int[] picked = listing.getSelectedIndices();
-            if (picked != null && picked.length > 1) {
+            if (picked.length > 1) {
                 many = new File[picked.length];
                 for (int i = 0; i < picked.length; i++) {
                     File f = entryAt(picked[i]);

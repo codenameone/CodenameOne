@@ -32,7 +32,7 @@ import java.util.ArrayList;
 /// One widget that takes the focus, or has key or focus listeners, or key
 /// bindings of its own. Traversal wraps around at both ends; focus cycle
 /// roots below the container are not treated specially.
-public class ContainerOrderFocusTraversalPolicy extends FocusTraversalPolicy implements java.io.Serializable {
+public class ContainerOrderFocusTraversalPolicy extends FocusTraversalPolicy {
 
     private boolean implicitDownCycleTraversal = true;
 

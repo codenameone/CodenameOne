@@ -33,7 +33,7 @@ import com.codename1.desktopcompat.rt.KeyMap;
 /// made with `CTRL_MASK` equals one made with `CTRL_DOWN_MASK`. Strokes are
 /// not cached: compare them with `equals`. Strokes are made by the static
 /// factory methods; `registerSubclass` and serialization are absent.
-public class AWTKeyStroke implements java.io.Serializable {
+public class AWTKeyStroke {
 
     private static final int ALL = InputEvent.SHIFT_DOWN_MASK | InputEvent.CTRL_DOWN_MASK
             | InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK | InputEvent.ALT_GRAPH_DOWN_MASK
@@ -103,11 +103,11 @@ public class AWTKeyStroke implements java.io.Serializable {
 
     public static AWTKeyStroke getAWTKeyStrokeForEvent(KeyEvent anEvent) {
         int[] p = cn1ForEvent(anEvent);
-        return p == null ? null : new AWTKeyStroke((char) p[0], p[1], p[2], p[3] != 0);
+        return p.length == 0 ? null : new AWTKeyStroke((char) p[0], p[1], p[2], p[3] != 0);
     }
 
     /// The parts of the stroke a key event is: character, key code,
-    /// modifiers and whether it is a release; `null` for another event.
+    /// modifiers and whether it is a release; empty for another event.
     static int[] cn1ForEvent(KeyEvent e) {
         int mods = e.getModifiers() | e.getModifiersEx();
         switch (e.getID()) {
@@ -118,7 +118,7 @@ public class AWTKeyStroke implements java.io.Serializable {
             case KeyEvent.KEY_TYPED:
                 return new int[]{e.getKeyChar(), KeyEvent.VK_UNDEFINED, mods, 0};
             default:
-                return null;
+                return new int[0];
         }
     }
 

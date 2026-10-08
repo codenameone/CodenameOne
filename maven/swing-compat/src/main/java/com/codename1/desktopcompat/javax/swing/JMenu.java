@@ -35,7 +35,7 @@ import java.util.ArrayList;
 /// and beside a submenu, and a second click closes it. In the menu bar of
 /// a frame the menu is not drawn: its items become commands under its
 /// name.
-public class JMenu extends JMenuItem implements MenuElement {
+public class JMenu extends JMenuItem {
 
     private JPopupMenu popupMenu;
     private int delay;

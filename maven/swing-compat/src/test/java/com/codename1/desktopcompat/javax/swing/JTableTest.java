@@ -53,21 +53,12 @@ import com.codename1.desktopcompat.javax.swing.table.TableColumnModel;
 import com.codename1.desktopcompat.javax.swing.table.TableRowSorter;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 /// The table: its model's events, indexes under sorting, filtering and
 /// moved columns, selection, geometry in logical pixels, column sizing,
 /// renderers, the header and the pointer and keys.
 public class JTableTest extends KernelTestBase {
-
-    /// The kernel counts clicks by time alone and keeps the count between
-    /// tests, so the taps made here would reach the next test class as
-    /// one long multiple click. Wait the count out.
-    @AfterClass
-    public static void letTheClickCountRunOut() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     /// name, age, member: `String`, `Integer`, `Boolean`.
     private static final class People extends DefaultTableModel {

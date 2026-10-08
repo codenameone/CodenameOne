@@ -43,8 +43,8 @@ public final class KeyMap {
 
     private static final String SHIFTED = "!@#$%^&*()";
     private static final String DIGITS = "1234567890";
-    private static HashMap<String, Integer> names;
-    private static HashMap<Integer, String> codes;
+    private static final HashMap<String, Integer> names = new HashMap<String, Integer>();
+    private static final HashMap<Integer, String> codes = new HashMap<Integer, String>();
 
     private KeyMap() {
     }
@@ -167,11 +167,9 @@ public final class KeyMap {
     }
 
     private static void init() {
-        if (names != null) {
+        if (!names.isEmpty()) {
             return;
         }
-        names = new HashMap<String, Integer>();
-        codes = new HashMap<Integer, String>();
         for (char c = 'A'; c <= 'Z'; c++) {
             name(String.valueOf(c), c);
         }

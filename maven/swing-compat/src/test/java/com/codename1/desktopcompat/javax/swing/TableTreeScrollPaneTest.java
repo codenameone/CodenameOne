@@ -37,21 +37,12 @@ import com.codename1.desktopcompat.java.awt.event.MouseMotionAdapter;
 import com.codename1.desktopcompat.javax.swing.table.DefaultTableModel;
 import com.codename1.desktopcompat.javax.swing.tree.DefaultMutableTreeNode;
 import com.codename1.desktopcompat.javax.swing.tree.TreePath;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 /// What a table and a tree ask of the scroll pane around them: the
 /// table's header becomes the pane's column header, the selection is
 /// scrolled into view, and a finger drag over rows is handed to the pane.
 public class TableTreeScrollPaneTest extends KernelTestBase {
-
-    /// The kernel counts clicks by time alone and keeps the count between
-    /// tests, so the taps made here would reach the next test class as
-    /// one long multiple click. Wait the count out.
-    @AfterClass
-    public static void letTheClickCountRunOut() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     private static boolean shows(JScrollPane pane, Rectangle r) {
         Point at = pane.getViewport().getViewPosition();

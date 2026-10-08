@@ -99,12 +99,15 @@ public final class MenuBridge {
     /// A menu bar, a menu, a popup menu or an item changed: the commands
     /// of the menu bar it belongs to, if any, are rebuilt.
     public static void changed(Component c) {
-        Component k = c;
-        while (k != null && !(k instanceof JMenuBar)) {
-            k = k instanceof JPopupMenu ? ((JPopupMenu) k).getInvoker() : k.getParent();
+        JMenuBar found = null;
+        for (Component k = c; k != null && found == null;
+                k = k instanceof JPopupMenu ? ((JPopupMenu) k).getInvoker() : k.getParent()) {
+            if (k instanceof JMenuBar) {
+                found = (JMenuBar) k;
+            }
         }
-        if (k instanceof JMenuBar) {
-            JMenuBar bar = (JMenuBar) k;
+        if (found != null) {
+            JMenuBar bar = found;
             Window w = SwingUtilities.getWindowAncestor(bar);
             if (w != null && barOf(w) == bar) {
                 sync(w, bar);

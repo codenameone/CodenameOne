@@ -129,7 +129,7 @@ public class JOptionPane extends JComponent {
     public JOptionPane(Object message, int messageType, int optionType, Icon icon, Object[] options,
             Object initialValue) {
         this.message = message;
-        this.options = copy(options);
+        this.options = options == null ? null : copy(options);
         this.initialValue = initialValue;
         this.icon = icon;
         this.messageType = messageType;
@@ -138,10 +138,13 @@ public class JOptionPane extends JComponent {
         this.inputValue = UNINITIALIZED_VALUE;
     }
 
+    /// Identity, not equality: the sentinel is one particular object,
+    /// and a value that merely reads the same is an answer.
+    private static boolean same(Object a, Object b) {
+        return a == b;
+    }
+
     private static Object[] copy(Object[] a) {
-        if (a == null) {
-            return null;
-        }
         Object[] r = new Object[a.length];
         System.arraycopy(a, 0, r, 0, a.length);
         return r;
@@ -189,7 +192,7 @@ public class JOptionPane extends JComponent {
         dialog.setVisible(true);
         dialog.dispose();
         Object v = pane.getInputValue();
-        return v == UNINITIALIZED_VALUE ? null : v;
+        return same(v, UNINITIALIZED_VALUE) ? null : v;
     }
 
     public static void showMessageDialog(Component parentComponent, Object message) {
@@ -551,7 +554,7 @@ public class JOptionPane extends JComponent {
         value = newValue;
         firePropertyChange(VALUE_PROPERTY, old, value);
         JDialog d = shownIn;
-        if (d != null && newValue != UNINITIALIZED_VALUE && d.isVisible()) {
+        if (d != null && !same(newValue, UNINITIALIZED_VALUE) && d.isVisible()) {
             d.setVisible(false);
         }
     }
@@ -562,12 +565,12 @@ public class JOptionPane extends JComponent {
 
     public void setOptions(Object[] newOptions) {
         Object[] old = options;
-        options = copy(newOptions);
+        options = newOptions == null ? null : copy(newOptions);
         firePropertyChange(OPTIONS_PROPERTY, old, options);
     }
 
     public Object[] getOptions() {
-        return copy(options);
+        return options == null ? null : copy(options);
     }
 
     public void setInitialValue(Object newInitialValue) {
@@ -614,7 +617,7 @@ public class JOptionPane extends JComponent {
 
     public void setSelectionValues(Object[] newValues) {
         Object[] old = selectionValues;
-        selectionValues = copy(newValues);
+        selectionValues = newValues == null ? null : copy(newValues);
         firePropertyChange(SELECTION_VALUES_PROPERTY, old, selectionValues);
         if (selectionValues != null) {
             setWantsInput(true);
@@ -622,7 +625,7 @@ public class JOptionPane extends JComponent {
     }
 
     public Object[] getSelectionValues() {
-        return copy(selectionValues);
+        return selectionValues == null ? null : copy(selectionValues);
     }
 
     public void setInitialSelectionValue(Object newValue) {

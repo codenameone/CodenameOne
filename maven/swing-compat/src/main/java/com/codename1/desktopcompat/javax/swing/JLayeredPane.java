@@ -96,11 +96,12 @@ public class JLayeredPane extends JComponent {
         if (c == null) {
             return null;
         }
-        Container p = c.getParent();
-        while (p != null && !(p instanceof JLayeredPane)) {
-            p = p.getParent();
+        for (Container p = c.getParent(); p != null; p = p.getParent()) {
+            if (p instanceof JLayeredPane) {
+                return (JLayeredPane) p;
+            }
         }
-        return p instanceof JLayeredPane ? (JLayeredPane) p : null;
+        return null;
     }
 
     public void setLayer(Component c, int layer) {

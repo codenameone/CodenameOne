@@ -27,7 +27,7 @@ import java.util.HashMap;
 
 /// Maps the names an input map answers to actions, with a parent that is
 /// asked for the names this map does not hold.
-public class ActionMap implements java.io.Serializable {
+public class ActionMap {
 
     private HashMap<Object, Action> table;
     private ActionMap parent;

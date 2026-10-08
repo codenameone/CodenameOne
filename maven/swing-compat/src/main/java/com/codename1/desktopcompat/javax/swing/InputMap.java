@@ -27,7 +27,7 @@ import java.util.HashMap;
 
 /// Maps key strokes to the names of actions, with a parent that is asked
 /// for the strokes this map does not hold.
-public class InputMap implements java.io.Serializable {
+public class InputMap {
 
     private HashMap<KeyStroke, Object> table;
     private InputMap parent;
