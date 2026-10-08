@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+        The shared style classes are copied from javafx-compat, where the
+        device runs them, and are written for that runtime: a value and a
+        selector take the arrays they are given and hand out no copies,
+        because a device cannot afford one per value and every caller is the
+        parser or the reader that just made the array. The same classes are
+        analysed, with the same reasoning, in javafx-compat.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.fxml.css.CssValue"/>
+            <Class name="com.codename1.fxml.css.CssSelector"/>
+            <Class name="com.codename1.fxml.css.CssSheetData"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

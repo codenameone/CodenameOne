@@ -97,6 +97,7 @@
         <module>android-compat</module>
         <module>swing-compat</module>
         <module>javafx-compat</module>
+        <module>fxml-compiler</module>
         <module>lottie-transcoder</module>
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
