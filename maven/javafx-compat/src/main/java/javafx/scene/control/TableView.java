@@ -417,8 +417,11 @@ public class TableView<S> extends Control {
         if (by == null) {
             return 0;
         }
-        int c = by.compare(column.getCellData(a), column.getCellData(b));
-        return column.getSortType() == TableColumn.SortType.DESCENDING ? -c : c;
+        // Descending by exchanging the operands: negating a result fails for
+        // a comparator that answers Integer.MIN_VALUE.
+        return column.getSortType() == TableColumn.SortType.DESCENDING
+                ? by.compare(column.getCellData(b), column.getCellData(a))
+                : by.compare(column.getCellData(a), column.getCellData(b));
     }
 
     /// Sorts the items by the columns of the sort order. With none the

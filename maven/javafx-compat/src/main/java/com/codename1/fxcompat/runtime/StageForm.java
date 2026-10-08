@@ -170,7 +170,11 @@ public final class StageForm extends Form implements StageHost {
     @Override
     public void layoutContainer() {
         super.layoutContainer();
-        core.sized();
+        // Form's constructor lays itself out when the theme installs a global
+        // toolbar, which is before this class's own fields exist.
+        if (core != null) {
+            core.sized();
+        }
     }
 
     @Override

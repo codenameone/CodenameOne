@@ -293,9 +293,12 @@ public class TableColumn<S, T> extends TableColumnBase<S, T> {
     /// commit the value the edit ended with.
     public static class CellEditEvent<S, T> extends Event {
 
-        private final TableView<S> table;
-        private final TablePosition<S, T> pos;
-        private final T newValue;
+        private static final long serialVersionUID = 1L;
+
+        // Transient as in JavaFX: a position names a live table, and is
+        // where the event's table is read from.
+        private final transient TablePosition<S, T> pos;
+        private final transient T newValue;
 
         /// Creates the event of a cell.
         public CellEditEvent(TableView<S> table, TablePosition<S, T> pos, EventType<CellEditEvent<S, T>> eventType,
@@ -304,14 +307,13 @@ public class TableColumn<S, T> extends TableColumnBase<S, T> {
             if (table == null) {
                 throw new NullPointerException("TableView can not be null");
             }
-            this.table = table;
             this.pos = pos;
             this.newValue = newValue;
         }
 
         /// Returns the table.
         public TableView<S> getTableView() {
-            return table;
+            return pos == null ? null : pos.getTableView();
         }
 
         /// Returns the column.
@@ -338,7 +340,8 @@ public class TableColumn<S, T> extends TableColumnBase<S, T> {
 
         /// Returns the item of the row that was edited.
         public S getRowValue() {
-            ObservableList<S> items = table.getItems();
+            TableView<S> table = getTableView();
+            ObservableList<S> items = table == null ? null : table.getItems();
             int row = pos == null ? -1 : pos.getRow();
             return items == null || row < 0 || row >= items.size() ? null : items.get(row);
         }

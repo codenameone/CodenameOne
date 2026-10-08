@@ -128,6 +128,8 @@
         <Or>
             <Class name="~javafx\.scene\.input\.[A-Za-z]+Event"/>
             <Class name="javafx.stage.WindowEvent"/>
+            <!-- The cell an edit event is about, and the value it ended with. -->
+            <Class name="javafx.scene.control.TableColumn$CellEditEvent"/>
         </Or>
         <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
     </Match>
