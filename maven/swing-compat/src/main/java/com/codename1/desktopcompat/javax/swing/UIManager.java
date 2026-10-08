@@ -23,86 +23,291 @@
 package com.codename1.desktopcompat.javax.swing;
 
 import com.codename1.desktopcompat.java.awt.Color;
+import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Font;
+import com.codename1.desktopcompat.java.awt.Insets;
+import com.codename1.desktopcompat.javax.swing.border.Border;
+import com.codename1.desktopcompat.rt.CellTheme;
 import com.codename1.desktopcompat.rt.EventBridge;
 import com.codename1.desktopcompat.rt.Fonts;
-import java.util.HashMap;
+import com.codename1.desktopcompat.rt.ScrollDelegate;
 
-/// A table of look and feel defaults.
+/// A table of look and feel defaults, and the look and feel itself.
 ///
-/// There is one look, the Codename One theme, so setting a look and feel
-/// does nothing. A key that was never `put` answers from the theme by its
-/// ending: `.background`, `.foreground` and `.font` give the window
-/// background, the label color and the default font; any other key gives
-/// `null`.
+/// ## The look and feel
+///
+/// There is one look, the Codename One theme. Setting a look and feel, by
+/// any class name or with an object, changes nothing that is drawn and
+/// never fails for a name: the usual
+/// `UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())`
+/// at the top of `main` runs as it is. A [LookAndFeel] object that is set
+/// is remembered and answered by [#getLookAndFeel], and is not asked to
+/// install anything. One look and feel is reported installed, under the
+/// class name both `get...ClassName` methods answer.
+///
+/// ## The defaults
+///
+/// What an application `put` is what it gets back. A key that was never
+/// put answers from the theme where the theme has something that means
+/// the same:
+///
+///  - a key ending in `.background`, and `control`, `window`, `menu`: the
+///    window background
+///  - a key ending in `.foreground`, and `controlText`, `windowText`,
+///    `menuText`, `textText`: the color of a label's text
+///  - a key ending in `.font`: the default font
+///  - a key ending in `.selectionBackground` or `.selectionForeground`,
+///    and `textHighlight`, `textHighlightText`: the colors of a selected
+///    table cell
+///  - a key ending in `.gridColor`: the color of the lines of a table
+///  - `ScrollBar.width`: the room a scroll pane gives a scroll bar, zero
+///    on a touch device
+///
+/// Any other key gives `null`, or zero or false from the typed getters.
+/// The widgets read what was put for the keys they know
+/// (`Table.gridColor`, `List.selectionBackground` and so on) when they are
+/// made; there are no borders, icons or strings of a look and feel to
+/// find here unless the application put them.
 public class UIManager {
 
-    private static final HashMap<Object, Object> VALUES = new HashMap<Object, Object>();
+    /// The defaults: what was put, and behind it the theme.
+    private static final class ThemeDefaults extends UIDefaults {
+        private static final long serialVersionUID = 1L;
+
+        Object raw(Object key) {
+            return key == null ? null : super.get(key);
+        }
+
+        @Override
+        public Object get(Object key) {
+            Object v = raw(key);
+            if (v != null || !(key instanceof String)) {
+                return v;
+            }
+            return fromTheme((String) key);
+        }
+    }
+
+    /// The one look and feel there is, answered until another is set.
+    private static final class ThemeLookAndFeel extends LookAndFeel {
+        @Override
+        public String getName() {
+            return LOOK_NAME;
+        }
+
+        @Override
+        public String getID() {
+            return "CodenameOne";
+        }
+
+        @Override
+        public String getDescription() {
+            return "The Codename One theme";
+        }
+
+        @Override
+        public boolean isNativeLookAndFeel() {
+            return true;
+        }
+
+        @Override
+        public boolean isSupportedLookAndFeel() {
+            return true;
+        }
+
+        @Override
+        public UIDefaults getDefaults() {
+            return VALUES;
+        }
+    }
+
+    /// The name and class name of a look and feel that is installed.
+    public static class LookAndFeelInfo {
+        private final String name;
+        private final String className;
+
+        public LookAndFeelInfo(String name, String className) {
+            this.name = name;
+            this.className = className;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getClassName() {
+            return className;
+        }
+
+        @Override
+        public String toString() {
+            return getClass().getName() + "[" + getName() + " " + getClassName() + "]";
+        }
+    }
+
+    private static final String LOOK_NAME = "Codename One";
+    private static final String LOOK_CLASS = "javax.swing.plaf.metal.MetalLookAndFeel";
+    private static final ThemeDefaults VALUES = new ThemeDefaults();
+    private static LookAndFeel current;
+    private static LookAndFeelInfo[] installed;
 
     public UIManager() {
     }
 
-    public static Object get(Object key) {
-        Object v = VALUES.get(key);
-        if (v != null || !(key instanceof String)) {
-            return v;
+    /// What the theme has for a key nobody put.
+    private static Object fromTheme(String k) {
+        if (k.endsWith(".selectionBackground") || "textHighlight".equals(k)) {
+            return CellTheme.selectionBackground(null);
         }
-        String k = (String) key;
-        if (k.endsWith(".background")) {
+        if (k.endsWith(".selectionForeground") || "textHighlightText".equals(k)) {
+            return CellTheme.selectionForeground(null);
+        }
+        if (k.endsWith(".gridColor")) {
+            return CellTheme.grid(null);
+        }
+        if (k.endsWith(".background") || "control".equals(k) || "window".equals(k) || "menu".equals(k)) {
             return EventBridge.defaultBackground();
         }
-        if (k.endsWith(".foreground")) {
+        if (k.endsWith(".foreground") || "controlText".equals(k) || "windowText".equals(k) || "menuText".equals(k)
+                || "textText".equals(k)) {
             return EventBridge.defaultForeground();
         }
         if (k.endsWith(".font")) {
             return Fonts.defaultFont();
         }
+        if ("ScrollBar.width".equals(k)) {
+            return Integer.valueOf(ScrollDelegate.barThickness());
+        }
         return null;
     }
 
-    public static Object put(Object key, Object value) {
-        return value == null ? VALUES.remove(key) : VALUES.put(key, value);
-    }
-
-    public static Color getColor(Object key) {
-        Object v = get(key);
+    /// The color an application put under a key, or `null`: never a value
+    /// of the theme. This is what a widget asks, so that its own reading
+    /// of the theme applies when the application said nothing.
+    public static Color cn1PutColor(Object key) {
+        Object v = VALUES.raw(key);
         return v instanceof Color ? (Color) v : null;
     }
 
+    public static Object get(Object key) {
+        return VALUES.get(key);
+    }
+
+    public static Object put(Object key, Object value) {
+        return VALUES.put(key, value);
+    }
+
+    /// The table behind `get` and `put`.
+    public static UIDefaults getDefaults() {
+        return VALUES;
+    }
+
+    /// The same table as [#getDefaults]: there is no look and feel with
+    /// defaults of its own beneath what the application put.
+    public static UIDefaults getLookAndFeelDefaults() {
+        return VALUES;
+    }
+
+    public static Color getColor(Object key) {
+        return VALUES.getColor(key);
+    }
+
     public static Font getFont(Object key) {
-        Object v = get(key);
-        return v instanceof Font ? (Font) v : null;
+        return VALUES.getFont(key);
     }
 
     public static String getString(Object key) {
-        Object v = get(key);
-        return v instanceof String ? (String) v : null;
+        return VALUES.getString(key);
     }
 
     public static int getInt(Object key) {
-        Object v = get(key);
-        return v instanceof Integer ? ((Integer) v).intValue() : 0;
+        return VALUES.getInt(key);
     }
 
     public static boolean getBoolean(Object key) {
-        Object v = get(key);
-        return v instanceof Boolean && ((Boolean) v).booleanValue();
+        return VALUES.getBoolean(key);
     }
 
     public static Icon getIcon(Object key) {
-        Object v = get(key);
-        return v instanceof Icon ? (Icon) v : null;
+        return VALUES.getIcon(key);
     }
 
-    /// Does nothing; see the class description.
+    public static Border getBorder(Object key) {
+        return VALUES.getBorder(key);
+    }
+
+    public static Insets getInsets(Object key) {
+        return VALUES.getInsets(key);
+    }
+
+    public static Dimension getDimension(Object key) {
+        return VALUES.getDimension(key);
+    }
+
+    /// Does nothing, whatever the name; see the class description.
     public static void setLookAndFeel(String className) {
     }
 
+    /// Remembers the look and feel for [#getLookAndFeel]; `null` puts the
+    /// built-in one back. Nothing that is drawn changes.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedLookAndFeelException`: if the look and feel itself
+    ///   answers false from `isSupportedLookAndFeel`
+    public static void setLookAndFeel(LookAndFeel newLookAndFeel) throws UnsupportedLookAndFeelException {
+        if (newLookAndFeel != null && !newLookAndFeel.isSupportedLookAndFeel()) {
+            throw new UnsupportedLookAndFeelException(newLookAndFeel + " not supported on this platform");
+        }
+        current = newLookAndFeel;
+    }
+
+    public static LookAndFeel getLookAndFeel() {
+        if (current == null) {
+            current = new ThemeLookAndFeel();
+        }
+        return current;
+    }
+
     public static String getSystemLookAndFeelClassName() {
-        return "javax.swing.plaf.metal.MetalLookAndFeel";
+        return LOOK_CLASS;
     }
 
     public static String getCrossPlatformLookAndFeelClassName() {
-        return "javax.swing.plaf.metal.MetalLookAndFeel";
+        return LOOK_CLASS;
+    }
+
+    /// The look and feels there are to choose from: one, unless the
+    /// application installed more names. The array is a copy.
+    public static LookAndFeelInfo[] getInstalledLookAndFeels() {
+        if (installed == null) {
+            installed = new LookAndFeelInfo[]{new LookAndFeelInfo(LOOK_NAME, LOOK_CLASS)};
+        }
+        LookAndFeelInfo[] copy = new LookAndFeelInfo[installed.length];
+        System.arraycopy(installed, 0, copy, 0, installed.length);
+        return copy;
+    }
+
+    /// Replaces the list [#getInstalledLookAndFeels] answers. The names
+    /// are only listed; setting one changes nothing.
+    public static void setInstalledLookAndFeels(LookAndFeelInfo[] infos) {
+        if (infos == null) {
+            throw new NullPointerException("infos");
+        }
+        LookAndFeelInfo[] copy = new LookAndFeelInfo[infos.length];
+        System.arraycopy(infos, 0, copy, 0, infos.length);
+        installed = copy;
+    }
+
+    public static void installLookAndFeel(LookAndFeelInfo info) {
+        LookAndFeelInfo[] now = getInstalledLookAndFeels();
+        LookAndFeelInfo[] more = new LookAndFeelInfo[now.length + 1];
+        System.arraycopy(now, 0, more, 0, now.length);
+        more[now.length] = info;
+        installed = more;
+    }
+
+    public static void installLookAndFeel(String name, String className) {
+        installLookAndFeel(new LookAndFeelInfo(name, className));
     }
 }

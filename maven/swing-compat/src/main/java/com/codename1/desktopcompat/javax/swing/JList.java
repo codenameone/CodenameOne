@@ -139,9 +139,9 @@ public class JList<E> extends JComponent implements Scrollable {
         setBackground(bg == null ? Color.WHITE : bg);
         Color fg = UIManager.getColor("List.foreground");
         setForeground(fg == null ? Color.BLACK : fg);
-        Color sb = UIManager.getColor("List.selectionBackground");
+        Color sb = UIManager.cn1PutColor("List.selectionBackground");
         selectionBackground = sb == null ? new Color(0x38, 0x75, 0xd7) : sb;
-        Color sf = UIManager.getColor("List.selectionForeground");
+        Color sf = UIManager.cn1PutColor("List.selectionForeground");
         selectionForeground = sf == null ? Color.WHITE : sf;
         enableEvents(AWTEvent.MOUSE_EVENT_MASK);
         bind(KeyEvent.VK_UP, "selectPreviousRow", Move.PREVIOUS);
