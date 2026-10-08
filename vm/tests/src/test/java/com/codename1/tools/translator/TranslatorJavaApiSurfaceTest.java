@@ -131,11 +131,16 @@ class TranslatorJavaApiSurfaceTest {
             for (Path p : sources) {
                 files.add(p.toFile());
             }
-            // No boot class path means the JDK's own Java 8 platform (--release 8);
-            // with one, that directory is the whole platform.
-            List<String> options = new ArrayList<String>(bootClassPath == null
-                    ? Arrays.asList("--release", "8")
-                    : Arrays.asList("-source", "1.8", "-target", "1.8", "-bootclasspath", bootClassPath.toString()));
+            // No boot class path means the JDK's own Java 8 platform; with one, that
+            // directory is the whole platform. The Java 8 platform is spelled two ways:
+            // --release 8 on JDK 9 and later (plain -source 8 would see the module
+            // system's java.base), and the running platform itself on JDK 8, whose
+            // javac does not know --release -- vm-tests runs this module on JDK 8.
+            boolean jdk8 = System.getProperty("java.specification.version", "").startsWith("1.");
+            List<String> options = new ArrayList<String>(bootClassPath != null
+                    ? Arrays.asList("-source", "1.8", "-target", "1.8", "-bootclasspath", bootClassPath.toString())
+                    : jdk8 ? Arrays.asList("-source", "1.8", "-target", "1.8")
+                    : Arrays.asList("--release", "8"));
             options.addAll(Arrays.asList("-encoding", "UTF-8", "-proc:none", "-nowarn", "-Xlint:-options",
                     "-Xmaxerrs", "100000", "-d", out.toString()));
             javac.getTask(null, fm, diagnostics, options, null, fm.getJavaFileObjectsFromFiles(files)).call();
