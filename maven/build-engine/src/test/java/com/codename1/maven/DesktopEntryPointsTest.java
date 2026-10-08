@@ -424,6 +424,49 @@ public class DesktopEntryPointsTest {
                 "com.acme.MyApp is this project's main class", "Delete the source of com.acme.MyApp");
     }
 
+    /// A project with BOTH an Android application and a desktop one. The
+    /// Android build writes the main class whenever the project has none, so
+    /// "delete its source" is advice nobody could follow; the message says
+    /// what the project holds and the two ways out. Without the record the
+    /// Android application starts and the desktop classes ship beside it.
+    @Test
+    public void anAndroidApplicationInTheSameProjectIsNamedAsTheConflict() throws Exception {
+        // The Android remap has run by the time a real build gets here, so
+        // the lifecycle is in the package that remap moves it to; the name it
+        // had before is recognized too.
+        androidAndDesktop("rt");
+        androidAndDesktop("runtime");
+    }
+
+    private void androidAndDesktop(String pkg) throws Exception {
+        String lifecycle = "package com.codename1.androidcompat." + pkg + ";\n"
+                + "public class AndroidLifecycle extends com.codename1.system.Lifecycle {\n"
+                + "    public void runApp() { }\n}\n";
+        String droid = "package com.acme;\n"
+                + "public class MyApp extends com.codename1.androidcompat." + pkg + ".AndroidLifecycle { }\n";
+        File classes = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/MyApp.java", droid,
+                "com/codename1/androidcompat/" + pkg + "/AndroidLifecycle.java", lifecycle);
+        try {
+            remapper(classes, record("mainClass=com.acme.swingapp.Main", "kind=swing"), "com.acme.MyApp").run();
+            fail("Two applications cannot both be the one a target starts");
+        } catch (BuildException e) {
+            String message = e.getMessage();
+            assertTrue(message, message.contains("an Android application (src/main/android) and a desktop "
+                    + "application (src/main/desktop)"));
+            assertTrue(message, message.contains("delete cn1-desktop.properties"));
+            assertTrue(message, message.contains("com.acme.swingapp.Main"));
+            assertFalse(message, message.contains("Delete the source"));
+        }
+
+        File kept = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/MyApp.java", droid,
+                "com/codename1/androidcompat/" + pkg + "/AndroidLifecycle.java", lifecycle);
+        assertTrue(remapper(kept, null, "com.acme.MyApp").run());
+        assertEquals("com.codename1.androidcompat." + pkg + ".AndroidLifecycle",
+                load(kept, "com.acme.MyApp").getSuperclass().getName());
+        assertTrue("The desktop runtime still ships",
+                new File(kept, "com/codename1/desktopcompat/javax/swing/JFrame.class").isFile());
+    }
+
     @Test
     public void theRecordIsReadAsTheImporterWritesIt() throws Exception {
         assertNotNull(DesktopEntryPoints.read(record("# comment", "mainClass = a.B ", "kind=swing")));

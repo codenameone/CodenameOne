@@ -1,0 +1,911 @@
+== Running Swing and JavaFX applications
+
+An existing desktop application written with Swing and AWT, with the SwingX
+component set, or with JavaFX can build and run as a Codename One
+application without changes to its Java code. The desktop sources go into
+the Codename One project, the build maps them onto a Codename One
+implementation of the `java.awt`, `javax.swing`, `org.jdesktop.swingx` and
+`javafx.*` APIs, and the result runs on every Codename One target: iOS,
+Android, the JavaScript port, the native desktop ports and the simulator.
+
+There is no desktop Java runtime involved. Buttons, text fields, check
+boxes, sliders and tabs are Codename One components that take the platform's
+theme, layout managers and layout panes run the rules they run on the
+desktop, and code that paints with `Graphics2D` or a JavaFX `Canvas` draws
+through Codename One's graphics.
+
+This is a compatibility layer for a subset of each toolkit, not a Java
+virtual machine with a desktop class library. It exists to bring a user
+interface that already works to phones, to the web and to native desktop
+builds. New code should use the Codename One API, which is designed for
+those devices. The two can live in one project: desktop sources can call
+any Codename One API, as described in <<desktop-interop-codename-one-api>>.
+
+=== Quick start
+
+Create a Codename One application project (for example from
+https://start.codenameone.com[the initializr]), then import the desktop
+project into it:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/desktop-interop.sh[tag=desktop-interop-bash-001,indent=0]
+----
+
+The goal accepts a Maven or a Gradle project. It copies the project's
+`src/main/java`, `src/main/kotlin` and `src/main/resources` into
+`common/src/main/desktop`, leaves out any `module-info.java`, works out how
+the application starts and records it, and lists what becomes of each of the
+project's dependencies: the ones a layer implements (the JavaFX modules,
+SwingX), the ones to add to the `common` module yourself, and the toolkit
+modules no layer implements.
+
+Two more parameters settle the cases the goal can't decide for itself:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/desktop-interop.sh[tag=desktop-interop-bash-002,indent=0]
+----
+
+`cn1.desktop.module` names the module to import when the project's root has
+no sources and more than one of its modules does. `cn1.desktop.mainClass`
+names the class the application starts through when the sources and the
+project's own build leave more than one candidate. In both cases the goal
+stops before it copies anything and lists the choices.
+
+After that, run and build as usual:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/desktop-interop.sh[tag=desktop-interop-bash-003,indent=0]
+----
+
+==== Placing the sources by hand
+
+The directory mirrors a desktop project's `src/main`:
+
+----
+common/src/main/desktop/
+    java/                    the desktop application's Java sources
+    kotlin/                  Kotlin sources, if the application has any
+    resources/               images, .properties, .fxml and .css files
+    cn1-desktop.properties   how the application starts
+----
+
+`cn1-desktop.properties` has two keys:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/desktop-interop.properties[tag=desktop-interop-properties-001,indent=0]
+----
+
+`mainClass` is the fully qualified name of the class that starts the
+application: the class with `public static void main(String[])` for a Swing
+application, the `javafx.application.Application` subclass for a JavaFX one.
+`kind` is `swing` or `javafx` and says which of the two it is.
+
+The file is optional when the sources leave no doubt. Without it the build
+uses the application's only concrete `Application` subclass, or else its
+only class with a `main` method. More than one candidate, or none, stops
+the build with a message that explains the file.
+
+The `common` module's `desktop-compat` profile activates when
+`src/main/desktop` exists. It adds the `codenameone-swing-compat` and
+`codenameone-javafx-compat` dependencies with the `provided` scope. Both are
+added because the directory doesn't say which toolkit its sources use; the
+build then ships only the runtime the compiled classes refer to, so a Swing
+application doesn't carry the JavaFX runtime. A project created before the
+profile existed gets it from the import goal, which adds it to
+`common/pom.xml`.
+
+Gradle projects need no configuration either: when `src/main/desktop`
+exists, the Codename One Gradle plugin adds the two dependencies and the same
+build steps.
+
+=== The entry point
+
+A device runs no `main` method, so the build generates the Codename One main
+class of the application, the class that `codename1.packageName` and
+`codename1.mainName` name:
+
+* For a Swing application it calls the recorded class's `main` with an empty
+  argument array, once, on the Codename One event dispatch thread (EDT).
+  That thread is also the Swing event dispatch thread, so
+  `SwingUtilities.invokeLater` from `main` runs its code after `main`
+  returns. The application stays alive after `main` returns.
+* For a JavaFX application it creates the `Application` subclass and calls
+  `init()` and then `start(Stage)` with the primary stage, on the same
+  thread, which is also the JavaFX application thread. The application's
+  `main` method is never called, and `Application.launch` does nothing.
+
+The import goal makes room for the generated class: it renames the source
+of the project's existing main class to `<name>.java.pre-desktop-import`.
+A project that keeps a main class with that name must remove either the
+class or `cn1-desktop.properties`; the build stops and says so when both are
+present.
+
+=== How the build works
+
+Three steps run as part of the normal build of the `common` module:
+
+. *`prepare-desktop-sources`* (in `generate-sources`) adds
+  `src/main/desktop/java` as a source directory and
+  `src/main/desktop/resources` as a resource directory, and compiles the FXML
+  documents and JavaFX style sheets it finds there.
+. The Java compiler builds the application. Swing code compiles against the
+  JDK's own `java.awt` and `javax.swing`, because those packages belong to
+  the JDK and nothing else can supply them. JavaFX code compiles against the
+  `javafx.*` API in the `codenameone-javafx-compat` artifact. This is why the
+  sources need no changes.
+. *`remap-compat`* (in `process-classes`) rewrites the compiled classes so
+  that every reference to `java.awt`, `javax.swing`, `java.beans`,
+  `org.jdesktop` or `javafx` points at the Codename One implementation,
+  which ships inside the application under `com.codename1.desktopcompat` and
+  `com.codename1.fxcompat`. Nothing in the application then uses a name that
+  only a desktop JDK has.
+
+The same step handles the parts of the JDK that a device doesn't have:
+
+* Classes that are missing altogether are replaced by implementations that
+  ship with the application: `java.io.File` with the file streams, readers
+  and writers, the buffered streams and `PrintWriter`; `Optional`,
+  `StringJoiner`, `Properties`, `UUID` and `EventObject`; `ResourceBundle`
+  with its property and list forms; `NumberFormat`, `DecimalFormat`,
+  `ChoiceFormat` and `MessageFormat`; `ConcurrentHashMap`,
+  `CopyOnWriteArrayList`, `Callable`, `Future`, `TimeUnit`, `Executor`,
+  `ExecutorService` and `Executors`; `java.util.logging.Logger` and `Level`;
+  `java.util.prefs.Preferences`; and `java.net.URL`.
+* Single methods that a device class lacks are redirected one call at a
+  time. This covers the resource lookups of `Class` and `ClassLoader`, the
+  system properties and `System.exit`, the constants and language tags of
+  `Locale`, and the newer methods of `Objects`, `String`, `StringBuilder`,
+  `Character`, `Math` and the number wrappers.
+
+Nothing is found by reflection at run time. The entry point, the list of
+resources and the resource bundles are generated by the build, which is what
+lets the same code run on iOS.
+
+[[desktop-interop-build-errors]]
+=== Unsupported API is a build error
+
+The layers implement a subset of each toolkit. The build checks every
+reference in the compiled application against what exists after the remap
+step, so a class, method, constructor or field that a layer doesn't have
+stops the build. It never becomes a failure on a user's device.
+
+The message names the API the way the source code spells it, and the source
+file and line that uses it:
+
+----
+Compliance check failed with 2 forbidden API references.
+See /projects/orders/common/target/codenameone/compliance_check.txt for the full report.
+First 2 violation(s):
+ - com/example/OrdersPanel#printOrders()V -> javax.swing.JTable.print() is not supported by the Codename One Swing compatibility layer (com/example/OrdersPanel.class) at OrdersPanel.java:48
+ - com/example/HelpDialog#showManual()V -> javax.swing.JEditorPane.setPage(java.lang.String) is not supported by the Codename One Swing compatibility layer (com/example/HelpDialog.class) at HelpDialog.java:31
+----
+
+The report file lists every reference, one entry each:
+
+----
+Source class: com/example/OrdersPanel
+Source method: printOrders()V
+Source location: OrdersPanel.java:48
+Source bytecode file: com/example/OrdersPanel.class
+Forbidden reference: javax.swing.JTable.print() is not supported by the Codename One Swing compatibility layer
+----
+
+A class that a layer lacks altogether is reported once, as the class,
+instead of once for each of its members. A JDK class outside the toolkits
+that the device doesn't have, such as `java.math.BigDecimal`, is reported by
+the same check.
+
+One case passes the check. A method the application *overrides* isn't a
+reference to anything, so an override of a method the layer never calls
+compiles, builds and is never called on a device. If a callback you rely on
+doesn't run, check that the layer's class calls it; an explicit
+`super.method()` call to a missing method is reported like any other call.
+
+=== How the application looks and behaves
+
+==== Widgets take the platform's theme
+
+The standard widgets are shown by Codename One components: a `JButton` or a
+JavaFX `Button` is a Codename One button, a `JTextField` or a `TextField`
+is the platform's text field with its own keyboard, selection and
+autocorrection, and the same holds for labels, check boxes, radio buttons,
+combo boxes, sliders, progress bars and tabs. They look the way the
+Codename One theme makes them look on each platform, not the way a desktop
+look and feel draws them.
+
+For that reason there are no look and feel classes, UI delegates or JavaFX
+skins. `UIManager.setLookAndFeel` is accepted and changes nothing, so the
+usual call at the top of `main` runs as it is. `UIManager` defaults that the
+application puts are stored and returned, and common keys that were never
+put (a `.background`, `.foreground` or `.font` key) are answered from the
+theme.
+
+A `JLabel`, button, tab title or tool tip whose text starts with `<html>`
+is formatted from a small subset of HTML: bold, italic and underlined text,
+line breaks and paragraphs, headings, `font` colors and sizes, and list
+items. Images, tables, links and style sheets
+inside such text aren't supported.
+
+`JTable`, `JTree` and `JList` paint themselves the way they do on the
+desktop: each visible cell is drawn by the component its renderer returns.
+The default renderers are labels and check boxes, so the cells carry the
+theme too. On a touch screen their rows are tall enough for a finger unless
+the application sets a row height, a tap selects, and a drag scrolls the
+enclosing scroll pane.
+
+==== Custom painting
+
+A Swing component that overrides `paintComponent` paints as it does on the
+desktop, through a `Graphics2D` with shapes, strokes, paints, clipping and
+an affine transform:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/BadgePanel.java[tag=desktopInteropSwingPaint,indent=0]
+----
+
+`Component.getGraphics()` returns `null`. Paint from `paint` or
+`paintComponent` and ask for a new frame with `repaint()`. A
+`BufferedImage` stores one ARGB integer for each pixel and can be drawn into
+and read back; rasters, color models and sample models aren't available.
+
+In JavaFX, the shapes, `Text`, paths, gradients and transforms are drawn by
+the layer, and a `Canvas` records its drawing calls and replays them when it
+paints, so its content stays sharp at any display density.
+
+==== Logical pixels
+
+Desktop code sizes things in pixels and assumes about 96 of them to the
+inch. A phone packs three or four device pixels into that distance, so the
+layers treat every Swing and JavaFX coordinate as a _logical pixel_ of 1/96
+inch. Component bounds, font sizes, strokes and everything painted are
+multiplied by the display's scale on the way to the screen, and edges are
+snapped to whole device pixels so that components that touch in the
+application's coordinates also touch on the screen.
+
+In practice a 24 pixel row is the same physical height on a phone as on a
+desktop monitor, and a layout designed for a 1024 pixel wide window is far
+wider than a phone, which is about 400 logical pixels across. Layout managers and
+panes that adapt to the available width keep working. Fixed sizes, `null`
+layouts and wide tables need the same attention they would need on a small
+desktop window.
+
+To make every logical pixel larger or smaller, set the Display property
+`desktopcompat.scale` to the number of device pixels for each logical pixel
+before the application shows its first window.
+
+==== Windows
+
+The first `JFrame` or the primary `Stage` an application shows fills a
+Codename One form. That's the application's screen on every device, and the
+size the application asked for is ignored. What happens to further windows
+depends on the port:
+
+* On the desktop ports, which have a window manager, each further frame or
+  stage is a real window with the size, position and title the application
+  gave it.
+* Everywhere else, a further frame is a form shown over the one before it,
+  with a back command that asks it to close. A dialog floats over the
+  current form at the size it was packed to, limited to the display, and is
+  centered whatever position the application set. A JavaFX stage with a
+  modality is shown as a dialog, and one without as a form.
+
+Closing follows the desktop rules. A request to close a frame, whether from
+the back command, the window's close box or the platform ending the
+application, runs the window listeners and then the frame's default close
+operation. A Swing application exits when its last window is disposed of or
+when a frame with `EXIT_ON_CLOSE` closes. A JavaFX application exits when
+its last window closes, unless `Platform.setImplicitExit(false)` was called,
+or when it calls `Platform.exit()`. When the application moves to the
+background, Swing frames receive `windowIconified`, and `windowDeiconified`
+when it returns.
+
+==== Dialogs block
+
+A modal dialog blocks its caller the way it does on the desktop.
+`JOptionPane.showMessageDialog`, `showConfirmDialog` and `showInputDialog`,
+`setVisible(true)` on a modal `JDialog`, and `showAndWait()` on a JavaFX
+`Alert`, `Dialog` or stage all return only after the user has answered.
+Painting, input and timers keep running while they wait, so code written as
+a sequence of questions needs no restructuring.
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/GreeterApp.java[tag=desktopInteropSwingApp,indent=0]
+----
+
+==== Menus
+
+A `JMenuBar` set on a frame with `setJMenuBar` isn't drawn as a bar. Every
+visible item of every menu becomes a Codename One command. On the desktop
+ports the commands appear in the native menu bar under the name of their
+top-level menu, and an accelerator made of a letter or a digit with the
+control or meta key becomes the command's shortcut with the platform's
+primary modifier. On a phone the commands are in the overflow menu of the
+form's toolbar as one flat list, where an item of a submenu is prefixed
+with the submenu's name. Separators are dropped. A `JMenuBar` added to a
+container like any other component, or set on a dialog, is drawn as a row of
+menus that open popups.
+
+A JavaFX `MenuBar` is always drawn inside the scene; the system menu bar
+isn't used. `JPopupMenu` and `ContextMenu` open on a secondary click and on
+a long press.
+
+==== Threading
+
+`SwingUtilities.invokeLater`, `EventQueue.invokeLater` and
+`Platform.runLater` queue code on the Codename One EDT. `invokeAndWait` runs
+its code immediately when it's called on that thread. `javax.swing.Timer`
+and the JavaFX animation classes fire there too.
+
+Long work belongs on another thread, as on the desktop. `SwingWorker` runs
+`doInBackground()` on a thread of its own and delivers `process`, `done`
+and the property changes on the EDT:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/LoadNames.java[tag=desktopInteropSwingWorker,indent=0]
+----
+
+A JavaFX `Task` or `Service` does the same for JavaFX code: `call()` runs on
+a background thread, and the task's properties and handlers change on the
+application thread. `Task` isn't a `FutureTask` here and has no blocking
+`get()`; read the result with `getValue()` in a succeeded handler.
+`Executors` creates services that run their tasks on background threads,
+never on the EDT.
+
+==== Resources
+
+`getClass().getResource(...)`, `getResourceAsStream(...)` and the
+`ClassLoader` lookups work, with relative and absolute names. A device has
+no class path and no directories, so the build flattens the files under
+`src/main/desktop/resources`, records their original paths, and the lookups
+resolve against that record. `getResource` returns a URL in the `cn1res`
+scheme that keeps the original path, so code that passes
+`url.toExternalForm()` to an image or a style sheet loader keeps working.
+
+`ResourceBundle.getBundle` finds `.properties` bundles and
+`ListResourceBundle` subclasses, with the usual fallback from language and
+country to language to the base bundle. The build registers every bundle it
+finds, so none is loaded by name at run time. `ResourceBundle.Control`
+isn't available.
+
+`ImageIcon`, `ImageIO.read` and the JavaFX `Image` decode PNG and JPEG
+through the platform. A JavaFX `Image` doesn't load `http` or `https` URLs.
+
+==== Third-party libraries
+
+A library written against Swing or JavaFX itself, such as a layout
+manager like MigLayout or a component set, can't stay an ordinary
+dependency, because its classes name the desktop toolkit too. Add it to the
+`common` module with the `compile` scope:
+
+[source,xml]
+----
+include::../demos/common/src/main/snippets/developer-guide/desktop-interop.xml[tag=desktop-interop-xml-001,indent=0]
+----
+
+The build unpacks such a library into the application and remaps it with
+the application's own classes. The check for unsupported API covers it as
+well, and a report about one of its classes names the library it came from.
+Whether a particular library builds depends on the API it uses. A library
+that doesn't refer to a desktop toolkit is merged into the application as
+before, and a library with the `provided` scope is never unpacked.
+
+=== FXML and style sheets
+
+FXML documents and JavaFX style sheets under `src/main/desktop/resources`
+are compiled when the application is built. An FXML document becomes a Java
+class that builds the same node tree with plain constructors and setters,
+and a style sheet becomes a compact table that a style engine in the runtime
+reads. No XML or CSS file is parsed on the device. A document is therefore
+fixed when the application is built: a document downloaded or written
+while the application runs can't be loaded, and `FXMLLoader` throws a
+`LoadException` that says so.
+
+==== Loading a document
+
+The application loads a document the way it does on the desktop:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/GreeterFxApp.java[tag=desktopInteropFxmlLoad,indent=0]
+----
+
+[source,xml]
+----
+include::../demos/desktop-interop/src/main/resources/com/codenameone/developerguide/desktopinterop/javafx/greeter.fxml[tag=desktopInteropFxml,indent=0]
+----
+
+The controller named by `fx:controller` is created by generated code.
+Fields and handler methods annotated with `@FXML` can stay private or be
+inherited from another class of the application, and `initialize()`, with
+or without the `Initializable` interface, is called after the fields are
+set. The build generates direct code for those assignments and calls after
+it has compiled the controller, so no reflection is involved:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/GreeterController.java[tag=desktopInteropFxmlController,indent=0]
+----
+
+The loader's instance API works too: a loader created with a location and a
+resource bundle, `setController`, `setControllerFactory`, `setRoot`,
+`getController` and `getNamespace`. Builder factories, and the character set
+and class loader settings, aren't part of it.
+
+==== What a document can contain
+
+* `<?import?>` instructions, for a class or for a package.
+* Elements that create objects, through a constructor without arguments or
+  one whose parameters are annotated with `@NamedArg`, and `fx:value`,
+  `fx:factory` and `fx:constant`.
+* Attributes and property elements, converted to the type of the property
+  when the application is built. Read-only list properties, default
+  properties (the children of a pane) and static properties such as
+  `GridPane.columnIndex` work as on the desktop.
+* `fx:id`, `fx:controller` and `#handler` attributes.
+* `fx:include`, with the included document's controller available as
+  `<id>Controller`; `fx:define`; `fx:reference` and `$variable` references;
+  and `fx:root`.
+* `%key` strings from the loader's resource bundle, and `@path` locations
+  relative to the document.
+* `${...}` bindings to one property of the controller or of an element with
+  an `fx:id`, such as `${slider.value}`.
+
+The compiler checks every class and property a document names against the
+application's class path, so a mistake that the desktop reports when the
+document is loaded is reported when the application is built, with the
+file, line and column:
+
+----
+src/main/desktop/resources/views/orders.fxml:7:26: txt="Orders": javafx.scene.control.Label has no property txt (no public setTxt and no list getTxt) (at <Label txt="Orders">)
+----
+
+These are build errors:
+
+* An unknown class or property, and a value that can't be converted to the
+  property's type.
+* An element that names a class from the application's own sources, such as
+  a custom control. Documents are compiled before those sources are, so an
+  element can only be a class of the layer or of a library. Create such a
+  control in the controller and add it to a pane that the document
+  declares.
+* Scripts: `<fx:script>` and the `<?language?>` instruction.
+* A `${...}` binding to anything other than one property, such as an
+  arithmetic expression. Write it as a binding in the controller's
+  `initialize()`.
+* A `$variable` or `${...}` reference to an `fx:id` that the document
+  defines further down.
+* A document that isn't well-formed XML.
+
+==== Style sheets
+
+A selector can use a type (`Label`), style classes (`.card`), an id
+(`#status`), pseudo-classes (`:hover`, `:focused`, `:pressed`, `:disabled`,
+`:selected`), the universal selector, any compound of those, and the
+descendant and child combinators. A rule can list several selectors. The
+cascade follows JavaFX: `!important` first, then an inline style, then the
+more specific selector, then the later style sheet and the later rule.
+Style sheets set on a scene and on any parent apply, `@import` is followed,
+and `setStyle` with inline declarations works on any node.
+
+Lengths can be written in `px`, `pt`, `pc`, `in`, `cm`, `mm`, `em`, `ex` and
+as a percentage. Colors can be written as a name, in hexadecimal notation, with
+`rgb`, `rgba`, `hsb`, `hsba`, `hsl` and `hsla`, and with `derive`, and a
+paint can also be a linear or a radial gradient. Looked-up colors, where
+one rule defines a name such as `-app-accent` and the rules below it use the
+name as a color, are resolved through a node's ancestors. A node inherits
+the font and those color definitions from its parent, and nothing else.
+
+[source,text]
+----
+include::../demos/desktop-interop/src/main/resources/com/codenameone/developerguide/desktopinterop/javafx/greeter.css[tag=desktopInteropFxCss,indent=0]
+----
+
+The properties a style sheet can set are the ones the nodes implement:
+
+* Every node: `-fx-opacity`, `-fx-rotate`, `-fx-scale-x`, `-fx-scale-y`,
+  `-fx-translate-x`, `-fx-translate-y`, `-fx-cursor`, `visibility` and
+  `-fx-managed`.
+* Regions, which includes the layout panes and the controls:
+  `-fx-background-color`, `-fx-background-radius`, `-fx-background-insets`,
+  the `-fx-border-color`, `-fx-border-width`, `-fx-border-radius` and
+  `-fx-border-style` group, `-fx-padding`, and the minimum, preferred and
+  maximum width and height.
+* Layout panes: `-fx-spacing`, `-fx-alignment`, `-fx-hgap`, `-fx-vgap`,
+  `-fx-orientation`, `-fx-fill-width` and `-fx-fill-height`, each on the
+  panes that have the property.
+* Labels, buttons and other labeled controls: `-fx-text-fill`, `-fx-font`,
+  `-fx-font-size`, `-fx-font-family`, `-fx-font-weight`, `-fx-font-style`,
+  `-fx-alignment`, `-fx-text-alignment`, `-fx-wrap-text`, `-fx-underline`,
+  `-fx-graphic-text-gap` and `-fx-content-display`.
+* Text input controls: `-fx-text-fill`, `-fx-prompt-text-fill` and the font
+  properties.
+* Scroll panes: `-fx-fit-to-width`, `-fx-fit-to-height`, `-fx-pannable`,
+  `-fx-hbar-policy` and `-fx-vbar-policy`.
+* Shapes and `Text`: `-fx-fill`, `-fx-stroke`, `-fx-stroke-width`, the
+  stroke line cap, line join and type, and for `Text` the font properties,
+  `-fx-text-alignment`, `-fx-strikethrough` and `-fx-line-spacing`.
+
+A style sheet written for the desktop usually names properties and values
+this layer doesn't have, and JavaFX itself only logs those. The build
+treats them the same way: an unknown property, a value it can't read and a
+selector form it doesn't support are each a build *warning* with the file
+and line, and the declaration or rule is left out.
+
+----
+src/main/desktop/resources/views/orders.css:2:5: -fx-effect is not a property this layer styles; the declaration is ignored
+src/main/desktop/resources/views/orders.css:3:5: -fx-background-color: layered values are not supported; only the last layer is used
+----
+
+Only a style sheet whose structure is broken, such as an unclosed
+block, is a build error. Two limits are worth knowing before you read
+the warnings:
+
+* A region has one background paint and one border. Where a declaration
+  lists several layers, the last one is used.
+* `@font-face` doesn't load a font. The family it names is used only when
+  the device already has a font with that name.
+
+A JavaFX application that builds its scene in code needs none of this:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/CounterApp.java[tag=desktopInteropJavaFxApp,indent=0]
+----
+
+=== Supported API
+
+The tables list the main classes of each area. A class in a table is one an
+application can use; it doesn't mean that every member the desktop class
+has is present. The build reports the members that are missing, as
+<<desktop-interop-build-errors>> describes.
+
+==== Swing and AWT
+
+[cols="1,3",options="header"]
+|===
+|Area |Classes
+
+|Windows and dialogs
+|`JFrame`, `JDialog`, `JWindow`, `JOptionPane`, `JFileChooser` with
+`FileNameExtensionFilter`, `JColorChooser`, `ProgressMonitor`, `JRootPane`
+and `JLayeredPane`
+
+|Containers
+|`JPanel`, `JScrollPane` with `JViewport` and `JScrollBar`, `JSplitPane`,
+`JTabbedPane`, `JToolBar` and `Box`
+
+|Buttons and labels
+|`JLabel`, `JButton`, `JToggleButton`, `JCheckBox`, `JRadioButton`,
+`ButtonGroup`, `Icon` and `ImageIcon`
+
+|Text
+|`JTextField`, `JPasswordField`, `JFormattedTextField` with its formatters,
+`JTextArea`, `JEditorPane` and `JTextPane` for plain text and simple HTML,
+`PlainDocument`, `DocumentFilter`, `DocumentListener` and `Caret`
+
+|Lists and values
+|`JList`, `JComboBox`, `JSpinner` with the number, list and date models,
+`JSlider`, `JProgressBar` and `JSeparator`, with their models and renderers
+
+|Tables and trees
+|`JTable` with `javax.swing.table` (table and column models, renderers,
+editors, `JTableHeader`, `TableRowSorter`) and `RowFilter`; `JTree` with
+`javax.swing.tree` (models, nodes, paths, selection, renderers and editors)
+
+|Menus and actions
+|`JMenuBar`, `JMenu`, `JMenuItem`, `JCheckBoxMenuItem`,
+`JRadioButtonMenuItem`, `JPopupMenu`, `Action`, `AbstractAction`,
+`KeyStroke`, `InputMap` and `ActionMap`
+
+|Layout managers
+|`BorderLayout`, `FlowLayout`, `GridLayout`, `GridBagLayout`, `CardLayout`,
+`BoxLayout`, `GroupLayout`, `SpringLayout` and `OverlayLayout`
+
+|Borders
+|Every class of `javax.swing.border`, and `BorderFactory`
+
+|Painting
+|`Graphics`, `Graphics2D`, `Color`, `Font`, `FontMetrics`, `BasicStroke`,
+`GradientPaint`, `AlphaComposite`, `RenderingHints`, the shapes, paths and
+`AffineTransform` of `java.awt.geom`, `Image`, `BufferedImage` and `ImageIO`
+
+|Events
+|The listeners, adapters and events of `java.awt.event` and
+`javax.swing.event`, key bindings, focus traversal, and
+`PropertyChangeSupport` with the rest of `java.beans` property change
+support
+
+|Threading
+|`SwingUtilities`, `EventQueue`, `SwingWorker` and `javax.swing.Timer`
+
+|Services
+|`Toolkit` (screen and font metrics, images), `Desktop` (`browse`, `mail`
+and `open`), the system `Clipboard` for text, `Cursor` and `UIManager`
+defaults
+|===
+
+==== SwingX
+
+[cols="1,3",options="header"]
+|===
+|Area |Classes
+
+|Components
+|`JXTable`, `JXTreeTable`, `JXList`, `JXTree`, `JXDatePicker`,
+`JXMonthView`, `JXTaskPane` and `JXTaskPaneContainer`, `JXCollapsiblePane`,
+`JXTitledPanel`, `JXTitledSeparator`, `JXHeader`, `JXStatusBar`,
+`JXHyperlink`, `JXBusyLabel`, `JXSearchField`, `JXErrorPane`, `JXFrame`,
+`JXDialog`, and `JXPanel`, `JXLabel`, `JXButton`, `JXTextField`,
+`JXTextArea` and `JXFormattedTextField`
+
+|Layout
+|`HorizontalLayout` and `VerticalLayout`
+
+|Highlighters
+|`ColorHighlighter`, `BorderHighlighter`, `FontHighlighter`,
+`IconHighlighter`, `PainterHighlighter`, `CompoundHighlighter`,
+`HighlighterFactory` and `HighlightPredicate`
+
+|Renderers
+|The component providers, cell contexts, `StringValue` and `IconValue` of
+`org.jdesktop.swingx.renderer`, with `DefaultTableRenderer`,
+`DefaultListRenderer` and `DefaultTreeRenderer`
+
+|Sorting and filtering
+|`TableSortController`, `ListSortController` and `RowFilters`
+
+|Painters
+|`Painter`, `CompoundPainter`, `MattePainter`, `RectanglePainter`,
+`ShapePainter`, `TextPainter`, `ImagePainter`, `GlossPainter`,
+`PinstripePainter`, `CheckerboardPainter`, `BusyPainter` and `AlphaPainter`
+
+|Tree tables and columns
+|`TreeTableModel`, `DefaultTreeTableModel`, the tree table nodes,
+`TableColumnExt`, `TableColumnModelExt` and the column control button
+
+|Dates
+|`DateSelectionModel` and its implementations
+
+|Other
+|`PromptSupport`, `AbstractActionExt`, the hyperlink actions and
+`AbstractBean`
+|===
+
+==== JavaFX
+
+[cols="1,3",options="header"]
+|===
+|Area |Classes
+
+|Application and windows
+|`Application`, `Platform`, `HostServices`, `Stage`, `Window`,
+`PopupWindow`, `Modality` and `StageStyle`
+
+|Scene graph
+|`Scene`, `Node`, `Parent`, `Group` and `Cursor`
+
+|Layout panes
+|`Pane`, `HBox`, `VBox`, `BorderPane`, `StackPane`, `GridPane`, `FlowPane`,
+`TilePane`, `AnchorPane` and `Region`, with `Background`, `Border`, `Insets`
+and the row and column constraints
+
+|Controls
+|`Label`, `Button`, `ToggleButton`, `CheckBox`, `RadioButton`, `Hyperlink`,
+`TextField`, `PasswordField`, `TextArea`, `ComboBox`, `ChoiceBox`,
+`DatePicker`, `Slider`, `ProgressBar`, `ProgressIndicator`, `Separator`,
+`ScrollPane`, `SplitPane`, `TabPane`, `ListView`, `TableView`, `ButtonBar`
+and `Tooltip`
+
+|Menus and dialogs
+|`MenuBar`, `Menu`, `MenuItem`, `CheckMenuItem`, `SeparatorMenuItem`,
+`ContextMenu`, `Alert`, `Dialog`, `DialogPane`, `ChoiceDialog` and
+`TextInputDialog`
+
+|Properties and bindings
+|The property, read-only property and wrapper classes of
+`javafx.beans.property`, the observable values, `Bindings`, the binding
+and expression classes and `When`
+
+|Collections
+|`ObservableList`, `ObservableMap`, `ObservableSet`, `FXCollections`,
+`FilteredList` and `SortedList`
+
+|Shapes, text and paint
+|The shapes and path elements of `javafx.scene.shape`, `Text`, `Font`,
+`Color`, `LinearGradient` and `RadialGradient`
+
+|Canvas and images
+|`Canvas`, `GraphicsContext`, `Image` and `ImageView`
+
+|Transforms
+|`Affine`, `Rotate`, `Scale`, `Shear` and `Translate`
+
+|Animation
+|`Timeline`, `KeyFrame`, `KeyValue`, `Interpolator`, `AnimationTimer`, the
+fade, translate, rotate, scale and pause transitions, and the sequential
+and parallel transitions
+
+|Concurrency
+|`Task`, `Service` and `Worker`
+
+|Events and input
+|`Event`, `EventHandler`, `EventType`, `ActionEvent`, `MouseEvent`,
+`KeyEvent`, `ScrollEvent` and `ContextMenuEvent`, with filters and handlers
+
+|FXML
+|`FXMLLoader`, `@FXML`, `Initializable` and `LoadException`
+
+|Styling
+|Style classes, ids, inline styles, `PseudoClass` and style sheets
+
+|Utilities
+|`Duration`, `Pair`, `Callback`, `StringConverter` with the number, boolean
+and default converters, and `javafx.geometry`
+|===
+
+=== What isn't supported
+
+The build reports each of these when an application uses it, except where
+the text says the call is accepted.
+
+Swing and AWT:
+
+* Look and feel classes and UI delegates. `UIManager.setLookAndFeel` is
+  accepted and ignored, and `updateUI` does nothing.
+* Printing (`java.awt.print`, and `print` on `JTable` and the text
+  components), dragging data with `java.awt.dnd` or `TransferHandler`, and the accessibility API
+  (`javax.accessibility`).
+* Styled text: `StyledDocument`, editor kits and `javax.swing.undo`.
+  `JTextPane` behaves as a `JEditorPane`, which shows plain text or simple
+  HTML that the user can't edit, and has no `setPage`.
+* `JDesktopPane` and `JInternalFrame`, and the internal-frame variants of
+  `JOptionPane`.
+* Tool tips for each row and type-ahead search in `JTree`.
+* The regular expression filter of `RowFilter` and the regular expression
+  filters and predicates of SwingX.
+* The accessory, file view and file system view of `JFileChooser`, and the
+  swatch and color model panels of `JColorChooser`.
+* Rasters, color models and image filters in `java.awt.image`, image
+  readers and writers other than PNG and JPEG, `Robot`, the system tray and
+  input methods.
+* Clipboard content other than text on the system clipboard.
+
+JavaFX:
+
+* Effects, blend modes, `Node.setClip`, snapshots, three-dimensional
+  shapes, cameras and transforms.
+* `WebView`, media playback, charts, printing and the Swing embedding
+  classes.
+* `TreeView`, `TreeTableView`, `Spinner`, `ColorPicker`, `Accordion`,
+  `TitledPane`, `ToolBar`, `Pagination`, `FileChooser` and
+  `DirectoryChooser`.
+* Editing, sorting, cell selection, row factories and column resize
+  policies in `TableView`. A column that doesn't fit is cut off; the table
+  doesn't scroll sideways. `ListView` is vertical and can't be edited.
+* Skins, the user agent style sheet and CSS metadata. Background images,
+  and layered backgrounds and borders from a style sheet.
+* The system menu bar, scene accelerators and mnemonics, and dragging data between nodes.
+* `WritableImage`, pixel readers and animated images.
+
+Both toolkits:
+
+* Reflection. `java.lang.reflect` members, `Class.getMethod` and similar
+  calls are build errors, and code that loads plugins or classes by name
+  with `Class.forName` or a class loader doesn't run on iOS.
+* Java serialization (`ObjectOutputStream` and `ObjectInputStream`).
+* `java.math.BigDecimal` and `BigInteger`, `java.util.regex`, the
+  `java.nio` file and channel APIs, sockets and JDBC. Use the Codename One
+  APIs for networking, storage and databases.
+* Keyboard modifiers on phones. The state of Shift, Control, Alt and Meta
+  is reported on the desktop ports only, for key and mouse events alike.
+* Function keys and the Home, End, Page Up, Page Down and Insert keys,
+  which the ports don't report as distinct keys.
+
+=== Differences from the desktop
+
+* *Rendering isn't pixel-identical with the JDK.* Widgets are Codename One
+  components in the platform's theme, so their sizes, paddings and colors
+  differ from any desktop look and feel. Lay out with layout managers
+  instead of fixed coordinates.
+* *Fonts are the platform's.* A font family is a request: text is drawn
+  with the device's own typeface in the weight, slant and size asked for,
+  so "Arial" at 12 pixels bold is the device's 12 pixel bold font. Text
+  measures differently from the desktop.
+* *File choosers.* `JFileChooser.showOpenDialog` opens the platform's own
+  picker: the document picker of a phone, the file dialog of a desktop. It
+  returns one file even when multiple selection is on, and it applies the
+  extensions of a `FileNameExtensionFilter` and no other kind of filter.
+  Saving and choosing a directory show a dialog that lists the directories
+  the application can reach, which on a phone is the application's own
+  storage.
+* *Files.* `java.io.File` paths resolve inside the application's storage.
+  The `user.home`, `user.dir` and `java.io.tmpdir` system properties all
+  name the application's home directory, and `System.getenv` returns `null`.
+* *Dialog size and position on phones.* A dialog keeps its packed size up
+  to the size of the display and is always centered. A frame fills the
+  screen whatever size it asked for.
+* *`System.exit` exits the application.* It runs the shutdown hooks and
+  asks the platform to close the application. The exit status is discarded.
+* *Scroll bars.* On a touch device a `JScrollPane` has no visible scroll
+  bars that take room; the user drags the content.
+* *Selection.* `JList` selects on the click, not on the press that starts
+  it, because a press also starts a scroll on a touch screen.
+* *`Locale`.* The device's `Locale` compares by identity. Calls made on a
+  variable of type `Locale` are redirected and behave as on the desktop,
+  but a locale used as a map key or held as an `Object` isn't. Key such a
+  map by the locale's string form.
+* *`NumberFormat`.* It can't be assigned to a variable of type
+  `java.text.Format`, rounding is always half-even, and currencies aren't
+  available.
+* *`URL`.* `openStream()` downloads an `http` or `https` resource in full
+  before it returns the stream. `openConnection` isn't available.
+* *Preferences and logging.* `Preferences` is stored in Codename One's
+  preferences and has no change listeners. `Logger` writes through Codename
+  One's log and has no handlers or formatters.
+
+[[desktop-interop-codename-one-api]]
+=== Calling Codename One from desktop code
+
+The desktop sources compile in the `common` module, next to the Codename One
+API, so they can call it directly. This is how a ported application adapts
+to the device it runs on, and how it reaches features the desktop APIs don't
+cover, such as the camera, push notifications or the platform's storage:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/CompactLayout.java[tag=desktopInteropCodenameOneApi,indent=0]
+----
+
+Code that uses Codename One classes no longer compiles in the original
+desktop project. Keep such calls behind a small class of your own if the
+application must go on building for the desktop JVM too.
+
+=== Troubleshooting
+
+*The build fails and names API that the Swing or JavaFX compatibility
+layer doesn't support.* The application uses API the layer
+doesn't implement. The message gives the source file and line. Replace the
+call with one the layer has, or move the feature behind a class of your own
+with a second implementation that uses the Codename One API. The full list
+is in `common/target/codenameone/compliance_check.txt`.
+
+*The message points at a library, not at your code.* A report that ends
+with "in the library ..., which is bundled and relocated with the
+application" comes from a dependency. If the application doesn't need the
+part of the library that makes the reference, exclude the library and
+replace what you used from it. Otherwise the library can't be used as it
+is.
+
+*The build reports `java.awt` or `javax.swing` references and suggests
+enabling the layer.* The sources that use the toolkit are outside
+`src/main/desktop`, so the layer isn't active for the project. Move them to
+`common/src/main/desktop/java`.
+
+*The build stops because it can't choose an entry point.* Add
+`cn1-desktop.properties` with `mainClass` and `kind`, or pass
+`-Dcn1.desktop.mainClass` to the import goal.
+
+*`src/main/desktop` exists but the build says a runtime dependency is
+missing.* The `common/pom.xml` predates the desktop layers. Run the import
+goal, which adds the profile, or add the `codenameone-swing-compat` and
+`codenameone-javafx-compat` dependencies with the `provided` scope.
+
+*Kotlin sources.* Kotlin files under `src/main/desktop/kotlin` compile
+with the application's Kotlin support, which the import goal switches on
+when the desktop project has any: it creates `common/src/main/kotlin`,
+whose presence activates the Kotlin build. Create that directory yourself
+when you place the sources by hand.
+
+*Two resources with the same flattened name.* The build stops instead of
+letting one file replace the other. Rename one of them.
+
+*An Android module in the same project.* `src/main/android` and
+`src/main/desktop` can exist in one project. The build applies every active
+layer in one pass, and each layer ships only when the project uses it.

@@ -191,6 +191,18 @@ public final class Resources {
         return contextLoader == null ? ClassLoader.getSystemClassLoader() : contextLoader;
     }
 
+    /// `loader.loadClass(name)`: the class of that name when the application
+    /// has it, which is all a class loader can answer where no class is ever
+    /// loaded at run time. Desktop code asks this way to find out whether an
+    /// optional class is present; one that is not throws
+    /// `ClassNotFoundException`, as on a desktop.
+    public static Class<?> loadClass(ClassLoader loader, String name) throws ClassNotFoundException {
+        if (loader == null || name == null) {
+            throw new NullPointerException();
+        }
+        return Class.forName(name);
+    }
+
     /// `Thread.setContextClassLoader(loader)`. There is one loader, so this
     /// only remembers the object for [#getContextClassLoader(Thread)] to
     /// hand back, for every thread alike.

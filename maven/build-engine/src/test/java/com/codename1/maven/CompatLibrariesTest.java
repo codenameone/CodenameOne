@@ -62,6 +62,43 @@ public class CompatLibrariesTest {
             + "    public Object launch() { return new ProcessBuilder(\"ls\"); }\n"
             + "}\n";
 
+    /// As [#PANEL], with the corners a real Swing library has: it can save
+    /// itself through long-term persistence, keeps a weak cache, and asks
+    /// whether a component is one of AWT's heavyweight widgets.
+    private static final String PERSISTENT_PANEL = "package org.fancy;\n"
+            + "public class FancyPanel extends javax.swing.JPanel\n"
+            + "        implements java.io.Externalizable, java.beans.ExceptionListener {\n"
+            + "    private final java.util.WeakHashMap<Object, String> cache = new java.util.WeakHashMap<Object, String>();\n"
+            + "    public boolean heavy(java.awt.Component c) {\n"
+            + "        return c instanceof java.awt.Label || c instanceof java.awt.TextComponent\n"
+            + "                || c instanceof java.awt.ScrollPane && ((java.awt.ScrollPane) c).getComponent(0) != null;\n"
+            + "    }\n"
+            + "    public void save(java.io.OutputStream out) {\n"
+            + "        java.beans.XMLEncoder e = new java.beans.XMLEncoder(out);\n"
+            + "        e.setExceptionListener(this);\n"
+            + "        e.writeObject(this);\n"
+            + "        e.close();\n"
+            + "    }\n"
+            + "    public boolean designing() throws Exception {\n"
+            + "        java.beans.Introspector.getBeanInfo(FancyPanel.class, java.beans.Introspector.IGNORE_ALL_BEANINFO)\n"
+            + "                .getBeanDescriptor().setValue(\"k\", \"v\");\n"
+            + "        return java.beans.Beans.isDesignTime()\n"
+            + "                || getClass().getClassLoader().loadClass(\"org.fancy.FancyPanel\") == null;\n"
+            + "    }\n"
+            + "    public void exceptionThrown(Exception x) { cache.put(x, \"x\"); }\n"
+            + "    public void writeExternal(java.io.ObjectOutput out) throws java.io.IOException { out.writeInt(1); }\n"
+            + "    public void readExternal(java.io.ObjectInput in) throws java.io.IOException { in.readInt(); }\n"
+            + "}\n";
+
+    /// An application that reaches for long-term persistence itself.
+    private static final String PERSISTENT_MAIN = "package com.acme.swingapp;\n"
+            + "public class Main {\n"
+            + "    public static void main(String[] args) {\n"
+            + "        new java.beans.XMLEncoder(new java.io.ByteArrayOutputStream()).close();\n"
+            + "        System.out.println(new javax.swing.JLabel() instanceof java.awt.Component);\n"
+            + "    }\n"
+            + "}\n";
+
     private static final String PLAIN = "package org.plain;\n"
             + "public class Words {\n"
             + "    public static int count(String s) { return s.length(); }\n"
@@ -113,10 +150,14 @@ public class CompatLibrariesTest {
     }
 
     private File application(File... libraries) throws Exception {
+        return application(MAIN, libraries);
+    }
+
+    private File application(String main, File... libraries) throws Exception {
         List<File> cp = runtimes();
         cp.addAll(Arrays.asList(libraries));
         File classes = tmp.newFolder();
-        CompatFixtures.compileAgainst(cp, tmp.newFolder(), classes, "com/acme/swingapp/Main.java", MAIN);
+        CompatFixtures.compileAgainst(cp, tmp.newFolder(), classes, "com/acme/swingapp/Main.java", main);
         return classes;
     }
 
@@ -226,6 +267,41 @@ public class CompatLibrariesTest {
                 .toPath())).contains("java/lang/ProcessBuilder.<init>"));
         assertTrue(CompatLibraries.classOrigins(classes).isEmpty());
         new BytecodeCompliance(host(classes, fancy)).execute();
+    }
+
+    /// MigLayout is the library this stands for: every class of it loads,
+    /// and the paths that save a layout as XML are never taken on a device.
+    @Test
+    public void aLibraryLinksAgainstApiNoDeviceCanServe() throws Exception {
+        File fancy = library("fancy-lib-1.0.jar", "org/fancy/FancyPanel.java", PERSISTENT_PANEL);
+        File classes = application(fancy);
+        assertTrue(remapper(classes, Collections.singletonList(fancy), fancy).run());
+        byte[] panel = Files.readAllBytes(new File(classes, "org/fancy/FancyPanel.class").toPath());
+        assertTrue(CompatFixtures.members(panel).toString(),
+                CompatFixtures.members(panel).contains("com/codename1/compat/jdk/Resources.loadClass"));
+        assertTrue(CompatFixtures.members(panel).toString(),
+                CompatFixtures.members(panel).contains("com/codename1/compat/jdk/ObjectOutput.writeInt"));
+        // No finding: the library names link-only classes, and it may.
+        new BytecodeCompliance(host(classes, fancy)).execute();
+    }
+
+    /// The same classes are no API of the layer as far as the developer's
+    /// own code goes: there they would be calls that compile and then fail.
+    @Test
+    public void theApplicationItselfMayNotUseLinkOnlyApi() throws Exception {
+        File fancy = library("fancy-lib-1.0.jar", "org/fancy/FancyPanel.java", PERSISTENT_PANEL);
+        File classes = application(PERSISTENT_MAIN, fancy);
+        assertTrue(remapper(classes, Collections.singletonList(fancy), fancy).run());
+        try {
+            new BytecodeCompliance(host(classes, fancy)).execute();
+            fail("java.beans.XMLEncoder cannot work on a device");
+        } catch (Exception e) {
+            String message = e.getMessage();
+            assertTrue(message, message.contains(
+                    "java.beans.XMLEncoder is not supported by the Codename One Swing compatibility layer"));
+            assertFalse("The library's own use is not a finding: " + message, message.contains("fancy-lib-1.0.jar"));
+            assertFalse(message, message.contains("java.awt.Component is not supported"));
+        }
     }
 
     @Test

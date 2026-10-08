@@ -1,0 +1,23 @@
+/* tag::desktopInteropFxCss[] */
+.root {
+    -app-accent: #2f6fed;
+}
+
+.card {
+    -fx-background-color: white;
+    -fx-border-color: -app-accent;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+#status {
+    -fx-text-fill: -app-accent;
+    -fx-font-size: 18;
+    -fx-font-weight: bold;
+}
+
+.card > .button:hover {
+    -fx-opacity: 0.85;
+}
+/* end::desktopInteropFxCss[] */

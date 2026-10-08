@@ -55,6 +55,11 @@ public final class Relocation {
         {"java/io/FilterOutputStream", JDK_PACKAGE + "FilterOutputStream"},
         {"java/io/PrintWriter", JDK_PACKAGE + "PrintWriter"},
         {"java/io/UncheckedIOException", JDK_PACKAGE + "UncheckedIOException"},
+        // Java serialization does not exist on a device; the interfaces do,
+        // for the classes that implement them.
+        {"java/io/Externalizable", JDK_PACKAGE + "Externalizable"},
+        {"java/io/ObjectInput", JDK_PACKAGE + "ObjectInput"},
+        {"java/io/ObjectOutput", JDK_PACKAGE + "ObjectOutput"},
         // Every Codename One stream, reader and writer is AutoCloseable, and
         // close() is the interface's only method, so code holding a Closeable
         // runs unchanged against it.
@@ -69,6 +74,7 @@ public final class Relocation {
         {"java/util/MissingResourceException", JDK_PACKAGE + "MissingResourceException"},
         {"java/util/Properties", JDK_PACKAGE + "Properties"},
         {"java/util/UUID", JDK_PACKAGE + "UUID"},
+        {"java/util/WeakHashMap", JDK_PACKAGE + "WeakHashMap"},
         // java.util.concurrent. The device has the atomics and
         // ThreadLocalRandom; these it does not. None of them synchronizes:
         // application code is confined to one thread.

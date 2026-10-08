@@ -201,7 +201,7 @@ public final class PromptSupport {
         }
         Integer style = getFontStyle(textComponent);
         Font f = textComponent.getFont();
-        if (style != null && f != null) {
+        if (style != null) {
             Font styled = f.deriveFont(style.intValue());
             hint.getAllStyles().setFont(Fonts.nativeFont(styled, styled.getSize2D() * Units.scale()));
         }

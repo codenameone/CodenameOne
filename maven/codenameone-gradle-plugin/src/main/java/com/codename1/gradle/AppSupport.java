@@ -186,7 +186,7 @@ final class AppSupport {
         // document reruns compileJava. The Maven build's counterpart, with
         // the full contract, is
         // PrepareDesktopSourcesMojo.compileDesktopResources.
-        final File desktopResources = com.codename1.maven.DesktopSources.resourcesDir(desktopDir);
+        final File desktopResources = com.codename1.maven.DesktopSources.resourcesDir(desktopDir).getAbsoluteFile();
         TaskProvider<com.codename1.gradle.tasks.CompileDesktopResourcesTask> desktopRes = project.getTasks().register(
                 "compileDesktopResources", com.codename1.gradle.tasks.CompileDesktopResourcesTask.class, t -> {
                     common(t, project, layout, ext, userProperties);
@@ -203,17 +203,22 @@ final class AppSupport {
         main.getResources().srcDir(desktopRes.flatMap(
                 com.codename1.gradle.tasks.CompileDesktopResourcesTask::getResourcesDirectory));
         main.getJava().srcDir(com.codename1.maven.DesktopSources.javaDir(desktopDir));
-        main.getResources().srcDir(com.codename1.maven.DesktopSources.resourcesDir(desktopDir));
-        // A desktop resource in a directory ships under a flat name, which
-        // the remap writes into the classes directory (CompatResources). It
-        // also removes the nested copy, which Maven's resources step put in
-        // that same directory; Gradle copies resources to a directory of
-        // their own that the remap never sees, so the nested copies are left
-        // out here. Without this every upload carried each of them twice, and
-        // not the files Maven's carried.
-        project.getTasks().named(main.getProcessResourcesTaskName(), org.gradle.api.tasks.Copy.class, copy ->
-                copy.exclude(new NestedDesktopResource(desktopResources,
-                        new File(layout.buildDir(), "generated/resources/cn1-desktop"))));
+        main.getResources().srcDir(desktopResources);
+        // A device bundle has no directories, so the relocation step ships a
+        // nested desktop resource under a flat name, written into the classes
+        // directory from the source file. Maven's resources land in that same
+        // directory and the step removes the nested copy there; Gradle's land
+        // in a directory of their own, which the step never sees, so the
+        // nested copy shipped a second time under a name nothing reads. It is
+        // left out here instead: a directory of the desktop resource root is
+        // not copied, and the files at the root, which keep their names, are.
+        // The filter is the source set's, so it holds for whatever reads the
+        // resources; it matches nothing outside that one root.
+        main.getResources().exclude(new NestedDesktopResources(desktopResources));
+        // The same holds for what compileDesktopResources generates: a compiled
+        // style sheet sits beside the path of its source, and ships flat too.
+        main.getResources().exclude(new NestedDesktopResources(
+                new File(layout.buildDir(), "generated/resources/cn1-desktop").getAbsoluteFile()));
         final File desktopEntry = com.codename1.maven.DesktopSources.entryRecord(desktopDir);
         // The class a desktop application's entry point is generated as.
         final String desktopMain = applicationMain(settings);
@@ -1013,6 +1018,29 @@ final class AppSupport {
         }
     }
 
+    /// Matches the directories directly inside the desktop resource root, so
+    /// that the main resources leave everything nested in it alone: those
+    /// resources ship under flat names the relocation step writes. A class of
+    /// its own rather than a lambda so that the configuration cache can store
+    /// it.
+    static final class NestedDesktopResources
+            implements org.gradle.api.specs.Spec<org.gradle.api.file.FileTreeElement>, java.io.Serializable {
+        private static final long serialVersionUID = 1L;
+        private final File root;
+
+        NestedDesktopResources(File root) {
+            this.root = root;
+        }
+
+        @Override
+        public boolean isSatisfiedBy(org.gradle.api.file.FileTreeElement element) {
+            if (!element.isDirectory()) {
+                return false;
+            }
+            File parent = element.getFile().getAbsoluteFile().getParentFile();
+            return root.equals(parent);
+        }
+    }
 
     /// `codename1.packageName` and `codename1.mainName` as one class name,
     /// or null when the settings name no main class.
@@ -1023,38 +1051,5 @@ final class AppSupport {
             return null;
         }
         return pkg.length() == 0 ? main : pkg + "." + main;
-    }
-
-    /// Selects the desktop resources that sit in a directory, and those
-    /// directories: what the remap ships under a flat name instead. A file
-    /// at the root of a desktop resource directory keeps its name and is
-    /// copied as any resource is.
-    static final class NestedDesktopResource
-            implements org.gradle.api.specs.Spec<org.gradle.api.file.FileTreeElement>, java.io.Serializable {
-
-        private static final long serialVersionUID = 1L;
-
-        private final String[] roots;
-
-        NestedDesktopResource(File... roots) {
-            this.roots = new String[roots.length];
-            for (int i = 0; i < roots.length; i++) {
-                this.roots[i] = roots[i].getAbsolutePath() + File.separator;
-            }
-        }
-
-        @Override
-        public boolean isSatisfiedBy(org.gradle.api.file.FileTreeElement element) {
-            if (!element.isDirectory() && element.getRelativePath().getSegments().length < 2) {
-                return false;
-            }
-            String path = element.getFile().getAbsolutePath();
-            for (String root : roots) {
-                if (path.startsWith(root)) {
-                    return true;
-                }
-            }
-            return false;
-        }
     }
 }

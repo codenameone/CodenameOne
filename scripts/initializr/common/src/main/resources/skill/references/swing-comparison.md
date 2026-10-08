@@ -2,6 +2,8 @@
 
 Codename One's UI model is consciously modeled on Swing. If you know `javax.swing`, ~80% of your reflexes will carry over. The differences are mostly *what to import* and *which methods are async*.
 
+This page is for writing new code against the Codename One API. An existing Swing application doesn't have to be rewritten first: its sources can be built as they are through the Swing compatibility layer, by placing them under `common/src/main/desktop` or importing the project with `mvn cn1:import-desktop-project -Dcn1.desktop.import=<path>`. The layer covers a subset of Swing, AWT and SwingX, and the build reports any API it lacks. See "Running Swing and JavaFX applications" in the developer guide.
+
 ## Mental model: identical concepts, different package
 
 | Swing concept | Codename One equivalent | Note |
@@ -19,8 +21,8 @@ Codename One's UI model is consciously modeled on Swing. If you know `javax.swin
 | `JTabbedPane` | `Tabs` | |
 | `JDialog` / `JOptionPane` | `Dialog` / `Dialog.show(...)` | |
 | `JMenuBar` / `JMenu` / `JMenuItem` | `Toolbar` (always present on every Form) | |
-| `JTable` | No direct equivalent | Use `Container` with `TableLayout`, or a `MultiList`. |
-| `JTree` | No direct equivalent | Build with nested `Accordion`s or custom rendering. |
+| `JTable` + `TableModel` | `Table` + `TableModel` | `com.codename1.ui.table.Table`, driven by a `com.codename1.ui.table.TableModel` (`DefaultTableModel` for simple data). |
+| `JTree` + `TreeModel` | `Tree` + `TreeModel` | `com.codename1.ui.tree.Tree`, driven by a `com.codename1.ui.tree.TreeModel`. |
 | `JScrollPane` | `Container.setScrollableY(true)` | Built into every container — no wrapper needed. |
 | `JSlider` | `Slider` | |
 | `JSpinner` | `Picker` (numeric/date variants) | |

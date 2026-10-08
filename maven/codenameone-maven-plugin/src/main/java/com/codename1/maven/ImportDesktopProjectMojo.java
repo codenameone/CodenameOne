@@ -68,8 +68,9 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
             throw new MojoExecutionException("Run this from a Codename One application project");
         }
         DesktopProjectImporter.Result r;
+        String declared;
         try {
-            wireDesktopCompat(common, DesktopProjectImporter.moduleDir(source, module));
+            declared = wireDesktopCompat(common, DesktopProjectImporter.moduleDir(source, module));
             r = new DesktopProjectImporter(MavenLog.of(getLog())).importProject(source, module, common, mainClass,
                     properties == null ? null : properties.getProperty("codename1.packageName"),
                     properties == null ? null : properties.getProperty("codename1.mainName"));
@@ -96,9 +97,21 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
                         + ". Code that uses it is reported at build time.");
                 continue;
             }
+            if (declares(declared, u)) {
+                getLog().info("  not part of the desktop compatibility layers: " + u + ". It is a dependency of the "
+                        + "common module (scope compile), and so " + DesktopProjectImporter.BUNDLED_NOTE + ".");
+                continue;
+            }
             getLog().warn("  not part of the desktop compatibility layers: " + u + ". Add it to the common "
                     + "module's dependencies (scope compile); it is then "
                     + DesktopProjectImporter.BUNDLED_NOTE + ".");
+        }
+        for (DesktopProjectImporter.Library lib : r.libraries) {
+            if (lib.provided && !declares(declared, lib.coordinate())) {
+                getLog().warn("  " + lib.coordinate() + " is what the imported sources are compiled against, and "
+                        + "the project's build does not spell out its version. Add it to the common module's "
+                        + "dependencies (scope provided).");
+            }
         }
         for (String u : r.unresolved) {
             getLog().warn("  " + u);
@@ -108,7 +121,13 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
     /// A project generated before the desktop layers existed has none of
     /// their wiring, and the imported sources would not build. Adds it to the
     /// common pom, or stops before copying anything, naming what to add.
-    private void wireDesktopCompat(File common, File moduleDir) throws MojoExecutionException, MojoFailureException {
+    ///
+    /// The libraries the project is compiled against are declared in the same
+    /// edit ([DesktopProjectImporter.Library]): an import that leaves sources
+    /// which cannot compile has not imported the project. Answers the pom as
+    /// it is afterwards.
+    private String wireDesktopCompat(File common, File moduleDir)
+            throws MojoExecutionException, MojoFailureException, com.codename1.builders.BuildException {
         File pomFile = new File(common, "pom.xml");
         String pom;
         try {
@@ -116,7 +135,8 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
         } catch (java.io.IOException e) {
             throw new MojoExecutionException("Cannot read " + pomFile, e);
         }
-        DesktopPomUpdater u = new DesktopPomUpdater(pom, hasKotlin(new File(moduleDir, "src/main")));
+        DesktopPomUpdater u = new DesktopPomUpdater(pom, hasKotlin(new File(moduleDir, "src/main")),
+                DesktopProjectImporter.librariesOf(moduleDir));
         if (!u.manual.isEmpty()) {
             StringBuilder sb = new StringBuilder("Nothing was imported: " + pomFile
                     + " needs the desktop compatibility layers wired in by hand. Add:\n");
@@ -131,8 +151,18 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
             } catch (java.io.IOException e) {
                 throw new MojoExecutionException("Cannot write " + pomFile, e);
             }
-            getLog().info("Added the desktop compatibility layers to " + pomFile);
+            getLog().info("Updated " + pomFile + " for the desktop compatibility layers");
+            for (String lib : u.addedLibraries) {
+                getLog().info("  added the dependency " + lib);
+            }
         }
+        return u.pom;
+    }
+
+    /// Whether `pom` declares `coordinate` (`group:artifact`), by its
+    /// artifact: the same test the update itself applies.
+    private static boolean declares(String pom, String coordinate) {
+        return pom.indexOf("<artifactId>" + coordinate.substring(coordinate.indexOf(':') + 1) + "</artifactId>") >= 0;
     }
 
     private static boolean hasKotlin(File dir) {

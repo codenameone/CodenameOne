@@ -223,10 +223,50 @@ public class DesktopProjectImporterTest {
         // MiG Layout is a library written against Swing, not part of a layer:
         // the build relocates it with the application.
         assertEquals(Arrays.asList("com.miglayout:miglayout-swing", "com.formdev:flatlaf"), r.uncovered);
+        // The sources are compiled against all three, so the project that
+        // receives them has to declare all three: SwingX to compile against
+        // only, since the layer has its own, and the others to ship.
+        StringBuilder libraries = new StringBuilder();
+        for (DesktopProjectImporter.Library lib : r.libraries) {
+            libraries.append(lib.coordinate()).append(':').append(lib.version)
+                    .append(lib.provided ? " provided\n" : " compile\n");
+        }
+        assertEquals("org.swinglabs.swingx:swingx-core:1.6.5-1 provided\n"
+                + "com.miglayout:miglayout-swing:11.3 compile\n"
+                + "com.formdev:flatlaf:3.4 compile\n", libraries.toString());
+        assertEquals(3, DesktopProjectImporter.librariesOf(new File(source, "app")).size());
         assertFalse(DesktopProjectImporter.isToolkitModule("com.miglayout:miglayout-swing"));
         assertTrue(DesktopProjectImporter.BUNDLED_NOTE.contains("bundled and relocated"));
         assertEquals(source.getName(), DesktopProjectImporter.moduleDir(source, null).getParentFile().getName());
         assertEquals("Swing", DesktopSources.toolkitsNamedIn(desktop));
+    }
+
+    /// A Maven project's dependencies, with a version held in a property and
+    /// one that only the parent's dependency management knows.
+    @Test
+    public void aMavenProjectsLibrariesAreReadWithTheirVersions() throws Exception {
+        File source = tmp.newFolder("mavenlibs");
+        write(source, "pom.xml", "<project>\n<properties><mig.version>5.3</mig.version></properties>\n"
+                + "<dependencyManagement><dependencies><dependency><groupId>org.managed</groupId>"
+                + "<artifactId>bom</artifactId><version>1</version></dependency></dependencies>"
+                + "</dependencyManagement>\n"
+                + "<dependencies>\n"
+                + "<dependency><groupId>com.miglayout</groupId><artifactId>miglayout-swing</artifactId>"
+                + "<version>${mig.version}</version></dependency>\n"
+                + "<dependency><groupId>org.swinglabs.swingx</groupId><artifactId>swingx-all</artifactId>"
+                + "<version>1.6.5-1</version></dependency>\n"
+                + "<dependency><groupId>org.example</groupId><artifactId>managed</artifactId></dependency>\n"
+                + "<dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4.13.2</version>"
+                + "<scope>test</scope></dependency>\n"
+                + "</dependencies>\n</project>\n");
+        StringBuilder libraries = new StringBuilder();
+        for (DesktopProjectImporter.Library lib : DesktopProjectImporter.librariesOf(source)) {
+            libraries.append(lib.coordinate()).append(':').append(lib.version)
+                    .append(lib.provided ? " provided\n" : " compile\n");
+        }
+        assertEquals("com.miglayout:miglayout-swing:5.3 compile\n"
+                + "org.swinglabs.swingx:swingx-all:1.6.5-1 provided\n"
+                + "org.example:managed:null compile\n", libraries.toString());
     }
 
     private File swingProject(String folder) throws IOException {
