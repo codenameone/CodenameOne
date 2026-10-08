@@ -65,6 +65,7 @@ public final class CompatRemapper {
     private File desktopEntry;
     private String applicationMain;
     private boolean entryGenerated;
+    private List<File> applicationLibraries;
     /// Null until [#withResourceDirectories] is called; see
     /// [#resourceDirectories()].
     private List<File> resourceDirs;
@@ -175,6 +176,7 @@ public final class CompatRemapper {
     /// classes directory, or one of the handler directories, refers to it.
     public List<Relocation> activeLayers() throws BuildException {
         if (active == null) {
+            bundleLibraries();
             List<File> dirs = new ArrayList<File>();
             dirs.add(classesDir);
             dirs.addAll(handlerDirs);
@@ -190,6 +192,40 @@ public final class CompatRemapper {
             }
         }
         return active;
+    }
+
+    /// The dependency jars that are part of the application -- Maven's
+    /// `compile` scope, Gradle's `implementation` -- as opposed to the ones
+    /// something else provides. Those among them that are written against a
+    /// desktop layer are unpacked into the classes directory and relocated
+    /// with the application; see [CompatLibraries]. Jars that name no desktop
+    /// layer are left alone, so the whole list can be passed as it is.
+    public CompatRemapper withApplicationLibraries(List<File> jars) {
+        this.applicationLibraries = jars == null ? null : new ArrayList<File>(jars);
+        return this;
+    }
+
+    /// Unpacks the libraries written against a desktop layer, before the
+    /// classes directory is read for the layers it uses: a library's use of
+    /// Swing is the application's.
+    private void bundleLibraries() throws BuildException {
+        if (!shipRuntime || applicationLibraries == null || applicationLibraries.isEmpty()) {
+            return;
+        }
+        List<Relocation> desktop = new ArrayList<Relocation>();
+        java.util.Set<File> runtimes = new java.util.HashSet<File>();
+        for (Relocation layer : CompatLayers.active(classpath)) {
+            runtimes.add(CompatLayers.runtimeJar(layer, classpath));
+            if (layer.isDesktop()) {
+                desktop.add(layer);
+            }
+        }
+        runtimes.add(CompatLayers.jdkJar(classpath));
+        try {
+            CompatLibraries.bundle(classesDir, applicationLibraries, desktop, runtimes, log);
+        } catch (IOException e) {
+            throw new BuildException("Could not bundle the application's libraries: " + e.getMessage(), e);
+        }
     }
 
     /// Whether `layer` is among the active ones.

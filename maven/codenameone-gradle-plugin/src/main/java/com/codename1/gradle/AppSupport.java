@@ -267,7 +267,9 @@ final class AppSupport {
             compile.doLast("cn1RemapCompat", new com.codename1.gradle.tasks.RemapCompatAction(
                     compile.getDestinationDirectory().getAsFile().get(), main.getCompileClasspath(),
                     onClickNamesFile(androidState), false, main.getOutput().getClassesDirs())
-                    .withDesktopEntryRecord(desktopEntry).withApplicationMain(desktopMain));
+                    .withDesktopEntryRecord(desktopEntry).withApplicationMain(desktopMain)
+                    .withApplicationLibraries(desktopProject ? main.getRuntimeClasspath().filter(
+                            f -> f.getName().endsWith(".jar")) : null));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)

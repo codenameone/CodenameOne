@@ -55,6 +55,7 @@ public class RemapCompatAction implements Action<Task> {
     private File desktopEntry;
     private String applicationMain;
     private FileCollection shipWhenEmpty;
+    private FileCollection libraries;
 
     public RemapCompatAction(File classesDir, FileCollection compileClasspath, File onClickNames,
                              boolean relocateOnly, FileCollection handlerDirs) {
@@ -81,6 +82,15 @@ public class RemapCompatAction implements Action<Task> {
         return this;
     }
 
+    /// The jars the application ships (`runtimeClasspath`), as opposed to
+    /// those it is only compiled against (`compileOnly`). The ones written
+    /// against Swing or JavaFX are unpacked into the classes directory and
+    /// relocated with the application.
+    public RemapCompatAction withApplicationLibraries(FileCollection jars) {
+        this.libraries = jars;
+        return this;
+    }
+
     /// Makes a relocate-only action a full one when `javaSources` turns out
     /// to be empty. Kotlin's directory is relocated only, because javac's
     /// pass ships the runtimes and generates what has to be generated -- but
@@ -103,6 +113,15 @@ public class RemapCompatAction implements Action<Task> {
         CompatRemapper r = new CompatRemapper(classesDir, classpath, onClickNames, log)
                 .withDesktopEntryRecord(desktopEntry)
                 .withApplicationMain(applicationMain);
+        if (libraries != null) {
+            List<File> jars = new ArrayList<File>();
+            for (File f : libraries.getFiles()) {
+                if (f.isFile() && f.getName().endsWith(".jar")) {
+                    jars.add(f);
+                }
+            }
+            r.withApplicationLibraries(jars);
+        }
         if (relocateOnly && !(shipWhenEmpty != null && shipWhenEmpty.isEmpty())) {
             r.relocateOnly();
         } else if (handlerDirs != null) {

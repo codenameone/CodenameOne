@@ -338,6 +338,20 @@ public class BytecodeCompliance {
 
         List<File> dependencyJars = getDependencyJarsForScanning();
         Map<String, ClassMetadata> allowedIndex = buildClassIndex(Arrays.asList(getJavaRuntimeJar(), getCodenameOneJar()));
+        // A library the remap step unpacked into the output directory is
+        // application code now: the relocated copy there is the one to
+        // index, not the jar it came from, whose classes still name the
+        // desktop toolkit.
+        Set<String> bundled = CompatLibraries.bundledJarNames(Collections.singletonList(outputDir));
+        if (!bundled.isEmpty()) {
+            List<File> kept = new ArrayList<File>();
+            for (File jar : dependencyJars) {
+                if (!bundled.contains(jar.getName())) {
+                    kept.add(jar);
+                }
+            }
+            dependencyJars = kept;
+        }
         Map<String, ClassMetadata> projectAndDependencyIndex = buildClassIndexWithOutput(outputDir, dependencyJars);
         projectAndDependencyIndex.putAll(buildClassIndex(siblingClassRoots));
         if (activeLayers == null) {
@@ -346,6 +360,14 @@ public class BytecodeCompliance {
 
         List<Violation> violations = scanProjectClasses(outputDir, allowedIndex, projectAndDependencyIndex);
         if (!violations.isEmpty()) {
+            // The developer did not write a bundled library's classes: say
+            // which jar a finding is in.
+            Map<String, String> origins = CompatLibraries.classOrigins(outputDir);
+            if (!origins.isEmpty()) {
+                for (Violation v : violations) {
+                    v.library = origins.get(v.sourceClass.replace('.', '/'));
+                }
+            }
             writeComplianceReport(violations, outputDir, dependencyJars, rewrittenClassCount);
             logViolationSummary(violations);
             throw new BuildFailureException(buildFailureSummary(violations));
@@ -1803,6 +1825,9 @@ public class BytecodeCompliance {
         /// otherwise, each on its own.
         private final String sourceFile;
         private final int line;
+        /// The bundled library jar the class came from, or null for a class
+        /// of the application's own.
+        private String library;
 
         private Violation(String sourceClass, String sourceMethod, String referencedMember, String suggestion, String sourcePath) {
             this(sourceClass, sourceMethod, referencedMember, suggestion, sourcePath, null, 0);
@@ -1836,6 +1861,10 @@ public class BytecodeCompliance {
                 sb.append("Source location: ").append(location).append("\n");
             }
             sb.append("Source bytecode file: ").append(sourcePath).append("\n");
+            if (library != null) {
+                sb.append("Source library: ").append(library).append(" (").append(CompatLibraries.origin(library))
+                        .append(")\n");
+            }
             sb.append("Forbidden reference: ").append(referencedMember);
             if (suggestion != null && !suggestion.isEmpty()) {
                 sb.append("\nSuggested replacement: ").append(suggestion);
@@ -1848,6 +1877,9 @@ public class BytecodeCompliance {
             sb.append(sourceClass).append("#").append(sourceMethod)
                     .append(" -> ").append(referencedMember)
                     .append(" (").append(sourcePath).append(")");
+            if (library != null) {
+                sb.append(" ").append(CompatLibraries.origin(library));
+            }
             String location = location();
             if (location != null) {
                 sb.append(" at ").append(location);

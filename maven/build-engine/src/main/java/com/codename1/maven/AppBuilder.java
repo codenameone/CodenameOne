@@ -1073,7 +1073,32 @@ public class AppBuilder {
         return scope != null && !"compile".equals(scope);
     }
 
+    /// The names of the jars some module of this build unpacked into its own
+    /// classes ([CompatLibraries]): libraries written against a desktop
+    /// toolkit, which ship relocated inside that module's jar. Merging the
+    /// jar itself as well would put the unrelocated classes back, under the
+    /// same names.
+    private Set<String> bundledLibraries() {
+        if (bundledLibraries == null) {
+            List<File> roots = new ArrayList<File>();
+            roots.add(host.outputDirectory());
+            for (BuildArtifact artifact : artifacts()) {
+                File jar = artifact.getFile();
+                if (jar != null) {
+                    roots.add(jar);
+                }
+            }
+            bundledLibraries = CompatLibraries.bundledJarNames(roots);
+        }
+        return bundledLibraries;
+    }
+
+    private Set<String> bundledLibraries;
+
     private boolean isStrippedFromStagedJar(BuildArtifact artifact) {
+        if (artifact.getFile() != null && bundledLibraries().contains(artifact.getFile().getName())) {
+            return true;
+        }
         return isStrippedAsDesktopRuntime(artifact)
                 || isStrippedFromStagedJar(artifact.getGroupId(), artifact.getArtifactId(), artifact.getScope(), buildTarget);
     }

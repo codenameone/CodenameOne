@@ -62,9 +62,17 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         List<File> classpath = new ArrayList<File>();
+        // What the application ships, as opposed to what it is only compiled
+        // against: of these, the ones written against Swing or JavaFX are
+        // relocated with it. A provided jar never is.
+        List<File> libraries = new ArrayList<File>();
         for (Artifact artifact : project.getArtifacts()) {
             if (artifact.getFile() != null) {
                 classpath.add(artifact.getFile());
+                if (Artifact.SCOPE_COMPILE.equals(artifact.getScope()) && "jar".equals(artifact.getType())
+                        && !"com.codenameone".equals(artifact.getGroupId())) {
+                    libraries.add(artifact.getFile());
+                }
             }
         }
         // By the jars alone: whether a desktop layer is also used can only be
@@ -91,6 +99,7 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
                     .withDesktopEntryRecord(desktopSourceDir == null ? null
                             : DesktopSources.entryRecord(desktopSourceDir))
                     .withApplicationMain(applicationMain())
+                    .withApplicationLibraries(libraries)
                     .run();
         } catch (com.codename1.builders.BuildException ex) {
             throw new MojoFailureException(ex.getMessage(), ex);
