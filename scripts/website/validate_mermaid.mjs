@@ -41,11 +41,39 @@ function extractDiagrams(file) {
   }));
 }
 
+export function collectSources(inputs, site) {
+  const files = [...new Set(inputs.flatMap(input => collectFiles(input, ".md")))].sort();
+  const diagrams = [];
+  const renderedFiles = [];
+  const outputs = new Set();
+  for (const file of files) {
+    const extracted = extractDiagrams(file);
+    diagrams.push(...extracted);
+    if (!site || !extracted.length) continue;
+    // Blog posts declare their public URL explicitly. Use that source contract,
+    // never the generated HTML: a broken shortcode can remove every container.
+    const text = fs.readFileSync(file, "utf8");
+    const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
+    const url = frontmatter?.match(/^url:\s*(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^\s#"']+))\s*(?:#.*)?$/m);
+    const route = url && (url[1] || url[2] || url[3]);
+    if (!route || !route.startsWith("/") || route.startsWith("//") || /[?#\\]/.test(route)) {
+      throw new Error(`${file}: Mermaid page needs an explicit site-relative frontmatter url`);
+    }
+    const output = path.resolve(site, `.${route}`, route.endsWith(".html") ? "" : "index.html");
+    if (!output.startsWith(path.resolve(site) + path.sep)) throw new Error(`${file}: url escapes --site output`);
+    if (outputs.has(output)) throw new Error(`${file}: duplicate Mermaid page URL ${route}`);
+    outputs.add(output);
+    renderedFiles.push({ file: output, source: file, count: extracted.length });
+  }
+  return { diagrams, renderedFiles };
+}
+
 export async function checkRenderedPage(page, url, expectedCount) {
   const response = await page.goto(url, { waitUntil: "domcontentloaded" });
   if (!response?.ok()) throw new Error(`Page returned HTTP ${response?.status()}`);
   const nodes = page.locator(".cn1-mermaid");
-  if (await nodes.count() !== expectedCount) throw new Error("Generated diagram count changed");
+  const actualCount = await nodes.count();
+  if (actualCount !== expectedCount) throw new Error(`Generated diagram count changed: expected ${expectedCount}, found ${actualCount}`);
   await page.waitForFunction(() => Boolean(window.__cn1MermaidRender), null, { timeout: 30000 });
   // An empty SVG is inserted before async layout. Wait for the actual loader,
   // including any rejection, rather than racing it with DOM existence checks.
@@ -60,7 +88,7 @@ export async function checkRenderedPage(page, url, expectedCount) {
   if (failures.length) throw new Error(JSON.stringify(failures));
 }
 
-async function serveSite(root) {
+export async function serveSite(root) {
   const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".woff2": "font/woff2" };
   const server = http.createServer((req, res) => {
     try {
@@ -90,12 +118,8 @@ async function main(args) {
   if (!inputs.length) throw new Error("Usage: node scripts/website/validate_mermaid.mjs [--site <Hugo output>] [--browser chromium|firefox] <markdown files or directories...>");
   if (!engines.length) engines.push("chromium");
   for (const engine of engines) if (!["chromium", "firefox"].includes(engine)) throw new Error(`Unknown browser: ${engine}`);
-  const diagrams = [...new Set(inputs.flatMap(input => collectFiles(input, ".md")))].sort().flatMap(extractDiagrams);
+  const { diagrams, renderedFiles } = collectSources(inputs, site);
   if (!diagrams.length) { console.log("No Mermaid diagrams found."); return; }
-  const renderedFiles = site ? collectFiles(site, ".html").map(file => ({
-    file, count: (fs.readFileSync(file, "utf8").match(/class=["'][^"']*\bcn1-mermaid\b/g) || []).length,
-  })).filter(item => item.count) : [];
-  if (site && !renderedFiles.length) throw new Error("No generated Mermaid pages found in --site output");
   const served = site ? await serveSite(site) : null;
   const failures = [];
   try {
@@ -128,7 +152,7 @@ async function main(args) {
         for (const item of renderedFiles) {
           const relative = path.relative(site, item.file).split(path.sep).map(encodeURIComponent).join("/");
           try { await checkRenderedPage(page, `${served.base}/${relative}`, item.count); }
-          catch (err) { failures.push(`${engine}: ${item.file}\n${err.message}`); }
+          catch (err) { failures.push(`${engine}: ${item.source} -> ${item.file}\n${err.message}`); }
         }
         console.log(`${engine}: checked ${diagrams.length} source renders and ${renderedFiles.length} generated pages.`);
       } finally { await browser.close(); }

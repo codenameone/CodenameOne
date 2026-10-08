@@ -71,8 +71,8 @@ The backend applies pending migrations before opening its entity manager or acce
 Use the Maven goals to inspect and validate a deployment before starting it:
 
 ```bash
-mvn -pl backend cn1:migrate-info
-mvn -pl backend cn1:migrate-validate
+mvn -pl backend -Dcodename1.platform=backend cn1:migrate-info
+mvn -pl backend -Dcodename1.platform=backend cn1:migrate-validate
 ```
 
 The [server migration guide](/developer-guide/backend-data/#backend-schema-migrations) also covers applying and repairing migrations. `migrate-info` reads history without changing it. Keep connection settings pointed at the intended environment before running a mutating goal.
