@@ -216,6 +216,10 @@ public final class AndroidRuntime {
     // ------------------------------------------------------------ implicit intents
 
     public boolean canResolve(Intent intent) {
+        if (Intent.ACTION_CHOOSER.equals(intent.getAction())) {
+            Intent inner = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            return inner != null && canResolve(inner);
+        }
         if (intent.getComponentClass() != null) {
             return app.activityInfo(intent.getComponentClass()) != null;
         }
@@ -246,6 +250,10 @@ public final class AndroidRuntime {
     /// `resolveActivity(pm) != null` guard drop every browser, dialer, mail
     /// and share intent.
     public android.content.ComponentName resolveComponent(Intent intent) {
+        if (Intent.ACTION_CHOOSER.equals(intent.getAction())) {
+            Intent inner = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            return inner == null ? null : resolveComponent(inner);
+        }
         if (!canResolve(intent)) {
             return null;
         }

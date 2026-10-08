@@ -23,14 +23,22 @@
 package android.view;
 
 import android.widget.FrameLayout;
+import android.app.ActivityThread;
+import android.content.Context;
+import android.content.Intent;
+import android.util.TypedValue;
 
 import com.codename1.androidcompat.runtime.GroupPeer;
+import com.codename1.androidcompat.runtime.CompiledAttributeSet;
+import com.codename1.androidcompat.runtime.ResValue;
+import com.codename1.androidcompat.runtime.XmlNode;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
 import com.codename1.androidcompat.testing.MainThreadRule;
 import com.codename1.ui.Image;
 
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.BeforeClass;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,10 +46,16 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /// Work a view posts can be cancelled through any view, and a root view's
 /// tree observer hears pre-draw and draw before the tree paints.
 public class ViewCallbacksTest {
+
+    @BeforeClass
+    public static void initDisplay() {
+        AndroidTestSupport.cleanDisplay();
+    }
 
     @Rule
     public final MainThreadRule mainThread = new MainThreadRule();
@@ -121,5 +135,25 @@ public class ViewCallbacksTest {
         Image img = Image.createImage(4, 4);
         ((GroupPeer) root.getPeer()).paint(img.getGraphics());
         assertEquals("[preDraw, draw]", log.toString());
+    }
+
+    @Test
+    public void callOnClickInvokesCompiledXmlHandler() {
+        try {
+            Context c = AndroidTestSupport.context();
+            c.startActivity(new Intent(c, AndroidTestSupport.TestActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            AndroidTestSupport.TestActivity activity =
+                    (AndroidTestSupport.TestActivity) ActivityThread.getTopActivity();
+            XmlNode node = new XmlNode("View", 1, new int[] {android.R.attr.onClick},
+                    new byte[] {(byte) XmlNode.NS_ANDROID}, new String[] {"onClick"},
+                    new ResValue[] {new ResValue(TypedValue.TYPE_STRING, 0, "xmlClick")},
+                    null, new XmlNode[0]);
+            View view = new View(activity, new CompiledAttributeSet(node));
+            assertTrue(view.callOnClick());
+            assertEquals(1, activity.xmlClickCount);
+        } finally {
+            ActivityThread.finishAllActivities();
+        }
     }
 }

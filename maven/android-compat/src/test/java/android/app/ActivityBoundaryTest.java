@@ -40,6 +40,20 @@ public class ActivityBoundaryTest {
     @Test public void finishFromSaveCallback() { finishWhileStopping("saveCallback"); }
     @Test public void finishFromStopCallback() { finishWhileStopping("stopCallback"); }
 
+    @Test public void chooserLaunchesItsInnerAppActivity() {
+        Context c = AndroidTestSupport.context().getApplicationContext();
+        for (Intent inner : new Intent[] {
+                new Intent(c, AndroidTestSupport.TestActivity.class),
+                new Intent("com.codename1.androidcompat.test.CHOOSER_TARGET")}) {
+            Intent chooser = Intent.createChooser(inner.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "Choose");
+            assertEquals(AndroidTestSupport.TestActivity.class.getName(),
+                    chooser.resolveActivity(c.getPackageManager()).getClassName());
+            c.startActivity(chooser);
+            assertTrue(ActivityThread.getTopActivity() instanceof AndroidTestSupport.TestActivity);
+            ActivityThread.finishAllActivities();
+        }
+    }
+
     @Test public void recreateStopsWhenPauseOrStopFinishesTheActivity() {
         for (String boundary : new String[] {"pause", "stop"}) {
             Context c = AndroidTestSupport.context().getApplicationContext();

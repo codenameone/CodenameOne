@@ -43,7 +43,10 @@ public class LifecycleRegistry extends Lifecycle {
 
     private final LifecycleOwner owner;
     private final List<Entry> entries = new ArrayList<Entry>();
+    private final List<State> parentStates = new ArrayList<State>();
     private State state = State.INITIALIZED;
+    private boolean syncing;
+    private int dispatchCount;
 
     public LifecycleRegistry(LifecycleOwner provider) {
         this.owner = provider;
@@ -81,6 +84,11 @@ public class LifecycleRegistry extends Lifecycle {
         Entry e = new Entry(observer, state == State.DESTROYED ? State.DESTROYED : State.INITIALIZED);
         entries.add(e);
         catchUp(e);
+        // An observer added during this catch-up can only reach the parent's
+        // current event. Finish it once the outer callback has returned.
+        if (parentStates.isEmpty()) {
+            sync();
+        }
     }
 
     @Override
@@ -100,11 +108,32 @@ public class LifecycleRegistry extends Lifecycle {
         if (state == State.INITIALIZED && next == State.DESTROYED) {
             throw new IllegalStateException("no event down from INITIALIZED");
         }
+        if (next == State.INITIALIZED || state == State.DESTROYED) {
+            throw new IllegalStateException("no lifecycle event from " + state + " to " + next);
+        }
         state = next;
         sync();
     }
 
     private void sync() {
+        if (syncing) {
+            return;
+        }
+        syncing = true;
+        try {
+            do {
+                int before = dispatchCount;
+                syncOnce();
+                if (!isSynced() && before == dispatchCount) {
+                    throw new IllegalStateException("no lifecycle event toward " + state);
+                }
+            } while (!isSynced());
+        } finally {
+            syncing = false;
+        }
+    }
+
+    private void syncOnce() {
         // Down in reverse order of addition, up in order, as AndroidX.
         // Over a snapshot: an observer may remove itself, or another, from
         // its callback, and indexing the live list then skipped the next
@@ -123,6 +152,15 @@ public class LifecycleRegistry extends Lifecycle {
         }
     }
 
+    private boolean isSynced() {
+        for (Entry e : entries) {
+            if (e.state != state) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private boolean anyAbove() {
         for (Entry e : entries) {
             if (e.state.compareTo(state) > 0) {
@@ -133,13 +171,21 @@ public class LifecycleRegistry extends Lifecycle {
     }
 
     private void catchUp(Entry e) {
-        while (e.state.compareTo(state) < 0 && entries.contains(e)) {
+        while (e.state.compareTo(targetState()) < 0 && entries.contains(e)) {
             Event up = Event.upFrom(e.state);
             if (up == null) {
                 return;
             }
             dispatch(e, up);
         }
+    }
+
+    private State targetState() {
+        if (parentStates.isEmpty()) {
+            return state;
+        }
+        State parent = parentStates.get(parentStates.size() - 1);
+        return parent.compareTo(state) < 0 ? parent : state;
     }
 
     private void goDown(Entry e) {
@@ -154,34 +200,40 @@ public class LifecycleRegistry extends Lifecycle {
 
     private void dispatch(Entry e, Event event) {
         e.state = event.getTargetState();
-        LifecycleObserver o = e.observer;
-        if (o instanceof DefaultLifecycleObserver) {
-            DefaultLifecycleObserver d = (DefaultLifecycleObserver) o;
-            switch (event) {
-                case ON_CREATE:
-                    d.onCreate(owner);
-                    break;
-                case ON_START:
-                    d.onStart(owner);
-                    break;
-                case ON_RESUME:
-                    d.onResume(owner);
-                    break;
-                case ON_PAUSE:
-                    d.onPause(owner);
-                    break;
-                case ON_STOP:
-                    d.onStop(owner);
-                    break;
-                case ON_DESTROY:
-                    d.onDestroy(owner);
-                    break;
-                default:
-                    break;
+        dispatchCount++;
+        parentStates.add(e.state);
+        try {
+            LifecycleObserver o = e.observer;
+            if (o instanceof DefaultLifecycleObserver) {
+                DefaultLifecycleObserver d = (DefaultLifecycleObserver) o;
+                switch (event) {
+                    case ON_CREATE:
+                        d.onCreate(owner);
+                        break;
+                    case ON_START:
+                        d.onStart(owner);
+                        break;
+                    case ON_RESUME:
+                        d.onResume(owner);
+                        break;
+                    case ON_PAUSE:
+                        d.onPause(owner);
+                        break;
+                    case ON_STOP:
+                        d.onStop(owner);
+                        break;
+                    case ON_DESTROY:
+                        d.onDestroy(owner);
+                        break;
+                    default:
+                        break;
+                }
             }
-        }
-        if (o instanceof LifecycleEventObserver) {
-            ((LifecycleEventObserver) o).onStateChanged(owner, event);
+            if (o instanceof LifecycleEventObserver) {
+                ((LifecycleEventObserver) o).onStateChanged(owner, event);
+            }
+        } finally {
+            parentStates.remove(parentStates.size() - 1);
         }
     }
 }

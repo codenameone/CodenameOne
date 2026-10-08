@@ -109,6 +109,7 @@ public class ComponentActivity extends Activity
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
+        mLifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);
         super.onSaveInstanceState(outState);
         mSavedStateRegistry.performSave(outState);
     }

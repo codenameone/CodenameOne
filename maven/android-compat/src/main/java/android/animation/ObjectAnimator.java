@@ -224,12 +224,13 @@ public final class ObjectAnimator extends ValueAnimator {
 
     @Override
     public void start() {
-        if (mAutoCancel) {
-            for (ObjectAnimator other : new java.util.ArrayList<ObjectAnimator>(AUTO_CANCEL)) {
-                if (other != this && other.isStarted() && other.hasSameTargetAndProperties(this)) {
-                    other.cancel();
-                }
+        for (ObjectAnimator other : new java.util.ArrayList<ObjectAnimator>(AUTO_CANCEL)) {
+            if (other != this && other.mAutoCancel && other.isStarted()
+                    && other.hasSameTargetAndProperties(this)) {
+                other.cancel();
             }
+        }
+        if (mAutoCancel) {
             if (!AUTO_CANCEL.contains(this)) {
                 AUTO_CANCEL.add(this);
             }

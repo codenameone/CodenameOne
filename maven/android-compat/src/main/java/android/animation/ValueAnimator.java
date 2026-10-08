@@ -360,6 +360,9 @@ public class ValueAnimator extends Animator {
             if (l != null) {
                 for (AnimatorListener a : l) {
                     a.onAnimationStart(this);
+                    if (!mStarted || mAnimationEndRequested) {
+                        break;
+                    }
                 }
             }
         }
@@ -417,7 +420,9 @@ public class ValueAnimator extends Animator {
             mStartTime = frameTime;
         }
         notifyStartListeners();
-        animateValue(getCurrentIterationFraction(mOverallFraction, mReversing));
+        if (mStarted && mRunning && !mAnimationEndRequested) {
+            animateValue(getCurrentIterationFraction(mOverallFraction, mReversing));
+        }
     }
 
     /// One frame; answers whether the animator still runs.

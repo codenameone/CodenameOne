@@ -255,6 +255,14 @@ public final class ActivityThread {
         if (intent == null) {
             throw new NullPointerException("intent");
         }
+        // A chooser wraps the activity intent; resolve that inner intent
+        // through the same in-app and platform paths as a direct launch.
+        if (Intent.ACTION_CHOOSER.equals(intent.getAction())) {
+            Intent inner = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            if (inner != null) {
+                intent = inner;
+            }
+        }
         // A launch crosses a process boundary on Android, so the activity
         // never shares the caller's object: a caller that reuses or mutates
         // its Intent after startActivity() must not change getIntent() or

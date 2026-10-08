@@ -31,6 +31,8 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /// `setProperty` on an animator made with a property name renames it after
 /// the new property. The old name used to stay, so the animator reported,
@@ -101,5 +103,59 @@ public class ObjectAnimatorSetPropertyTest {
         set.playTogether(first, second);
         set.start();
         assertEquals(0, secondStarts[0]);
+    }
+
+    @Test
+    public void endingFromStartListenerKeepsTheFinalPropertyValue() {
+        com.codename1.androidcompat.testing.AndroidTestSupport.context();
+        AnimatorMathTest.Holder h = new AnimatorMathTest.Holder();
+        ObjectAnimator a = ObjectAnimator.ofFloat(h, AnimatorMathTest.VALUE, 0f, 50f);
+        a.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationStart(Animator animation) {
+                animation.end();
+            }
+        });
+        a.start();
+        assertFalse(a.isStarted());
+        assertEquals(50f, h.value, 1e-3f);
+    }
+
+    @Test
+    public void cancellingFromStartListenerDoesNotApplyAnInitialValue() {
+        com.codename1.androidcompat.testing.AndroidTestSupport.context();
+        AnimatorMathTest.Holder h = new AnimatorMathTest.Holder();
+        h.value = 7f;
+        ObjectAnimator a = ObjectAnimator.ofFloat(h, AnimatorMathTest.VALUE, 0f, 50f);
+        a.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationStart(Animator animation) {
+                animation.cancel();
+            }
+        });
+        a.start();
+        assertFalse(a.isStarted());
+        assertEquals(7f, h.value, 1e-3f);
+    }
+
+    @Test
+    public void autoCancelBelongsToTheRunningAnimator() {
+        com.codename1.androidcompat.testing.AndroidTestSupport.context();
+        AnimatorMathTest.Holder h = new AnimatorMathTest.Holder();
+        ObjectAnimator optedIn = ObjectAnimator.ofFloat(h, AnimatorMathTest.VALUE, 0f, 10f);
+        optedIn.setAutoCancel(true);
+        optedIn.start();
+        ObjectAnimator defaultNext = ObjectAnimator.ofFloat(h, AnimatorMathTest.VALUE, 10f, 20f);
+        defaultNext.start();
+        assertFalse(optedIn.isStarted());
+        assertTrue(defaultNext.isStarted());
+        defaultNext.cancel();
+
+        ObjectAnimator plain = ObjectAnimator.ofFloat(h, AnimatorMathTest.VALUE, 0f, 10f);
+        plain.start();
+        ObjectAnimator optedInNext = ObjectAnimator.ofFloat(h, AnimatorMathTest.VALUE, 10f, 20f);
+        optedInNext.setAutoCancel(true);
+        optedInNext.start();
+        assertTrue(plain.isStarted());
+        plain.cancel();
+        optedInNext.cancel();
     }
 }

@@ -56,6 +56,11 @@ public final class AndroidTestSupport {
         public int resultCode;
         public android.content.Intent resultData;
         public int permissionResults;
+        public int xmlClickCount;
+
+        public void xmlClick(View view) {
+            xmlClickCount++;
+        }
 
         /// How many `onStart` calls preceded the last result delivered, or -1.
         public int startsBeforeResult = -1;
@@ -295,6 +300,9 @@ public final class AndroidTestSupport {
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "Finishing", null, null, false);
             activity(TestActivity.class, TestActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "Test", null, null, false);
+            android.content.IntentFilter chooserFilter = intentFilter(TestActivity.class);
+            chooserFilter.addAction("com.codename1.androidcompat.test.CHOOSER_TARGET");
+            chooserFilter.addCategory(android.content.Intent.CATEGORY_DEFAULT);
             activity(UiModeHandlingActivity.class, UiModeHandlingActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "UiMode", null, null, false);
             configChanges(UiModeHandlingActivity.class, android.content.pm.ActivityInfo.CONFIG_UI_MODE);
@@ -359,6 +367,15 @@ public final class AndroidTestSupport {
         @Override
         public Application createApplication() {
             return new Application();
+        }
+
+        @Override
+        public boolean dispatchOnClick(Object target, String method, View view) {
+            if (target instanceof TestActivity && "xmlClick".equals(method)) {
+                ((TestActivity) target).xmlClick(view);
+                return true;
+            }
+            return false;
         }
     }
 

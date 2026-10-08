@@ -375,6 +375,11 @@ the gallery and automated tests cover a subset of those behaviors.
   and checked item keys in the activity state, then restore selection and
   checks after attaching and populating the adapter. Stable item keys belong
   to the application; positions alone may change when its data changes.
+* `RecyclerView` does not defer a saved layout anchor for an empty adapter.
+  `PREVENT` and `PREVENT_WHEN_EMPTY` restoration policies do not gate that
+  restore, so an empty first layout can consume the anchor. If data arrives
+  later, save a stable item key or position in activity state and restore the
+  scroll position after the adapter contains the items.
 * Drawable selectors keep the window-focused appearance when a window loses
   focus. Applications needing a different appearance can update their
   drawables in `onWindowFocusChanged()`.

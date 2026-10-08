@@ -129,4 +129,47 @@ public class LifecycleRegistryTest {
         o.registry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE);
         assertEquals("[a:ON_CREATE, b:ON_CREATE]", log.toString());
     }
+
+    @Test
+    public void observerAddedDuringCreateWaitsForOlderObserverToAdvance() {
+        final Owner o = new Owner();
+        final List<String> log = new ArrayList<String>();
+        o.registry.addObserver(new LifecycleEventObserver() {
+            @Override
+            public void onStateChanged(LifecycleOwner source, Lifecycle.Event event) {
+                log.add("a:" + event);
+                if (event == Lifecycle.Event.ON_CREATE) {
+                    o.registry.addObserver(recorder("b", log));
+                }
+            }
+        });
+        o.registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
+        assertEquals("[a:ON_CREATE, b:ON_CREATE, a:ON_START, a:ON_RESUME, b:ON_START, b:ON_RESUME]",
+                log.toString());
+    }
+
+    @Test
+    public void nestedObserverAddedDuringLateCatchUpEventuallyReachesCurrentState() {
+        final Owner o = new Owner();
+        o.registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
+        final List<String> log = new ArrayList<String>();
+        o.registry.addObserver(new LifecycleEventObserver() {
+            @Override
+            public void onStateChanged(LifecycleOwner source, Lifecycle.Event event) {
+                log.add("a:" + event);
+                if (event == Lifecycle.Event.ON_CREATE) {
+                    o.registry.addObserver(recorder("b", log));
+                }
+            }
+        });
+        assertEquals("[a:ON_CREATE, b:ON_CREATE, a:ON_START, a:ON_RESUME, b:ON_START, b:ON_RESUME]",
+                log.toString());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void cannotMoveBackToInitializedAfterCreation() {
+        Owner o = new Owner();
+        o.registry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE);
+        o.registry.setCurrentState(Lifecycle.State.INITIALIZED);
+    }
 }

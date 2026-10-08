@@ -2671,6 +2671,10 @@ public class View implements Drawable.Callback {
             mOnClickListener.onClick(this);
             return true;
         }
+        if (mOnClickMethod != null) {
+            AndroidRuntime rt = AndroidRuntime.getInstance();
+            return rt != null && rt.dispatchOnClick(this, mOnClickMethod);
+        }
         return false;
     }
 
