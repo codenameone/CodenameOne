@@ -632,7 +632,15 @@ public final class NetworkManager {
     /// Whether [#addDefaultHeader(String, String)] set an `Authorization` header, which
     /// then goes on every request and wins over any authorizer.
     boolean hasDefaultAuthorizationHeader() {
-        return userHeaders != null && userHeaders.containsKey("Authorization");
+        if (userHeaders != null) {
+            Enumeration keys = userHeaders.keys();
+            while (keys.hasMoreElements()) {
+                if ("Authorization".equalsIgnoreCase((String) keys.nextElement())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// The registration with the longest base URL that covers `url`. Called on the EDT.

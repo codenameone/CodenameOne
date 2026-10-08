@@ -164,6 +164,56 @@ public class RequestAuthorizerTest extends UITestBase {
         return p;
     }
 
+    @Test
+    void defaultAuthorizationHeaderSkipsProactiveRefreshRegardlessOfCase() throws Exception {
+        NetworkManager manager = NetworkManager.getInstance();
+        java.lang.reflect.Field field = NetworkManager.class.getDeclaredField("userHeaders");
+        field.setAccessible(true);
+        Object previous = field.get(manager);
+        final java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        RequestAuthorizer.Proactive pending = new RequestAuthorizer.Proactive() {
+            public AsyncResource<Boolean> prepareAuthorization(ConnectionRequest request) {
+                calls.incrementAndGet();
+                return new AsyncResource<Boolean>();
+            }
+            public String getAuthorization(ConnectionRequest request) {
+                calls.incrementAndGet();
+                return "Bearer authorizer";
+            }
+            public AsyncResource<Boolean> refreshAuthorization(ConnectionRequest request, String rejected) {
+                calls.incrementAndGet();
+                return new AsyncResource<Boolean>();
+            }
+        };
+        manager.setAuthorizer(API, pending);
+        try {
+            for (String name : new String[] {"authorization", "aUtHoRiZaTiOn", "Authorization"}) {
+                field.set(manager, null);
+                manager.addDefaultHeader(name, "Bearer default");
+                List<String> sent = Collections.synchronizedList(new ArrayList<String>());
+                TestCodenameOneImplementation.getInstance().setNetworkMockHandler(c -> {
+                    sent.add(c.getHeaders().get(name));
+                    c.respond(200, "OK", utf8("welcome"));
+                });
+                Probe request = new Probe(API + "/default-header");
+                try {
+                    AsyncResource<ConnectionRequest> done = manager.addToQueueAsync(request);
+                    DisplayTest.flushEdt();
+                    assertEquals(0, calls.get(), name + " must bypass the authorizer entirely");
+                    done.get(5000);
+                    assertEquals(200, request.getResponseCode());
+                    assertEquals(Collections.singletonList("Bearer default"), sent);
+                } finally {
+                    request.kill();
+                    DisplayTest.flushEdt();
+                }
+            }
+        } finally {
+            field.set(manager, previous);
+            manager.setAuthorizer(API, null);
+        }
+    }
+
     // ---- which requests get the header --------------------------------
 
     @Test

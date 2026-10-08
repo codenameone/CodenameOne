@@ -844,8 +844,11 @@ bean to declare instead.
 
 Apple answers with a form that the browser posts from Apple's page, and a
 browser doesn't send the session cookie with such a request. The pending
-sign-in is therefore kept in a signed cookie of its own. Set
-`cn1.security.oauth2.client.cookie-secret`, at least 32 characters, to the
+sign-in is therefore kept in a signed cookie of its own. Its `__Host-` name,
+`Path=/`, `Secure` flag, and absence of a `Domain` attribute prevent a sibling
+subdomain from injecting a parent-domain cookie. The old unprefixed cookie
+isn't accepted; a sign-in started with that cookie must be started again.
+Set `cn1.security.oauth2.client.cookie-secret`, at least 32 characters, to the
 same value on every instance. Without it each process makes its own key when
 it starts.
 

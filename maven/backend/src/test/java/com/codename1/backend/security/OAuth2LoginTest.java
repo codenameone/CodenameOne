@@ -858,14 +858,27 @@ class OAuth2LoginTest {
                     }
                 }
                 assertNotNull(cookie, start.toString());
-                // Sent with a cross-site post, to the callback only, for five minutes.
-                assertTrue(cookie.endsWith("; Path=/login/oauth2/code; Max-Age=300; Secure; "
+                // Browser-enforced host binding blocks a sibling's Domain cookie.
+                assertTrue(cookie.startsWith("__Host-"), cookie);
+                assertFalse(cookie.toLowerCase().contains("domain="), cookie);
+                assertTrue(cookie.endsWith("; Path=/; Max-Age=300; Secure; "
                         + "HttpOnly; SameSite=None"), cookie);
                 // The post arrives from Apple's page: no session cookie, no
                 // CSRF token. The signed cookie is the whole of what ties it here.
                 app.cookies.remove("CN1SESSION");
                 String value = app.cookies.get(CookieOAuth2AuthorizationRequestRepository.COOKIE);
                 answerWith(sign(idClaims(sent.get("nonce")).build()));
+
+                // A valid signed value injected under the old, domain-settable name
+                // cannot stand in for the initiating browser's host cookie.
+                int exchanges = stub.tokenRequests.size();
+                app.cookies.remove(CookieOAuth2AuthorizationRequestRepository.COOKIE);
+                app.cookies.put("cn1_oauth2_authorization_request", value);
+                Reply injected = app.post("/login/oauth2/code/apple", form("code", "c", "state",
+                        sent.get("state")));
+                assertEquals("/login?error", injected.header("Location"));
+                assertEquals(exchanges, stub.tokenRequests.size());
+                app.cookies.remove("cn1_oauth2_authorization_request");
 
                 // A cookie somebody edited, and one they made up.
                 app.cookies.put(CookieOAuth2AuthorizationRequestRepository.COOKIE,
@@ -881,7 +894,7 @@ class OAuth2LoginTest {
                 // An answer by redirect, for the provider that posts.
                 app.cookies.put(CookieOAuth2AuthorizationRequestRepository.COOKIE, value);
                 app.get("/login/oauth2/code/apple?code=c&state=" + sent.get("state"));
-                assertEquals(Arrays.asList("authorization_request_not_found",
+                assertEquals(Arrays.asList("authorization_request_not_found", "authorization_request_not_found",
                         "invalid_state_parameter", "authorization_request_not_found"), failures);
 
                 app.cookies.remove("CN1SESSION");
@@ -892,6 +905,9 @@ class OAuth2LoginTest {
                 assertEquals("/", done.header("Location"));
                 // The cookie is taken back with the answer.
                 assertNull(app.cookies.get(CookieOAuth2AuthorizationRequestRepository.COOKIE));
+                assertTrue(done.headers("Set-Cookie").contains(
+                        CookieOAuth2AuthorizationRequestRepository.COOKIE
+                        + "=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=None"));
                 assertTrue(app.get("/who").body.startsWith("/who user-1 "));
 
                 // The secret that went to the token endpoint: an ES256 JWT in

@@ -37,8 +37,10 @@ import java.io.IOException;
 /// That answer is a `POST` from the provider's page, and a browser does not
 /// send a `SameSite=Lax` cookie with one -- so the session, and a request kept
 /// in it, are not there when the answer arrives. This cookie is
-/// `SameSite=None; Secure; HttpOnly`, lasts five minutes, is sent only to the
-/// callback path, and is signed with HMAC-SHA256: a value this server did not
+/// `SameSite=None; Secure; HttpOnly`, lasts five minutes, and uses a `__Host-`
+/// name with `Path=/` and no `Domain`. Browsers therefore reject a sibling
+/// subdomain's attempt to plant this cookie for the parent domain. It is
+/// signed with HMAC-SHA256: a value this server did not
 /// write, or wrote more than five minutes ago, is no request at all. Its
 /// `state` is what ties the posted answer to this browser.
 ///
@@ -54,19 +56,20 @@ public final class CookieOAuth2AuthorizationRequestRepository
     /// The setting that holds the key, as at least 32 characters of text.
     public static final String SECRET = "cn1.security.oauth2.client.cookie-secret";
     /// The cookie's name.
-    public static final String COOKIE = "cn1_oauth2_authorization_request";
+    public static final String COOKIE = "__Host-cn1_oauth2_authorization_request";
     private static final String PURPOSE = "oauth2-authorization-request";
     private static final long SECONDS = 300;
 
     private final SignedTokens tokens;
-    private final String path;
 
     /// @param secret at least 32 bytes
-    /// @param callbackPath the path the provider posts to, before the
-    /// registration's id
+    /// @param callbackPath the callback route, beginning with `/`; the cookie always
+    /// uses `Path=/`, as required for browser-enforced host binding
     public CookieOAuth2AuthorizationRequestRepository(byte[] secret, String callbackPath) {
+        if (callbackPath == null || !callbackPath.startsWith("/")) {
+            throw new IllegalArgumentException("callbackPath must begin with /");
+        }
         this.tokens = new SignedTokens(secret);
-        this.path = callbackPath;
     }
 
     /// The signer; for tests that move the clock.
@@ -106,7 +109,7 @@ public final class CookieOAuth2AuthorizationRequestRepository
     private void write(String value, long maxAge) {
         SecurityExchange exchange = SecurityExchange.current();
         if (exchange != null) {
-            exchange.addResponseHeader("Set-Cookie", COOKIE + "=" + value + "; Path=" + path
+            exchange.addResponseHeader("Set-Cookie", COOKIE + "=" + value + "; Path=/"
                     + "; Max-Age=" + maxAge + "; Secure; HttpOnly; SameSite=None");
         }
     }
