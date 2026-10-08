@@ -47,9 +47,19 @@ final class AuthCheckServer {
     }
 
     static void run() throws Exception {
+        forwarding(null);
+        forwarding("");
+        forwarding("127.0.0.1,10.0.0.0/8");
+        limits();
+    }
+
+    private static void forwarding(String trustedProxies) throws Exception {
         Properties settings = new Properties();
         settings.setProperty("cn1.server.port", "0");
         settings.setProperty("cn1.server.forwardHeaders", "true");
+        if(trustedProxies != null) {
+            settings.setProperty("cn1.server.trustedProxies", trustedProxies);
+        }
         Backend backend = Backend.builder(Config.of(settings, "test")).quiet().host("127.0.0.1")
                 .handler(new HttpServer.Handler() {
                     public HttpServer.Response handle(HttpServer.Request request) {
@@ -61,6 +71,13 @@ final class AuthCheckServer {
             String url = "http://127.0.0.1:" + backend.getServer().getPort() + "/who";
             AuthCheck.value("who, directly", ask(url, null, null));
             AuthCheck.check("the peer is loopback", "200 127.0.0.1|127.0.0.1|false", ask(url, null, null));
+            if(trustedProxies == null || trustedProxies.length() == 0) {
+                String untrusted = ask(url, "198.51.100.9, 203.0.113.7, 10.1.2.3", "https");
+                AuthCheck.value("who, without explicit proxy trust", untrusted);
+                AuthCheck.check("omitted or empty proxy trust refuses address and HTTPS spoofing",
+                        "200 127.0.0.1|127.0.0.1|false", untrusted);
+                return;
+            }
             AuthCheck.value("who, through proxies", ask(url,
                     "198.51.100.9, 203.0.113.7, 10.1.2.3", "https"));
             AuthCheck.check("the rightmost address that is not a proxy is the client",
@@ -71,7 +88,6 @@ final class AuthCheckServer {
         } finally {
             backend.stop();
         }
-        limits();
     }
 
     private static String ask(String url, String forwardedFor, String forwardedProto)
