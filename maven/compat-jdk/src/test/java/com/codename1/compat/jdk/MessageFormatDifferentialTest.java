@@ -22,6 +22,8 @@
  */
 package com.codename1.compat.jdk;
 
+import com.codename1.compat.testing.ReferenceJdk;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -172,6 +174,7 @@ public class MessageFormatDifferentialTest {
 
     @Test
     public void reproducesPatternsLikeTheJdk() {
+        ReferenceJdk.assume("quotes the braces of a pattern nested in a choice when it writes the pattern back");
         List<String> failures = new ArrayList<String>();
         for (String pattern : PATTERNS) {
             String expected = new java.text.MessageFormat(pattern, Locale.US).toPattern();

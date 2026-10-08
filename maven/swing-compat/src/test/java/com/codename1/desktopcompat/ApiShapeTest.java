@@ -28,7 +28,10 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.Test;
 
@@ -56,6 +59,16 @@ import static org.junit.Assert.fail;
 public class ApiShapeTest {
 
     private static final String PREFIX = "com.codename1.desktopcompat.";
+
+    /// JDK classes that a release after Java 8 declared final, by the JDK's
+    /// own name. An application may be compiled against any JDK, so the layer
+    /// keeps such a class as open as the most permissive of them has it: a
+    /// subclass that compiled must still link. The allowance is one way only.
+    /// A class named here that the running JDK has final may be open in the
+    /// layer; one the running JDK has open must be open here as ever.
+    private static final Set<String> FINAL_IN_LATER_JDKS = new HashSet<String>(Arrays.asList(
+            // Open in Java 8 and 17, final in Java 19 and later.
+            "javax.swing.GroupLayout$SequentialGroup"));
 
     private final List<String> problems = new ArrayList<String>();
     private int checked;
@@ -147,7 +160,9 @@ public class ApiShapeTest {
         if (ours.isInterface() != real.isInterface()) {
             problems.add(name + ": interface here but not in the JDK, or the reverse");
         }
-        if (Modifier.isFinal(real.getModifiers()) != Modifier.isFinal(ours.getModifiers())) {
+        boolean realFinal = Modifier.isFinal(real.getModifiers());
+        if (realFinal != Modifier.isFinal(ours.getModifiers())
+                && !(realFinal && FINAL_IN_LATER_JDKS.contains(real.getName()))) {
             problems.add(name + ": final differs from the JDK");
         }
         if (Modifier.isAbstract(ours.getModifiers()) && !Modifier.isAbstract(real.getModifiers())) {

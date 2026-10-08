@@ -28,8 +28,10 @@ import java.util.List;
 import java.util.Random;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
+import com.codename1.compat.testing.ReferenceJdk;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Container;
 import com.codename1.desktopcompat.java.awt.Dimension;
@@ -876,6 +878,15 @@ public class GroupLayoutParityTest {
         for (int i = 0; i < sizes.length; i += 2) {
             same(what, spec, r, o, sizes[i], sizes[i + 1]);
         }
+    }
+
+    /// Every test here lays the same tree out with the JDK's `GroupLayout`
+    /// and compares pixels. The JDK's side reaches `sun.swing`, which a
+    /// modular JDK does not export, and its unbounded maximum size changed.
+    @Before
+    public void onTheReferenceJdkOnly() {
+        ReferenceJdk.assume("stopped exporting sun.swing.DefaultLayoutStyle, and no longer caps a group's "
+                + "maximum size at Short.MAX_VALUE");
     }
 
     @After

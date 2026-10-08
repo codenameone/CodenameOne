@@ -22,6 +22,8 @@
  */
 package com.codename1.desktopcompat.java.awt.geom;
 
+import com.codename1.compat.testing.ReferenceJdk;
+
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Point;
@@ -869,6 +871,7 @@ public class GeomParityTest {
 
     @Test
     public void curvedShapesAgreeWithTheJdkAwayFromTheirEdges() {
+        ReferenceJdk.assume("answers the tight bounds of a curve, not the bounds of its control points");
         // curves are hit-tested over a flattened outline, so points within a
         // whisker of the edge are left out of the comparison
         QuadCurve2D quad = new QuadCurve2D.Double(5, 5, 60, 90, 95, 10);

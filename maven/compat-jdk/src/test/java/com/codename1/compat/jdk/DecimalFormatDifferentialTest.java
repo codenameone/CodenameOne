@@ -22,6 +22,8 @@
  */
 package com.codename1.compat.jdk;
 
+import com.codename1.compat.testing.ReferenceJdk;
+
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -96,6 +98,7 @@ public class DecimalFormatDifferentialTest {
 
     @Test
     public void formatsDoublesLikeTheJdk() {
+        ReferenceJdk.assume("takes its number symbols from CLDR data, where NaN is written out as text");
         List<String> failures = new ArrayList<String>();
         for (String pattern : PATTERNS) {
             DecimalFormat mine = shim(pattern);
@@ -133,6 +136,7 @@ public class DecimalFormatDifferentialTest {
     /// representation both matter.
     @Test
     public void formatsRandomDoublesLikeTheJdk() {
+        ReferenceJdk.assume("takes its number symbols from CLDR data, where NaN is written out as text");
         String[] patterns = {
             "0", "0.0", "0.00", "0.000", "#.####", "#,##0.00", "0.###E0", "##0.##E0", "0.00%", "0.0000000",
         };
@@ -184,6 +188,7 @@ public class DecimalFormatDifferentialTest {
 
     @Test
     public void readsPatternSettingsLikeTheJdk() {
+        ReferenceJdk.assume("reports 340 fraction digits at most for an empty pattern");
         List<String> failures = new ArrayList<String>();
         for (String pattern : PATTERNS) {
             java.text.DecimalFormat t = jdk(pattern);
@@ -207,6 +212,7 @@ public class DecimalFormatDifferentialTest {
 
     @Test
     public void rejectsTheMalformedPatternsTheJdkRejects() {
+        ReferenceJdk.assume("reads a pattern with text between its digits differently");
         String[] bad = {
             "0.0.0", "#0#", "0#.0", "0.#0", "0E", "E0", "0E0E0", "#,", "0;0;0", "0'", "%%0", "0;",
             "0.0#0", "#,##0.00;", ";0", "0.0x0", "0x0;y0z0", "0%;0%%", "0E0x0", "0.0x#",
@@ -247,6 +253,7 @@ public class DecimalFormatDifferentialTest {
 
     @Test
     public void parsesLikeTheJdk() {
+        ReferenceJdk.assume("takes its number symbols from CLDR data, where NaN is written out as text");
         String[] patterns = {
             "#,##0.###", "0.00", "#", "#%", "0.0%", "#,##0.00;(#,##0.00)", "$#,##0.00", "0.###E0",
             "0 'units'", "#" + PER_MILLE, "-0;+0", "#,####.##",
@@ -433,6 +440,7 @@ public class DecimalFormatDifferentialTest {
 
     @Test
     public void symbolsChangeTheOutput() {
+        ReferenceJdk.assume("groups a currency pattern with a monetary grouping separator of its own");
         DecimalFormatSymbols mySymbols = new DecimalFormatSymbols(US);
         java.text.DecimalFormatSymbols theirSymbols = new java.text.DecimalFormatSymbols(Locale.US);
         mySymbols.setDecimalSeparator(',');

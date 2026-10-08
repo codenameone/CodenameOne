@@ -22,6 +22,8 @@
  */
 package com.codename1.compat.jdk;
 
+import com.codename1.compat.testing.ReferenceJdk;
+
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -179,6 +181,7 @@ public class URLDifferentialTest {
 
     @Test
     public void parsesLikeTheJdk() {
+        ReferenceJdk.assume("rejects a host name with a space in it");
         List<String> failures = new ArrayList<String>();
         for (String spec : SPECS) {
             String expected = jdk(spec);

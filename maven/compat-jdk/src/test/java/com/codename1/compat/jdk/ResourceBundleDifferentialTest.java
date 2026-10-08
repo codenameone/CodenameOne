@@ -22,6 +22,8 @@
  */
 package com.codename1.compat.jdk;
 
+import com.codename1.compat.testing.ReferenceJdk;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
@@ -190,6 +192,7 @@ public class ResourceBundleDifferentialTest {
 
     @Test
     public void parsesRandomPropertiesLikeTheJdk() {
+        ReferenceJdk.assume("reads a comment marker that follows an empty continued line as a comment");
         String[] pieces = {
             "a", "b", "key", "value", " ", "  ", "\t", "\f", "=", ":", "#", "!", "\\", "\\\\", "\n", "\r", "\r\n",
             "\\n", "\\t", "\\ ", "\\=", "\\:", "\\#", BS + "u0041", BS + "u00e9", "x", "1", ".", "\\\n", "\\\r\n",
