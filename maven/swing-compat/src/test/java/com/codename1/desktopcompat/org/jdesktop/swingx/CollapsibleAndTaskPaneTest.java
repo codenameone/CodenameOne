@@ -41,19 +41,11 @@ import com.codename1.desktopcompat.javax.swing.JFrame;
 import com.codename1.desktopcompat.javax.swing.JPanel;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 /// The collapsible pane's sizes while it closes and opens, and the task
 /// pane and its container built on it.
 public class CollapsibleAndTaskPaneTest extends KernelTestBase {
-
-    /// The kernel counts clicks by time alone and keeps the count between
-    /// tests; wait the count of the taps made here out.
-    @AfterClass
-    public static void letTheClickCountRunOut() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     private static JPanel box(int w, int h) {
         JPanel p = new JPanel();

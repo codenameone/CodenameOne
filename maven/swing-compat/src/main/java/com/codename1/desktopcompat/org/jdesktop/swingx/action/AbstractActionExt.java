@@ -28,12 +28,12 @@ import com.codename1.desktopcompat.java.beans.PropertyChangeListener;
 import com.codename1.desktopcompat.javax.swing.AbstractAction;
 import com.codename1.desktopcompat.javax.swing.Action;
 import com.codename1.desktopcompat.javax.swing.Icon;
+import com.codename1.desktopcompat.javax.swing.KeyStroke;
 
 /// An action with typed accessors for the standard values, a group, and a
 /// selected state for actions that are toggles.
 ///
-/// The accelerator accessors are absent because the layer has no key
-/// strokes. The copy constructor copies the values this class has
+/// The copy constructor copies the values this class has
 /// accessors for; a device cannot enumerate more than
 /// [AbstractAction#getKeys()] offers, which it also copies.
 public abstract class AbstractActionExt extends AbstractAction implements ItemListener {
@@ -148,6 +148,16 @@ public abstract class AbstractActionExt extends AbstractAction implements ItemLi
 
     public String getActionCommand() {
         return cn1String(Action.ACTION_COMMAND_KEY);
+    }
+
+    /// The key stroke stored under [Action#ACCELERATOR_KEY], or null.
+    public KeyStroke getAccelerator() {
+        Object v = getValue(Action.ACCELERATOR_KEY);
+        return v instanceof KeyStroke ? (KeyStroke) v : null;
+    }
+
+    public void setAccelerator(KeyStroke key) {
+        putValue(Action.ACCELERATOR_KEY, key);
     }
 
     public void setGroup(Object group) {

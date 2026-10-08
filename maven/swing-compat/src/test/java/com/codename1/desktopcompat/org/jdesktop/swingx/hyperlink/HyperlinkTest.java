@@ -39,7 +39,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -49,13 +48,6 @@ import org.junit.Test;
 public class HyperlinkTest extends KernelTestBase {
 
     private final List<String> opened = new ArrayList<String>();
-
-    /// The kernel counts clicks by time alone and keeps the count between
-    /// tests; wait the count of the taps made here out.
-    @AfterClass
-    public static void letTheClickCountRunOut() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     @Before
     public void record() {

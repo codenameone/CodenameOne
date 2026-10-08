@@ -28,6 +28,8 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.LayoutManager;
 import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
+import com.codename1.desktopcompat.javax.swing.AbstractAction;
+import com.codename1.desktopcompat.javax.swing.Action;
 import com.codename1.desktopcompat.javax.swing.JComponent;
 import com.codename1.desktopcompat.javax.swing.Timer;
 import com.codename1.desktopcompat.javax.swing.border.Border;
@@ -48,11 +50,14 @@ import com.codename1.desktopcompat.javax.swing.border.Border;
 /// when a change starts and `expanded` or `collapsed` when it has
 /// finished.
 ///
+/// The pane's action map holds, under [#TOGGLE_ACTION], an action that
+/// flips the collapsed state. Icons stored in that action under
+/// [#EXPAND_ICON] and [#COLLAPSE_ICON] become its small icon in turn: the
+/// expand icon while the pane is collapsed, the collapse icon while it is
+/// open.
+///
 /// ## What differs from SwingX
 ///
-///  - There are no action maps in this layer, so the toggle action
-///    cannot be looked up under [#TOGGLE_ACTION]; call
-///    [#setCollapsed(boolean)] from a listener instead.
 ///  - Component orientation is absent: `LEADING` and `START` are left
 ///    and top, `TRAILING` and `END` are right and bottom.
 ///  - A border, opacity and minimum or preferred size set on the pane
@@ -125,6 +130,33 @@ public class JXCollapsiblePane extends JXPanel {
         this.direction = direction == null ? Direction.UP : direction;
         constructed = true;
         setContentPane(createContentPane());
+        getActionMap().put(TOGGLE_ACTION, new ToggleAction());
+    }
+
+    /// Flips the collapsed state, and shows as its small icon the one
+    /// stored for the state the pane would change to.
+    private final class ToggleAction extends AbstractAction {
+
+        ToggleAction() {
+            super(TOGGLE_ACTION);
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            setCollapsed(!isCollapsed());
+        }
+
+        @Override
+        public void putValue(String key, Object newValue) {
+            super.putValue(key, newValue);
+            if (EXPAND_ICON.equals(key) || COLLAPSE_ICON.equals(key)) {
+                cn1UpdateIcon();
+            }
+        }
+
+        void cn1UpdateIcon() {
+            super.putValue(Action.SMALL_ICON, getValue(isCollapsed() ? EXPAND_ICON : COLLAPSE_ICON));
+        }
     }
 
     /// Lays the content pane out at its full size, shifted so that the
@@ -294,6 +326,10 @@ public class JXCollapsiblePane extends JXPanel {
             }
         } else {
             cn1Finish();
+        }
+        Action toggle = getActionMap().get(TOGGLE_ACTION);
+        if (toggle instanceof ToggleAction) {
+            ((ToggleAction) toggle).cn1UpdateIcon();
         }
         firePropertyChange("collapsed", !val, val);
     }

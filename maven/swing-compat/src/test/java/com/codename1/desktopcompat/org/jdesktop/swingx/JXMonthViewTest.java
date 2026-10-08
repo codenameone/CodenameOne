@@ -40,20 +40,12 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 /// The month view: where its days are, what presses select and how the
 /// month moves. Every date is fixed; March 2024 starts on a Friday and
 /// has 31 days.
 public class JXMonthViewTest extends KernelTestBase {
-
-    /// Lets the events the presses queued drain before the next class
-    /// replaces the display.
-    @AfterClass
-    public static void settle() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     private static Date date(int month, int day, int hour) {
         Calendar c = Calendar.getInstance();

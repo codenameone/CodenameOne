@@ -42,7 +42,6 @@ import com.codename1.desktopcompat.org.jdesktop.swingx.painter.Painter;
 import com.codename1.desktopcompat.rt.Fonts;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.AfterClass;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -55,13 +54,6 @@ import static org.junit.Assert.assertTrue;
 /// The widgets a painter draws: the label, the button, the busy label
 /// and the titled separator.
 public class PainterWidgetsTest extends KernelTestBase {
-
-    /// The kernel counts clicks by time alone and keeps the count between
-    /// tests; wait out the taps made here.
-    @AfterClass
-    public static void letTheClickCountRunOut() throws InterruptedException {
-        Thread.sleep(600);
-    }
 
     /// A painter that records every call and draws a string, so its turn
     /// shows among the text the frame draws.
