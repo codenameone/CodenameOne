@@ -63,6 +63,8 @@ public final class CompatRemapper {
     private final List<File> handlerDirs = new ArrayList<File>();
     private boolean shipRuntime = true;
     private File desktopEntry;
+    private String applicationMain;
+    private boolean entryGenerated;
     /// Null until [#withResourceDirectories] is called; see
     /// [#resourceDirectories()].
     private List<File> resourceDirs;
@@ -117,6 +119,16 @@ public final class CompatRemapper {
     /// application that has none.
     public CompatRemapper withDesktopEntryRecord(File record) {
         this.desktopEntry = record;
+        return this;
+    }
+
+    /// The project's main class, as `codename1.packageName` and
+    /// `codename1.mainName` name it (`com.example.MyApp`): the class the
+    /// entry point of a desktop application is generated as. Without it the
+    /// class is generated only for an application with an entry record, as
+    /// [DesktopEntryPoints#DEFAULT_MAIN].
+    public CompatRemapper withApplicationMain(String className) {
+        this.applicationMain = className;
         return this;
     }
 
@@ -201,6 +213,7 @@ public final class CompatRemapper {
         try {
             jdkJar = CompatLayers.jdkJar(classpath);
             resourcesShipped = false;
+            entryGenerated = false;
             List<String> appClasses;
             int runtime = 0;
             boolean android = isActive(AndroidRemapper.RELOCATION);
@@ -259,15 +272,27 @@ public final class CompatRemapper {
         }
     }
 
-    /// Hook, not implemented yet: generates the class that starts a Swing
-    /// application -- the Codename One lifecycle class that calls the
-    /// application's `main`, since nothing on a device runs a `main` method.
-    /// `appClasses` are the application's relocated internal names. Called
-    /// after every runtime is in place, on a full (not relocate-only) run with
-    /// the Swing layer active. Whatever it writes must be written with
+    /// Generates the class that starts a Swing application -- the Codename
+    /// One lifecycle class that calls the application's `main`, since nothing
+    /// on a device runs a `main` method: [DesktopEntryPoints]. `appClasses`
+    /// are the application's relocated internal names. Called after every
+    /// runtime is in place, on a full (not relocate-only) run with the Swing
+    /// layer active. Whatever it writes must be written with
     /// [ClassRelocator#writeIfDifferent], to keep a second run a no-op.
-    void generateSwingEntryPoint(List<String> appClasses) throws IOException {
-        // Deliberately empty: see the comment above.
+    void generateSwingEntryPoint(List<String> appClasses) throws IOException, BuildException {
+        generateDesktopEntryPoint(appClasses);
+    }
+
+    /// The one main class of a desktop application, generated once per run
+    /// however many desktop layers are active: which of the two kinds it is
+    /// comes from the entry record, not from the layer that asked.
+    private void generateDesktopEntryPoint(List<String> appClasses) throws IOException, BuildException {
+        if (entryGenerated) {
+            return;
+        }
+        entryGenerated = true;
+        new DesktopEntryPoints(classesDir, handlerDirs, relocator, active, jdkJar != null, log)
+                .generate(DesktopEntryPoints.read(desktopEntry), applicationMain, appClasses);
     }
 
     /// Ships what a Swing application loads by name -- `Class.getResource`
@@ -307,12 +332,12 @@ public final class CompatRemapper {
         }
     }
 
-    /// Hook, not implemented yet: generates the class that starts a JavaFX
-    /// application, instantiating its `javafx.application.Application`
-    /// subclass with `new` rather than by reflection. Same contract as
+    /// Generates the class that starts a JavaFX application, instantiating
+    /// its `javafx.application.Application` subclass with `new` rather than
+    /// by reflection: [DesktopEntryPoints]. Same contract as
     /// [#generateSwingEntryPoint], for the JavaFX layer.
-    void generateJavaFxEntryPoint(List<String> appClasses) throws IOException {
-        // Deliberately empty: see the comment above.
+    void generateJavaFxEntryPoint(List<String> appClasses) throws IOException, BuildException {
+        generateDesktopEntryPoint(appClasses);
     }
 
     /// Hook, not implemented yet: generates what FXML resolves by name at

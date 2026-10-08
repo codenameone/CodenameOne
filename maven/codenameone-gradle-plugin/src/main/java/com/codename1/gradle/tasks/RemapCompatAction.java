@@ -53,6 +53,7 @@ public class RemapCompatAction implements Action<Task> {
     private final boolean relocateOnly;
     private final FileCollection handlerDirs;
     private File desktopEntry;
+    private String applicationMain;
     private FileCollection shipWhenEmpty;
 
     public RemapCompatAction(File classesDir, FileCollection compileClasspath, File onClickNames,
@@ -69,6 +70,14 @@ public class RemapCompatAction implements Action<Task> {
     /// generators.
     public RemapCompatAction withDesktopEntryRecord(File record) {
         this.desktopEntry = record;
+        return this;
+    }
+
+    /// The project's main class (`codename1.packageName` and
+    /// `codename1.mainName`), which a desktop application's entry point is
+    /// generated as.
+    public RemapCompatAction withApplicationMain(String className) {
+        this.applicationMain = className;
         return this;
     }
 
@@ -92,7 +101,8 @@ public class RemapCompatAction implements Action<Task> {
         }
         Log log = new GradleLog(task.getLogger());
         CompatRemapper r = new CompatRemapper(classesDir, classpath, onClickNames, log)
-                .withDesktopEntryRecord(desktopEntry);
+                .withDesktopEntryRecord(desktopEntry)
+                .withApplicationMain(applicationMain);
         if (relocateOnly && !(shipWhenEmpty != null && shipWhenEmpty.isEmpty())) {
             r.relocateOnly();
         } else if (handlerDirs != null) {

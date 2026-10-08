@@ -219,11 +219,81 @@ public class DesktopProjectImporterTest {
         assertEquals("com.acme.swing.Main", r.mainClass);
         assertEquals("swing", r.kind);
         assertEquals("swing", DesktopSources.readEntryRecord(desktop).getProperty("kind"));
-        assertEquals(Arrays.asList("org.swinglabs.swingx:swingx-core (SwingX)",
-                "com.miglayout:miglayout-swing (covered by the built-in MiG layout support)"), r.covered);
-        assertEquals(Collections.singletonList("com.formdev:flatlaf"), r.uncovered);
+        assertEquals(Collections.singletonList("org.swinglabs.swingx:swingx-core (SwingX)"), r.covered);
+        // MiG Layout is a library written against Swing, not part of a layer:
+        // the build relocates it with the application.
+        assertEquals(Arrays.asList("com.miglayout:miglayout-swing", "com.formdev:flatlaf"), r.uncovered);
+        assertFalse(DesktopProjectImporter.isToolkitModule("com.miglayout:miglayout-swing"));
+        assertTrue(DesktopProjectImporter.BUNDLED_NOTE.contains("bundled and relocated"));
         assertEquals(source.getName(), DesktopProjectImporter.moduleDir(source, null).getParentFile().getName());
         assertEquals("Swing", DesktopSources.toolkitsNamedIn(desktop));
+    }
+
+    private File swingProject(String folder) throws IOException {
+        File source = tmp.newFolder(folder);
+        write(source, "src/main/java/com/acme/swing/Main.java", SWING_MAIN);
+        return source;
+    }
+
+    /// The build generates the application's main class from the entry
+    /// record, so the one the project template wrote has to make room.
+    @Test
+    public void theTemplatesMainClassIsSetAsideForTheGeneratedOne() throws Exception {
+        File common = common();
+        String template = "package com.acme;\npublic class MyApp extends com.codename1.system.Lifecycle {\n}\n";
+        File main = write(common, "src/main/java/com/acme/MyApp.java", template);
+
+        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(swingProject("setaside"),
+                null, common, null, "com.acme", "MyApp");
+        assertEquals("com.acme.MyApp", r.generatedMain);
+        assertFalse(main.exists());
+        File aside = new File(main.getPath() + DesktopProjectImporter.SET_ASIDE_SUFFIX);
+        assertEquals(aside, r.setAside);
+        assertEquals(template, read(aside));
+
+        // Importing again has nothing left to move, and keeps the copy.
+        r = new DesktopProjectImporter(log).importProject(swingProject("setaside2"), null, common, null, "com.acme",
+                "MyApp");
+        assertEquals("com.acme.MyApp", r.generatedMain);
+        assertNull(r.setAside);
+        assertEquals(template, read(aside));
+
+        // A main class written since is the developer's to resolve.
+        write(common, "src/main/java/com/acme/MyApp.java", template);
+        logged.clear();
+        r = new DesktopProjectImporter(log).importProject(swingProject("setaside3"), null, common, null, "com.acme",
+                "MyApp");
+        assertTrue(main.isFile());
+        assertNull(r.setAside);
+        assertTrue(logged.toString(), logged.toString().contains("warn: MyApp.java was written after"));
+    }
+
+    @Test
+    public void aLifecycleOfTheDevelopersOwnIsKept() throws Exception {
+        File common = common();
+        String own = "package com.acme;\npublic class MyApp extends com.codename1.desktopcompat.rt.DesktopLifecycle {\n"
+                + "    protected void runMain() { com.acme.swing.Main.main(new String[0]); }\n}\n";
+        File main = write(common, "src/main/java/com/acme/MyApp.java", own);
+        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(swingProject("own"), null,
+                common, null, "com.acme", "MyApp");
+        assertEquals(own, read(main));
+        assertNull(r.setAside);
+    }
+
+    /// The generated class cannot share a name with a class of the imported
+    /// application: nothing is copied, and the message says what to change.
+    @Test
+    public void anImportedClassNamedLikeTheMainClassStopsTheImport() throws Exception {
+        File common = common();
+        try {
+            new DesktopProjectImporter(log).importProject(swingProject("clash"), null, common, null, "com.acme.swing",
+                    "Main");
+            fail("The import must stop");
+        } catch (BuildException e) {
+            assertTrue(e.getMessage(), e.getMessage().contains("Nothing was imported"));
+            assertTrue(e.getMessage(), e.getMessage().contains("codename1.mainName"));
+        }
+        assertFalse(new File(common, "src/main/desktop").exists());
     }
 
     /// A launcher beside the Application subclass is how a JavaFX project is
@@ -244,9 +314,10 @@ public class DesktopProjectImporterTest {
         assertEquals("com.acme.fx.App", r.mainClass);
         assertEquals("javafx", r.kind);
         assertEquals(Collections.singletonList("org.openjfx:javafx-controls (JavaFX controls)"), r.covered);
-        assertEquals(2, r.uncovered.size());
-        assertEquals("org.openjfx:javafx-media", r.uncovered.get(0));
-        assertTrue(r.uncovered.get(1), r.uncovered.get(1).contains("version catalog"));
+        assertEquals(Collections.singletonList("org.openjfx:javafx-media"), r.uncovered);
+        assertTrue(DesktopProjectImporter.isToolkitModule(r.uncovered.get(0)));
+        assertEquals(1, r.unresolved.size());
+        assertTrue(r.unresolved.get(0), r.unresolved.get(0).contains("version catalog"));
         assertEquals("JavaFX", DesktopSources.toolkitsNamedIn(new File(common(), "src/main/desktop")));
     }
 

@@ -44,8 +44,9 @@ import java.util.regex.Pattern;
 /// Imports a Swing or JavaFX project (a Maven or Gradle project, or one
 /// module of it) into a Codename One application: copies its `src/main`
 /// sources and resources into `src/main/desktop`, records how the application
-/// starts ([DesktopSources#ENTRY_RECORD]), and reports which of its
-/// dependencies the desktop layers cover.
+/// starts ([DesktopSources#ENTRY_RECORD]), makes room for the main class the
+/// build generates from that record ([DesktopEntryPoints]), and reports what
+/// becomes of each of its dependencies.
 ///
 /// Nothing is asked. The entry point is found by reading the sources, and
 /// where they leave a choice the source project's own main-class setting
@@ -71,11 +72,27 @@ public final class DesktopProjectImporter {
         COVERED.put("org.openjfx:javafx-fxml", "FXML");
         COVERED.put("org.openjfx:javafx-graphics", "JavaFX graphics");
         COVERED.put("org.openjfx:javafx-base", "JavaFX base");
-        COVERED.put("com.miglayout:miglayout-swing", "covered by the built-in MiG layout support");
         COVERED.put("org.jetbrains.kotlin:kotlin-stdlib", "Kotlin standard library");
         COVERED.put("org.jetbrains.kotlin:kotlin-stdlib-jdk7", "Kotlin standard library");
         COVERED.put("org.jetbrains.kotlin:kotlin-stdlib-jdk8", "Kotlin standard library");
     }
+
+    /// What an import says about a dependency no layer implements. Such a
+    /// library is application code: when it is written against Swing or
+    /// JavaFX the build relocates it with the application
+    /// ([CompatRemapper#withApplicationLibraries]).
+    public static final String BUNDLED_NOTE = "bundled and relocated; unsupported API it uses will be reported at build "
+            + "time";
+
+    /// Whether `coordinate` (`group:artifact`) is a module of a toolkit a
+    /// layer stands in for. One the layer does not implement cannot be added
+    /// as a library: its classes are the toolkit's own.
+    public static boolean isToolkitModule(String coordinate) {
+        return coordinate.startsWith("org.openjfx:");
+    }
+
+    /// The suffix a main class source is set aside under.
+    static final String SET_ASIDE_SUFFIX = ".pre-desktop-import";
 
     /// Dependencies that only matter to tests.
     static final String[] IGNORED = {"junit:", "org.junit", "org.mockito", "org.testfx", "org.hamcrest",
@@ -83,7 +100,21 @@ public final class DesktopProjectImporter {
 
     public static final class Result {
         public final List<String> covered = new ArrayList<String>();
+        /// Dependencies no layer implements, by `group:artifact`. They are
+        /// not copied: add each to the application's own build, where it is
+        /// handled as [#BUNDLED_NOTE] says.
         public final List<String> uncovered = new ArrayList<String>();
+        /// The class the build generates to start the application
+        /// (`codename1.packageName` and `codename1.mainName`), or null when
+        /// the import was not told the project's.
+        /// What the import could not read from the project's build, as
+        /// sentences.
+        public final List<String> unresolved = new ArrayList<String>();
+        public String generatedMain;
+        /// The source of the project's previous main class, where the import
+        /// set it aside to make room for the generated one; null when there
+        /// was none to move.
+        public File setAside;
         /// The `module-info.java` files that were left out, relative to
         /// `src/main/desktop`. A Codename One application is not a module.
         public final List<String> droppedModuleInfo = new ArrayList<String>();
@@ -164,6 +195,18 @@ public final class DesktopProjectImporter {
     /// entry point and no other is considered.
     public Result importProject(File source, String module, File commonDir, String mainClassOverride)
             throws BuildException {
+        return importProject(source, module, commonDir, mainClassOverride, null, null);
+    }
+
+    /// As [#importProject(File, String, File, String)], for an application
+    /// whose main class is `mainPackage`.`mainName` (its
+    /// `codename1.packageName` and `codename1.mainName`). The build generates
+    /// that class from the entry record, so a source of the same name -- the
+    /// one the project template wrote -- is set aside as
+    /// `<name>.java.pre-desktop-import`; one that already extends a desktop
+    /// lifecycle is the developer's own and stays.
+    public Result importProject(File source, String module, File commonDir, String mainClassOverride,
+                                String mainPackage, String mainName) throws BuildException {
         File moduleDir = moduleDir(source, module);
         File main = new File(moduleDir, "src/main");
         File target = new File(commonDir, "src/main/desktop");
@@ -178,6 +221,17 @@ public final class DesktopProjectImporter {
             Properties existing = DesktopSources.readEntryRecord(target);
             Candidate entry = chooseEntry(candidates, mainClassOverride, declaredMainClasses(source, moduleDir),
                     existing == null ? null : existing.getProperty("mainClass"), existing != null);
+
+            String generated = mainName == null || mainName.trim().length() == 0 ? null
+                    : (mainPackage == null || mainPackage.trim().length() == 0 ? "" : mainPackage.trim() + ".")
+                    + mainName.trim();
+            if (generated != null && declares(main, generated)) {
+                throw new BuildException("Nothing was imported: the desktop project has a class named " + generated
+                        + ", which is the name of this application's main class (codename1.packageName and "
+                        + "codename1.mainName). The build generates the main class, so it needs a name the "
+                        + "imported sources do not use: change codename1.mainName in "
+                        + "codenameone_settings.properties and import again.");
+            }
 
             ImportedFiles files = new ImportedFiles(target, IMPORT_RECORD, "the desktop project", log)
                     .skipping("module-info.java")
@@ -206,6 +260,10 @@ public final class DesktopProjectImporter {
                 r.mainClass = existing.getProperty("mainClass");
                 r.kind = existing.getProperty("kind");
             }
+            if (generated != null && r.mainClass != null) {
+                r.generatedMain = generated;
+                r.setAside = setAsideMainClass(commonDir, generated);
+            }
             readDependencies(moduleDir, r);
             if (ImportedFiles.hasKotlin(target)) {
                 // The application's Kotlin build switches on when
@@ -225,6 +283,47 @@ public final class DesktopProjectImporter {
             throw new BuildException("Import failed: " + e.getMessage(), e);
         }
         return r;
+    }
+
+    /// Whether the sources under `main` declare the top-level class `name`.
+    private static boolean declares(File main, String name) {
+        String path = name.replace('.', '/');
+        return new File(main, "java/" + path + ".java").isFile() || new File(main, "kotlin/" + path + ".kt").isFile();
+    }
+
+    /// Moves the application's own main class source out of the compiler's
+    /// way, so that the class the build generates under that name is the
+    /// only one. Answers where it went, or null when nothing was moved.
+    private File setAsideMainClass(File commonDir, String className) throws IOException {
+        String path = className.replace('.', '/');
+        File[] sources = {new File(commonDir, "src/main/java/" + path + ".java"),
+            new File(commonDir, "src/main/kotlin/" + path + ".kt")};
+        File moved = null;
+        for (File f : sources) {
+            if (!f.isFile()) {
+                continue;
+            }
+            String text = code(new String(Files.readAllBytes(f.toPath()), UTF8));
+            if (text.indexOf("DesktopLifecycle") >= 0 || text.indexOf("FxLifecycle") >= 0) {
+                log.info(f.getName() + " already extends a desktop lifecycle and was kept; the build generates no "
+                        + "main class beside it");
+                continue;
+            }
+            File backup = new File(f.getPath() + SET_ASIDE_SUFFIX);
+            if (backup.exists()) {
+                // An earlier import's copy of the original, which is the one
+                // worth keeping; this file was written since.
+                log.warn(f.getName() + " was written after an earlier import set the original aside ("
+                        + backup.getName() + "). The build fails while both it and " + DesktopSources.ENTRY_RECORD
+                        + " ask to start the application: delete one of them.");
+                continue;
+            }
+            Files.move(f.toPath(), backup.toPath());
+            log.info("Set " + f.getName() + " aside as " + backup.getName() + ": the build generates " + className
+                    + " to start the imported application");
+            moved = backup;
+        }
+        return moved;
     }
 
     /// Picks the entry point. Answers null only when there is no candidate
@@ -572,8 +671,8 @@ public final class DesktopProjectImporter {
             }
         }
         if (catalog) {
-            r.uncovered.add("dependencies declared through a version catalog (libs.*) were not resolved; "
-                    + "check them against the supported list by hand");
+            r.unresolved.add("dependencies declared through a version catalog (libs.*) were not resolved; "
+                    + "add the ones the application needs to its build by hand");
         }
     }
 }

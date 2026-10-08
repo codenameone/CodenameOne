@@ -65,8 +65,9 @@ import javafx.stage.Stage;
 /// An exception from `init`, `start` or `stop` is logged and rethrown as
 /// a `RuntimeException`. `Application.launch` is not used: there is no
 /// `main` method on a device, and no reflection to find the class with.
-/// `Application.getParameters()` and `getHostServices()` are not part of
-/// this layer.
+/// The application's `main` is never called, and `launch` does nothing
+/// when something else calls it. `Application.getParameters()` answers
+/// empty parameters.
 public abstract class FxLifecycle extends Lifecycle {
 
     private Application application;

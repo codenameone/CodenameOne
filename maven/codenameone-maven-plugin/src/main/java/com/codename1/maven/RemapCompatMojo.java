@@ -90,9 +90,25 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
                     .withResourceDirectories(desktopResources)
                     .withDesktopEntryRecord(desktopSourceDir == null ? null
                             : DesktopSources.entryRecord(desktopSourceDir))
+                    .withApplicationMain(applicationMain())
                     .run();
         } catch (com.codename1.builders.BuildException ex) {
             throw new MojoFailureException(ex.getMessage(), ex);
         }
+    }
+
+    /// The project's main class, which the entry point of a desktop
+    /// application is generated as; null for a module that is not an
+    /// application's.
+    private String applicationMain() {
+        if (!isCN1ProjectDir()) {
+            return null;
+        }
+        String pkg = properties == null ? null : properties.getProperty("codename1.packageName");
+        String main = properties == null ? null : properties.getProperty("codename1.mainName");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        return pkg == null || pkg.trim().length() == 0 ? main.trim() : pkg.trim() + "." + main.trim();
     }
 }
