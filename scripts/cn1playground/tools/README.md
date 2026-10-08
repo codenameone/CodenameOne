@@ -56,7 +56,10 @@ assertions use the same coordinate space as the accessibility bounds. The tests
 derive the preview bounds from the accessibility tree and examine screenshot
 pixels for visible scene content,
 preview coverage, and animation. They reject blank scenes, a fixed-size scene
-painted into a corner of a larger preview, and frozen foregrounds. The cube must
+painted into a corner of a larger preview, and frozen foregrounds. Animation
+sampling starts immediately and allows up to five seconds for visible movement
+on software WebGL; the foreground change threshold is unchanged. A permanently
+frozen scene still fails, with every sampled frame retained in the artifacts. The cube must
 also be centered and retain its proportions. Pixel thresholds tolerate antialiasing; these are behavioral
 checks rather than machine-specific golden screenshots. The small Node test
 suite validates the pixel oracle against good, blank, misplaced and frozen

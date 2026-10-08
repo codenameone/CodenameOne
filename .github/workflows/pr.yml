@@ -40,6 +40,8 @@ on:
       - 'scripts/check-native-cpp-linkage.py'
       # Same: the builder define-toggle lint runs from this workflow and nowhere else.
       - 'scripts/check-builder-define-toggles.py'
+      - 'scripts/check-cast-semantics.sh'
+      - 'scripts/cast-semantics-baseline.txt'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -108,6 +110,8 @@ on:
       - 'scripts/check-native-cpp-linkage.py'
       # Same: the builder define-toggle lint runs from this workflow and nowhere else.
       - 'scripts/check-builder-define-toggles.py'
+      - 'scripts/check-cast-semantics.sh'
+      - 'scripts/cast-semantics-baseline.txt'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -387,7 +391,7 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
             -DbackendAnalysis \
-            -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac -am verify
+            -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac,android-res-compiler,android-compat -am verify
       - name: Type-check the SQLCipher-backed database package
         if: ${{ matrix.java-version == 8 }}
         env:
@@ -602,7 +606,7 @@ jobs:
       - name: Generate static analysis HTML summaries
         if: ${{ !cancelled() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target:maven/javac/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target:maven/javac/target:maven/android-res-compiler/target:maven/android-compat/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -622,6 +626,8 @@ jobs:
             "bytecode-translator:vm/ByteCodeTranslator/target" \
             "maven-plugin:maven/codenameone-maven-plugin/target" \
             "build-engine:maven/build-engine/target" \
+            "android-res-compiler:maven/android-res-compiler/target" \
+            "android-compat:maven/android-compat/target" \
             "project-model:maven/project-model/target" \
             "gradle-plugin:maven/codenameone-gradle-plugin/target" \
             "backend:maven/backend/target" \
@@ -752,11 +758,11 @@ jobs:
       - name: Generate quality report summary
         if: ${{ !cancelled() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target:maven/javac/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target:maven/javac/target:maven/android-res-compiler/target:maven/android-compat/target
           # Every project listed here must produce a SpotBugs report and that
           # report must be empty. A missing report fails the gate too, so a
           # SpotBugs run that silently stops running is not mistaken for clean.
-          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-engine:project-model:codenameone-gradle-plugin:build-hint-catalog:build-hint-tools:backend:backend-test:javac
+          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-engine:project-model:codenameone-gradle-plugin:build-hint-catalog:build-hint-tools:backend:backend-test:javac:android-res-compiler:android-compat
           # PMD and Checkstyle run on the core and on the backend runtime, and each
           # must produce its report: without one, the forbidden-rule gate below it
           # has nothing to read and passes.

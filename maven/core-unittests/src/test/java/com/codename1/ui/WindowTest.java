@@ -6064,4 +6064,40 @@ class WindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void backgroundModalWaitReleasesOnTheEdtAfterVisibilityPublication() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        new Form("main").show();
+        final Window w = new Window("modal");
+        final Throwable[] failure = {null};
+        Thread caller = new Thread(new Runnable() {
+            @Override public void run() {
+                try { w.showModal(); } catch (Throwable t) { failure[0] = t; }
+            }
+        }, "modal-wait-regression");
+        caller.start();
+        try {
+            for (int i=0; i<400 && !w.isWindowShowing(); i++) {
+                DisplayTest.flushEdt(); Thread.sleep(5);
+            }
+            assertTrue(w.isWindowShowing());
+            // Hold hide() at the point after visibility is published but before
+            // releaseModal(). The waiter can observe this interval on another CPU.
+            java.lang.reflect.Field visible = Window.class.getDeclaredField("nativeVisible");
+            visible.setAccessible(true);
+            synchronized (Display.lock) {
+                visible.setBoolean(w, false);
+                Display.lock.notifyAll();
+            }
+            for (int i=0; i<400 && caller.isAlive(); i++) {
+                DisplayTest.flushEdt(); Thread.sleep(5);
+            }
+            caller.join(2000); DisplayTest.flushEdt();
+            assertFalse(caller.isAlive()); assertNull(failure[0]);
+            assertEquals(java.util.Collections.emptyList(), wm.getOffEdtCalls());
+        } finally {
+            w.dispose(); DisplayTest.flushEdt(); caller.join(2000);
+        }
+    }
+
 }

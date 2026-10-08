@@ -1674,7 +1674,17 @@ public class Form extends Container implements TopLevelContainer {
         transitionOutAnimator = laf.getDefaultFormTransitionOut();
         transitionInAnimator = laf.getDefaultFormTransitionIn();
         focusScrolling = laf.isFocusScrolling();
-        if (menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass())) {
+        // A form with a toolbar (every form of an application using the global
+        // toolbar) uses the toolbar's own menu bar, a Toolbar.ToolbarSideMenu,
+        // whose class is never the look and feel's. Without this guard the
+        // class check below replaced it with a fresh look-and-feel menu bar
+        // whenever initLaf ran -- refreshTheme(), a system dark mode change
+        // (UIManager.refreshNativeThemeSettings), and show() on a theme without
+        // form transitions -- and the form's back command, which lives on the
+        // menu bar and is what the hardware back key runs, was lost with it.
+        // FormToolbarThemeRefreshTest covers it.
+        boolean toolbarOwnsMenuBar = toolbar != null && menuBar != null && menuBar == toolbar.getMenuBar(); //NOPMD CompareObjectsWithEquals - the same instance, not an equal one
+        if (!toolbarOwnsMenuBar && (menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass()))) {
             try {
                 menuBar = (MenuBar) laf.getMenuBarClass().newInstance();
             } catch (Exception ex) {

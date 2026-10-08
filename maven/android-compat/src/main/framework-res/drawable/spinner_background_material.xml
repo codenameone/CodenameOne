@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The spinner's background: a drop-down arrow at the end, tinted with
+     colorControlNormal. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="end|center_vertical" android:width="24dp" android:height="24dp" android:end="4dp">
+        <vector android:width="24dp" android:height="24dp"
+                android:viewportWidth="24" android:viewportHeight="24"
+                android:tint="?attr/colorControlNormal">
+            <path android:fillColor="#ff000000" android:pathData="M7,10l5,5 5,-5z"/>
+        </vector>
+    </item>
+</layer-list>

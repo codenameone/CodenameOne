@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget styles and text appearances. Names and values follow AOSP's
+     Material styles; the legacy names applications still inherit from
+     (Widget.Button, TextAppearance.Large, ...) are aliases of them. -->
+<resources>
+    <!-- ============================================ text appearances -->
+    <style name="TextAppearance">
+        <item name="textColor">?attr/textColorPrimary</item>
+        <item name="textColorHint">?attr/textColorHint</item>
+        <item name="textColorHighlight">?attr/textColorHighlight</item>
+        <item name="textColorLink">?attr/textColorLink</item>
+        <item name="textSize">16sp</item>
+        <item name="textStyle">normal</item>
+    </style>
+    <style name="TextAppearance.Material">
+        <item name="textColor">?attr/textColorPrimary</item>
+        <item name="textColorHint">?attr/textColorHint</item>
+        <item name="textColorHighlight">?attr/textColorHighlight</item>
+        <item name="textColorLink">?attr/textColorLink</item>
+        <item name="textSize">@dimen/text_size_body_1_material</item>
+        <item name="fontFamily">@string/font_family_body_1_material</item>
+    </style>
+    <style name="TextAppearance.Material.Display4">
+        <item name="textSize">@dimen/text_size_display_4_material</item>
+        <item name="textColor">?attr/textColorSecondary</item>
+        <item name="fontFamily">sans-serif-light</item>
+    </style>
+    <style name="TextAppearance.Material.Display3">
+        <item name="textSize">@dimen/text_size_display_3_material</item>
+        <item name="textColor">?attr/textColorSecondary</item>
+    </style>
+    <style name="TextAppearance.Material.Display2">
+        <item name="textSize">@dimen/text_size_display_2_material</item>
+        <item name="textColor">?attr/textColorSecondary</item>
+    </style>
+    <style name="TextAppearance.Material.Display1">
+        <item name="textSize">@dimen/text_size_display_1_material</item>
+        <item name="textColor">?attr/textColorSecondary</item>
+    </style>
+    <style name="TextAppearance.Material.Headline">
+        <item name="textSize">@dimen/text_size_headline_material</item>
+    </style>
+    <style name="TextAppearance.Material.Title">
+        <item name="textSize">@dimen/text_size_title_material</item>
+        <item name="fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="TextAppearance.Material.Subhead">
+        <item name="textSize">@dimen/text_size_subhead_material</item>
+    </style>
+    <style name="TextAppearance.Material.Body2">
+        <item name="textSize">@dimen/text_size_body_2_material</item>
+        <item name="fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="TextAppearance.Material.Body1">
+        <item name="textSize">@dimen/text_size_body_1_material</item>
+    </style>
+    <style name="TextAppearance.Material.Caption">
+        <item name="textSize">@dimen/text_size_caption_material</item>
+        <item name="textColor">?attr/textColorSecondary</item>
+    </style>
+    <style name="TextAppearance.Material.Large">
+        <item name="textSize">@dimen/text_size_large_material</item>
+    </style>
+    <style name="TextAppearance.Material.Medium">
+        <item name="textSize">@dimen/text_size_medium_material</item>
+        <item name="textColor">?attr/textColorSecondary</item>
+    </style>
+    <style name="TextAppearance.Material.Small">
+        <item name="textSize">@dimen/text_size_small_material</item>
+        <item name="textColor">?attr/textColorTertiary</item>
+    </style>
+    <style name="TextAppearance.Material.Button">
+        <item name="textSize">@dimen/text_size_button_material</item>
+        <item name="fontFamily">@string/font_family_button_material</item>
+        <item name="textAllCaps">true</item>
+        <item name="textColor">?attr/textColorPrimary</item>
+    </style>
+    <style name="TextAppearance.Material.Widget.EditText">
+        <item name="textSize">@dimen/text_size_medium_material</item>
+        <item name="textColor">?attr/editTextColor</item>
+    </style>
+    <style name="TextAppearance.Large" parent="TextAppearance.Material.Large"/>
+    <style name="TextAppearance.Medium" parent="TextAppearance.Material.Medium"/>
+    <style name="TextAppearance.Small" parent="TextAppearance.Material.Small"/>
+    <style name="TextAppearance.DeviceDefault" parent="TextAppearance.Material"/>
+    <style name="TextAppearance.DeviceDefault.Large" parent="TextAppearance.Material.Large"/>
+    <style name="TextAppearance.DeviceDefault.Medium" parent="TextAppearance.Material.Medium"/>
+    <style name="TextAppearance.DeviceDefault.Small" parent="TextAppearance.Material.Small"/>
+
+    <!-- ============================================ widgets -->
+    <style name="Widget">
+        <item name="textAppearance">?attr/textAppearance</item>
+    </style>
+    <style name="Widget.Material"/>
+    <!-- As in AOSP's Widget.TextView: a TextView with no appearance of its
+         own is Small, so in the Material themes it is 14sp and
+         textColorTertiary (54% black on light), not textColorPrimary. -->
+    <style name="Widget.Material.TextView">
+        <item name="textAppearance">?attr/textAppearanceSmall</item>
+    </style>
+    <style name="Widget.Material.Button">
+        <item name="background">@drawable/btn_default_material</item>
+        <item name="textAppearance">?attr/textAppearanceButton</item>
+        <item name="minHeight">48dip</item>
+        <item name="minWidth">88dip</item>
+        <item name="focusable">true</item>
+        <item name="clickable">true</item>
+        <item name="gravity">center_vertical|center_horizontal</item>
+    </style>
+    <style name="Widget.Material.Button.Borderless">
+        <item name="background">@drawable/btn_borderless_material</item>
+    </style>
+    <style name="Widget.Material.Button.Small">
+        <item name="minHeight">48dip</item>
+        <item name="minWidth">48dip</item>
+    </style>
+    <style name="Widget.Material.EditText">
+        <item name="focusable">true</item>
+        <item name="focusableInTouchMode">true</item>
+        <item name="clickable">true</item>
+        <item name="background">?attr/editTextBackground</item>
+        <item name="textAppearance">@style/TextAppearance.Material.Widget.EditText</item>
+        <item name="textColor">?attr/editTextColor</item>
+        <item name="gravity">center_vertical</item>
+    </style>
+    <style name="Widget.Material.ImageButton">
+        <item name="focusable">true</item>
+        <item name="clickable">true</item>
+        <item name="scaleType">center</item>
+        <item name="background">@drawable/btn_default_material</item>
+    </style>
+    <style name="Widget.Material.ImageView"/>
+
+    <style name="Widget.TextView" parent="Widget.Material.TextView"/>
+    <style name="Widget.Button" parent="Widget.Material.Button"/>
+    <style name="Widget.Button.Small" parent="Widget.Material.Button.Small"/>
+    <style name="Widget.EditText" parent="Widget.Material.EditText"/>
+    <style name="Widget.ImageButton" parent="Widget.Material.ImageButton"/>
+    <style name="Widget.DeviceDefault.Button" parent="Widget.Material.Button"/>
+    <style name="Widget.DeviceDefault.Button.Borderless" parent="Widget.Material.Button.Borderless"/>
+    <style name="Widget.DeviceDefault.EditText" parent="Widget.Material.EditText"/>
+    <style name="Widget.DeviceDefault.TextView" parent="Widget.Material.TextView"/>
+</resources>

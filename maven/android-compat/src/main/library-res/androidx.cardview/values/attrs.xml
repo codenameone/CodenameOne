@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CardView's attributes, as androidx.cardview declares them. -->
+<resources>
+    <attr name="cardViewStyle" format="reference"/>
+    <attr name="cardElevation" format="dimension"/>
+    <attr name="cardMaxElevation" format="dimension"/>
+    <attr name="cardCornerRadius" format="dimension"/>
+    <attr name="cardBackgroundColor" format="color"/>
+    <attr name="cardUseCompatPadding" format="boolean"/>
+    <attr name="cardPreventCornerOverlap" format="boolean"/>
+    <attr name="contentPadding" format="dimension"/>
+    <attr name="contentPaddingLeft" format="dimension"/>
+    <attr name="contentPaddingRight" format="dimension"/>
+    <attr name="contentPaddingTop" format="dimension"/>
+    <attr name="contentPaddingBottom" format="dimension"/>
+    <declare-styleable name="CardView">
+        <attr name="cardElevation"/>
+        <attr name="cardMaxElevation"/>
+        <attr name="cardCornerRadius"/>
+        <attr name="cardBackgroundColor"/>
+        <attr name="cardUseCompatPadding"/>
+        <attr name="cardPreventCornerOverlap"/>
+        <attr name="contentPadding"/>
+        <attr name="contentPaddingLeft"/>
+        <attr name="contentPaddingRight"/>
+        <attr name="contentPaddingTop"/>
+        <attr name="contentPaddingBottom"/>
+        <attr name="android:minWidth"/>
+        <attr name="android:minHeight"/>
+    </declare-styleable>
+</resources>

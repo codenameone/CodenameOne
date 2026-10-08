@@ -1,0 +1,48 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.androidcompat.runtime;
+
+import android.view.MenuItem;
+import android.view.View;
+
+/// Placeholder for the `android:onClick` dispatcher. The `remap-android`
+/// build goal replaces this class in the application with one generated from
+/// the compiled classes, which calls each `public void name(View)` method a
+/// layout names directly, and each `name(MenuItem)` method a menu item names.
+/// Without that step (for example in the runtime's own tests) no handler is
+/// found.
+public final class OnClickDispatch {
+
+    private OnClickDispatch() {
+    }
+
+    public static boolean dispatch(Object target, String method, View view) {
+        return false;
+    }
+
+    /// -1 when `target` has no such handler, else its result: 1 for true
+    /// (or a void handler), 0 for false.
+    public static int dispatchMenu(Object target, String method, MenuItem item) {
+        return -1;
+    }
+}

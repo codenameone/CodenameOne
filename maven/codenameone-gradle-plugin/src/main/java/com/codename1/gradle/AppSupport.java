@@ -87,6 +87,12 @@ final class AppSupport {
         // The framework is `provided`: compiled against, supplied by the build server
         // or the simulator, never part of the upload.
         addFramework(project, "compileOnly", version, "codenameone-core", "java-runtime");
+        final boolean androidProject = com.codename1.maven.AndroidResourceRunner.isAndroidProject(layout.androidSourceDir());
+        if (androidProject) {
+            // The android.* API the application compiles against; the remap
+            // step copies the runtime itself into the application's classes.
+            addFramework(project, "compileOnly", version, "codenameone-android-compat");
+        }
         addFramework(project, "testImplementation", version, "codenameone-core", "codenameone-javase");
         Configuration framework = resolvable(project, "cn1Framework", "codenameone-core and java-runtime, for local builds");
         framework.setTransitive(false);
@@ -128,6 +134,32 @@ final class AppSupport {
         main.getJava().srcDir(svg.flatMap(TranscodeSvgTask::getOutputDirectory));
 
         registerGuiSources(project, layout, ext, userProperties, main);
+
+        // Android compatibility: src/main/android (manifest, res/, assets/,
+        // java/) compiles against codenameone-android-compat; its resources
+        // become R classes, the generated factory and the resource table.
+        final File androidDir = layout.androidSourceDir();
+        final File androidState = new File(layout.buildDir(), "android-res");
+        java.util.Properties settings = AppSettings.read(layout.settingsFile());
+        TaskProvider<com.codename1.gradle.tasks.CompileAndroidResTask> androidRes = project.getTasks().register(
+                "compileAndroidRes", com.codename1.gradle.tasks.CompileAndroidResTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Compiles src/main/android resources for the Android compatibility runtime");
+                    t.getSources().from(project.fileTree(androidDir, tree -> tree.exclude("java/**", "kotlin/**")));
+                    t.getCompatJar().from(project.getConfigurations().getByName("compileClasspath").filter(
+                            f -> f.getName().startsWith(com.codename1.maven.AndroidResourceRunner.COMPAT_ARTIFACT + "-")));
+                    t.getMainPackage().set(settings.getProperty("codename1.packageName"));
+                    t.getMainClass().set(settings.getProperty("codename1.mainName"));
+                    t.getSourceRoots().from(layout.javaSourceDir(), new File(layout.projectDir(), "src/main/kotlin"));
+                    t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-android"));
+                    t.getResourcesDirectory().set(new File(layout.buildDir(), "generated/resources/cn1-android"));
+                    t.getStateDirectory().set(androidState);
+                    t.onlyIf(x -> com.codename1.maven.AndroidResourceRunner.isAndroidProject(androidDir));
+                });
+        main.getJava().srcDir(androidRes.flatMap(com.codename1.gradle.tasks.CompileAndroidResTask::getOutputDirectory));
+        main.getJava().srcDir(new File(androidDir, "java"));
+        main.getResources().srcDir(androidRes.flatMap(
+                com.codename1.gradle.tasks.CompileAndroidResTask::getResourcesDirectory));
 
         TaskProvider<Cn1CssTask> css = project.getTasks().register("cn1Css", Cn1CssTask.class, t -> {
             common(t, project, layout, ext, userProperties);
@@ -171,6 +203,13 @@ final class AppSupport {
         // compileJava up to date and uploaded classes nobody had checked.
         final String skipInput = String.valueOf(skip);
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
+            if (androidProject) {
+                // Relocation rewrites this task's output descriptors. A source edit
+                // must compile all Java sources against the original Android API,
+                // never against unchanged, relocated classes from the last build.
+                // Unchanged builds still use Gradle's task up-to-date checks.
+                compile.getOptions().setIncremental(false);
+            }
             compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
             processingInputs(compile, layout, userProperties);
             Provider<List<String>> roots = project.provider(() -> sourceRoots(main, layout));
@@ -179,6 +218,12 @@ final class AppSupport {
             // poms bind process-classes in.
             // Kotlin's classes (compiled first, into a directory of their own) are
             // the Java pass's siblings, so Java calling Kotlin resolves.
+            // Android code is relocated onto the compatibility runtime before
+            // the compliance check sees it, as remap-android precedes
+            // bytecode-compliance in the Maven build.
+            compile.doLast("cn1RemapAndroid", new com.codename1.gradle.tasks.RemapAndroidAction(
+                    compile.getDestinationDirectory().getAsFile().get(), main.getCompileClasspath(),
+                    onClickNamesFile(androidState), false, main.getOutput().getClassesDirs()));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
@@ -210,14 +255,39 @@ final class AppSupport {
         // the classes it reads in place, so the Java pass would have to write
         // Kotlin's classes, and a Kotlin-only edit leaves compileJava up to date
         // with nothing reprocessed.
+        // Kotlin's source set already includes the Java directories (and so
+        // src/main/android/java and the generated R classes); the Android
+        // module's own kotlin/ directory is added to it here.
+        project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin -> {
+            Object kotlinSources = ((org.gradle.api.plugins.ExtensionAware) main).getExtensions().findByName("kotlin");
+            if (kotlinSources instanceof org.gradle.api.file.SourceDirectorySet) {
+                ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(new File(androidDir, "kotlin"));
+            }
+            // Kotlin's classes are relocated after javac rather than right after
+            // Kotlin compiles: they are javac's classpath, and Java calling a
+            // relocated Kotlin class would not compile (the relocated runtime is
+            // not on that classpath). Rewriting compileKotlin's outputs here makes
+            // Gradle rerun it from scratch next time, so javac always sees them as
+            // Kotlin wrote them.
+            final Provider<File> kotlinDir = project.getTasks().named("compileKotlin")
+                    .flatMap(k -> kotlinDestinationProvider(k, layout));
+            // Captured outside the action: the configuration cache cannot store a
+            // SourceSet, so the action must not reach the classpath through one.
+            final org.gradle.api.file.FileCollection compileClasspath = main.getCompileClasspath();
+            final File onClickNames = onClickNamesFile(androidState);
+            registerKotlinRelocation(project.getTasks(), main.getCompileJavaTaskName(), main.getClassesTaskName(),
+                    t -> new com.codename1.gradle.tasks.RemapAndroidAction(
+                            kotlinDir.get(), compileClasspath, onClickNames, true, null).execute(t));
+        });
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
                     processingInputs(compile, layout, userProperties);
                     Provider<File> kotlinClasses = kotlinDestinationProvider(compile, layout);
                     Provider<List<String>> roots = project.provider(() -> sourceRoots(main, layout));
-                    // javac has not run yet, so the Java classes Kotlin calls are
-                    // known by their sources.
+                    // Kotlin's classes are relocated after javac (see below), not
+                    // here; this check accepts their unrelocated names, which the
+                    // compatibility jar provides.
                     compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(
                             layout.rootDir(), layout.projectDir(), kotlinClasses, project.getName(),
                             main.getCompileClasspath(), compileArtifacts, complianceProperties)
@@ -579,6 +649,14 @@ final class AppSupport {
     /// Where the annotation processors write generated stub sources. Asked for
     /// inside the compile tasks' configuration, after the build script has had
     /// its say about the build directory.
+    /// The `android:onClick` names compileAndroidRes writes. The task hands
+    /// `androidState` to [com.codename1.maven.AndroidResourceRunner] as its build
+    /// directory, and the runner nests its files under that, so the path comes
+    /// from the runner rather than being rebuilt here.
+    static File onClickNamesFile(File androidState) {
+        return com.codename1.maven.AndroidResourceRunner.onClickNamesFile(androidState);
+    }
+
     static File stubsDir(ProjectLayout layout) {
         return new File(layout.buildDir(), "generated/sources/cn1-annotations");
     }
@@ -621,6 +699,30 @@ final class AppSupport {
     /// [#kotlinDestination(org.gradle.api.Task, ProjectLayout)], lazily: the task's own
     /// `destinationDirectory` provider, which follows a build script that sets
     /// it after the plugin configured the task.
+    /// Relocates Kotlin's classes in a task of its own, after javac. Not an
+    /// action of `compileJava`: javac's classpath is compared by ABI, so a
+    /// Kotlin change to method bodies alone -- or no change at all, since the
+    /// previous relocation makes `compileKotlin` rerun and write its classes
+    /// unrelocated again -- leaves `compileJava` up to date, its actions never
+    /// run, and the packaged Kotlin classes keep their `android/` names. This
+    /// task declares no outputs, so it runs on every build, as the Maven
+    /// build relocates on every build; relocating classes already relocated
+    /// changes nothing. It finalizes `compileJava`, so javac and its
+    /// processing always see the classes as Kotlin wrote them, and `classes`
+    /// (which every Codename One task depends on) waits for it.
+    static TaskProvider<org.gradle.api.Task> registerKotlinRelocation(org.gradle.api.tasks.TaskContainer tasks,
+            String compileJavaName, String classesName, org.gradle.api.Action<? super org.gradle.api.Task> remap) {
+        TaskProvider<org.gradle.api.Task> relocate = tasks.register("cn1RemapAndroidKotlin", t -> {
+            t.setDescription("Relocates Android references in Kotlin's classes onto the compatibility runtime");
+            t.dependsOn("compileKotlin");
+            t.mustRunAfter(compileJavaName);
+            t.doLast(remap);
+        });
+        tasks.named(compileJavaName).configure(javac -> javac.finalizedBy(relocate));
+        tasks.named(classesName).configure(classes -> classes.dependsOn(relocate));
+        return relocate;
+    }
+
     static Provider<File> kotlinDestinationProvider(final org.gradle.api.Task compile, final ProjectLayout layout) {
         try {
             Object dir = compile.getClass().getMethod("getDestinationDirectory").invoke(compile);

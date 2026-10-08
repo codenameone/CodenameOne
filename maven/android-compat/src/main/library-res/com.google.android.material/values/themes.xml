@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Components' themes. MaterialComponents (the second generation)
+     and Material 3 extend AppCompat's, set the color roles, type scale and
+     shapes of their generation and name the Material widget styles, and ask
+     for MaterialComponentsViewInflater, so a <Button> inflates as a
+     MaterialButton. DayNight follows the device's dark mode through
+     values-night. -->
+<resources>
+    <style name="Base.Theme.MaterialComponents.Light" parent="Theme.AppCompat.Light">
+        <item name="viewInflaterClass">com.google.android.material.theme.MaterialComponentsViewInflater</item>
+        <item name="isMaterialTheme">true</item>
+        <item name="elevationOverlayEnabled">true</item>
+        <item name="textAppearanceDisplayLarge">@style/TextAppearance.Material3.DisplayLarge</item>
+        <item name="textAppearanceDisplayMedium">@style/TextAppearance.Material3.DisplayMedium</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.Material3.DisplaySmall</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.Material3.HeadlineLarge</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Material3.HeadlineMedium</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Material3.HeadlineSmall</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Material3.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Material3.TitleMedium</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.Material3.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.Material3.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.Material3.BodyMedium</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.Material3.BodySmall</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.Material3.LabelLarge</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.Material3.LabelMedium</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.Material3.LabelSmall</item>
+        <item name="textAppearanceHeadline1">@style/TextAppearance.MaterialComponents.Headline1</item>
+        <item name="textAppearanceHeadline2">@style/TextAppearance.MaterialComponents.Headline2</item>
+        <item name="textAppearanceHeadline3">@style/TextAppearance.MaterialComponents.Headline3</item>
+        <item name="textAppearanceHeadline4">@style/TextAppearance.MaterialComponents.Headline4</item>
+        <item name="textAppearanceHeadline5">@style/TextAppearance.MaterialComponents.Headline5</item>
+        <item name="textAppearanceHeadline6">@style/TextAppearance.MaterialComponents.Headline6</item>
+        <item name="textAppearanceSubtitle1">@style/TextAppearance.MaterialComponents.Subtitle1</item>
+        <item name="textAppearanceSubtitle2">@style/TextAppearance.MaterialComponents.Subtitle2</item>
+        <item name="textAppearanceBody1">@style/TextAppearance.MaterialComponents.Body1</item>
+        <item name="textAppearanceBody2">@style/TextAppearance.MaterialComponents.Body2</item>
+        <item name="textAppearanceCaption">@style/TextAppearance.MaterialComponents.Caption</item>
+        <item name="textAppearanceButton">@style/TextAppearance.MaterialComponents.Button</item>
+        <item name="textAppearanceOverline">@style/TextAppearance.MaterialComponents.Overline</item>
+        <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.MaterialComponents.Button.OutlinedButton</item>
+        <item name="borderlessButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
+        <item name="materialIconButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
+        <item name="materialCardViewStyle">@style/Widget.MaterialComponents.CardView</item>
+        <item name="floatingActionButtonStyle">@style/Widget.MaterialComponents.FloatingActionButton</item>
+        <item name="extendedFloatingActionButtonStyle">@style/Widget.MaterialComponents.ExtendedFloatingActionButton.Icon</item>
+        <item name="textInputStyle">@style/Widget.MaterialComponents.TextInputLayout.FilledBox</item>
+        <item name="textInputOutlinedStyle">@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox</item>
+        <item name="textInputFilledStyle">@style/Widget.MaterialComponents.TextInputLayout.FilledBox</item>
+        <item name="chipStyle">@style/Widget.MaterialComponents.Chip.Action</item>
+        <item name="chipStandaloneStyle">@style/Widget.MaterialComponents.Chip.Entry</item>
+        <item name="chipGroupStyle">@style/Widget.MaterialComponents.ChipGroup</item>
+        <item name="bottomNavigationStyle">@style/Widget.MaterialComponents.BottomNavigationView</item>
+        <item name="tabStyle">@style/Widget.MaterialComponents.TabLayout</item>
+        <item name="toolbarStyle">@style/Widget.MaterialComponents.Toolbar</item>
+        <item name="snackbarStyle">@style/Widget.MaterialComponents.Snackbar</item>
+        <item name="snackbarButtonStyle">@style/Widget.MaterialComponents.Button.TextButton.Snackbar</item>
+        <item name="snackbarTextViewStyle">@style/Widget.MaterialComponents.Snackbar.TextView</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.MaterialComponents.MaterialAlertDialog</item>
+        <item name="switchStyle">@style/Widget.MaterialComponents.CompoundButton.Switch</item>
+        <item name="materialSwitchStyle">@style/Widget.MaterialComponents.CompoundButton.Switch</item>
+        <item name="checkboxStyle">@style/Widget.MaterialComponents.CompoundButton.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.MaterialComponents.CompoundButton.RadioButton</item>
+        <item name="sliderStyle">@style/Widget.MaterialComponents.Slider</item>
+        <item name="linearProgressIndicatorStyle">@style/Widget.MaterialComponents.LinearProgressIndicator</item>
+        <item name="circularProgressIndicatorStyle">@style/Widget.MaterialComponents.CircularProgressIndicator</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.MaterialComponents.BottomSheetDialog</item>
+        <item name="materialDividerStyle">@style/Widget.MaterialComponents.MaterialDivider</item>
+        <item name="appBarLayoutStyle">@style/Widget.MaterialComponents.AppBarLayout.Primary</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.MaterialComponents.SmallComponent</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.MaterialComponents.MediumComponent</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.MaterialComponents.LargeComponent</item>
+        <item name="colorPrimary">@color/design_default_color_primary</item>
+        <item name="colorPrimaryVariant">@color/design_default_color_primary_variant</item>
+        <item name="colorOnPrimary">@color/design_default_color_on_primary</item>
+        <item name="colorSecondary">@color/design_default_color_secondary</item>
+        <item name="colorSecondaryVariant">@color/design_default_color_secondary_variant</item>
+        <item name="colorOnSecondary">@color/design_default_color_on_secondary</item>
+        <item name="colorSurface">@color/design_default_color_surface</item>
+        <item name="colorOnSurface">@color/design_default_color_on_surface</item>
+        <item name="colorError">@color/design_default_color_error</item>
+        <item name="colorOnError">@color/design_default_color_on_error</item>
+        <item name="colorOnBackground">@color/design_default_color_on_background</item>
+        <item name="android:colorBackground">@color/design_default_color_background</item>
+        <item name="colorPrimaryDark">?attr/colorPrimaryVariant</item>
+        <item name="colorAccent">?attr/colorSecondary</item>
+        <item name="colorPrimaryContainer">?attr/colorPrimary</item>
+        <item name="colorOnPrimaryContainer">?attr/colorOnPrimary</item>
+        <item name="colorSecondaryContainer">?attr/colorSecondary</item>
+        <item name="colorOnSecondaryContainer">?attr/colorOnSecondary</item>
+        <item name="colorSurfaceVariant">?attr/colorSurface</item>
+        <item name="colorOnSurfaceVariant">@color/mtrl_on_surface_emphasis_medium</item>
+        <item name="colorOutline">@color/mtrl_outline_light</item>
+        <item name="colorOutlineVariant">@color/mtrl_outline_light</item>
+        <item name="colorSurfaceInverse">@color/design_snackbar_background_color</item>
+        <item name="colorOnSurfaceInverse">@color/design_dark_default_color_on_surface</item>
+        <item name="colorPrimaryInverse">@color/design_dark_default_color_primary</item>
+        <item name="colorSurfaceContainerLowest">?attr/colorSurface</item>
+        <item name="colorSurfaceContainerLow">?attr/colorSurface</item>
+        <item name="colorSurfaceContainer">?attr/colorSurface</item>
+        <item name="colorSurfaceContainerHigh">?attr/colorSurface</item>
+        <item name="colorSurfaceContainerHighest">?attr/colorSurface</item>
+    </style>
+    <style name="Base.Theme.MaterialComponents" parent="Theme.AppCompat">
+        <item name="viewInflaterClass">com.google.android.material.theme.MaterialComponentsViewInflater</item>
+        <item name="isMaterialTheme">true</item>
+        <item name="elevationOverlayEnabled">true</item>
+        <item name="textAppearanceDisplayLarge">@style/TextAppearance.Material3.DisplayLarge</item>
+        <item name="textAppearanceDisplayMedium">@style/TextAppearance.Material3.DisplayMedium</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.Material3.DisplaySmall</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.Material3.HeadlineLarge</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Material3.HeadlineMedium</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Material3.HeadlineSmall</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Material3.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Material3.TitleMedium</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.Material3.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.Material3.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.Material3.BodyMedium</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.Material3.BodySmall</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.Material3.LabelLarge</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.Material3.LabelMedium</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.Material3.LabelSmall</item>
+        <item name="textAppearanceHeadline1">@style/TextAppearance.MaterialComponents.Headline1</item>
+        <item name="textAppearanceHeadline2">@style/TextAppearance.MaterialComponents.Headline2</item>
+        <item name="textAppearanceHeadline3">@style/TextAppearance.MaterialComponents.Headline3</item>
+        <item name="textAppearanceHeadline4">@style/TextAppearance.MaterialComponents.Headline4</item>
+        <item name="textAppearanceHeadline5">@style/TextAppearance.MaterialComponents.Headline5</item>
+        <item name="textAppearanceHeadline6">@style/TextAppearance.MaterialComponents.Headline6</item>
+        <item name="textAppearanceSubtitle1">@style/TextAppearance.MaterialComponents.Subtitle1</item>
+        <item name="textAppearanceSubtitle2">@style/TextAppearance.MaterialComponents.Subtitle2</item>
+        <item name="textAppearanceBody1">@style/TextAppearance.MaterialComponents.Body1</item>
+        <item name="textAppearanceBody2">@style/TextAppearance.MaterialComponents.Body2</item>
+        <item name="textAppearanceCaption">@style/TextAppearance.MaterialComponents.Caption</item>
+        <item name="textAppearanceButton">@style/TextAppearance.MaterialComponents.Button</item>
+        <item name="textAppearanceOverline">@style/TextAppearance.MaterialComponents.Overline</item>
+        <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.MaterialComponents.Button.OutlinedButton</item>
+        <item name="borderlessButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
+        <item name="materialIconButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
+        <item name="materialCardViewStyle">@style/Widget.MaterialComponents.CardView</item>
+        <item name="floatingActionButtonStyle">@style/Widget.MaterialComponents.FloatingActionButton</item>
+        <item name="extendedFloatingActionButtonStyle">@style/Widget.MaterialComponents.ExtendedFloatingActionButton.Icon</item>
+        <item name="textInputStyle">@style/Widget.MaterialComponents.TextInputLayout.FilledBox</item>
+        <item name="textInputOutlinedStyle">@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox</item>
+        <item name="textInputFilledStyle">@style/Widget.MaterialComponents.TextInputLayout.FilledBox</item>
+        <item name="chipStyle">@style/Widget.MaterialComponents.Chip.Action</item>
+        <item name="chipStandaloneStyle">@style/Widget.MaterialComponents.Chip.Entry</item>
+        <item name="chipGroupStyle">@style/Widget.MaterialComponents.ChipGroup</item>
+        <item name="bottomNavigationStyle">@style/Widget.MaterialComponents.BottomNavigationView</item>
+        <item name="tabStyle">@style/Widget.MaterialComponents.TabLayout</item>
+        <item name="toolbarStyle">@style/Widget.MaterialComponents.Toolbar</item>
+        <item name="snackbarStyle">@style/Widget.MaterialComponents.Snackbar</item>
+        <item name="snackbarButtonStyle">@style/Widget.MaterialComponents.Button.TextButton.Snackbar</item>
+        <item name="snackbarTextViewStyle">@style/Widget.MaterialComponents.Snackbar.TextView</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.MaterialComponents.MaterialAlertDialog</item>
+        <item name="switchStyle">@style/Widget.MaterialComponents.CompoundButton.Switch</item>
+        <item name="materialSwitchStyle">@style/Widget.MaterialComponents.CompoundButton.Switch</item>
+        <item name="checkboxStyle">@style/Widget.MaterialComponents.CompoundButton.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.MaterialComponents.CompoundButton.RadioButton</item>
+        <item name="sliderStyle">@style/Widget.MaterialComponents.Slider</item>
+        <item name="linearProgressIndicatorStyle">@style/Widget.MaterialComponents.LinearProgressIndicator</item>
+        <item name="circularProgressIndicatorStyle">@style/Widget.MaterialComponents.CircularProgressIndicator</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.MaterialComponents.BottomSheetDialog</item>
+        <item name="materialDividerStyle">@style/Widget.MaterialComponents.MaterialDivider</item>
+        <item name="appBarLayoutStyle">@style/Widget.MaterialComponents.AppBarLayout.Primary</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.MaterialComponents.SmallComponent</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.MaterialComponents.MediumComponent</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.MaterialComponents.LargeComponent</item>
+        <item name="colorPrimary">@color/design_dark_default_color_primary</item>
+        <item name="colorPrimaryVariant">@color/design_dark_default_color_primary_variant</item>
+        <item name="colorOnPrimary">@color/design_dark_default_color_on_primary</item>
+        <item name="colorSecondary">@color/design_dark_default_color_secondary</item>
+        <item name="colorSecondaryVariant">@color/design_dark_default_color_secondary_variant</item>
+        <item name="colorOnSecondary">@color/design_dark_default_color_on_secondary</item>
+        <item name="colorSurface">@color/design_dark_default_color_surface</item>
+        <item name="colorOnSurface">@color/design_dark_default_color_on_surface</item>
+        <item name="colorError">@color/design_dark_default_color_error</item>
+        <item name="colorOnError">@color/design_dark_default_color_on_error</item>
+        <item name="colorOnBackground">@color/design_dark_default_color_on_background</item>
+        <item name="android:colorBackground">@color/design_dark_default_color_background</item>
+        <item name="colorPrimaryDark">?attr/colorPrimaryVariant</item>
+        <item name="colorAccent">?attr/colorSecondary</item>
+        <item name="colorPrimaryContainer">?attr/colorPrimary</item>
+        <item name="colorOnPrimaryContainer">?attr/colorOnPrimary</item>
+        <item name="colorSecondaryContainer">?attr/colorSecondary</item>
+        <item name="colorOnSecondaryContainer">?attr/colorOnSecondary</item>
+        <item name="colorSurfaceVariant">?attr/colorSurface</item>
+        <item name="colorOnSurfaceVariant">@color/mtrl_dark_on_surface_emphasis_medium</item>
+        <item name="colorOutline">@color/mtrl_outline_light</item>
+        <item name="colorOutlineVariant">@color/mtrl_outline_light</item>
+        <item name="colorSurfaceInverse">@color/design_snackbar_background_color</item>
+        <item name="colorOnSurfaceInverse">@color/design_dark_default_color_on_surface</item>
+        <item name="colorPrimaryInverse">@color/design_dark_default_color_primary</item>
+        <item name="colorSurfaceContainerLowest">?attr/colorSurface</item>
+        <item name="colorSurfaceContainerLow">?attr/colorSurface</item>
+        <item name="colorSurfaceContainer">?attr/colorSurface</item>
+        <item name="colorSurfaceContainerHigh">?attr/colorSurface</item>
+        <item name="colorSurfaceContainerHighest">?attr/colorSurface</item>
+    </style>
+    <style name="Theme.MaterialComponents.Light" parent="Base.Theme.MaterialComponents.Light"/>
+    <style name="Theme.MaterialComponents.Light.DarkActionBar" parent="Theme.MaterialComponents.Light">
+        <item name="actionBarTheme">@style/ThemeOverlay.MaterialComponents.Dark.ActionBar</item>
+    </style>
+    <style name="Theme.MaterialComponents.Light.NoActionBar" parent="Theme.MaterialComponents.Light">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+    <style name="Theme.MaterialComponents.Light.Bridge" parent="Theme.MaterialComponents.Light"/>
+    <style name="Theme.MaterialComponents.Light.DarkActionBar.Bridge" parent="Theme.MaterialComponents.Light.DarkActionBar"/>
+    <style name="Theme.MaterialComponents.Light.NoActionBar.Bridge" parent="Theme.MaterialComponents.Light.NoActionBar"/>
+    <style name="Theme.MaterialComponents.Light.Dialog" parent="Theme.MaterialComponents.Light"/>
+    <style name="Theme.MaterialComponents" parent="Base.Theme.MaterialComponents"/>
+    <style name="Theme.MaterialComponents.NoActionBar" parent="Theme.MaterialComponents">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+    <style name="Theme.MaterialComponents.Bridge" parent="Theme.MaterialComponents"/>
+    <style name="Theme.MaterialComponents.NoActionBar.Bridge" parent="Theme.MaterialComponents.NoActionBar"/>
+    <style name="Theme.MaterialComponents.Dialog" parent="Theme.MaterialComponents"/>
+    <style name="Theme.MaterialComponents.DayNight" parent="Theme.MaterialComponents.Light"/>
+    <style name="Theme.MaterialComponents.DayNight.DarkActionBar" parent="Theme.MaterialComponents.Light.DarkActionBar"/>
+    <style name="Theme.MaterialComponents.DayNight.NoActionBar" parent="Theme.MaterialComponents.Light.NoActionBar"/>
+    <style name="Theme.MaterialComponents.DayNight.Bridge" parent="Theme.MaterialComponents.Light.Bridge"/>
+    <style name="Theme.MaterialComponents.DayNight.DarkActionBar.Bridge" parent="Theme.MaterialComponents.Light.DarkActionBar.Bridge"/>
+    <style name="Theme.MaterialComponents.DayNight.NoActionBar.Bridge" parent="Theme.MaterialComponents.Light.NoActionBar.Bridge"/>
+    <style name="Base.Theme.Material3.Light" parent="Theme.AppCompat.Light">
+        <item name="viewInflaterClass">com.google.android.material.theme.MaterialComponentsViewInflater</item>
+        <item name="isMaterialTheme">true</item>
+        <item name="elevationOverlayEnabled">true</item>
+        <item name="textAppearanceDisplayLarge">@style/TextAppearance.Material3.DisplayLarge</item>
+        <item name="textAppearanceDisplayMedium">@style/TextAppearance.Material3.DisplayMedium</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.Material3.DisplaySmall</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.Material3.HeadlineLarge</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Material3.HeadlineMedium</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Material3.HeadlineSmall</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Material3.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Material3.TitleMedium</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.Material3.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.Material3.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.Material3.BodyMedium</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.Material3.BodySmall</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.Material3.LabelLarge</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.Material3.LabelMedium</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.Material3.LabelSmall</item>
+        <item name="textAppearanceHeadline1">@style/TextAppearance.MaterialComponents.Headline1</item>
+        <item name="textAppearanceHeadline2">@style/TextAppearance.MaterialComponents.Headline2</item>
+        <item name="textAppearanceHeadline3">@style/TextAppearance.MaterialComponents.Headline3</item>
+        <item name="textAppearanceHeadline4">@style/TextAppearance.MaterialComponents.Headline4</item>
+        <item name="textAppearanceHeadline5">@style/TextAppearance.MaterialComponents.Headline5</item>
+        <item name="textAppearanceHeadline6">@style/TextAppearance.MaterialComponents.Headline6</item>
+        <item name="textAppearanceSubtitle1">@style/TextAppearance.MaterialComponents.Subtitle1</item>
+        <item name="textAppearanceSubtitle2">@style/TextAppearance.MaterialComponents.Subtitle2</item>
+        <item name="textAppearanceBody1">@style/TextAppearance.MaterialComponents.Body1</item>
+        <item name="textAppearanceBody2">@style/TextAppearance.MaterialComponents.Body2</item>
+        <item name="textAppearanceCaption">@style/TextAppearance.MaterialComponents.Caption</item>
+        <item name="textAppearanceButton">@style/TextAppearance.MaterialComponents.Button</item>
+        <item name="textAppearanceOverline">@style/TextAppearance.MaterialComponents.Overline</item>
+        <item name="isMaterial3Theme">true</item>
+        <item name="materialButtonStyle">@style/Widget.Material3.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.Material3.Button.OutlinedButton</item>
+        <item name="borderlessButtonStyle">@style/Widget.Material3.Button.TextButton</item>
+        <item name="materialIconButtonStyle">@style/Widget.Material3.Button.IconButton</item>
+        <item name="materialCardViewStyle">@style/Widget.Material3.CardView.Elevated</item>
+        <item name="floatingActionButtonStyle">@style/Widget.Material3.FloatingActionButton.Primary</item>
+        <item name="extendedFloatingActionButtonStyle">@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Primary</item>
+        <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+        <item name="textInputOutlinedStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+        <item name="textInputFilledStyle">@style/Widget.Material3.TextInputLayout.FilledBox</item>
+        <item name="chipStyle">@style/Widget.Material3.Chip.Assist</item>
+        <item name="chipStandaloneStyle">@style/Widget.Material3.Chip.Input</item>
+        <item name="chipGroupStyle">@style/Widget.Material3.ChipGroup</item>
+        <item name="bottomNavigationStyle">@style/Widget.Material3.BottomNavigationView</item>
+        <item name="tabStyle">@style/Widget.Material3.TabLayout</item>
+        <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
+        <item name="snackbarStyle">@style/Widget.Material3.Snackbar</item>
+        <item name="snackbarButtonStyle">@style/Widget.Material3.Button.TextButton.Snackbar</item>
+        <item name="snackbarTextViewStyle">@style/Widget.Material3.Snackbar.TextView</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Material3.MaterialAlertDialog</item>
+        <item name="materialSwitchStyle">@style/Widget.Material3.CompoundButton.MaterialSwitch</item>
+        <item name="checkboxStyle">@style/Widget.Material3.CompoundButton.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.Material3.CompoundButton.RadioButton</item>
+        <item name="sliderStyle">@style/Widget.Material3.Slider</item>
+        <item name="linearProgressIndicatorStyle">@style/Widget.Material3.LinearProgressIndicator</item>
+        <item name="circularProgressIndicatorStyle">@style/Widget.Material3.CircularProgressIndicator</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.Material3.BottomSheetDialog</item>
+        <item name="materialDividerStyle">@style/Widget.Material3.MaterialDivider</item>
+        <item name="appBarLayoutStyle">@style/Widget.Material3.AppBarLayout</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Material3.SmallComponent</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Material3.MediumComponent</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Material3.LargeComponent</item>
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.Material3.Corner.ExtraSmall</item>
+        <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.Material3.Corner.Small</item>
+        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.Material3.Corner.Medium</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.Material3.Corner.Large</item>
+        <item name="shapeAppearanceCornerExtraLarge">@style/ShapeAppearance.Material3.Corner.ExtraLarge</item>
+        <item name="colorControlNormal">?attr/colorOnSurfaceVariant</item>
+        <item name="colorControlActivated">?attr/colorPrimary</item>
+        <item name="colorAccent">?attr/colorPrimary</item>
+        <item name="colorPrimaryDark">?attr/colorSurface</item>
+        <item name="colorBackgroundFloating">?attr/colorSurfaceContainerHigh</item>
+        <item name="android:colorBackground">?attr/colorSurface</item>
+        <item name="android:windowBackground">?attr/colorSurface</item>
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="colorPrimary">@color/m3_sys_color_light_primary</item>
+        <item name="colorOnPrimary">@color/m3_sys_color_light_on_primary</item>
+        <item name="colorPrimaryContainer">@color/m3_sys_color_light_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/m3_sys_color_light_on_primary_container</item>
+        <item name="colorPrimaryInverse">@color/m3_sys_color_light_inverse_primary</item>
+        <item name="colorSecondary">@color/m3_sys_color_light_secondary</item>
+        <item name="colorOnSecondary">@color/m3_sys_color_light_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/m3_sys_color_light_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/m3_sys_color_light_on_secondary_container</item>
+        <item name="colorTertiary">@color/m3_sys_color_light_tertiary</item>
+        <item name="colorOnTertiary">@color/m3_sys_color_light_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/m3_sys_color_light_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/m3_sys_color_light_on_tertiary_container</item>
+        <item name="colorError">@color/m3_sys_color_light_error</item>
+        <item name="colorOnError">@color/m3_sys_color_light_on_error</item>
+        <item name="colorErrorContainer">@color/m3_sys_color_light_error_container</item>
+        <item name="colorOnErrorContainer">@color/m3_sys_color_light_on_error_container</item>
+        <item name="colorOnBackground">@color/m3_sys_color_light_on_background</item>
+        <item name="colorSurface">@color/m3_sys_color_light_surface</item>
+        <item name="colorOnSurface">@color/m3_sys_color_light_on_surface</item>
+        <item name="colorSurfaceVariant">@color/m3_sys_color_light_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/m3_sys_color_light_on_surface_variant</item>
+        <item name="colorSurfaceInverse">@color/m3_sys_color_light_inverse_surface</item>
+        <item name="colorOnSurfaceInverse">@color/m3_sys_color_light_inverse_on_surface</item>
+        <item name="colorOutline">@color/m3_sys_color_light_outline</item>
+        <item name="colorOutlineVariant">@color/m3_sys_color_light_outline_variant</item>
+        <item name="colorSurfaceContainerLowest">@color/m3_sys_color_light_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/m3_sys_color_light_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/m3_sys_color_light_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/m3_sys_color_light_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/m3_sys_color_light_surface_container_highest</item>
+        <item name="colorPrimaryVariant">?attr/colorPrimaryContainer</item>
+        <item name="colorSecondaryVariant">?attr/colorSecondaryContainer</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="isLightTheme">true</item>
+    </style>
+    <style name="Base.Theme.Material3.Dark" parent="Theme.AppCompat">
+        <item name="viewInflaterClass">com.google.android.material.theme.MaterialComponentsViewInflater</item>
+        <item name="isMaterialTheme">true</item>
+        <item name="elevationOverlayEnabled">true</item>
+        <item name="textAppearanceDisplayLarge">@style/TextAppearance.Material3.DisplayLarge</item>
+        <item name="textAppearanceDisplayMedium">@style/TextAppearance.Material3.DisplayMedium</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.Material3.DisplaySmall</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.Material3.HeadlineLarge</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Material3.HeadlineMedium</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Material3.HeadlineSmall</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Material3.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Material3.TitleMedium</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.Material3.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.Material3.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.Material3.BodyMedium</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.Material3.BodySmall</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.Material3.LabelLarge</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.Material3.LabelMedium</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.Material3.LabelSmall</item>
+        <item name="textAppearanceHeadline1">@style/TextAppearance.MaterialComponents.Headline1</item>
+        <item name="textAppearanceHeadline2">@style/TextAppearance.MaterialComponents.Headline2</item>
+        <item name="textAppearanceHeadline3">@style/TextAppearance.MaterialComponents.Headline3</item>
+        <item name="textAppearanceHeadline4">@style/TextAppearance.MaterialComponents.Headline4</item>
+        <item name="textAppearanceHeadline5">@style/TextAppearance.MaterialComponents.Headline5</item>
+        <item name="textAppearanceHeadline6">@style/TextAppearance.MaterialComponents.Headline6</item>
+        <item name="textAppearanceSubtitle1">@style/TextAppearance.MaterialComponents.Subtitle1</item>
+        <item name="textAppearanceSubtitle2">@style/TextAppearance.MaterialComponents.Subtitle2</item>
+        <item name="textAppearanceBody1">@style/TextAppearance.MaterialComponents.Body1</item>
+        <item name="textAppearanceBody2">@style/TextAppearance.MaterialComponents.Body2</item>
+        <item name="textAppearanceCaption">@style/TextAppearance.MaterialComponents.Caption</item>
+        <item name="textAppearanceButton">@style/TextAppearance.MaterialComponents.Button</item>
+        <item name="textAppearanceOverline">@style/TextAppearance.MaterialComponents.Overline</item>
+        <item name="isMaterial3Theme">true</item>
+        <item name="materialButtonStyle">@style/Widget.Material3.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.Material3.Button.OutlinedButton</item>
+        <item name="borderlessButtonStyle">@style/Widget.Material3.Button.TextButton</item>
+        <item name="materialIconButtonStyle">@style/Widget.Material3.Button.IconButton</item>
+        <item name="materialCardViewStyle">@style/Widget.Material3.CardView.Elevated</item>
+        <item name="floatingActionButtonStyle">@style/Widget.Material3.FloatingActionButton.Primary</item>
+        <item name="extendedFloatingActionButtonStyle">@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Primary</item>
+        <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+        <item name="textInputOutlinedStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+        <item name="textInputFilledStyle">@style/Widget.Material3.TextInputLayout.FilledBox</item>
+        <item name="chipStyle">@style/Widget.Material3.Chip.Assist</item>
+        <item name="chipStandaloneStyle">@style/Widget.Material3.Chip.Input</item>
+        <item name="chipGroupStyle">@style/Widget.Material3.ChipGroup</item>
+        <item name="bottomNavigationStyle">@style/Widget.Material3.BottomNavigationView</item>
+        <item name="tabStyle">@style/Widget.Material3.TabLayout</item>
+        <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
+        <item name="snackbarStyle">@style/Widget.Material3.Snackbar</item>
+        <item name="snackbarButtonStyle">@style/Widget.Material3.Button.TextButton.Snackbar</item>
+        <item name="snackbarTextViewStyle">@style/Widget.Material3.Snackbar.TextView</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Material3.MaterialAlertDialog</item>
+        <item name="materialSwitchStyle">@style/Widget.Material3.CompoundButton.MaterialSwitch</item>
+        <item name="checkboxStyle">@style/Widget.Material3.CompoundButton.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.Material3.CompoundButton.RadioButton</item>
+        <item name="sliderStyle">@style/Widget.Material3.Slider</item>
+        <item name="linearProgressIndicatorStyle">@style/Widget.Material3.LinearProgressIndicator</item>
+        <item name="circularProgressIndicatorStyle">@style/Widget.Material3.CircularProgressIndicator</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.Material3.BottomSheetDialog</item>
+        <item name="materialDividerStyle">@style/Widget.Material3.MaterialDivider</item>
+        <item name="appBarLayoutStyle">@style/Widget.Material3.AppBarLayout</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Material3.SmallComponent</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Material3.MediumComponent</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Material3.LargeComponent</item>
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.Material3.Corner.ExtraSmall</item>
+        <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.Material3.Corner.Small</item>
+        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.Material3.Corner.Medium</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.Material3.Corner.Large</item>
+        <item name="shapeAppearanceCornerExtraLarge">@style/ShapeAppearance.Material3.Corner.ExtraLarge</item>
+        <item name="colorControlNormal">?attr/colorOnSurfaceVariant</item>
+        <item name="colorControlActivated">?attr/colorPrimary</item>
+        <item name="colorAccent">?attr/colorPrimary</item>
+        <item name="colorPrimaryDark">?attr/colorSurface</item>
+        <item name="colorBackgroundFloating">?attr/colorSurfaceContainerHigh</item>
+        <item name="android:colorBackground">?attr/colorSurface</item>
+        <item name="android:windowBackground">?attr/colorSurface</item>
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="colorPrimary">@color/m3_sys_color_dark_primary</item>
+        <item name="colorOnPrimary">@color/m3_sys_color_dark_on_primary</item>
+        <item name="colorPrimaryContainer">@color/m3_sys_color_dark_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/m3_sys_color_dark_on_primary_container</item>
+        <item name="colorPrimaryInverse">@color/m3_sys_color_dark_inverse_primary</item>
+        <item name="colorSecondary">@color/m3_sys_color_dark_secondary</item>
+        <item name="colorOnSecondary">@color/m3_sys_color_dark_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/m3_sys_color_dark_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/m3_sys_color_dark_on_secondary_container</item>
+        <item name="colorTertiary">@color/m3_sys_color_dark_tertiary</item>
+        <item name="colorOnTertiary">@color/m3_sys_color_dark_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/m3_sys_color_dark_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/m3_sys_color_dark_on_tertiary_container</item>
+        <item name="colorError">@color/m3_sys_color_dark_error</item>
+        <item name="colorOnError">@color/m3_sys_color_dark_on_error</item>
+        <item name="colorErrorContainer">@color/m3_sys_color_dark_error_container</item>
+        <item name="colorOnErrorContainer">@color/m3_sys_color_dark_on_error_container</item>
+        <item name="colorOnBackground">@color/m3_sys_color_dark_on_background</item>
+        <item name="colorSurface">@color/m3_sys_color_dark_surface</item>
+        <item name="colorOnSurface">@color/m3_sys_color_dark_on_surface</item>
+        <item name="colorSurfaceVariant">@color/m3_sys_color_dark_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/m3_sys_color_dark_on_surface_variant</item>
+        <item name="colorSurfaceInverse">@color/m3_sys_color_dark_inverse_surface</item>
+        <item name="colorOnSurfaceInverse">@color/m3_sys_color_dark_inverse_on_surface</item>
+        <item name="colorOutline">@color/m3_sys_color_dark_outline</item>
+        <item name="colorOutlineVariant">@color/m3_sys_color_dark_outline_variant</item>
+        <item name="colorSurfaceContainerLowest">@color/m3_sys_color_dark_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/m3_sys_color_dark_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/m3_sys_color_dark_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/m3_sys_color_dark_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/m3_sys_color_dark_surface_container_highest</item>
+        <item name="colorPrimaryVariant">?attr/colorPrimaryContainer</item>
+        <item name="colorSecondaryVariant">?attr/colorSecondaryContainer</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="isLightTheme">false</item>
+    </style>
+    <style name="Theme.Material3.Light" parent="Base.Theme.Material3.Light"/>
+    <style name="Theme.Material3.Light.NoActionBar" parent="Theme.Material3.Light">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+    <style name="Theme.Material3.Light.Dialog" parent="Theme.Material3.Light"/>
+    <style name="Theme.Material3.Dark" parent="Base.Theme.Material3.Dark"/>
+    <style name="Theme.Material3.Dark.NoActionBar" parent="Theme.Material3.Dark">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+    <style name="Theme.Material3.Dark.Dialog" parent="Theme.Material3.Dark"/>
+    <style name="Theme.Material3.DayNight" parent="Theme.Material3.Light"/>
+    <style name="Theme.Material3.DayNight.NoActionBar" parent="Theme.Material3.Light.NoActionBar"/>
+    <style name="Theme.Material3.DayNight.Dialog" parent="Theme.Material3.Light.Dialog"/>
+    <style name="Theme.Material3.DynamicColors.Light" parent="Theme.Material3.Light"/>
+    <style name="Theme.Material3.DynamicColors.Light.NoActionBar" parent="Theme.Material3.Light.NoActionBar"/>
+    <style name="Theme.Material3.DynamicColors.Dark" parent="Theme.Material3.Dark"/>
+    <style name="Theme.Material3.DynamicColors.Dark.NoActionBar" parent="Theme.Material3.Dark.NoActionBar"/>
+    <style name="Theme.Material3.DynamicColors.DayNight" parent="Theme.Material3.DayNight"/>
+    <style name="Theme.Material3.DynamicColors.DayNight.NoActionBar" parent="Theme.Material3.DayNight.NoActionBar"/>
+    <style name="ThemeOverlay.MaterialComponents"/>
+    <style name="ThemeOverlay.MaterialComponents.Dark.ActionBar" parent="ThemeOverlay.AppCompat.Dark.ActionBar"/>
+    <style name="ThemeOverlay.MaterialComponents.Light" parent="ThemeOverlay.AppCompat.Light"/>
+    <style name="ThemeOverlay.MaterialComponents.Dark" parent="ThemeOverlay.AppCompat.Dark"/>
+    <style name="ThemeOverlay.MaterialComponents.Toolbar.Primary">
+        <item name="colorControlNormal">?attr/colorOnPrimary</item>
+        <item name="android:textColorPrimary">?attr/colorOnPrimary</item>
+        <item name="android:colorControlNormal">?attr/colorOnPrimary</item>
+    </style>
+    <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="android:colorAccent">?attr/colorPrimary</item>
+        <item name="android:colorBackground">?attr/colorSurface</item>
+    </style>
+    <style name="ThemeOverlay.MaterialComponents.Dialog.Alert">
+        <item name="android:colorAccent">?attr/colorPrimary</item>
+    </style>
+    <style name="ThemeOverlay.MaterialComponents.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.MaterialComponents.BottomSheet.Modal</item>
+    </style>
+    <style name="ThemeOverlay.Material3"/>
+    <style name="ThemeOverlay.Material3.Light" parent="ThemeOverlay.AppCompat.Light"/>
+    <style name="ThemeOverlay.Material3.Dark" parent="ThemeOverlay.AppCompat.Dark"/>
+    <style name="ThemeOverlay.Material3.Dark.ActionBar" parent="ThemeOverlay.AppCompat.Dark.ActionBar"/>
+    <style name="ThemeOverlay.Material3.ActionBar" parent="ThemeOverlay.AppCompat.ActionBar">
+        <item name="colorControlNormal">?attr/colorOnSurface</item>
+        <item name="android:colorControlNormal">?attr/colorOnSurface</item>
+    </style>
+    <style name="ThemeOverlay.Material3.Toolbar.Surface">
+        <item name="colorControlNormal">?attr/colorOnSurfaceVariant</item>
+        <item name="android:colorControlNormal">?attr/colorOnSurfaceVariant</item>
+    </style>
+    <style name="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:colorAccent">?attr/colorPrimary</item>
+        <item name="android:colorBackground">?attr/colorSurfaceContainerHigh</item>
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="dialogCornerRadius">@dimen/m3_dialog_corner</item>
+    </style>
+    <style name="ThemeOverlay.Material3.Dialog.Alert">
+        <item name="android:colorAccent">?attr/colorPrimary</item>
+        <item name="android:colorBackground">?attr/colorSurfaceContainerHigh</item>
+    </style>
+    <style name="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.Material3.BottomSheet.Modal</item>
+    </style>
+</resources>

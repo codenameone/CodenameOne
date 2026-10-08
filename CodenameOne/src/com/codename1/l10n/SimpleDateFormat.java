@@ -971,32 +971,28 @@ public class SimpleDateFormat extends DateFormat {
                 return readNumber(source, ofs, token, adjacent);
             }
         }
-        int i = findEndText(source, ofs);
-        if (i == -1) {
-            i = source.length();
-        }
-        String fragment = readSubstring(source, ofs, i);
-        if (fragment == null) {
-            return null;
-        }
+        // Match the symbols themselves: localized names can contain accents,
+        // punctuation, spaces, or non-Latin characters. Prefer the longest
+        // match when an abbreviation is a prefix of the full month name.
         DateFormatSymbols ds = getDateFormatSymbols();
-        for (String month : ds.getMonths()) {
-            if (fragment.equalsIgnoreCase(month)) {
-                return readSubstring(source, ofs, ofs + month.length());
+        String best = null;
+        String[][] names = {ds.getMonths(), ds.getShortMonths(), DateFormatSymbols.MONTHS};
+        for (String[] group : names) {
+            for (String month : group) {
+                if (month != null && month.length() > 0
+                        && (best == null || month.length() > best.length())
+                        && source.regionMatches(true, ofs, month, 0, month.length())) {
+                    best = month;
+                }
             }
         }
-        for (String month : ds.getShortMonths()) {
-            if (fragment.equalsIgnoreCase(month)) {
-                return readSubstring(source, ofs, ofs + month.length());
+        for (String month : DateFormatSymbols.MONTHS) {
+            if ((best == null || best.length() < 3)
+                    && source.regionMatches(true, ofs, month, 0, 3)) {
+                best = month.substring(0, 3);
             }
         }
-        if (ds.isLocalized()) {
-            ds.setLocalized(false);
-            String s = readMonth(source, ofs, token, adjacent);
-            ds.setLocalized(true);
-            return s;
-        }
-        return null;
+        return best == null ? null : readSubstring(source, ofs, ofs + best.length());
     }
 
     /// Parse a month value to an offset from Calendar.JANUARY. The source month
@@ -1025,7 +1021,7 @@ public class SimpleDateFormat extends DateFormat {
         if (month == null) {
             return throwInvalid("month", offset);
         }
-        if (month.length() < 3) {
+        if (month.length() < 3 && month.length() > 0 && isNumeric(month.charAt(0))) {
             return (parseNumber(month, offset, "month", 1, 12) - 1) + Calendar.JANUARY;
         }
         DateFormatSymbols ds = getDateFormatSymbols();
@@ -1043,17 +1039,15 @@ public class SimpleDateFormat extends DateFormat {
                 return i + Calendar.JANUARY;
             }
         }
-        if (ds.isLocalized()) {
-            ds.setLocalized(false);
-            int i = 0;
-            try {
-                i = parseMonth(month, offset);
-            } finally {
-                ds.setLocalized(true);
+        // The English names are always accepted, long or abbreviated, whatever
+        // the platform's language. This used to switch the shared symbols to
+        // unlocalized and retry, which the symbols' cached short names ignored.
+        String[] english = DateFormatSymbols.MONTHS;
+        for (int i = 0; i < english.length; i++) {
+            if (month.equalsIgnoreCase(english[i]) || month.equalsIgnoreCase(english[i].substring(0, 3))) {
+                return i + Calendar.JANUARY;
             }
-            return i;
         }
-
         return throwInvalid("month", offset);
     }
 

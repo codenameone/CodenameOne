@@ -7812,7 +7812,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return null;
         }
         if (invoke.getOpcode() == Opcodes.INVOKESTATIC) {
-            ByteCodeClass ownerClass = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            ByteCodeClass ownerClass = Parser.getClassObject(owner.replace('/', '_').replace('$', '_').replace('-', '_'));
             String resolvedOwner = findActualStaticOwner(ownerClass, invoke.getName(), invoke.getDesc());
             return resolvedOwner != null ? resolvedOwner : owner;
         }

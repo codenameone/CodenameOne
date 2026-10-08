@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppCompat's themes. Each sets AppCompat's attributes and the framework
+     attributes of the same meaning (android:colorAccent from colorAccent and
+     so on), so framework widgets in an AppCompat application follow its
+     colors. windowActionBar and windowNoTitle are set in both namespaces: the
+     runtime shows the action bar from the framework pair. DayNight follows the
+     device's dark mode through values-night. -->
+<resources>
+    <style name="Base.Theme.AppCompat" parent="android:Theme.Material">
+        <item name="isLightTheme">false</item>
+        <item name="colorPrimary">@color/primary_material_dark</item>
+        <item name="colorPrimaryDark">@color/primary_dark_material_dark</item>
+        <item name="colorAccent">@color/accent_material_dark</item>
+        <item name="colorControlNormal">?android:attr/textColorSecondary</item>
+        <item name="colorControlActivated">?attr/colorAccent</item>
+        <item name="colorControlHighlight">@color/ripple_material_dark</item>
+        <item name="colorButtonNormal">@color/button_material_dark</item>
+        <item name="colorSwitchThumbNormal">@color/switch_thumb_normal_material_dark</item>
+        <item name="colorError">@color/error_color_material_dark</item>
+        <item name="colorBackgroundFloating">@color/background_floating_material_dark</item>
+        <item name="android:colorBackground">@color/background_material_dark</item>
+        <item name="windowActionBar">true</item>
+        <item name="windowNoTitle">false</item>
+        <item name="android:windowActionBar">true</item>
+        <item name="android:windowNoTitle">false</item>
+        <item name="actionBarSize">@dimen/abc_action_bar_default_height_material</item>
+        <item name="actionBarStyle">@style/Widget.AppCompat.ActionBar.Solid</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.AppCompat.ActionBar</item>
+        <item name="actionBarItemBackground">?attr/selectableItemBackgroundBorderless</item>
+        <item name="actionOverflowButtonStyle">@style/Widget.AppCompat.ActionButton.Overflow</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.AppCompat.PopupMenu.Overflow</item>
+        <item name="actionButtonStyle">@style/Widget.AppCompat.ActionButton</item>
+        <item name="toolbarStyle">@style/Widget.AppCompat.Toolbar</item>
+        <item name="toolbarNavigationButtonStyle">@style/Widget.AppCompat.Toolbar.Button.Navigation</item>
+        <item name="homeAsUpIndicator">@drawable/abc_ic_ab_back_material</item>
+        <item name="popupMenuStyle">@style/Widget.AppCompat.PopupMenu</item>
+        <item name="listPopupWindowStyle">@style/Widget.AppCompat.ListPopupWindow</item>
+        <item name="dropDownListViewStyle">@style/Widget.AppCompat.ListView</item>
+        <item name="textAppearanceLargePopupMenu">@style/TextAppearance.AppCompat.Widget.PopupMenu.Large</item>
+        <item name="textAppearanceSmallPopupMenu">@style/TextAppearance.AppCompat.Widget.PopupMenu.Small</item>
+        <item name="textAppearanceListItem">@style/TextAppearance.AppCompat.Subhead</item>
+        <item name="textAppearanceListItemSmall">@style/TextAppearance.AppCompat.Subhead</item>
+        <item name="listPreferredItemHeight">@dimen/abc_list_item_height_material</item>
+        <item name="listPreferredItemHeightSmall">@dimen/abc_list_item_height_small_material</item>
+        <item name="listPreferredItemHeightLarge">@dimen/abc_list_item_height_large_material</item>
+        <item name="listPreferredItemPaddingLeft">@dimen/abc_list_item_padding_horizontal_material</item>
+        <item name="listPreferredItemPaddingRight">@dimen/abc_list_item_padding_horizontal_material</item>
+        <item name="listPreferredItemPaddingStart">@dimen/abc_list_item_padding_horizontal_material</item>
+        <item name="listPreferredItemPaddingEnd">@dimen/abc_list_item_padding_horizontal_material</item>
+        <item name="selectableItemBackground">?android:attr/selectableItemBackground</item>
+        <item name="selectableItemBackgroundBorderless">?android:attr/selectableItemBackgroundBorderless</item>
+        <item name="controlBackground">?attr/selectableItemBackgroundBorderless</item>
+        <item name="editTextStyle">@style/Widget.AppCompat.EditText</item>
+        <item name="editTextColor">?android:attr/textColorPrimary</item>
+        <item name="buttonStyle">@style/Widget.AppCompat.Button</item>
+        <item name="buttonStyleSmall">@style/Widget.AppCompat.Button.Small</item>
+        <item name="borderlessButtonStyle">@style/Widget.AppCompat.Button.Borderless</item>
+        <item name="imageButtonStyle">@style/Widget.AppCompat.ImageButton</item>
+        <item name="checkboxStyle">@style/Widget.AppCompat.CompoundButton.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.AppCompat.CompoundButton.RadioButton</item>
+        <item name="switchStyle">@style/Widget.AppCompat.CompoundButton.Switch</item>
+        <item name="seekBarStyle">@style/Widget.AppCompat.SeekBar</item>
+        <item name="ratingBarStyle">@style/Widget.AppCompat.RatingBar</item>
+        <item name="ratingBarStyleIndicator">@style/Widget.AppCompat.RatingBar.Indicator</item>
+        <item name="ratingBarStyleSmall">@style/Widget.AppCompat.RatingBar.Small</item>
+        <item name="spinnerStyle">@style/Widget.AppCompat.Spinner</item>
+        <item name="autoCompleteTextViewStyle">@style/Widget.AppCompat.AutoCompleteTextView</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.AppCompat.Dialog.Alert</item>
+        <item name="dialogTheme">@style/ThemeOverlay.AppCompat.Dialog</item>
+        <item name="dialogPreferredPadding">@dimen/abc_dialog_padding_material</item>
+        <item name="dialogCornerRadius">@dimen/abc_control_corner_material</item>
+        <item name="android:colorPrimary">?attr/colorPrimary</item>
+        <item name="android:colorPrimaryDark">?attr/colorPrimaryDark</item>
+        <item name="android:colorAccent">?attr/colorAccent</item>
+        <item name="android:colorControlNormal">?attr/colorControlNormal</item>
+        <item name="android:colorControlActivated">?attr/colorControlActivated</item>
+        <item name="android:colorControlHighlight">?attr/colorControlHighlight</item>
+        <item name="android:colorButtonNormal">?attr/colorButtonNormal</item>
+        <item name="android:colorError">?attr/colorError</item>
+        <item name="android:colorBackgroundFloating">?attr/colorBackgroundFloating</item>
+        <item name="android:statusBarColor">?attr/colorPrimaryDark</item>
+    </style>
+    <style name="Base.Theme.AppCompat.Light" parent="android:Theme.Material.Light">
+        <item name="isLightTheme">true</item>
+        <item name="colorPrimary">@color/primary_material_light</item>
+        <item name="colorPrimaryDark">@color/primary_dark_material_light</item>
+        <item name="colorAccent">@color/accent_material_light</item>
+        <item name="colorControlNormal">?android:attr/textColorSecondary</item>
+        <item name="colorControlActivated">?attr/colorAccent</item>
+        <item name="colorControlHighlight">@color/ripple_material_light</item>
+        <item name="colorButtonNormal">@color/button_material_light</item>
+        <item name="colorSwitchThumbNormal">@color/switch_thumb_normal_material_light</item>
+        <item name="colorError">@color/error_color_material_light</item>
+        <item name="colorBackgroundFloating">@color/background_floating_material_light</item>
+        <item name="android:colorBackground">@color/background_material_light</item>
+        <item name="windowActionBar">true</item>
+        <item name="windowNoTitle">false</item>
+        <item name="android:windowActionBar">true</item>
+        <item name="android:windowNoTitle">false</item>
+        <item name="actionBarSize">@dimen/abc_action_bar_default_height_material</item>
+        <item name="actionBarStyle">@style/Widget.AppCompat.Light.ActionBar.Solid</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.AppCompat.ActionBar</item>
+        <item name="actionBarItemBackground">?attr/selectableItemBackgroundBorderless</item>
+        <item name="actionOverflowButtonStyle">@style/Widget.AppCompat.ActionButton.Overflow</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.AppCompat.Light.PopupMenu.Overflow</item>
+        <item name="actionButtonStyle">@style/Widget.AppCompat.ActionButton</item>
+        <item name="toolbarStyle">@style/Widget.AppCompat.Toolbar</item>
+        <item name="toolbarNavigationButtonStyle">@style/Widget.AppCompat.Toolbar.Button.Navigation</item>
+        <item name="homeAsUpIndicator">@drawable/abc_ic_ab_back_material</item>
+        <item name="popupMenuStyle">@style/Widget.AppCompat.Light.PopupMenu</item>
+        <item name="listPopupWindowStyle">@style/Widget.AppCompat.ListPopupWindow</item>
+        <item name="dropDownListViewStyle">@style/Widget.AppCompat.ListView</item>
+        <item name="textAppearanceLargePopupMenu">@style/TextAppearance.AppCompat.Widget.PopupMenu.Large</item>
+        <item name="textAppearanceSmallPopupMenu">@style/TextAppearance.AppCompat.Widget.PopupMenu.Small</item>
+        <item name="textAppearanceListItem">@style/TextAppearance.AppCompat.Subhead</item>
+        <item name="textAppearanceListItemSmall">@style/TextAppearance.AppCompat.Subhead</item>
+        <item name="listPreferredItemHeight">@dimen/abc_list_item_height_material</item>
+        <item name="listPreferredItemHeightSmall">@dimen/abc_list_item_height_small_material</item>
+        <item name="listPreferredItemHeightLarge">@dimen/abc_list_item_height_large_material</item>
+        <item name="listPreferredItemPaddingLeft">@dimen/abc_list_item_padding_horizontal_material</item>
+        <item name="listPreferredItemPaddingRight">@dimen/abc_list_item_padding_horizontal_material</item>
+        <item name="listPreferredItemPaddingStart">@dimen/abc_list_item_padding_horizontal_material</item>
+        <item name="listPreferredItemPaddingEnd">@dimen/abc_list_item_padding_horizontal_material</item>
+        <item name="selectableItemBackground">?android:attr/selectableItemBackground</item>
+        <item name="selectableItemBackgroundBorderless">?android:attr/selectableItemBackgroundBorderless</item>
+        <item name="controlBackground">?attr/selectableItemBackgroundBorderless</item>
+        <item name="editTextStyle">@style/Widget.AppCompat.EditText</item>
+        <item name="editTextColor">?android:attr/textColorPrimary</item>
+        <item name="buttonStyle">@style/Widget.AppCompat.Button</item>
+        <item name="buttonStyleSmall">@style/Widget.AppCompat.Button.Small</item>
+        <item name="borderlessButtonStyle">@style/Widget.AppCompat.Button.Borderless</item>
+        <item name="imageButtonStyle">@style/Widget.AppCompat.ImageButton</item>
+        <item name="checkboxStyle">@style/Widget.AppCompat.CompoundButton.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.AppCompat.CompoundButton.RadioButton</item>
+        <item name="switchStyle">@style/Widget.AppCompat.CompoundButton.Switch</item>
+        <item name="seekBarStyle">@style/Widget.AppCompat.SeekBar</item>
+        <item name="ratingBarStyle">@style/Widget.AppCompat.RatingBar</item>
+        <item name="ratingBarStyleIndicator">@style/Widget.AppCompat.RatingBar.Indicator</item>
+        <item name="ratingBarStyleSmall">@style/Widget.AppCompat.RatingBar.Small</item>
+        <item name="spinnerStyle">@style/Widget.AppCompat.Spinner</item>
+        <item name="autoCompleteTextViewStyle">@style/Widget.AppCompat.AutoCompleteTextView</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.AppCompat.Dialog.Alert</item>
+        <item name="dialogTheme">@style/ThemeOverlay.AppCompat.Dialog</item>
+        <item name="dialogPreferredPadding">@dimen/abc_dialog_padding_material</item>
+        <item name="dialogCornerRadius">@dimen/abc_control_corner_material</item>
+        <item name="android:colorPrimary">?attr/colorPrimary</item>
+        <item name="android:colorPrimaryDark">?attr/colorPrimaryDark</item>
+        <item name="android:colorAccent">?attr/colorAccent</item>
+        <item name="android:colorControlNormal">?attr/colorControlNormal</item>
+        <item name="android:colorControlActivated">?attr/colorControlActivated</item>
+        <item name="android:colorControlHighlight">?attr/colorControlHighlight</item>
+        <item name="android:colorButtonNormal">?attr/colorButtonNormal</item>
+        <item name="android:colorError">?attr/colorError</item>
+        <item name="android:colorBackgroundFloating">?attr/colorBackgroundFloating</item>
+        <item name="android:statusBarColor">?attr/colorPrimaryDark</item>
+    </style>
+    <style name="Base.Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">@color/primary_material_dark</item>
+        <item name="colorPrimaryDark">@color/primary_dark_material_dark</item>
+        <item name="actionBarStyle">@style/Widget.AppCompat.ActionBar.Solid</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.AppCompat.Dark.ActionBar</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.AppCompat.Light</item>
+    </style>
+
+    <style name="Theme.AppCompat" parent="Base.Theme.AppCompat"/>
+    <style name="Theme.AppCompat.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+    <style name="Theme.AppCompat.Light" parent="Base.Theme.AppCompat.Light"/>
+    <style name="Theme.AppCompat.Light.DarkActionBar" parent="Base.Theme.AppCompat.Light.DarkActionBar"/>
+    <style name="Theme.AppCompat.Light.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+    <style name="Theme.AppCompat.Dialog"/>
+    <style name="Theme.AppCompat.Dialog.Alert"/>
+    <style name="Theme.AppCompat.Light.Dialog"/>
+    <style name="Theme.AppCompat.Light.Dialog.Alert"/>
+    <style name="Theme.AppCompat.DialogWhenLarge"/>
+    <style name="Theme.AppCompat.Light.DialogWhenLarge"/>
+    <style name="Theme.AppCompat.Empty"/>
+
+    <!-- The light variants; values-night redefines them over Theme.AppCompat. -->
+    <style name="Theme.AppCompat.DayNight" parent="Theme.AppCompat.Light"/>
+    <style name="Theme.AppCompat.DayNight.DarkActionBar" parent="Theme.AppCompat.Light.DarkActionBar"/>
+    <style name="Theme.AppCompat.DayNight.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar"/>
+    <style name="Theme.AppCompat.DayNight.Dialog" parent="Theme.AppCompat.Light.Dialog"/>
+    <style name="Theme.AppCompat.DayNight.Dialog.Alert" parent="Theme.AppCompat.Light.Dialog.Alert"/>
+    <style name="Theme.AppCompat.DayNight.DialogWhenLarge" parent="Theme.AppCompat.Light.DialogWhenLarge"/>
+
+    <style name="ThemeOverlay.AppCompat"/>
+    <style name="ThemeOverlay.AppCompat.Light">
+        <item name="isLightTheme">true</item>
+        <item name="android:colorBackground">@color/background_material_light</item>
+        <item name="android:textColorPrimary">@color/abc_primary_text_material_light</item>
+        <item name="android:textColorSecondary">@color/abc_secondary_text_material_light</item>
+        <item name="android:textColorHint">@color/abc_hint_foreground_material_light</item>
+        <item name="colorControlNormal">?android:attr/textColorSecondary</item>
+        <item name="colorControlHighlight">@color/ripple_material_light</item>
+        <item name="colorButtonNormal">@color/button_material_light</item>
+        <item name="colorBackgroundFloating">@color/background_floating_material_light</item>
+        <item name="android:colorControlNormal">?attr/colorControlNormal</item>
+        <item name="android:colorControlHighlight">?attr/colorControlHighlight</item>
+    </style>
+    <style name="ThemeOverlay.AppCompat.Dark">
+        <item name="isLightTheme">false</item>
+        <item name="android:colorBackground">@color/background_material_dark</item>
+        <item name="android:textColorPrimary">@color/abc_primary_text_material_dark</item>
+        <item name="android:textColorSecondary">@color/abc_secondary_text_material_dark</item>
+        <item name="android:textColorHint">@color/abc_hint_foreground_material_dark</item>
+        <item name="colorControlNormal">?android:attr/textColorSecondary</item>
+        <item name="colorControlHighlight">@color/ripple_material_dark</item>
+        <item name="colorButtonNormal">@color/button_material_dark</item>
+        <item name="colorBackgroundFloating">@color/background_floating_material_dark</item>
+        <item name="android:colorControlNormal">?attr/colorControlNormal</item>
+        <item name="android:colorControlHighlight">?attr/colorControlHighlight</item>
+    </style>
+    <style name="ThemeOverlay.AppCompat.ActionBar">
+        <item name="colorControlNormal">?android:attr/textColorPrimary</item>
+        <item name="android:colorControlNormal">?android:attr/textColorPrimary</item>
+    </style>
+    <style name="ThemeOverlay.AppCompat.Dark.ActionBar">
+        <item name="colorControlNormal">?android:attr/textColorPrimary</item>
+        <item name="android:colorControlNormal">?android:attr/textColorPrimary</item>
+    </style>
+    <style name="ThemeOverlay.AppCompat.Dialog"/>
+    <style name="ThemeOverlay.AppCompat.Dialog.Alert"/>
+    <style name="ThemeOverlay.AppCompat.DayNight" parent="ThemeOverlay.AppCompat.Light"/>
+    <style name="ThemeOverlay.AppCompat.DayNight.ActionBar">
+        <item name="colorControlNormal">?android:attr/textColorPrimary</item>
+        <item name="android:colorControlNormal">?android:attr/textColorPrimary</item>
+    </style>
+</resources>

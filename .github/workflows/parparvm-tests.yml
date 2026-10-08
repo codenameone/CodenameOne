@@ -177,7 +177,8 @@ jobs:
   vm-tests:
     runs-on: ubuntu-24.04
     # The full suite takes about an hour before the bounded GC benchmark arms.
-    # Leave time for both; each benchmark workload retains its own timeout.
+    # Android compatibility and Kotlin translation add time; leave room for
+    # both phases while each GC workload retains its own timeout.
     timeout-minutes: 120
     # The two database engines the backend speaks a wire protocol to.
     #

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Attributes and styleables of the compound buttons (CheckBox, RadioButton,
+  Switch, ToggleButton, CheckedTextView), RadioGroup and the progress family
+  (ProgressBar, SeekBar, RatingBar). Names, formats and values follow AOSP.
+-->
+<resources>
+    <attr name="button" format="reference"/>
+    <attr name="buttonTint" format="color"/>
+    <attr name="textOn" format="string"/>
+    <attr name="textOff" format="string"/>
+    <attr name="showText" format="boolean"/>
+    <attr name="thumb" format="reference"/>
+    <attr name="thumbTint" format="color"/>
+    <attr name="thumbOffset" format="dimension"/>
+    <attr name="track" format="reference"/>
+    <attr name="trackTint" format="color"/>
+    <attr name="splitTrack" format="boolean"/>
+    <attr name="switchMinWidth" format="dimension"/>
+    <attr name="switchPadding" format="dimension"/>
+    <attr name="max" format="integer"/>
+    <attr name="min" format="integer"/>
+    <attr name="progress" format="integer"/>
+    <attr name="secondaryProgress" format="integer"/>
+    <attr name="indeterminate" format="boolean"/>
+    <attr name="indeterminateOnly" format="boolean"/>
+    <attr name="progressTint" format="color"/>
+    <attr name="progressBackgroundTint" format="color"/>
+    <attr name="secondaryProgressTint" format="color"/>
+    <attr name="indeterminateTint" format="color"/>
+    <attr name="progressDrawable" format="reference"/>
+    <attr name="indeterminateDrawable" format="reference"/>
+    <attr name="keyProgressIncrement" format="integer"/>
+    <attr name="numStars" format="integer"/>
+    <attr name="rating" format="float"/>
+    <attr name="stepSize" format="float"/>
+    <attr name="isIndicator" format="boolean"/>
+    <attr name="checkedButton" format="integer"/>
+    <attr name="checkMark" format="reference"/>
+    <attr name="checkMarkTint" format="color"/>
+    <attr name="ratingBarStyle" format="reference"/>
+    <attr name="ratingBarStyleSmall" format="reference"/>
+    <attr name="ratingBarStyleIndicator" format="reference"/>
+    <attr name="buttonStyleToggle" format="reference"/>
+    <attr name="checkedTextViewStyle" format="reference"/>
+    <attr name="progressBarStyleSmall" format="reference"/>
+    <attr name="progressBarStyleLarge" format="reference"/>
+
+    <declare-styleable name="CompoundButton">
+        <attr name="button"/>
+        <attr name="buttonTint"/>
+        <attr name="checked"/>
+    </declare-styleable>
+    <declare-styleable name="RadioGroup">
+        <attr name="checkedButton"/>
+        <attr name="orientation"/>
+    </declare-styleable>
+    <declare-styleable name="Switch">
+        <attr name="thumb"/>
+        <attr name="thumbTint"/>
+        <attr name="track"/>
+        <attr name="trackTint"/>
+        <attr name="textOn"/>
+        <attr name="textOff"/>
+        <attr name="showText"/>
+        <attr name="splitTrack"/>
+        <attr name="switchMinWidth"/>
+        <attr name="switchPadding"/>
+    </declare-styleable>
+    <declare-styleable name="ToggleButton">
+        <attr name="textOn"/>
+        <attr name="textOff"/>
+        <attr name="disabledAlpha"/>
+    </declare-styleable>
+    <declare-styleable name="ProgressBar">
+        <attr name="max"/>
+        <attr name="min"/>
+        <attr name="progress"/>
+        <attr name="secondaryProgress"/>
+        <attr name="indeterminate"/>
+        <attr name="indeterminateOnly"/>
+        <attr name="progressTint"/>
+        <attr name="progressBackgroundTint"/>
+        <attr name="secondaryProgressTint"/>
+        <attr name="indeterminateTint"/>
+        <attr name="progressDrawable"/>
+        <attr name="indeterminateDrawable"/>
+        <attr name="minWidth"/>
+        <attr name="maxWidth"/>
+        <attr name="minHeight"/>
+        <attr name="maxHeight"/>
+    </declare-styleable>
+    <declare-styleable name="AbsSeekBar">
+        <attr name="thumb"/>
+        <attr name="thumbTint"/>
+        <attr name="thumbOffset"/>
+        <attr name="splitTrack"/>
+    </declare-styleable>
+    <declare-styleable name="SeekBar">
+        <attr name="keyProgressIncrement"/>
+    </declare-styleable>
+    <declare-styleable name="RatingBar">
+        <attr name="numStars"/>
+        <attr name="rating"/>
+        <attr name="stepSize"/>
+        <attr name="isIndicator"/>
+    </declare-styleable>
+    <declare-styleable name="CheckedTextView">
+        <attr name="checked"/>
+        <attr name="checkMark"/>
+        <attr name="checkMarkTint"/>
+    </declare-styleable>
+</resources>

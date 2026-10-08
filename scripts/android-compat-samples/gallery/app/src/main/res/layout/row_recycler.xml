@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:padding="12dp" android:background="?android:attr/selectableItemBackground">
+    <ImageView android:id="@+id/rv_star" android:layout_width="24dp" android:layout_height="24dp"
+        android:src="@drawable/ic_star"/>
+    <TextView android:id="@+id/rv_title" android:layout_width="0dp" android:layout_weight="1"
+        android:layout_height="wrap_content" android:layout_marginStart="12dp" android:textSize="16sp"/>
+    <TextView android:id="@+id/rv_remove" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:padding="8dp" android:text="X"
+        android:textColor="#888888" android:textSize="16sp"/>
+</LinearLayout>

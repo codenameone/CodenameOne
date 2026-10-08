@@ -192,7 +192,7 @@ public final class FusedConstructor {
      * fusable shape. {@code owner} is the JVM internal name.
      */
     public static FusedConstructor analyze(String owner, String desc) {
-        ByteCodeClass cls = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+        ByteCodeClass cls = Parser.getClassObject(owner.replace('/', '_').replace('$', '_').replace('-', '_'));
         if (cls == null || !cls.isFused()) {
             return null;
         }
@@ -228,7 +228,7 @@ public final class FusedConstructor {
             if (in instanceof Invoke && in.getOpcode() == Opcodes.INVOKESPECIAL
                     && "<init>".equals(((Invoke) in).getName())) {
                 // a this(...) delegation hides the stores in the delegate -- bail
-                if (((Invoke) in).getOwner().replace('/', '_').replace('$', '_')
+                if (((Invoke) in).getOwner().replace('/', '_').replace('$', '_').replace('-', '_')
                         .equals(ctor.getClsName())) {
                     return null;
                 }
@@ -299,7 +299,7 @@ public final class FusedConstructor {
                         // must match the NEWARRAY element type -- OR be the special
                         // compact-string backing slot (see stringCompactValueMatch).
                         int __at = ((VarOp) body.get(j)).getIndex();
-                        if (f.getOwner().replace('/', '_').replace('$', '_').equals(ctor.getClsName())
+                        if (f.getOwner().replace('/', '_').replace('$', '_').replace('-', '_').equals(ctor.getClsName())
                                 && (descMatchesArrayType(f.getDesc(), __at)
                                     || stringCompactValueMatch(ctor.getClsName(), f, __at))) {
                             if (found.size() >= MAX_CHILDREN) {

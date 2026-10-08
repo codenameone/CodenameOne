@@ -281,4 +281,14 @@
         <Method name="argumentZero" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
+    <!--
+    AndroidProjectImporter.Result is what the import hands back to the build
+    plugin: the Maven goal reads applicationId (to tell the developer how it
+    compares with codename1.packageName), and it lives in another module,
+    which this module's analysis cannot see.
+    -->
+    <Match>
+        <Class name="com.codename1.maven.AndroidProjectImporter$Result" />
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
 </FindBugsFilter>

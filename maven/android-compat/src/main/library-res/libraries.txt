@@ -1,0 +1,12 @@
+# The library resource sets the runtime ships, one Android res directory per
+# library package, highest priority first: a resource two libraries define is
+# taken from the one listed first, as the Android Gradle plugin merges a
+# library over its dependencies. Every set is compiled into one namespace
+# (package 0x7e) that applications see as their own; see LibraryMain.
+com.google.android.material
+androidx.appcompat
+androidx.core
+androidx.constraintlayout.widget
+androidx.cardview
+androidx.recyclerview
+androidx.viewpager2

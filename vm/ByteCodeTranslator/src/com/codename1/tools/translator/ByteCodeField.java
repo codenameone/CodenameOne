@@ -53,7 +53,7 @@ public class ByteCodeField {
         staticField = (access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
         finalField = (access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL;
         volatileField = (access & Opcodes.ACC_VOLATILE) == Opcodes.ACC_VOLATILE;
-        fieldName = name.replace('$', '_');
+        fieldName = name.replace('$', '_').replace('-', '_');
 
         arrayDimensions = 0;
         while(desc.startsWith("[")) {
@@ -66,7 +66,7 @@ public class ByteCodeField {
                 // Object skip until ;
                 int idx = desc.indexOf(';');
                 String objectType = desc.substring(1, idx);
-                objectType = objectType.replace('/', '_').replace('$', '_');
+                objectType = objectType.replace('/', '_').replace('$', '_').replace('-', '_');
                 if(!dependentClasses.contains(objectType)) {
                     dependentClasses.add(objectType);
                 }

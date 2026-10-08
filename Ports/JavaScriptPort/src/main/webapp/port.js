@@ -1560,6 +1560,66 @@ bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_
   return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");
 });
 
+// The JS interop interfaces' static factories have Java bodies that return
+// null ("Native implementation"); the bridge only dispatches instance members,
+// so without a binding here the null IS the answer. JSString.valueOf was
+// unbound, so every LocalForage.setItem(String, String) stored null -- which
+// localStorage reads as a delete -- and FileSystemStorage.mkdir, whose marker
+// is an empty string, never created a directory.
+// scripts/test-javascript-native-stub-bindings.mjs fails on an unbound stub.
+function cn1Typed(ctor, cls, arg) {
+  const value = (typeof arg === "number") ? new ctor(arg | 0) : new ctor(jvm.unwrapJsValue(arg));
+  return jvm.wrapJsObject(value, cls);
+}
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSString_valueOf_java_lang_String_R_com_codename1_html5_js_core_JSString",
+  "cn1_com_codename1_html5_js_core_JSString_valueOf___java_lang_String_R_com_codename1_html5_js_core_JSString"
+], function(str) {
+  return str == null ? null : jvm.toNativeString(str);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf_int_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf___int_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf_double_R_com_codename1_html5_js_core_JSNumber",
+  "cn1_com_codename1_html5_js_core_JSNumber_valueOf___double_R_com_codename1_html5_js_core_JSNumber"
+], function(value) {
+  return Number(value);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_core_JSBoolean_valueOf_boolean_R_com_codename1_html5_js_core_JSBoolean",
+  "cn1_com_codename1_html5_js_core_JSBoolean_valueOf___boolean_R_com_codename1_html5_js_core_JSBoolean"
+], function(value) {
+  return !!value;
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_encodeURIComponent_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_html5_js_browser_Window_encodeURIComponent___java_lang_String_R_java_lang_String"
+], function(value) {
+  return value == null ? null : jvm.wrapJsResult(encodeURIComponent(jvm.toNativeString(value)), "java_lang_String");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create_int_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create___int_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int32Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int32Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int32Array"
+], function(arg) {
+  return cn1Typed(global.Int32Array, "com_codename1_html5_js_typedarrays_Int32Array", arg);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create_int_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create___int_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int16Array",
+  "cn1_com_codename1_html5_js_typedarrays_Int16Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Int16Array"
+], function(arg) {
+  return cn1Typed(global.Int16Array, "com_codename1_html5_js_typedarrays_Int16Array", arg);
+});
+
 bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_html5_js_browser_Window", "cn1_com_codename1_html5_js_browser_Window_current___R_com_codename1_html5_js_browser_Window"], function*() {
   // Cache the main-thread window reference: it never changes for
   // the lifetime of the worker, but ``Window.current()`` on the JS

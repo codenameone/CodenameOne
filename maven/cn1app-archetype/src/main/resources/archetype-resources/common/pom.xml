@@ -93,6 +93,25 @@
         </build>
 
     </profile>
+        <!-- Android compatibility: an Android application's AndroidManifest.xml,
+             res/, assets/ and java/ placed in src/main/android build and run
+             unchanged on every Codename One target. The compile-android-res
+             and remap-android goals below are no-ops without this directory. -->
+        <profile>
+            <id>android-compat</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/android</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-android-compat</artifactId>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+        </profile>
         <!-- A profile to add kotlin support.  Activated if the src/main/kotlin
             directory exists -->
         <profile>
@@ -154,6 +173,14 @@
                         <executions>
                             <execution>
                                 <id>compile</id>
+                                <!-- Ahead of javac, which runs in the compile phase: Java may
+                                     refer to Kotlin classes (the generated Android factory names
+                                     every activity), and javac finds Kotlin's output in
+                                     target/classes. Kotlin reads the Java sources itself.
+                                     process-resources rather than process-sources: the source
+                                     generators (generate-gui-sources) run in process-sources,
+                                     and Kotlin must see what they generate. -->
+                                <phase>process-resources</phase>
                                 <goals>
                                     <goal>compile</goal>
                                 </goals>
@@ -161,6 +188,12 @@
                                     <sourceDirs>
                                         <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
                                         <sourceDir>${project.basedir}/src/main/java</sourceDir>
+                                        <!-- Android sources (src/main/android): Android Studio keeps
+                                             Kotlin in java/ as often as in kotlin/, and Kotlin compiles
+                                             before javac, so it reads the generated R classes too. -->
+                                        <sourceDir>${project.basedir}/src/main/android/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/main/android/java</sourceDir>
+                                        <sourceDir>${project.build.directory}/generated-sources/android</sourceDir>
                                     </sourceDirs>
                                     <args>
                                         <arg>-no-reflect</arg>
@@ -170,6 +203,7 @@
                             </execution>
                             <execution>
                                 <id>test-compile</id>
+                                <phase>process-test-sources</phase>
                                 <goals> 
                                     <goal>test-compile</goal> 
                                 </goals>
@@ -361,6 +395,15 @@
                         </goals>
                     </execution>
                     <execution>
+                        <!-- Android resources (src/main/android): R classes,
+                             the resource table and the activity/view factory. -->
+                        <id>compile-android-res</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>compile-android-res</goal>
+                        </goals>
+                    </execution>
+                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>
@@ -371,6 +414,9 @@
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
                         <goals>
+                            <!-- Relocates Android code onto the compatibility
+                                 runtime; must precede bytecode-compliance. -->
+                            <goal>remap-android</goal>
                             <goal>bytecode-compliance</goal>
                             <goal>css</goal>
                             <!-- Scans the project's compiled bytecode for
