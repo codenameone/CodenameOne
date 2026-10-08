@@ -263,6 +263,30 @@ class CSSGeneratedImageTest {
         assertEquals(11, topLeft.getHeight());
     }
 
+    @Test
+    void aUrlNamingADirectoryIsStoredAsAMultiImage(@TempDir Path dir) throws Exception {
+        png(new File(dir.toFile(), "img/icon.png/medium.png"), 16, 16, 0xff00aa00);
+        png(new File(dir.toFile(), "img/icon.png/veryhigh.png"), 32, 32, 0xff00aa00);
+        Files.write(new File(dir.toFile(), "img/icon.png/.DS_Store").toPath(), new byte[] {1, 2, 3});
+        Compiled c = compile(dir, "Icon { background-image: url(img/icon.png); }");
+
+        assertEquals(16, stored(c.res, "icon.png", Display.DENSITY_MEDIUM).getWidth());
+        assertEquals(32, stored(c.res, "icon.png", Display.DENSITY_VERY_HIGH).getWidth());
+        assertEquals("icon.png", c.res.findId(c.keys.get("Icon.bgImage")), "the rule's background is that image");
+    }
+
+    @Test
+    void aMultiImageDirectoryIsPaintedIntoAGeneratedImageFromItsMediumDensity(@TempDir Path dir) throws Exception {
+        png(new File(dir.toFile(), "img/tile.png/medium.png"), 4, 4, 0xff0000cc);
+        png(new File(dir.toFile(), "img/tile.png/veryhigh.png"), 8, 8, 0xffcc0000);
+        Compiled c = compile(dir, "Card { border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.5);"
+                + " background-image: url(img/tile.png); }");
+
+        BufferedImage center = stored(c.res, "CardCenter_1.png", Display.DENSITY_HD);
+        assertEquals(0xff0000cc, center.getRGB(center.getWidth() / 2, center.getHeight() / 2),
+                "the medium density tile fills the box");
+    }
+
     // ---- gradients that used to hang the compiler ----
 
     private static void assertCompilesPromptly(Path dir, String css) {
@@ -274,6 +298,16 @@ class CSSGeneratedImageTest {
         // The two-colour parser's loop had no way out for a first argument that
         // is not a keyword, which is the plainest radial gradient there is.
         assertCompilesPromptly(dir, "G { background: radial-gradient(#ffffff, #000000); }");
+    }
+
+    @Test
+    void aStopWithTwoPositionsCompiles(@TempDir Path dir) throws Exception {
+        // `red 20% 40%` is red held from 20% to 40%. The second position used
+        // to be read as the next colour, which failed the compile.
+        Callable<Compiled> job = () -> compile(dir,
+                "G { background: linear-gradient(to right, #ff0000 20% 40%, #0000ff); box-shadow: 0 0 4px black; }");
+        Compiled c = assertTimeoutPreemptively(Duration.ofSeconds(60), job::call);
+        assertTrue(c.keys.get("G.border") instanceof com.codename1.ui.plaf.Border, "G.border");
     }
 
     @Test

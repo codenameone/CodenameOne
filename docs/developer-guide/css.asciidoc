@@ -20,7 +20,7 @@ Once enabled your `theme.res` file will regenerate from a CSS file that resides 
 
 A stylesheet can pull in other local stylesheets with `@import`. Both spellings work: `@import "buttons.css";` and `@import url(buttons.css);`. The path is relative to the file that contains the rule.
 
-The compiler inlines the imported rules at the point where the `@import` appears, as if you had pasted the file there. An imported file can import other files in turn.
+The compiler places the imported rules at the point where the `@import` appears, as if you had pasted the file there. An imported file can import other files in turn.
 
 A relative `url()` inside an imported file stays relative to that file, not to the file that imported it. An image that sits beside `widgets/buttons.css` is referenced the same way whether `theme.css` imports that file directly or through another stylesheet.
 

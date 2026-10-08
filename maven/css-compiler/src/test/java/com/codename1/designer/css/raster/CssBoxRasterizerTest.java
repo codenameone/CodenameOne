@@ -292,4 +292,20 @@ class CssBoxRasterizerTest {
         assertSame(BorderSide.NONE, s.getLeft());
         assertOpaque(paint(BoxStyle.builder().size(1, 1).backgroundColor(RED)), 0, 0);
     }
+
+    @Test
+    void aGradientIsMeasuredInThePaddingBoxNotTheBorderBox() {
+        // 100 wide with a 20px border left and right: the padding box runs
+        // from 20 to 80. A hard stop at 50% therefore falls at x = 50 either
+        // way, but one at 25% falls at 35, not at 25.
+        BorderSide thick = new BorderSide(20, BorderStyle.SOLID, 0x00000000);
+        GradientSpec gradient = GradientSpec.linear(90)
+                .addStop(0xffff0000, 25, GradientSpec.Unit.PERCENT)
+                .addStop(0xff0000ff, 25, GradientSpec.Unit.PERCENT);
+        BufferedImage img = new CssBoxRasterizer().rasterize(
+                BoxStyle.builder().size(100, 10).left(thick).right(thick).gradient(gradient).build());
+
+        assertEquals(0xffff0000, img.getRGB(30, 5), "red up to a quarter of the padding box");
+        assertEquals(0xff0000ff, img.getRGB(40, 5), "blue after it");
+    }
 }

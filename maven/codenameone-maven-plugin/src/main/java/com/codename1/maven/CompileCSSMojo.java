@@ -350,6 +350,9 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         long sourcesModTime;
         try {
             sourcesModTime = Math.max(getCSSSourcesModificationTime(), getLocalizationModificationTime());
+            // A stylesheet imported from outside src/main/css changes the theme
+            // without touching anything the walk above sees.
+            sourcesModTime = Math.max(sourcesModTime, CssImportDependencies.lastModified(cssDirectory));
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to check CSS file modification times", ex);
         }

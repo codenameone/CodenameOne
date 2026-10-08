@@ -44,9 +44,9 @@ import java.util.List;
 /// position make a hard edge, and the later one wins exactly on it.
 ///
 /// Each pixel takes the colour at its centre. The gradient box is the box
-/// handed in, which the rasterizer makes the border box; sizing a gradient
-/// to the padding box (`background-origin`) or with `background-size` is
-/// out of scope.
+/// handed in, which the rasterizer makes the padding box, the initial
+/// `background-origin`. Sizing a gradient with `background-size` is out of
+/// scope.
 public final class GradientPainter {
     private final GradientSpec spec;
     private final double boxX;

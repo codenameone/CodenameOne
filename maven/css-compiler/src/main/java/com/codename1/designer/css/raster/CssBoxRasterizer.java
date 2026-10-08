@@ -103,7 +103,14 @@ public final class CssBoxRasterizer {
 
         GradientSpec gradient = style.getGradient();
         if (gradient != null) {
-            GradientPainter painter = new GradientPainter(gradient, padLeft, padTop, boxW, boxH);
+            // A gradient is sized and positioned in the padding box, the
+            // initial background-origin, and shows through to the border
+            // edge, the initial background-clip. A box that is all border has
+            // no padding box to measure in and falls back to the border box.
+            GradientPainter painter = paddingBox.isEmpty()
+                    ? new GradientPainter(gradient, padLeft, padTop, boxW, boxH)
+                    : new GradientPainter(gradient, paddingBox.getX(), paddingBox.getY(),
+                            paddingBox.getWidth(), paddingBox.getHeight());
             Pixels.layer(px, painter.paint(w, h), borderCoverage);
         }
 

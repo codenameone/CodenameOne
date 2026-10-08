@@ -755,26 +755,37 @@ public class CSSTheme {
                 }
                 int argb = (alpha << 24) | (rgb & 0xffffff);
                 ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
-                Float pos = null;
-                if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
-                    pos = (float) (nx.getNumericValue() / 100f);
-                    nx = (ScaledUnit) nx.getNextLexicalUnit();
-                } else if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_DEGREE) {
-                    pos = (float) (nx.getNumericValue() / 360.0);
-                    nx = (ScaledUnit) nx.getNextLexicalUnit();
-                } else if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_RADIAN) {
-                    pos = (float) (nx.getNumericValue() / (2 * Math.PI));
-                    nx = (ScaledUnit) nx.getNextLexicalUnit();
-                } else if (nx != null && isLength(nx.getLexicalUnitType())) {
-                    if (lengthBasis <= 0) {
-                        // No box to measure the length in; see rasterWidth.
-                        return null;
+                // A stop is a colour and up to two positions. `red 20% 40%`
+                // is the colour held from 20% to 40%, which is the same as
+                // the two stops `red 20%, red 40%`.
+                int placed = 0;
+                while (nx != null && placed < 2) {
+                    int nt = nx.getLexicalUnitType();
+                    Float pos;
+                    if (nt == LexicalUnit.SAC_PERCENTAGE) {
+                        pos = (float) (nx.getNumericValue() / 100f);
+                    } else if (nt == LexicalUnit.SAC_DEGREE) {
+                        pos = (float) (nx.getNumericValue() / 360.0);
+                    } else if (nt == LexicalUnit.SAC_RADIAN) {
+                        pos = (float) (nx.getNumericValue() / (2 * Math.PI));
+                    } else if (isLength(nt)) {
+                        if (lengthBasis <= 0) {
+                            // No box to measure the length in; see rasterWidth.
+                            return null;
+                        }
+                        pos = (float) (rasterLength(nx, lengthBasis) / lengthBasis);
+                    } else {
+                        break;
                     }
-                    pos = (float) (rasterLength(nx, lengthBasis) / lengthBasis);
+                    colors.add(argb);
+                    positions.add(pos);
+                    placed++;
                     nx = (ScaledUnit) nx.getNextLexicalUnit();
                 }
-                colors.add(argb);
-                positions.add(pos);
+                if (placed == 0) {
+                    colors.add(argb);
+                    positions.add(null);
+                }
                 p = nx;
             }
             if (colors.isEmpty()) return null;
@@ -3337,6 +3348,10 @@ public class CSSTheme {
                     //File largestVersion = null;
                     //long largestSize = 0;
                     for (File f : imageFolder.listFiles()) {
+                        if (!f.isFile() || !endsWithIgnoreCase(f.getName(), ".png")) {
+                            // A .DS_Store or a Thumbs.db is not a density.
+                            continue;
+                        }
                         int density  = Display.DENSITY_MEDIUM;
                         switch (f.getName()) {
                             case "2hd.png":
@@ -3539,13 +3554,13 @@ public class CSSTheme {
                 imgURL = new URL(baseURL, url);
             }
             
-            if (false && isFileURL(imgURL)) {
-                // This section is switched off because loading multi-images via url() 
-                // will cause unexpected results in cases where image borders are generated.
-                // In order for this approach to work, we need take into account multi-images when
-                // producing snapshots in the webview so that the correct size of image is used.
-                // You can still load multi-images as theme constants.
-                // See https://github.com/codenameone/CodenameOne/issues/2569#issuecomment-426730539
+            if (isFileURL(imgURL)) {
+                // A url() naming a directory is a multi-image: one file per
+                // density, named for it. Opening such a URL as a stream does
+                // not fail -- it answers with the directory listing as text,
+                // which was then stored in the theme as the bytes of a PNG.
+                // A rule that needs a generated image never gets here; it
+                // reads the directory through readRasterImage.
                 File imgDir = new File(imgURL.toURI());
                 if (imgDir.isDirectory()) {
                     try {
@@ -3944,9 +3959,50 @@ public class CSSTheme {
         return endsWithIgnoreCase(path, ".svg") || endsWithIgnoreCase(path, ".json");
     }
 
+    /// The directory `url` names when it is a multi-image -- one PNG per
+    /// density -- and null for anything else.
+    private File multiImageDirectory(String url) {
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            return null;
+        }
+        try {
+            URL imgURL = new URL(baseURL, url);
+            if (!isFileURL(imgURL)) {
+                return null;
+            }
+            File dir = new File(imgURL.toURI());
+            return dir.isDirectory() ? dir : null;
+        } catch (java.net.MalformedURLException ex) {
+            return null;
+        } catch (java.net.URISyntaxException ex) {
+            return null;
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    /// Why the image `url` names cannot be painted into a generated image,
+    /// or null when it can.
+    private String unpaintableReason(String url) {
+        if (isVectorAsset(url)) {
+            return "a vector image";
+        }
+        File multi = multiImageDirectory(url);
+        if (multi != null && !new File(multi, "medium.png").isFile()) {
+            return "a multi-image with no medium.png";
+        }
+        return null;
+    }
+
     private BufferedImage readRasterImage(String url) {
         try {
             URL imgURL = url.startsWith("http://") || url.startsWith("https://") ? new URL(url) : new URL(baseURL, url);
+            File multi = multiImageDirectory(url);
+            if (multi != null) {
+                // The page a generated image is painted on is at medium
+                // density, one CSS pixel to one image pixel.
+                imgURL = new File(multi, "medium.png").toURI().toURL();
+            }
             InputStream in = imgURL.openStream();
             try {
                 BufferedImage img = javax.imageio.ImageIO.read(in);
@@ -4576,7 +4632,18 @@ public class CSSTheme {
             LexicalUnit background = styles.get("background");
             while (background != null) {
                 if (isGradient(background)) {
-                    box.gradient(CN1Gradient.describeForRaster((ScaledUnit) background, (int) boxWidth, (int) boxHeight));
+                    // Lengths and percentages in a gradient are measured in
+                    // the padding box, where the rasterizer positions it.
+                    double[] borderWidths = com.codename1.designer.css.raster.BorderPainter.effectiveWidths(
+                            new BorderSide[] {top, right, bottom, left}, boxWidth, boxHeight);
+                    double gradientWidth = boxWidth - borderWidths[1] - borderWidths[3];
+                    double gradientHeight = boxHeight - borderWidths[0] - borderWidths[2];
+                    if (gradientWidth < 1 || gradientHeight < 1) {
+                        gradientWidth = boxWidth;
+                        gradientHeight = boxHeight;
+                    }
+                    box.gradient(CN1Gradient.describeForRaster((ScaledUnit) background,
+                            (int) gradientWidth, (int) gradientHeight));
                     break;
                 }
                 background = background.getNextLexicalUnit();
@@ -4591,14 +4658,15 @@ public class CSSTheme {
             LexicalUnit bgImage = styles.get("background-image");
             if (bgImage != null && bgImage.getLexicalUnitType() == LexicalUnit.SAC_URI) {
                 String url = bgImage.getStringValue();
-                if (isVectorAsset(url)) {
+                String unpaintable = unpaintableReason(url);
+                if (unpaintable != null) {
                     // An SVG or Lottie file is not decoded by the compiler at
                     // all: outside a generated image it is a placeholder the
                     // transcoded class replaces at runtime. There are no
                     // pixels to paint here, so the layer is left out and the
                     // rest of the box still gets its image, instead of one
                     // background failing a build.
-                    System.out.println("CSS Warning: " + url + " is a vector image and is left out of the image"
+                    System.out.println("CSS Warning: " + url + " is " + unpaintable + " and is left out of the image"
                             + " generated for this rule. Use a PNG or JPEG, or drop the border, shadow or"
                             + " size that needs a generated image, to keep it.");
                 } else {
@@ -4678,6 +4746,10 @@ public class CSSTheme {
 
         private BorderImage rasterBorderImage(Map<String, LexicalUnit> styles, LexicalUnit borderImage) {
             BufferedImage image = readRasterImage(borderImage.getStringValue());
+            // Only the url() of the border-image shorthand is read: the page
+            // these images used to be measured on was given that alone, so a
+            // slice or a repeat keyword written after it never had an effect.
+            // The slices come from border-image-slice and the edges stretch.
             // CSS reads one to four slice values as top, right, bottom, left with
             // the usual shorthand fill-in. Only percentages ever reached the
             // page these images used to be measured on; any other value was

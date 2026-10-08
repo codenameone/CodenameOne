@@ -269,6 +269,15 @@ public class ResourceEditorApp extends SingleFrameApplication {
         
         // creates a deadlock between FX, Swing and CN1. Horrible horrible deadlock...
         JavaSEPortWithSVGSupport.blockNativeBrowser = true;
+        // EditableResources is shared with the CSS compiler, which has no
+        // display, so its dialogs are supplied from here. This comes before
+        // the command modes below: -style, -img, -mimg and the rest open a
+        // resource file too, and one that is password protected has to be
+        // able to ask. Only -css stays without it, because it must not need
+        // a display.
+        if (args.length == 0 || !args[0].equalsIgnoreCase("-css")) {
+            com.codename1.ui.util.ResourceEditorUi.install(new SwingResourceEditorUi());
+        }
         if(args.length > 0) {
             if(args[0].equalsIgnoreCase("-buildVersion")) {
                 Properties p = new Properties();
@@ -566,9 +575,6 @@ public class ResourceEditorApp extends SingleFrameApplication {
         }
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());
         Display.init(null);
-        // EditableResources is shared with the CSS compiler, which has no
-        // display, so its dialogs are supplied from here.
-        com.codename1.ui.util.ResourceEditorUi.install(new SwingResourceEditorUi());
         launch(ResourceEditorApp.class, args);
     }
     
