@@ -147,7 +147,7 @@ public interface HighlightPredicate {
     HighlightPredicate ODD = new HighlightPredicate() {
         @Override
         public boolean isHighlighted(Component renderer, ComponentAdapter adapter) {
-            return adapter.row % 2 == 1;
+            return adapter.row % 2 != 0;
         }
     };
 
@@ -281,7 +281,7 @@ public interface HighlightPredicate {
 
         @Override
         public boolean isHighlighted(Component renderer, ComponentAdapter adapter) {
-            return adapter.row >= 0 && (adapter.row / linesPerGroup) % 2 == 1;
+            return adapter.row >= 0 && (adapter.row / linesPerGroup) % 2 != 0;
         }
 
         public int getLinesPerGroup() {

@@ -229,7 +229,9 @@ public abstract class DefaultSortController<M> extends DefaultRowSorter<M, Integ
     }
 
     @SuppressWarnings("rawtypes")
-    private static final class ComparableComparator implements Comparator {
+    private static final class ComparableComparator implements Comparator, java.io.Serializable {
+
+        private static final long serialVersionUID = 1L;
 
         @Override
         @SuppressWarnings("unchecked")
@@ -249,7 +251,7 @@ public abstract class DefaultSortController<M> extends DefaultRowSorter<M, Integ
             if (a instanceof Number && b instanceof Number) {
                 double x = ((Number) a).doubleValue();
                 double y = ((Number) b).doubleValue();
-                return x < y ? -1 : x > y ? 1 : 0;
+                return Double.compare(x, y);
             }
             return a.toString().compareTo(b.toString());
         }

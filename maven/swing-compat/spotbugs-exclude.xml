@@ -351,4 +351,121 @@
     </Match>
 
     <!-- END windows-menus slice -->
+
+    <!-- BEGIN swingx slice -->
+
+    <!-- SwingX hands out and takes the objects a component is built from,
+         as Swing does: a table's column control and column factory, a
+         list's sorter, a titled panel's content, a renderer's provider and
+         the component a cell context describes are the application's to
+         configure. A copy would not be the object the component uses. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXBusyLabel"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXCollapsiblePane"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXDatePicker"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXList"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXMonthView"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXSearchField"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXTable"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXTitledPanel"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.decorator.ComponentAdapter"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.painter.ImagePainter"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.AbstractRenderer"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.CellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.ComponentProvider"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.ListCellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.TableCellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.TreeCellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.sort.ListSortController"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.sort.TableSortController"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.table.ColumnControlButton"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The shared column factory is a replaceable singleton in SwingX:
+         getInstance/setInstance are its API, and it is made on first use.
+         It is only reached from the event dispatch thread. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.table.ColumnFactory"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="LI_LAZY_INIT_STATIC"/>
+        </Or>
+    </Match>
+
+    <!-- createTableColumn is overridable and SwingX documents that an
+         override may answer null to leave a model column out, so the null
+         checks are live although this class's own version never does. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.table.ColumnFactory"/>
+                <Method name="createAndConfigureTableColumn"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXTable"/>
+                <Method name="createDefaultColumnsFromModel"/>
+            </And>
+        </Or>
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+    </Match>
+
+    <!-- SwingX builds a provider's component and a renderer's provider in
+         the constructor through overridable factory methods
+         (createRendererComponent, createDefaultComponentProvider), and the
+         collapsible pane sets its content pane the same way; subclasses
+         override them counting on that. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.JXCollapsiblePane"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.AbstractRenderer"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.ComponentProvider"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- noFocusBorder is "protected static Border", not final, in SwingX,
+         and dropOn and the three icons are protected fields a subclass
+         assigns; nothing in the layer writes them. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.CellContext"/>
+            <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.TreeCellContext"/>
+        </Or>
+        <Or>
+            <Bug pattern="MS_SHOULD_BE_FINAL"/>
+            <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- The default tree icons are read from one renderer made on first
+         use; cell contexts are only used on the event dispatch thread. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.renderer.TreeCellContext"/>
+        <Bug pattern="LI_LAZY_INIT_STATIC"/>
+    </Match>
+
+    <!-- Serializable only because java.util.EventObject is; nothing in
+         Codename One serializes an event. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.org.jdesktop.swingx.event.DateSelectionEvent"/>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
+    </Match>
+
+    <!-- Picker's constructor calls updateValue() before this class has
+         its host. The override expects that: it tests the field for null
+         and falls back to the superclass's text. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.DatePickerPeer"/>
+        <Method name="updateValue"/>
+        <Bug pattern="UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- END swingx slice -->
 </FindBugsFilter>

@@ -84,7 +84,10 @@ public class JRendererCheckBox extends JCheckBox implements PainterAware {
 
     @SuppressWarnings("unchecked")
     private void cn1Paint(Graphics2D g) {
-        painter.paint(g, this, getWidth(), getHeight());
+        Painter p = painter;
+        if (p != null) {
+            p.paint(g, this, getWidth(), getHeight());
+        }
     }
 
     /// Does nothing: the renderer is in no layout.
