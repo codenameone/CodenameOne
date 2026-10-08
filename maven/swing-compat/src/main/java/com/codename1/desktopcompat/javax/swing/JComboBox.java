@@ -409,12 +409,13 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
     /// Opens the popup after the current event; the popup is modal the way
     /// Codename One shows it, so it is not opened inside this call.
     public void setPopupVisible(boolean v) {
-        final com.codename1.ui.Component p = cn1PeerOrNull();
+        com.codename1.ui.Component p = cn1PeerOrNull();
         if (v && p instanceof ComboPeer && com.codename1.ui.Display.isInitialized()) {
+            final ComboPeer combo = (ComboPeer) p;
             com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    ((ComboPeer) p).openPopup();
+                    combo.openPopup();
                 }
             });
         }

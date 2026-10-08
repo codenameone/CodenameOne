@@ -544,7 +544,7 @@ public class JSpinner extends JComponent {
     public static class DefaultEditor extends JPanel implements PropertyChangeListener, ChangeListener,
             LayoutManager {
 
-        private final JTextField field = new JTextField();
+        private final JFormattedTextField field = new JFormattedTextField();
         private final Codec codec;
         private final Relay relay = new Relay(this);
 
@@ -567,6 +567,12 @@ public class JSpinner extends JComponent {
             // a relay.
             setLayout(relay);
             spinner.addChangeListener(relay);
+        }
+
+        /// The field the value is shown and typed in. It has no formatter of
+        /// its own: the editor formats and parses the value.
+        public JFormattedTextField getTextField() {
+            return field;
         }
 
         /// The text field, for the spinner and the tests.

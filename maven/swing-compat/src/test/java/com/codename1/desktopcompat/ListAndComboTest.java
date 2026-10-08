@@ -64,6 +64,14 @@ import static org.junit.Assert.fail;
 /// ones, the rows a custom renderer paints, and selection by clicking.
 public class ListAndComboTest extends KernelTestBase {
 
+    /// The click count of the layer is kept for the whole process and by
+    /// time alone, so the clicks made here would be counted into the first
+    /// click of whichever test runs next.
+    @org.junit.AfterClass
+    public static void letTheClicksLapse() throws InterruptedException {
+        Thread.sleep(600);
+    }
+
     // ------------------------------------------------------------ selection model
 
     private static String state(ListSelectionModel m) {

@@ -42,16 +42,16 @@ public class DefaultComboBoxModel<E> extends AbstractListModel<E> implements Mut
         for (int i = 0; i < items.length; i++) {
             objects.addElement(items[i]);
         }
-        if (getSize() > 0) {
-            selectedObject = getElementAt(0);
+        if (items.length > 0) {
+            selectedObject = items[0];
         }
     }
 
     /// Uses `v` itself, not a copy of it, as the desktop does.
     public DefaultComboBoxModel(Vector<E> v) {
         objects = v;
-        if (getSize() > 0) {
-            selectedObject = getElementAt(0);
+        if (v.size() > 0) {
+            selectedObject = v.elementAt(0);
         }
     }
 

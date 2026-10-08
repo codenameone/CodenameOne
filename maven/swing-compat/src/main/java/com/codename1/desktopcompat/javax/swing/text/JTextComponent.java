@@ -328,6 +328,7 @@ public abstract class JTextComponent extends JComponent implements Scrollable {
     }
 
     private static final class Moved extends CaretEvent {
+        private static final long serialVersionUID = 1L;
         private final int dot;
         private final int mark;
 

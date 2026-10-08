@@ -151,4 +151,32 @@
         <Class name="com.codename1.desktopcompat.rt.DesktopToolkit"/>
         <Bug pattern="ISC_INSTANTIATE_STATIC_CLASS"/>
     </Match>
+    <!-- BEGIN widgets slice -->
+
+    <!-- Swing's own contract: each of these constructors builds a part of
+         the component through a protected factory method a subclass may
+         replace (createViewport and the scroll bars, createSelectionModel,
+         createDefaultModel), or installs the document through the public
+         setDocument. Calling them from the constructor is the documented
+         extension point, so it cannot be made final or private here. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.javax.swing.JScrollPane"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JList"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JTextArea"/>
+            <Class name="com.codename1.desktopcompat.javax.swing.JTextField"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- The stamp exists to paint a component somebody else owns: the
+         renderer hands it the cell for one paint and takes it back. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.CellStamp"/>
+        <Method name="setCell"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- END widgets slice -->
+
 </FindBugsFilter>

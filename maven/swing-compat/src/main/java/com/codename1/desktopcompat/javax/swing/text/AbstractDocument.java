@@ -273,12 +273,7 @@ public abstract class AbstractDocument implements Document {
 
     @Override
     public final Position getStartPosition() {
-        return new Position() {
-            @Override
-            public int getOffset() {
-                return 0;
-            }
-        };
+        return new Sticky(0);
     }
 
     /// The position after the last character, which follows the end of the
