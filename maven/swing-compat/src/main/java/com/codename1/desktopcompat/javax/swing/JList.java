@@ -52,10 +52,20 @@ import java.util.Vector;
 ///
 /// ## What differs from the desktop
 ///
-/// Only the `VERTICAL` layout orientation is laid out; the wrapping ones
-/// are recorded and shown as one column. A row is selected by a click, not
-/// by the press that starts it, because on a touch screen a press is also
-/// how a scroll begins.
+/// A row is selected by a click, not by the press that starts it, because
+/// on a touch screen a press is also how a scroll begins.
+///
+/// ## Layout orientations
+///
+/// `VERTICAL` is one column of rows, each as high as its renderer asks.
+/// The two wrapping orientations are a grid of cells of one size, the
+/// widest by the highest of the renderer's sizes or the fixed cell size:
+/// `HORIZONTAL_WRAP` fills a row and goes on in the next, `VERTICAL_WRAP`
+/// fills a column and goes on in the next. A visible row count above zero
+/// is the number of rows of the grid; with zero or less the grid takes as
+/// many columns (or rows) as the list's width (or height) holds, and a
+/// scroll pane then scrolls it only the other way. Left and right move
+/// the selection by a column in a grid, up and down by a row.
 public class JList<E> extends JComponent implements Scrollable {
 
     public static final int VERTICAL = 0;
@@ -80,6 +90,8 @@ public class JList<E> extends JComponent implements Scrollable {
     /// the rows have to be measured again.
     private int[] rowTops;
     private int cellWidth;
+    /// The height of the highest row, the height of a cell of the grid.
+    private int cellHeight;
 
     private final ListDataListener dataHandler = new ListDataListener() {
         @Override
@@ -127,9 +139,9 @@ public class JList<E> extends JComponent implements Scrollable {
         setBackground(bg == null ? Color.WHITE : bg);
         Color fg = UIManager.getColor("List.foreground");
         setForeground(fg == null ? Color.BLACK : fg);
-        Color sb = UIManager.getColor("List.selectionBackground");
+        Color sb = UIManager.cn1PutColor("List.selectionBackground");
         selectionBackground = sb == null ? new Color(0x38, 0x75, 0xd7) : sb;
-        Color sf = UIManager.getColor("List.selectionForeground");
+        Color sf = UIManager.cn1PutColor("List.selectionForeground");
         selectionForeground = sf == null ? Color.WHITE : sf;
         enableEvents(AWTEvent.MOUSE_EVENT_MASK);
         bind(KeyEvent.VK_UP, "selectPreviousRow", Move.PREVIOUS);
@@ -138,6 +150,8 @@ public class JList<E> extends JComponent implements Scrollable {
         bind(KeyEvent.VK_END, "selectLastRow", Move.LAST);
         bind(KeyEvent.VK_PAGE_UP, "scrollUp", Move.PAGE_UP);
         bind(KeyEvent.VK_PAGE_DOWN, "scrollDown", Move.PAGE_DOWN);
+        bind(KeyEvent.VK_LEFT, "selectPreviousColumn", Move.LEFT);
+        bind(KeyEvent.VK_RIGHT, "selectNextColumn", Move.RIGHT);
     }
 
     private void bind(int key, String name, int kind) {
@@ -156,6 +170,8 @@ public class JList<E> extends JComponent implements Scrollable {
         static final int LAST = 3;
         static final int PAGE_UP = 4;
         static final int PAGE_DOWN = 5;
+        static final int LEFT = 6;
+        static final int RIGHT = 7;
 
         private final JList<?> list;
         private final int kind;
@@ -173,13 +189,30 @@ public class JList<E> extends JComponent implements Scrollable {
             }
             int lead = list.getLeadSelectionIndex();
             int page = Math.max(1, list.getLastVisibleIndex() - list.getFirstVisibleIndex());
+            // In a grid one step up or down, or left or right, is this
+            // many indices; in a column there are no steps sideways.
+            int[] grid = list.cn1Wrapped() ? list.grid() : null;
+            int down = grid == null ? 1 : list.getLayoutOrientation() == HORIZONTAL_WRAP ? grid[1] : 1;
+            int across = grid == null ? 0 : list.getLayoutOrientation() == HORIZONTAL_WRAP ? 1 : grid[0];
             int to;
             switch (kind) {
                 case PREVIOUS:
-                    to = lead < 0 ? n - 1 : lead - 1;
+                    to = lead < 0 ? n - 1 : lead - down < 0 ? lead : lead - down;
                     break;
                 case NEXT:
-                    to = lead < 0 ? 0 : lead + 1;
+                    to = lead < 0 ? 0 : lead + down >= n ? lead : lead + down;
+                    break;
+                case LEFT:
+                    if (across == 0) {
+                        return;
+                    }
+                    to = lead < 0 ? 0 : lead - across < 0 ? lead : lead - across;
+                    break;
+                case RIGHT:
+                    if (across == 0) {
+                        return;
+                    }
+                    to = lead < 0 ? 0 : lead + across >= n ? lead : lead + across;
                     break;
                 case FIRST:
                     to = 0;
@@ -376,6 +409,9 @@ public class JList<E> extends JComponent implements Scrollable {
         int old = this.layoutOrientation;
         this.layoutOrientation = layoutOrientation;
         firePropertyChange("layoutOrientation", old, layoutOrientation);
+        if (old != layoutOrientation) {
+            cn1RowsChanged();
+        }
     }
 
     public Color getSelectionForeground() {
@@ -416,6 +452,7 @@ public class JList<E> extends JComponent implements Scrollable {
         int n = dataModel.getSize();
         int[] tops = new int[n + 1];
         int widest = 0;
+        int highest = 0;
         boolean measure = fixedCellHeight <= 0 || fixedCellWidth <= 0;
         int y = 0;
         for (int i = 0; i < n; i++) {
@@ -431,11 +468,71 @@ public class JList<E> extends JComponent implements Scrollable {
                 }
             }
             y += Math.max(0, h);
+            highest = Math.max(highest, h);
         }
         tops[n] = y;
         cellWidth = fixedCellWidth > 0 ? fixedCellWidth : widest;
+        cellHeight = fixedCellHeight > 0 ? fixedCellHeight : highest;
         rowTops = tops;
         return tops;
+    }
+
+    /// Whether the cells are laid out as a grid.
+    boolean cn1Wrapped() {
+        return layoutOrientation != VERTICAL;
+    }
+
+    /// The grid of a wrapping orientation: the rows in a column, then the
+    /// columns. The desktop's rule: a visible row count above zero is the
+    /// number of rows, and the columns follow from the number of cells;
+    /// otherwise the list's own width or height says how many fit.
+    int[] grid() {
+        rows();
+        int n = dataModel.getSize();
+        Insets in = getInsets();
+        int rowsPer;
+        int cols;
+        if (visibleRowCount > 0) {
+            rowsPer = visibleRowCount;
+            cols = Math.max(1, n / rowsPer);
+            if (n > rowsPer && n % rowsPer != 0) {
+                cols++;
+            }
+            if (layoutOrientation == HORIZONTAL_WRAP) {
+                rowsPer = n / cols;
+                if (n % cols > 0) {
+                    rowsPer++;
+                }
+            }
+        } else if (layoutOrientation == HORIZONTAL_WRAP) {
+            cols = Math.max(1, (getWidth() - in.left - in.right) / Math.max(1, cellWidth));
+            rowsPer = n / cols;
+            if (n % cols > 0) {
+                rowsPer++;
+            }
+        } else {
+            rowsPer = Math.max(1, (getHeight() - in.top - in.bottom) / Math.max(1, cellHeight));
+            cols = n / rowsPer;
+            if (n % rowsPer > 0) {
+                cols++;
+            }
+        }
+        return new int[]{Math.max(1, rowsPer), Math.max(1, cols)};
+    }
+
+    /// The bounds of one cell of the grid.
+    private Rectangle gridCell(int index, int[] grid) {
+        Insets in = getInsets();
+        int row;
+        int col;
+        if (layoutOrientation == HORIZONTAL_WRAP) {
+            row = index / grid[1];
+            col = index % grid[1];
+        } else {
+            col = index / grid[0];
+            row = index % grid[0];
+        }
+        return new Rectangle(in.left + col * cellWidth, in.top + row * cellHeight, cellWidth, cellHeight);
     }
 
     @Override
@@ -445,6 +542,14 @@ public class JList<E> extends JComponent implements Scrollable {
         }
         int[] tops = rows();
         Insets in = getInsets();
+        if (cn1Wrapped()) {
+            if (tops.length == 1) {
+                return new Dimension(in.left + in.right, in.top + in.bottom);
+            }
+            int[] grid = grid();
+            return new Dimension(grid[1] * cellWidth + in.left + in.right,
+                    grid[0] * cellHeight + in.top + in.bottom);
+        }
         return new Dimension(cellWidth + in.left + in.right, tops[tops.length - 1] + in.top + in.bottom);
     }
 
@@ -455,6 +560,19 @@ public class JList<E> extends JComponent implements Scrollable {
         int n = tops.length - 1;
         if (n == 0) {
             return -1;
+        }
+        if (cn1Wrapped()) {
+            int[] grid = grid();
+            Insets in = getInsets();
+            int col = Math.max(0, Math.min(grid[1] - 1, (location.x - in.left) / Math.max(1, cellWidth)));
+            int row = Math.max(0, (location.y - in.top) / Math.max(1, cellHeight));
+            // The desktop's rule: below the last row of a grid filled row
+            // by row is the last cell, while a grid filled column by
+            // column answers the last row of the column under the point.
+            if (layoutOrientation == HORIZONTAL_WRAP) {
+                return Math.min(n - 1, Math.min(row, n - 1) * grid[1] + col);
+            }
+            return Math.min(n - 1, col * grid[0] + Math.min(row, grid[0] - 1));
         }
         int y = location.y - getInsets().top;
         if (y < 0) {
@@ -483,6 +601,11 @@ public class JList<E> extends JComponent implements Scrollable {
         if (min < 0 || max >= n) {
             return null;
         }
+        if (cn1Wrapped()) {
+            int[] grid = grid();
+            Rectangle a = gridCell(min, grid);
+            return min == max ? a : a.union(gridCell(max, grid));
+        }
         Insets in = getInsets();
         int w = Math.max(cellWidth, getWidth() - in.left - in.right);
         return new Rectangle(in.left, in.top + tops[min], w, tops[max + 1] - tops[min]);
@@ -510,7 +633,7 @@ public class JList<E> extends JComponent implements Scrollable {
 
     public int getLastVisibleIndex() {
         Rectangle r = cn1VisibleRect();
-        int last = locationToIndex(new Point(r.x, r.y + r.height - 1));
+        int last = locationToIndex(new Point(r.x + r.width - 1, r.y + r.height - 1));
         if (last >= 0) {
             Rectangle b = getCellBounds(last, last);
             if (b == null || !b.intersects(r)) {
@@ -551,10 +674,21 @@ public class JList<E> extends JComponent implements Scrollable {
         Rectangle clip = g.getClipBounds();
         int lead = selectionModel.getLeadSelectionIndex();
         boolean focused = hasFocus();
+        int[] grid = cn1Wrapped() ? grid() : null;
+        int x = in.left;
         for (int i = 0; i < n; i++) {
             int y = in.top + tops[i];
             int ch = tops[i + 1] - tops[i];
-            if (clip != null) {
+            if (grid != null) {
+                Rectangle cell = gridCell(i, grid);
+                x = cell.x;
+                y = cell.y;
+                cw = cell.width;
+                ch = cell.height;
+                if (clip != null && !clip.intersects(cell)) {
+                    continue;
+                }
+            } else if (clip != null) {
                 if (y + ch <= clip.y) {
                     continue;
                 }
@@ -570,9 +704,9 @@ public class JList<E> extends JComponent implements Scrollable {
             if (c == null) {
                 continue;
             }
-            c.setBounds(in.left, y, cw, ch);
+            c.setBounds(x, y, cw, ch);
             c.validate();
-            Graphics cg = g.create(in.left, y, cw, ch);
+            Graphics cg = g.create(x, y, cw, ch);
             try {
                 c.paint(cg);
             } finally {
@@ -805,6 +939,15 @@ public class JList<E> extends JComponent implements Scrollable {
         int dy = in.top + in.bottom;
         int[] tops = rows();
         int n = tops.length - 1;
+        if (cn1Wrapped()) {
+            // The whole grid when the row count fixes it; else one cell,
+            // and the list grows the way it does not track.
+            if (visibleRowCount > 0) {
+                return getPreferredSize();
+            }
+            return new Dimension((n == 0 && fixedCellWidth <= 0 ? 256 : cellWidth) + dx,
+                    (n == 0 && fixedCellHeight <= 0 ? 16 : cellHeight) + dy);
+        }
         int width = n == 0 && fixedCellWidth <= 0 ? 256 : cellWidth;
         int rowHeight;
         if (fixedCellHeight > 0) {
@@ -820,7 +963,7 @@ public class JList<E> extends JComponent implements Scrollable {
     @Override
     public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
         if (orientation != SwingConstants.VERTICAL) {
-            return 10;
+            return cn1Wrapped() && cellWidth > 0 ? cellWidth : 10;
         }
         int row = locationToIndex(new Point(visibleRect.x, visibleRect.y));
         Rectangle r = row < 0 ? null : getCellBounds(row, row);
@@ -846,12 +989,18 @@ public class JList<E> extends JComponent implements Scrollable {
     /// A list narrower than its viewport is stretched to fill it.
     @Override
     public boolean getScrollableTracksViewportWidth() {
+        if (layoutOrientation == HORIZONTAL_WRAP && visibleRowCount <= 0) {
+            return true;
+        }
         Container p = getParent();
         return p instanceof JViewport && p.getWidth() > getPreferredSize().width;
     }
 
     @Override
     public boolean getScrollableTracksViewportHeight() {
+        if (layoutOrientation == VERTICAL_WRAP && visibleRowCount <= 0) {
+            return true;
+        }
         Container p = getParent();
         return p instanceof JViewport && p.getHeight() > getPreferredSize().height;
     }

@@ -116,6 +116,24 @@ public abstract class Component implements ImageObserver {
         return peer;
     }
 
+    /// Gives up the peer and makes a new one in its place, for a component
+    /// whose kind of peer follows a property that changed after the first
+    /// was made. Nothing happens while there is no peer yet.
+    protected final void cn1RecreatePeer() {
+        com.codename1.ui.Component old = peer;
+        if (old == null) {
+            return;
+        }
+        com.codename1.ui.Container host = old.getParent();
+        peer = null;
+        com.codename1.ui.Component now = cn1Peer();
+        if (host != null) {
+            int at = host.getComponentIndex(old);
+            host.removeComponent(old);
+            host.addComponent(Math.max(0, Math.min(at, host.getComponentCount())), now);
+        }
+    }
+
     /// The peer if it was made already, else `null`.
     public final com.codename1.ui.Component cn1PeerOrNull() {
         return peer;

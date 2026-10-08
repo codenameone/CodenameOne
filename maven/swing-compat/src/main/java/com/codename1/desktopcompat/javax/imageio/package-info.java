@@ -20,13 +20,8 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.javax.swing;
-
-/// An editor pane for styled text. Styled documents are not part of this
-/// layer, so it behaves as the [JEditorPane] it extends: plain text, or a
-/// formatted page with the content type `text/html`.
-public class JTextPane extends JEditorPane {
-
-    public JTextPane() {
-    }
-}
+/// Reading and writing image files: [ImageIO] stands in for the JDK's
+/// `javax.imageio.ImageIO` once an application has been relocated onto the
+/// layer. Only the static `read` and `write` methods are here; the
+/// device's own decoder and encoder do the work.
+package com.codename1.desktopcompat.javax.imageio;

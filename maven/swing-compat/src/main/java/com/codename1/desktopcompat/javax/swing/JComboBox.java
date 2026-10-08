@@ -22,7 +22,13 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.java.awt.Color;
 import com.codename1.desktopcompat.java.awt.Component;
+import com.codename1.desktopcompat.java.awt.Container;
+import com.codename1.desktopcompat.java.awt.Dimension;
+import com.codename1.desktopcompat.java.awt.Graphics;
+import com.codename1.desktopcompat.java.awt.Insets;
+import com.codename1.desktopcompat.java.awt.LayoutManager;
 import com.codename1.desktopcompat.java.awt.ItemSelectable;
 import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
@@ -30,6 +36,7 @@ import com.codename1.desktopcompat.java.awt.event.ItemEvent;
 import com.codename1.desktopcompat.java.awt.event.ItemListener;
 import com.codename1.desktopcompat.javax.swing.event.ListDataEvent;
 import com.codename1.desktopcompat.javax.swing.event.ListDataListener;
+import com.codename1.desktopcompat.javax.swing.plaf.basic.BasicComboBoxEditor;
 import com.codename1.desktopcompat.rt.CellStamp;
 import com.codename1.desktopcompat.rt.ComboPeer;
 import com.codename1.ui.events.DataChangedListener;
@@ -44,13 +51,29 @@ import java.util.Vector;
 /// events are this class's, and they follow the desktop: selecting through
 /// [#setSelectedItem] tells the item listeners about the item given up and
 /// the item taken, when they differ, and then always the action listeners.
+/// What the user highlights in an open popup is not a selection: the
+/// listeners hear once, when the popup closes with a row picked, and not
+/// at all when it is dismissed.
+///
+/// ## Editable
+///
+/// An editable combo box is a text field, the component of its
+/// [ComboBoxEditor], with an arrow button beside it. Enter in the field
+/// makes the text the selected item, in the model or not, and tells the
+/// action listeners, the last time with the command `comboBoxEdited`. The
+/// arrow opens a popup menu of the model's items.
 ///
 /// ## What differs from the desktop
 ///
-/// An editable combo box accepts a selected item that is not in its model,
-/// but shows no text field to type one into. A popup that is open cannot
-/// be closed from code.
-public class JComboBox<E> extends JComponent implements ItemSelectable, ListDataListener {
+///  - The popup of an editable combo box is a menu showing each item's
+///    `toString()`; the renderer draws only the popup of one that is not
+///    editable.
+///  - The popup of a combo box that is not editable is modal. `showPopup`
+///    opens it after the current event, and `hidePopup` closes it without
+///    a selection, as a click outside it does.
+///  - Typing does not select as it goes; there is no key selection manager
+///    and no `ComboBoxUI`.
+public class JComboBox<E> extends JComponent implements ItemSelectable, ListDataListener, ActionListener {
 
     private ComboBoxModel<E> dataModel;
     private ListCellRenderer<? super E> renderer = new DefaultListCellRenderer.UIResource();
@@ -65,6 +88,9 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
     private final ArrayList<ActionListener> actionListeners = new ArrayList<ActionListener>();
     private final Bridge bridge = new Bridge();
     private JList<E> rendererList;
+    private ComboBoxEditor editor;
+    private JButton arrow;
+    private JPopupMenu menu;
 
     public JComboBox(ComboBoxModel<E> aModel) {
         setModel(aModel);
@@ -100,16 +126,39 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
             return dataModel.getSize();
         }
 
+        /// While the popup is open the widget sees the row highlighted
+        /// in it; the combo box's own selection has not moved yet.
+        boolean popupOpen;
+        int highlighted = -1;
+
         @Override
         public int getSelectedIndex() {
-            return JComboBox.this.getSelectedIndex();
+            return popupOpen ? highlighted : JComboBox.this.getSelectedIndex();
         }
 
-        /// The popup picked a row.
+        /// The widget moved its selection. With the popup open that is
+        /// only the highlight following the pointer or the keys, and a
+        /// dismissed popup puts it back where it was; the row is taken
+        /// when the popup has closed.
         @Override
         public void setSelectedIndex(int index) {
+            if (popupOpen) {
+                if (index >= 0 && index < dataModel.getSize() && index != highlighted) {
+                    int old = highlighted;
+                    highlighted = index;
+                    tell(old, index);
+                }
+                return;
+            }
             if (index >= 0 && index < dataModel.getSize() && index != JComboBox.this.getSelectedIndex()) {
                 JComboBox.this.setSelectedIndex(index);
+            }
+        }
+
+        void tell(int old, int now) {
+            SelectionListener[] all = selection.toArray(new SelectionListener[selection.size()]);
+            for (int i = 0; i < all.length; i++) {
+                all[i].selectionChanged(old, now);
             }
         }
 
@@ -156,9 +205,8 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
             }
             int old = shownIndex;
             shownIndex = now;
-            SelectionListener[] all = selection.toArray(new SelectionListener[selection.size()]);
-            for (int i = 0; i < all.length; i++) {
-                all[i].selectionChanged(old, now);
+            if (!popupOpen) {
+                tell(old, now);
             }
         }
     }
@@ -198,8 +246,13 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
         return renderer.getListCellRendererComponent(rendererList, (E) value, index, selected, false);
     }
 
+    /// An editable combo box is a container of its editor and its arrow;
+    /// one that is not is the Codename One combo box.
     @Override
     protected com.codename1.ui.Component cn1CreatePeer() {
+        if (isEditable) {
+            return super.cn1CreatePeer();
+        }
         return new ComboPeer(this, bridge);
     }
 
@@ -208,9 +261,253 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
         super.cn1PeerCreated();
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (p instanceof ComboPeer) {
-            ((ComboPeer) p).setRenderer(new Stamps());
+            ComboPeer combo = (ComboPeer) p;
+            combo.setRenderer(new Stamps());
+            combo.setPopupWatcher(new ComboPeer.PopupWatcher() {
+                @Override
+                public void popupOpening() {
+                    cn1PopupOpening();
+                }
+
+                @Override
+                public void popupClosed(boolean cancelled) {
+                    cn1PopupClosed(cancelled);
+                }
+            });
         }
         bridge.shownIndex = getSelectedIndex();
+    }
+
+    /// The popup of the Codename One widget is about to open.
+    void cn1PopupOpening() {
+        bridge.highlighted = getSelectedIndex();
+        bridge.popupOpen = true;
+    }
+
+    /// The popup has closed. The row highlighted in it becomes the
+    /// selection, unless the popup was closed from code; a popup the user
+    /// dismissed has had its highlight put back already.
+    void cn1PopupClosed(boolean cancelled) {
+        if (!bridge.popupOpen) {
+            return;
+        }
+        int picked = bridge.highlighted;
+        bridge.popupOpen = false;
+        int current = getSelectedIndex();
+        bridge.shownIndex = picked;
+        if (!cancelled && picked >= 0 && picked < dataModel.getSize() && picked != current) {
+            setSelectedIndex(picked);
+        }
+        bridge.selectionMoved();
+    }
+
+    // ------------------------------------------------------------ editable
+
+    /// The arrow of an editable combo box.
+    private static final class Arrow implements Icon {
+        private static final int WIDTH = 9;
+        private static final int HEIGHT = 6;
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Color fg = c == null ? null : c.getForeground();
+            g.setColor(fg != null ? fg : Color.DARK_GRAY);
+            int[] xs = {x, x + WIDTH - 1, x + WIDTH / 2};
+            int[] ys = {y, y, y + HEIGHT - 1};
+            g.fillPolygon(xs, ys, 3);
+        }
+
+        @Override
+        public int getIconWidth() {
+            return WIDTH;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return HEIGHT;
+        }
+    }
+
+    /// The editor fills the box and the arrow stands at its end.
+    private final class EditableRow implements LayoutManager {
+        private static final int ARROW_WIDTH = 24;
+
+        @Override
+        public void addLayoutComponent(String name, Component comp) {
+        }
+
+        @Override
+        public void removeLayoutComponent(Component comp) {
+        }
+
+        private Dimension size(boolean minimum) {
+            Component e = editor == null ? null : editor.getEditorComponent();
+            Dimension ed = e == null ? new Dimension(0, 0) : minimum ? e.getMinimumSize() : e.getPreferredSize();
+            Insets in = getInsets();
+            int w = ed.width;
+            if (!minimum) {
+                // Wide enough for the longest item, as the desktop sizes it.
+                w = Math.max(w, cn1WidestItem());
+            }
+            return new Dimension(w + ARROW_WIDTH + in.left + in.right, ed.height + in.top + in.bottom);
+        }
+
+        @Override
+        public Dimension preferredLayoutSize(Container parent) {
+            return size(false);
+        }
+
+        @Override
+        public Dimension minimumLayoutSize(Container parent) {
+            return size(true);
+        }
+
+        @Override
+        public void layoutContainer(Container parent) {
+            Insets in = getInsets();
+            int w = Math.max(0, getWidth() - in.left - in.right);
+            int h = Math.max(0, getHeight() - in.top - in.bottom);
+            int aw = Math.min(ARROW_WIDTH, w / 2);
+            Component e = editor == null ? null : editor.getEditorComponent();
+            if (e != null) {
+                e.setBounds(in.left, in.top, w - aw, h);
+            }
+            if (arrow != null) {
+                arrow.setBounds(in.left + w - aw, in.top, aw, h);
+            }
+        }
+    }
+
+    /// The width the longest item of the model needs in the editor's font.
+    private int cn1WidestItem() {
+        Component e = editor == null ? null : editor.getEditorComponent();
+        if (e == null || e.getFont() == null) {
+            return 0;
+        }
+        com.codename1.desktopcompat.java.awt.FontMetrics fm = e.getFontMetrics(e.getFont());
+        int widest = 0;
+        for (int i = 0; i < dataModel.getSize(); i++) {
+            E item = dataModel.getElementAt(i);
+            if (item != null) {
+                widest = Math.max(widest, fm.stringWidth(item.toString()));
+            }
+        }
+        Insets in = e instanceof Container ? ((Container) e).getInsets() : null;
+        return widest + (in == null ? 0 : in.left + in.right) + fm.charWidth('W');
+    }
+
+    /// Makes this combo box the container of an editor and an arrow.
+    private void cn1BuildEditable() {
+        if (arrow == null) {
+            arrow = new JButton(new Arrow());
+            arrow.setName("ComboBox.arrowButton");
+            arrow.setFocusable(false);
+            arrow.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    setPopupVisible(!isPopupVisible());
+                }
+            });
+        }
+        if (editor == null) {
+            editor = createDefaultEditor();
+            editor.addActionListener(this);
+        }
+        removeAll();
+        setLayout(new EditableRow());
+        Component ec = editor.getEditorComponent();
+        if (ec != null) {
+            add(ec);
+            ec.setEnabled(isEnabled());
+        }
+        add(arrow);
+        arrow.setEnabled(isEnabled());
+        configureEditor(editor, getSelectedItem());
+    }
+
+    private ComboBoxEditor createDefaultEditor() {
+        return new BasicComboBoxEditor();
+    }
+
+    /// The popup menu of an editable combo box, made over from the model
+    /// each time it opens.
+    private JPopupMenu cn1Menu() {
+        if (menu == null) {
+            menu = new JPopupMenu();
+        }
+        menu.removeAll();
+        for (int i = 0; i < dataModel.getSize(); i++) {
+            final E item = dataModel.getElementAt(i);
+            JMenuItem row = new JMenuItem(item == null ? "" : item.toString());
+            row.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    setSelectedItem(item);
+                }
+            });
+            menu.add(row);
+        }
+        return menu;
+    }
+
+    /// The editor of an editable combo box. One is made when the combo
+    /// box becomes editable, so a combo box that never was has none.
+    public ComboBoxEditor getEditor() {
+        return editor;
+    }
+
+    public void setEditor(ComboBoxEditor anEditor) {
+        ComboBoxEditor old = editor;
+        if (old != null) {
+            old.removeActionListener(this);
+            Component oc = old.getEditorComponent();
+            if (oc != null && oc.getParent() == this) {
+                remove(oc);
+            }
+        }
+        editor = anEditor;
+        if (editor != null) {
+            editor.addActionListener(this);
+        }
+        if (isEditable) {
+            cn1BuildEditable();
+            revalidate();
+            repaint();
+        }
+        firePropertyChange("editor", old, editor);
+    }
+
+    /// Shows an item in an editor.
+    public void configureEditor(ComboBoxEditor anEditor, Object anItem) {
+        if (anEditor != null) {
+            anEditor.setItem(anItem);
+        }
+    }
+
+    /// The editor finished an edit: its item becomes the selected item,
+    /// and the action listeners hear the command `comboBoxEdited`.
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        setPopupVisible(false);
+        if (editor != null) {
+            getModel().setSelectedItem(editor.getItem());
+        }
+        String oldCommand = getActionCommand();
+        setActionCommand("comboBoxEdited");
+        fireActionEvent();
+        setActionCommand(oldCommand);
+    }
+
+    @Override
+    public void setEnabled(boolean b) {
+        super.setEnabled(b);
+        if (arrow != null) {
+            arrow.setEnabled(b);
+        }
+        Component ec = editor == null ? null : editor.getEditorComponent();
+        if (ec != null) {
+            ec.setEnabled(b);
+        }
     }
 
     private void cn1Refresh() {
@@ -245,6 +542,22 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
     public void setEditable(boolean aFlag) {
         boolean old = isEditable;
         isEditable = aFlag;
+        if (old != aFlag) {
+            if (aFlag) {
+                cn1BuildEditable();
+            } else {
+                if (menu != null) {
+                    menu.setVisible(false);
+                }
+                removeAll();
+                setLayout(null);
+            }
+            // The two kinds have different peers; one made already is
+            // made again.
+            cn1RecreatePeer();
+            revalidate();
+            repaint();
+        }
         firePropertyChange("editable", old, isEditable);
     }
 
@@ -406,22 +719,45 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
         setPopupVisible(false);
     }
 
-    /// Opens the popup after the current event; the popup is modal the way
-    /// Codename One shows it, so it is not opened inside this call.
+    /// Opens or closes the popup. The popup of a combo box that is not
+    /// editable is modal the way Codename One shows it, so it is opened
+    /// after the current event and not inside this call; closing it takes
+    /// nothing from it.
     public void setPopupVisible(boolean v) {
+        if (isEditable) {
+            if (v == isPopupVisible()) {
+                return;
+            }
+            if (v) {
+                if (isEnabled() && cn1PeerOrNull() != null) {
+                    cn1Menu().show(this, 0, getHeight());
+                }
+            } else {
+                menu.setVisible(false);
+            }
+            return;
+        }
         com.codename1.ui.Component p = cn1PeerOrNull();
-        if (v && p instanceof ComboPeer && com.codename1.ui.Display.isInitialized()) {
-            final ComboPeer combo = (ComboPeer) p;
+        if (!(p instanceof ComboPeer) || !com.codename1.ui.Display.isInitialized()) {
+            return;
+        }
+        final ComboPeer combo = (ComboPeer) p;
+        if (v) {
             com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
                     combo.openPopup();
                 }
             });
+        } else {
+            combo.closePopup();
         }
     }
 
     public boolean isPopupVisible() {
+        if (isEditable) {
+            return menu != null && menu.isVisible();
+        }
         com.codename1.ui.Component p = cn1PeerOrNull();
         return p instanceof ComboPeer && ((ComboPeer) p).isShowingPopupDialog();
     }
@@ -508,6 +844,9 @@ public class JComboBox<E> extends JComponent implements ItemSelectable, ListData
                     ItemEvent.DESELECTED));
         }
         selectedItemReminder = dataModel.getSelectedItem();
+        if (isEditable && editor != null) {
+            configureEditor(editor, selectedItemReminder);
+        }
         if (selectedItemReminder != null) {
             fireItemStateChanged(new ItemEvent(this, ItemEvent.ITEM_STATE_CHANGED, selectedItemReminder,
                     ItemEvent.SELECTED));

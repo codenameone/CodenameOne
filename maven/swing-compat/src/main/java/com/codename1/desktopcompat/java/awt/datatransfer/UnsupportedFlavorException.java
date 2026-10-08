@@ -20,13 +20,14 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.javax.swing;
+package com.codename1.desktopcompat.java.awt.datatransfer;
 
-/// An editor pane for styled text. Styled documents are not part of this
-/// layer, so it behaves as the [JEditorPane] it extends: plain text, or a
-/// formatted page with the content type `text/html`.
-public class JTextPane extends JEditorPane {
+/// Thrown when data is asked for in a flavor it is not offered in.
+public class UnsupportedFlavorException extends Exception {
 
-    public JTextPane() {
+    private static final long serialVersionUID = 5383814944251665601L;
+
+    public UnsupportedFlavorException(DataFlavor flavor) {
+        super(flavor != null ? flavor.getHumanPresentableName() : null);
     }
 }

@@ -232,6 +232,7 @@ public class CompatRemapperTest {
         assertEquals(SWING + "javax/swing/JTable", every.map("javax/swing/JTable"));
         assertEquals(SWING + "java/beans/PropertyChangeListener", every.map("java/beans/PropertyChangeListener"));
         assertEquals(SWING + "javax/accessibility/Accessible", every.map("javax/accessibility/Accessible"));
+        assertEquals(SWING + "javax/imageio/ImageIO", every.map("javax/imageio/ImageIO"));
         assertEquals(SWING + "org/jdesktop/layout/GroupLayout", every.map("org/jdesktop/layout/GroupLayout"));
         assertEquals(FX + "javafx/stage/Stage", every.map("javafx/stage/Stage"));
         assertEquals(FX + "rt/FxApp", every.map(FX + "runtime/FxApp"));

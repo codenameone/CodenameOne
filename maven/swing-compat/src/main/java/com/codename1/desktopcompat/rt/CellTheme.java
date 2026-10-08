@@ -57,7 +57,7 @@ public final class CellTheme {
     }
 
     private static Color put(String key) {
-        return key == null ? null : com.codename1.desktopcompat.javax.swing.UIManager.getColor(key);
+        return key == null ? null : com.codename1.desktopcompat.javax.swing.UIManager.cn1PutColor(key);
     }
 
     private static Style style(String uiid, boolean selected) {
@@ -76,7 +76,7 @@ public final class CellTheme {
     /// window background.
     public static Color background(String key) {
         Color c = put(key);
-        if (c != null && !key.endsWith(".background")) {
+        if (c != null) {
             return c;
         }
         Style s = style("TableCell", false);
@@ -86,7 +86,7 @@ public final class CellTheme {
     /// The color of cell text.
     public static Color foreground(String key) {
         Color c = put(key);
-        if (c != null && !key.endsWith(".foreground")) {
+        if (c != null) {
             return c;
         }
         Style s = style("TableCell", false);
@@ -133,7 +133,7 @@ public final class CellTheme {
     /// The background of a table header.
     public static Color headerBackground(String key) {
         Color c = put(key);
-        if (c != null && !key.endsWith(".background")) {
+        if (c != null) {
             return c;
         }
         Style s = style("TableHeader", false);
@@ -146,7 +146,7 @@ public final class CellTheme {
     /// The text color of a table header.
     public static Color headerForeground(String key) {
         Color c = put(key);
-        if (c != null && !key.endsWith(".foreground")) {
+        if (c != null) {
             return c;
         }
         Style s = style("TableHeader", false);

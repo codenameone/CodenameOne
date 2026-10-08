@@ -20,13 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.javax.swing;
-
-/// An editor pane for styled text. Styled documents are not part of this
-/// layer, so it behaves as the [JEditorPane] it extends: plain text, or a
-/// formatted page with the content type `text/html`.
-public class JTextPane extends JEditorPane {
-
-    public JTextPane() {
-    }
-}
+/// The few classes of the basic look and feel an application names
+/// directly, such as the default editor of an editable combo box. There are
+/// no UI delegates here: the widgets are drawn by Codename One.
+package com.codename1.desktopcompat.javax.swing.plaf.basic;

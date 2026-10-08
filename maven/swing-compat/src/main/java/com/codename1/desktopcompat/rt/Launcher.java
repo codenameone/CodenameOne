@@ -22,40 +22,35 @@
  */
 package com.codename1.desktopcompat.rt;
 
-import com.codename1.desktopcompat.java.awt.Graphics;
-import com.codename1.desktopcompat.java.awt.Image;
-import com.codename1.desktopcompat.java.awt.image.ImageObserver;
+import com.codename1.ui.Display;
 
-/// An AWT image that is a Codename One image: one decoded from a file or a
-/// resource, or the result of scaling another. One made of `null` is an
-/// image that could not be read: it has no pixels, and its width and
-/// height are -1, which is how the desktop reports one.
-public final class NativeImage extends Image {
+/// Hands a URL to the device to open in whatever application handles it:
+/// a browser for `http`, the mail application for `mailto`, a viewer for a
+/// file.
+public final class Launcher {
 
-    private final com.codename1.ui.Image image;
-
-    public NativeImage(com.codename1.ui.Image image) {
-        this.image = image;
+    /// What opens a URL.
+    public interface Opener {
+        void open(String url);
     }
 
-    @Override
-    public int getWidth(ImageObserver observer) {
-        return image == null ? -1 : image.getWidth();
+    private static Opener opener;
+
+    private Launcher() {
     }
 
-    @Override
-    public int getHeight(ImageObserver observer) {
-        return image == null ? -1 : image.getHeight();
+    /// Replaces what opens a URL, for a test that must not start another
+    /// application; `null` puts the device's back.
+    public static void setOpener(Opener o) {
+        opener = o;
     }
 
-    /// Only an image created to be drawn into has a graphics, as in AWT.
-    @Override
-    public Graphics getGraphics() {
-        throw new UnsupportedOperationException("getGraphics() is only valid for images created off screen");
-    }
-
-    @Override
-    public com.codename1.ui.Image cn1Image() {
-        return image;
+    public static void open(String url) {
+        Opener o = opener;
+        if (o != null) {
+            o.open(url);
+        } else if (Display.isInitialized()) {
+            Display.getInstance().execute(url);
+        }
     }
 }

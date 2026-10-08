@@ -20,13 +20,24 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.desktopcompat.javax.swing;
+package com.codename1.desktopcompat.java.awt.datatransfer;
 
-/// An editor pane for styled text. Styled documents are not part of this
-/// layer, so it behaves as the [JEditorPane] it extends: plain text, or a
-/// formatted page with the content type `text/html`.
-public class JTextPane extends JEditorPane {
+import java.io.IOException;
 
-    public JTextPane() {
-    }
+/// Data that can be put on a [Clipboard], in one or more flavors.
+public interface Transferable {
+
+    /// The flavors the data can be had in, the richest first.
+    DataFlavor[] getTransferDataFlavors();
+
+    boolean isDataFlavorSupported(DataFlavor flavor);
+
+    /// The data in one flavor.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedFlavorException`: if the data is not offered in `flavor`
+    ///
+    /// - `IOException`: if the data is no longer there to read
+    Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException;
 }

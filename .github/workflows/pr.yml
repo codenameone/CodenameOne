@@ -391,7 +391,7 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
             -DbackendAnalysis \
-            -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac,android-res-compiler,android-compat,compat-jdk -am verify
+            -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac,android-res-compiler,android-compat,compat-jdk,swing-compat,javafx-compat -am verify
       - name: Type-check the SQLCipher-backed database package
         if: ${{ matrix.java-version == 8 }}
         env:

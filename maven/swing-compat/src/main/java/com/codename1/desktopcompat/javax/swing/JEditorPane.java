@@ -22,27 +22,58 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
-import com.codename1.desktopcompat.javax.swing.text.PlainDocument;
+import com.codename1.desktopcompat.java.awt.AWTEvent;
+import com.codename1.desktopcompat.java.awt.Color;
+import com.codename1.desktopcompat.java.awt.Dimension;
+import com.codename1.desktopcompat.java.awt.Font;
+import com.codename1.desktopcompat.java.awt.Graphics;
+import com.codename1.desktopcompat.java.awt.Insets;
+import com.codename1.desktopcompat.java.awt.event.MouseEvent;
+import com.codename1.desktopcompat.javax.swing.event.HyperlinkEvent;
+import com.codename1.desktopcompat.javax.swing.event.HyperlinkListener;
 import com.codename1.desktopcompat.javax.swing.text.JTextComponent;
+import com.codename1.desktopcompat.javax.swing.text.PlainDocument;
+import com.codename1.desktopcompat.rt.MiniHtml;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 /// A multi-line text component with a content type.
 ///
+/// With the content type `text/plain` it is a text area. With `text/html`
+/// the markup is shown formatted, by the reader the labels use: bold,
+/// italic, underline, `font` colors and sizes, headings, paragraphs, line
+/// breaks, lists as dashed lines, centered and aligned blocks, the common
+/// entities, and links. Lines are wrapped at the pane's width. Anything
+/// else in the markup -- tables, images, style sheets -- is read as the
+/// text it contains.
+///
+/// A click on a link fires a `HyperlinkEvent` of the type `ACTIVATED` to
+/// the pane's `HyperlinkListener`s, with the link's `href` as its
+/// description and, when the `href` is an absolute URL, as its URL.
+///
 /// ## What differs from the desktop
 ///
-/// The pane shows plain text only. With the content type `text/html` the
-/// markup is kept and answered by [#getText()], while what is shown is the
-/// text with the tags taken out, the line breaks of `br`, `p`, `div`, `li`
-/// and the headings kept, and the common entities decoded. There are no
-/// editor kits, no styled documents, no hyperlink events and no loading of
-/// a page from a URL.
+///  - A pane that shows HTML is never edited by the user, whatever
+///    `setEditable` says; on the desktop links work only in a pane that is
+///    not editable, and that is the one kind there is here. Its document
+///    holds the text without the tags, and [#getText()] answers the markup
+///    that was set.
+///  - There are no editor kits and no styled documents, and a page is not
+///    loaded from a URL: `setPage` is not part of this layer.
+///  - Only `ACTIVATED` is fired; there is no `ENTERED` and `EXITED` as
+///    the pointer moves over a link.
 public class JEditorPane extends JTextComponent {
+
+    private static final int PAD = 3;
 
     private String contentType = "text/plain";
     private String markup;
     private String shown;
+    private MiniHtml.Document page;
 
     public JEditorPane() {
         setDocument(new PlainDocument());
+        enableEvents(AWTEvent.MOUSE_EVENT_MASK);
     }
 
     public JEditorPane(String type, String text) {
@@ -76,6 +107,145 @@ public class JEditorPane extends JTextComponent {
         String old = contentType;
         contentType = bare;
         firePropertyChange("contentType", old, bare);
+        cn1ApplyMode();
+    }
+
+    @Override
+    protected void cn1PeerCreated() {
+        super.cn1PeerCreated();
+        cn1ApplyMode();
+    }
+
+    @Override
+    public void setEditable(boolean b) {
+        super.setEditable(b);
+        cn1ApplyMode();
+    }
+
+    /// Keeps the widget from being edited while the pane shows a page.
+    private void cn1ApplyMode() {
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        if (p instanceof com.codename1.ui.TextArea) {
+            ((com.codename1.ui.TextArea) p).setEditable(isEditable() && !html());
+        }
+    }
+
+    /// The page that is showing, or `null` when the pane shows plain
+    /// text: its type is not HTML, or the text was changed through the
+    /// document since the markup was set.
+    private MiniHtml.Document cn1Page() {
+        if (!html() || markup == null || page == null) {
+            return null;
+        }
+        String now = super.getText();
+        return now != null && now.equals(shown) ? page : null;
+    }
+
+    private Insets cn1TextInsets() {
+        Insets in = getInsets();
+        Insets m = getMargin();
+        int t = m == null ? PAD : m.top;
+        int l = m == null ? PAD : m.left;
+        int b = m == null ? PAD : m.bottom;
+        int r = m == null ? PAD : m.right;
+        return new Insets(in.top + t, in.left + l, in.bottom + b, in.right + r);
+    }
+
+    /// A page is as wide as its longest line and, once the pane has a
+    /// width, as high as its lines are when broken at that width.
+    @Override
+    public Dimension getPreferredSize() {
+        MiniHtml.Document doc = isPreferredSizeSet() ? null : cn1Page();
+        if (doc == null) {
+            return super.getPreferredSize();
+        }
+        Insets in = cn1TextInsets();
+        Font f = getFont();
+        Dimension whole = MiniHtml.preferredSize(doc, f);
+        int room = getWidth() - in.left - in.right;
+        int h = room > 0 ? MiniHtml.wrappedSize(doc, f, room).height : whole.height;
+        return new Dimension(whole.width + in.left + in.right, h + in.top + in.bottom);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        MiniHtml.Document doc = cn1Page();
+        if (doc == null) {
+            super.paintComponent(g);
+            return;
+        }
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        if (isOpaque()) {
+            Color bg = isBackgroundSet() || p == null ? getBackground() : new Color(p.getStyle().getBgColor() & 0xffffff);
+            if (bg != null) {
+                g.setColor(bg);
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        }
+        Color fg = isForegroundSet() || p == null ? getForeground() : new Color(p.getStyle().getFgColor() & 0xffffff);
+        if (fg != null) {
+            g.setColor(fg);
+        }
+        Font f = getFont();
+        if (f != null) {
+            g.setFont(f);
+        }
+        Insets in = cn1TextInsets();
+        MiniHtml.paint(g, doc, in.left, in.top, Math.max(1, getWidth() - in.left - in.right), MiniHtml.ALIGN_LEFT);
+    }
+
+    // ------------------------------------------------------------ links
+
+    public void addHyperlinkListener(HyperlinkListener listener) {
+        listenerList.add(HyperlinkListener.class, listener);
+    }
+
+    public void removeHyperlinkListener(HyperlinkListener listener) {
+        listenerList.remove(HyperlinkListener.class, listener);
+    }
+
+    public HyperlinkListener[] getHyperlinkListeners() {
+        return listenerList.getListeners(HyperlinkListener.class);
+    }
+
+    public void fireHyperlinkUpdate(HyperlinkEvent e) {
+        HyperlinkListener[] ls = getHyperlinkListeners();
+        for (int i = ls.length - 1; i >= 0; i--) {
+            ls[i].hyperlinkUpdate(e);
+        }
+    }
+
+    /// The `href` of the link at a point of the pane, or `null`.
+    String cn1LinkAt(int x, int y) {
+        MiniHtml.Document doc = cn1Page();
+        if (doc == null) {
+            return null;
+        }
+        Insets in = cn1TextInsets();
+        return MiniHtml.hrefAt(doc, getFont(), Math.max(1, getWidth() - in.left - in.right), MiniHtml.ALIGN_LEFT,
+                x - in.left, y - in.top);
+    }
+
+    @Override
+    protected void processMouseEvent(MouseEvent e) {
+        super.processMouseEvent(e);
+        if (e.getID() != MouseEvent.MOUSE_CLICKED || e.isConsumed() || !isEnabled()
+                || e.getButton() != MouseEvent.BUTTON1) {
+            return;
+        }
+        String href = cn1LinkAt(e.getX(), e.getY());
+        if (href == null) {
+            return;
+        }
+        URL url = null;
+        try {
+            url = new URL(href);
+        } catch (MalformedURLException notAbsolute) {
+            // A relative link has no base to resolve against here: the
+            // listener gets it as the description alone.
+            url = null;
+        }
+        fireHyperlinkUpdate(new HyperlinkEvent(this, HyperlinkEvent.EventType.ACTIVATED, url, href));
     }
 
     private boolean html() {
@@ -86,13 +256,17 @@ public class JEditorPane extends JTextComponent {
     public void setText(String t) {
         if (html() && t != null) {
             markup = t;
+            page = MiniHtml.parse(t);
             shown = cn1PlainText(t);
             super.setText(shown);
         } else {
             markup = null;
             shown = null;
+            page = null;
             super.setText(t);
         }
+        revalidate();
+        repaint();
     }
 
     /// The markup that was set, for as long as the text it was shown as
