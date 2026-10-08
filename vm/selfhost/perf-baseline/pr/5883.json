@@ -209,6 +209,26 @@
     }
    }
   },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.803,
+      "time": 1.221,
+      "tolerance": {
+       "time": 0.45
+      }
+     },
+     "memory": 0.577,
+     "reason": "Master's hybrid generational GC (#5940, merged in c717e15d2a) lowered the hello app's footprint: RAM 0.58x against 0.80x on Windows x64 AMD 25/1; run 37733388341",
+     "runs": 1,
+     "time": 1.221,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   }
+  },
   "windows-x64@intel64-family-6-model-106-genuineintel": {
    "valueEscape": {
     "all": {
