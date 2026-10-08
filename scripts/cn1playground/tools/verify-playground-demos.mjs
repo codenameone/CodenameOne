@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {scenePixels, changedPixels, sceneChecks, sampleSceneFrames} from './demo-pixels.mjs';
+import {scenePixels, changedPixels, sceneChecks, sampleScene} from './demo-pixels.mjs';
+import {gpuLifecycleScript} from './gpu-lifecycle-fixture.mjs';
 let chromium, firefox;
 try { ({chromium, firefox} = await import('playwright')); }
 catch { ({chromium, firefox} = await import('@playwright/test')); }
@@ -96,7 +97,7 @@ async function check(name, fn) {
   try { await fn(); results.push({name, ok: true}); console.log('PASS ' + name); }
   catch (error) { results.push({name, ok: false, error: error.message}); console.error('FAIL ' + name + ': ' + error.message); }
 }
-async function run(slug, title, width, exercise, caseName = slug, code = null) {
+async function run(slug, title, width, exercise, caseName = slug, script = null) {
   const name = browserName + '-' + caseName + '-' + width + 'x' + viewport.height + '-dpr' + deviceScaleFactor;
   if (process.env.PLAYGROUND_DEMO_FILTER && !name.includes(process.env.PLAYGROUND_DEMO_FILTER)) return;
   console.log('RUN ' + name);
@@ -128,8 +129,8 @@ async function run(slug, title, width, exercise, caseName = slug, code = null) {
   try {
     await check(name + ' interaction', async () => {
       const target = new URL(url);
-      if (code) target.searchParams.set('code', Buffer.from(code).toString('base64url'));
-      else target.searchParams.set('sample', slug);
+      target.searchParams.set('sample', slug);
+      if (script !== null) target.searchParams.set('code', Buffer.from(script).toString('base64url'));
       await page.goto(target.href, {waitUntil: 'domcontentloaded', timeout: 90000});
       await page.waitForFunction(() => window.cn1Started === true || !!document.querySelector('iframe[title="Codename One Playground"]'));
       const embedded = await page.locator('iframe[title="Codename One Playground"]').elementHandles();
@@ -142,6 +143,14 @@ async function run(slug, title, width, exercise, caseName = slug, code = null) {
         await page.waitForTimeout(100);
       }
       assert.ok(log.some(m => m.text.startsWith('[playground] preview updated')), 'Sample did not initialize');
+      if (script === gpuLifecycleScript) {
+        // This fixture attaches after preview initialization. Let its timer
+        // complete before observing rendered frames and animation.
+        while (!log.some(m => m.text.includes('[gpu-lifecycle] attached')) && Date.now() < deadline) {
+          await page.waitForTimeout(100);
+        }
+        assert.ok(log.some(m => m.text.includes('[gpu-lifecycle] attached')), 'GPU fixture did not attach');
+      }
       const consent = page.getByRole('button', {name: 'Keep Crisp Disabled', exact: true});
       if (await consent.count()) await consent.click();
       const region = await preview(page, title);
@@ -172,7 +181,7 @@ async function run(slug, title, width, exercise, caseName = slug, code = null) {
 async function animatedScene(page, region, name, kind) {
   // Start sampling promptly, while the balls still bounce. Compare only scene
   // foreground pixels so editor carets, status text and other UI cannot pass this.
-  const frames = await sampleSceneFrames(
+  const frames = await sampleScene(
     i => measure(page, region, kind, path.join(artifacts, name + '-frame-' + i + '.png')),
     ms => page.waitForTimeout(ms), region, kind);
   for (const [behavior, ok] of Object.entries(sceneChecks(frames, region, kind))) {
@@ -342,6 +351,8 @@ try {
           assert.ok(attached.foreground > 150, 'Reattached GPU scene did not become visible');
           await animatedScene(p, r, n + ' after reattach', 'cube');
         }, 'gpu-reattach', gpuReattachCode);
+        await run('3d-gpu', '3D / GPU', width, (p, r, n) => animatedScene(p, r, n, 'cube'),
+          'gpu-lifecycle', gpuLifecycleScript);
         await run('camera-capture', 'Camera', width, cameraDemo);
         await run('camera-capture', 'Camera', width, demoNavigation, 'demo-navigation');
       }

@@ -378,7 +378,13 @@ The backend is held to the client's gates:
   `package-info.java` per package; no since markers.
 - SpotBugs (zero findings, `maven/backend/spotbugs-exclude.xml`), PMD (the core's
   forbidden list) and Checkstyle (zero errors) run in `maven/backend`'s `verify`,
-  using the core's own `pmd.xml` and `checkstyle.xml`.
+  using the core's own `pmd.xml` and `checkstyle.xml`. Only two of the three
+  fail a local build: SpotBugs, and Checkstyle through its `check` execution
+  (`checkstyle-zero-errors`). **PMD writes `maven/backend/target/pmd.xml` and
+  judges nothing** -- its forbidden list lives in
+  `.github/scripts/generate-quality-report.py`, which PR CI runs afterwards. A
+  green `mvn verify` therefore says nothing about PMD: read the report. Both
+  reports once sat at seven and fifteen findings behind green local builds.
 - Error Prone's `BanClassForName`, because ParparVM translates the backend too.
 - `maven/backend` compiles only the `impl/javase` twins, so the production
   `impl/parparvm` tree gets its own analysis-only module, `maven/backend-parparvm`
@@ -393,6 +399,39 @@ The backend is held to the client's gates:
 
 `DM_CONVERT_CASE` is deliberately not excluded for the backend, as it is for the
 core: a server folds protocol tokens, and the next section is why that matters.
+
+#### A package shared only in part: `vm/backend/package-docs`
+
+A core package of which the backend takes only SOME classes cannot be described
+by the core's `package-info.java`. That file links every class of the package,
+and the ones a server does not have are references the backend run cannot
+resolve: doclint fails on them, and the website's doclet would print each as
+plain text where a link was meant. `com.codename1.security` is the case that
+exists -- the server shares the digests and the one-time passwords, not the
+client's ciphers and key storage.
+
+`vm/backend/package-docs/<package path>/package-info.java` is the server's own
+description of such a package. `build_javadocs.sh` copies that tree into the
+backend staging directory *before* it copies the shared classes, and the loop
+that follows takes a core `package-info.java` only for a package that has none
+yet, so the server's one stays. The website build renders the same staging
+directory, so it needs nothing of its own.
+
+- It cannot live in `vm/backend/src`: `shared-sources.sh` and
+  `maven/backend/pom.xml` fail the build on any file there with the same package
+  and name as a core source, and a `package-info.java` cannot be marked
+  `@SharedWithBackend` either.
+- It is documentation only. No build compiles it, so nothing but the javadoc
+  run tells you it is wrong: after touching one, run the backend half of
+  `build_javadocs.sh` under a JDK 25 `javadoc`.
+- A package the backend shares WHOLE needs no entry -- the core's description is
+  true of it and is taken as it is.
+- The directory is in the `paths` of `javadocs.yml` and `website-docs.yml`; a
+  new tree beside it would need adding there.
+
+`com.codename1.impl.*` is on the source path of that run but not among the
+documented sources, so doclint never reads its comments: a broken reference in
+an internal class passes the gate. Write those references fully qualified.
 
 ### No `@author`, `@version` or `@since` in documentation
 

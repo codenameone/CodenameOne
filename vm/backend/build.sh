@@ -271,10 +271,20 @@ if [ -n "$CN1_BACKEND_SRC_OUT" ]; then
     exit 0
 fi
 
+# What nothing reaches is left out of the binary by the LINKER. The translator
+# drops the Java nobody calls, but native/*.c is compiled whole: every native of
+# cn1_backend_crypto.c -- signatures, AES-GCM, RSA key generation -- was in a
+# server with no security at all, measured with nm on demo/linknone. One section
+# per function and per object, and a link that collects the unreferenced ones.
+# docker/link.sh and BackendPackager.link carry the same flags; keep the three
+# together. CN1_BACKEND_DEAD_STRIP=0 turns it off, to measure what it saves.
+GC_CFLAGS="-ffunction-sections -fdata-sections"
+if [ "$(uname -s)" = "Darwin" ]; then GC_LDFLAGS="-Wl,-dead_strip"; else GC_LDFLAGS="-Wl,--gc-sections"; fi
+if [ "${CN1_BACKEND_DEAD_STRIP:-1}" = "0" ]; then GC_CFLAGS=""; GC_LDFLAGS=""; fi
 # -fwrapv -fno-strict-aliasing -fno-builtin-fmod(f) are MANDATORY for generated C
 # (Java wrapping arithmetic; clang -O3 provably miscompiles without them).
-$CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf \
+$CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf $GC_CFLAGS \
     $CN1_BACKEND_CFLAGS $EXTRA $SSL_FLAGS -I"$SRCDIR" "$SRCDIR"/*.c "$SRCDIR"/*.S \
-    -lm -lpthread $CURL_LIB -o "$OUTBIN" \
+    -lm -lpthread $CURL_LIB $GC_LDFLAGS -o "$OUTBIN" \
     2> "$WORK/cc.log" || { echo "COMPILE FAILED"; tail -40 "$WORK/cc.log"; exit 1; }
 echo "built $OUTBIN (workdir $WORK)"

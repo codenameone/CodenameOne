@@ -83,8 +83,9 @@ final class BackendSources {
             if (aspect.timed != null || aspect.counted != null) {
                 layers.add("metrics");
             }
+            boolean secured = aspect.security != null;
             for (int i = 0; i < layers.size(); i++) {
-                boolean outermost = i == layers.size() - 1 && aspect.async == null;
+                boolean outermost = i == layers.size() - 1 && aspect.async == null && !secured;
                 String name = outermost ? m.getName() : m.getName() + "$cn1" + layers.get(i);
                 sb.append("    static ").append(retType).append(' ').append(name).append('(')
                   .append(params).append(") throws Throwable {\n");
@@ -97,8 +98,29 @@ final class BackendSources {
                 inner = simple(a.helperBinary) + "." + name + "(" + callArgs + ")";
             }
             if (aspect.async != null) {
-                async(sb, cls, aspect, index, params, callArgs, isVoid, retType, m);
+                String name = secured ? m.getName() + "$cn1async" : m.getName();
+                async(sb, cls, aspect, index, params, callArgs, isVoid, retType, name);
                 out.put(aspect.asyncTaskBinary, task(cls, aspect, args, inner, isVoid));
+                inner = simple(a.helperBinary) + "." + name + "(" + callArgs + ")";
+            }
+            if (secured) {
+                // Outermost, and before an @Async hand-off: who is calling is
+                // known on the caller's thread and nowhere else.
+                sb.append("    static ").append(retType).append(' ').append(m.getName())
+                  .append('(').append(params).append(") throws Throwable {\n");
+                sb.append("        com.codename1.backend.security.Authentication ")
+                  .append(MethodSecurityCompiler.AUTH).append(" = ")
+                  .append(MethodSecurityCompiler.RUNTIME).append(".authentication();\n");
+                sb.append("        if (!(").append(aspect.security).append(")) {\n");
+                sb.append("            throw ").append(MethodSecurityCompiler.RUNTIME)
+                  .append(".denied(").append(MethodSecurityCompiler.AUTH).append(", ")
+                  .append(quote(cls.getBinaryName() + "." + m.getName())).append(");\n");
+                sb.append("        }\n");
+                sb.append("        ").append(isVoid ? "" : "return ").append(inner).append(";\n");
+                sb.append("    }\n\n");
+                for (Map.Entry<String, String> bean : aspect.securityBeans.entrySet()) {
+                    beanAccessor(bean.getKey(), bean.getValue());
+                }
             }
         }
         sb.append("}\n");
@@ -266,10 +288,29 @@ final class BackendSources {
     }
 
     private final StringBuilder pendingMembers = new StringBuilder();
+    private final java.util.Set<String> pendingBeans = new java.util.HashSet<String>();
+
+    /// The accessor of a bean an authorization expression calls: asked of the
+    /// calling thread's server on every call, and checked to be what the call
+    /// was compiled against before it is cast.
+    private void beanAccessor(String name, String type) {
+        if (!pendingBeans.add(name)) {
+            return;
+        }
+        pendingMembers.append("    private static ").append(type).append(' ')
+          .append(MethodSecurityCompiler.accessor(name)).append("() {\n");
+        pendingMembers.append("        Object bean = ").append(MethodSecurityCompiler.RUNTIME)
+          .append(".bean(").append(quote(name)).append(");\n");
+        pendingMembers.append("        if (bean instanceof ").append(type).append(") {\n");
+        pendingMembers.append("            return (").append(type).append(") bean;\n        }\n");
+        pendingMembers.append("        throw ").append(MethodSecurityCompiler.RUNTIME)
+          .append(".noBean(").append(quote(name)).append(", ").append(quote(type))
+          .append(", bean);\n    }\n\n");
+    }
 
     private void async(StringBuilder sb, AnnotatedClass cls, BackendBeans.Aspect aspect,
                        int index, String params, String callArgs, boolean isVoid,
-                       String retType, MethodInfo m) {
+                       String retType, String name) {
         String executor = aspect.async.getStringOrDefault("value", "");
         String thread = BackendBeans.enumName(aspect.async.get("thread"), "PLATFORM");
         // Looked up on every call, never cached in a static: the executor
@@ -277,7 +318,7 @@ final class BackendSources {
         // in one process -- or one started again -- each have their own.
         String lookup = "com.codename1.impl.backend.BackendAccess.get().executor("
                 + quote(executor) + ", com.codename1.impl.backend.BackendAccess." + thread + ")";
-        sb.append("    static ").append(retType).append(' ').append(m.getName()).append('(')
+        sb.append("    static ").append(retType).append(' ').append(name).append('(')
           .append(params).append(") throws Throwable {\n");
         sb.append("        ").append(simple(aspect.asyncTaskBinary)).append(" cn1Task = new ")
           .append(simple(aspect.asyncTaskBinary)).append('(').append(callArgs).append(");\n");
@@ -778,6 +819,7 @@ final class BackendSources {
         int close = source.lastIndexOf('}');
         String out = source.substring(0, close) + pendingMembers + source.substring(close);
         pendingMembers.setLength(0);
+        pendingBeans.clear();
         return out;
     }
 

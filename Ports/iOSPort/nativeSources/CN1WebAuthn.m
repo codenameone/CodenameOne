@@ -41,7 +41,8 @@
 #endif
 #import "CodenameOne_GLViewController.h"
 
-#ifdef CN1_INCLUDE_WEBAUTHN
+// Platform passkey credentials are unavailable on watchOS.
+#if defined(CN1_INCLUDE_WEBAUTHN) && !TARGET_OS_WATCH
 
 #import "CN1AppleUI.h"
 #import <AuthenticationServices/AuthenticationServices.h>
@@ -445,10 +446,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnGet___java_lang_String_R_ja
 
 #else
 
-// Stubs when CN1_INCLUDE_WEBAUTHN is not defined: app didn't reference any
-// com.codename1.io.webauthn.* class, so the Java side won't load
-// WebAuthnNativeImpl and these natives are unreachable. ParparVM still needs
-// the symbols to satisfy the native-method declarations on IOSNative.java.
+// Stubs for watchOS, where platform passkeys are unsupported, and for apps
+// that do not reference com.codename1.io.webauthn.*. ParparVM still needs the
+// symbols to satisfy the native-method declarations on IOSNative.java.
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_webauthnSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {

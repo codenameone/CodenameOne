@@ -16,7 +16,40 @@ import time
 from urllib.parse import parse_qs
 
 source = Path(sys.argv[1]).resolve()
+# The reason table (REASON_CASES) is about the launcher's own code, which every
+# Initializr download shares: generate-initializr-fixtures.py asks for it on one
+# representative archive. Run for all of them, each Windows case also starts
+# the Java capture helper, and twenty archives of it outran the job's timeout.
+check_reasons = '--reasons' in sys.argv[2:]
 windows = os.name == 'nt'
+# (output, exit code, reason): what Maven or the build client prints for each
+# way a first build ends, and the word the launcher must report for it.
+REASON_CASES = [
+    ("Your build size is: 6kb\nSending build request to the server, notice that the build might take a while to complete!\n"
+     "Your build was submitted follow the status on: https://cloud.codenameone.com/secure/index.html\nBUILD SUCCESS\n", 0, 'ok'),
+    ("Jar size limit reached for free accounts.\nYou can upgrade your account at https://www.codenameone.com/pricing.html\n"
+     "BUILD SUCCESS\n", 0, 'size_limit'),
+    ("Sending build request to the server, notice that the build might take a while to complete!\nBUILD SUCCESS\n", 0,
+     'not_submitted'),
+    ("[ERROR] No compiler is provided in this environment. Perhaps you are running on a JRE rather than a JDK?\n"
+     "BUILD FAILURE\n", 1, 'no_jdk'),
+    ("[ERROR] Failed to execute goal ... Fatal error compiling: error: invalid target release: 17\nBUILD FAILURE\n", 1,
+     'java_too_old'),
+    ("[ERROR] COMPILATION ERROR :\nBUILD FAILURE\n", 1, 'compile'),
+    ("Could not transfer artifact com.codenameone:codenameone-core:jar:7.0.274 from/to codenameone: PKIX path building "
+     "failed: unable to find valid certification path to requested target\nBUILD FAILURE\n", 1, 'tls'),
+    ("[ERROR] Plugin com.codenameone:codenameone-maven-plugin:7.0.275 or one of its dependencies could not be resolved: "
+     "Could not find artifact com.codenameone:codenameone-maven-plugin:jar:7.0.275\nBUILD FAILURE\n", 1, 'maven_download'),
+    ("Cannot authenticate a non-interactive build: no saved token and no credentials.\nBUILD FAILURE\n", 1, 'login_failed'),
+    ("A certificate from Apple with the appropriate password is required for building an iOS native app!\n"
+     "BUILD FAILURE\n", 1, 'no_certificate'),
+    ("The icon must be a 512x512 pixel PNG image. It will be scaled to the proper sizes for devices\nBUILD FAILURE\n", 1,
+     'project_config'),
+    ("Error connecting to s3: 403 please check your proxy settings\nBUILD FAILURE\n", 1, 'upload_failed'),
+    ("Server Detailed Error Message: ERROR You don't have enough build credits\nBUILD FAILURE\n", 1, 'server_refused'),
+    ("[ERROR] Something nobody anticipated\nBUILD FAILURE\n", 1, 'build_failed'),
+]
+
 with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     parent = Path(directory)
     project = parent / "Project O'Brien with spaces"
@@ -43,9 +76,12 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     executable = cache / 'wrapper/dists' / distro / cache_key / 'bin' / ('mvn.cmd' if windows else 'mvn')
     executable.parent.mkdir(parents=True)
     if windows:
-        executable.write_bytes(b'@echo off\r\nif defined MVNW_USERNAME exit /b 91\r\nif defined MVNW_PASSWORD exit /b 92\r\necho %cd%>"%CN1_TEST_RECORD%"\r\necho %*>>"%CN1_TEST_RECORD%"\r\nexit /b %CN1_TEST_EXIT%\r\n')
+        executable.write_bytes(b'@echo off\r\nif defined MVNW_USERNAME exit /b 91\r\nif defined MVNW_PASSWORD exit /b 92\r\necho %cd%>"%CN1_TEST_RECORD%"\r\necho %*>>"%CN1_TEST_RECORD%"\r\nif defined CN1_TEST_OUTPUT_FILE type "%CN1_TEST_OUTPUT_FILE%"\r\nexit /b %CN1_TEST_EXIT%\r\n')
     else:
-        executable.write_text('#!/bin/sh\npwd > "$CN1_TEST_RECORD"\nprintf "%s\\n" "$@" >> "$CN1_TEST_RECORD"\nexit "$CN1_TEST_EXIT"\n')
+        # CN1_TEST_OUTPUT_FILE: what this fake Maven prints, so a test can hand
+        # the launcher the output of a real failure and check the reason it reports.
+        executable.write_text('#!/bin/sh\npwd > "$CN1_TEST_RECORD"\nprintf "%s\\n" "$@" >> "$CN1_TEST_RECORD"\n'
+                              '[ -n "$CN1_TEST_OUTPUT_FILE" ] && cat "$CN1_TEST_OUTPUT_FILE"\nexit "$CN1_TEST_EXIT"\n')
         executable.chmod(0o755)
     record = parent / 'record.txt'
     # Initializr launchers report build progress (see launcher-telemetry-sh.txt in
@@ -118,6 +154,40 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         assert 'launch' in steps and 'exit' in steps, events
         assert all(len(e.get('pkg', '')) == 64 for e in events), events
         assert any(e.get('step') == 'exit' and e.get('exit') == '37' for e in events), events
+        # The one-word reason, from the output of real failures. Each case is what
+        # Maven or the build client actually prints, and the reason the funnel
+        # needs to tell it apart from the others -- on Windows too, where
+        # build.bat copies the output through .mvn/Cn1Capture.java.
+        output_file = parent / 'maven-output.txt'
+        script = project / ('build.bat' if windows else 'build.sh')
+        table_env = dict(env)
+        if not windows:
+            # The table is about the output, not this machine's JDK: a stub java
+            # reporting 17, so a run under JDK 8 (gradle-smoke) does not turn
+            # "BUILD FAILURE" into java_too_old. Windows needs the real JDK, which
+            # runs the output-capture helper.
+            fake_jdk = parent / 'fake-jdk'
+            (fake_jdk / 'bin').mkdir(parents=True, exist_ok=True)
+            (fake_jdk / 'bin/java').write_text('#!/bin/sh\necho \'openjdk version "17.0.9" 2023-10-17\' >&2\n')
+            (fake_jdk / 'bin/java').chmod(0o755)
+            table_env['JAVA_HOME'] = str(fake_jdk)
+        for text, exit_code, expected_reason in (REASON_CASES if check_reasons else []):
+            output_file.write_text(text)
+            events.clear()
+            command = [str(script), 'javascript_cloud']
+            if windows:
+                command = ('"' + os.environ.get('COMSPEC', 'cmd.exe') + '" /d /s /c ""' + str(script)
+                           + '" javascript_cloud"')
+            result = subprocess.run(command, cwd=parent,
+                                    env=dict(table_env, CN1_TEST_EXIT=str(exit_code),
+                                             CN1_TEST_OUTPUT_FILE=str(output_file)),
+                                    text=True, capture_output=True, timeout=60)
+            assert result.returncode == exit_code, (text, result.returncode, result.stdout, result.stderr)
+            # Copying the output for the reason must not keep it from the console.
+            assert text.splitlines()[0] in result.stdout, (text, result.stdout)
+            reasons = [e.get('reason') for e in events if e.get('step') == 'exit']
+            assert reasons == [expected_reason], (text, exit_code, expected_reason, events, result.stdout,
+                                                  result.stderr)
         if not windows:
             # Reporting must never change the build itself. A TMPDIR that does
             # not exist leaves no room for the reason log: the build still

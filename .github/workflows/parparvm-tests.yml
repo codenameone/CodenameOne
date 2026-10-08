@@ -41,6 +41,14 @@ on:
       - 'CodenameOne/src/com/codename1/annotations/JsonIgnore.java'
       - 'CodenameOne/src/com/codename1/annotations/JsonProperty.java'
       - 'CodenameOne/src/com/codename1/io/gzip/**'
+      - 'CodenameOne/src/com/codename1/migration/**'
+      - 'CodenameOne/src/com/codename1/impl/migration/**'
+      - 'CodenameOne/src/com/codename1/security/Hash.java'
+      - 'CodenameOne/src/com/codename1/security/Hmac.java'
+      - 'CodenameOne/src/com/codename1/security/MessageDigestImpl.java'
+      - 'CodenameOne/src/com/codename1/security/Otp.java'
+      - 'CodenameOne/src/com/codename1/security/Base32.java'
+      - 'CodenameOne/src/com/codename1/security/CryptoException.java'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -85,6 +93,14 @@ on:
       - 'CodenameOne/src/com/codename1/annotations/JsonIgnore.java'
       - 'CodenameOne/src/com/codename1/annotations/JsonProperty.java'
       - 'CodenameOne/src/com/codename1/io/gzip/**'
+      - 'CodenameOne/src/com/codename1/migration/**'
+      - 'CodenameOne/src/com/codename1/impl/migration/**'
+      - 'CodenameOne/src/com/codename1/security/Hash.java'
+      - 'CodenameOne/src/com/codename1/security/Hmac.java'
+      - 'CodenameOne/src/com/codename1/security/MessageDigestImpl.java'
+      - 'CodenameOne/src/com/codename1/security/Otp.java'
+      - 'CodenameOne/src/com/codename1/security/Base32.java'
+      - 'CodenameOne/src/com/codename1/security/CryptoException.java'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -148,10 +164,21 @@ jobs:
         run: vm/benchmarks/check-ablation-arms.sh
         env:
           CN1_ABLATION_CFLAGS: -O1
+      - name: Preserve ablation failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ablation-failure-logs
+          path: |
+            vm/benchmarks/target/ablation/*.log
+            vm/benchmarks/target/ablation/*.run
+          if-no-files-found: warn
 
   vm-tests:
     runs-on: ubuntu-24.04
-    # The hello translation tests now include the Android compatibility runtime and the Kotlin stdlib (about 17 more minutes); 90 left no margin.
+    # The full suite takes about an hour before the bounded GC benchmark arms.
+    # Android compatibility and Kotlin translation add time; leave room for
+    # both phases while each GC workload retains its own timeout.
     timeout-minutes: 120
     # The two database engines the backend speaks a wire protocol to.
     #

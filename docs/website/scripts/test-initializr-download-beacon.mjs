@@ -176,7 +176,7 @@ for (const status of [400, 429, 503]) {
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(hanging.timers.length, 0, "hashing has not started a request deadline");
   finishDigest(new Uint8Array(32).buffer);
-  await started;
+  await Promise.race([started, pending.then(() => assert.fail("the request must start before settling"))]);
   assert.equal(hanging.timers.length, 1, "a deadline is armed for the confirmed request");
   assert.ok(hanging.timers[0].ms < 20000, "shorter than the bridge's 20 s wait");
   hanging.timers[0].fn();

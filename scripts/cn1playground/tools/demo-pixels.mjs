@@ -48,16 +48,29 @@ export function sceneChecks(frames, region, kind) {
   };
 }
 
-// Software WebGL can hold its initial frame while shaders/startup work finishes.
-// Keep the pixel oracle strict, but observe movement within a bounded interval.
-export async function sampleSceneFrames(takeFrame, wait, region, kind,
-  {now = Date.now, timeoutMs = 5000, intervalMs = 220} = {}) {
+// Compilation and semantic layout can finish before software WebGL presents a
+// frame. Require the same pixel checks, but give startup/animation a bounded
+// opportunity to present three usable frames instead of assuming a frame rate.
+// Startup and animation get separate bounded windows: a slow screenshot of the
+// initial blank surface must not consume the moving scene's observation window.
+export async function sampleScene(sample, wait, region, kind, now = Date.now, timeout = 8000) {
+  let deadline = now() + timeout;
   const frames = [];
-  const deadline = now() + timeoutMs;
+  let presented = false;
+  let index = 0;
   do {
-    frames.push(await takeFrame(frames.length));
-    if (frames.length >= 3 && (sceneChecks(frames, region, kind).animation || now() >= deadline)) break;
-    await wait(intervalMs);
+    const frame = await sample(index++);
+    const {animation, ...appearance} = sceneChecks([frame], region, kind);
+    if (!presented && Object.values(appearance).every(Boolean)) {
+      presented = true;
+      deadline = now() + timeout;
+      frames.length = 0;
+    }
+    frames.push(frame);
+    if (frames.length > 3) frames.shift();
+    if (frames.length === 3 && Object.values(sceneChecks(frames, region, kind)).every(Boolean)) break;
+    if (now() >= deadline) break;
+    await wait(220);
   } while (true);
   return frames;
 }

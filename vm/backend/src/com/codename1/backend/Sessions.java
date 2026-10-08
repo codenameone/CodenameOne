@@ -864,6 +864,12 @@ final class Sessions {
         }
 
         @Override
+        public synchronized Object consumeAttribute(String id, String name) {
+            HttpSession session = load(id);
+            return session == null || !session.isValid() ? null : session.consumeLocalAttribute(name);
+        }
+
+        @Override
         public int purgeExpired(long now) {
             return purgeExpired(now, java.util.Collections.EMPTY_SET);
         }
@@ -972,6 +978,32 @@ final class Sessions {
 
         /// Attempts at an optimistic save before two requests' races are reported.
         private static final int SAVE_ATTEMPTS = 8;
+
+        @Override
+        public Object consumeAttribute(String id, String name) throws IOException {
+            prepare();
+            for (int attempt = 0; attempt < SAVE_ATTEMPTS; attempt++) {
+                Map row = pool.queryOne("SELECT attributes, version FROM " + TABLE
+                        + " WHERE id = ? AND namespace = ?", new Object[] {id, namespace});
+                if (row == null || !(row.get("attributes") instanceof String)) {
+                    return null;
+                }
+                Map values = Json.parseObject((String) row.get("attributes"));
+                Object taken = values.remove(name);
+                if (taken == null) {
+                    return null;
+                }
+                long version = number(row.get("version"));
+                int updated = pool.execute("UPDATE " + TABLE
+                        + " SET attributes = ?, version = ? WHERE id = ? AND namespace = ? AND version = ?",
+                        new Object[] {Json.write(values), Long.valueOf(version + 1), id, namespace,
+                            Long.valueOf(version)});
+                if (updated > 0) {
+                    return taken;
+                }
+            }
+            throw new IOException("Session attribute could not be consumed: concurrent updates");
+        }
 
         /// Two requests of one client load separate copies of the session, and a
         /// copy written back whole would replace whatever the other request saved

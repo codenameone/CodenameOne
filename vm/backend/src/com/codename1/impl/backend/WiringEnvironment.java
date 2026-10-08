@@ -41,6 +41,9 @@ public final class WiringEnvironment {
     private final List managed;
     /// {name, description, unit, Gauge.Source}, for the server to add and later remove.
     final List gauges = new ArrayList();
+    /// {Integer order, chain}, in the order they were registered.
+    private final List securityChains = new ArrayList();
+    private final java.util.Map namedBeans = new java.util.HashMap();
 
     public WiringEnvironment(Config config, DataSource dataSource, EntityManager entities,
                 List tools, List managed) {
@@ -99,6 +102,50 @@ public final class WiringEnvironment {
             }
         }
         managed.add(bean);
+    }
+
+    /// Makes a bean reachable by name from woven code: the bean an authorization
+    /// expression calls. Generated code calls this once the beans are built; a
+    /// conditional bean that is off is null and is not registered.
+    public void registerNamedBean(String name, Object bean) {
+        if (bean != null) {
+            namedBeans.put(name, bean);
+        }
+    }
+
+    /// The beans registered with [#registerNamedBean], by name.
+    public java.util.Map namedBeans() {
+        return namedBeans;
+    }
+
+    /// Hands the server a `SecurityFilterChain` bean and its `@Order`. Generated
+    /// code calls this once the beans are built. An Object, so this class -- which
+    /// every server links -- names nothing of the security layer.
+    public void registerSecurityFilterChain(Object chain, int order) {
+        if (chain != null) {
+            securityChains.add(new Object[] {Integer.valueOf(order), chain});
+        }
+    }
+
+    /// The registered chains, lowest `@Order` first; chains of one order keep the
+    /// order they were registered in.
+    public List securityFilterChains() {
+        // An insertion sort from the end: stable, and there are a handful.
+        List sorted = new ArrayList();
+        for (Object element : securityChains) {
+            int order = ((Integer) ((Object[]) element)[0]).intValue();
+            int at = sorted.size();
+            while (at > 0
+                    && ((Integer) ((Object[]) sorted.get(at - 1))[0]).intValue() > order) {
+                at--;
+            }
+            sorted.add(at, element);
+        }
+        List out = new ArrayList(sorted.size());
+        for (Object element : sorted) {
+            out.add(((Object[]) element)[1]);
+        }
+        return out;
     }
 
     public Config getConfig() {

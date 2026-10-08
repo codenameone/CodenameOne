@@ -1918,7 +1918,16 @@ public class ByteCodeClass {
                 // as if they are regular virtual calls
                 for(BytecodeMethod m : virtualMethodList) {
                     if(m.getClsName().equals("java_lang_Object")) {
-                        m.appendVirtualMethodC(clsName, b, "" + offset, true);
+                        // Object methods use the receiver's class vtable, not
+                        // the interface map. The latter excludes inherited
+                        // Object methods and may redeclare equals/hashCode,
+                        // so its running offset is not an Object slot.
+                        ByteCodeClass objectClass = findClass("java_lang_Object", allClasses);
+                        int objectOffset = objectClass.virtualMethodList.indexOf(m);
+                        if (objectOffset < 0) {
+                            throw new IllegalStateException("Missing Object vtable slot for " + m);
+                        }
+                        m.appendVirtualMethodC(clsName, b, "" + objectOffset, true);
                     } else {
                         // we pretend to have a virtual method here but the optimizer says its not really needed
                         if(!m.isVirtualOverriden()) {

@@ -61,9 +61,9 @@ class HTML5GLSurface extends HTML5Peer {
             // keeps firing and flushing the display forever, degrading the whole
             // playground (and stacking up if several samples were run).
             if (!isLive()) {
-                // A frame can arrive while a preview is being reparented, or
-                // before its form becomes current. Park the loop without
-                // discarding the caller's continuous-rendering preference.
+                // A frame can arrive before the form becomes current or while
+                // the preview is reparented. Keep the requested mode; painting
+                // the attached surface will restart the parked loop.
                 return;
             }
             // Repaint; the actual GL render + blit happens in paint() so the 3D

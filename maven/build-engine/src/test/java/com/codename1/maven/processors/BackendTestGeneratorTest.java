@@ -44,6 +44,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +53,7 @@ import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -648,6 +650,279 @@ public class BackendTestGeneratorTest {
         }
     }
 
+    private static Map<String, String> securedApplication() {
+        String imports = MAIN + "import com.codename1.backend.security.*;\n"
+                + "import com.codename1.backend.security.core.userdetails.*;\n"
+                + "import com.codename1.backend.security.crypto.*;\n";
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.SecurityConfig", imports
+                + "@Configuration public class SecurityConfig {\n"
+                + "    @Bean public SecurityFilterChain web(HttpSecurity http) {\n"
+                + "        http.authorizeHttpRequests(auth -> auth\n"
+                + "                .requestMatchers(\"/admin/**\").hasRole(\"ADMIN\")\n"
+                + "                .anyRequest().authenticated())\n"
+                + "            .formLogin(Customizer.withDefaults())\n"
+                + "            .httpBasic(Customizer.withDefaults());\n"
+                + "        return http.build();\n"
+                + "    }\n"
+                + "    @Bean public PasswordEncoder encoder() { return new BCryptPasswordEncoder(4); }\n"
+                + "    @Bean public UserDetailsService users(PasswordEncoder encoder) {\n"
+                + "        return new InMemoryUserDetailsManager(User.withUsername(\"real\")\n"
+                + "                .password(encoder.encode(\"real-pw\")).roles(\"USER\").build());\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Notes", imports + "@RestController public class Notes {\n"
+                + "    @GetMapping(\"/me\") public String me(Authentication who) {\n"
+                + "        return who.getName() + \" \" + who.getAuthorities();\n    }\n"
+                + "    @GetMapping(\"/admin/x\") public String admin() { return \"admin\"; }\n"
+                + "    @PostMapping(\"/notes\") public String save() { return \"saved\"; }\n"
+                + "}\n");
+        return s;
+    }
+
+    private static final String SECURED_TEST = "package com.example;\n"
+            + "import com.codename1.backend.annotations.*;\n"
+            + "import com.codename1.backend.security.*;\n"
+            + "import com.codename1.backend.test.*;\n"
+            + "import static com.codename1.backend.test.MockMvcRequestBuilders.*;\n"
+            + "import static com.codename1.backend.test.MockMvcResultMatchers.*;\n"
+            + "import static com.codename1.backend.test.SecurityMockMvcRequestPostProcessors.*;\n"
+            + "@BackendTest\n"
+            + "@WithMockUser(username = \"ada\", roles = \"EDITOR\")\n"
+            + "public class SecuredTest {\n"
+            + "    @Autowired private MockMvc mvc;\n"
+            + "    private static void runningAs(String name) {\n"
+            + "        Authentication who = SecurityContextHolder.getContext().getAuthentication();\n"
+            + "        String actual = who == null ? null : who.getName();\n"
+            + "        if (!String.valueOf(name).equals(String.valueOf(actual))) {\n"
+            + "            throw new AssertionError(\"the test thread runs as \" + actual);\n"
+            + "        }\n"
+            + "    }\n"
+            + "    @org.junit.jupiter.api.Test\n"
+            + "    void asTheClassSays() throws Exception {\n"
+            + "        runningAs(\"ada\");\n"
+            + "        mvc.perform(get(\"/me\")).andExpect(content().string(\"ada [ROLE_EDITOR]\"));\n"
+            // Still ada after a request: the server clears the thread it served on.
+            + "        runningAs(\"ada\");\n"
+            + "        mvc.perform(get(\"/admin/x\")).andExpect(status().isForbidden());\n"
+            + "    }\n"
+            + "    @org.junit.jupiter.api.Test\n"
+            + "    @WithMockUser(authorities = {\"notes:write\", \"ROLE_ADMIN\"})\n"
+            + "    void asTheMethodSays() throws Exception {\n"
+            + "        mvc.perform(get(\"/me\"))\n"
+            + "                .andExpect(content().string(\"user [notes:write, ROLE_ADMIN]\"));\n"
+            + "        mvc.perform(get(\"/admin/x\")).andExpect(content().string(\"admin\"));\n"
+            + "    }\n"
+            + "    @org.junit.jupiter.api.Test\n"
+            + "    @WithAnonymousUser\n"
+            + "    void asNobody() throws Exception {\n"
+            + "        runningAs(\"anonymous\");\n"
+            + "        mvc.perform(get(\"/me\")).andExpect(status().isFound())\n"
+            + "                .andExpect(redirectedUrl(\"/login\"));\n"
+            + "    }\n"
+            + "    @org.junit.jupiter.api.Test\n"
+            + "    void oneRequestAtATime() throws Exception {\n"
+            + "        mvc.perform(get(\"/admin/x\").with(user(\"bob\").roles(\"ADMIN\")))\n"
+            + "                .andExpect(content().string(\"admin\"));\n"
+            + "        mvc.perform(get(\"/me\").with(user(\"cy\").authorities(\"a\", \"b\")))\n"
+            + "                .andExpect(content().string(\"cy [a, b]\"));\n"
+            // The request after is the class's user again.
+            + "        runningAs(\"ada\");\n"
+            + "        mvc.perform(get(\"/admin/x\")).andExpect(status().isForbidden());\n"
+            + "        mvc.perform(get(\"/me\").with(anonymous())).andExpect(status().isFound());\n"
+            // Real credentials, checked by the chain against the user store.
+            + "        mvc.perform(get(\"/me\").with(anonymous()).with(httpBasic(\"real\", \"real-pw\")))\n"
+            + "                .andExpect(content().string(\"real [ROLE_USER]\"));\n"
+            + "        mvc.perform(get(\"/me\").with(anonymous()).with(httpBasic(\"real\", \"nope\")))\n"
+            + "                .andExpect(status().isUnauthorized());\n"
+            + "        runningAs(\"ada\");\n"
+            + "    }\n"
+            + "    @org.junit.jupiter.api.Test\n"
+            + "    void aStateChangingRequestNeedsItsToken() throws Exception {\n"
+            + "        mvc.perform(post(\"/notes\")).andExpect(status().isForbidden());\n"
+            + "        mvc.perform(post(\"/notes\").with(csrf())).andExpect(content().string(\"saved\"));\n"
+            + "        mvc.perform(post(\"/notes\").with(csrf().asHeader()))\n"
+            + "                .andExpect(content().string(\"saved\"));\n"
+            + "        mvc.perform(post(\"/notes\").with(csrf().useInvalidToken()))\n"
+            + "                .andExpect(status().isForbidden());\n"
+            // The token was for that one request.
+            + "        mvc.perform(post(\"/notes\")).andExpect(status().isForbidden());\n"
+            + "    }\n"
+            + "    @org.junit.jupiter.api.Test\n"
+            + "    void aTokenOrAKeyThatWasAccepted() throws Exception {\n"
+            + "        mvc.perform(get(\"/me\").with(jwt())).andExpect(content().string(\"user [SCOPE_read]\"));\n"
+            + "        mvc.perform(get(\"/me\").with(jwt().subject(\"svc\").scopes(\"a\", \"b\")\n"
+            + "                .claim(\"tenant\", \"acme\")))\n"
+            + "                .andExpect(content().string(\"svc [SCOPE_a, SCOPE_b]\"));\n"
+            + "        mvc.perform(get(\"/admin/x\").with(jwt().authorities(\"ROLE_ADMIN\")))\n"
+            + "                .andExpect(content().string(\"admin\"));\n"
+            + "        mvc.perform(get(\"/admin/x\").with(jwt())).andExpect(status().isForbidden());\n"
+            + "        mvc.perform(get(\"/me\").with(apiKey(\"billing\").scopes(\"orders:read\")))\n"
+            + "                .andExpect(content().string(\"billing [SCOPE_orders:read]\"));\n"
+            + "        mvc.perform(get(\"/me\").with(apiKey(\"billing\")))\n"
+            + "                .andExpect(content().string(\"billing []\"));\n"
+            + "        runningAs(\"ada\");\n"
+            + "    }\n"
+            + "    @org.junit.jupiter.api.Test\n"
+            + "    void expectsTheWrongUser() throws Exception {\n"
+            + "        mvc.perform(get(\"/me\")).andExpect(content().string(\"eve [ROLE_EDITOR]\"));\n"
+            + "    }\n"
+            + "}\n";
+
+    private static int counter(String name) throws Exception {
+        java.lang.reflect.Field f = com.codename1.impl.backend.test.TestRun.class
+                .getDeclaredField(name);
+        f.setAccessible(true);
+        return f.getInt(null);
+    }
+
+    @Test
+    public void aTestRunsAsTheUserItNamesOnTheJvmAndCompiled() throws Exception {
+        File classes = mainBuild(securedApplication());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.SecuredTest", SECURED_TEST);
+        File tests = testBuild(classes, t, true);
+        URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
+                classes.toURI().toURL()}, getClass().getClassLoader());
+        try {
+            // What the JUnit extension asks the generated context before a test.
+            TestContext context = (TestContext) loader
+                    .loadClass("com.example.SecuredTestCn1TestContext").newInstance();
+            assertEquals("[user, ada, password, ROLE_EDITOR]",
+                    Arrays.asList(context.securityContext("asTheClassSays")).toString());
+            assertEquals("[user, user, password, notes:write, ROLE_ADMIN]",
+                    Arrays.asList(context.securityContext("asTheMethodSays")).toString());
+            assertEquals("[anonymous]",
+                    Arrays.asList(context.securityContext("asNobody")).toString());
+            assertNull(context.securityContext("noSuchTest"));
+
+            // And the same tests as the compiled run runs them: the generated
+            // runner carries each test's user as a literal.
+            int passed = counter("passed");
+            int failed = counter("failed");
+            loader.loadClass("com.example.SecuredTestCn1TestRunner").getMethod("run").invoke(null);
+            assertEquals("exactly the test that expects another user fails",
+                    failed + 1, counter("failed"));
+            assertEquals(passed + 6, counter("passed"));
+            // Nothing of the last test's user is left on this thread.
+            assertNull(com.codename1.impl.backend.security.SecurityAccess.get().testContext());
+            assertNull(com.codename1.backend.security.SecurityContextHolder.getContext()
+                    .getAuthentication());
+
+            // The JUnit extension's own sequence, by hand: apply, test, clear.
+            TestEnvironment env = TestContexts.acquire(context);
+            Object test = loader.loadClass("com.example.SecuredTest").newInstance();
+            context.inject(test, env);
+            for (String name : new String[] {"asTheClassSays", "asTheMethodSays", "asNobody",
+                "oneRequestAtATime", "aStateChangingRequestNeedsItsToken",
+                "aTokenOrAKeyThatWasAccepted"}) {
+                com.codename1.impl.backend.test.TestSecurity.apply(context.securityContext(name));
+                try {
+                    invoke(test, name);
+                } finally {
+                    com.codename1.impl.backend.test.TestSecurity.clear();
+                }
+            }
+            // Without the user the annotations name, the same test does not pass.
+            try {
+                invoke(test, "asTheClassSays");
+                fail("a test passed without the user it runs as");
+            } catch (AssertionError expected) {
+                assertTrue(expected.getMessage(), expected.getMessage().contains(
+                        "the test thread runs as null"));
+            }
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
+    public void aTestApplicationWithoutAChainLinksNoSecurity() throws Exception {
+        File classes = mainBuild(application());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.PlainTest", "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "@BackendTest\n"
+                + "public class PlainTest {\n"
+                + "    @Autowired private MockMvc mvc;\n"
+                + "    @org.junit.jupiter.api.Test void nothing() { }\n"
+                + "}\n");
+        File tests = testBuild(classes, t, true);
+        String context = classFile(tests, "com/example/PlainTestCn1TestContext.class");
+        assertFalse("the context of an application with no chain links the layer",
+                callsSecurityLink(context));
+        for (String generated : new String[] {"com/example/PlainTestCn1TestContext.class",
+            "com/example/PlainTestCn1TestRunner.class"}) {
+            String bytes = classFile(tests, generated);
+            assertFalse(generated + " names the security layer",
+                    bytes.contains("backend/security/"));
+            assertFalse(generated + " names the security layer", bytes.contains("TestSecurity"));
+        }
+
+        // The control: with a chain, the same generated classes do link it.
+        File secured = mainBuild(securedApplication());
+        t = new LinkedHashMap<String, String>();
+        t.put("com.example.SecuredTest", SECURED_TEST);
+        File securedTests = testBuild(secured, t, true);
+        assertTrue(callsSecurityLink(classFile(securedTests,
+                "com/example/SecuredTestCn1TestContext.class")));
+        assertTrue(classFile(securedTests, "com/example/SecuredTestCn1TestRunner.class")
+                .contains("com/codename1/impl/backend/test/TestSecurity"));
+    }
+
+    private static String classFile(File dir, String name) throws Exception {
+        return new String(Files.readAllBytes(new File(dir, name).toPath()), "ISO-8859-1");
+    }
+
+    /// Whether a class file's constant pool names a method called exactly
+    /// `security`: BackendAccess.security(builder), the call that links the layer.
+    /// A UTF-8 constant is a tag of 1, a two-byte length and the text.
+    private static boolean callsSecurityLink(String classBytes) {
+        String constant = String.valueOf((char) 1) + (char) 0 + (char) 8 + "security";
+        return classBytes.contains(constant);
+    }
+
+    @Test
+    public void aMockUserThatCannotBeBuiltIsABuildError() throws Exception {
+        File classes = mainBuild(securedApplication());
+        String head = "package com.example;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "@BackendTest public class BadTest {\n";
+        String[][] cases = {
+            {"    @org.junit.jupiter.api.Test @WithMockUser(roles = \"ROLE_ADMIN\") void t() { }\n",
+                "roles cannot start with ROLE_, which is added. Got ROLE_ADMIN"},
+            {"    @org.junit.jupiter.api.Test @WithMockUser @WithAnonymousUser void t() { }\n",
+                "carries both @WithMockUser and @WithAnonymousUser"},
+            {"    @org.junit.jupiter.api.Test\n"
+                + "    @WithMockUser(roles = \"A\", authorities = \"b\") void t() { }\n",
+                "gives both roles and authorities"},
+        };
+        for (String[] c : cases) {
+            Map<String, String> t = new LinkedHashMap<String, String>();
+            t.put("com.example.BadTest", head + c[0] + "}\n");
+            try {
+                testBuild(classes, t, true);
+                fail("accepted: " + c[0]);
+            } catch (BuildFailureException expected) {
+                assertTrue(expected.getMessage(), expected.getMessage().contains(c[1]));
+            }
+        }
+        // Outside a @BackendTest there are no requests for it to act on.
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.LooseTest", "package com.example;\n"
+                + "import com.codename1.backend.test.*;\n"
+                + "public class LooseTest {\n"
+                + "    @org.junit.jupiter.api.Test @WithMockUser void t() { }\n}\n");
+        try {
+            testBuild(classes, t, true);
+            fail("@WithMockUser was accepted outside a @BackendTest");
+        } catch (BuildFailureException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains(
+                    "act on the requests of a @BackendTest; this class is not one"));
+        }
+    }
+
     private static void invoke(Object test, String name) throws Exception {
         java.lang.reflect.Method m = test.getClass().getDeclaredMethod(name);
         m.setAccessible(true);
@@ -700,6 +975,12 @@ public class BackendTestGeneratorTest {
     }
 
     private File testBuild(File classes, Map<String, String> sources) throws Exception {
+        return testBuild(classes, sources, false);
+    }
+
+    /// @param compiled whether to generate the runners of a compiled test run too
+    private File testBuild(File classes, Map<String, String> sources, boolean compiled)
+            throws Exception {
         File tests = tmp.newFolder();
         List<File> cp = new ArrayList<File>(classpath());
         cp.add(0, classes);
@@ -709,7 +990,7 @@ public class BackendTestGeneratorTest {
             elements.add(f.getAbsolutePath());
         }
         BackendTests.process(classes, tests, tmp.newFolder(), tmp.newFolder(),
-                Collections.<String>emptyList(), "UTF-8", elements, false, new SystemStreamLog());
+                Collections.<String>emptyList(), "UTF-8", elements, compiled, new SystemStreamLog());
         return tests;
     }
 

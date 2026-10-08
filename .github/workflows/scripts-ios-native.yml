@@ -26,7 +26,10 @@ jobs:
     permissions:
       contents: read
     runs-on: macos-15
-    # Master already hit 45 at the job level; the hello app now also translates the Android compatibility gallery, its runtime and the Kotlin stdlib.
+    # Allow setup plus the separately bounded 30-minute generation and 45-minute
+    # XCTest build/run steps. A 45-minute job cap canceled a progressing native
+    # build after only 34 minutes of the XCTest step in run 37728629000.
+    # The hello app also translates the Android compatibility gallery and Kotlin stdlib.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6

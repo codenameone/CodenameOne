@@ -34,6 +34,10 @@ public class CollectionSemanticsApp {
         System.out.println("CASE|" + k + "|" + v);
     }
 
+    static String stringFromCollection(java.util.Collection<String> values) {
+        return values.toString();
+    }
+
     static class ExposedVector extends java.util.Vector<String> {
         Object[] data() { return elementData; }
         void replace() { elementData = new Object[] {"direct", "second", null}; elementCount = 2; }
@@ -240,7 +244,26 @@ public class CollectionSemanticsApp {
         } catch (NullPointerException expected) { emit("fieldTraversal.null", traversalCalls); }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
+        // The migration result exposes this exact wrapper. Its toString calls
+        // Object.toString through a Collection receiver, whose interface also
+        // redeclares equals and hashCode. These use different dispatch tables.
+        List<String> migrations = new ArrayList<String>();
+        migrations.add("V1__create_migration_probe.sql");
+        migrations.add("V2__add_probe_created.sql");
+        migrations.add("R__probe_summary_view.sql");
+        // Keep the Object slots before toString live, as in a real UI app.
+        emit("unmodifiable.type", migrations.getClass().getName());
+        synchronized (migrations) {
+            migrations.notify();
+            migrations.notifyAll();
+            migrations.wait(1);
+        }
+        List<String> applied = java.util.Collections.unmodifiableList(migrations);
+        emit("unmodifiable.hash", applied.hashCode());
+        emit("unmodifiable.string", String.valueOf(applied));
+        emit("unmodifiable.collection", java.util.Collections.unmodifiableCollection(migrations).toString());
+        emit("interface.string", stringFromCollection(applied));
         new CollectionSemanticsApp().fieldTraversalCases();
         new CollectionSemanticsApp().directCallCases();
         nativeStorageCases();

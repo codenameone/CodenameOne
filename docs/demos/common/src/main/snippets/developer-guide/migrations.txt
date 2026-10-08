@@ -1,0 +1,17 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::migrations-layout-server[]
+src/main/resources/db/migration/
+    V1__create_note.sql
+    V2__add_note_created.sql
+    R__note_summary_view.sql
+    postgresql/V3__note_search_index.sql
+    mysql/V3__note_search_index.sql
+    sqlite/V3__note_search_index.sql
+// end::migrations-layout-server[]
+
+// tag::migrations-layout-app[]
+common/src/main/db/migration/
+    V1__create_note.sql
+    V2__add_note_created.sql
+// end::migrations-layout-app[]

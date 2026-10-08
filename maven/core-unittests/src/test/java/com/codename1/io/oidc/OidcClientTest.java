@@ -208,14 +208,40 @@ public class OidcClientTest extends UITestBase {
     }
 
     @Test
-    void discoverToleratesTrailingSlashesOnIssuer() {
+    void discoverPreservesIssuerWhileRemovingTrailingSlashesFromRequestUrl() {
         mock(ISSUER + "/.well-known/openid-configuration", 200,
-                "{\"issuer\":\"" + ISSUER + "\",\"authorization_endpoint\":\""
+                "{\"issuer\":\"" + ISSUER + "///\",\"authorization_endpoint\":\""
                         + AUTH_EP + "\"}");
 
         Outcome<OidcClient> r = await(OidcClient.discover(ISSUER + "///"));
         assertNull(r.error);
+        assertEquals(ISSUER + "///", r.value.getConfiguration().getIssuer());
         assertEquals(AUTH_EP, r.value.getConfiguration().getAuthorizationEndpoint());
+    }
+
+    @Test
+    void discoverRejectsMissingMalformedOrDifferentIssuer() {
+        for (String named : new String[] {null, "null", "42", "\"\"",
+                "\"https://other.example.com\"", "\"" + ISSUER + "/tenant\"",
+                "\"" + ISSUER + "/\"", "\"https://ISSUER.example.com\""}) {
+            mock(ISSUER + "/.well-known/openid-configuration", 200,
+                    "{" + (named == null ? "" : "\"issuer\":" + named + ",")
+                            + "\"authorization_endpoint\":\"" + AUTH_EP + "\"}");
+            Outcome<OidcClient> r = await(OidcClient.discover(ISSUER));
+            assertNull(r.value, "must not adopt metadata issuer " + named);
+            assertInstanceOf(OidcException.class, r.error);
+            assertEquals(OidcException.DISCOVERY_FAILED, ((OidcException) r.error).getError());
+        }
+    }
+
+    @Test
+    void discoverDoesNotNormalizeIssuerBeforeComparingMetadata() {
+        mock(ISSUER + "/.well-known/openid-configuration", 200,
+                "{\"issuer\":\"" + ISSUER + "\",\"authorization_endpoint\":\"" + AUTH_EP + "\"}");
+        Outcome<OidcClient> r = await(OidcClient.discover(ISSUER + "/"));
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals(OidcException.DISCOVERY_FAILED, ((OidcException) r.error).getError());
     }
 
     @Test
@@ -281,6 +307,124 @@ public class OidcClientTest extends UITestBase {
         assertEquals("expired", ex.getErrorDescription());
     }
 
+    @Test
+    void unsupportedOrMissingTokenTypesAreNeverAcceptedOrStored() {
+        for (String type : new String[] {"", ",\"token_type\":\"DPoP\"",
+                ",\"token_type\":42", ",\"token_type\":null"}) {
+            MemoryTokenStore store = new MemoryTokenStore();
+            OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+            mock(TOKEN_EP, 200, "{\"access_token\":\"AT-new\"" + type + "}");
+            Outcome<OidcTokens> r = await(c.refresh("RT"));
+            assertNull(r.value);
+            assertInstanceOf(OidcException.class, r.error);
+            assertEquals(OidcException.INVALID_RESPONSE, ((OidcException) r.error).getError());
+            assertNull(store.saved, "unsupported token type was persisted: " + type);
+        }
+        OidcClient c = configuredClient(fullConfig());
+        mock(TOKEN_EP, 200, "{\"access_token\":\"AT-new\",\"token_type\":\"bEaReR\"}");
+        assertNotNull(await(c.refresh("RT")).value);
+    }
+
+    @Test
+    void invalidExpiryCompletesWithAnErrorWithoutPersistingTokens() {
+        for (String expiry : new String[] {"-1", "9223372036854775807", "1.5", "\"bad\""}) {
+            MemoryTokenStore store = new MemoryTokenStore();
+            OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+            mock(TOKEN_EP, 200, "{\"access_token\":\"AT\",\"token_type\":\"Bearer\",\"expires_in\":"
+                    + expiry + "}");
+            Outcome<OidcTokens> result = await(c.refresh("RT"));
+            assertNull(result.value);
+            assertInstanceOf(OidcException.class, result.error);
+            assertEquals(OidcException.INVALID_RESPONSE, ((OidcException) result.error).getError());
+            assertNull(store.saved);
+        }
+    }
+
+    @Test
+    void aSuccessWithoutAnAccessTokenIsNotASession() {
+        MemoryTokenStore store = new MemoryTokenStore();
+        OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+        mock(TOKEN_EP, 200, "{\"token_type\":\"Bearer\",\"expires_in\":3600}");
+
+        Outcome<OidcTokens> r = await(c.refresh("RT"));
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals(OidcException.INVALID_RESPONSE, ((OidcException) r.error).getError());
+        assertEquals("Token endpoint response has no access_token", r.error.getMessage());
+        assertNull(store.saved, "a token set with no access token was stored");
+    }
+
+    @Test
+    void aFailingStatusWithNoOAuthErrorIsTheServerFailingNotRefusing() {
+        MemoryTokenStore store = new MemoryTokenStore();
+        OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+        mock(TOKEN_EP, 500, "{\"message\":\"failure\"}");
+
+        Outcome<OidcTokens> r = await(c.refresh("RT"));
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals(OidcException.TRANSPORT_ERROR, ((OidcException) r.error).getError());
+        assertEquals("Token endpoint answered HTTP 500 without an OAuth error", r.error.getMessage());
+        assertNull(store.saved);
+    }
+
+    @Test
+    void aGatewaysErrorPageIsNotARefusalEither() {
+        OidcClient c = configuredClient(fullConfig());
+        mock(TOKEN_EP, 502, "<html>Bad Gateway</html>");
+
+        Outcome<OidcTokens> r = await(c.refresh("RT"));
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals(OidcException.TRANSPORT_ERROR, ((OidcException) r.error).getError());
+    }
+
+    @Test
+    void anOAuthErrorIsReportedAsItselfUnderItsOwnStatus() {
+        OidcClient c = configuredClient(fullConfig());
+        mock(TOKEN_EP, 400, "{\"error\":\"invalid_grant\",\"error_description\":\"revoked\"}");
+
+        Outcome<OidcTokens> r = await(c.refresh("RT"));
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals("invalid_grant", ((OidcException) r.error).getError());
+    }
+
+    @Test
+    void aRefreshCancelledBeforeItsAnswerStoresNothing() throws Exception {
+        MemoryTokenStore store = new MemoryTokenStore();
+        OidcClient c = configuredClient(fullConfig()).setTokenStore(store);
+        final CountDownLatch atTokenEndpoint = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        TestCodenameOneImplementation.getInstance().setNetworkMockHandler(
+                new TestCodenameOneImplementation.NetworkMockHandler() {
+                    public void handle(TestCodenameOneImplementation.TestConnection connection) {
+                        connection.clearRequest();
+                        atTokenEndpoint.countDown();
+                        try {
+                            release.await(15, java.util.concurrent.TimeUnit.SECONDS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                        connection.respond(200, "OK", utf8(
+                                "{\"access_token\":\"AT-new\",\"token_type\":\"Bearer\"}"));
+                    }
+                });
+
+        AsyncResource<OidcTokens> pending = c.refresh("RT");
+        long deadline = System.currentTimeMillis() + 15000;
+        while (atTokenEndpoint.getCount() > 0 && System.currentTimeMillis() < deadline) {
+            DisplayTest.flushEdt();
+        }
+        assertEquals(0, atTokenEndpoint.getCount(), "the exchange never started");
+        // Whoever asked stops waiting while the answer is on its way.
+        assertTrue(pending.cancel(false));
+        release.countDown();
+        for (int i = 0; i < 50; i++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(10);
+        }
+        assertNull(store.saved, "an answer nobody was waiting for was stored");
+    }
+
     // ---- revocation --------------------------------------------------
 
     @Test
@@ -304,6 +448,38 @@ public class OidcClientTest extends UITestBase {
         OidcClient c = configuredClient(fullConfig());
         mock(REVOKE_EP, 200, "");
         Outcome<Boolean> r = await(c.revoke("tok"));
+        assertNull(r.error);
+        assertEquals(Boolean.TRUE, r.value);
+    }
+
+    @Test
+    void revokeReportsOAuthErrors() {
+        mock(REVOKE_EP, 400, "{\"error\":\"invalid_client\",\"error_description\":\"Credentials rejected\"}");
+        Outcome<Boolean> r = await(configuredClient(fullConfig()).revoke("tok"));
+        assertNull(r.value);
+        assertInstanceOf(OidcException.class, r.error);
+        assertEquals("invalid_client", ((OidcException) r.error).getError());
+        assertEquals("Credentials rejected", r.error.getMessage());
+    }
+
+    @Test
+    void revokeReportsHttpErrorsWithoutOAuthBodies() {
+        int[] statuses = {401, 500, 503};
+        String[] bodies = {"", "{\"message\":\"unavailable\"}", "<html>Gateway unavailable</html>"};
+        for (int i = 0; i < statuses.length; i++) {
+            mock(REVOKE_EP, statuses[i], bodies[i]);
+            Outcome<Boolean> r = await(configuredClient(fullConfig()).revoke("tok"));
+            assertNull(r.value, "HTTP " + statuses[i] + " must not report revocation success");
+            assertInstanceOf(OidcException.class, r.error);
+            assertEquals(OidcException.TRANSPORT_ERROR, ((OidcException) r.error).getError());
+            assertTrue(r.error.getMessage().contains("HTTP " + statuses[i]));
+        }
+    }
+
+    @Test
+    void revokeAcceptsNoContentSuccess() {
+        mock(REVOKE_EP, 204, "");
+        Outcome<Boolean> r = await(configuredClient(fullConfig()).revoke("tok"));
         assertNull(r.error);
         assertEquals(Boolean.TRUE, r.value);
     }

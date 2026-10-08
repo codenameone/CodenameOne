@@ -347,7 +347,8 @@ indexes. Generated text keys, indexed fields, and foreign keys accept at most
 whether null values are allowed, and primary-key membership in entity and
 collection tables. It doesn't migrate
 schemas or validate every database-specific constraint. Existing tables are
-left to explicit migrations. In particular, a legacy client DAO's text char
+left to <<client-schema-migrations,migrations>>, which `EntityManager.open(name)`
+applies before it returns. In particular, a legacy client DAO's text char
 columns need migration to the managed layer's numeric UTF-16 storage when moving
 to a managed schema.
 

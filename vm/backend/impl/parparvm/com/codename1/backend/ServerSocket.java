@@ -221,6 +221,13 @@ public final class ServerSocket {
         }
     }
 
+    /// The address of a connection's other end as its raw bytes -- 4 for IPv4,
+    /// 16 for IPv6 -- or null when the descriptor is not a connected socket.
+    public static byte[] peerAddress(int fd) {
+        return fd < 0 ? null : peerAddressImpl(fd);
+    }
+
+    private static native byte[] peerAddressImpl(int fd);
     private static native void shutdownImpl(int fd);
     private static native int setReceiveTimeoutImpl(int fd, int millis);
     private static native int bindImpl(String host, int port, int backlog);

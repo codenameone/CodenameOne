@@ -27,6 +27,7 @@ package com.codename1.security;
 //
 // One class with a small dispatch is more compact than five separate classes
 // and keeps all the round constants close to the rounds that use them.
+@com.codename1.impl.SharedWithBackend
 abstract class MessageDigestImpl {
 
     abstract void update(byte[] data, int offset, int length);

@@ -64,6 +64,15 @@ class BackendPackageHostLibrariesTest {
     }
 
     @Test
+    void leavesOutWhatNothingReachesInTheLinkersOwnSpelling() {
+        // Apple's linker and the ELF ones name the same thing differently, and
+        // the wrong spelling fails the link outright.
+        assertEquals("-Wl,-dead_strip", BackendPackager.deadStripFlag("Mac OS X"));
+        assertEquals("-Wl,--gc-sections", BackendPackager.deadStripFlag("Linux"));
+        assertEquals("-Wl,--gc-sections", BackendPackager.deadStripFlag(""));
+    }
+
+    @Test
     void addsNothingWhenTheHeadersAreWhereClangLooks(@TempDir File tmp) throws Exception {
         // A Linux box with the distribution's -dev package: none of the probes
         // match and the command is left exactly as it was.

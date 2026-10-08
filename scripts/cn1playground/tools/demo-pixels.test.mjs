@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {scenePixels, sceneChecks, changedPixels, sampleSceneFrames} from './demo-pixels.mjs';
+import {scenePixels, sceneChecks, changedPixels, sampleScene} from './demo-pixels.mjs';
 
 const region = {x: 120, y: 40, width: 160, height: 240};
 function fixture({blank = false, small = false, outside = false, offset = 0, kind = 'balls'} = {}) {
@@ -53,15 +53,32 @@ test('a disappearing cube is not successful animation', () => {
   assert.equal(sceneChecks(frames, region, 'cube').animation, false);
 });
 
-for (const moving of [true, false]) {
-  test('bounded sampling ' + (moving ? 'accepts delayed startup movement' : 'rejects a permanently frozen cube'), async () => {
-    let elapsed = 0;
-    const frames = await sampleSceneFrames(
-      () => fixture({kind: 'cube', offset: moving && elapsed >= 1100 ? 8 : 0}),
-      async ms => { elapsed += ms; }, region, 'cube', {now: () => elapsed});
-    assert.equal(sceneChecks(frames, region, 'cube').animation, moving);
-    assert.ok(frames.length > 3, 'must observe beyond the old three-frame window');
-    assert.ok(elapsed <= 5220, 'must stop at the bounded deadline');
-    if (!moving) assert.ok(elapsed >= 5000);
+test('sampling waits for delayed visible animation without changing pixel requirements', async () => {
+  let time = 0;
+  const frames = await sampleScene(async i => fixture({kind: 'cube', blank: i < 6,
+    offset: i % 2 ? 8 : 0}), async ms => { time += ms; }, region, 'cube', () => time);
+  assert.ok(time > 1000, 'the old three-sample window would have missed every frame');
+  assert.ok(Object.values(sceneChecks(frames, region, 'cube')).every(Boolean));
+});
+
+test('slow screenshots get an animation window after the first visible frame', async () => {
+  let time = 0;
+  const frames = await sampleScene(async i => {
+    time += 3000;
+    return fixture({kind: 'cube', blank: i === 0, offset: i % 2 ? 8 : 0});
+  }, async ms => { time += ms; }, region, 'cube', () => time);
+  assert.equal(frames.length, 3);
+  assert.ok(Object.values(sceneChecks(frames, region, 'cube')).every(Boolean));
+  assert.ok(time < 16000);
+});
+
+for (const condition of ['blank', 'frozen', 'wrong-size']) {
+  test('sampling still rejects ' + condition + ' scenes at its deadline', async () => {
+    let time = 0;
+    const frames = await sampleScene(async i => fixture({kind: 'cube', blank: condition === 'blank',
+      small: condition === 'wrong-size', offset: condition === 'frozen' ? 0 : i % 2 ? 8 : 0}),
+    async ms => { time += ms; }, region, 'cube', () => time);
+    assert.ok(time >= 8000 && time < 8220);
+    assert.ok(Object.values(sceneChecks(frames, region, 'cube')).some(ok => !ok));
   });
 }
