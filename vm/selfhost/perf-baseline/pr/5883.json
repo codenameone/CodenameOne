@@ -189,6 +189,26 @@
     }
    }
   },
+  "windows-arm64@armv8-64-bit-family-8-model-d84-microsoft-corporation": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.57,
+      "time": 0.775,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.452,
+     "reason": "Merge of master c717e15d2a changed the translator's own source (the workload is the translator), self-host RAM fell 0.57x -> 0.45x on Windows arm64; run 37728363561 at e565fc2b02",
+     "runs": 1,
+     "time": 0.775,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "windows-x64@intel64-family-6-model-106-genuineintel": {
    "valueEscape": {
     "all": {
