@@ -151,7 +151,9 @@ jobs:
 
   vm-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # Setup, the JVM suite, and the GC benchmarks share this budget. The JVM
+    # suite alone can take 52 minutes before the benchmark step begins.
+    timeout-minutes: 120
     # The two database engines the backend speaks a wire protocol to.
     #
     # BackendDatabaseTest and BackendOrmTest run one body of assertions against

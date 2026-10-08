@@ -160,11 +160,16 @@ for (const status of [400, 429, 503]) {
 // as not sent -- before the Initializr bridge's own (longer) wait runs out, so
 // the panel never says "not sent" for a request still in flight.
 {
+  let requestStarted;
+  const started = new Promise((resolve) => { requestStarted = resolve; });
   const hanging = loadBeacon({ fetchImpl: (url, init) => new Promise((resolve, reject) => {
     init.signal.addEventListener("abort", () => reject(new Error("AbortError")));
+    requestStarted();
   }) });
   const pending = hanging.beacon.sendSteps("dev@example.org", "com.example.app", "", "", "maven");
-  await new Promise((r) => setTimeout(r, 0));
+  // WebCrypto hashing completes asynchronously before the request starts. One
+  // event-loop tick does not guarantee it has finished on a busy CI runner.
+  await Promise.race([started, pending.then(() => assert.fail("request settled before fetch started"))]);
   assert.equal(hanging.timers.length, 1, "a deadline is armed for the confirmed request");
   assert.ok(hanging.timers[0].ms < 20000, "shorter than the bridge's 20 s wait");
   hanging.timers[0].fn();

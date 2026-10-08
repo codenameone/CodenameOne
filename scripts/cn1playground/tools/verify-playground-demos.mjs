@@ -145,11 +145,26 @@ async function run(slug, title, width, exercise, caseName = slug) {
   }
 }
 async function animatedScene(page, region, name, kind) {
-  // Start sampling promptly, while the balls still bounce. Compare only scene
-  // foreground pixels so editor carets, status text and other UI cannot pass this.
+  // "preview updated" reports loaded user code, before the first painted frame
+  // (including WebGL shader setup). Wait for visible scene pixels, bounded by
+  // the normal interaction timeout, rather than sampling three startup blanks.
+  // Start as soon as content appears so the balls are still bouncing. Once
+  // sampling starts, every frame must remain visible and animation must advance.
   const frames = [];
   for (let i = 0; i < 3; i++) {
-    frames.push(await measure(page, region, kind, path.join(artifacts, name + '-frame-' + i + '.png')));
+    const screenshotPath = path.join(artifacts, name + '-frame-' + i + '.png');
+    let frame = await measure(page, region, kind, screenshotPath);
+    if (i === 0) {
+      const started = Date.now();
+      const deadline = started + 15000;
+      while (frame.foreground <= 150 && Date.now() < deadline) {
+        await page.waitForTimeout(100);
+        frame = await measure(page, region, kind, screenshotPath);
+      }
+      console.log(name + ' startup wait: ' + (Date.now() - started)
+        + 'ms; foreground pixels: ' + frame.foreground);
+    }
+    frames.push(frame);
     await page.waitForTimeout(220);
   }
   for (const [behavior, ok] of Object.entries(sceneChecks(frames, region, kind))) {
