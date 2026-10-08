@@ -16,6 +16,11 @@ import time
 from urllib.parse import parse_qs
 
 source = Path(sys.argv[1]).resolve()
+# The reason table (REASON_CASES) is about the launcher's own code, which every
+# Initializr download shares: generate-initializr-fixtures.py asks for it on one
+# representative archive. Run for all of them, each Windows case also starts
+# the Java capture helper, and twenty archives of it outran the job's timeout.
+check_reasons = '--reasons' in sys.argv[2:]
 windows = os.name == 'nt'
 # (output, exit code, reason): what Maven or the build client prints for each
 # way a first build ends, and the word the launcher must report for it.
@@ -155,7 +160,7 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         # build.bat copies the output through .mvn/Cn1Capture.java.
         output_file = parent / 'maven-output.txt'
         script = project / ('build.bat' if windows else 'build.sh')
-        for text, exit_code, expected_reason in REASON_CASES:
+        for text, exit_code, expected_reason in (REASON_CASES if check_reasons else []):
             output_file.write_text(text)
             events.clear()
             command = [str(script), 'javascript_cloud']

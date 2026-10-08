@@ -32,6 +32,16 @@ REM copies its output; it runs as a single source file, which needs Java 11 or
 REM newer. With an older Java, no JDK, or reporting off, Maven runs exactly as
 REM before and the reason comes from the Java check alone.
 set "CN1_LOG="
+REM A JRE runs java but has no javac, and Maven then fails with "No compiler is
+REM provided". Known here without the output copy, which a Java 8 project's
+REM JDK 8 cannot make, so it is reported as no_jdk either way.
+set "CN1_JAVAC=yes"
+if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\javac.exe" set "CN1_JAVAC=no"
+if not defined JAVA_HOME where javac >nul 2>&1 || set "CN1_JAVAC=no"
+REM Copies left by builds that were interrupted (cmd cannot trap Ctrl+C, so
+REM those never reach the cleanup at the end). A day old, so a build still
+REM running in another window keeps its own.
+if not "%CN1_TELEMETRY%"=="0" forfiles /p "%TEMP%" /m cn1-build-*.log /d -1 /c "cmd /c del /q @path" >nul 2>&1
 set "CN1_JMAJ=0"
 set /a CN1_JMAJ=%CN1_JAVA% >nul 2>&1
 if not "%CN1_TELEMETRY%"=="0" if %CN1_JMAJ% GEQ 11 if exist "%~dp0.mvn\Cn1Capture.java" set "CN1_LOG=%TEMP%\cn1-build-%RANDOM%%RANDOM%.log"
