@@ -124,6 +124,10 @@ A project that keeps a main class with that name must remove either the
 class or `cn1-desktop.properties`; the build stops and says so when both are
 present.
 
+A project that already has a Codename One main class of its own, and uses
+the desktop sources as a library of screens, generates no entry point. See
+<<desktop-interop-mixing>>.
+
 === How the build works
 
 Three steps run as part of the normal build of the `common` module:
@@ -866,6 +870,83 @@ include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/d
 Code that uses Codename One classes no longer compiles in the original
 desktop project. Keep such calls behind a small class of your own if the
 application must go on building for the desktop JVM too.
+
+[[desktop-interop-mixing]]
+=== Mixing with Codename One code
+
+A Codename One application can use Swing and JavaFX code without handing it
+the whole application. The desktop sources still go in
+`common/src/main/desktop`, and the project keeps its own main class. The
+build then generates no entry point and ships the desktop classes as a
+library. It does so in either of two cases:
+
+* The project has no `cn1-desktop.properties` and has a source for its main
+  class.
+* `cn1-desktop.properties` says `kind=library`. Use this to state the
+  intent, or when the desktop sources contain a `main` method that you don't
+  want started.
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/desktop-interop.properties[tag=desktop-interop-properties-002,indent=0]
+----
+
+==== Showing a Swing or JavaFX screen in a form
+
+`SwingInterop.asComponent` wraps a Swing component in a Codename One
+component that you add to a form like any other. The Swing component is
+laid out to the size the wrapper is given, and the wrapper's preferred size
+is the Swing component's:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/EmbeddedReport.java[tag=desktopInteropEmbedSwing,indent=0]
+----
+
+`FxInterop.asComponent` does the same for JavaFX. It takes the root of a
+scene graph, or a `Scene` when the screen needs style sheets or a fill:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/EmbeddedChart.java[tag=desktopInteropEmbedFx,indent=0]
+----
+
+Both classes are in the runtime's own packages, `com.codename1.desktopcompat`
+and `com.codename1.fxcompat`. Their parameter is declared as `Object`, so
+passing anything other than a Swing component, a JavaFX parent or a scene
+compiles and then throws an `IllegalArgumentException`. Call them on the
+EDT.
+
+An embedded screen receives pointer input, paints with the form and opens
+its popups, tooltips and combo box lists over it. Keyboard input reaches it
+through the platform's text editing, which is how text fields work on a
+device; key listeners and keyboard focus traversal apply to a frame or a
+stage, not to an embedded screen. A `JMenuBar` or `MenuBar` inside an
+embedded screen is drawn as a row of menus.
+
+==== Opening windows and dialogs
+
+Frames, stages and dialogs work from a Codename One application too. A
+frame or a stage is shown as a form over the one that was showing, and
+closing it returns there. The application doesn't exit when the last Swing
+or JavaFX window closes, because the windows aren't what keeps it running.
+Modal dialogs block their caller as they do in a desktop application:
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/EmbeddedReport.java[tag=desktopInteropSwingWindows,indent=0]
+----
+
+[source,java]
+----
+include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/EmbeddedChart.java[tag=desktopInteropFxWindows,indent=0]
+----
+
+On the desktop ports these windows are real windows of the window manager.
+Call `SwingInterop.setNativeWindows(false)` or
+`FxInterop.setNativeWindows(false)` to keep them inside the application's
+own window instead, where a frame is a form and a dialog floats over the
+current form, as on a phone.
 
 === Troubleshooting
 

@@ -78,6 +78,22 @@ import java.util.TreeSet;
 /// when it does not while an entry record asks for one, the build stops and
 /// says which of the two to remove.
 ///
+/// #### Library mode: desktop classes inside another application
+///
+/// Desktop sources do not have to BE the application. A Codename One
+/// application (or an Android one) that only uses some Swing or JavaFX
+/// screens keeps its own main class, and nothing is generated; the layers
+/// are relocated in and that is all. The rule, in the order it is applied:
+///
+/// 1. `kind=library` in the entry record: never generate, whatever else
+///    the project holds. A main class an earlier run generated is removed.
+/// 2. The project's own main class is a compiled class and there is no
+///    entry record: library mode, logged at info level.
+/// 3. The project's own main class is a compiled class and the record names
+///    an application: a build error, since a target starts one class.
+/// 4. No main class of the project's own: one is generated, from the record
+///    or, without one, from the only candidate (below).
+///
 /// #### Without an entry record
 ///
 /// The application's only concrete `Application` subclass is used, else its
@@ -188,20 +204,35 @@ final class DesktopEntryPoints {
         String target = mainClass == null || mainClass.trim().length() == 0 ? null
                 : mainClass.trim().replace('.', '/');
         Info existing = target == null ? null : info(target);
+        boolean library = DesktopSources.KIND_LIBRARY.equalsIgnoreCase(value(record, "kind"));
         if (existing != null && GENERATED_SOURCE.equals(existing.source)) {
-            // An earlier run's output, which this run replaces.
+            // An earlier run's output, which this run replaces -- or, in
+            // library mode, takes away: the record changed since.
             existing = null;
             classes.remove(target);
+            if (library) {
+                File stale = new File(classesDir, target + ".class");
+                if (stale.isFile() && !stale.delete()) {
+                    throw new IOException("Cannot delete " + stale);
+                }
+            }
         }
         removeBridges(classes);
+        if (library) {
+            log.info(DesktopSources.ENTRY_RECORD + " has kind=" + DesktopSources.KIND_LIBRARY
+                    + ": the desktop classes ship relocated and no main class is generated"
+                    + (target == null ? "" : "; " + dotted(target) + " is left to start the application"));
+            return null;
+        }
         if (existing != null) {
             if (extendsOneOf(existing, SWING_LIFECYCLE, fxLifecycle())) {
                 log.debug(dotted(target) + " is a desktop lifecycle of the application's own; none is generated");
                 return null;
             }
             if (record == null) {
-                log.debug(dotted(target) + " is the application's own main class; no desktop entry point is "
-                        + "generated without " + DesktopSources.ENTRY_RECORD);
+                log.info(dotted(target) + " is the application's own main class and there is no "
+                        + DesktopSources.ENTRY_RECORD + ": the desktop classes ship relocated, as a library, and "
+                        + "no main class is generated");
                 return null;
             }
             if (extendsOneOf(existing, ANDROID_LIFECYCLE, ANDROID_LIFECYCLE_SOURCE)) {
@@ -214,7 +245,8 @@ final class DesktopEntryPoints {
                         + "desktop application (src/main/desktop), and each is to be started by the project's one "
                         + "main class, " + dotted(target) + ". A project starts one application. To keep the "
                         + "Android application as the one that starts, delete " + DesktopSources.ENTRY_RECORD
-                        + ": the desktop classes still ship, relocated, and the Android code can use them. To "
+                        + " (or give it kind=" + DesktopSources.KIND_LIBRARY
+                        + "): the desktop classes still ship, relocated, and the Android code can use them. To "
                         + "start " + value(record, "mainClass") + " instead, move the Android application to a "
                         + "project of its own.");
             }
@@ -222,7 +254,8 @@ final class DesktopEntryPoints {
                     + "but " + DesktopSources.ENTRY_RECORD + " asks the build to generate the class that starts "
                     + value(record, "mainClass") + ". Delete the source of " + dotted(target)
                     + " so that the build generates it, or delete " + DesktopSources.ENTRY_RECORD
-                    + " to keep starting the application yourself.");
+                    + " (or give it kind=" + DesktopSources.KIND_LIBRARY
+                    + ") to keep starting the application yourself.");
         }
         if (record == null && target == null) {
             log.debug("No " + DesktopSources.ENTRY_RECORD + " and no main class name; no desktop entry point");
@@ -267,7 +300,8 @@ final class DesktopEntryPoints {
             cls = swing(out, entry, classes);
         } else {
             throw new BuildException(DesktopSources.ENTRY_RECORD + " has kind=" + kind + "; it is "
-                    + DesktopSources.KIND_SWING + " or " + DesktopSources.KIND_JAVAFX + ".");
+                    + DesktopSources.KIND_SWING + ", " + DesktopSources.KIND_JAVAFX + " or "
+                    + DesktopSources.KIND_LIBRARY + ".");
         }
         File dest = new File(classesDir, out + ".class");
         File parent = dest.getParentFile();

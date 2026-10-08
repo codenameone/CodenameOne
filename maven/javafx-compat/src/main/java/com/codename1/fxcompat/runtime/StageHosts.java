@@ -45,8 +45,23 @@ import javafx.stage.Window;
 public final class StageHosts {
 
     private static Runnable exitHook;
+    private static boolean nativeWindows = true;
 
     private StageHosts() {
+    }
+
+    /// Says whether windows other than the primary stage are windows of
+    /// the platform's window manager where it has one, which is the default.
+    /// With `false` every window stays inside the application's own: a
+    /// modal stage is a dialog over the current form and any other a form,
+    /// as on a phone.
+    public static void setNativeWindows(boolean value) {
+        nativeWindows = value;
+    }
+
+    /// Whether [#setNativeWindows] left the window manager in use.
+    public static boolean isNativeWindows() {
+        return nativeWindows;
     }
 
     /// Creates the host of a window that is about to be shown.
@@ -55,7 +70,7 @@ public final class StageHosts {
             return new StagePopup((PopupWindow) window);
         }
         boolean primary = window instanceof Stage && ((Stage) window).cn1IsPrimary();
-        if (!primary && Display.isInitialized() && Desktop.isSupported()) {
+        if (!primary && nativeWindows && Display.isInitialized() && Desktop.isSupported()) {
             return new StageWindow(window);
         }
         if (!primary && window instanceof Stage && ((Stage) window).getModality() != Modality.NONE) {

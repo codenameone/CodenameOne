@@ -1,0 +1,48 @@
+/* The colours every rule below looks up by name. */
+.root {
+    -app-accent: #2f6fed;
+    -app-surface: #f2f6fa;
+    -app-ink: #1d2733;
+}
+
+.screen {
+    -fx-background-color: -app-surface;
+}
+
+.heading {
+    -fx-text-fill: -app-accent;
+    -fx-font-size: 22;
+    -fx-font-weight: bold;
+}
+
+.card {
+    -fx-background-color: white;
+    -fx-border-color: -app-accent;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.card .label {
+    -fx-text-fill: -app-ink;
+}
+
+#status {
+    -fx-text-fill: -app-accent;
+    -fx-font-weight: bold;
+}
+
+.value {
+    -fx-font-style: italic;
+}
+
+.primary {
+    -fx-background-color: -app-accent;
+    -fx-text-fill: white;
+    -fx-background-radius: 6;
+}
+
+.note {
+    -fx-text-fill: derive(-app-ink, 40%);
+    -fx-font-size: 12;
+}

@@ -23,6 +23,7 @@
         <Or>
             <Class name="com.codename1.desktopcompat.rt.PeerSupport"/>
             <Class name="com.codename1.desktopcompat.rt.FrameForm"/>
+            <Class name="com.codename1.desktopcompat.rt.EmbedHost"/>
             <Class name="com.codename1.desktopcompat.rt.LayoutBridge"/>
             <Class name="com.codename1.desktopcompat.rt.NativeImage"/>
             <Class name="com.codename1.desktopcompat.rt.G2D"/>

@@ -424,6 +424,102 @@ public class DesktopEntryPointsTest {
                 "com.acme.MyApp is this project's main class", "Delete the source of com.acme.MyApp");
     }
 
+    /// Library mode: desktop sources that another application uses. Said
+    /// outright with `kind=library`, nothing is ever generated -- not beside
+    /// a main class of the project's own, not in its absence, and a class an
+    /// earlier run generated is taken away. Without a record, the project's
+    /// own main class existing is what says it.
+    @Test
+    public void libraryModeGeneratesNoMainClass() throws Exception {
+        String plain = "package com.acme;\npublic class MyApp extends com.codename1.system.Lifecycle {\n"
+                + "    public void runApp() { }\n}\n";
+        // Beside the project's own main class, where a record naming an
+        // application is an error.
+        File own = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/MyApp.java", plain);
+        assertTrue(remapper(own, record("kind=library"), "com.acme.MyApp").run());
+        assertEquals("com.codename1.system.Lifecycle", load(own, "com.acme.MyApp").getSuperclass().getName());
+        assertTrue("The desktop runtime ships",
+                new File(own, "com/codename1/desktopcompat/javax/swing/JFrame.class").isFile());
+        assertCompliant(own);
+
+        // mainClass is not read, and the kind is matched without its case.
+        File named = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/MyApp.java", plain);
+        assertTrue(remapper(named, record("mainClass=com.acme.swingapp.Main", "kind=Library"), "com.acme.MyApp")
+                .run());
+        assertEquals("com.codename1.system.Lifecycle", load(named, "com.acme.MyApp").getSuperclass().getName());
+
+        // With no main class at all: still none, where the absence of a
+        // record would have picked the only candidate.
+        File none = compile("com/acme/swingapp/Main.java", SWING_MAIN);
+        assertTrue(remapper(none, record("kind=library"), "com.acme.MyApp").run());
+        assertFalse(new File(none, "com/acme/MyApp.class").exists());
+        assertTrue(remapper(none, record("kind=library"), null).run());
+        assertFalse(new File(none, DesktopEntryPoints.DEFAULT_MAIN + ".class").exists());
+
+        // An application turned into a library: the generated class goes.
+        File turned = compile("com/acme/swingapp/Main.java", SWING_MAIN);
+        assertTrue(remapper(turned, record("mainClass=com.acme.swingapp.Main", "kind=swing"), "com.acme.MyApp")
+                .run());
+        assertTrue(new File(turned, "com/acme/MyApp.class").isFile());
+        assertTrue(remapper(turned, record("kind=library"), "com.acme.MyApp").run());
+        assertFalse(new File(turned, "com/acme/MyApp.class").exists());
+
+        // An Android application beside it is no conflict either.
+        String lifecycle = "package com.codename1.androidcompat.rt;\n"
+                + "public class AndroidLifecycle extends com.codename1.system.Lifecycle {\n"
+                + "    public void runApp() { }\n}\n";
+        String droid = "package com.acme;\n"
+                + "public class MyApp extends com.codename1.androidcompat.rt.AndroidLifecycle { }\n";
+        File both = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/MyApp.java", droid,
+                "com/codename1/androidcompat/rt/AndroidLifecycle.java", lifecycle);
+        assertTrue(remapper(both, record("kind=library"), "com.acme.MyApp").run());
+        assertEquals("com.codename1.androidcompat.rt.AndroidLifecycle",
+                load(both, "com.acme.MyApp").getSuperclass().getName());
+    }
+
+    /// Without a record the project's own main class decides: when it is a
+    /// compiled class the sources are a library and the build says so, and
+    /// when it is not, the application is started through its only
+    /// candidate. An unknown kind names the three there are.
+    @Test
+    public void withoutARecordTheProjectsOwnMainClassMeansLibraryMode() throws Exception {
+        String plain = "package com.acme;\npublic class MyApp extends com.codename1.system.Lifecycle {\n"
+                + "    public void runApp() { }\n}\n";
+        File own = compile("com/acme/swingapp/Main.java", SWING_MAIN, "com/acme/MyApp.java", plain);
+        final StringBuilder said = new StringBuilder();
+        com.codename1.build.Log log = new com.codename1.build.Log() {
+            public void debug(CharSequence c) { }
+            public void debug(CharSequence c, Throwable e) { }
+            public void debug(Throwable e) { }
+            public void info(CharSequence c) { said.append(c).append('\n'); }
+            public void info(CharSequence c, Throwable e) { }
+            public void info(Throwable e) { }
+            public void warn(CharSequence c) { }
+            public void warn(CharSequence c, Throwable e) { }
+            public void warn(Throwable e) { }
+            public void error(CharSequence c) { }
+            public void error(CharSequence c, Throwable e) { }
+            public void error(Throwable e) { }
+            public boolean isDebugEnabled() { return false; }
+            public boolean isInfoEnabled() { return true; }
+            public boolean isWarnEnabled() { return false; }
+            public boolean isErrorEnabled() { return false; }
+        };
+        assertTrue(new CompatRemapper(own, classpath(), null, log).withApplicationMain("com.acme.MyApp").run());
+        assertTrue(said.toString(), said.toString().contains("com.acme.MyApp is the application's own main class"));
+        assertTrue(said.toString(), said.toString().contains("as a library"));
+        assertEquals("com.codename1.system.Lifecycle", load(own, "com.acme.MyApp").getSuperclass().getName());
+
+        File none = compile("com/acme/swingapp/Main.java", SWING_MAIN);
+        assertTrue(remapper(none, null, "com.acme.MyApp").run());
+        assertEquals("com.codename1.desktopcompat.rt.DesktopLifecycle",
+                load(none, "com.acme.MyApp").getSuperclass().getName());
+
+        File odd = compile("com/acme/swingapp/Main.java", SWING_MAIN);
+        assertFails(remapper(odd, record("mainClass=com.acme.swingapp.Main", "kind=applet"), "com.acme.MyApp"),
+                "kind=applet", "swing, javafx or library");
+    }
+
     /// A project with BOTH an Android application and a desktop one. The
     /// Android build writes the main class whenever the project has none, so
     /// "delete its source" is advice nobody could follow; the message says

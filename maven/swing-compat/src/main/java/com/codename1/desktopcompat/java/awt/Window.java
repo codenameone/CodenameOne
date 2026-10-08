@@ -64,6 +64,7 @@ public class Window extends Container {
     private boolean locationByPlatform;
     private boolean focusableWindowState = true;
     private boolean autoRequestFocus = true;
+    private boolean embedded;
 
     public Window(Frame owner) {
         this((Window) owner);
@@ -99,6 +100,29 @@ public class Window extends Container {
     /// dialog that floats it -- or `null`.
     public com.codename1.ui.Form cn1HostForm() {
         return host == null ? null : host.form();
+    }
+
+    /// Puts the window inside a host its caller owns, for good: a
+    /// Codename One component that shows a Swing tree inside a form of the
+    /// application (see `com.codename1.desktopcompat.SwingInterop`).
+    ///
+    /// Such a window is showing from here on and is never one of the
+    /// application's windows: it is not registered, it does not become the
+    /// active window, and hiding or disposing of it does nothing -- the
+    /// component that hosts it is what comes and goes.
+    public void cn1Embed(WindowHost h) {
+        embedded = true;
+        host = h;
+        visible = true;
+        if (!isDisplayable()) {
+            addNotify();
+        }
+        validate();
+    }
+
+    /// Whether [#cn1Embed] put this window inside a component.
+    public boolean cn1Embedded() {
+        return embedded;
     }
 
     /// The title the host carries; frames and dialogs answer theirs.
@@ -246,7 +270,9 @@ public class Window extends Container {
     @Override
     public void addNotify() {
         super.addNotify();
-        WindowHosts.registered(this);
+        if (!embedded) {
+            WindowHosts.registered(this);
+        }
     }
 
     // ------------------------------------------------------------ bounds
@@ -304,7 +330,7 @@ public class Window extends Container {
 
     @Override
     public void setVisible(boolean b) {
-        if (b == visible) {
+        if (b == visible || embedded) {
             return;
         }
         visible = b;
@@ -351,6 +377,9 @@ public class Window extends Container {
     /// Hides the window, disposes of the windows it owns and releases
     /// what showed it. The window can be shown again.
     public void dispose() {
+        if (embedded) {
+            return;
+        }
         boolean was = isDisplayable();
         if (owned != null) {
             Window[] ws = getOwnedWindows();
@@ -373,7 +402,7 @@ public class Window extends Container {
 
     /// Puts the window on top of the others and makes it the active one.
     public void toFront() {
-        if (visible) {
+        if (visible && !embedded) {
             if (host != null) {
                 host.open();
             }
@@ -386,6 +415,12 @@ public class Window extends Container {
     }
 
     public boolean isActive() {
+        if (embedded) {
+            // Active while the form its component is on is the one showing.
+            com.codename1.ui.Form f = host == null ? null : host.form();
+            return f != null && com.codename1.ui.Display.isInitialized()
+                    && com.codename1.ui.Display.getInstance().getCurrent() == f;
+        }
         return visible && WindowHosts.active() == this;
     }
 
