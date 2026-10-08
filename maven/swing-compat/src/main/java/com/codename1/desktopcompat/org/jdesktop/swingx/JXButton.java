@@ -186,7 +186,7 @@ public class JXButton extends JButton {
     private void paintContent(Graphics g) {
         String text = getText();
         Icon icon = getIcon();
-        Font f = getFont() != null ? getFont() : Fonts.defaultFont();
+        Font f = getFont();
         FontMetrics fm = Fonts.metrics(f);
         boolean hasText = text != null && text.length() > 0;
         int tw = hasText ? fm.stringWidth(text) : 0;

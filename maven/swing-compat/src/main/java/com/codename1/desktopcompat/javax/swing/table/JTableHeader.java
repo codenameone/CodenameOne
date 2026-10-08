@@ -479,7 +479,7 @@ public class JTableHeader extends JComponent implements TableColumnModelListener
             if (bg != null && !bg.equals(isBackgroundSet() ? getBackground() : null)) {
                 super.setBackground(bg);
             }
-            if (f != null && !f.equals(isFontSet() ? getFont() : null)) {
+            if (!f.equals(isFontSet() ? getFont() : null)) {
                 setFont(f);
             }
             setValue(value);

@@ -158,6 +158,18 @@ public abstract class JComponent extends Container {
         repaint(0, r.x, r.y, r.width, r.height);
     }
 
+    /// The font this component draws with, which is never null. On a desktop
+    /// every Swing component has the font its look and feel installed, so
+    /// `getFont().deriveFont(Font.BOLD)` is written everywhere, a cell
+    /// renderer included -- and a renderer is in no window to inherit a font
+    /// from. One that was given none answers the theme's default, which is
+    /// what a window answers for everything shown in it.
+    @Override
+    public com.codename1.desktopcompat.java.awt.Font getFont() {
+        com.codename1.desktopcompat.java.awt.Font f = super.getFont();
+        return f != null ? f : com.codename1.desktopcompat.rt.Fonts.defaultFont();
+    }
+
     @Override
     public boolean isOpaque() {
         return opaque;

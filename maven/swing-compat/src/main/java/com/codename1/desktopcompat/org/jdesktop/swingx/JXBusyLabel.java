@@ -274,7 +274,7 @@ public class JXBusyLabel extends JLabel {
             right += Units.toLogicalCeil(st.getPaddingRightNoRTL());
         }
         String text = getText();
-        Font f = getFont() != null ? getFont() : Fonts.defaultFont();
+        Font f = getFont();
         FontMetrics fm = Fonts.metrics(f);
         boolean hasText = text != null && text.length() > 0 && !MiniHtml.isHtml(text);
         int tw = hasText ? fm.stringWidth(text) : 0;

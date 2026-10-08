@@ -12,8 +12,13 @@
 #   - the runtime of the toolkit the sample uses is in the application's
 #     classes, under its relocated name;
 #   - every target's upload jar (staged, never sent) carries all of it, so the
-#     iOS, Android, JavaScript and desktop builders all get the remapped code;
+#     iOS, Android, JavaScript and desktop builders all get the remapped code,
+#     and no class in any of those jars names a toolkit type either;
 #   - the Gradle build uploads the same entries as the Maven build.
+#
+# It also prints what the layer costs an application: the size of each staged
+# jar, and how many of its classes and bytes are the layer's runtime rather
+# than the application.
 #
 # Needs the reactor installed (mvn install) and a JDK 17+; see inc/gradle.sh.
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
@@ -32,7 +37,7 @@ rm -rf "$WORKDIR"
 mkdir -p "$WORKDIR"
 
 # The packages of both toolkits, as an application is compiled against them.
-TOOLKITS='java/awt|javax/swing|java/beans|org/jdesktop|javafx'
+TOOLKITS='java/awt|javax/swing|java/beans|javax/accessibility|javax/imageio|org/jdesktop|javafx'
 FAILED=0
 
 # What every target's upload has to carry, whichever tool staged it. MAIN_ENTRY
@@ -44,6 +49,30 @@ check_desktop_upload() {
   # At the root: the relocated runtimes legitimately live under
   # com/codename1/desktopcompat/ and com/codename1/fxcompat/.
   assert_zip_lacks "$jar" "^($TOOLKITS)/.*\\.class\$"
+  # And inside the classes: the same question the classes directory was asked,
+  # of what is actually uploaded.
+  local bad
+  bad=$(compat_unrelocated "$jar" "$TOOLKITS")
+  if [ -n "$bad" ]; then
+    echo "FAIL: $jar: classes still name a desktop toolkit:"
+    echo "$bad" | head -20
+    FAILED=1
+  fi
+}
+
+# desktop_shipped_size <target> <jar>
+#
+# One line: the jar's size, and the share of it that is a compatibility
+# runtime (the relocated toolkit and the shared JDK classes) as a class count,
+# the bytes those classes take in the jar, and their size unpacked.
+desktop_shipped_size() {
+  local target="$1" jar="$2" total
+  total=$(wc -c < "$jar" | tr -d ' ')
+  unzip -v "$jar" | awk -v target="$target" -v total="$total" '
+    $NF ~ /\.class$/ { all++ }
+    $NF ~ /^com\/codename1\/(desktopcompat|fxcompat|compat\/jdk)\/.*\.class$/ { n++; raw += $1; packed += $3 }
+    END { printf "   size %s: jar %d bytes, %d classes; compatibility runtime %d classes, %d bytes in the jar (%d unpacked)\n",
+                 target, total, all, n, packed, raw }'
 }
 
 for sample_dir in "$SAMPLES"/*/; do
@@ -90,6 +119,10 @@ for sample_dir in "$SAMPLES"/*/; do
   [ -f "$GAPP/src/main/desktop/cn1-desktop.properties" ] || fail "$sample: the Gradle conversion dropped src/main/desktop"
 
   compat_stage_all "$sample" "$W" "$MAPP" "$GAPP" check_desktop_upload
+  for target in android-device ios-device javascript mac-os-x-desktop; do
+    staged=$(compat_staged_jar "$W/maven-$target.log")
+    [ -f "$staged" ] && desktop_shipped_size "$target" "$staged"
+  done
 done
 
 [ $FAILED -eq 0 ] || exit 1

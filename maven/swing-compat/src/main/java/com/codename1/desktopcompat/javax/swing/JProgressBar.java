@@ -129,7 +129,7 @@ public class JProgressBar extends JComponent implements SwingConstants {
     private int thickness() {
         Dimension d = super.cn1NativePreferredSize();
         int t = d == null ? FALLBACK_THICKNESS : orientation == VERTICAL ? d.width : d.height;
-        if (paintString && getFont() != null) {
+        if (paintString) {
             t = Math.max(t, getFontMetrics(getFont()).getHeight() + 2);
         }
         return t;
