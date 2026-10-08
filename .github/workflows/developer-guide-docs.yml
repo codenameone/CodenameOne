@@ -36,12 +36,13 @@ on:
       # The themed figures are rendered against the compiled native themes, so
       # what those themes look like is an input to this guide exactly the way the
       # build hint sources above are. build-native-themes.sh compiles
-      # native-themes/<name>/theme.css with maven/css-compiler, so a change to
-      # any of the three changes the pictures without touching docs/ at all --
-      # and the committed figures would then go stale silently until some later
-      # run failed against them.
+      # native-themes/<name>/theme.css with maven/css-compiler through its
+      # command line in maven/css-cli, so a change to any of them changes the
+      # pictures without touching docs/ at all -- and the committed figures
+      # would then go stale silently until some later run failed against them.
       - 'native-themes/**'
       - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'scripts/build-native-themes.sh'
       # The figures are rendered by the framework itself, so a change to how a
       # component paints, how a layout measures, or how the JavaSE port
@@ -109,6 +110,7 @@ jobs:
               # comparison step is gated on this filter too.
               - 'native-themes/**'
               - 'maven/css-compiler/**'
+              - 'maven/css-cli/**'
               - 'scripts/build-native-themes.sh'
               # Same reason, and the same two-lists rule: the figure comparison
               # step is gated on this filter as well as on the trigger.
@@ -167,7 +169,9 @@ jobs:
           mkdir -p "$HOME/.codenameone"
           touch "$HOME/.codenameone/guibuilder.jar"
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
-          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml process-classes
+          # No virtual display: process-classes compiles each demo's CSS, which
+          # is headless. The screenshot generator below is the step that needs one.
+          mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml process-classes
 
       - name: Install demo common module for screenshot generation
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'

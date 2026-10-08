@@ -43,17 +43,20 @@ fi
 # .github/workflows/native-themes-sync.yml. For local iteration on
 # native-themes/ios-modern/theme.css, run scripts/build-native-themes.sh.
 
-# Rebuild the `designer` module first so changes under maven/css-compiler/
-# are picked up by the maven plugin's CSS compile step. The designer module's
-# jar-with-dependencies embeds css-compiler classes (CSSTheme etc.); without
-# this install, a cached ~/.m2/repository restores the previous build's
-# designer.jar even when CSSTheme.java has changed and new gradient/filter
-# parsing silently misses the app's theme.res. Done as a separate invocation
-# (with -Plocal-dev-javase) because `designer` -> `javase-svg` -> `javase`,
-# and the javase port only resolves its CEF dependency under that profile.
+# Reinstall the CSS compiler first so changes under maven/css-compiler/ and
+# maven/css-cli/ reach the app build that follows this script. The maven
+# plugin's css goal forks com.codename1.designer.css.CN1CSSCLI on a classpath
+# it resolves from the local repository (codenameone-css-cli, which brings
+# codenameone-css-compiler and codenameone-project-model), so a cached
+# ~/.m2/repository would otherwise hand it the previous build's jars even when
+# CSSTheme.java has changed, and the new parsing would silently miss the
+# app's theme.res. The designer module has no part in this -- it is the
+# resource editor, and no build runs it -- so it is not built here. Nothing
+# else in this slice is needed later: `-pl ios -am` below rebuilds core
+# itself, and the plugin and the javase port come from setup-workspace.sh.
 # Skip javadoc/source jars: they aren't needed to install the iOS port, and the
 # framework is compiled with JDK 8 whose javadoc rejects the JDK 9+ options
 # (--add-stylesheet / --add-script) configured in maven/pom.xml. Mirrors the flags
 # setup-workspace.sh already passes for the main framework install.
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl designer -am -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true install
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl css-cli -am -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true install
 "$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios -am -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"

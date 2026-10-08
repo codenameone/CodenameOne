@@ -1,9 +1,11 @@
 # Native theme CSS sources
 
 This directory holds the Codename One platform native themes authored in CSS.
-They are compiled by `scripts/build-native-themes.sh` (which invokes the thin
-`maven/css-compiler` jar with `strictNoCef=true`) into `.res` files under the
-repo's `Themes/` directory, alongside the legacy hand-authored themes.
+They are compiled by `scripts/build-native-themes.sh` (which runs the CSS
+compiler's command line, the `maven/css-cli` jar, with `-no-raster
+-native-theme-units`) into `.res` files under the repo's `Themes/` directory,
+alongside the legacy hand-authored themes. The compiler is headless: it needs
+no display and no browser.
 
 ## Optional OS defaults
 
@@ -40,11 +42,10 @@ PARTS instead, because two OS design generations ship from it:
 `scripts/build-native-themes.sh` lists the parts in cascade order and the script
 concatenates them into `native-themes/<theme>/target/` before compiling.
 
-**Never `@import`.** It is not merely unsupported -- `CSSTheme.importStyle` has
-an EMPTY body, so Flute parses the at-rule, the compiler ignores it, and every
-rule in the imported file is missing from the `.res` with no error and no
-warning. The build refuses any `@import` under `native-themes/` for that reason.
-Add the file to `theme_parts()` instead.
+**Layers go in `theme_parts()`, not in an `@import`.** The compiler does inline
+a local `@import` at the point it appears, but an `@import` is written into the
+file, and the point of the split is that the SAME `common.css` compiles twice
+with a different last part. Keep `@import` for sharing a file inside one theme.
 
 ### What the cascade guarantees
 
@@ -83,9 +84,10 @@ generation 26 moves.
 
 ## Authoring rules
 
-Because these themes ship inside the port jars, rasterized image fallbacks
-are forbidden. The compiler runs in `strictNoCef` mode: any rule that would
-require CEF rasterization fails the build and lists the offending UIID.
+Because these themes ship inside the port jars and have to stay resolution
+independent, generated image fallbacks are forbidden. The build passes
+`-no-raster`: any rule that would need a generated image fails the build, and
+the error names the rule.
 
 **Allowed:**
 
@@ -124,7 +126,8 @@ require CEF rasterization fails the build and lists the offending UIID.
 - `@media (prefers-color-scheme: dark)` for dark palette overrides.
 - `var(--x)` and `@constants { ... }`.
 
-**Forbidden (trigger CEF):**
+**Forbidden (each would need a generated image, so `-no-raster` fails the build
+and names the rule):**
 
 - A blurred `box-shadow`, even when its blur is smaller than its spread. The
   software painter has no separate CSS blur halo allocation and its cached fast
@@ -142,10 +145,9 @@ require CEF rasterization fails the build and lists the offending UIID.
   draws the shadow but cannot do unequal sides; `CSSBorder` does unequal sides but
   not shadows. Pick one per UIID.
 - `background-image: url(...)` and `cn1-9patch`.
-- A gradient that is not a CN1 native gradient. A simple two-stop `linear-gradient`
-  is native and compiles fine. **`radial-gradient` currently hangs the compiler**
-  rather than failing cleanly -- a pre-existing defect, not a rule; avoid it and do
-  not read a hung build as your rule being rejected.
+- A gradient that is not a CN1 native gradient, and an image or gradient
+  background combined with a radius or a shadow. A simple two-stop
+  `linear-gradient` on its own is native and compiles fine.
 
 Each line above is measured against the compiler rather than assumed -- the
 earlier version of this list forbade rounded-plus-bordered boxes, per-side border

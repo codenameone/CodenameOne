@@ -275,11 +275,11 @@ jobs:
       - name: Vault bridge in a real browser (IndexedDB, Web Crypto, WebAuthn PRF)
         run: node scripts/test-javascript-vault-bridge.mjs
 
-      - name: Install Xvfb for headless Java AWT
-        run: bash scripts/ci/apt-get-update.sh && sudo apt-get install -y xvfb
-
+      # No virtual display for the Maven steps below: they only build, and the
+      # css goal compiles theme.css headless. The browsers the tests drive are
+      # launched headless by their own scripts.
       - name: Setup workspace
-        run: xvfb-run ./scripts/setup-workspace.sh -q -DskipTests
+        run: ./scripts/setup-workspace.sh -q -DskipTests
 
       - name: Build HelloCodenameOne JavaScript port bundle
         run: |
@@ -290,8 +290,7 @@ jobs:
           echo "Using JAVA_HOME=$JAVA_HOME"
           java -version
 
-          # xvfb-run is required for CSS compilation which uses java.awt
-          SKIP_PARPARVM_BUILD=1 xvfb-run ./scripts/build-javascript-port-hellocodenameone.sh "${GITHUB_WORKSPACE}/artifacts/javascript-ui-tests/hellocodenameone-javascript-port.zip"
+          SKIP_PARPARVM_BUILD=1 ./scripts/build-javascript-port-hellocodenameone.sh "${GITHUB_WORKSPACE}/artifacts/javascript-ui-tests/hellocodenameone-javascript-port.zip"
 
       # What the screenshot suite cannot see. Its capture reads the app's canvas back, which
       # suspends the DOM text layer, so it never looks at the page a browser shows -- and
@@ -304,7 +303,7 @@ jobs:
           set -euo pipefail
           export JAVA_HOME="${JAVA_HOME_17_X64}"
           export PATH="$JAVA_HOME/bin:$PATH"
-          (cd scripts/javascript/composited-app && xvfb-run mvn -B package -DskipTests \
+          (cd scripts/javascript/composited-app && mvn -B package -DskipTests \
               -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript)
           bundle_dir="${RUNNER_TEMP}/composited-app"
           rm -rf "$bundle_dir" && mkdir -p "$bundle_dir"

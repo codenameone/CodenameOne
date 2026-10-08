@@ -563,7 +563,10 @@ build_initializr_for_site() {
     ensure_maven_wrapper_jar "${PWD}"
 
     run_initializr_mvn() {
-      if command -v xvfb-run >/dev/null 2>&1; then
+      # A virtual display only for a PUBLISHED plugin, whose CSS compile may
+      # still open an AWT frame. The workspace plugin compiles CSS headless,
+      # so a bootstrapped build runs Maven directly.
+      if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" != "true" ] && command -v xvfb-run >/dev/null 2>&1; then
         xvfb-run -a sh ./mvnw "$@"
       else
         sh ./mvnw "$@"
@@ -654,7 +657,10 @@ build_playground_for_site() {
     fi
 
     run_playground_mvn() {
-      if command -v xvfb-run >/dev/null 2>&1; then
+      # A virtual display only for a PUBLISHED plugin, whose CSS compile may
+      # still open an AWT frame. The workspace plugin compiles CSS headless,
+      # so a bootstrapped build runs Maven directly.
+      if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" != "true" ] && command -v xvfb-run >/dev/null 2>&1; then
         xvfb-run -a sh ./mvnw "$@"
       else
         sh ./mvnw "$@"
@@ -741,7 +747,10 @@ build_skindesigner_for_site() {
     fi
 
     run_skindesigner_mvn() {
-      if command -v xvfb-run >/dev/null 2>&1; then
+      # A virtual display only for a PUBLISHED plugin, whose CSS compile may
+      # still open an AWT frame. The workspace plugin compiles CSS headless,
+      # so a bootstrapped build runs Maven directly.
+      if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" != "true" ] && command -v xvfb-run >/dev/null 2>&1; then
         xvfb-run -a sh ./mvnw "$@"
       else
         sh ./mvnw "$@"

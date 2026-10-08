@@ -228,11 +228,11 @@ jobs:
       - name: Run push service-worker contract
         if: ${{ matrix.java-version == 8 }}
         run: node tests/push-e2e/service-worker-contract.mjs
-      - name: Build CSS compiler and smoke native-themes
+      - name: Build CSS compiler CLI and smoke native-themes
         if: ${{ matrix.java-version == 8 }}
         run: |
           cd maven
-          mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          mvn -B -pl css-cli -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
           cd ..
           ./scripts/build-native-themes.sh
           test -f Themes/iOSModernTheme.res || { echo "missing Themes/iOSModernTheme.res"; exit 1; }
@@ -579,11 +579,11 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl codenameone-maven-plugin -am -Plocal-dev-javase -DskipTests install)
           cd scripts/settings
-          # Under xvfb: the module's POM binds cn1:css at process-classes, and
-          # the CSS compiler opens a JFrame -- in this container that is
-          # java.awt.HeadlessException before a test runs. Same X server for the
-          # whole retry sequence.
-          JAVA_HOME="${JAVA_HOME_17}" xvfb-run bash ../../scripts/ci/retry.sh \
+          # No xvfb, and DISPLAY cleared: the module's POM binds cn1:css at
+          # process-classes, the CSS compiler is headless, and none of these
+          # tests initialises Display. A test that starts needing a window
+          # should fail here rather than borrow one.
+          JAVA_HOME="${JAVA_HOME_17}" env -u DISPLAY -u WAYLAND_DISPLAY bash ../../scripts/ci/retry.sh \
             mvn -B -pl common test -Dcn1.settings.skipTests=false
       - name: Run Certificate Wizard tests
         if: ${{ matrix.java-version == 8 }}
@@ -597,6 +597,9 @@ jobs:
         run: |
           set -euo pipefail
           cd scripts/certificatewizard
+          # Under xvfb, unlike the Settings step: CertificateWizardStructureHarness
+          # calls Display.init and builds real forms on the JavaSE port, which
+          # needs a display. The cn1:css goal this build also runs does not.
           JAVA_HOME="${JAVA_HOME_17}" xvfb-run bash ../../scripts/ci/retry.sh \
             mvn -B -pl common test -Dcn1.certificatewizard.skipTests=false
       - name: Generate static analysis HTML summaries

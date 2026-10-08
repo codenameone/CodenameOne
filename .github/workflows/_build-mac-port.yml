@@ -98,11 +98,12 @@ jobs:
           # triggers on, and scripts-macos.yml triggers on maven/** -- so naming
           # codenameone-maven-plugin and svg-transcoder left every other module
           # able to start this job and then hit an exact cache. build-mac-port.sh
-          # runs `-pl designer -am` and `-pl mac -am`, so the modules it actually
+          # runs `-pl css-cli -am` and `-pl mac -am`, so the modules it actually
           # rebuilds are the transitive dependencies of those two: core,
-          # css-compiler, javase, factory and the rest. A CSS compiler change is
-          # the concrete case -- the script rebuilds designer precisely so it
-          # reaches the test app, and the cache key was cancelling that rebuild.
+          # css-compiler, project-model, factory and the rest. A CSS compiler
+          # change is the concrete case -- the script reinstalls css-cli precisely
+          # so it reaches the test app, and the cache key was cancelling that
+          # rebuild.
           # Listing them would be the same mistake one module later, so the
           # subtree is hashed and the list is gone.
           #
@@ -120,9 +121,9 @@ jobs:
           # null-aware sort.
           # CodenameOneDesigner/src is here because maven/designer is a pom and
           # nothing else -- it sets <sourceDirectory>../../CodenameOneDesigner/src,
-          # so the module the build script rebuilds by name compiles a tree that
-          # lives outside maven/ entirely. Hashing maven/ alone would have looked
-          # complete and still missed it.
+          # so a module setup-workspace.sh installs into the cached repository
+          # compiles a tree that lives outside maven/ entirely. Hashing maven/
+          # alone would have looked complete and still missed it.
           SRC_HASH=$(find CodenameOne/src Ports/MacPort Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
               CodenameOneDesigner/src \
               maven \

@@ -49,12 +49,10 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-      - name: Install Xvfb
-        run: bash scripts/ci/apt-get-install.sh xvfb
       - name: Set up workspace
-        run: xvfb-run ./scripts/setup-workspace.sh -q -DskipTests
+        run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build compliance application for JavaScript
-        run: SKIP_PARPARVM_BUILD=1 xvfb-run ./scripts/build-javascript-port-hellocodenameone.sh "${GITHUB_WORKSPACE}/hellocodenameone-javascript-port.zip"
+        run: SKIP_PARPARVM_BUILD=1 ./scripts/build-javascript-port-hellocodenameone.sh "${GITHUB_WORKSPACE}/hellocodenameone-javascript-port.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: nightly-javascript-app

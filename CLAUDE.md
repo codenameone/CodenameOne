@@ -277,6 +277,50 @@ scripts/check-build-hint-catalog.sh            # every hint the code reads is de
 means a hint went in undeclared. Do not re-run `tools/build-hint-bootstrap/`; it
 seeded the catalog once and would overwrite hand edits.
 
+### The CSS compiler is headless, and has to stay that way
+
+Compiling `css/theme.css` to `theme.res` opens no window, boots no JavaSE port
+and starts no browser. `maven/css-compiler` is the engine and `maven/css-cli`
+(`com.codename1.designer.css.CN1CSSCLI`) its command line; neither depends on
+`codenameone-javase`. Every build forks that CLI -- the Maven and Gradle css
+goals, and the simulator's live reload through `cn1.css.cli.classpath`. The
+Designer is a resource editor and has no part in a build.
+
+- **CSS with no native equivalent is painted in process** by the pure-Java
+  rasterizer in `com.codename1.designer.css.raster`, into a 9-piece border or a
+  stretched background image. Do not reach for AWT windows, CEF or a web view to
+  render anything there.
+- **Both modules' tests run with `-Djava.awt.headless=true`.** A test that needs
+  a display is a regression in the compiler, not a test to exclude.
+- **Native themes are built with `-no-raster -native-theme-units`**, by
+  `scripts/build-native-themes.sh` and `scripts/verify-native-theme-split.sh`
+  and nothing else. `-no-raster` fails the build, naming the rule, when a rule
+  would need a generated image: a shipped theme must stay resolution
+  independent. `-native-theme-units` is the unit conversion those themes are
+  built with. Application builds pass neither.
+- **Never wrap a build step in `xvfb-run` for CSS.** `archetype-smoke.yml`
+  (`cn1app-staged-jar-test.sh`) and `gradle-smoke.yml` (`gradle-cn1lib-test.sh`)
+  run with `DISPLAY` and `WAYLAND_DISPLAY` cleared, precisely so a compiler
+  change that reaches for a display fails there. xvfb belongs only to steps
+  that start the simulator, run `cn1:test`/`cn1Test` or `@CodenameOneTest`
+  classes, take screenshots or drive a browser.
+
+The one place a display is still supplied for a CSS compile is a build that
+runs a **published** plugin instead of this tree's: `starter-canary.yml`, and
+`scripts/website/build.sh` when it is not bootstrapping the workspace snapshots.
+
+The runnable jar is
+`maven/css-cli/target/codenameone-css-cli-<version>-jar-with-dependencies.jar`,
+built by `mvn -pl css-cli -am`:
+
+```bash
+java -Djava.awt.headless=true -cp <cp> com.codename1.designer.css.CN1CSSCLI \
+  -input a.css[,b.css] -output theme.res [-merge file] [-l l10n-dir] [-watch]
+```
+
+Exit status is 0, 1 for a stylesheet that failed to compile, 2 for a bad
+command line.
+
 ### Never rely on ClassCastException
 
 **ParparVM's `CHECKCAST` is unchecked.** `BC_CHECKCAST` expands to nothing and the
