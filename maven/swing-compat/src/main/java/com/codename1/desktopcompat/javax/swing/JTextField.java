@@ -25,11 +25,19 @@ package com.codename1.desktopcompat.javax.swing;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.event.ActionEvent;
 import com.codename1.desktopcompat.java.awt.event.ActionListener;
+import com.codename1.desktopcompat.javax.swing.text.Document;
 import com.codename1.desktopcompat.javax.swing.text.JTextComponent;
+import com.codename1.desktopcompat.javax.swing.text.PlainDocument;
 import com.codename1.desktopcompat.rt.TextFieldPeer;
 
 /// A single line of editable text, shown and edited by a Codename One
-/// text field. Finishing the edit notifies the action listeners.
+/// text field over a [PlainDocument].
+///
+/// Finishing the edit -- the Enter or Done key of the device's keyboard
+/// -- notifies the action listeners. The columns size the field and the
+/// horizontal alignment is honoured. Line breaks in inserted text become
+/// spaces. Not supported: the scroll offset and horizontal visibility
+/// model, and binding an `Action`.
 public class JTextField extends JTextComponent implements SwingConstants {
 
     public static final String notifyAction = "notify-field-accept";
@@ -39,25 +47,46 @@ public class JTextField extends JTextComponent implements SwingConstants {
     private String command;
 
     public JTextField() {
-        this(null, 0);
+        this(null, null, 0);
     }
 
     public JTextField(String text) {
-        this(text, 0);
+        this(null, text, 0);
     }
 
     public JTextField(int columns) {
-        this(null, columns);
+        this(null, null, columns);
     }
 
     public JTextField(String text, int columns) {
+        this(null, text, columns);
+    }
+
+    public JTextField(Document doc, String text, int columns) {
         if (columns < 0) {
             throw new IllegalArgumentException("columns less than zero.");
         }
         this.columns = columns;
+        if (doc == null) {
+            doc = createDefaultModel();
+        }
+        setDocument(doc);
         if (text != null) {
             setText(text);
         }
+    }
+
+    /// The document a field starts with: plain text without line breaks.
+    protected Document createDefaultModel() {
+        return new PlainDocument();
+    }
+
+    @Override
+    public void setDocument(Document doc) {
+        if (doc != null) {
+            doc.putProperty("filterNewlines", Boolean.TRUE);
+        }
+        super.setDocument(doc);
     }
 
     @Override
@@ -67,9 +96,11 @@ public class JTextField extends JTextComponent implements SwingConstants {
         if (columns > 0) {
             p.setColumns(columns);
         }
+        p.setAlignment(JLabel.nativeAlignment(horizontalAlignment));
         p.addActionListener(new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
             @Override
             public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                cn1PullText();
                 postActionEvent();
             }
         });
@@ -102,13 +133,32 @@ public class JTextField extends JTextComponent implements SwingConstants {
         }
     }
 
+    /// The width of one column: that of the letter m in the field's font.
+    protected int getColumnWidth() {
+        com.codename1.desktopcompat.java.awt.Font f = getFont();
+        return f == null ? 0 : getFontMetrics(f).charWidth('m');
+    }
+
     public int getHorizontalAlignment() {
         return horizontalAlignment;
     }
 
-    /// Recorded only.
     public void setHorizontalAlignment(int alignment) {
+        if (alignment == horizontalAlignment) {
+            return;
+        }
+        if (alignment != LEFT && alignment != CENTER && alignment != RIGHT && alignment != LEADING
+                && alignment != TRAILING) {
+            throw new IllegalArgumentException("horizontalAlignment");
+        }
+        int old = horizontalAlignment;
         horizontalAlignment = alignment;
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        if (p instanceof com.codename1.ui.TextArea) {
+            ((com.codename1.ui.TextArea) p).setAlignment(JLabel.nativeAlignment(alignment));
+        }
+        firePropertyChange("horizontalAlignment", old, alignment);
+        repaint();
     }
 
     public void addActionListener(ActionListener l) {
@@ -141,5 +191,10 @@ public class JTextField extends JTextComponent implements SwingConstants {
 
     public void postActionEvent() {
         fireActionPerformed();
+    }
+
+    @Override
+    protected String paramString() {
+        return super.paramString() + ",columns=" + columns;
     }
 }
