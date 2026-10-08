@@ -42,7 +42,7 @@ import javafx.stage.Window;
 ///
 /// Pointer and key events enter the scene here before Codename One sees
 /// them; see [SceneInput].
-public class StageForm extends Form implements StageHost {
+public final class StageForm extends Form implements StageHost {
 
     private final HostCore core;
     private final boolean primary;
@@ -156,8 +156,9 @@ public class StageForm extends Form implements StageHost {
 
     @Override
     public final void stageChanged() {
-        if (!primary && core.window() instanceof Stage) {
-            String title = ((Stage) core.window()).getTitle();
+        Window window = core.window();
+        if (!primary && window instanceof Stage) {
+            String title = ((Stage) window).getTitle();
             setTitle(title == null ? "" : title);
         }
     }

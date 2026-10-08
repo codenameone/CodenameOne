@@ -36,7 +36,7 @@ public class Pane extends Region {
 
     /// Creates a pane with children.
     public Pane(Node... children) {
-        getChildren().addAll(children);
+        cn1Children().addAll(children);
     }
 
     @Override

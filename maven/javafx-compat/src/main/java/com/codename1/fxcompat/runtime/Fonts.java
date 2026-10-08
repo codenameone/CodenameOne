@@ -48,7 +48,7 @@ public final class Fonts {
     /// posture and a size in logical pixels.
     public static Font create(String family, int weight, boolean italic, double size) {
         double scale = Units.scale();
-        if (scale != cacheScale) {
+        if (Double.compare(scale, cacheScale) != 0) {
             CACHE.clear();
             cacheScale = scale;
         }
@@ -101,7 +101,7 @@ public final class Fonts {
     /// Returns whether a native font came from the cache of the current
     /// scale, so it is still the right size.
     public static boolean isCurrent(Object nativeFont) {
-        return cacheScale == Units.scale() && nativeFont instanceof Font && CACHE.containsValue(nativeFont);
+        return Double.compare(cacheScale, Units.scale()) == 0 && nativeFont instanceof Font && CACHE.containsValue(nativeFont);
     }
 
     /// Returns the native font of a JavaFX font, the default font for

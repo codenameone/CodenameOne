@@ -159,6 +159,13 @@ public abstract class Parent extends Node {
         }
     }
 
+    /// Returns the modifiable list of children, for a constructor: unlike
+    /// [#getChildren()] it cannot be overridden, so it is safe to call
+    /// before a subclass is initialized.
+    protected final ObservableList<Node> cn1Children() {
+        return children;
+    }
+
     @Override
     protected Component cn1CreatePeer() {
         return new ParentPeer(this);

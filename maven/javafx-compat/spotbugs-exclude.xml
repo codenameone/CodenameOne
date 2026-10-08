@@ -117,4 +117,72 @@
         <Field name="target"/>
         <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
     </Match>
+
+    <!--
+        The same holds for the input and window events: the pick result, the
+        node a gesture started on and the like are transient because they
+        name live scene graph objects, which are not serializable in JavaFX
+        either.
+    -->
+    <Match>
+        <Or>
+            <Class name="~javafx\.scene\.input\.[A-Za-z]+Event"/>
+            <Class name="javafx.stage.WindowEvent"/>
+        </Or>
+        <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+    </Match>
+
+    <!--
+        A scene graph is shared by reference; that is the API. A node hands
+        out its properties, its children, its style classes, its scene and
+        its peer, a control hands out its items and its selection model, an
+        event names the node it happened on, and a peer or a renderer keeps
+        the node or the graphics it was made for. A defensive copy of any of
+        them would detach the caller from the live object it asked for.
+    -->
+    <Match>
+        <Or>
+            <Class name="~javafx\.(scene|stage|animation|concurrent|application)\..*"/>
+            <Class name="~com\.codename1\.fxcompat\.runtime\..*"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!--
+        Window.getWindows() answers one unmodifiable view of the showing
+        windows, as JavaFX does; callers listen to it for windows opening
+        and closing, so it has to be the same object every time.
+    -->
+    <Match>
+        <Class name="javafx.stage.Window"/>
+        <Method name="getWindows"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!--
+        null is the documented answer here and means something an empty
+        array could not: no matrix (identity, so nothing is installed), no
+        bounds (an empty path has none, not a box at the origin) and no dash
+        pattern (a solid stroke).
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="javafx.scene.Node"/>
+                <Method name="cn1PaintMatrix"/>
+            </And>
+            <And>
+                <Class name="com.codename1.fxcompat.runtime.FxPath"/>
+                <Method name="bounds"/>
+            </And>
+            <And>
+                <Class name="javafx.scene.layout.Region"/>
+                <Method name="dashes"/>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
 </FindBugsFilter>

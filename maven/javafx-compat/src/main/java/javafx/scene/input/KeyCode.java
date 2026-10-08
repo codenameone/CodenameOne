@@ -714,7 +714,6 @@ public enum KeyCode {
         }
     }
 
-    private static HashMap<String, KeyCode> byName;
 
     private final int code;
     private final String ch;
@@ -795,14 +794,24 @@ public enum KeyCode {
 
     /// Returns the key with a name as [#getName()] answers it, or `null`.
     public static KeyCode getKeyCode(String name) {
-        if (byName == null) {
+        return Names.BY_NAME.get(name);
+    }
+
+    /// The keys by name, built when first asked for: an enum cannot fill
+    /// a static map from its own constructor.
+    private static final class Names {
+        static final HashMap<String, KeyCode> BY_NAME = build();
+
+        private Names() {
+        }
+
+        private static HashMap<String, KeyCode> build() {
             HashMap<String, KeyCode> map = new HashMap<String, KeyCode>();
             KeyCode[] all = values();
             for (int i = 0; i < all.length; i++) {
                 map.put(all[i].name, all[i]);
             }
-            byName = map;
+            return map;
         }
-        return byName.get(name);
     }
 }

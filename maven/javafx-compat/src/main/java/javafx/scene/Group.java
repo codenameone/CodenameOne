@@ -43,12 +43,12 @@ public class Group extends Parent {
 
     /// Creates a group with children.
     public Group(Node... children) {
-        getChildren().addAll(children);
+        cn1Children().addAll(children);
     }
 
     /// Creates a group with children.
     public Group(Collection<Node> children) {
-        getChildren().addAll(children);
+        cn1Children().addAll(children);
     }
 
     @Override

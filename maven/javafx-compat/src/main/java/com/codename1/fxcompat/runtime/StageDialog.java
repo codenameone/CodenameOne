@@ -36,7 +36,7 @@ import javafx.stage.Window;
 /// size of the scene. It is shown modeless as far as Codename One is
 /// concerned, so `Stage.show()` returns at once as JavaFX requires; the
 /// form below cannot be reached while it is up either way.
-public class StageDialog extends Dialog implements StageHost {
+public final class StageDialog extends Dialog implements StageHost {
 
     private final HostCore core;
 
@@ -134,8 +134,9 @@ public class StageDialog extends Dialog implements StageHost {
 
     @Override
     public final void stageChanged() {
-        if (core.window() instanceof Stage) {
-            String title = ((Stage) core.window()).getTitle();
+        Window window = core.window();
+        if (window instanceof Stage) {
+            String title = ((Stage) window).getTitle();
             setTitle(title == null ? "" : title);
         }
     }

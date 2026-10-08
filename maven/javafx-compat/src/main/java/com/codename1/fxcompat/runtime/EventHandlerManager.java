@@ -205,13 +205,17 @@ public final class EventHandlerManager implements EventDispatcher {
         return event.getSource() == owner ? event : event.copyFor(owner, target);
     }
 
+    private static void noteConsumedByFilter() {
+        consumedByFilter = true;
+    }
+
     @Override
     public Event dispatchEvent(Event event, EventDispatchChain tail) {
         if (filters != null) {
             Event capturing = localize(event);
             fire(filters, capturing, false);
             if (capturing.isConsumed()) {
-                consumedByFilter = true;
+                noteConsumedByFilter();
                 return null;
             }
         }

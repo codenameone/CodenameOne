@@ -62,7 +62,7 @@ public final class Stop {
                     continue;
                 }
                 double o = s.offset < 0 ? 0 : (s.offset > 1 ? 1 : s.offset);
-                Stop clamped = o == s.offset ? s : new Stop(o, s.color);
+                Stop clamped = s.offset >= 0 && s.offset <= 1 ? s : new Stop(o, s.color);
                 int at = out.size();
                 while (at > 0 && out.get(at - 1).offset > o) {
                     at--;

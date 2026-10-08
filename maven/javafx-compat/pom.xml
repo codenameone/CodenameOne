@@ -80,6 +80,13 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- ApiNamingTest reads the compiled classes to hold the cn1 hook
+             list to what is really declared. -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- The headless Codename One implementation the tests run on. -->
         <dependency>
             <groupId>com.codenameone</groupId>

@@ -37,7 +37,6 @@ import javafx.beans.NamedArg;
 public final class Font {
 
     private static final double DEFAULT_SIZE = 13;
-    private static Font defaultFont;
 
     private final String family;
     private final String name;
@@ -144,10 +143,15 @@ public final class Font {
     /// Returns the default font, the platform typeface at the default
     /// size.
     public static Font getDefault() {
-        if (defaultFont == null) {
-            defaultFont = new Font("System", FontWeight.NORMAL, FontPosture.REGULAR, DEFAULT_SIZE);
+        return Default.FONT;
+    }
+
+    /// Holds the default font, created when first asked for.
+    private static final class Default {
+        static final Font FONT = new Font("System", FontWeight.NORMAL, FontPosture.REGULAR, DEFAULT_SIZE);
+
+        private Default() {
         }
-        return defaultFont;
     }
 
     /// Returns the font of a family with a weight, a posture and a size.

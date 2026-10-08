@@ -38,7 +38,7 @@ import javafx.stage.Window;
 /// with, else the preferred size of its root, unless the stage was given
 /// a width and height. The platform's close control fires the stage's
 /// close request instead of closing the window itself.
-public class StageWindow extends com.codename1.ui.Window implements StageHost {
+public final class StageWindow extends com.codename1.ui.Window implements StageHost {
 
     private final HostCore core;
 
@@ -160,8 +160,9 @@ public class StageWindow extends com.codename1.ui.Window implements StageHost {
 
     @Override
     public final void stageChanged() {
-        if (core.window() instanceof Stage) {
-            Stage stage = (Stage) core.window();
+        Window window = core.window();
+        if (window instanceof Stage) {
+            Stage stage = (Stage) window;
             String title = stage.getTitle();
             setTitle(title == null ? "" : title);
             setResizable(stage.isResizable());
