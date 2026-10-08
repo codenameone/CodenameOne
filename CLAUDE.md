@@ -856,6 +856,21 @@ What holds it together:
   Compile-scope dependency jars that name a layer are unpacked and relocated as
   application code (`CompatLibraries`).
 
+- **Library mode: desktop sources inside a Codename One app.** No
+  `cn1-desktop.properties` beside a compiled main class of the project's own,
+  or `kind=library`, generates no entry point; the classes ship relocated.
+  `SwingInterop.asComponent` / `FxInterop.asComponent` wrap a component, a
+  parent or a scene as a `com.codename1.ui.Component`, and a `JFrame` or
+  `Stage` shown with no generated entry point is a form over the host's --
+  closing the last one returns there and never exits. Both `asComponent`
+  parameters are `Object` **on purpose**: the remap copies the relocated
+  runtime into `target/classes`, which shadows the jar on the next non-clean
+  compile, so a non-relocated public class naming a toolkit type in a
+  signature stops compiling against application source. `hellocodenameone`
+  is the library-mode project (`common/src/main/desktop`, the
+  `DesktopCompat*` screenshot tests); `DesktopCompatScenesTest` in
+  `build-engine` runs the same scenes headless from the remapped classes.
+
 `compat-jdk`, `swing-compat`, `javafx-compat` and `fxml-compiler` are in the
 SpotBugs zero-findings gate, each with its own `spotbugs-exclude.xml`.
 

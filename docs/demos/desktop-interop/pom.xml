@@ -26,6 +26,12 @@
     </dependency>
     <dependency>
       <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-swing-compat</artifactId>
+      <version>${cn1.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.codenameone</groupId>
       <artifactId>codenameone-javafx-compat</artifactId>
       <version>${cn1.version}</version>
       <scope>provided</scope>
