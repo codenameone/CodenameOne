@@ -49,7 +49,8 @@ public final class ParparVMBootstrap implements Runnable {
      * initialized and before the lifecycle's {@code init}/{@code start} callbacks. The generated
      * launcher uses this to stamp the app-hardening metadata (so {@code Hardening.isHardened()} and
      * any crash raised during {@code init}/{@code start} already see the mapping id and level).
-     * The lifecycle itself is then queued to the EDT, so {@code afterInit} always runs first.
+     * The lifecycle itself then runs on the EDT, so {@code afterInit} always runs first, and this
+     * call returns only once {@code start} has returned.
      *
      * @param lifecycle the application lifecycle
      * @param afterInit code to run after {@code Display.init} and before the lifecycle starts; may be null
@@ -66,7 +67,18 @@ public final class ParparVMBootstrap implements Runnable {
         // worker's main thread, so init() and start() ran off the EDT: anything that checks
         // -- a transpiled Flutter app's runApp asserts it -- threw before the first frame,
         // and the transpiled Flutter gallery never got past its loading screen.
-        Display.getInstance().callSerially(bootstrap);
+        //
+        // It must still be WAITED for here, not just queued. The runtime reports the app
+        // as started when this (main) thread finishes -- parparvm_runtime.js posts the
+        // ``lifecycle``/``started`` message from its drain loop, and browser_bridge.js
+        // turns that into the page's ``window.cn1Started``. Queuing and returning let the
+        // main thread finish before init() and start() had even run, so cn1Started went
+        // true while the first form was not yet shown: the Playground editor-input check
+        // clicked into an empty display and the click was lost. Blocking until the
+        // lifecycle has run keeps "the main thread finished" meaning "start() returned",
+        // as it did when run() was called inline. run() catches everything, so the
+        // wrapper always completes and this wait always ends.
+        Display.getInstance().callSeriallyAndWait(bootstrap);
     }
 
     // ``window.cn1Initialized = true`` lands on the worker's global
@@ -89,7 +101,7 @@ public final class ParparVMBootstrap implements Runnable {
     // in-page invocations from the JavaScript-port simulator.
     @JSBody(params = {}, script = ""
             + "window.cn1Started = true;"
-            + "var __cn1LifecycleMsg = {type: 'lifecycle', phase: 'started'};"
+            + "var __cn1LifecycleMsg = {type: 'lifecycle', phase: 'started', source: 'bootstrap'};"
             + "if (typeof parentPort !== 'undefined' && parentPort && typeof parentPort.postMessage === 'function') {"
             + "  parentPort.postMessage(__cn1LifecycleMsg);"
             + "} else if (typeof self !== 'undefined' && self !== this && typeof self.postMessage === 'function') {"

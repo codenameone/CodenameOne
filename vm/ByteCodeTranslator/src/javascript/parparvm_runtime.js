@@ -3126,7 +3126,13 @@ const jvm = {
               vmLifecycle("main-thread-completed");
               emitVmMessage({
                 type: this.protocol.messages.LIFECYCLE || "lifecycle",
-                phase: "started"
+                phase: "started",
+                // Tells this signal apart from the one ParparVMBootstrap posts
+                // (source "bootstrap") once start() returns. A Codename One app
+                // must send that one FIRST: run-javascript-lifecycle-tests.mjs
+                // fails a bundle whose main thread finishes before it, which is
+                // the bootstrap returning without waiting for the lifecycle.
+                source: "main-thread"
               });
             }
             if (thread.object) {
