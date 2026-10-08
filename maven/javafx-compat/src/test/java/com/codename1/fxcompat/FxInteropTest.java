@@ -221,14 +221,14 @@ public class FxInteropTest {
                 ((SceneEmbed) FxInterop.asComponent(box)).window().getScene());
         assertNotNull(hosted);
         try {
-            FxInterop.asComponent((Scene) null);
-            fail("no scene");
+            FxInterop.asComponent(null);
+            fail("nothing");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected.getMessage());
         }
         try {
-            FxInterop.asComponent((javafx.scene.Parent) null);
-            fail("no root");
+            FxInterop.asComponent("a string");
+            fail("neither a scene nor a root");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected.getMessage());
         }

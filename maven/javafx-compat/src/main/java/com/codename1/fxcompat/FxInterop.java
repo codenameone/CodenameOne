@@ -58,49 +58,45 @@ public final class FxInterop {
     private FxInterop() {
     }
 
-    /// Answers a Codename One component that shows `root`, laid out to the
-    /// size the answered component is given, painted with it, and receiving
-    /// the pointer input that falls on it. Its preferred size is the
-    /// root's, scaled to the display.
+    /// Answers a Codename One component that shows a scene graph, laid out
+    /// to the size the answered component is given, painted with it, and
+    /// receiving the pointer input that falls on it. Its preferred size is
+    /// the root's, scaled to the display.
     ///
-    /// A root that is the root of a scene already is shown with that
-    /// scene, its style sheets included; any other is given a scene of
-    /// its own. Call this on the event dispatch thread, which is the
-    /// JavaFX application thread.
+    /// The argument is a `javafx.scene.Parent` or a `javafx.scene.Scene`.
+    /// A root that is the root of a scene already is shown with that scene,
+    /// its style sheets included; any other is given a scene of its own.
+    /// Pass a scene to give it style sheets or a fill; one that a stage is
+    /// showing leaves that stage. Call this on the event dispatch thread,
+    /// which is the JavaFX application thread.
+    ///
+    /// The parameter is declared as `Object` because the build relocates
+    /// the JavaFX classes an application names: the application is compiled
+    /// against `javafx.scene.Parent`, and what reaches this method on a
+    /// device is the relocated class. Anything that is neither a parent nor
+    /// a scene is refused with an `IllegalArgumentException`.
     ///
     /// #### Parameters
     ///
-    /// - `root`: the root of the scene graph to show
+    /// - `sceneOrRoot`: the `Scene` to show, or the `Parent` at the root of
+    ///   the scene graph to show
     ///
     /// #### Returns
     ///
     /// the Codename One component that shows it
-    public static Component asComponent(Parent root) {
-        if (root == null) {
-            throw new IllegalArgumentException("root is null");
-        }
-        Scene scene = root.getScene();
-        if (scene == null || scene.getRoot() != root) {
-            scene = new Scene(root);
-        }
-        return asComponent(scene);
-    }
-
-    /// Answers a Codename One component that shows `scene`: as
-    /// [#asComponent(Parent)], for a scene the caller built -- to give it
-    /// style sheets or a fill. A scene that a stage is showing leaves that
-    /// stage.
-    ///
-    /// #### Parameters
-    ///
-    /// - `scene`: the scene to show
-    ///
-    /// #### Returns
-    ///
-    /// the Codename One component that shows it
-    public static Component asComponent(Scene scene) {
-        if (scene == null) {
-            throw new IllegalArgumentException("scene is null");
+    public static Component asComponent(Object sceneOrRoot) {
+        Scene scene;
+        if (sceneOrRoot instanceof Scene) {
+            scene = (Scene) sceneOrRoot;
+        } else if (sceneOrRoot instanceof Parent) {
+            Parent root = (Parent) sceneOrRoot;
+            scene = root.getScene();
+            if (scene == null || scene.getRoot() != root) {
+                scene = new Scene(root);
+            }
+        } else {
+            throw new IllegalArgumentException("asComponent takes a javafx.scene.Parent or a javafx.scene.Scene, not "
+                    + (sceneOrRoot == null ? "null" : sceneOrRoot.getClass().getName()));
         }
         Stage stage = new Stage();
         SceneEmbed embed = new SceneEmbed(stage);
