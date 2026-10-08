@@ -1204,6 +1204,21 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
 // The sweep's liveness rule for a specific OBJECT, which is what the reference-clearing
 // passes must ask now that a fresh mark alone no longer decides it: they have to clear
 // exactly what the sweep frees, or get() hands out a freed slot.
+//
+// A CONSEQUENCE THAT LOOKS LIKE A LEAK AND IS NOT ONE. A referent on a page its thread is
+// still allocating into (bibopCurrent) stays mark -1 for as long as the page is owned: no
+// sweep touches an owned page (BIBOP-INVARIANTS R5), so nothing promotes it out of grace,
+// and a concurrent cycle answers 0 here. Measured: 64 WeakReferences to unreachable int[8]
+// referents, stack scrubbed, 0 cleared after 20 forced concurrent cycles, all 64 cleared
+// once the thread filled and retired that page or once a stop-the-world cycle held it
+// (cn1BibopRetireHeldThreadPages), on 1 and 4 markers, on master and before #5940 alike.
+// The root is the allocation page, not a stack word. It is not avoidable in a concurrent
+// cycle: the owner bumps that page while the cycle runs, and the barriers filter fresh
+// references there (cn1GcFreshFilter) on the strength of grace, so freeing an unmarked
+// fresh slot on it would be unsound -- and the clear must match what the sweep frees. It
+// is bounded: one page per size class per thread, released at the next page fill or the
+// next stop-the-world hold. A test that asserts a weak referent clears must therefore
+// retire the page first (or use a referent off the page heap), never just wait.
 static inline int cn1GcSweepReclaimsObj(JAVA_OBJECT o, int mark) {
     if(mark != -1) {
         return cn1GcSweepReclaims(mark);

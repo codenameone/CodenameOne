@@ -848,6 +848,15 @@ survived until the data contradicted it:
   whether a run falls in is timing-sensitive. Single runs there measure the coin. If that
   regime is what you want, count how many of N runs complete; do not time one.
 
+**A weak referent on its thread's current allocation page is not cleared until that
+page retires**, and the memory is not freed either: the clear follows the sweep, and no
+sweep touches an owned page. 64 unreachable `int[8]` referents stayed set through 20
+concurrent cycles and cleared the moment the page was filled, or under any stop-the-world
+cycle that held the thread -- on master and before #5940 too. Bounded (one page per size
+class per thread) and not avoidable in a concurrent cycle; see `cn1GcSweepReclaimsObj`. A
+test that asserts clearing must retire the page or use a referent off the page heap
+(`RefPolicy`'s 32KB payloads are legacy-heap, so its counts are unaffected).
+
 **What is still not measured.** Nothing here separates ranking by RECENCY from "trims at
 all" -- there is no random-eviction arm at a matched rate, so the LRU claim is unproven,
 only the trimming claim. And the 64MB-cache-against-a-128MB-budget shape is a choice made
