@@ -124,25 +124,25 @@
      "from": {
       "value": 12910326
      },
-     "reason": "master merge c717e15d2a (runtime and Playground support) grew the JavaScript bundle +0.13% code; run 37726200794 at be95ff25e5",
+     "reason": "the lifecycle fix fe482ff7e8 (bootstrap waits for start(), lifecycle messages tagged with their source) adds 460 bytes of code; run 37733388159",
      "runs": 1,
-     "value": 12820642
+     "value": 12821102
     },
     "install_bytes": {
      "from": {
       "value": 110000963
      },
-     "reason": "master merge c717e15d2a (runtime and Playground support) grew the JavaScript bundle +0.13% code; run 37726200794 at be95ff25e5",
+     "reason": "the lifecycle fix fe482ff7e8 (bootstrap waits for start(), lifecycle messages tagged with their source) adds 460 bytes of code; run 37733388159",
      "runs": 1,
-     "value": 108106939
+     "value": 108107399
     },
     "wire_bytes": {
      "from": {
       "value": 80610118
      },
-     "reason": "master merge c717e15d2a (runtime and Playground support) grew the JavaScript bundle +0.13% code; run 37726200794 at be95ff25e5",
+     "reason": "the lifecycle fix fe482ff7e8 (bootstrap waits for start(), lifecycle messages tagged with their source) adds 460 bytes of code; run 37733388159",
      "runs": 1,
-     "value": 79714641
+     "value": 79714783
     }
    }
   },
