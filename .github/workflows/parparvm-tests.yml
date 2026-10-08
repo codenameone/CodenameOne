@@ -176,7 +176,9 @@ jobs:
 
   vm-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # The full suite takes about an hour before the bounded GC benchmark arms.
+    # Leave time for both; each benchmark workload retains its own timeout.
+    timeout-minutes: 120
     # The two database engines the backend speaks a wire protocol to.
     #
     # BackendDatabaseTest and BackendOrmTest run one body of assertions against
