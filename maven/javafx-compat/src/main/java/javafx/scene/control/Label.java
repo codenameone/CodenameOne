@@ -61,6 +61,11 @@ public class Label extends Labeled {
         return new com.codename1.ui.Label();
     }
 
+    @Override
+    boolean cn1BareText() {
+        return true;
+    }
+
     /// Returns the control this label describes, or `null`.
     public final Node getLabelFor() {
         return labelFor.get();

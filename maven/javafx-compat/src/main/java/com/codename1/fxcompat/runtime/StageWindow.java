@@ -40,7 +40,12 @@ import javafx.stage.Window;
 /// close request instead of closing the window itself.
 public final class StageWindow extends com.codename1.ui.Window implements StageHost {
 
+    private static final int SETTLE_TRIES = 4;
+
     private final HostCore core;
+    private int wantedWidth = -1;
+    private int wantedHeight = -1;
+    private int settling;
 
     /// Creates the desktop window of a stage.
     public StageWindow(Window window) {
@@ -57,6 +62,7 @@ public final class StageWindow extends com.codename1.ui.Window implements StageH
         addSizeChangedListener(new ActionListener<ActionEvent>() {
             @Override
             public void actionPerformed(ActionEvent evt) {
+                settleContentSize();
                 core.sized();
             }
         });
@@ -201,7 +207,10 @@ public final class StageWindow extends com.codename1.ui.Window implements StageH
                     : (scene.getRoot() == null ? 0 : scene.getRoot().prefHeight(-1));
         }
         if (width > 0 && height > 0) {
-            setWindowContentSize(Units.sizeToPixels(width), Units.sizeToPixels(height));
+            wantedWidth = Units.sizeToPixels(width);
+            wantedHeight = Units.sizeToPixels(height);
+            settling = 0;
+            setWindowContentSize(wantedWidth, wantedHeight);
         }
         if (Double.isNaN(w.getX()) || Double.isNaN(w.getY())) {
             centerOnDesktop();
@@ -210,10 +219,40 @@ public final class StageWindow extends com.codename1.ui.Window implements StageH
         }
     }
 
+    /// Asks again for the size of the scene while the window is not that
+    /// size, a few times at most.
+    ///
+    /// A window is asked for the size of what it shows, and the platform
+    /// is asked for a frame of that plus its title bar and borders, which
+    /// are measured as the frame less what is drawn in. On the desktop
+    /// port a window that was just created draws in nothing yet and says
+    /// one pixel, so the whole frame was taken for borders and the window
+    /// came up twice the size of its scene. The first sizes a window
+    /// reports are therefore checked against what was asked for, and it
+    /// is asked again once there is something to measure. After it was
+    /// the right size once, or was asked that often, its size is the
+    /// user's to change.
+    private void settleContentSize() {
+        if (wantedWidth <= 0 || wantedHeight <= 0) {
+            return;
+        }
+        if (Math.abs(getWidth() - wantedWidth) <= 1 && Math.abs(getHeight() - wantedHeight) <= 1) {
+            wantedWidth = -1;
+            return;
+        }
+        if (settling >= SETTLE_TRIES) {
+            wantedWidth = -1;
+            return;
+        }
+        settling++;
+        setWindowContentSize(wantedWidth, wantedHeight);
+    }
+
     @Override
     public void open() {
         boundsRequested();
         show();
+        settleContentSize();
         core.sized();
     }
 

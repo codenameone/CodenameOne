@@ -105,4 +105,32 @@ public class ControlSizeTest {
         icon.cn1Paint(new Renderer(com.codename1.ui.Image.createImage(100, 100, 0).getGraphics(), 0, 0));
         assertTrue("drew " + drawn, drawn.contains("fill:40x40"));
     }
+
+    /// A label is its text and nothing around it: the padding the native
+    /// theme gives its own labels is not part of a JavaFX one, and with it
+    /// every row of labels stood taller than the original.
+    @Test
+    public void aLabelIsAsTallAsItsLineOfText() {
+        javafx.scene.control.Label label = new javafx.scene.control.Label("First Name");
+        label.setFont(javafx.scene.text.Font.font(20));
+        javafx.scene.text.Text text = new javafx.scene.text.Text("First Name");
+        text.setFont(javafx.scene.text.Font.font(20));
+        new javafx.scene.Scene(new HBox(label, text), 300, 60).cn1Layout(300, 60);
+        double line = text.getLayoutBounds().getHeight();
+        assertEquals(line, label.prefHeight(-1), 2.5);
+    }
+
+    /// The standard theme draws a column's header bold, and a style sheet
+    /// that only changes its size keeps that.
+    @Test
+    public void aColumnHeaderIsBoldUntilAStyleSheetSaysOtherwise() {
+        javafx.scene.control.TableView<String> table = new javafx.scene.control.TableView<String>();
+        table.getColumns().add(new javafx.scene.control.TableColumn<String, String>("First Name"));
+        new javafx.scene.Scene(new StackPane(table), 300, 200).cn1Layout(300, 200);
+        javafx.scene.Node found = table.lookup(".column-header .label");
+        assertTrue("no header label", found instanceof javafx.scene.control.Label);
+        javafx.scene.control.Label header = (javafx.scene.control.Label) found;
+        assertTrue("header font is " + header.getFont().getStyle(),
+                header.getFont().getStyle().indexOf("Bold") >= 0);
+    }
 }

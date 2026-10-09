@@ -152,6 +152,16 @@ public abstract class Labeled extends Control {
             style.setBgTransparency(0);
             style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
         }
+        // A JavaFX label is its text and nothing around it; the room a
+        // Codename One theme gives a label made every one a few pixels
+        // taller and wider than the application laid it out for.
+        boolean bare = cn1BareText();
+        if (bare) {
+            style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+            style.setPadding(0, 0, 0, 0);
+            style.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+            style.setMargin(0, 0, 0, 0);
+        }
         Paint fill = getTextFill();
         if (fill instanceof Color) {
             int argb = ((Color) fill).cn1Argb();
@@ -176,10 +186,20 @@ public abstract class Labeled extends Control {
             Style base = UIManager.getInstance().getComponentStyle(label.getUIID());
             int[] room = g == null ? new int[GRAPHIC_BOX] : graphicBox(label, g);
             style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-            style.setPadding(base.getPaddingTop() + room[0], base.getPaddingBottom() + room[1],
-                    base.getPaddingLeftNoRTL() + room[2], base.getPaddingRightNoRTL() + room[3]);
+            if (bare) {
+                style.setPadding(room[0], room[1], room[2], room[3]);
+            } else {
+                style.setPadding(base.getPaddingTop() + room[0], base.getPaddingBottom() + room[1],
+                        base.getPaddingLeftNoRTL() + room[2], base.getPaddingRightNoRTL() + room[3]);
+            }
             paddedForGraphic = g != null;
         }
+    }
+
+    /// Whether the native component is text alone, with none of the
+    /// padding or margin a theme gives one. True of a label.
+    boolean cn1BareText() {
+        return false;
     }
 
     private static final int GRAPHIC_BOX = 9;

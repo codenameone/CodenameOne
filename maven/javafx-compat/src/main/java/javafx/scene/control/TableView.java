@@ -462,7 +462,8 @@ public class TableView<S> extends Control {
         @Override
         public String cn1DefaultStyle() {
             return "-fx-border-color: transparent -fx-table-header-border-color -fx-table-header-border-color"
-                    + " transparent; -fx-border-width: 0 1 1 0; -fx-padding: 2 8 2 8;";
+                    + " transparent; -fx-border-width: 0 1 1 0; -fx-padding: 2; -fx-size: 24;"
+                    + " -fx-font-weight: bold;";
         }
 
         @Override
