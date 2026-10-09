@@ -60,6 +60,8 @@ public class Button extends ButtonBase {
         };
         backgroundProperty().addListener(chrome);
         borderProperty().addListener(chrome);
+        // The text of a button is centred unless the application says otherwise.
+        setAlignment(javafx.geometry.Pos.CENTER);
     }
 
     private boolean drawsItself() {

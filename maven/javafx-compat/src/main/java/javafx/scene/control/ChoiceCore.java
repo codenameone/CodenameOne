@@ -23,7 +23,9 @@
 package javafx.scene.control;
 
 import com.codename1.fxcompat.runtime.Dirty;
+import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.spinner.Picker;
@@ -199,6 +201,9 @@ final class ChoiceCore<T> {
     Picker create() {
         final Picker p = new Picker();
         p.setType(Display.PICKER_TYPE_STRINGS);
+        // The arrow that says a list drops down, after the text.
+        p.setMaterialIcon(FontImage.MATERIAL_ARROW_DROP_DOWN);
+        p.setTextPosition(Component.LEFT);
         p.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {

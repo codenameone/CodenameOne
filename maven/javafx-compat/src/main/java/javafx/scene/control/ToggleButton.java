@@ -25,12 +25,16 @@ package javafx.scene.control;
 import com.codename1.fxcompat.runtime.Dirty;
 import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.ui.Component;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.css.PseudoClass;
 import javafx.event.ActionEvent;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 
 /// A button that stays selected until it is pressed again, shown as a
@@ -69,25 +73,56 @@ public class ToggleButton extends ButtonBase implements Toggle {
 
     /// Creates a toggle button with no text.
     public ToggleButton() {
-        getStyleClass().add("toggle-button");
+        init();
     }
 
     /// Creates a toggle button with text.
     public ToggleButton(String text) {
         super(text);
-        getStyleClass().add("toggle-button");
+        init();
     }
 
     /// Creates a toggle button with text and a graphic.
     public ToggleButton(String text, Node graphic) {
         super(text, graphic);
+        init();
+    }
+
+    private void init() {
         getStyleClass().add("toggle-button");
+        // The text of a button is centred unless the application says otherwise.
+        setAlignment(Pos.CENTER);
+    }
+
+    /// Whether the theme says nothing about a component name: its style
+    /// is the one a name no theme knows gets, so nothing tells such a
+    /// component from the form behind it.
+    static boolean unstyled(String uiid) {
+        Style s = UIManager.getInstance().getComponentStyle(uiid);
+        Style none = UIManager.getInstance().getComponentStyle("FxNoSuchComponent");
+        return s.getBgColor() == none.getBgColor() && s.getBgTransparency() == none.getBgTransparency()
+                && s.getBgImage() == none.getBgImage() && sameBorder(s.getBorder(), none.getBorder())
+                && s.getPaddingTop() == none.getPaddingTop()
+                && s.getPaddingLeftNoRTL() == none.getPaddingLeftNoRTL();
+    }
+
+    private static boolean sameBorder(Border a, Border b) {
+        boolean noA = a == null || a.isEmptyBorder();
+        boolean noB = b == null || b.isEmptyBorder();
+        return a == b || (noA && noB);
     }
 
     @Override
     protected Component cn1CreateNative() {
         com.codename1.ui.CheckBox b = new com.codename1.ui.CheckBox();
         b.setToggle(true);
+        if (unstyled(b.getUIID())) {
+            // A theme with no look for a toggle button, as the desktop
+            // themes are, would leave bare text with no sign of being
+            // selected. The toggle then takes the look of a push button,
+            // which Codename One draws pressed while it is selected.
+            b.setUIID("Button");
+        }
         b.addActionListener(cn1ActionBridge());
         return b;
     }

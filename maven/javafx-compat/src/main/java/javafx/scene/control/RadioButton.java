@@ -52,6 +52,8 @@ public class RadioButton extends ToggleButton {
 
     private void init() {
         getStyleClass().setAll("radio-button");
+        // A radio button is text beside a mark, not a centred button.
+        setAlignment(javafx.geometry.Pos.CENTER_LEFT);
     }
 
     @Override

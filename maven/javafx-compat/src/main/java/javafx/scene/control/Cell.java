@@ -116,6 +116,11 @@ public class Cell<T> extends Labeled {
         return new com.codename1.ui.Label();
     }
 
+    @Override
+    boolean ownsGraphic() {
+        return true;
+    }
+
     private Node shownGraphic() {
         Node g = getGraphic();
         return g == null || getContentDisplay() == ContentDisplay.TEXT_ONLY ? null : g;

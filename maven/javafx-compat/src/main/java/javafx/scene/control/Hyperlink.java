@@ -28,40 +28,64 @@ import com.codename1.ui.Component;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
 import javafx.beans.property.BooleanProperty;
 import javafx.css.PseudoClass;
 import javafx.event.ActionEvent;
 import javafx.scene.Node;
+import javafx.scene.paint.Color;
 
 /// Text that is pressed like a link, shown as a Codename One `Button`
-/// without a border and with underlined text.
+/// without a border.
 ///
 /// Invoking it marks it visited and fires an `ActionEvent`; opening
 /// anything is up to the handler. The `visited` pseudo-class follows the
-/// visited property. The text is always underlined, whatever
-/// `setUnderline` says.
+/// visited property.
+///
+/// A link without a text fill of its own is drawn in the accent colour of
+/// JavaFX, and in the colour of plain text once it was visited. The text
+/// is underlined while the pointer is over the link or the link is
+/// pressed or armed, and always when `setUnderline(true)` asked for it.
 public class Hyperlink extends ButtonBase {
 
     private static final int VISITED = Dirty.USER;
     private static final PseudoClass VISITED_STATE = PseudoClass.getPseudoClass("visited");
 
-    private final BooleanProperty visited = new FxBoolean(this, "visited", false, VISITED);
+    private static final Color LINK_TEXT = Color.rgb(0, 150, 201);
+    private static final Color VISITED_TEXT = Color.gray(0.2);
+
+    private final BooleanProperty visited = new FxBoolean(this, "visited", false, VISITED | Dirty.NATIVE);
 
     /// Creates a hyperlink with no text.
     public Hyperlink() {
-        getStyleClass().add("hyperlink");
+        init();
     }
 
     /// Creates a hyperlink with text.
     public Hyperlink(String text) {
         super(text);
-        getStyleClass().add("hyperlink");
+        init();
     }
 
     /// Creates a hyperlink with text and a graphic.
     public Hyperlink(String text, Node graphic) {
         super(text, graphic);
+        init();
+    }
+
+    private void init() {
         getStyleClass().add("hyperlink");
+        // The line under the text comes and goes with the pointer.
+        InvalidationListener look = new InvalidationListener() {
+            @Override
+            public void invalidated(Observable observable) {
+                cn1Invalidated(Dirty.NATIVE);
+            }
+        };
+        hoverProperty().addListener(look);
+        armedProperty().addListener(look);
+        pressedProperty().addListener(look);
     }
 
     @Override
@@ -79,7 +103,13 @@ public class Hyperlink extends ButtonBase {
         super.cn1SyncNative();
         Component c = cn1NativeIfCreated();
         if (c != null) {
-            c.getAllStyles().setTextDecoration(Style.TEXT_DECORATION_UNDERLINE);
+            Style s = c.getAllStyles();
+            if (textFillProperty().get() == null) {
+                s.setFgColor((isVisited() ? VISITED_TEXT : LINK_TEXT).cn1Argb() & 0xffffff);
+                s.setOpacity(255);
+            }
+            boolean line = isUnderline() || isHover() || isArmed() || isPressed();
+            s.setTextDecoration(line ? Style.TEXT_DECORATION_UNDERLINE : Style.TEXT_DECORATION_NONE);
         }
     }
 
