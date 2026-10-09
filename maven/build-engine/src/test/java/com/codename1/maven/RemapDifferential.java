@@ -119,6 +119,10 @@ final class RemapDifferential {
                 + "        return String.valueOf(o);\n"
                 + "    }\n"
                 + "    public static String[] texts() throws Exception {\n"
+                + "        if (Boolean.getBoolean(\"cn1.remapped\")) {\n"
+                + "            Class.forName(\"com.codename1.compat.testing.HeadlessImplementation\")\n"
+                + "                    .getMethod(\"install\").invoke(null);\n"
+                + "        }\n"
                 + "        List<Object> all = run();\n"
                 + "        String[] t = new String[all.size()];\n"
                 + "        for (int i = 0; i < t.length; i++) { t[i] = text(all.get(i)); }\n"
@@ -163,13 +167,23 @@ final class RemapDifferential {
             byte[] out = relocator.remap(Files.readAllBytes(c.toPath()));
             Files.write(new File(remapped, "q/" + c.getName()).toPath(), out);
         }
-        return new String[][] {execute(jdk, original), execute(jdk, remapped)};
+        return new String[][] {execute(jdk, original, false), execute(jdk, remapped, true)};
     }
 
     /// Runs `body` both ways and requires the same results, of which there
     /// have to be at least `atLeast`.
-    void same(String body, int atLeast) throws Exception {
+    void same(String body, int atLeast, String... gone) throws Exception {
         String[][] both = run(body);
+        // What the remap was to replace is named by no class any more, so
+        // the second run cannot have been the JDK's own classes again.
+        File[] classes = new File(work, "remapped/q").listFiles();
+        assertNotNull(classes);
+        for (File c : classes) {
+            String constants = new String(Files.readAllBytes(c.toPath()), "ISO-8859-1");
+            for (String name : gone) {
+                assertTrue(c.getName() + " still names " + name, constants.indexOf(name) < 0);
+            }
+        }
         assertEquals(Arrays.asList(both[0]).toString().replace(", ", ",\n "),
                 Arrays.asList(both[1]).toString().replace(", ", ",\n "));
         assertTrue("only " + both[0].length + " results", both[0].length >= atLeast);
@@ -204,8 +218,12 @@ final class RemapDifferential {
         assertEquals(result[1], "0", result[0]);
     }
 
-    private String[] execute(File jdk, File classes) throws Exception {
+    private String[] execute(File jdk, File classes, boolean device) throws Exception {
         if (jdk == null) {
+            if (device) {
+                // What the stand-ins run on: Codename One, with no display.
+                com.codename1.compat.testing.HeadlessImplementation.install();
+            }
             // Only the fixture's own classes are defined here; everything
             // else, the stand-ins included, is the test's class path.
             Loader loader = new Loader(getClass().getClassLoader(), classes);
@@ -222,6 +240,7 @@ final class RemapDifferential {
         List<String> args = new ArrayList<String>();
         args.add(new File(jdk, "bin/java").getAbsolutePath());
         args.add("-Djava.awt.headless=true");
+        args.add("-Dcn1.remapped=" + device);
         args.add("-cp");
         args.add(classes.getAbsolutePath() + File.pathSeparator + System.getProperty("java.class.path"));
         args.add("q.D");

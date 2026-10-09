@@ -377,4 +377,71 @@ public final class Executors {
             return new ExecutionException(cause);
         }
     }
+
+    // ------------------------------------------------------------------
+    // The overloads that take a thread factory, and the executors that
+    // schedule. A factory is accepted and not asked for a thread: the work
+    // runs on Codename One's own threads.
+    // ------------------------------------------------------------------
+
+    public static ExecutorService newSingleThreadExecutor(ThreadFactory threadFactory) {
+        requireFactory(threadFactory);
+        return newSingleThreadExecutor();
+    }
+
+    public static ExecutorService newFixedThreadPool(int nThreads, ThreadFactory threadFactory) {
+        requireFactory(threadFactory);
+        return newFixedThreadPool(nThreads);
+    }
+
+    public static ExecutorService newCachedThreadPool(ThreadFactory threadFactory) {
+        requireFactory(threadFactory);
+        return newCachedThreadPool();
+    }
+
+    /// A pool for work that splits itself up: here, a fixed pool.
+    public static ExecutorService newWorkStealingPool() {
+        return new Pool(CACHED_POOL_WORKERS);
+    }
+
+    public static ExecutorService newWorkStealingPool(int parallelism) {
+        return newFixedThreadPool(parallelism);
+    }
+
+    public static ScheduledExecutorService newScheduledThreadPool(int corePoolSize) {
+        if (corePoolSize < 0) {
+            throw new IllegalArgumentException();
+        }
+        return new ScheduledPool(new Pool(Math.max(1, corePoolSize)));
+    }
+
+    public static ScheduledExecutorService newScheduledThreadPool(int corePoolSize, ThreadFactory threadFactory) {
+        requireFactory(threadFactory);
+        return newScheduledThreadPool(corePoolSize);
+    }
+
+    public static ScheduledExecutorService newSingleThreadScheduledExecutor() {
+        return new ScheduledPool(new Pool(1));
+    }
+
+    public static ScheduledExecutorService newSingleThreadScheduledExecutor(ThreadFactory threadFactory) {
+        requireFactory(threadFactory);
+        return newSingleThreadScheduledExecutor();
+    }
+
+    /// The factory the JDK's executors use by default: a plain thread.
+    public static ThreadFactory defaultThreadFactory() {
+        return new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(r);
+            }
+        };
+    }
+
+    private static void requireFactory(ThreadFactory threadFactory) {
+        if (threadFactory == null) {
+            throw new NullPointerException();
+        }
+    }
 }

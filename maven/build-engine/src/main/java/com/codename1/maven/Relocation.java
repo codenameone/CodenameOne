@@ -218,6 +218,15 @@ public final class Relocation {
         {"java/util/regex/Matcher", JDK_PACKAGE + "Matcher"},
         {"java/util/regex/MatchResult", JDK_PACKAGE + "MatchResult"},
         {"java/util/regex/PatternSyntaxException", JDK_PACKAGE + "PatternSyntaxException"},
+        // java.util.concurrent: futures that complete each other, latches and work run later,
+        // on Codename One's threads.
+        {"java/util/concurrent/CompletableFuture", JDK_PACKAGE + "CompletableFuture"},
+        {"java/util/concurrent/CompletionStage", JDK_PACKAGE + "CompletionStage"},
+        {"java/util/concurrent/CompletionException", JDK_PACKAGE + "CompletionException"},
+        {"java/util/concurrent/CountDownLatch", JDK_PACKAGE + "CountDownLatch"},
+        {"java/util/concurrent/ThreadFactory", JDK_PACKAGE + "ThreadFactory"},
+        {"java/util/concurrent/ScheduledExecutorService", JDK_PACKAGE + "ScheduledExecutorService"},
+        {"java/util/concurrent/ScheduledFuture", JDK_PACKAGE + "ScheduledFuture"},
     };
 
     private final String name;
