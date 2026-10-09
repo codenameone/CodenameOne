@@ -224,4 +224,33 @@ public class NarrowScreenTest {
         assertFalse(other.isScrollableY());
         assertEquals(wide, plain.getWidth(), 1);
     }
+
+    /// To learn whether a scene has to scroll it is laid out in the pane
+    /// first, and then at its minimum. Done on every pass, that moved
+    /// every node twice each time, each move asked for another pass, and
+    /// a scene wider than the screen was laid out and painted for as long
+    /// as it was shown. A pass with nothing changed leaves the scene be.
+    @Test
+    public void aSceneThatScrollsIsNotLaidOutAgainByEveryPass() {
+        final int wide = Display.getInstance().getDisplayWidth() * 2;
+        final javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane(
+                new javafx.scene.Group(new javafx.scene.shape.Rectangle(wide, 10)));
+        Container content = shown(root);
+        assertTrue(content.isScrollableX());
+        assertEquals(wide, root.getWidth(), 1);
+        final int[] changes = new int[1];
+        root.widthProperty().addListener(new javafx.beans.value.ChangeListener<Number>() {
+            @Override
+            public void changed(javafx.beans.value.ObservableValue<? extends Number> o, Number before, Number now) {
+                changes[0]++;
+            }
+        });
+        for (int i = 0; i < 3; i++) {
+            content.setShouldCalcPreferredSize(true);
+            content.getComponentForm().revalidate();
+        }
+        assertEquals(0, changes[0]);
+        assertTrue(content.isScrollableX());
+        assertEquals(wide, root.getWidth(), 1);
+    }
 }

@@ -80,7 +80,20 @@ final class HostCore {
     /// pane as JavaFX would, and only an axis along which what it then
     /// holds reaches past the pane is given the minimum and scrolls. A
     /// minimum the application set on the root itself is taken as given.
+    ///
+    /// Laying the scene out in the pane to find that out, and then at its
+    /// minimum, moves every node twice, and a node that moved asks for the
+    /// layout to run again: a scene that did have to scroll was laid out
+    /// and painted without end. So what was found for a pane and a
+    /// minimum is kept, and the scene is tried in the pane once for each.
     private final class Fit extends Layout {
+
+        private int triedWidth = -1;
+        private int triedHeight = -1;
+        private int triedLeastWidth = -1;
+        private int triedLeastHeight = -1;
+        private boolean triedOverX;
+        private boolean triedOverY;
 
         @Override
         public void layoutContainer(Container parent) {
@@ -95,7 +108,11 @@ final class HostCore {
             Dimension least = least();
             boolean overX = least.getWidth() > w;
             boolean overY = least.getHeight() > h;
-            if (overX || overY) {
+            if (triedWidth == w && triedHeight == h && triedLeastWidth == least.getWidth()
+                    && triedLeastHeight == least.getHeight()) {
+                overX = triedOverX;
+                overY = triedOverY;
+            } else if (overX || overY) {
                 Dimension reach = reach(w, h);
                 // A minimum the application set itself is what it asked
                 // for; only one worked out from the content is doubted.
@@ -105,6 +122,20 @@ final class HostCore {
                 if (reach != null) {
                     overX = overX && (setX || reach.getWidth() > w);
                     overY = overY && (setY || reach.getHeight() > h);
+                }
+                // Only a scene that scrolls is laid out at another size
+                // than it was tried at, so only that is kept: one that
+                // fits is tried again at no cost, and what it then holds
+                // may have grown.
+                if (overX || overY) {
+                    triedWidth = w;
+                    triedHeight = h;
+                    triedLeastWidth = least.getWidth();
+                    triedLeastHeight = least.getHeight();
+                    triedOverX = overX;
+                    triedOverY = overY;
+                } else {
+                    triedWidth = -1;
                 }
             }
             // Back to the start of an axis before it stops scrolling:
