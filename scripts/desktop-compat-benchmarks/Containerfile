@@ -1,0 +1,11 @@
+# The image the Linux leg of the desktop-compat benchmarks runs in when it is
+# not on a CI runner. Same distribution as the ubuntu-24.04 runners, and the
+# same install script the workflow calls, so both measure one stack.
+#
+#   podman build -t bench-linux -f scripts/desktop-compat-benchmarks/Containerfile \
+#       scripts/desktop-compat-benchmarks
+FROM docker.io/library/ubuntu:24.04
+COPY install-linux-deps.sh javafx-jmods.sh /opt/bench/
+RUN bash /opt/bench/install-linux-deps.sh /opt/bench/tools \
+    && rm -rf /var/lib/apt/lists/*
+ENV BENCH_TOOLS=/opt/bench/tools
