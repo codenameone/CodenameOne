@@ -174,6 +174,9 @@ public class List<T> extends Component implements ActionSource {
     /// Set once this list, as the popup of a `ComboBox`, has reported a choice. The combo
     /// reads it to tell a popup that closed on a choice from one that just went away.
     boolean popupSelectionFired;
+    /// Set on the popup list of a `ComboBox` on a desktop: the list owns the keyboard for
+    /// as long as the popup is up and cannot be talked out of it. See `#setHandlesInput(boolean)`.
+    boolean popupKeepsInput;
     /// #### See also
     ///
     /// - #setRenderingPrototype
@@ -977,6 +980,16 @@ public class List<T> extends Component implements ActionSource {
     /// {@inheritDoc}
     @Override
     public void setHandlesInput(boolean b) {
+        if (popupKeepsInput) {
+            // Input mode is how a list on a form shares the arrow keys with focus
+            // traversal: Fire takes them, Fire or a sideways arrow or running off either
+            // end gives them back. In a combo popup on a desktop there is nothing to
+            // share them with. Every one of those hand-backs left the popup deaf to the
+            // arrows, and the next Enter then only switched input mode back on instead
+            // of choosing the row.
+            super.setHandlesInput(true);
+            return;
+        }
         TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             // prevent the list from losing focus if its the only element

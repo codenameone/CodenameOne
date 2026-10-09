@@ -400,6 +400,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             }
         }
 
+        // On a desktop Escape has to cancel the popup whether or not Select and Cancel are
+        // shown, and Form only acts on Escape when there is a back command to run. A centred
+        // or spinner popup without the commands had none. Off the desktop this is left as it
+        // was: a back command there changes what the platform back key does.
+        if (Display.getInstance().isDesktop()) {
+            popupDialog.setBackCommand(popupDialog.getMenuBar().getCancelMenuItem());
+        }
         if (includeSelectCancel) {
             popupDialog.setBackCommand(popupDialog.getMenuBar().getCancelMenuItem());
             if (Display.getInstance().isTouchScreenDevice()) {
@@ -414,6 +421,21 @@ public class ComboBox<T> extends List<T> implements ActionSource {
                     popupDialog.addCommand(popupDialog.getMenuBar().getCancelMenuItem());
                     popupDialog.addCommand(popupDialog.getMenuBar().getSelectMenuItem());
                 }
+            }
+        }
+
+        if (Display.getInstance().isDesktop()) {
+            // With a keyboard in front of it the popup is driven by one: the arrows move
+            // the highlight from the first keystroke and Enter takes it. Both go to the
+            // focused component, so the list is given the focus -- here, after the
+            // commands are placed, because a Cancel button placed in the body asks for
+            // the focus itself -- and it keeps input mode for as long as the popup is up.
+            // Done for desktops only: on a keypad or a remote the sideways arrows are
+            // how the user reaches such a button, and there they keep doing that.
+            l.popupKeepsInput = true;
+            l.setHandlesInputParent(true);
+            if (l.getComponentForm() == popupDialog) { //NOPMD CompareObjectsWithEquals
+                popupDialog.setFocused(l);
             }
         }
 
