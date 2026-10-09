@@ -54,8 +54,11 @@ final class StreamState {
         }
         RuntimeException first = null;
         for (int i = 0; i < handlers.size(); i++) {
+            // Read outside the try: the cast a generic get compiles to must
+            // not sit under a handler that would swallow its failure.
+            Runnable handler = handlers.get(i);
             try {
-                handlers.get(i).run();
+                handler.run();
             } catch (RuntimeException e) {
                 if (first == null) {
                     first = e;
