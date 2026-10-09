@@ -71,15 +71,38 @@ if [ -n "${DOTNET:-}" ]; then
   DOTNET_ARG=("-Dcn1.unity.dotnet=$DOTNET")
 fi
 
-# The PATH with every directory that holds a dotnet taken out, for the builds
-# that have to work without one.
-NO_DOTNET_PATH=$(python3 - <<'EOF'
-import os
-keep = [d for d in os.environ.get("PATH", "").split(os.pathsep)
-        if d and not os.path.exists(os.path.join(d, "dotnet"))]
+# The PATH with dotnet taken out, for the builds that have to work without one.
+# A directory that holds a dotnet cannot simply be dropped: on a Linux runner
+# the SDK is linked into /usr/bin, and a PATH without /usr/bin has no env, no
+# bash and no mvn either ("env: 'env': No such file or directory"). Such a
+# directory is replaced by one of links to everything in it but dotnet.
+NO_DOTNET_PATH=$(python3 - "$W/no-dotnet-path" <<'EOF'
+import os, sys
+shadow_root = sys.argv[1]
+keep = []
+seen = set()
+for d in os.environ.get("PATH", "").split(os.pathsep):
+    if not d or d in seen:
+        continue
+    seen.add(d)
+    if not os.path.lexists(os.path.join(d, "dotnet")):
+        keep.append(d)
+        continue
+    shadow = os.path.join(shadow_root, str(len(keep)))
+    os.makedirs(shadow)
+    for name in os.listdir(d):
+        if name not in ("dotnet", "dotnet.exe"):
+            os.symlink(os.path.join(os.path.abspath(d), name), os.path.join(shadow, name))
+    keep.append(shadow)
 print(os.pathsep.join(keep))
 EOF
 )
+if PATH="$NO_DOTNET_PATH" command -v dotnet > /dev/null 2>&1; then
+  fail "dotnet is still on the PATH the SDK-less builds run with: $NO_DOTNET_PATH"
+fi
+for tool in env bash mvn; do
+  PATH="$NO_DOTNET_PATH" command -v $tool > /dev/null 2>&1 || fail "the SDK-less PATH lost $tool: $NO_DOTNET_PATH"
+done
 without_dotnet() {
   env -u DOTNET_ROOT -u DOTNET PATH="$NO_DOTNET_PATH" "$@"
 }

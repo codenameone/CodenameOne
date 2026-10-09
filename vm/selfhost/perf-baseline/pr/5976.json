@@ -1,0 +1,26 @@
+{
+ "pr": 5976,
+ "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.378,
+      "time": 1.768,
+      "tolerance": {
+       "time": 0.45
+      }
+     },
+     "memory": 0.37,
+     "reason": "Recalibrate objectAllocation RAM on Neoverse-N2 from four complete five-round runs: this pull request's run 37950022133 (run median 0.298x) and three master controls, 37927504399 at d65703afaa (0.378x), 37902400038 at 438399d5f1 (0.380x) and 37889241211 at 8e6f2cf05 (0.363x). ParparVM's peak is bimodal on this runner, about 156-167 MB or about 123-129 MB against a steady 430 MB for JDK 25: the low mode is one round of fifteen on master (37889241211 round 5, 125.1 MB, 0.291x) and three rounds of five here (124.0, 128.6, 123.3 MB), so this run's median landed in it and failed as IMPROVED against a two-run 0.378x row that carried only the global 15% RAM tolerance. Whether this pull request makes the low mode more frequent (it adds -ffp-contract=off to the benchmark's native build and changes arraycopy/clone sizing for arrays of primitive arrays) or one run of five rounds simply drew it was NOT established: there is a single run of this branch. So this records no improvement. It keeps the baseline at the pooled run median (0.370x) and widens the RAM tolerance to the 30% the tool derives from the observed spread, which is what the objectAllocation rows of the other runners already carry; taking this run alone would have set 0.298x at 15% and failed the next high-mode run as a regression. Time is unchanged.",
+     "runs": 4,
+     "time": 1.768,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.45
+     }
+    }
+   }
+  }
+ }
+}
