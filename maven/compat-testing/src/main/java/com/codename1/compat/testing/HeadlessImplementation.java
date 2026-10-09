@@ -644,7 +644,15 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.lang.String[] listFilesystemRoots() {
-        return null;
+        return new java.lang.String[] {"file:///"};
+    }
+
+    /// A fixed home under the one root, so a relative path an application
+    /// opens resolves instead of failing on a root list that is not there.
+    /// Nothing exists in it until a test writes it: see [#FILES].
+    @Override
+    public java.lang.String getAppHomePath() {
+        return "file:///home/";
     }
 
     @Override

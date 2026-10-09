@@ -50,7 +50,10 @@ import java.util.Map;
 /// - `os.name` is the Codename One platform name (`ios`, `and`, ...);
 /// - `line.separator`, `file.separator` and `path.separator` are the ones
 ///   the file classes of this package use;
-/// - `user.name` and `java.version` are fixed, harmless values.
+/// - `user.name` and `java.version` are fixed, harmless values;
+/// - `os.arch` is `unknown`. The JDK never answers null for it, and code
+///   written for the desktop calls a method on the answer without checking;
+///   no port reports its processor, so no real name is claimed.
 ///
 /// Anything set through `setProperty` is remembered for the run, and any
 /// other key is asked of `Display.getProperty`, which answers null for what
@@ -114,6 +117,9 @@ public final class JdkSystem {
         }
         if ("java.version".equals(key)) {
             return "1.8.0";
+        }
+        if ("os.arch".equals(key)) {
+            return "unknown";
         }
         return Display.getInstance().getProperty(key, null);
     }
