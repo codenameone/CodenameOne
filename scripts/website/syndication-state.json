@@ -2630,6 +2630,19 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-09T00:03:26+00:00"
+      },
+      "devto": {
+        "id": 4825016,
+        "url": "https://dev.to/codenameone/a-smaller-faster-java-server-with-a-spring-style-api-ij1",
+        "syndicated_at": "2026-10-09T18:48:51+00:00"
+      },
+      "foojay": {
+        "id": 116,
+        "url": "https://github.com/foojayio/website/pull/116",
+        "pull_request_url": "https://github.com/foojayio/website/pull/116",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-10-09T18:49:13+00:00"
       }
     }
   }
