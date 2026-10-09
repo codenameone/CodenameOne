@@ -373,6 +373,7 @@ public class BytecodeCompliance {
 
         stats = new ScanStats();
         int rewrittenClassCount = enforceMaxClassVersion(outputDir, MAX_CLASS_MAJOR_VERSION);
+        desugarBootstraps(outputDir);
         InvocationRewriteSummary invocationRewriteSummary = applyInvocationRewrites(outputDir);
         lastInvocationRewriteSummary = invocationRewriteSummary;
 
@@ -714,7 +715,7 @@ public class BytecodeCompliance {
         }
         return stats.newerClassFiles + " class file(s) were compiled for a Java newer than 17 (up to Java "
                 + (stats.newestClassVersion - 44) + ") and were rewritten to the Java 17 class format. "
-                + "The Java 18+ API they use is checked like any other.\n";
+                + "What they call, by instruction or by invokedynamic, is checked like any other class's.\n";
     }
 
 
@@ -741,9 +742,39 @@ public class BytecodeCompliance {
         if (rewritten > 0) {
             getLog().info("Rewrote " + rewritten + " class file(s) to Java 17 major version " + maxVersion
                     + ": they were compiled for a newer Java (up to Java " + (stats.newestClassVersion - 44)
-                    + "). The Java 18+ API they use is checked like any other");
+                    + "). What they call, by instruction or by invokedynamic, is checked like any other class's");
         }
         return rewritten;
+    }
+
+    /// Gives every record its `equals`, `hashCode` and `toString`, and every
+    /// pattern switch its test, as plain methods ([RecordDesugar]). A project
+    /// with a compatibility layer had this done by the remap step, and then
+    /// nothing here is rewritten; a plain application's classes come
+    /// straight from javac, and no translator implements the two bootstrap
+    /// classes they call. Whatever is left afterwards is what the scan
+    /// reports.
+    private void desugarBootstraps(File outputDir) throws BuildExecutionException {
+        List<File> classFiles = new ArrayList<File>();
+        collectClassFiles(outputDir, classFiles);
+        int rewritten = 0;
+        for (File classFile : classFiles) {
+            try {
+                byte[] originalBytes = FileUtils.readFileToByteArray(classFile);
+                byte[] rewrittenBytes = RecordDesugar.apply(originalBytes);
+                if (rewrittenBytes != originalBytes) {
+                    validateClass(rewrittenBytes, classFile, outputDir);
+                    FileUtils.writeByteArrayToFile(classFile, rewrittenBytes);
+                    rewritten++;
+                }
+            } catch (IOException ex) {
+                throw new BuildExecutionException("Failed to rewrite the record and switch methods of " + classFile,
+                        ex);
+            }
+        }
+        if (rewritten > 0) {
+            getLog().info("Generated the record and pattern-switch methods of " + rewritten + " class file(s)");
+        }
     }
 
     private ClassVersionInfo readClassVersion(byte[] classBytes) {
@@ -1676,6 +1707,9 @@ public class BytecodeCompliance {
 
                 @Override
                 public void visitLdcInsn(Object value) {
+                    if (value instanceof ConstantDynamic) {
+                        reportDynamicConstant(sourceMethod, (ConstantDynamic) value);
+                    }
                     if (!layers.isEmpty()) {
                         checkLayerConstant(sourceMethod, value);
                     }
@@ -1684,11 +1718,16 @@ public class BytecodeCompliance {
                 @Override
                 public void visitInvokeDynamicInsn(String indyName, String indyDescriptor, Handle bootstrap,
                                                    Object... bootstrapArguments) {
+                    // Every project, with a layer or without: the call is
+                    // made by the bootstrap method, and what that reaches is
+                    // named only in its static arguments.
+                    if (checkBootstrap(sourceMethod, bootstrap)) {
+                        for (Object argument : bootstrapArguments) {
+                            checkBootstrapArgument(sourceMethod, argument);
+                        }
+                    }
                     if (layers.isEmpty()) {
                         return;
-                    }
-                    if (isDesktopProject()) {
-                        checkBootstrap(sourceMethod, bootstrap);
                     }
                     int before = violations.size();
                     checkLayerDescriptor(sourceMethod, indyDescriptor, null);
@@ -1721,10 +1760,13 @@ public class BytecodeCompliance {
         /// translators implement the bootstraps of [#SUPPORTED_BOOTSTRAPS]
         /// by hand, and any other would pass every other check here and
         /// then fail where it is first reached.
-        private void checkBootstrap(String sourceMethod, Handle bootstrap) {
+        ///
+        /// Answers whether the bootstrap is one a device implements, which is
+        /// when its static arguments are worth reading.
+        private boolean checkBootstrap(String sourceMethod, Handle bootstrap) {
             String owner = bootstrap.getOwner();
             if (SUPPORTED_BOOTSTRAPS.contains(owner)) {
-                return;
+                return true;
             }
             String name = owner.replace('/', '.');
             String feature;
@@ -1745,7 +1787,14 @@ public class BytecodeCompliance {
             if (DESUGARED_BOOTSTRAPS.contains(owner)) {
                 advice += " The build normally rewrites this into plain methods; this class was not rewritten.";
             }
-            if (!reportedLayerSymbols.add("indy " + owner + "@" + sourceMethod)) {
+            reportLanguage(sourceMethod, "indy " + owner, feature, advice);
+            return false;
+        }
+
+        /// One finding for a feature of the language, once for each method
+        /// it is used in.
+        private void reportLanguage(String sourceMethod, String key, String feature, String advice) {
+            if (!reportedLayerSymbols.add(key + "@" + sourceMethod)) {
                 return;
             }
             Violation v = new Violation(className, sourceMethod, feature + " is not supported on a device", advice,
@@ -1753,6 +1802,55 @@ public class BytecodeCompliance {
             v.language = true;
             v.api = feature;
             violations.add(v);
+        }
+
+        /// A constant computed by a bootstrap method the first time it is
+        /// loaded. No translator computes one, whatever the bootstrap.
+        private void reportDynamicConstant(String sourceMethod, ConstantDynamic constant) {
+            Handle bootstrap = constant.getBootstrapMethod();
+            String name = bootstrap.getOwner().replace('/', '.') + "." + bootstrap.getName();
+            reportLanguage(sourceMethod, "condy " + name, "a dynamic constant (computed by " + name + ")",
+                    "A device cannot compute a constant at run time. Compile for Java 17 "
+                            + "(maven.compiler.release 17) or write the value out.");
+        }
+
+        /// What a supported bootstrap is handed: the method a lambda or a
+        /// method reference runs is named here and in no instruction, so a
+        /// reference to API a device lacks would otherwise pass. A layer's own
+        /// classes are left to the wider scan, which reports them under the
+        /// name the application used.
+        private void checkBootstrapArgument(String sourceMethod, Object argument) {
+            if (argument instanceof ConstantDynamic) {
+                reportDynamicConstant(sourceMethod, (ConstantDynamic) argument);
+            } else if (argument instanceof Handle) {
+                Handle handle = (Handle) argument;
+                String owner = handle.getOwner();
+                if (layerOf(owner) != null) {
+                    return;
+                }
+                if (handle.getTag() >= Opcodes.H_INVOKEVIRTUAL) {
+                    checkMethodReference(className, sourceMethod, owner, handle.getName(), handle.getDesc());
+                } else {
+                    checkFieldReference(className, sourceMethod, owner, handle.getName(), handle.getDesc());
+                }
+            } else if (argument instanceof Type) {
+                Type type = (Type) argument;
+                if (type.getSort() == Type.METHOD) {
+                    for (Type parameter : type.getArgumentTypes()) {
+                        checkBootstrapType(sourceMethod, parameter);
+                    }
+                    checkBootstrapType(sourceMethod, type.getReturnType());
+                } else {
+                    checkBootstrapType(sourceMethod, type);
+                }
+            }
+        }
+
+        private void checkBootstrapType(String sourceMethod, Type type) {
+            Type element = type.getSort() == Type.ARRAY ? type.getElementType() : type;
+            if (element.getSort() == Type.OBJECT && layerOf(element.getInternalName()) == null) {
+                checkTypeReference(className, sourceMethod, element.getInternalName());
+            }
         }
 
         private void checkMethodReference(String sourceClass, String sourceMethod, String owner, String memberName, String memberDescriptor) {

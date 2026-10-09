@@ -259,8 +259,12 @@ public class DesktopPortReportTest {
     private static byte[] indy(int version, String name, String owner, String bootstrap) {
         ClassWriter cw = new ClassWriter(0);
         cw.visit(version, Opcodes.ACC_PUBLIC, name, null, "java/lang/Object", null);
+        cw.visitSource(name.substring(name.lastIndexOf('/') + 1) + ".java", null);
         MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "toString", "()Ljava/lang/String;", null, null);
         mv.visitCode();
+        org.objectweb.asm.Label start = new org.objectweb.asm.Label();
+        mv.visitLabel(start);
+        mv.visitLineNumber(42, start);
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitInvokeDynamicInsn("toString", "(L" + name + ";)Ljava/lang/String;", new Handle(Opcodes.H_INVOKESTATIC,
                 owner, bootstrap, "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;"
@@ -283,8 +287,9 @@ public class DesktopPortReportTest {
     @Test
     public void whatInvokedynamicCannotBeBuiltAheadOfTimeIsAFinding() throws Exception {
         TestProjectHost host = application();
+        // Not the bootstrap method javac calls, so not one the build rewrites.
         put(host.outputDir, "com/acme/port/Point", indy(Opcodes.V17, "com/acme/port/Point",
-                "java/lang/runtime/ObjectMethods", "bootstrap"));
+                "java/lang/runtime/ObjectMethods", "another"));
         put(host.outputDir, "com/acme/port/Odd", indy(Opcodes.V17, "com/acme/port/Odd", "org/odd/Bootstraps",
                 "make"));
         try {
@@ -303,10 +308,10 @@ public class DesktopPortReportTest {
         assertTrue(report, report.contains("java.lang.runtime.ObjectMethods"));
     }
 
-    /// A project that uses no desktop layer has always been allowed whatever
-    /// its classes compile to, and is not made to fail by this.
+    /// A record of a project that uses no layer is given its methods by the
+    /// check itself, since no remap went over it.
     @Test
-    public void aProjectWithoutADesktopLayerIsNotHeldToIt() throws Exception {
+    public void aPlainProjectsRecordIsRewrittenToo() throws Exception {
         File classes = tmp.newFolder();
         put(classes, "com/acme/plain/Point", indy(Opcodes.V17, "com/acme/plain/Point",
                 "java/lang/runtime/ObjectMethods", "bootstrap"));
@@ -316,6 +321,43 @@ public class DesktopPortReportTest {
         TestProjectHost host = RealCompatJars.host(classes, tmp.newFolder(), scratch);
         new BytecodeCompliance(host).execute();
         assertFalse("Nothing to port, so no port report", defaultReport(host).exists());
+        final boolean[] dynamic = new boolean[1];
+        new org.objectweb.asm.ClassReader(Files.readAllBytes(new File(classes, "com/acme/plain/Point.class").toPath()))
+                .accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
+                            String[] exceptions) {
+                        return new MethodVisitor(Opcodes.ASM9) {
+                            @Override
+                            public void visitInvokeDynamicInsn(String name, String descriptor, Handle bootstrap,
+                                    Object... arguments) {
+                                dynamic[0] = true;
+                            }
+                        };
+                    }
+                }, 0);
+        assertFalse("The record's toString is a plain method now", dynamic[0]);
+    }
+
+    /// A bootstrap nobody implements fails every project, with a layer or
+    /// without, and the failure says where it is.
+    @Test
+    public void anUnknownBootstrapFailsAPlainProjectAndSaysWhere() throws Exception {
+        File classes = tmp.newFolder();
+        put(classes, "com/acme/plain/Odd", indy(Opcodes.V17, "com/acme/plain/Odd", "org/odd/Bootstraps", "make"));
+        scratch = tmp.newFolder("jars");
+        TestProjectHost host = RealCompatJars.host(classes, tmp.newFolder(), scratch);
+        try {
+            new BytecodeCompliance(host).execute();
+            fail("org.odd.Bootstraps exists on no device");
+        } catch (BuildFailureException expected) {
+            String message = expected.getMessage();
+            assertTrue(message, message.contains("invokedynamic through org.odd.Bootstraps.make is not supported "
+                    + "on a device"));
+            assertTrue(message, message.contains("com/acme/plain/Odd"));
+            assertTrue(message, message.contains("toString"));
+            assertTrue(message, message.contains("Odd.java:42"));
+        }
     }
 
     @Test
@@ -348,7 +390,7 @@ public class DesktopPortReportTest {
         String check = read(new File(host.buildDir, "codenameone/compliance_check.txt"));
         assertTrue(check, check.contains("Rewritten class files to Java 17 major version: 2"));
         assertTrue(check, check.contains("2 class file(s) were compiled for a Java newer than 17 (up to Java 21) and "
-                + "were rewritten to the Java 17 class format. The Java 18+ API they use is checked like any other."));
+                + "were rewritten to the Java 17 class format. What they call, by instruction or by invokedynamic, is checked like any other class's."));
         assertTrue(read(defaultReport(host)), read(defaultReport(host)).contains("Java 21"));
     }
 }

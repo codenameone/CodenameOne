@@ -22,7 +22,9 @@
  */
 package com.codename1.maven;
 
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
@@ -66,6 +68,42 @@ final class RecordDesugar extends ClassVisitor {
     RecordDesugar(ClassVisitor next) {
         super(Opcodes.ASM9, next);
     }
+
+    /// Rewrites one class file on its own, for a project no layer's remap
+    /// went over: a plain application's record needs the same methods. The
+    /// answer is `in` itself when the class has no such call site, which is
+    /// every class the remap already rewrote, so running both does the work
+    /// once.
+    static byte[] apply(byte[] in) {
+        if (!namesRuntimePackage(in)) {
+            return in;
+        }
+        ClassReader reader = new ClassReader(in);
+        ClassWriter writer = new ClassWriter(0);
+        RecordDesugar desugar = new RecordDesugar(writer);
+        reader.accept(desugar, 0);
+        return desugar.sites.isEmpty() ? in : writer.toByteArray();
+    }
+
+    /// Whether the bytes hold the name of the package both bootstrap
+    /// classes are in; nearly no class does, and those are not parsed.
+    private static boolean namesRuntimePackage(byte[] in) {
+        byte[] name = RUNTIME_PACKAGE;
+        int last = in.length - name.length;
+        for (int i = 0; i <= last; i++) {
+            int j = 0;
+            while (j < name.length && in[i + j] == name[j]) {
+                j++;
+            }
+            if (j == name.length) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final byte[] RUNTIME_PACKAGE = {'j', 'a', 'v', 'a', '/', 'l', 'a', 'n', 'g', '/', 'r', 'u', 'n',
+        't', 'i', 'm', 'e', '/'};
 
     /// One replaced call site and the method that stands in for it.
     private static final class Site {
