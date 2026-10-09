@@ -144,13 +144,30 @@ public final class PeerSupport {
         s.setBorder(null);
     }
 
+    /// Every style a native component is drawn with, as one: what is set
+    /// on the answer is set on each.
+    ///
+    /// `Component.getAllStyles()` is the styles at rest, selected, pressed
+    /// and disabled, and leaves out the one a theme may declare for a
+    /// component under the pointer. A font or a colour set through it was
+    /// therefore not the font or the colour of a hovered control, which
+    /// changed its text for as long as the pointer stayed over it.
+    public static Style allStyles(com.codename1.ui.Component c) {
+        Style hover = c.getHoverStyle();
+        if (hover == null) {
+            return c.getAllStyles();
+        }
+        return Style.createProxyStyle(c.getUnselectedStyle(), c.getSelectedStyle(), c.getPressedStyle(),
+                c.getDisabledStyle(), hover);
+    }
+
     /// Pushes the foreground, background and font that were set on the
     /// owner into the styles of a peer with a native look.
     public void applyStyle() {
         if (!(peer instanceof Peer) || !((Peer) peer).nativeLook()) {
             return;
         }
-        Style s = peer.getAllStyles();
+        Style s = allStyles(peer);
         if (owner.isForegroundSet()) {
             s.setFgColor(owner.getForeground().getRGB() & 0xffffff);
         }

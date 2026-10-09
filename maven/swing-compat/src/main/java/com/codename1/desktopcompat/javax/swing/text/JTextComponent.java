@@ -622,7 +622,7 @@ public abstract class JTextComponent extends JComponent implements Accessible, S
     private void applyMargin() {
         com.codename1.ui.TextArea t = nativeText();
         if (t != null && margin != null) {
-            com.codename1.ui.plaf.Style s = t.getAllStyles();
+            com.codename1.ui.plaf.Style s = com.codename1.desktopcompat.rt.PeerSupport.allStyles(t);
             s.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
             s.setPadding(Units.toDevice(margin.top), Units.toDevice(margin.bottom), Units.toDevice(margin.left),
                     Units.toDevice(margin.right));

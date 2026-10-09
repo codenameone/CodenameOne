@@ -147,7 +147,7 @@ public abstract class Labeled extends Control {
         com.codename1.ui.Label label = (com.codename1.ui.Label) c;
         String t = isMnemonicParsing() ? Mnemonics.strip(getText()) : getText();
         label.setText(t == null || getContentDisplay() == ContentDisplay.GRAPHIC_ONLY ? "" : t);
-        Style style = label.getAllStyles();
+        Style style = com.codename1.fxcompat.runtime.PeerPaint.allStyles(label);
         if (c.getClass() == com.codename1.ui.Label.class) {
             style.setBgTransparency(0);
             style.setBorder(com.codename1.ui.plaf.Border.createEmpty());

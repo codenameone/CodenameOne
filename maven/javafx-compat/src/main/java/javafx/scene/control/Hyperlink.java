@@ -91,7 +91,7 @@ public class Hyperlink extends ButtonBase {
     @Override
     protected Component cn1CreateNative() {
         com.codename1.ui.Button b = new com.codename1.ui.Button();
-        Style s = b.getAllStyles();
+        Style s = com.codename1.fxcompat.runtime.PeerPaint.allStyles(b);
         s.setBorder(Border.createEmpty());
         s.setBgTransparency(0);
         b.addActionListener(cn1ActionBridge());
@@ -103,7 +103,7 @@ public class Hyperlink extends ButtonBase {
         super.cn1SyncNative();
         Component c = cn1NativeIfCreated();
         if (c != null) {
-            Style s = c.getAllStyles();
+            Style s = com.codename1.fxcompat.runtime.PeerPaint.allStyles(c);
             if (textFillProperty().get() == null) {
                 s.setFgColor((isVisited() ? VISITED_TEXT : LINK_TEXT).cn1Argb() & 0xffffff);
                 s.setOpacity(255);

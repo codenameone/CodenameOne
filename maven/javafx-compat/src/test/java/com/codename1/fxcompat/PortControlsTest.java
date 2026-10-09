@@ -442,6 +442,31 @@ public class PortControlsTest {
         assertFalse(label.isTickerRunning());
     }
 
+    /// A theme of a desktop port has a style for a component under the
+    /// pointer, which `getAllStyles()` leaves out. The font and the fill
+    /// of a control are the font and the fill of that one too: the text of
+    /// a hovered button was drawn in the theme's font, wider than the room
+    /// the button was given for its own.
+    @Test
+    public void aHoveredButtonKeepsItsFontAndItsFill() {
+        java.util.Hashtable<String, Object> theme = new java.util.Hashtable<String, Object>();
+        theme.put("Button.hover#fgColor", "ff0000");
+        com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(theme);
+        Pane root = new Pane();
+        Button b = new Button("Click me");
+        b.setFont(javafx.scene.text.Font.font(21));
+        b.setTextFill(javafx.scene.paint.Color.BLUE);
+        b.relocate(10, 10);
+        root.getChildren().add(b);
+        show(root);
+        MainThreadRule.drain();
+        com.codename1.ui.Component c = b.cn1Native();
+        com.codename1.ui.plaf.Style hover = c.getHoverStyle();
+        assertTrue("the theme has a hover style", hover != null);
+        assertEquals(0x0000ff, hover.getFgColor());
+        assertSame(c.getUnselectedStyle().getFont(), hover.getFont());
+    }
+
     /// The menu of a menu bar, opened, is walked the same way.
     @Test
     public void theMenuOfAMenuBarIsChosenFromWithTheKeyboard() {

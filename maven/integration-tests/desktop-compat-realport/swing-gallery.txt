@@ -3,10 +3,10 @@
 # was moving by itself; see RealPortDriver.java.
 sleep 4000
 shot start
-# A button, a check box and a radio button.
+# A button and a radio button, then the check box, which disables both.
 click 0.061 0.268
-click 0.121 0.268
-click 0.212 0.268
+click 0.245 0.270
+click 0.132 0.270
 # A text field: focus, typing, and Tab on to the next one.
 click 0.370 0.382
 type bc

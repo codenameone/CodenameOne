@@ -106,7 +106,7 @@ public class Button extends ButtonBase {
         ownPadding = bare;
         super.cn1SyncNative();
         if (c != null && own) {
-            Style style = c.getAllStyles();
+            Style style = com.codename1.fxcompat.runtime.PeerPaint.allStyles(c);
             style.setBgTransparency(0);
             style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
             if (bare) {

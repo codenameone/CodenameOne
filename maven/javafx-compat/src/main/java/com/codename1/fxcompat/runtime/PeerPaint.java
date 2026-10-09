@@ -56,6 +56,24 @@ public final class PeerPaint {
         s.setMargin(0, 0, 0, 0);
     }
 
+    /// Every style a native component is drawn with, as one: what is set
+    /// on the answer is set on each.
+    ///
+    /// `Component.getAllStyles()` is the styles at rest, selected, pressed
+    /// and disabled, and leaves out the one a theme may declare for a
+    /// component under the pointer. A font or a colour set through it was
+    /// therefore not the font or the colour of a hovered control: its
+    /// text changed size where it was sized for the font at rest, and the
+    /// last letter was cut off for as long as the pointer stayed.
+    public static Style allStyles(Component c) {
+        Style hover = c.getHoverStyle();
+        if (hover == null) {
+            return c.getAllStyles();
+        }
+        return Style.createProxyStyle(c.getUnselectedStyle(), c.getSelectedStyle(), c.getPressedStyle(),
+                c.getDisabledStyle(), hover);
+    }
+
     /// Whether nothing of a node can be seen: it is fully transparent, or
     /// its matrix leaves it no area. The peers then paint nothing at all.
     /// A native component under a transparent node is the reason this is

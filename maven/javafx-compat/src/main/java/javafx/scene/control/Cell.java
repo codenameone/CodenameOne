@@ -143,14 +143,14 @@ public class Cell<T> extends Labeled {
             return;
         }
         if (textFillProperty().get() == null && themeText >= 0) {
-            c.getAllStyles().setFgColor(isSelected() && getBackground() == null ? selectedText()
-                    : (onDark() ? 0xffffff : themeText));
+            com.codename1.fxcompat.runtime.PeerPaint.allStyles(c).setFgColor(
+                    isSelected() && getBackground() == null ? selectedText() : (onDark() ? 0xffffff : themeText));
         }
         if (basePadding < 0) {
             basePadding = c.getStyle().getPaddingLeftNoRTL();
         }
         // The text starts after the graphic, which is a node of its own.
-        Style style = c.getAllStyles();
+        Style style = com.codename1.fxcompat.runtime.PeerPaint.allStyles(c);
         style.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
         style.setPaddingLeft(basePadding + Units.toPixels(graphicWidth()));
     }
