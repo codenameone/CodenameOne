@@ -2,14 +2,14 @@
 <div class="cn1-home-v2">
   <section class="cn1-v2-hero">
     <div class="cn1-v2-hero__copy">
-      <p class="cn1-eyebrow">Native, and you own the UI</p>
-      <h1>Native apps in Java<br><span>A UI you control</span></h1>
+      <p class="cn1-eyebrow">100% native. Fast.</p>
+      <h1>Full-stack Java.<br><span>Compiled to native.</span></h1>
       <p class="cn1-v2-hero__lead">
-        Codename One compiles one Java codebase into native apps across mobile, desktop, web, watch, TV, and vehicles. Its UI ships with your app instead of being restyled by the platform after release.
+        Take Java from your UI to your server. Share models and typed APIs across the full stack, control the UI you ship, and deploy your server without a JVM. Reach iOS, Android and desktop natively, plus the web through the JavaScript port.
       </p>
       <div class="cn1-action-row">
         {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-primary-project") }}
-        {{ partial "cn1-cta.html" (dict "label" "View source on GitHub" "href" "https://github.com/codenameone/CodenameOne" "variant" "secondary" "external" true) }}
+        {{ partial "cn1-cta.html" (dict "label" "View source on GitHub" "href" "https://github.com/codenameone/CodenameOne?utm_source=codenameone&utm_medium=website&utm_campaign=homepage&utm_content=source" "event" "home-source" "variant" "secondary" "external" true) }}
       </div>
       <p class="cn1-v2-hero__note">GPLv2 with the Classpath Exception. Free for commercial use. No royalties.</p>
     </div>
@@ -24,7 +24,7 @@ app.add(CENTER, buildContent());
 app.add(SOUTH, buildTabs());
 app.show();</code></pre>
       </div>
-      <a class="cn1-runtime-proof" href="/blog/pixel-perfect-is-a-test/" aria-label="See the iOS Liquid Glass fidelity tests">
+      <a class="cn1-runtime-proof" href="/blog/pixel-perfect-is-a-test/" data-cn1-conversion="home-ui-proof" aria-label="See the iOS Liquid Glass fidelity tests">
         <div class="cn1-runtime-proof__comparison">
           <p><span>Native iOS 26</span><span>Codename One Metal</span></p>
           <video class="cn1-runtime-proof__motion" data-cn1-motion-proof data-src="/proof/tab-morph-native-vs-cn1.mp4" poster="/proof/tab-morph-native-vs-cn1.png" muted loop playsinline aria-label="Native iOS 26 and Codename One Liquid Glass tab selection animations in light and dark appearance" width="900" height="324"></video>
@@ -42,6 +42,59 @@ app.show();</code></pre>
   <div class="cn1-section-shell">
     {{ partial "cn1-proof-strip.html" . }}
   </div>
+
+  <section class="cn1-v2-section" id="build-with-java">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Choose your starting point</p>
+      <h2>A new service. An existing Android app. A shared stack.</h2>
+      <p>Start with the part you need. The app framework works with any backend, and the native backend can run on its own.</p>
+    </div>
+    <div class="cn1-v2-ownership__grid">
+      <article class="cn1-v2-feature">
+        <h3>Java services without a deployed JVM</h3>
+        <p>Use Spring-style controllers, dependency injection and transactions. The build generates the wiring and compiles a native executable. Add SQL persistence, OAuth2/OIDC, migrations and OpenTelemetry as your service grows.</p>
+        <p>The backend is evolving, with its own supported APIs and libraries. It is not a drop-in Spring Boot replacement.</p>
+        <a href="/developer-guide/backend/" data-cn1-conversion="home-backend">Build a native Java backend</a>
+      </article>
+      <article class="cn1-v2-feature">
+        <h3>Your Android app on more platforms</h3>
+        <p>Import classic Android Java or Kotlin code, activities, XML layouts and resources. Supported Android and AndroidX APIs run over Codename One on iOS, desktop and the web, as well as Android.</p>
+        <p>Check your dependencies and data flows against the compatibility guide. Coverage is specific to the documented APIs.</p>
+        <a href="/developer-guide/android-interop/" data-cn1-conversion="home-android-import">Explore Android app compatibility</a>
+      </article>
+      <article class="cn1-v2-feature">
+        <h3>Keep app and server contracts together</h3>
+        <p>Share Java models and generate typed REST clients instead of maintaining a second definition of every object crossing the network. Initializr creates app-only, app-with-backend and backend-only projects.</p>
+        <a href="/blog/java-backend-shared-models/" data-cn1-conversion="home-shared-models">See the shared-model example</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="cn1-v2-section" id="performance">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Measured, with code you can run</p>
+      <h2>Compare the runtime costs.</h2>
+      <p>Published reference results against HotSpot, Spring and Go. These are separate workloads, with their hardware, methodology and limits linked below.</p>
+    </div>
+    <div class="cn1-v2-ownership__grid">
+      <article class="cn1-v2-feature">
+        <h3>37.5% less time than JDK 25</h3>
+        <p>ParparVM translating its own compiler also used 45.8% less peak memory in the Linux ARM64 Neoverse N2 baseline, across seven calibration runs. Generated files were identical. Allocation-heavy workloads can favor HotSpot.</p>
+        <a href="/blog/parparvm-four-byte-header/" data-cn1-conversion="home-performance-hotspot">Inspect every workload and machine</a>
+      </article>
+      <article class="cn1-v2-feature">
+        <h3>3.9× Spring's plaintext throughput</h3>
+        <p>The CN1 HTTP handler reached 3.9× plaintext and 3.4× JSON throughput versus Spring Boot 4.1.1 on JDK 25: two pinned CPUs in a Linux ARM64 VM on M4 Max, 32 connections and matched 60-second warmup.</p>
+        <p>This compares HTTP stacks, without database, TLS or authentication. It does not measure CN1's generated controller API.</p>
+        <a href="/blog/java-server-work-before-startup/" data-cn1-conversion="home-performance-spring">Reproduce the Spring comparison</a>
+      </article>
+      <article class="cn1-v2-feature">
+        <h3>595,610 requests per second</h3>
+        <p>CN1 native musl versus 496,293 for Go fasthttp in a separate plaintext test: two pinned cores, 64 connections, medians of three interleaved runs. Go used less memory and a smaller binary.</p>
+        <a href="/developer-guide/backend-operations/" data-cn1-conversion="home-performance-go">Compare throughput, startup and memory</a>
+      </article>
+    </div>
+  </section>
 
   <section class="cn1-v2-section cn1-v2-ownership" id="ownership">
     <div class="cn1-v2-section__intro">
@@ -69,7 +122,7 @@ app.show();</code></pre>
     <aside class="cn1-ownership-proof">
       <strong>Adopt platform changes on your schedule</strong>
       <p>Ship Liquid Glass, Material 3, or your own design as a versioned part of the application. An OS upgrade does not silently replace the UI you tested.</p>
-      <a href="/blog/liquid-glass-material-3-modern-native-themes/">See the current themes</a>
+      <a href="/blog/liquid-glass-material-3-modern-native-themes/" data-cn1-conversion="home-ui-control">See the current themes</a>
     </aside>
   </section>
 
@@ -77,13 +130,13 @@ app.show();</code></pre>
     <div class="cn1-v2-section__intro cn1-v2-section__intro--center">
       <p class="cn1-eyebrow">The build path</p>
       <h2>Java in. Native applications out.</h2>
-      <p>Use Maven and your existing IDE. Codename One supplies the portable runtime, platform ports, and build tooling.</p>
+      <p>Use Maven or Gradle and your existing IDE. Codename One supplies the portable runtime, platform ports, and build tooling.</p>
     </div>
     <ol class="cn1-v2-steps">
       <li>
         <span>1</span>
         <h3>Write the application once</h3>
-        <p>Application logic and the shared UI stay in a standard Maven project.</p>
+        <p>Keep your application logic, UI and optional backend in one project, with shared models where they help.</p>
         <a href="/getting-started/">Start the project</a>
       </li>
       <li>
@@ -107,8 +160,8 @@ app.show();</code></pre>
       <h2>Give the agent a strict codebase and a short feedback loop.</h2>
       <p>A generated Java 17 project includes Codename One instructions for coding agents. The simulator can expose the running UI to Codex, Claude Code, and other MCP hosts, so the agent can inspect meaning and invoke actions instead of guessing screen coordinates.</p>
       <div class="cn1-action-row">
-        {{ partial "cn1-cta.html" (dict "label" "Connect an agent" "href" "/getting-started/#agent" "variant" "secondary") }}
-        {{ partial "cn1-cta.html" (dict "label" "Read the MCP implementation" "href" "/developer-guide/mcp-headless-api/#_mcp_headless_api" "variant" "text") }}
+        {{ partial "cn1-cta.html" (dict "label" "Connect an agent" "href" "/getting-started/#agent" "event" "home-agent-tools" "variant" "secondary") }}
+        {{ partial "cn1-cta.html" (dict "label" "Read the MCP implementation" "href" "/developer-guide/mcp-headless-api/#_mcp_headless_api" "event" "home-agent-mcp" "variant" "text") }}
       </div>
     </div>
     <div class="cn1-v2-agent__grid">
@@ -119,8 +172,8 @@ app.show();</code></pre>
       </article>
       <article>
         <span>Local</span>
-        <h3>Fast loops use fewer tokens</h3>
-        <p>Compile, run tests, and inspect the simulator locally. Short feedback cycles mean fewer speculative retries and less context spent diagnosing a distant native build.</p>
+        <h3>Inspect the running application</h3>
+        <p>Compile, run tests, and inspect the simulator locally. Give the agent a concrete test result and the current UI state before the next edit.</p>
       </article>
       <article>
         <span>Tools</span>
@@ -135,8 +188,8 @@ app.show();</code></pre>
     <div class="cn1-v2-reach__copy">
       <p class="cn1-eyebrow">Deployment targets</p>
       <h2>One Java project across the ports we test.</h2>
-      <p>The same application model reaches phones, native desktops, browsers, watches, and TV. The Port Status page publishes the architecture, operating-system floor, and CI evidence for each target.</p>
-      <a class="cn1-reach-link" href="/port-status/">Inspect every port and test</a>
+      <p>The same application model reaches phones, native desktops, browsers, watches, and TV. Add a native backend for the server. The Port Status page publishes the architecture, operating-system floor, and CI evidence for the app targets.</p>
+      <a class="cn1-reach-link" href="/port-status/" data-cn1-conversion="home-platforms">Inspect every port and test</a>
     </div>
     <ul class="cn1-platform-grid" aria-label="Supported deployment targets">
       {{- range site.Data.port_status_support.deployment_support }}
