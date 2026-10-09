@@ -362,7 +362,11 @@ the stage scrolls instead of cutting the content off as a desktop window
 does:
 
 * A root whose minimum size is larger than the form is laid out at that
-  minimum size.
+  minimum size. A minimum you set on the root always counts. One that
+  JavaFX works out from the content counts only when the content, laid out
+  in the form, reaches past its edge: a root that scales what it holds to
+  its own size, as a game board that follows its window does, fits the
+  form and doesn't scroll.
 * A root that isn't resizable, a `Group`, keeps the size of what it holds.
 
 The stage scrolls only along the axis that overflows, by dragging, and the

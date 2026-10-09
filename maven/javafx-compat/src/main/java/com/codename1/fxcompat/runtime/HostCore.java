@@ -22,6 +22,8 @@
  */
 package com.codename1.fxcompat.runtime;
 
+import java.util.List;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.codename1.ui.Component;
@@ -31,9 +33,11 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.Layout;
 
 import javafx.geometry.Bounds;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 
 import javafx.scene.Scene;
+import javafx.scene.layout.Region;
 import javafx.stage.Window;
 
 /// What the three kinds of host share: keeping the peer of the scene's
@@ -67,6 +71,15 @@ final class HostCore {
     /// what it holds, and the pane scrolls along each axis that
     /// overflows: nothing is laid out narrower than it can be, and all of
     /// it can be reached.
+    ///
+    /// A minimum is not always what the scene needs, though. A root that
+    /// holds a group counts the group at its full size, and an
+    /// application that scales that group to its window -- a game board
+    /// that follows the size of its pane -- fits a pane far smaller than
+    /// the minimum says. So a resizable root is first laid out in the
+    /// pane as JavaFX would, and only an axis along which what it then
+    /// holds reaches past the pane is given the minimum and scrolls. A
+    /// minimum the application set on the root itself is taken as given.
     private final class Fit extends Layout {
 
         @Override
@@ -82,6 +95,18 @@ final class HostCore {
             Dimension least = least();
             boolean overX = least.getWidth() > w;
             boolean overY = least.getHeight() > h;
+            if (overX || overY) {
+                Dimension reach = reach(w, h);
+                // A minimum the application set itself is what it asked
+                // for; only one worked out from the content is doubted.
+                Parent root = scene.getRoot();
+                boolean setX = root instanceof Region && ((Region) root).getMinWidth() >= 0;
+                boolean setY = root instanceof Region && ((Region) root).getMinHeight() >= 0;
+                if (reach != null) {
+                    overX = overX && (setX || reach.getWidth() > w);
+                    overY = overY && (setY || reach.getHeight() > h);
+                }
+            }
             // Back to the start of an axis before it stops scrolling:
             // a pane that does not scroll cannot be moved back.
             if (parent.isScrollableX() != overX) {
@@ -131,6 +156,33 @@ final class HostCore {
             h = bounds.getMaxY();
         }
         // A fraction of a pixel over is rounding, not content out of reach.
+        return new Dimension(Units.toPixels(Math.floor(w)), Units.toPixels(Math.floor(h)));
+    }
+
+    /// How far what a resizable root holds reaches when the root is laid
+    /// out in a pane of the given size, in device pixels; `null` for a
+    /// root that is not resizable, whose extent is its own.
+    private Dimension reach(int paneWidth, int paneHeight) {
+        Parent root = scene == null ? null : scene.getRoot();
+        if (root == null || !root.isResizable()) {
+            return null;
+        }
+        scene.cn1Layout(Units.toLogical(paneWidth), Units.toLogical(paneHeight));
+        double w = 0;
+        double h = 0;
+        List<Node> children = root.getChildrenUnmodifiable();
+        for (int i = 0; i < children.size(); i++) {
+            Node child = children.get(i);
+            if (!child.isVisible()) {
+                continue;
+            }
+            Bounds bounds = child.getBoundsInParent();
+            if (bounds.getWidth() < 0 || bounds.getHeight() < 0) {
+                continue;
+            }
+            w = Math.max(w, bounds.getMaxX());
+            h = Math.max(h, bounds.getMaxY());
+        }
         return new Dimension(Units.toPixels(Math.floor(w)), Units.toPixels(Math.floor(h)));
     }
 

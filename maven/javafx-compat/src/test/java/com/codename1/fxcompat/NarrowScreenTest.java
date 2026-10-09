@@ -185,4 +185,43 @@ public class NarrowScreenTest {
         form.pointerDragged(new int[] {x, x + 40}, new int[] {y, y});
         assertEquals("[]", seen.toString());
     }
+
+    /// A pane that holds a group has the size of the group for its
+    /// minimum, whatever the application does with the group. One that
+    /// scales the group to the pane -- a game board that follows its
+    /// window -- fits any pane, and was laid out at the full size of the
+    /// board all the same: larger than the screen, scrolling, with every
+    /// swipe moving the page and none reaching the game.
+    @Test
+    public void aRootThatScalesWhatItHoldsToFitIsNotMadeToScroll() {
+        final int wide = Display.getInstance().getDisplayWidth() * 2;
+        final int tall = Display.getInstance().getDisplayHeight() * 2;
+        final javafx.scene.Group board = new javafx.scene.Group(new javafx.scene.shape.Rectangle(wide, tall));
+        final javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane(board);
+        javafx.beans.value.ChangeListener<Number> fit = new javafx.beans.value.ChangeListener<Number>() {
+            @Override
+            public void changed(javafx.beans.value.ObservableValue<? extends Number> o, Number before, Number now) {
+                double scale = Math.min(root.getWidth() / wide, root.getHeight() / tall);
+                board.setScaleX(scale);
+                board.setScaleY(scale);
+            }
+        };
+        root.widthProperty().addListener(fit);
+        root.heightProperty().addListener(fit);
+        assertTrue(root.minWidth(-1) >= wide);
+        Container content = shown(root);
+        assertFalse(content.isScrollableX());
+        assertFalse(content.isScrollableY());
+        assertEquals(content.getWidth(), root.getWidth(), 0.01);
+        assertEquals(content.getHeight(), root.getHeight(), 0.01);
+
+        // The same board left at its size does not fit, and scrolls.
+        javafx.scene.layout.StackPane plain = new javafx.scene.layout.StackPane(
+                new javafx.scene.Group(new javafx.scene.shape.Rectangle(wide, 10)));
+        stage.hide();
+        Container other = shown(plain);
+        assertTrue(other.isScrollableX());
+        assertFalse(other.isScrollableY());
+        assertEquals(wide, plain.getWidth(), 1);
+    }
 }
