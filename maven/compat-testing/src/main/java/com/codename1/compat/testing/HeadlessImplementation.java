@@ -486,6 +486,40 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return desktop;
     }
 
+    /// Whether the title of the form showing belongs on the window of the
+    /// operating system, as it does on a desktop port in its `native`
+    /// title bar mode. A test that sets it must reset it.
+    public static boolean nativeTitle;
+
+    /// The title last pushed to the window of the operating system, or
+    /// null. Only [#refreshNativeTitle] writes it, as on a real port: a
+    /// title that nothing asked to push stays where it was.
+    public static String windowTitle;
+
+    /// The size last asked of the application's window as `{width,
+    /// height}`, or null.
+    public static int[] windowSize;
+
+    @Override
+    public boolean isNativeTitle() {
+        return desktop && nativeTitle;
+    }
+
+    @Override
+    public void refreshNativeTitle() {
+        com.codename1.ui.Form f = getCurrentForm();
+        if (isNativeTitle() && f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            windowTitle = f.getTitle() == null ? "" : f.getTitle();
+        }
+    }
+
+    @Override
+    public void setWindowSize(int width, int height) {
+        if (desktop) {
+            windowSize = new int[] {width, height};
+        }
+    }
+
     @Override
     public boolean isTouchDevice() {
         return true;

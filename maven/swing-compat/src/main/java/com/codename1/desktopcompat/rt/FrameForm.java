@@ -47,6 +47,16 @@ public final class FrameForm extends Form implements WindowHost {
     private final Window window;
     private final ArrayList<Command> commands = new ArrayList<Command>();
     private Form previous;
+    /// The display size the last whole paint of this form was made for.
+    private int paintedWidth = -1;
+    private int paintedHeight = -1;
+    private int paintedAgain;
+    private final Runnable again = new Runnable() {
+        @Override
+        public void run() {
+            repaint();
+        }
+    };
 
     public FrameForm(Window w) {
         super(w.cn1Title(), new BorderLayout());
@@ -83,9 +93,62 @@ public final class FrameForm extends Form implements WindowHost {
                     }
                 });
             }
+            // The window of a desktop application is the application's
+            // own: a frame that fills it gives it the size the application
+            // gave the frame, which the form is about to replace with the
+            // display's. A frame shown over a form that is not a frame's
+            // is a guest in that window and leaves its size alone.
+            Display d = Display.getInstance();
+            boolean own = current == null || current instanceof FrameForm;
+            if (own && d.isDesktop() && window.getWidth() > 0 && window.getHeight() > 0) {
+                d.setWindowSize(Units.toDevice(window.getWidth()), Units.toDevice(window.getHeight()));
+            }
             show();
+            nativeTitle();
         }
         revalidate();
+    }
+
+    /// Hands the title to the window of the operating system, on a port
+    /// that keeps the title of a form there. Codename One pushes a title
+    /// that is set on the form showing, and not the title a form already
+    /// has when it is shown: a frame titled before `setVisible`, which is
+    /// every frame, left the window with the port's own name.
+    private void nativeTitle() {
+        Display d = Display.getInstance();
+        if (d.getCurrent() == this && d.isNativeTitle()) {
+            d.refreshNativeTitle();
+        }
+    }
+
+    /// Paints the form, and asks for one more paint when the display has
+    /// a size that no paint of this form was made for yet.
+    ///
+    /// A port that draws into a buffer of the window's size may replace
+    /// the buffer when the frame ends: the native Linux port applies a
+    /// resize it has recorded right after the flush, and shows a buffer
+    /// nothing has drawn on. The first frame of a window whose menu bar
+    /// has just taken its strip is such a frame, and so is the frame that
+    /// follows any resize; the window stayed blank until an input event
+    /// made something paint. The frame after that flush is drawn on the
+    /// new buffer. It costs one paint for each size the display takes.
+    @Override
+    public void paint(com.codename1.ui.Graphics g) {
+        super.paint(g);
+        Display d = Display.getInstance();
+        int w = d.getDisplayWidth();
+        int h = d.getDisplayHeight();
+        if (w != paintedWidth || h != paintedHeight) {
+            paintedWidth = w;
+            paintedHeight = h;
+            paintedAgain++;
+            d.callSerially(again);
+        }
+    }
+
+    /// How many times a paint asked for another one; see [#paint].
+    public int cn1PaintedAgain() {
+        return paintedAgain;
     }
 
     /// Goes back to the form of the window below this one, or the form
@@ -117,6 +180,7 @@ public final class FrameForm extends Form implements WindowHost {
     @Override
     public void title(String title) {
         setTitle(title);
+        nativeTitle();
         // A title label keeps the width of the text it was laid out with:
         // the title area alone is laid out again, never the content.
         com.codename1.ui.Toolbar bar = getToolbar();
