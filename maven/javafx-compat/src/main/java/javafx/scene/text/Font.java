@@ -22,6 +22,7 @@
  */
 package javafx.scene.text;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -182,6 +183,25 @@ public final class Font {
     /// Returns the default typeface at a size.
     public static Font font(double size) {
         return new Font(null, null, null, size);
+    }
+
+    /// Loads a font file an application carries, which this layer does
+    /// not do: the answer is `null`, the answer JavaFX gives for a font
+    /// it could not load, and every application has to be ready for it.
+    ///
+    /// A family named after such a file, in a style sheet or in
+    /// [#font(String, double)], is drawn with the system face of the
+    /// weight and posture its name ends in, so `Clear Sans Bold` is the
+    /// bold system face.
+    public static Font loadFont(String urlStr, double size) {
+        return null;
+    }
+
+    /// Loads a font from a stream, which this layer does not do: the
+    /// answer is `null`, as for [#loadFont(String, double)]. The stream
+    /// is neither read nor closed, as in JavaFX.
+    public static Font loadFont(InputStream in, double size) {
+        return null;
     }
 
     /// Returns the family names known by name to every platform.

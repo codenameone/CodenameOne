@@ -46,6 +46,8 @@ import javafx.geometry.VPos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.paint.Paint;
+import javafx.scene.shape.SVGPath;
+import javafx.scene.shape.Shape;
 
 /// A parent with a size of its own, a background, a border and padding;
 /// the base of the layout panes and of the controls.
@@ -99,6 +101,9 @@ public class Region extends Parent {
     private final ObjectProperty<Background> background = new FxObject<Background>(this, "background", null, LOOK);
     private final ObjectProperty<Border> border = new FxObject<Border>(this, "border", null, EDGE | SIZE);
     private final BooleanProperty snapToPixel = new FxBoolean(this, "snapToPixel", true, Dirty.LAYOUT);
+    private final ObjectProperty<Shape> shape = new FxObject<Shape>(this, "shape", null, Dirty.PAINT);
+    private final BooleanProperty scaleShape = new FxBoolean(this, "scaleShape", true, Dirty.PAINT);
+    private final BooleanProperty centerShape = new FxBoolean(this, "centerShape", true, Dirty.PAINT);
 
     private Background baseBackground;
     private Border baseBorder;
@@ -703,6 +708,59 @@ public class Region extends Parent {
         child.relocate(snapPositionX(areaX + x), snapPositionY(areaY + y));
     }
 
+    // -------------------------------------------------------------- shape
+
+    /// Returns the shape this region takes its form from, `null` for the
+    /// rectangle it is.
+    public final Shape getShape() {
+        return shape.get();
+    }
+
+    /// Gives this region the form of a shape: its background fills and
+    /// its border are drawn as that shape instead of as rectangles. The
+    /// shape is read when the region paints; it is not a child of the
+    /// region, and changing it afterwards shows at the next repaint of
+    /// the region, not by itself. The size the region computes for
+    /// itself does not change with the shape.
+    public final void setShape(Shape value) {
+        shape.set(value);
+    }
+
+    /// The shape this region takes its form from.
+    public final ObjectProperty<Shape> shapeProperty() {
+        return shape;
+    }
+
+    /// Returns whether the shape is stretched to the size of the region.
+    public final boolean isScaleShape() {
+        return scaleShape.get();
+    }
+
+    /// Sets whether the shape is stretched to the size of the region.
+    public final void setScaleShape(boolean value) {
+        scaleShape.set(value);
+    }
+
+    /// Whether the shape is stretched to the size of the region.
+    public final BooleanProperty scaleShapeProperty() {
+        return scaleShape;
+    }
+
+    /// Returns whether a shape that is not stretched is centred.
+    public final boolean isCenterShape() {
+        return centerShape.get();
+    }
+
+    /// Sets whether a shape that is not stretched is centred.
+    public final void setCenterShape(boolean value) {
+        centerShape.set(value);
+    }
+
+    /// Whether a shape that is not stretched is centred.
+    public final BooleanProperty centerShapeProperty() {
+        return centerShape;
+    }
+
     // --------------------------------------------- background and border
 
     /// Returns the background, or `null`.
@@ -835,6 +893,12 @@ public class Region extends Parent {
             return Double.valueOf(getMaxHeight());
         } else if ("-fx-snap-to-pixel".equals(property)) {
             return Boolean.valueOf(isSnapToPixel());
+        } else if ("-fx-shape".equals(property)) {
+            return getShape();
+        } else if ("-fx-scale-shape".equals(property)) {
+            return Boolean.valueOf(isScaleShape());
+        } else if ("-fx-position-shape".equals(property)) {
+            return Boolean.valueOf(isCenterShape());
         }
         return super.cn1StyleValue(property);
     }
@@ -909,6 +973,31 @@ public class Region extends Parent {
             }
             setSnapToPixel(((Boolean) value).booleanValue());
             return true;
+        } else if ("-fx-shape".equals(property)) {
+            // A style sheet gives the path as text; what comes back to
+            // restore the property is the shape that was there before.
+            if (value instanceof String) {
+                SVGPath svg = new SVGPath();
+                svg.setContent((String) value);
+                setShape(svg);
+            } else if (value instanceof Shape) {
+                setShape((Shape) value);
+            } else if (value == null) {
+                setShape(null);
+            } else {
+                return false;
+            }
+            return true;
+        } else if ("-fx-scale-shape".equals(property) || "-fx-position-shape".equals(property)) {
+            if (!(value instanceof Boolean)) {
+                return false;
+            }
+            if ("-fx-scale-shape".equals(property)) {
+                setScaleShape(((Boolean) value).booleanValue());
+            } else {
+                setCenterShape(((Boolean) value).booleanValue());
+            }
+            return true;
         } else if (property.endsWith("-width") || property.endsWith("-height")) {
             DoubleProperty target = sizeProperty(property);
             if (target == null) {
@@ -951,6 +1040,13 @@ public class Region extends Parent {
             return;
         }
         Background bg = getBackground();
+        Shape form = getShape();
+        FxPath formPath = form == null ? null : form.cn1Outline();
+        double[] formBounds = formPath == null ? null : formPath.bounds();
+        if (formBounds != null) {
+            paintShaped(renderer, formPath, formBounds, w, h);
+            return;
+        }
         if (bg != null) {
             List<BackgroundFill> fills = bg.getFills();
             for (int i = 0; i < fills.size(); i++) {
@@ -976,6 +1072,66 @@ public class Region extends Parent {
             List<BorderStroke> strokes = b.getStrokes();
             for (int i = 0; i < strokes.size(); i++) {
                 paintStroke(renderer, strokes.get(i), w, h);
+            }
+        }
+    }
+
+    /// The shape placed in a rectangle of this region: stretched over it
+    /// when the shape is scaled, else at its own size and centred when
+    /// it is positioned.
+    private FxPath placed(FxPath path, double[] b, double x, double y, double w, double h) {
+        double pw = b[2] - b[0];
+        double ph = b[3] - b[1];
+        double sx = 1;
+        double sy = 1;
+        if (isScaleShape()) {
+            sx = pw > 0 ? w / pw : 1;
+            sy = ph > 0 ? h / ph : 1;
+        }
+        double tx;
+        double ty;
+        if (isScaleShape() || isCenterShape()) {
+            tx = x + (w - pw * sx) / 2 - b[0] * sx;
+            ty = y + (h - ph * sy) / 2 - b[1] * sy;
+        } else {
+            tx = x;
+            ty = y;
+        }
+        return path.transformed(new double[] {sx, 0, 0, sy, tx, ty});
+    }
+
+    /// Paints the fills and the strokes in the form of the shape rather
+    /// than as rectangles; the corner radii play no part then.
+    private void paintShaped(Renderer renderer, FxPath path, double[] bounds, double w, double h) {
+        Background bg = getBackground();
+        if (bg != null) {
+            List<BackgroundFill> fills = bg.getFills();
+            for (int i = 0; i < fills.size(); i++) {
+                BackgroundFill f = fills.get(i);
+                Insets in = f.getInsets();
+                double x = in.getLeft();
+                double y = in.getTop();
+                double fw = w - in.getLeft() - in.getRight();
+                double fh = h - in.getTop() - in.getBottom();
+                if (f.getFill() != null && fw > 0 && fh > 0) {
+                    renderer.fill(placed(path, bounds, x, y, fw, fh), f.getFill(), x, y, fw, fh);
+                }
+            }
+        }
+        Border b = getBorder();
+        if (b != null) {
+            List<BorderStroke> strokes = b.getStrokes();
+            for (int i = 0; i < strokes.size(); i++) {
+                BorderStroke s = strokes.get(i);
+                BorderWidths bw = s.getWidths();
+                BorderStrokeStyle style = s.getTopStyle();
+                if (bw == null || style == null || style == BorderStrokeStyle.NONE || bw.getTop() <= 0
+                        || s.getTopStroke() == null) {
+                    continue;
+                }
+                renderer.stroke(placed(path, bounds, 0, 0, w, h), s.getTopStroke(), bw.getTop(),
+                        style.getLineCap(), style.getLineJoin(), style.getMiterLimit(), dashes(style),
+                        style.getDashOffset());
             }
         }
     }

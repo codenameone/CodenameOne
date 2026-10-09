@@ -145,6 +145,13 @@ public abstract class Shape extends Node {
         return path;
     }
 
+    /// Returns the outline of this shape in its own coordinates, for a
+    /// region that takes its form from the shape. The path is the
+    /// shape's own and must not be changed.
+    public final FxPath cn1Outline() {
+        return outline();
+    }
+
     final DoubleProperty geometry(String name, double initial) {
         return new FxDouble(this, name, initial, Dirty.GEOMETRY);
     }

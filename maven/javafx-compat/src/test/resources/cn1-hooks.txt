@@ -77,3 +77,4 @@ javafx.stage.Window#cn1Embed
 javafx.stage.Window#cn1Embedded
 javafx.stage.Window#cn1Host
 javafx.stage.Window#cn1Show
+javafx.scene.shape.Shape#cn1Outline

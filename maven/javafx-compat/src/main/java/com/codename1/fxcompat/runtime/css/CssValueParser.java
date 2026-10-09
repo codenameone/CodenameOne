@@ -221,6 +221,12 @@ public final class CssValueParser {
                 }
                 return CssValue.text(CssValue.KEYWORD, word);
             }
+            case CssProperties.TEXT: {
+                if (!one(terms) || unquote(first).equals(first)) {
+                    return fail("expected one quoted string");
+                }
+                return CssValue.text(CssValue.STRING, unquote(first));
+            }
             case CssProperties.POS:
                 return word(terms, POSITIONS, "an alignment");
             case CssProperties.CURSOR: {

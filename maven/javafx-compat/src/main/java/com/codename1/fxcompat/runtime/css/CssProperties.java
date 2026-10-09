@@ -53,6 +53,8 @@ public final class CssProperties {
     public static final int BOOLEAN = 6;
     /// One of a fixed set of words.
     public static final int KEYWORD = 7;
+    /// One quoted string, taken as it is: the path of `-fx-shape`.
+    public static final int TEXT = 16;
     /// The `-fx-font` shorthand.
     public static final int FONT = 8;
     /// A font size: a length, a percentage or a size keyword.
@@ -85,7 +87,8 @@ public final class CssProperties {
         add(RADII, "-fx-background-radius", "-fx-border-radius");
         add(BOOLEAN, "-fx-managed", "-fx-snap-to-pixel", "-fx-fill-height", "-fx-fill-width", "-fx-wrap-text",
                 "-fx-underline", "-fx-strikethrough", "-fx-fit-to-width", "-fx-fit-to-height", "-fx-pannable",
-                "-fx-smooth");
+                "-fx-smooth", "-fx-scale-shape", "-fx-position-shape");
+        add(TEXT, "-fx-shape");
         add(FONT, "-fx-font");
         add(FONT_SIZE, "-fx-font-size");
         add(FONT_FAMILY, "-fx-font-family");

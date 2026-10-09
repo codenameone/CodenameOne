@@ -25,7 +25,9 @@ package javafx.stage;
 import com.codename1.ui.Display;
 
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.beans.value.ChangeListener;
@@ -52,7 +54,9 @@ public class Stage extends Window {
     private final StringProperty title = new SimpleStringProperty(this, "title", "");
     private final BooleanProperty resizable = new SimpleBooleanProperty(this, "resizable", true);
     private final BooleanProperty fullScreen = new SimpleBooleanProperty(this, "fullScreen", false);
-    private final BooleanProperty maximized = new SimpleBooleanProperty(this, "maximized", false);
+    private final ObjectProperty<String> fullScreenExitHint = new SimpleObjectProperty<String>(this,
+            "fullScreenExitHint");
+    private final BooleanProperty maximized =new SimpleBooleanProperty(this, "maximized", false);
     private final BooleanProperty iconified = new SimpleBooleanProperty(this, "iconified", false);
     private final BooleanProperty alwaysOnTop = new SimpleBooleanProperty(this, "alwaysOnTop", false);
     private final ObservableList<Image> icons = FXCollections.observableArrayList();
@@ -231,6 +235,23 @@ public class Stage extends Window {
     /// Whether full screen was asked for.
     public final BooleanProperty fullScreenProperty() {
         return fullScreen;
+    }
+
+    /// Sets the words JavaFX shows as a stage enters full screen. They
+    /// are recorded and never shown: a stage here does not change into
+    /// full screen, so there is nothing to tell the user how to leave.
+    public final void setFullScreenExitHint(String value) {
+        fullScreenExitHint.set(value);
+    }
+
+    /// Returns the words set for entering full screen.
+    public final String getFullScreenExitHint() {
+        return fullScreenExitHint.get();
+    }
+
+    /// The words set for entering full screen.
+    public final ObjectProperty<String> fullScreenExitHintProperty() {
+        return fullScreenExitHint;
     }
 
     /// Returns whether the stage was asked to be maximized.

@@ -847,6 +847,7 @@ public final class CssEngine extends StyleEngine {
             case CssProperties.BOOLEAN:
                 return v.flags() != 0 ? Boolean.TRUE : Boolean.FALSE;
             case CssProperties.KEYWORD:
+            case CssProperties.TEXT:
                 return v.text();
             case CssProperties.POS:
                 return v.text() == null ? null : POSITIONS.get(v.text());

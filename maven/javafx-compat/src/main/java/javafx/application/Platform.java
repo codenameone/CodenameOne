@@ -71,6 +71,19 @@ public final class Platform {
         return implicitExit;
     }
 
+    /// Returns whether a part of JavaFX is there to be used.
+    ///
+    /// The scene graph, the controls, FXML, clipping to a shape and a
+    /// pointing device are. Touch events are not: every pointer reaches
+    /// the scene as a mouse event, a finger included, so an application
+    /// that asks before it hides the cursor or wires touch handlers is
+    /// told the truth. Everything else answers `false`.
+    public static boolean isSupported(ConditionalFeature feature) {
+        return feature == ConditionalFeature.GRAPHICS || feature == ConditionalFeature.CONTROLS
+                || feature == ConditionalFeature.FXML || feature == ConditionalFeature.SHAPE_CLIP
+                || feature == ConditionalFeature.INPUT_POINTER;
+    }
+
     /// The toolkit needs no starting on Codename One; the code is run on
     /// the JavaFX application thread as [#runLater(Runnable)] would.
     public static void startup(Runnable runnable) {

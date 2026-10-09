@@ -57,6 +57,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.PickResult;
 import javafx.scene.input.ScrollEvent;
+import javafx.scene.input.SwipeEvent;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Window;
@@ -86,6 +87,8 @@ public class Scene implements EventTarget {
 
     private static final double DRAG_THRESHOLD = 4;
     private static final long MULTI_CLICK_MILLIS = 500;
+    private static final double SWIPE_DISTANCE = 40;
+    private static final long SWIPE_MILLIS = 600;
 
     private final ReadOnlyDoubleWrapper width = new ReadOnlyDoubleWrapper(this, "width", 0);
     private final ReadOnlyDoubleWrapper height = new ReadOnlyDoubleWrapper(this, "height", 0);
@@ -108,6 +111,7 @@ public class Scene implements EventTarget {
     private MouseButton pressButton = MouseButton.NONE;
     private double pressX;
     private double pressY;
+    private long pressTime;
     private boolean still;
     private boolean dragDetected;
     private long lastClickTime;
@@ -634,6 +638,7 @@ public class Scene implements EventTarget {
             pressButton = button == null || button == MouseButton.NONE ? MouseButton.PRIMARY : button;
             pressX = x;
             pressY = y;
+            pressTime = System.currentTimeMillis();
             still = true;
             dragDetected = false;
             if (under != null && !under.isDisabled()) {
@@ -681,6 +686,12 @@ public class Scene implements EventTarget {
                 fire(target, new ContextMenuEvent(target, target, ContextMenuEvent.CONTEXT_MENU_REQUESTED, x, y, x,
                         y, false, new PickResult(target, x, y)));
             }
+            EventType<SwipeEvent> swipe = b == MouseButton.PRIMARY ? swipe(x - pressX, y - pressY) : null;
+            if (swipe != null) {
+                fire(pressedOn, new SwipeEvent(pressedOn, pressedOn, swipe, pressX, pressY, pressX, pressY,
+                        SceneInput.shiftDown(), SceneInput.controlDown(), SceneInput.altDown(),
+                        SceneInput.metaDown(), true, 1, new PickResult(pressedOn, pressX, pressY)));
+            }
             pressButton = MouseButton.NONE;
             updateHover(under, x, y);
             return filtered;
@@ -689,6 +700,22 @@ public class Scene implements EventTarget {
             fire(target, mouse(MouseEvent.MOUSE_MOVED, target, x, y, MouseButton.NONE, 0, false, false));
         }
         return EventHandlerManager.wasConsumedByFilter();
+    }
+
+    /// The swipe a finished press amounts to: far enough, quick enough
+    /// and at least twice as long along one axis as along the other.
+    private EventType<SwipeEvent> swipe(double dx, double dy) {
+        double ax = Math.abs(dx);
+        double ay = Math.abs(dy);
+        if (Math.max(ax, ay) < SWIPE_DISTANCE || System.currentTimeMillis() - pressTime > SWIPE_MILLIS) {
+            return null;
+        }
+        if (ax >= ay * 2) {
+            return dx < 0 ? SwipeEvent.SWIPE_LEFT : SwipeEvent.SWIPE_RIGHT;
+        } else if (ay >= ax * 2) {
+            return dy < 0 ? SwipeEvent.SWIPE_UP : SwipeEvent.SWIPE_DOWN;
+        }
+        return null;
     }
 
     private int nextClickCount(double x, double y) {

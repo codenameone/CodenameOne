@@ -66,10 +66,13 @@ import javafx.geometry.BoundingBox;
 import javafx.geometry.Bounds;
 import javafx.geometry.Orientation;
 import javafx.geometry.Point2D;
+import javafx.scene.effect.Effect;
 import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
+import javafx.scene.input.SwipeEvent;
+import javafx.scene.input.TouchEvent;
 import javafx.scene.transform.Transform;
 
 /// The base of everything in a scene graph.
@@ -156,6 +159,7 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
 
     private ObservableList<Transform> transforms;
     private ObjectProperty<Node> clip;
+    private ObjectProperty<Effect> effect;
     private ObjectProperty<Cursor> cursor;
     private Object userData;
     private ObservableMap<Object, Object> properties;
@@ -1009,6 +1013,26 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         return cursor;
     }
 
+    /// Sets the effect of this node. It is recorded and not drawn: the
+    /// node is painted as it is without one, and its bounds do not grow
+    /// by what the effect would add. See [Effect].
+    public final void setEffect(Effect value) {
+        effectProperty().set(value);
+    }
+
+    /// Returns the effect set on this node, `null` for none.
+    public final Effect getEffect() {
+        return effect == null ? null : effect.get();
+    }
+
+    /// The effect of this node, recorded and not drawn.
+    public final ObjectProperty<Effect> effectProperty() {
+        if (effect == null) {
+            effect = new javafx.beans.property.SimpleObjectProperty<Effect>(this, "effect");
+        }
+        return effect;
+    }
+
     /// Returns the application's own object attached to this node.
     public Object getUserData() {
         return userData;
@@ -1580,6 +1604,130 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
 
     private <T extends Event> EventHandler<? super T> handler(EventType<T> type) {
         return events == null ? null : events.getSlot(type);
+    }
+
+    /// Sets the handler of a swipe upwards that began on this node.
+    public final void setOnSwipeUp(EventHandler<? super SwipeEvent> value) {
+        cn1Events().setSlot(SwipeEvent.SWIPE_UP, "onSwipeUp", value);
+    }
+
+    /// Returns the handler of a swipe upwards.
+    public final EventHandler<? super SwipeEvent> getOnSwipeUp() {
+        return handler(SwipeEvent.SWIPE_UP);
+    }
+
+    /// The handler of a swipe upwards.
+    public final ObjectProperty<EventHandler<? super SwipeEvent>> onSwipeUpProperty() {
+        return on(SwipeEvent.SWIPE_UP, "onSwipeUp");
+    }
+
+    /// Sets the handler of a swipe downwards that began on this node.
+    public final void setOnSwipeDown(EventHandler<? super SwipeEvent> value) {
+        cn1Events().setSlot(SwipeEvent.SWIPE_DOWN, "onSwipeDown", value);
+    }
+
+    /// Returns the handler of a swipe downwards.
+    public final EventHandler<? super SwipeEvent> getOnSwipeDown() {
+        return handler(SwipeEvent.SWIPE_DOWN);
+    }
+
+    /// The handler of a swipe downwards.
+    public final ObjectProperty<EventHandler<? super SwipeEvent>> onSwipeDownProperty() {
+        return on(SwipeEvent.SWIPE_DOWN, "onSwipeDown");
+    }
+
+    /// Sets the handler of a swipe to the left that began on this node.
+    public final void setOnSwipeLeft(EventHandler<? super SwipeEvent> value) {
+        cn1Events().setSlot(SwipeEvent.SWIPE_LEFT, "onSwipeLeft", value);
+    }
+
+    /// Returns the handler of a swipe to the left.
+    public final EventHandler<? super SwipeEvent> getOnSwipeLeft() {
+        return handler(SwipeEvent.SWIPE_LEFT);
+    }
+
+    /// The handler of a swipe to the left.
+    public final ObjectProperty<EventHandler<? super SwipeEvent>> onSwipeLeftProperty() {
+        return on(SwipeEvent.SWIPE_LEFT, "onSwipeLeft");
+    }
+
+    /// Sets the handler of a swipe to the right that began on this node.
+    public final void setOnSwipeRight(EventHandler<? super SwipeEvent> value) {
+        cn1Events().setSlot(SwipeEvent.SWIPE_RIGHT, "onSwipeRight", value);
+    }
+
+    /// Returns the handler of a swipe to the right.
+    public final EventHandler<? super SwipeEvent> getOnSwipeRight() {
+        return handler(SwipeEvent.SWIPE_RIGHT);
+    }
+
+    /// The handler of a swipe to the right.
+    public final ObjectProperty<EventHandler<? super SwipeEvent>> onSwipeRightProperty() {
+        return on(SwipeEvent.SWIPE_RIGHT, "onSwipeRight");
+    }
+
+    /// Sets the handler of a finger going down on this node. The scene
+    /// produces no touch events of its own, see [TouchEvent].
+    public final void setOnTouchPressed(EventHandler<? super TouchEvent> value) {
+        cn1Events().setSlot(TouchEvent.TOUCH_PRESSED, "onTouchPressed", value);
+    }
+
+    /// Returns the handler of a finger going down.
+    public final EventHandler<? super TouchEvent> getOnTouchPressed() {
+        return handler(TouchEvent.TOUCH_PRESSED);
+    }
+
+    /// The handler of a finger going down.
+    public final ObjectProperty<EventHandler<? super TouchEvent>> onTouchPressedProperty() {
+        return on(TouchEvent.TOUCH_PRESSED, "onTouchPressed");
+    }
+
+    /// Sets the handler of a finger moving on this node. The scene
+    /// produces no touch events of its own, see [TouchEvent].
+    public final void setOnTouchMoved(EventHandler<? super TouchEvent> value) {
+        cn1Events().setSlot(TouchEvent.TOUCH_MOVED, "onTouchMoved", value);
+    }
+
+    /// Returns the handler of a finger moving.
+    public final EventHandler<? super TouchEvent> getOnTouchMoved() {
+        return handler(TouchEvent.TOUCH_MOVED);
+    }
+
+    /// The handler of a finger moving.
+    public final ObjectProperty<EventHandler<? super TouchEvent>> onTouchMovedProperty() {
+        return on(TouchEvent.TOUCH_MOVED, "onTouchMoved");
+    }
+
+    /// Sets the handler of a finger being lifted from this node. The
+    /// scene produces no touch events of its own, see [TouchEvent].
+    public final void setOnTouchReleased(EventHandler<? super TouchEvent> value) {
+        cn1Events().setSlot(TouchEvent.TOUCH_RELEASED, "onTouchReleased", value);
+    }
+
+    /// Returns the handler of a finger being lifted.
+    public final EventHandler<? super TouchEvent> getOnTouchReleased() {
+        return handler(TouchEvent.TOUCH_RELEASED);
+    }
+
+    /// The handler of a finger being lifted.
+    public final ObjectProperty<EventHandler<? super TouchEvent>> onTouchReleasedProperty() {
+        return on(TouchEvent.TOUCH_RELEASED, "onTouchReleased");
+    }
+
+    /// Sets the handler of a finger resting on this node. The scene
+    /// produces no touch events of its own, see [TouchEvent].
+    public final void setOnTouchStationary(EventHandler<? super TouchEvent> value) {
+        cn1Events().setSlot(TouchEvent.TOUCH_STATIONARY, "onTouchStationary", value);
+    }
+
+    /// Returns the handler of a finger resting.
+    public final EventHandler<? super TouchEvent> getOnTouchStationary() {
+        return handler(TouchEvent.TOUCH_STATIONARY);
+    }
+
+    /// The handler of a finger resting.
+    public final ObjectProperty<EventHandler<? super TouchEvent>> onTouchStationaryProperty() {
+        return on(TouchEvent.TOUCH_STATIONARY, "onTouchStationary");
     }
 
     /// Sets the handler of a click on this node.
