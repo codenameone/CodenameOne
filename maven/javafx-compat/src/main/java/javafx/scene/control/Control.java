@@ -170,6 +170,12 @@ public abstract class Control extends Region {
         try {
             nativeComponent = cn1CreateNative();
             if (nativeComponent != null) {
+                if (nativeComponent instanceof com.codename1.ui.Label) {
+                    // A Codename One label that is a pixel short of its text scrolls it
+                    // back and forth while the pointer is over it or it holds the focus:
+                    // a phone's answer to a narrow screen. JavaFX text never moves.
+                    ((com.codename1.ui.Label) nativeComponent).setTickerEnabled(false);
+                }
                 Component peer = cn1Peer();
                 if (peer instanceof Container) {
                     ((Container) peer).addComponent(0, nativeComponent);

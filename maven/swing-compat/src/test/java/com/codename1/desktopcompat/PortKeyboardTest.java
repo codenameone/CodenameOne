@@ -110,6 +110,48 @@ public class PortKeyboardTest extends WindowsTestBase {
         assertEquals("[b, d]", seen.toString());
     }
 
+    /// A text field is edited by the port's own editor, which takes Tab
+    /// itself and asks the form for the component after the one it edits.
+    /// The answer has to be the next component Swing would focus.
+    @Test
+    public void theComponentAfterATextFieldIsTheOneThePortEditsNext() {
+        JFrame f = new JFrame("fields");
+        f.getContentPane().setLayout(new FlowLayout());
+        com.codename1.desktopcompat.javax.swing.JLabel l = new com.codename1.desktopcompat.javax.swing.JLabel("Name");
+        com.codename1.desktopcompat.javax.swing.JTextField name =
+                new com.codename1.desktopcompat.javax.swing.JTextField("Ada", 10);
+        com.codename1.desktopcompat.javax.swing.JPasswordField pw =
+                new com.codename1.desktopcompat.javax.swing.JPasswordField(10);
+        f.getContentPane().add(l);
+        f.getContentPane().add(name);
+        f.getContentPane().add(pw);
+        f.getContentPane().add(button("ok"));
+        f.setSize(400, 200);
+        show(f);
+        com.codename1.ui.Component next = f.cn1Form().getNextComponent(name.cn1Peer());
+        assertTrue("after the name comes " + next, next == pw.cn1Peer());
+        assertTrue(f.cn1Form().getPreviousComponent(pw.cn1Peer()) == name.cn1Peer());
+    }
+
+    /// A button narrower than its text keeps the text still with the
+    /// focus on it; the native label scrolled it back and forth.
+    @Test
+    public void theTextOfANarrowButtonDoesNotScroll() {
+        JFrame f = new JFrame("narrow");
+        f.getContentPane().setLayout(null);
+        JButton b = button("A button with more text than room");
+        f.getContentPane().add(b);
+        b.setBounds(10, 10, 60, 30);
+        f.setSize(400, 200);
+        show(f);
+        assertTrue(b.cn1Peer() instanceof com.codename1.ui.Label);
+        com.codename1.ui.Label label = (com.codename1.ui.Label) b.cn1Peer();
+        assertTrue(b.requestFocusInWindow());
+        label.requestFocus();
+        MainThreadRule.drain();
+        assertTrue("the text is scrolling", !label.isTickerRunning());
+    }
+
     @Test
     public void enterFiresTheDefaultButton() {
         JFrame f = new JFrame("default");

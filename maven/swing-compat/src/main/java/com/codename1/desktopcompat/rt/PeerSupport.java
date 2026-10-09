@@ -44,6 +44,12 @@ public final class PeerSupport {
         this.owner = owner;
         this.peer = peer;
         peer.setOpaque(false);
+        if (peer instanceof com.codename1.ui.Label) {
+            // A Codename One label a pixel short of its text scrolls it back and forth
+            // under the pointer or with the focus: a phone's answer to a narrow screen.
+            // Swing text never moves.
+            ((com.codename1.ui.Label) peer).setTickerEnabled(false);
+        }
     }
 
     /// The AWT component.

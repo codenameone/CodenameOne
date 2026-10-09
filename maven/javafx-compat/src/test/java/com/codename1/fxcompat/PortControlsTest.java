@@ -420,6 +420,28 @@ public class PortControlsTest {
         assertEquals("[third, ok]", seen.toString());
     }
 
+    /// A button a little narrower than its text keeps the text where it is
+    /// under the pointer and with the focus. The native label scrolled it
+    /// back and forth, which is what a phone does and JavaFX never does.
+    @Test
+    public void theTextOfANarrowButtonDoesNotScroll() {
+        Pane root = new Pane();
+        Button narrow = new Button("A button with more text than room");
+        narrow.resizeRelocate(10, 10, 60, 30);
+        narrow.setManaged(false);
+        root.getChildren().add(narrow);
+        show(root);
+        assertTrue(narrow.cn1Native() instanceof com.codename1.ui.Label);
+        com.codename1.ui.Label label = (com.codename1.ui.Label) narrow.cn1Native();
+        form.pointerHover(new int[] {px(30)}, new int[] {py(25)});
+        narrow.requestFocus();
+        label.requestFocus();
+        MainThreadRule.drain();
+        form.pointerHover(new int[] {px(32)}, new int[] {py(25)});
+        MainThreadRule.drain();
+        assertFalse(label.isTickerRunning());
+    }
+
     /// The menu of a menu bar, opened, is walked the same way.
     @Test
     public void theMenuOfAMenuBarIsChosenFromWithTheKeyboard() {
