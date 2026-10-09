@@ -412,6 +412,21 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void percentageRadiiOfAnEllipseAreOfTheWidthAndOfTheHeight(@TempDir Path dir) throws Exception {
+        // The box is 320x96 and starts 2px in, so the ellipse is 80px by 24px
+        // about (162, 50): 40px above the centre is well outside it, and
+        // would be inside were the vertical radius a quarter of the width.
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
+                + " background: radial-gradient(ellipse 25% 25%, #ffffff, #000000);"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertTrue((img.getRGB(162, 50) & 0xff) > 0xe0, "white at the centre");
+        assertTrue((img.getRGB(162, 10) & 0xff) < 0x20, "black beyond the vertical radius, was "
+                + Integer.toHexString(img.getRGB(162, 10)));
+        assertTrue((img.getRGB(162 + 40, 50) & 0xff) > 0x60, "still blending half way along the horizontal one");
+    }
+
+    @Test
     void aRadialGradientPositionedByALengthIsPaintedWhereItSays(@TempDir Path dir) throws Exception {
         // A length has no meaning in a resolution-independent gradient, so this
         // one is painted: the page is 640x100 and the centre is 10px in from

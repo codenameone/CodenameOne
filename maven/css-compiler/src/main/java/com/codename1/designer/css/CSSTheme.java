@@ -581,6 +581,16 @@ public class CSSTheme {
                         if (n != null && n.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
                             ry = (float) (n.getNumericValue() / 100f);
                             p = n;
+                            if (rasterWidth > 0 && rasterHeight > 0) {
+                                // In CSS the first percentage is of the
+                                // box's width and the second of its height.
+                                // RadialGradient measures both against the
+                                // longer side, so with a box to hand they are
+                                // restated in that unit.
+                                float ref = Math.max(rasterWidth, rasterHeight);
+                                rx = rx * rasterWidth / ref;
+                                ry = ry * rasterHeight / ref;
+                            }
                         } else {
                             ry = rx;
                         }
