@@ -37,10 +37,39 @@ public final class Background {
     public static final Background EMPTY = new Background((BackgroundFill[]) null);
 
     private final List<BackgroundFill> fills;
+    private final List<BackgroundImage> images;
     private final Insets outsets;
 
     /// Creates a background from fills; `null` entries are ignored.
     public Background(@NamedArg("fills") BackgroundFill... fills) {
+        this(fills, (BackgroundImage[]) null);
+    }
+
+    /// Creates a background of pictures and no fills, bottom first.
+    public Background(@NamedArg("images") BackgroundImage... images) {
+        this((BackgroundFill[]) null, images);
+    }
+
+    /// Creates a background of fills with pictures over them, each list
+    /// bottom first; `null` entries are left out.
+    public Background(@NamedArg("fills") List<BackgroundFill> fills,
+            @NamedArg("images") List<BackgroundImage> images) {
+        this(fills == null ? null : fills.toArray(new BackgroundFill[0]),
+                images == null ? null : images.toArray(new BackgroundImage[0]));
+    }
+
+    /// Creates a background of fills with pictures over them, each array
+    /// bottom first; `null` entries are left out.
+    public Background(@NamedArg("fills") BackgroundFill[] fills, @NamedArg("images") BackgroundImage[] images) {
+        ArrayList<BackgroundImage> pictures = new ArrayList<BackgroundImage>();
+        if (images != null) {
+            for (int i = 0; i < images.length; i++) {
+                if (images[i] != null) {
+                    pictures.add(images[i]);
+                }
+            }
+        }
+        this.images = Collections.unmodifiableList(pictures);
         ArrayList<BackgroundFill> list = new ArrayList<BackgroundFill>();
         double top = 0;
         double right = 0;
@@ -75,7 +104,7 @@ public final class Background {
 
     /// Returns whether there is nothing to paint.
     public final boolean isEmpty() {
-        return fills.isEmpty();
+        return fills.isEmpty() && images.isEmpty();
     }
 
     /// Returns whether any fill has corner radii given as a fraction of
@@ -94,11 +123,18 @@ public final class Background {
         if (this == o) {
             return true;
         }
-        return o instanceof Background && fills.equals(((Background) o).fills);
+        return o instanceof Background && fills.equals(((Background) o).fills)
+                && images.equals(((Background) o).images);
     }
 
     @Override
     public int hashCode() {
         return fills.hashCode();
+    }
+
+    /// Returns the pictures, bottom first; unmodifiable. They are drawn
+    /// over the fills.
+    public final List<BackgroundImage> getImages() {
+        return images;
     }
 }

@@ -40,6 +40,10 @@ public final class BorderWidths {
     private final double right;
     private final double bottom;
     private final double left;
+    private final boolean topAsPercentage;
+    private final boolean rightAsPercentage;
+    private final boolean bottomAsPercentage;
+    private final boolean leftAsPercentage;
 
     /// Creates the same width on every side.
     public BorderWidths(@NamedArg("width") double width) {
@@ -49,6 +53,17 @@ public final class BorderWidths {
     /// Creates a width per side.
     public BorderWidths(@NamedArg("top") double top, @NamedArg("right") double right,
             @NamedArg("bottom") double bottom, @NamedArg("left") double left) {
+        this(top, right, bottom, left, false, false, false, false);
+    }
+
+    /// Creates a width per side, each a length or a share written 0 to 1
+    /// of the side it is measured against.
+    public BorderWidths(@NamedArg("top") double top, @NamedArg("right") double right,
+            @NamedArg("bottom") double bottom, @NamedArg("left") double left,
+            @NamedArg("topAsPercentage") boolean topAsPercentage,
+            @NamedArg("rightAsPercentage") boolean rightAsPercentage,
+            @NamedArg("bottomAsPercentage") boolean bottomAsPercentage,
+            @NamedArg("leftAsPercentage") boolean leftAsPercentage) {
         if ((top < 0 && top != AUTO) || (right < 0 && right != AUTO) || (bottom < 0 && bottom != AUTO)
                 || (left < 0 && left != AUTO)) {
             throw new IllegalArgumentException("None of the widths can be < 0");
@@ -57,6 +72,30 @@ public final class BorderWidths {
         this.right = right;
         this.bottom = bottom;
         this.left = left;
+        this.topAsPercentage = topAsPercentage;
+        this.rightAsPercentage = rightAsPercentage;
+        this.bottomAsPercentage = bottomAsPercentage;
+        this.leftAsPercentage = leftAsPercentage;
+    }
+
+    /// Returns whether the top width is a share, 0 to 1.
+    public final boolean isTopAsPercentage() {
+        return topAsPercentage;
+    }
+
+    /// Returns whether the right width is a share, 0 to 1.
+    public final boolean isRightAsPercentage() {
+        return rightAsPercentage;
+    }
+
+    /// Returns whether the bottom width is a share, 0 to 1.
+    public final boolean isBottomAsPercentage() {
+        return bottomAsPercentage;
+    }
+
+    /// Returns whether the left width is a share, 0 to 1.
+    public final boolean isLeftAsPercentage() {
+        return leftAsPercentage;
     }
 
     /// Returns the width of the top side.
@@ -89,7 +128,9 @@ public final class BorderWidths {
         }
         BorderWidths that = (BorderWidths) o;
         return Double.compare(top, that.top) == 0 && Double.compare(right, that.right) == 0
-                && Double.compare(bottom, that.bottom) == 0 && Double.compare(left, that.left) == 0;
+                && Double.compare(bottom, that.bottom) == 0 && Double.compare(left, that.left) == 0
+                && topAsPercentage == that.topAsPercentage && rightAsPercentage == that.rightAsPercentage
+                && bottomAsPercentage == that.bottomAsPercentage && leftAsPercentage == that.leftAsPercentage;
     }
 
     @Override

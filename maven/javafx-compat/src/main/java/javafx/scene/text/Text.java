@@ -343,6 +343,23 @@ public class Text extends Shape {
         return p;
     }
 
+    /// The runs a flow cut this text into and where each starts, counted
+    /// from the left of the text; `null` for a text drawn whole.
+    private String[] flowParts;
+    private double[] flowOffsets;
+
+    /// Has the text drawn as runs of one direction each, which a flow
+    /// places apart when the order they are read in is not the order
+    /// they are seen in. `null` draws the text whole again.
+    void flowRuns(String[] parts, double[] offsets) {
+        if (parts == null && flowParts == null) {
+            return;
+        }
+        flowParts = parts;
+        flowOffsets = offsets;
+        cn1Repaint();
+    }
+
     @Override
     public void cn1Paint(Renderer renderer) {
         Paint fill = getFill();
@@ -355,6 +372,21 @@ public class Text extends Shape {
         double lineHeight = Fonts.lineHeight(f);
         double ascent = Fonts.ascent(f);
         double thickness = Math.max(1, f.getSize() / 14);
+        if (flowParts != null && flowOffsets != null) {
+            double y = top();
+            for (int i = 0; i < flowParts.length && i < flowOffsets.length; i++) {
+                double w = Fonts.width(f, flowParts[i]);
+                double lx = getX() + flowOffsets[i];
+                renderer.drawText(flowParts[i], lx, y, f, fill);
+                if (w > 0 && isUnderline()) {
+                    renderer.fillRect(lx, y + ascent + thickness, w, thickness, fill);
+                }
+                if (w > 0 && isStrikethrough()) {
+                    renderer.fillRect(lx, y + ascent * 0.65, w, thickness, fill);
+                }
+            }
+            return;
+        }
         TextAlignment align = getTextAlignment();
         double lineTop = top();
         for (int i = 0; i < all.length; i++) {

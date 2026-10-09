@@ -118,6 +118,17 @@ public class Region extends Parent {
     private Object styleStrokeRadii;
     private Object styleStrokeStyle;
     private Object styleStrokeInsets;
+    // The pictures of the background and of the border, as the text a
+    // style gives; StyleImages reads them.
+    private Object styleImage;
+    private Object styleImageRepeat;
+    private Object styleImagePosition;
+    private Object styleImageSize;
+    private Object styleEdge;
+    private Object styleEdgeSlice;
+    private Object styleEdgeWidth;
+    private Object styleEdgeRepeat;
+    private Object styleEdgeInsets;
     private Insets insetsCache;
 
     /// Creates an empty region.
@@ -891,6 +902,13 @@ public class Region extends Parent {
                     bg = new Background(changed);
                 }
             }
+            if (styleImage != null) {
+                BackgroundImage[] pictures = StyleImages.backgrounds(styleImage, styleImageRepeat,
+                        styleImagePosition, styleImageSize);
+                if (pictures.length > 0 || (bg != null && !bg.getImages().isEmpty())) {
+                    bg = new Background(bg == null ? null : bg.getFills().toArray(new BackgroundFill[0]), pictures);
+                }
+            }
             background.set(bg);
             Border b = baseBorder;
             if (styleStroke != null || styleStrokeWidths != null || styleStrokeRadii != null
@@ -949,6 +967,13 @@ public class Region extends Parent {
                     b = new Border(kept);
                 }
             }
+            if (styleEdge != null) {
+                BorderImage[] pictures = StyleImages.borders(styleEdge, styleEdgeSlice, styleEdgeWidth,
+                        styleEdgeRepeat, styleEdgeInsets);
+                if (pictures.length > 0 || (b != null && !b.getImages().isEmpty())) {
+                    b = new Border(b == null ? null : b.getStrokes().toArray(new BorderStroke[0]), pictures);
+                }
+            }
             border.set(b);
         } finally {
             composing = false;
@@ -973,6 +998,24 @@ public class Region extends Parent {
             return styleStrokeStyle;
         } else if ("-fx-border-insets".equals(property)) {
             return styleStrokeInsets;
+        } else if ("-fx-background-image".equals(property)) {
+            return styleImage;
+        } else if ("-fx-background-repeat".equals(property)) {
+            return styleImageRepeat;
+        } else if ("-fx-background-position".equals(property)) {
+            return styleImagePosition;
+        } else if ("-fx-background-size".equals(property)) {
+            return styleImageSize;
+        } else if ("-fx-border-image-source".equals(property)) {
+            return styleEdge;
+        } else if ("-fx-border-image-slice".equals(property)) {
+            return styleEdgeSlice;
+        } else if ("-fx-border-image-width".equals(property)) {
+            return styleEdgeWidth;
+        } else if ("-fx-border-image-repeat".equals(property)) {
+            return styleEdgeRepeat;
+        } else if ("-fx-border-image-insets".equals(property)) {
+            return styleEdgeInsets;
         } else if ("-fx-padding".equals(property)) {
             return getPadding();
         } else if ("-fx-min-width".equals(property)) {
@@ -1059,6 +1102,51 @@ public class Region extends Parent {
                 return false;
             }
             styleStrokeInsets = value;
+        } else if ("-fx-background-image".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleImage = value;
+        } else if ("-fx-background-repeat".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleImageRepeat = value;
+        } else if ("-fx-background-position".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleImagePosition = value;
+        } else if ("-fx-background-size".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleImageSize = value;
+        } else if ("-fx-border-image-source".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleEdge = value;
+        } else if ("-fx-border-image-slice".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleEdgeSlice = value;
+        } else if ("-fx-border-image-width".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleEdgeWidth = value;
+        } else if ("-fx-border-image-repeat".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleEdgeRepeat = value;
+        } else if ("-fx-border-image-insets".equals(property)) {
+            if (value != null && !(value instanceof String)) {
+                return false;
+            }
+            styleEdgeInsets = value;
         } else if ("-fx-padding".equals(property)) {
             Insets in = insets(value, null);
             if (in == null) {
@@ -1165,12 +1253,20 @@ public class Region extends Parent {
                     renderer.fill(outline(r, x, y, fw, fh, 0), f.getFill(), x, y, fw, fh);
                 }
             }
+            List<BackgroundImage> pictures = bg.getImages();
+            for (int i = 0; i < pictures.size(); i++) {
+                StyleImages.paint(renderer, pictures.get(i), w, h);
+            }
         }
         Border b = getBorder();
         if (b != null) {
             List<BorderStroke> strokes = b.getStrokes();
             for (int i = 0; i < strokes.size(); i++) {
                 paintStroke(renderer, strokes.get(i), w, h);
+            }
+            List<BorderImage> edges = b.getImages();
+            for (int i = 0; i < edges.size(); i++) {
+                StyleImages.paint(renderer, edges.get(i), w, h);
             }
         }
     }

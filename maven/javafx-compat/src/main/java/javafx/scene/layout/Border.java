@@ -38,16 +38,55 @@ public final class Border {
     public static final Border EMPTY = new Border((BorderStroke[]) null);
 
     private final List<BorderStroke> strokes;
+    private final List<BorderImage> images;
     private final Insets insets;
     private final Insets outsets;
 
     /// Creates a border from strokes; `null` entries are ignored.
     public Border(@NamedArg("strokes") BorderStroke... strokes) {
+        this(strokes, (BorderImage[]) null);
+    }
+
+    /// Creates a border of pictures and no strokes, bottom first.
+    public Border(@NamedArg("images") BorderImage... images) {
+        this((BorderStroke[]) null, images);
+    }
+
+    /// Creates a border of strokes with pictures over them, each list
+    /// bottom first; `null` entries are left out.
+    public Border(@NamedArg("strokes") List<BorderStroke> strokes, @NamedArg("images") List<BorderImage> images) {
+        this(strokes == null ? null : strokes.toArray(new BorderStroke[0]),
+                images == null ? null : images.toArray(new BorderImage[0]));
+    }
+
+    /// Creates a border of strokes with pictures over them, each array
+    /// bottom first; `null` entries are left out.
+    public Border(@NamedArg("strokes") BorderStroke[] strokes, @NamedArg("images") BorderImage[] images) {
         ArrayList<BorderStroke> list = new ArrayList<BorderStroke>();
+        ArrayList<BorderImage> pictures = new ArrayList<BorderImage>();
         double top = 0;
         double right = 0;
         double bottom = 0;
         double left = 0;
+        if (images != null) {
+            for (int i = 0; i < images.length; i++) {
+                BorderImage image = images[i];
+                if (image == null) {
+                    continue;
+                }
+                pictures.add(image);
+                // A width that is a share of the region cannot be room
+                // taken from it before the region has a size.
+                Insets in = image.getInsets();
+                BorderWidths w = image.getWidths();
+                top = Math.max(top, in.getTop() + (w.isTopAsPercentage() ? 0 : Math.max(0, w.getTop())));
+                right = Math.max(right, in.getRight() + (w.isRightAsPercentage() ? 0 : Math.max(0, w.getRight())));
+                bottom = Math.max(bottom,
+                        in.getBottom() + (w.isBottomAsPercentage() ? 0 : Math.max(0, w.getBottom())));
+                left = Math.max(left, in.getLeft() + (w.isLeftAsPercentage() ? 0 : Math.max(0, w.getLeft())));
+            }
+        }
+        this.images = Collections.unmodifiableList(pictures);
         double outTop = 0;
         double outRight = 0;
         double outBottom = 0;
@@ -100,7 +139,7 @@ public final class Border {
 
     /// Returns whether there is nothing to draw.
     public final boolean isEmpty() {
-        return strokes.isEmpty();
+        return strokes.isEmpty() && images.isEmpty();
     }
 
     @Override
@@ -108,11 +147,18 @@ public final class Border {
         if (this == o) {
             return true;
         }
-        return o instanceof Border && strokes.equals(((Border) o).strokes);
+        return o instanceof Border && strokes.equals(((Border) o).strokes)
+                && images.equals(((Border) o).images);
     }
 
     @Override
     public int hashCode() {
         return strokes.hashCode();
+    }
+
+    /// Returns the pictures, bottom first; unmodifiable. They are drawn
+    /// over the strokes.
+    public final List<BorderImage> getImages() {
+        return images;
     }
 }

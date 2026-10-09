@@ -75,6 +75,11 @@ public final class CssProperties {
     /// `-fx-effect`: `dropshadow(...)`, `innershadow(...)` or `none`.
     public static final int EFFECT = 17;
 
+    /// A value kept as the text that was written, for the node to read:
+    /// the pictures of a background and of a border, and how they are
+    /// placed. An address in it is made whole when the sheet is compiled.
+    public static final int RAW = 18;
+
     private static final HashMap<String, Integer> KINDS = new HashMap<String, Integer>();
     private static final HashMap<String, String[]> KEYWORDS = new HashMap<String, String[]>();
 
@@ -91,6 +96,9 @@ public final class CssProperties {
                 "-fx-underline", "-fx-strikethrough", "-fx-fit-to-width", "-fx-fit-to-height", "-fx-pannable",
                 "-fx-smooth", "-fx-scale-shape", "-fx-position-shape");
         add(TEXT, "-fx-shape");
+        add(RAW, "-fx-background-image", "-fx-background-repeat", "-fx-background-position",
+                "-fx-background-size", "-fx-border-image-source", "-fx-border-image-slice",
+                "-fx-border-image-width", "-fx-border-image-repeat", "-fx-border-image-insets");
         add(FONT, "-fx-font");
         add(FONT_SIZE, "-fx-font-size");
         add(FONT_FAMILY, "-fx-font-family");

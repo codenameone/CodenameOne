@@ -124,6 +124,73 @@ public final class CssValueParser {
 
     private String error;
     private String warning;
+    private String base;
+
+    /// Says where the text being parsed is: the directory of its style
+    /// sheet among the resources of the application, ending in a slash,
+    /// or an empty string for the root. An address written in a value is
+    /// then read from there, and kept as a path from the root. `null`,
+    /// which a parser starts with, keeps an address as it was written.
+    public void setBase(String directory) {
+        base = directory;
+    }
+
+    /// The addresses of a value, each `url(...)` of it, made whole.
+    private String rebased(String value) {
+        if (base == null) {
+            return value;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = -1;
+            for (int i = at; i + 4 <= value.length(); i++) {
+                if (value.regionMatches(true, i, "url(", 0, 4)) {
+                    open = i;
+                    break;
+                }
+            }
+            int close = open < 0 ? -1 : value.indexOf(')', open);
+            if (close < 0) {
+                out.append(value.substring(at));
+                return out.toString();
+            }
+            String address = unquote(value.substring(open + 4, close).trim());
+            out.append(value.substring(at, open)).append("url(\"").append(whole(address)).append("\")");
+            at = close + 1;
+        }
+    }
+
+    /// An address as a path from the root of the resources; one with a
+    /// scheme, or already from the root, is kept.
+    private String whole(String address) {
+        if (address.indexOf(':') >= 0 || address.startsWith("/")) {
+            return address;
+        }
+        String path = base + address;
+        ArrayList<String> kept = new ArrayList<String>();
+        int start = 0;
+        while (start <= path.length()) {
+            int slash = path.indexOf('/', start);
+            String part = path.substring(start, slash < 0 ? path.length() : slash);
+            if ("..".equals(part)) {
+                if (!kept.isEmpty()) {
+                    kept.remove(kept.size() - 1);
+                }
+            } else if (part.length() > 0 && !".".equals(part)) {
+                kept.add(part);
+            }
+            if (slash < 0) {
+                break;
+            }
+            start = slash + 1;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < kept.size(); i++) {
+            out.append('/').append(kept.get(i));
+        }
+        return out.toString();
+    }
 
     /// Creates a parser.
     public CssValueParser() {
@@ -163,6 +230,9 @@ public final class CssValueParser {
         List<String> layers = split(value, ',');
         if (layers == null) {
             return fail("unbalanced parentheses or quotes");
+        }
+        if (kind == CssProperties.RAW) {
+            return CssValue.text(CssValue.STRING, rebased(value));
         }
         if (kind == CssProperties.FONT_FAMILY || kind == CssProperties.FONT) {
             // The further families are fallbacks; a device has one font per name.

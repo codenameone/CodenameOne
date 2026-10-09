@@ -74,6 +74,10 @@ public final class CssCompiler {
     private CssCompiler(String file, String path, String text, Set<String> knownSheets, Messages messages) {
         this.file = file;
         this.path = path;
+        // An address in a value -- the picture of a background -- is
+        // written from where the sheet is.
+        int directory = path == null ? -1 : path.lastIndexOf('/');
+        parser.setBase(directory < 0 ? "" : path.substring(0, directory + 1));
         this.text = CssDeclarations.stripComments(text);
         this.knownSheets = knownSheets;
         this.messages = messages;

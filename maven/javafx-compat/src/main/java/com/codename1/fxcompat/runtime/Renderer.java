@@ -383,6 +383,9 @@ public final class Renderer {
             fill(path, outer, bx, by, bw, bh);
             return;
         }
+        if (masked(path, null, rg, bx, by, bw, bh)) {
+            return;
+        }
         double cx = rg.isProportional() ? bx + rg.getCenterX() * bw : rg.getCenterX();
         double cy = rg.isProportional() ? by + rg.getCenterY() * bh : rg.getCenterY();
         double rx = rg.isProportional() ? rg.getRadius() * bw : rg.getRadius();
@@ -410,6 +413,98 @@ public final class Renderer {
         g.popClip();
     }
 
+    /// A gradient drawn through a shape, kept for the next paint.
+    private static final class Raster {
+        Paint paint;
+        double[] key;
+        Image image;
+    }
+
+    private static final Raster[] RASTERS = new Raster[8];
+    private static int nextRaster;
+
+    /// The most pixels a gradient is worked out for. Past it the shape is
+    /// drawn the way a port without shapes draws it.
+    private static final int RASTER_LIMIT = 4000000;
+
+    /// Draws a gradient through a shape pixel by pixel: the shape is drawn
+    /// in one colour on an image of its own, which says how much of every
+    /// pixel it covers, and each pixel then takes the colour the gradient
+    /// has there. `stroke` is `null` to fill the path and the pen to draw
+    /// its outline with otherwise. Returns `false` when it cannot be done
+    /// here, and the caller draws what it can.
+    private boolean masked(FxPath path, Stroke stroke, Paint paint, double bx, double by, double bw, double bh) {
+        double det = m[0] * m[3] - m[1] * m[2];
+        if (!g.isShapeSupported() || det == 0) {
+            return false;
+        }
+        double[] b = deviceBounds(path, m);
+        double grow = stroke == null ? 1 : stroke.getLineWidth() * Math.max(1, stroke.getMiterLimit()) / 2 + 1;
+        int[] clip = g.getClip();
+        int left = (int) Math.floor(Math.max(b[0] - grow, clip[0]));
+        int top = (int) Math.floor(Math.max(b[1] - grow, clip[1]));
+        int right = (int) Math.ceil(Math.min(b[2] + grow, clip[0] + (double) clip[2]));
+        int bottom = (int) Math.ceil(Math.min(b[3] + grow, clip[1] + (double) clip[3]));
+        int w = right - left;
+        int h = bottom - top;
+        if (w <= 0 || h <= 0) {
+            return true;
+        }
+        if ((long) w * h > RASTER_LIMIT) {
+            return false;
+        }
+        double[] pts = path.points();
+        double sum = 0;
+        for (int i = 0; i < pts.length; i++) {
+            sum += pts[i] * (i + 1);
+        }
+        double[] key = new double[] {m[0], m[1], m[2], m[3], m[4] - left, m[5] - top, w, h, bx, by, bw, bh,
+            path.commandCount(), pts.length, sum, stroke == null ? -1 : stroke.getLineWidth(),
+            stroke == null ? 0 : stroke.getCapStyle(), stroke == null ? 0 : stroke.getJoinStyle(),
+            stroke == null ? 0 : stroke.getMiterLimit()};
+        Image image = null;
+        for (int i = 0; i < RASTERS.length && image == null; i++) {
+            Raster r = RASTERS[i];
+            if (r != null && r.paint.equals(paint) && java.util.Arrays.equals(r.key, key)) {
+                image = r.image;
+            }
+        }
+        if (image == null) {
+            Image mask = Image.createImage(w, h, 0);
+            Graphics mg = mask.getGraphics();
+            if (!mg.isShapeSupported()) {
+                return false;
+            }
+            double[] local = new double[] {m[0], m[1], m[2], m[3], m[4] - left, m[5] - top};
+            mg.setColor(0xffffff);
+            mg.setAntiAliased(true);
+            if (stroke == null) {
+                mg.fillShape(path.toDevice(local));
+            } else {
+                mg.drawShape(path.toDevice(local), stroke);
+            }
+            int[] pixels = mask.getRGB();
+            double[] inverse = new double[] {m[3] / det, -m[1] / det, -m[2] / det, m[0] / det,
+                (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det};
+            GradientRaster.colour(pixels, w, h, left, top, inverse, paint, bx, by, bw, bh, 1);
+            image = Image.createImage(pixels, w, h);
+            Raster r = new Raster();
+            r.paint = paint;
+            r.key = key;
+            r.image = image;
+            RASTERS[nextRaster] = r;
+            nextRaster = (nextRaster + 1) % RASTERS.length;
+        }
+        int old = g.getAlpha();
+        int a = alpha(old, 255);
+        if (a > 0) {
+            g.setAlpha(a);
+            g.drawImage(image, left, top);
+            g.setAlpha(old);
+        }
+        return true;
+    }
+
     private static Color solid(Paint paint) {
         if (paint instanceof Color) {
             return (Color) paint;
@@ -423,7 +518,8 @@ public final class Renderer {
         return null;
     }
 
-    /// Strokes the outline of a path. A gradient paint strokes with its
+    /// Strokes the outline of a path. A gradient is drawn through the
+    /// outline pixel by pixel, and on a port without shapes with its
     /// middle colour. Dashes are cut out of the flattened outline, so they
     /// work on every port.
     public void stroke(FxPath path, Paint paint, double width, StrokeLineCap cap, StrokeLineJoin join,
@@ -441,6 +537,20 @@ public final class Renderer {
             double half = width * uniformScale() / 2;
             trace.drawn("stroke", new double[] {b[0] - half, b[1] - half, b[2] + half, b[3] + half}, paint, null);
         }
+        float deviceWidth = (float) Math.max(1, width * uniformScale());
+        int nativeCap = cap == StrokeLineCap.ROUND ? Stroke.CAP_ROUND
+                : (cap == StrokeLineCap.SQUARE ? Stroke.CAP_SQUARE : Stroke.CAP_BUTT);
+        int nativeJoin = join == StrokeLineJoin.ROUND ? Stroke.JOIN_ROUND
+                : (join == StrokeLineJoin.BEVEL ? Stroke.JOIN_BEVEL : Stroke.JOIN_MITER);
+        if (!(paint instanceof Color)) {
+            // A proportional gradient on an outline is measured against
+            // the bounds of the path, as a fill of the same shape is.
+            double[] pb = path.bounds();
+            if (pb != null && masked(outline, new Stroke(deviceWidth, nativeCap, nativeJoin,
+                    (float) Math.max(1, miterLimit)), paint, pb[0], pb[1], pb[2] - pb[0], pb[3] - pb[1])) {
+                return;
+            }
+        }
         int old = g.getAlpha();
         int a = alpha(old, argb(c) >>> 24);
         if (a == 0) {
@@ -448,12 +558,7 @@ public final class Renderer {
         }
         g.setAlpha(a);
         g.setColor(argb(c) & 0xffffff);
-        float deviceWidth = (float) Math.max(1, width * uniformScale());
         if (g.isShapeSupported()) {
-            int nativeCap = cap == StrokeLineCap.ROUND ? Stroke.CAP_ROUND
-                    : (cap == StrokeLineCap.SQUARE ? Stroke.CAP_SQUARE : Stroke.CAP_BUTT);
-            int nativeJoin = join == StrokeLineJoin.ROUND ? Stroke.JOIN_ROUND
-                    : (join == StrokeLineJoin.BEVEL ? Stroke.JOIN_BEVEL : Stroke.JOIN_MITER);
             boolean aa = g.isAntiAliased();
             g.setAntiAliased(true);
             g.drawShape(outline.toDevice(m),
