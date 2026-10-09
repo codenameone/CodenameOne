@@ -2182,6 +2182,42 @@ public class List<T> extends Component implements ActionSource {
         return d;
     }
 
+    /// The scrollable extent is what the model holds, not what the list asks its parent for.
+    ///
+    /// The inherited implementation answers `calcPreferredSize()`, and for a list those two
+    /// are different questions: the preferred size is how much room the list would like on
+    /// screen, and it is routinely capped -- by `setMaxElementHeight(int)`, or by a subclass
+    /// that limits its preferred height so a long list does not swallow the form. A capped
+    /// preferred size used to cap the scroll size with it, the list was then laid out at
+    /// exactly its "scroll" height, `isScrollableY()` answered false, and neither the wheel
+    /// nor a drag could reach the rows below the cap. Nothing reported it.
+    ///
+    /// So the scrolling axis is measured from the rows themselves, with the same arithmetic
+    /// the look and feel uses for an uncapped list. The preferred size still wins when it is
+    /// the larger of the two, which keeps the minimum element count, the hint label and the
+    /// spinner overlay minimums exactly as they were. A combo box face is not a scrolling
+    /// list at all and keeps the inherited answer.
+    @Override
+    protected Dimension calcScrollSize() {
+        Dimension pref = calcPreferredSize();
+        int count = model.getSize();
+        int o = getOrientation();
+        if (count == 0 || (o != VERTICAL && o != HORIZONTAL)) {
+            return pref;
+        }
+        Dimension unselected = getElementSize(false, true);
+        Dimension selected = getElementSize(true, true);
+        Style style = getStyle();
+        if (o == VERTICAL) {
+            int content = selected.getHeight() + (unselected.getHeight() + itemGap) * (count - 1)
+                    + style.getVerticalPadding();
+            return new Dimension(pref.getWidth(), Math.max(pref.getHeight(), content));
+        }
+        int content = selected.getWidth() + (unselected.getWidth() + itemGap) * (count - 1)
+                + style.getHorizontalPadding();
+        return new Dimension(Math.max(pref.getWidth(), content), pref.getHeight());
+    }
+
     /// Allows adding an element to a list if the underlying model supports this, notice that
     /// it is an optional operation and if the model does not support it (default list model does)
     /// then this operation may failed.
