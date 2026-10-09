@@ -133,4 +133,32 @@ public class ControlSizeTest {
         assertTrue("header font is " + header.getFont().getStyle(),
                 header.getFont().getStyle().indexOf("Bold") >= 0);
     }
+
+    /// Ensemble's coloured buttons: `setStyle("-fx-base: ...")` on a
+    /// button that has no other style. Only the standard theme's button
+    /// is coloured by that name, so the button takes that look.
+    @Test
+    public void anInlineBaseColourMakesAButtonOfThatColour() {
+        Button plain = new Button("Plain");
+        Button red = new Button("Red");
+        red.setStyle("-fx-base: #ff0000;");
+        new javafx.scene.Scene(new HBox(plain, red), 300, 60).cn1Layout(300, 60);
+        assertTrue("a plain button is the native theme's", plain.getBackground() == null
+                || plain.getBackground().getFills().isEmpty());
+        javafx.scene.layout.Background drawn = red.getBackground();
+        assertTrue("the red button draws itself", drawn != null && drawn.getFills().size() == 4);
+        Paint body = drawn.getFills().get(3).getFill();
+        assertTrue("the body is a gradient", body instanceof javafx.scene.paint.LinearGradient);
+        javafx.scene.paint.Color top = ((javafx.scene.paint.LinearGradient) body).getStops().get(0).getColor();
+        assertTrue("of the base colour: " + top, top.getRed() > 0.9 && top.getBlue() < 0.3);
+        // Light text on a dark colour, as the theme's ladder picks it.
+        assertEquals(javafx.scene.paint.Color.WHITE, red.getTextFill());
+        // Two thirds of an em at either side.
+        assertEquals(javafx.scene.text.Font.getDefault().getSize() * 2 / 3, red.getPadding().getLeft(), 0.1);
+
+        red.setStyle("");
+        new javafx.scene.Scene(new HBox(red), 300, 60).cn1Layout(300, 60);
+        assertTrue("and the native look again without it", red.getBackground() == null
+                || red.getBackground().getFills().isEmpty());
+    }
 }

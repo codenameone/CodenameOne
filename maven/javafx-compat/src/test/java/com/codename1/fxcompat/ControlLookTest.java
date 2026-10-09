@@ -154,10 +154,10 @@ public class ControlLookTest {
     // ------------------------------------------------------------ progress
 
     @Test
-    public void aProgressBarIsAHundredByTwentyUnlessAskedOtherwise() {
+    public void aProgressBarIsAHundredByEighteenUnlessAskedOtherwise() {
         ProgressBar bar = new ProgressBar();
         assertEquals(100, bar.prefWidth(-1), 0.01);
-        assertEquals(20, bar.prefHeight(-1), 0.01);
+        assertEquals(18, bar.prefHeight(-1), 0.01);
         ProgressBar wide = new ProgressBar(0.5);
         wide.setPrefWidth(150);
         VBox box = new VBox(bar, wide);
@@ -165,25 +165,44 @@ public class ControlLookTest {
         box.layout();
         assertEquals(100, bar.getWidth(), 0.01);
         assertEquals(150, wide.getWidth(), 0.01);
-        assertEquals(20, wide.getHeight(), 0.01);
+        assertEquals(18, wide.getHeight(), 0.01);
     }
 
+    private static javafx.scene.layout.Region part(ProgressBar bar, String name) {
+        Node found = bar.lookup("." + name);
+        assertTrue("no ." + name, found instanceof javafx.scene.layout.Region);
+        return (javafx.scene.layout.Region) found;
+    }
+
+    /// The bar is two regions, as in JavaFX, so that a style sheet's
+    /// `.track` and `.bar` rules have something to style.
     @Test
     public void aProgressBarFillsItsTrackInProportion() {
         ProgressBar bar = new ProgressBar(0.25);
-        bar.resize(100, 20);
-        List<Op> ops = paint(bar);
-        assertEquals("fill", ops.get(0).kind);
-        assertEquals("the track spans the bar", 100, ops.get(0).width(), 1.01);
-        Op quarter = accentFill(ops);
-        assertNotNull(quarter);
-        assertEquals(24, quarter.width(), 0.5);
-        assertEquals(2, quarter.bounds[0], 0.5);
+        bar.resize(100, 18);
+        bar.layout();
+        assertEquals("the track spans the bar", 100, part(bar, "track").getWidth(), 0.01);
+        assertEquals(25, part(bar, "bar").getWidth(), 0.01);
+        assertEquals(0, part(bar, "bar").getLayoutX(), 0.01);
+        assertEquals(18, part(bar, "bar").getHeight(), 0.01);
 
         bar.setProgress(1);
-        assertEquals(96, accentFill(paint(bar)).width(), 0.5);
+        assertEquals(100, part(bar, "bar").getWidth(), 0.01);
         bar.setProgress(0);
-        assertNull("nothing is done yet", accentFill(paint(bar)));
+        assertFalse("nothing is done yet", part(bar, "bar").isVisible());
+    }
+
+    @Test
+    public void aStyleSheetColoursTheTwoRegionsOfABar() {
+        ProgressBar bar = new ProgressBar(0.5);
+        bar.getStyleClass().add("time");
+        StackPane root = new StackPane(bar);
+        Scene scene = new Scene(root, 300, 100);
+        root.setStyle("-fx-accent: #ff0000;");
+        scene.cn1Layout(300, 100);
+        javafx.scene.layout.Background fill = part(bar, "bar").getBackground();
+        assertNotNull(fill);
+        assertEquals(Color.web("#ff0000"), fill.getFills().get(0).getFill());
     }
 
     @Test
@@ -193,15 +212,16 @@ public class ControlLookTest {
         Scene scene = new Scene(new StackPane(bar), 300, 100);
         assertNotNull(scene);
         assertTrue("an indeterminate bar in a scene takes frames", FrameClock.isActive());
-        bar.resize(100, 20);
-        Op first = accentFill(paint(bar));
-        assertNotNull(first);
-        assertTrue("a segment, not the whole track", first.width() > 10 && first.width() < 60);
+        bar.resize(100, 18);
+        bar.layout();
+        double width = part(bar, "bar").getWidth();
+        double at = part(bar, "bar").getLayoutX();
+        assertTrue("a segment, not the whole track", width > 10 && width < 60);
         FrameClock.advance(300);
-        Op later = accentFill(paint(bar));
-        assertEquals(first.width(), later.width(), 0.01);
-        assertTrue("the segment moved", later.bounds[0] > first.bounds[0] + 5);
-        assertTrue(later.bounds[2] <= 98.5);
+        bar.layout();
+        assertEquals(width, part(bar, "bar").getWidth(), 0.01);
+        assertTrue("the segment moved", part(bar, "bar").getLayoutX() > at + 5);
+        assertTrue(part(bar, "bar").getLayoutX() + width <= 100.01);
 
         bar.setProgress(0.5);
         assertFalse("a determinate bar takes no frames", FrameClock.isActive());
@@ -218,13 +238,27 @@ public class ControlLookTest {
         assertEquals(Math.max(32, text), quarter.prefWidth(-1), 1.01);
         assertEquals(32 + 2 + line, quarter.prefHeight(-1), 1.01);
         quarter.resize(50, 50);
-        List<Op> ops = paint(quarter);
-        assertEquals("[25%]", texts(ops).toString());
-        assertNotNull("the part that is done", accentFill(ops));
+        quarter.layout();
+        Node shown = quarter.lookup(".percentage");
+        assertTrue(shown instanceof javafx.scene.text.Text);
+        assertEquals("25%", ((javafx.scene.text.Text) shown).getText());
+        assertNotNull("the part that is done", accentFill(paint(quarter)));
 
+        quarter.setProgress(1);
+        assertEquals("Done", ((javafx.scene.text.Text) shown).getText());
+    }
+
+    /// `-fx-progress-color` is the standard theme's name for the colour
+    /// of what is done, and a rule that defines it recolours the disc.
+    @Test
+    public void aRuleDefiningTheProgressColourRecoloursTheIndicator() {
         ProgressIndicator done = new ProgressIndicator(1);
-        done.resize(50, 50);
-        assertEquals("[Done]", texts(paint(done)).toString());
+        StackPane root = new StackPane(done);
+        Scene scene = new Scene(root, 300, 100);
+        done.setStyle("-fx-progress-color: red;");
+        scene.cn1Layout(300, 100);
+        List<Op> ops = paint(done);
+        assertEquals(Color.RED, ops.get(0).paint);
     }
 
     @Test

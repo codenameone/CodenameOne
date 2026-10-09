@@ -22,9 +22,7 @@
  */
 package javafx.scene.control;
 
-import com.codename1.fxcompat.runtime.Dirty;
 import com.codename1.ui.Component;
-import com.codename1.ui.plaf.Style;
 
 import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
@@ -32,8 +30,6 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.event.ActionEvent;
 import javafx.scene.Node;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.Border;
 
 /// A push button, shown as a Codename One `Button`.
 ///
@@ -41,7 +37,10 @@ import javafx.scene.layout.Border;
 /// application or by a style sheet, is drawn by those alone: the native
 /// button under them gives up the background and the border of the
 /// theme and keeps its text. Without either it looks as the theme makes
-/// a button look.
+/// a button look -- unless a rule or an inline style redefines one of the
+/// standard theme's colours, `-fx-base` say, for the button or anything
+/// above it: the button is then drawn as the standard theme draws one,
+/// in those colours.
 ///
 /// The default and cancel flags are recorded; Enter and Escape are not
 /// routed to such a button by this layer.
@@ -49,19 +48,8 @@ public class Button extends ButtonBase {
 
     private final BooleanProperty defaultButton = new SimpleBooleanProperty(this, "defaultButton", false);
     private final BooleanProperty cancelButton = new SimpleBooleanProperty(this, "cancelButton", false);
-    private boolean ownChrome;
-    private boolean ownPadding;
 
     {
-        InvalidationListener chrome = new InvalidationListener() {
-            @Override
-            public void invalidated(Observable observable) {
-                cn1Invalidated(Dirty.NATIVE);
-            }
-        };
-        backgroundProperty().addListener(chrome);
-        borderProperty().addListener(chrome);
-        paddingProperty().addListener(chrome);
         // ":default" and ":cancel" are how a style sheet marks the two.
         defaultButton.addListener(new InvalidationListener() {
             @Override
@@ -79,44 +67,16 @@ public class Button extends ButtonBase {
         setAlignment(javafx.geometry.Pos.CENTER);
     }
 
-    private boolean drawsItself() {
-        Background b = getBackground();
-        if (b != null && !b.getFills().isEmpty()) {
-            return true;
-        }
-        Border border = getBorder();
-        return border != null && !border.getStrokes().isEmpty();
+    @Override
+    boolean cn1OwnsChrome() {
+        return true;
     }
 
     @Override
-    protected void cn1SyncNative() {
-        Component c = cn1NativeIfCreated();
-        boolean own = drawsItself();
-        // A button that draws itself and has a padding of its own is
-        // that padding around its text, as in JavaFX; the padding the
-        // theme gives its button would come on top of it.
-        javafx.geometry.Insets pad = getPadding();
-        boolean bare = own && getGraphic() == null && pad != null
-                && pad.getTop() + pad.getRight() + pad.getBottom() + pad.getLeft() > 0;
-        if (c != null && ((ownChrome && !own) || (ownPadding && !bare))) {
-            // Setting the UIID again brings the styles of the theme back.
-            c.setUIID(c.getUIID());
-        }
-        ownChrome = own;
-        ownPadding = bare;
-        super.cn1SyncNative();
-        if (c != null && own) {
-            Style style = c.getAllStyles();
-            style.setBgTransparency(0);
-            style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
-            if (bare) {
-                style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                style.setPadding(0, 0, 0, 0);
-            }
-        }
+    public String cn1ThemedStyle() {
+        return cn1StandardLook(false, isDefaultButton());
     }
 
-    /// Creates a button with no text.
     public Button() {
         getStyleClass().add("button");
     }

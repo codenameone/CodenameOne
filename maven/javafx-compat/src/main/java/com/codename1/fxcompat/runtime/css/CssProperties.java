@@ -129,6 +129,7 @@ public final class CssProperties {
         "-fx-selection-bar-non-focused", "-fx-selection-bar-text", "-fx-cell-hover-color", "-fx-mark-color",
         "-fx-mark-highlight-color", "-fx-cell-focus-inner-border", "-fx-focused-text-base-color",
         "-fx-focused-mark-color", "-fx-table-cell-border-color", "-fx-table-header-border-color",
+        "-fx-progress-color",
     };
 
     /// Whether a name that is not a property may define a looked-up

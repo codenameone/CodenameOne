@@ -421,6 +421,18 @@ public final class CssEngine extends StyleEngine {
 
         // 2. The colours this node defines, which its own values may use.
         boolean changed = updateLookups(state, above);
+        if (state.lookupsAbove) {
+            // Colours of the standard theme are redefined here or above:
+            // a node the native theme draws takes the standard theme's
+            // look, which is what those colours colour.
+            String themed = node.cn1ThemedStyle();
+            if (themed != null) {
+                CssSheet.Decl[] look = defaultDecls(themed);
+                for (int i = 0; i < look.length; i++) {
+                    offer(look[i], -1);
+                }
+            }
+        }
 
         // 3. The font, which an em length below is relative to.
         changed |= updateFont(state, above);
@@ -792,6 +804,7 @@ public final class CssEngine extends StyleEngine {
         "-fx-body-color", "-fx-color",
         "-fx-mark-color", "ladder(-fx-color, white 30%, derive(-fx-color, -63%) 31%)",
         "-fx-mark-highlight-color", "ladder(-fx-color, derive(-fx-color, 80%) 60%, white 70%)",
+        "-fx-progress-color", "-fx-accent",
         "-fx-selection-bar", "-fx-accent",
         "-fx-selection-bar-non-focused", "lightgrey",
         "-fx-selection-bar-text", "ladder(-fx-selection-bar, -fx-light-text-color 45%, -fx-dark-text-color 46%,"

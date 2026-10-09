@@ -22,31 +22,51 @@
  */
 package javafx.scene.control;
 
-import com.codename1.fxcompat.runtime.FxPath;
-import com.codename1.fxcompat.runtime.Renderer;
+import javafx.geometry.Insets;
+import javafx.scene.layout.Region;
 
-import javafx.scene.paint.Color;
-import javafx.scene.shape.StrokeLineCap;
-import javafx.scene.shape.StrokeLineJoin;
-
-/// A bar that fills with progress, drawn by the control itself.
+/// A bar that fills with progress.
 ///
-/// The bar is a rounded track with, inside it, a filled part in the
-/// accent colour whose width is the progress, from 0 to 1. A negative
-/// progress is indeterminate: a segment of the track runs from one end
-/// to the other and back while the bar is in a scene.
+/// The bar is two regions a style sheet reaches as it does in JavaFX: a
+/// `.track` the size of the control and, in it, a `.bar` whose width is
+/// the progress, from 0 to 1. Until a sheet says otherwise the track is
+/// the standard theme's inset well and the bar its accent colour. A
+/// negative progress is indeterminate: a segment of the track runs from
+/// one end to the other and back while the bar is in a scene.
 ///
-/// The preferred size is 100 by 20 logical pixels, and `setPrefWidth`
+/// The preferred size is 100 by 18 logical pixels, and `setPrefWidth`
 /// makes a longer or a shorter bar.
 public class ProgressBar extends ProgressIndicator {
 
     private static final double DEFAULT_WIDTH = 100;
-    private static final double DEFAULT_HEIGHT = 20;
-    private static final double EDGE = 2;
+    private static final double DEFAULT_HEIGHT = 18;
     private static final double SEGMENT = 0.4;
     private static final long SWEEP_MILLIS = 1200;
-    private static final Color TRACK = Color.gray(0.96);
-    private static final Color TRACK_EDGE = Color.gray(0.73);
+
+    private final Region track = new Part("track",
+            "-fx-background-color: -fx-shadow-highlight-color, -fx-text-box-border,"
+                    + " derive(-fx-control-inner-background, -4%); -fx-background-insets: 0, 0 0 1 0, 1 1 2 1;"
+                    + " -fx-background-radius: 4, 3, 2;");
+    private final Region bar = new Part("bar",
+            "-fx-background-color: -fx-accent; -fx-background-insets: 3 3 4 3; -fx-background-radius: 2;");
+
+    /// One of the two regions of a bar, with the standard theme's look
+    /// below whatever a style sheet gives it.
+    private static final class Part extends Region {
+        private final String look;
+
+        Part(String styleClass, String look) {
+            this.look = look;
+            getStyleClass().add(styleClass);
+            setManaged(false);
+            setMouseTransparent(true);
+        }
+
+        @Override
+        public String cn1DefaultStyle() {
+            return look;
+        }
+    }
 
     /// Creates an indeterminate progress bar.
     public ProgressBar() {
@@ -55,8 +75,11 @@ public class ProgressBar extends ProgressIndicator {
 
     /// Creates a progress bar at a progress.
     public ProgressBar(double progress) {
-        super(progress);
+        super(progress, false);
         getStyleClass().setAll("progress-bar");
+        cn1Children().add(track);
+        cn1Children().add(bar);
+        built = true;
     }
 
     /// Returns the part of the track that is filled, as
@@ -72,26 +95,28 @@ public class ProgressBar extends ProgressIndicator {
     }
 
     @Override
-    void paintProgress(Renderer renderer, double x, double y, double w, double h) {
-        double radius = Math.min(3, Math.min(w, h) / 2);
-        FxPath track = new FxPath();
-        track.addRoundRect(x + 0.5, y + 0.5, w - 1, h - 1, radius, radius);
-        renderer.fill(track, TRACK, x, y, w, h);
-        renderer.stroke(track, TRACK_EDGE, 1, StrokeLineCap.BUTT, StrokeLineJoin.MITER, 10, null, 0);
-        double innerW = w - 2 * EDGE;
-        double innerH = h - 2 * EDGE;
-        if (!(innerW > 0) || !(innerH > 0)) {
-            return;
-        }
+    void paintProgress(com.codename1.fxcompat.runtime.Renderer renderer, double x, double y, double w, double h) {
+        // The two regions are the bar.
+    }
+
+    @Override
+    void progressShown() {
+        Insets in = getInsets();
+        double x = in.getLeft();
+        double y = in.getTop();
+        double w = Math.max(0, getWidth() - x - in.getRight());
+        double h = Math.max(0, getHeight() - y - in.getBottom());
+        track.resizeRelocate(x, y, w, h);
         double[] part = filledPart(getProgress(), frameMillis());
-        double fillW = innerW * part[1];
-        if (fillW > 0) {
-            double r = Math.min(2, Math.min(fillW, innerH) / 2);
-            double fx = x + EDGE + innerW * part[0];
-            FxPath fill = new FxPath();
-            fill.addRoundRect(fx, y + EDGE, fillW, innerH, r, r);
-            renderer.fill(fill, ACCENT, fx, y + EDGE, fillW, innerH);
-        }
+        double filled = w * part[1];
+        bar.setVisible(filled > 0);
+        bar.resizeRelocate(x + w * part[0], y, filled, h);
+    }
+
+    @Override
+    protected void layoutChildren() {
+        super.layoutChildren();
+        progressShown();
     }
 
     @Override

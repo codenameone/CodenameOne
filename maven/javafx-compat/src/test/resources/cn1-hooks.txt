@@ -11,6 +11,7 @@ javafx.scene.Node#cn1ComputeBoundsInLocal
 javafx.scene.Node#cn1ComputeLayoutBounds
 javafx.scene.Node#cn1CreatePeer
 javafx.scene.Node#cn1DefaultStyle
+javafx.scene.Node#cn1ThemedStyle
 javafx.scene.Node#cn1EffectCache
 javafx.scene.Node#cn1SetEffectCache
 javafx.scene.Node#cn1Events

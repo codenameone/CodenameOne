@@ -693,6 +693,21 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         return null;
     }
 
+    /// Returns the look the standard JavaFX theme gives this node, as the
+    /// text of a style, for a node that otherwise looks as the native
+    /// theme makes it; `null`, the default, for a node with none.
+    ///
+    /// It is applied, below every rule as [#cn1DefaultStyle()] is, only
+    /// where a rule or an inline style redefines one of the standard
+    /// theme's colours for the node or something above it: a button is
+    /// the platform's button until an application asks for a red one with
+    /// `-fx-base`, which only the standard theme's look can be. The text
+    /// may differ with the state of the node, and must not define colours
+    /// itself.
+    public String cn1ThemedStyle() {
+        return null;
+    }
+
     /// Stores what the style engine keeps for this node.
     public final void cn1SetStyleState(Object state) {
         styleState = state;

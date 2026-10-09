@@ -113,6 +113,16 @@ public class ToggleButton extends ButtonBase implements Toggle {
     }
 
     @Override
+    boolean cn1OwnsChrome() {
+        return true;
+    }
+
+    @Override
+    public String cn1ThemedStyle() {
+        return cn1StandardLook(isSelected(), false);
+    }
+
+    @Override
     protected Component cn1CreateNative() {
         com.codename1.ui.CheckBox b = new com.codename1.ui.CheckBox();
         b.setToggle(true);

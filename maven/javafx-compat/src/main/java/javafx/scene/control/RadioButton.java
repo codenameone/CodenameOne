@@ -57,6 +57,16 @@ public class RadioButton extends ToggleButton {
     }
 
     @Override
+    boolean cn1OwnsChrome() {
+        return false;
+    }
+
+    @Override
+    public String cn1ThemedStyle() {
+        return null;
+    }
+
+    @Override
     protected Component cn1CreateNative() {
         com.codename1.ui.RadioButton b = new com.codename1.ui.RadioButton();
         // The toggle group decides; the native button never turns itself

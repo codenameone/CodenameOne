@@ -22,6 +22,7 @@
  */
 package javafx.scene.control;
 
+import com.codename1.fxcompat.runtime.CssEngine;
 import com.codename1.fxcompat.runtime.Dirty;
 import com.codename1.fxcompat.runtime.Fonts;
 import com.codename1.fxcompat.runtime.FrameClock;
@@ -41,6 +42,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 
 /// A round indicator of progress, drawn by the control itself: it has no
 /// native component, so it looks and measures the same on every theme.
@@ -59,7 +61,8 @@ public class ProgressIndicator extends Control {
     /// The progress of an indicator that does not know how far it is.
     public static final double INDETERMINATE_PROGRESS = -1;
 
-    /// The colour of the part that is done, the accent of JavaFX.
+    /// The colour of the part that is done where no rule defines
+    /// `-fx-progress-color` or `-fx-accent`: the accent of JavaFX.
     static final Color ACCENT = Color.rgb(0, 150, 201);
 
     private static final int PROGRESS = Dirty.USER;
@@ -71,17 +74,25 @@ public class ProgressIndicator extends Control {
     private static final PseudoClass INDETERMINATE = PseudoClass.getPseudoClass("indeterminate");
     private static final PseudoClass DETERMINATE = PseudoClass.getPseudoClass("determinate");
     private static final Color TRACK = Color.gray(0.73);
-    private static final Color TEXT = Color.gray(0.2);
+
+    /// The text below the disc, which a style sheet reaches as
+    /// `.percentage`; `null` in a bar, which has none.
+    private final Text percentage;
 
     private final DoubleProperty progress = new FxDouble(this, "progress", INDETERMINATE_PROGRESS,
             PROGRESS | Dirty.PAINT);
     private final ReadOnlyBooleanWrapper indeterminate = new ReadOnlyBooleanWrapper(this, "indeterminate", true);
     private long frameMillis;
+
+    /// Whether the constructors are through: the progress is set by the
+    /// first of them, before a bar has the regions it would place.
+    boolean built;
     private final FrameClock.Pulse frames = new FrameClock.Pulse() {
         @Override
         public void pulse(long nowNanos) {
             frameMillis = nowNanos / 1000000L;
-            // A peer that is on no form is not drawn; nothing to do then.
+            // A peer that is on no form is not drawn.
+            progressShown();
             if (cn1HasPeer() && cn1Peer().getComponentForm() != null) {
                 cn1Repaint();
             }
@@ -95,6 +106,18 @@ public class ProgressIndicator extends Control {
 
     /// Creates an indicator at a progress.
     public ProgressIndicator(double progress) {
+        this(progress, true);
+        built = true;
+    }
+
+    /// Creates an indicator with or without the line of text below it.
+    ProgressIndicator(double progress, boolean text) {
+        if (text) {
+            percentage = new Percentage();
+            cn1Children().add(percentage);
+        } else {
+            percentage = null;
+        }
         getStyleClass().add("progress-indicator");
         setFocusTraversable(false);
         pseudoClassStateChanged(INDETERMINATE, true);
@@ -130,6 +153,9 @@ public class ProgressIndicator extends Control {
             pseudoClassStateChanged(INDETERMINATE, unknown);
             pseudoClassStateChanged(DETERMINATE, !unknown);
             animate();
+            if (built) {
+                progressShown();
+            }
         }
         super.cn1Invalidated(what);
     }
@@ -140,7 +166,66 @@ public class ProgressIndicator extends Control {
         return frameMillis;
     }
 
-    /// Returns the text drawn below the disc of a determinate indicator.
+    /// The text of an indicator: the text of the scene's background until
+    /// a style sheet fills it otherwise.
+    private static final class Percentage extends Text {
+        Percentage() {
+            getStyleClass().add("percentage");
+            setManaged(false);
+            setMouseTransparent(true);
+            setTextOrigin(javafx.geometry.VPos.TOP);
+        }
+
+        @Override
+        public String cn1DefaultStyle() {
+            return "-fx-fill: -fx-text-background-color;";
+        }
+    }
+
+    /// Returns the colour of the part that is done: `-fx-progress-color`
+    /// where a rule defines it, which the standard theme does as the
+    /// accent colour.
+    final Color progressColor() {
+        Color c = CssEngine.themeColor(this, "-fx-progress-color");
+        return c == null ? ACCENT : c;
+    }
+
+    /// Brings what the indicator is made of up to date with its progress
+    /// and its size: here the text, in a bar its two regions.
+    void progressShown() {
+        if (percentage == null) {
+            return;
+        }
+        boolean shown = !isIndeterminate();
+        percentage.setVisible(shown);
+        if (!shown) {
+            return;
+        }
+        String text = progressText();
+        if (!text.equals(percentage.getText())) {
+            percentage.setText(text);
+        }
+        Insets in = getInsets();
+        double w = getWidth() - in.getLeft() - in.getRight();
+        double h = getHeight() - in.getTop() - in.getBottom();
+        Font font = percentage.getFont();
+        double below = TEXT_GAP + Fonts.lineHeight(font);
+        double d = Math.min(w, h - below);
+        if (!(d > 2)) {
+            percentage.setVisible(false);
+            return;
+        }
+        double top = in.getTop() + Math.max(0, (h - d - below) / 2);
+        percentage.relocate(in.getLeft() + (w - Fonts.width(font, text)) / 2, top + d + TEXT_GAP);
+    }
+
+    @Override
+    protected void layoutChildren() {
+        super.layoutChildren();
+        progressShown();
+    }
+
+    /// Returns the text shown below the disc of a determinate indicator.
     private String progressText() {
         double p = getProgress();
         if (p >= 1) {
@@ -167,7 +252,8 @@ public class ProgressIndicator extends Control {
             paintRing(renderer, x, y, w, h);
             return;
         }
-        Font font = Font.getDefault();
+        Font font = percentage == null ? Font.getDefault() : percentage.getFont();
+        Color done = progressColor();
         double below = TEXT_GAP + Fonts.lineHeight(font);
         double d = Math.min(w, h - below);
         if (!(d > 2)) {
@@ -186,7 +272,7 @@ public class ProgressIndicator extends Control {
         FxPath disc = new FxPath();
         disc.addEllipse(cx, cy, r, r);
         if (p >= 1) {
-            renderer.fill(disc, ACCENT, cx - r, cy - r, 2 * r, 2 * r);
+            renderer.fill(disc, done, cx - r, cy - r, 2 * r, 2 * r);
             FxPath tick = new FxPath();
             tick.moveTo(cx - r * 0.45, cy + r * 0.05);
             tick.lineTo(cx - r * 0.1, cy + r * 0.4);
@@ -200,13 +286,9 @@ public class ProgressIndicator extends Control {
                 pie.moveTo(cx, cy);
                 pie.addArc(cx, cy, r, r, 90, -360 * p, true);
                 pie.closePath();
-                renderer.fill(pie, ACCENT, cx - r, cy - r, 2 * r, 2 * r);
+                renderer.fill(pie, done, cx - r, cy - r, 2 * r, 2 * r);
             }
             renderer.stroke(disc, TRACK, 1, StrokeLineCap.BUTT, StrokeLineJoin.MITER, 10, null, 0);
-        }
-        if (below > 0) {
-            String text = progressText();
-            renderer.drawText(text, cx - Fonts.width(font, text) / 2, top + d + TEXT_GAP, font, TEXT);
         }
     }
 
@@ -219,6 +301,7 @@ public class ProgressIndicator extends Control {
         double ring = d / 2 - dot;
         double cx = x + w / 2;
         double cy = y + h / 2;
+        Color done = progressColor();
         int lead = (int) ((frameMillis / STEP_MILLIS) % DOTS);
         for (int i = 0; i < DOTS; i++) {
             // The dot the lead left longest ago is the faintest.
@@ -229,7 +312,8 @@ public class ProgressIndicator extends Control {
             double py = cy + ring * Math.sin(angle);
             FxPath p = new FxPath();
             p.addEllipse(px, py, dot, dot);
-            renderer.fill(p, Color.rgb(0, 150, 201, 0.15 + 0.85 * strength), px - dot, py - dot, 2 * dot, 2 * dot);
+            renderer.fill(p, done.deriveColor(0, 1, 1, 0.15 + 0.85 * strength), px - dot, py - dot, 2 * dot,
+                    2 * dot);
         }
     }
 
