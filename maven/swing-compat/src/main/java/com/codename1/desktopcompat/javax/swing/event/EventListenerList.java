@@ -22,6 +22,10 @@
  */
 package com.codename1.desktopcompat.javax.swing.event;
 
+import com.codename1.desktopcompat.java.awt.event.ActionListener;
+import com.codename1.desktopcompat.java.awt.event.AdjustmentListener;
+import com.codename1.desktopcompat.java.awt.event.ItemListener;
+
 import java.lang.reflect.Array;
 import java.util.EventListener;
 
@@ -35,6 +39,36 @@ import java.util.EventListener;
 public class EventListenerList {
 
     private static final Object[] NULL_ARRAY = new Object[0];
+
+    /// The array class of every listener type this layer itself passes to
+    /// `getListeners`, named so that it exists on a device.
+    ///
+    /// ParparVM has an array class only for a type some bytecode creates an
+    /// array of -- an `anewarray`, or a class literal like the ones below. A
+    /// method that merely *returns* `DocumentListener[]`, or casts to it, does
+    /// not count, so `Array.newInstance(DocumentListener.class, n)` threw
+    /// "the component class has no registered array class" and a native build
+    /// of any application with a text field opened on an error dialog. The
+    /// simulator and Android create array classes on demand and never showed
+    /// it.
+    ///
+    /// A type an application defines and passes here itself is covered only if
+    /// the application creates such an array somewhere, which the usual
+    /// `new FooListener[0]` or `toArray` idiom does.
+    private static final Class<?>[] LISTENER_ARRAYS = {
+        ActionListener[].class, AdjustmentListener[].class, ItemListener[].class,
+        CaretListener[].class, CellEditorListener[].class, ChangeListener[].class,
+        DocumentListener[].class, HyperlinkListener[].class, InternalFrameListener[].class,
+        ListDataListener[].class, ListSelectionListener[].class, MenuListener[].class,
+        PopupMenuListener[].class, RowSorterListener[].class, TableColumnModelListener[].class,
+        TableModelListener[].class, TreeExpansionListener[].class, TreeModelListener[].class,
+        TreeSelectionListener[].class, TreeWillExpandListener[].class, UndoableEditListener[].class
+    };
+
+    /// For the test that holds the table above against the layer's call sites.
+    static Class<?>[] listenerArrayTypes() {
+        return LISTENER_ARRAYS;
+    }
 
     protected Object[] listenerList = NULL_ARRAY;
 
