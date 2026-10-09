@@ -55,6 +55,9 @@ public class NodePeer extends Component implements FxPeer {
 
     @Override
     public void paint(Graphics g) {
+        if (PeerPaint.unseen(node)) {
+            return;
+        }
         int old = g.getAlpha();
         double opacity = node.getOpacity();
         if (opacity < 1) {

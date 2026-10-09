@@ -29,6 +29,7 @@ import com.codename1.fxcompat.runtime.FxBoolean;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.collections.ObservableList;
+import javafx.geometry.Bounds;
 
 /// A parent that adds nothing of its own: its bounds are the union of its
 /// children's, and it does not position them. Transforms and opacity set
@@ -36,6 +37,7 @@ import javafx.collections.ObservableList;
 public class Group extends Parent {
 
     private final BooleanProperty autoSizeChildren = new FxBoolean(this, "autoSizeChildren", true, Dirty.LAYOUT);
+    private boolean measuring;
 
     /// Creates an empty group.
     public Group() {
@@ -71,6 +73,24 @@ public class Group extends Parent {
     /// Whether resizable children get their preferred size at each layout.
     public final BooleanProperty autoSizeChildrenProperty() {
         return autoSizeChildren;
+    }
+
+    /// The bounds of a group that sizes its children are those of the
+    /// children at their preferred sizes, so a group asked before any
+    /// layout pass ran gives them those sizes first. An application reads
+    /// this in a constructor to learn how large what it just built is, and
+    /// divides by the answer.
+    @Override
+    protected Bounds cn1ComputeLayoutBounds() {
+        if (!measuring && isAutoSizeChildren() && isNeedsLayout()) {
+            measuring = true;
+            try {
+                layout();
+            } finally {
+                measuring = false;
+            }
+        }
+        return super.cn1ComputeLayoutBounds();
     }
 
     @Override

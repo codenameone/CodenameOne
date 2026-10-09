@@ -542,12 +542,17 @@ public final class Renderer {
         } else {
             Transform before = Transform.makeIdentity();
             g.getTransform(before);
+            // The turn is about the point the drawing starts at, which is
+            // drawn at the graphics translation plus that point.
+            int ox = g.getTranslateX();
+            int oy = g.getTranslateY();
             Transform t = before.copy();
-            t.translate((float) px, (float) py);
+            t.translate((float) (ox + px), (float) (oy + py));
             t.rotate((float) MathUtil.atan2(m[1], m[0]), 0, 0);
-            g.setTransform(t);
+            t.translate(-ox, -oy);
+            PeerPaint.setDeviceTransform(g, t);
             g.drawString(text, 0, 0);
-            g.setTransform(before);
+            PeerPaint.setDeviceTransform(g, before);
         }
         g.setAlpha(old);
     }
@@ -572,12 +577,17 @@ public final class Renderer {
         } else {
             Transform before = Transform.makeIdentity();
             g.getTransform(before);
+            // The turn is about the point the drawing starts at, which is
+            // drawn at the graphics translation plus that point.
+            int ox = g.getTranslateX();
+            int oy = g.getTranslateY();
             Transform t = before.copy();
-            t.translate((float) px, (float) py);
+            t.translate((float) (ox + px), (float) (oy + py));
             t.rotate((float) MathUtil.atan2(m[1], m[0]), 0, 0);
-            g.setTransform(t);
+            t.translate(-ox, -oy);
+            PeerPaint.setDeviceTransform(g, t);
             g.drawImage(image, 0, 0, pw, ph);
-            g.setTransform(before);
+            PeerPaint.setDeviceTransform(g, before);
         }
         g.setAlpha(old);
     }

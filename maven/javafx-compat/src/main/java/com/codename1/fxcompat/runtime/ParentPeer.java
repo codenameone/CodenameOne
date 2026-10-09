@@ -79,6 +79,9 @@ public class ParentPeer extends Container implements FxPeer {
 
     @Override
     public void paint(Graphics g) {
+        if (PeerPaint.unseen(node)) {
+            return;
+        }
         int old = g.getAlpha();
         double opacity = node.getOpacity();
         if (opacity < 1) {
@@ -102,7 +105,7 @@ public class ParentPeer extends Container implements FxPeer {
         Transform saved = PeerPaint.push(g, node, m, getX(), getY());
         super.paint(g);
         if (saved != null) {
-            g.setTransform(saved);
+            PeerPaint.setDeviceTransform(g, saved);
         }
         if (clipped) {
             g.popClip();
@@ -123,6 +126,9 @@ public class ParentPeer extends Container implements FxPeer {
                 new Renderer(g, getX(), getY()).fillRect(0, 0, Units.toLogical(getWidth()),
                         Units.toLogical(getHeight()), fill);
             }
+        }
+        if (PeerPaint.unseen(node)) {
+            return;
         }
         double opacity = node.getOpacity();
         if (opacity < 1) {

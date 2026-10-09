@@ -55,6 +55,28 @@ public final class PeerPaint {
         s.setMargin(0, 0, 0, 0);
     }
 
+    /// Whether nothing of a node can be seen: it is fully transparent, or
+    /// its matrix leaves it no area. The peers then paint nothing at all.
+    /// A native component under a transparent node is the reason this is
+    /// asked rather than left to the alpha: a theme may draw its text with
+    /// an alpha of its own, and a label faded out to nothing stayed.
+    static boolean unseen(Node node) {
+        return !(node.getOpacity() > 0) || collapsed(node.cn1PaintMatrix());
+    }
+
+    /// Whether a node's matrix maps everything onto a line or a point, as a
+    /// scale of zero does -- the first frame of a node that grows into view.
+    /// Nothing of such a node is visible, and a matrix that cannot be
+    /// inverted leaves a port without a clip to answer, so the peers paint
+    /// nothing rather than install it.
+    static boolean collapsed(double[] m) {
+        if (m == null) {
+            return false;
+        }
+        double det = m[0] * m[3] - m[1] * m[2];
+        return !(det > 1e-12 || det < -1e-12);
+    }
+
     /// Returns the graphics alpha for a node drawn with an opacity.
     static int alpha(int base, double opacity) {
         double o = opacity < 0 ? 0 : (opacity > 1 ? 1 : opacity);
@@ -79,20 +101,48 @@ public final class PeerPaint {
         if (m == null || !g.isTransformSupported()) {
             return null;
         }
-        double s = Units.scale();
         Bounds lb = node.getLayoutBounds();
-        double lx = lb.getMinX();
-        double ly = lb.getMinY();
-        double px = -x / s + lx;
-        double py = -y / s + ly;
-        double tx = (m[0] * px + m[2] * py + m[4] - lx) * s + x;
-        double ty = (m[1] * px + m[3] * py + m[5] - ly) * s + y;
+        double[] d = deviceMatrix(m, lb.getMinX(), lb.getMinY(), Units.scale(), g.getTranslateX() + x,
+                g.getTranslateY() + y);
         Transform saved = Transform.makeIdentity();
         g.getTransform(saved);
         Transform t = saved.copy();
-        t.concatenate(Transform.makeAffine(m[0], m[1], m[2], m[3], tx, ty));
-        g.setTransform(t);
+        t.concatenate(Transform.makeAffine(d[0], d[1], d[2], d[3], d[4], d[5]));
+        setDeviceTransform(g, t);
         return saved;
+    }
+
+    /// A node's matrix, which is in logical units about the origin of its
+    /// layout bounds `(lx, ly)`, as the matrix in pixels for a peer whose
+    /// origin is drawn at `(ox, oy)`: a point of the peer stays where the
+    /// node's matrix puts it, whatever the peer's position.
+    public static double[] deviceMatrix(double[] m, double lx, double ly, double scale, double ox, double oy) {
+        double px = -ox / scale + lx;
+        double py = -oy / scale + ly;
+        return new double[] {m[0], m[1], m[2], m[3],
+            (m[0] * px + m[2] * py + m[4] - lx) * scale + ox,
+            (m[1] * px + m[3] * py + m[5] - ly) * scale + oy};
+    }
+
+    /// Sets a transform that acts on what is drawn where it is drawn.
+    ///
+    /// `Graphics.setTransform` called under a translation keeps the matrix
+    /// as one about the translated origin, and moves it along with every
+    /// later `translate`. A matrix installed for a parent would then scale
+    /// each child about the child's own corner, and a matrix read back and
+    /// restored further down the tree would be re-based on that place: the
+    /// siblings painted after a scaled node landed somewhere else. Set at
+    /// no translation, the matrix is the port's own and stays put.
+    static void setDeviceTransform(Graphics g, Transform t) {
+        int tx = g.getTranslateX();
+        int ty = g.getTranslateY();
+        if (tx == 0 && ty == 0) {
+            g.setTransform(t);
+            return;
+        }
+        g.translate(-tx, -ty);
+        g.setTransform(t);
+        g.translate(tx, ty);
     }
 
     private static Renderer renderer(Graphics g, Node node, int x, int y, boolean matrixInstalled) {

@@ -282,14 +282,18 @@ public abstract class Control extends Region {
         return computePrefHeight(width);
     }
 
+    /// A control grows no larger than its preferred size, and that is the
+    /// preferred size the application set when it set one: a button with
+    /// no text given `setPrefSize(40, 40)` is 40 wide, not as wide as its
+    /// missing text.
     @Override
     protected double computeMaxWidth(double height) {
-        return computePrefWidth(height);
+        return prefWidth(height);
     }
 
     @Override
     protected double computeMaxHeight(double width) {
-        return computePrefHeight(width);
+        return prefHeight(width);
     }
 
     @Override
