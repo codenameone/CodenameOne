@@ -939,6 +939,17 @@ Traps that have already cost a fix:
   with Maven and Gradle, and fails if
   any shipped class still names `java/awt`, `javax/swing`, `java/beans`,
   `org/jdesktop` or `javafx`.
+- **`maven/integration-tests/desktop-compat-realport/run.sh`** runs a staged
+  application on the real JavaSE port and plays a script of real input
+  (`java.awt.Robot`) against it. It fails on anything thrown and on a click,
+  drag or key that changes no pixel outside what was already moving. The unit
+  tests fire events at the node they are meant for, so they cannot see a
+  control that is dead, or scrolls its text, or loses a key, under a real
+  port. With no arguments it runs `<sample>.txt` beside it against what
+  `desktop-compat-test.sh` staged (`desktop-compat.yml` does, under
+  `xvfb-run`). It opens a window: run it under xvfb or in a container. The
+  port turns Space and Enter into the same key code, and drops every
+  Ctrl/Alt/Meta combination before the form sees it.
 
 ### Integration Tests
 

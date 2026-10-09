@@ -49,6 +49,31 @@ public class ContainerPeer extends com.codename1.ui.Container implements Peer {
         return false;
     }
 
+    /// The peers are held in the order they are painted, which is the
+    /// reverse of the order of the container's children: the first child
+    /// of a Swing container is the one on top. The order of traversal is
+    /// the children's, so the indices are given from the last peer to the
+    /// first. A port asks the form for the component after the text field
+    /// it is editing when Tab is pressed there, and the answer was the
+    /// field before it -- or nothing, from the first field of a window.
+    @Override
+    public int updateTabIndices(int offset) {
+        int idx = offset;
+        for (int i = getComponentCount() - 1; i >= 0; i--) {
+            com.codename1.ui.Component c = getComponentAt(i);
+            int preferred = c.getPreferredTabIndex();
+            if (preferred == 0) {
+                c.setTabIndex(idx++);
+            } else {
+                c.setTabIndex(preferred);
+            }
+            if (c instanceof com.codename1.ui.Container) {
+                idx = ((com.codename1.ui.Container) c).updateTabIndices(idx);
+            }
+        }
+        return idx;
+    }
+
     @Override
     public void paintNativeLook(Graphics g) {
     }

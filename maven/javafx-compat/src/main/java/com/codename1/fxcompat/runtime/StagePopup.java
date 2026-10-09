@@ -36,6 +36,8 @@ import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.PopupWindow;
@@ -162,6 +164,25 @@ public final class StagePopup implements StageHost {
         }
         hit.scene.cn1Wheel(hit.localX(x), hit.localY(y), Units.toLogical(deltaX), Units.toLogical(deltaY));
         return true;
+    }
+
+    /// Offers a key to the open popups. The one opened last that closes
+    /// by itself has the keyboard, as the popup window of a menu has in
+    /// JavaFX: the key goes to its scene and to nothing behind it, and
+    /// Escape closes it when nothing in it wanted the key.
+    static boolean key(EventType<KeyEvent> kind, KeyCode code, String text) {
+        for (int i = OPEN.size() - 1; i >= 0; i--) {
+            StagePopup p = OPEN.get(i);
+            if (!p.opened || p.scene == null || !p.window.isAutoHide()) {
+                continue;
+            }
+            boolean taken = p.scene.cn1Key(kind, code, text);
+            if (!taken && kind == KeyEvent.KEY_PRESSED && code == KeyCode.ESCAPE && p.opened) {
+                p.window.hide();
+            }
+            return true;
+        }
+        return false;
     }
 
     /// Returns whether an open popup is under a display position.

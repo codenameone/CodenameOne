@@ -23,10 +23,17 @@
 package com.codename1.fxcompat.runtime;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.ReleasableComponent;
 import com.codename1.ui.events.PointerEvent;
 
+import javafx.geometry.Point2D;
+import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Control;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
@@ -45,6 +52,26 @@ import javafx.scene.input.MouseEvent;
 ///
 /// An open popup under the pointer takes the event before the scene of
 /// the host does; see [StagePopup].
+///
+/// ### A native component is pressed where its node is drawn
+///
+/// Codename One finds the component under a pointer from the bounds of
+/// the components, and the bounds of a peer know nothing of a scale, a
+/// rotation or a transform of the node or of a parent of it: a button in
+/// a group scaled to fit its window is drawn in one place and its peer
+/// lies in another, often outside the form altogether. Left to Codename
+/// One such a button is never pressed, and a press where its peer lies,
+/// where nothing is drawn, presses it.
+///
+/// So the scene decides. The node it picks names the control, the scene
+/// point is taken into the control's own coordinates and from there into
+/// its peer's, and when that is not where the pointer is on the display
+/// the press, the drags and the release of the gesture go to the native
+/// component directly, at that point, and the host passes nothing on. A
+/// pointer over a native component whose node is drawn elsewhere is
+/// swallowed the same way. Where the two places agree, which is every
+/// scene with no such transform, Codename One delivers the event as it
+/// always did.
 public final class SceneInput {
 
     private SceneInput() {
@@ -134,11 +161,42 @@ public final class SceneInput {
 
     /// A pointer went down at a display position.
     public static boolean pressed(Scene scene, Component root, int x, int y) {
+        gesture = PLAIN;
+        captured = null;
+        capturedOwner = null;
         if (StagePopup.pointer(MouseEvent.MOUSE_PRESSED, x, y, button())) {
             return true;
         }
-        return scene != null && root != null
-                && scene.cn1Pointer(MouseEvent.MOUSE_PRESSED, sceneX(root, x), sceneY(root, y), button());
+        if (scene == null || root == null) {
+            return false;
+        }
+        double sx = sceneX(root, x);
+        double sy = sceneY(root, y);
+        if (scene.cn1Pointer(MouseEvent.MOUSE_PRESSED, sx, sy, button())) {
+            return true;
+        }
+        Control owner = controlAt(scene, sx, sy);
+        if (owner != null) {
+            if (!place(owner, sx, sy) || !apart(placeX, x) && !apart(placeY, y)) {
+                return false;
+            }
+            Component target = deepest(owner.cn1Native(), placeX, placeY);
+            gesture = DIRECT;
+            captured = target;
+            capturedOwner = owner;
+            if (target.isEnabled()) {
+                if (target.isFocusable()) {
+                    target.requestFocus();
+                }
+                target.pointerPressed(placeX, placeY);
+            }
+            return true;
+        }
+        if (phantom(root, x, y, sx, sy)) {
+            gesture = SWALLOWED;
+            return true;
+        }
+        return false;
     }
 
     /// A pointer moved while down.
@@ -146,17 +204,50 @@ public final class SceneInput {
         if (StagePopup.pointer(MouseEvent.MOUSE_DRAGGED, x, y, button())) {
             return true;
         }
-        return scene != null && root != null
-                && scene.cn1Pointer(MouseEvent.MOUSE_DRAGGED, sceneX(root, x), sceneY(root, y), button());
+        if (scene == null || root == null) {
+            return false;
+        }
+        double sx = sceneX(root, x);
+        double sy = sceneY(root, y);
+        boolean consumed = scene.cn1Pointer(MouseEvent.MOUSE_DRAGGED, sx, sy, button());
+        if (gesture == DIRECT) {
+            if (!consumed && captured != null && captured.isEnabled() && capturedOwner != null
+                    && capturedOwner.getScene() == scene && place(capturedOwner, sx, sy)) {
+                captured.pointerDragged(placeX, placeY);
+            }
+            return true;
+        }
+        return consumed || gesture == SWALLOWED;
     }
 
     /// A pointer came up.
     public static boolean released(Scene scene, Component root, int x, int y) {
+        int was = gesture;
+        Component target = captured;
+        Control owner = capturedOwner;
+        gesture = PLAIN;
+        captured = null;
+        capturedOwner = null;
         if (StagePopup.pointer(MouseEvent.MOUSE_RELEASED, x, y, button())) {
+            cancel(target);
             return true;
         }
-        return scene != null && root != null
-                && scene.cn1Pointer(MouseEvent.MOUSE_RELEASED, sceneX(root, x), sceneY(root, y), button());
+        if (scene == null || root == null) {
+            return false;
+        }
+        double sx = sceneX(root, x);
+        double sy = sceneY(root, y);
+        boolean consumed = scene.cn1Pointer(MouseEvent.MOUSE_RELEASED, sx, sy, button());
+        if (was == DIRECT) {
+            if (target != null && target.isEnabled() && !consumed && owner != null && owner.getScene() == scene
+                    && place(owner, sx, sy) && target.contains(placeX, placeY)) {
+                target.pointerReleased(placeX, placeY);
+            } else {
+                cancel(target);
+            }
+            return true;
+        }
+        return consumed || was == SWALLOWED;
     }
 
     /// A mouse moved with no button down.
@@ -164,8 +255,115 @@ public final class SceneInput {
         if (StagePopup.pointer(MouseEvent.MOUSE_MOVED, x, y, MouseButton.NONE)) {
             return true;
         }
-        return scene != null && root != null
-                && scene.cn1Pointer(MouseEvent.MOUSE_MOVED, sceneX(root, x), sceneY(root, y), MouseButton.NONE);
+        if (scene == null || root == null) {
+            return false;
+        }
+        double sx = sceneX(root, x);
+        double sy = sceneY(root, y);
+        if (scene.cn1Pointer(MouseEvent.MOUSE_MOVED, sx, sy, MouseButton.NONE)) {
+            return true;
+        }
+        Control owner = controlAt(scene, sx, sy);
+        if (owner != null) {
+            // Codename One would light up whatever peer lies under the pointer; the
+            // node's own hover state is what shows where the node is drawn.
+            return place(owner, sx, sy) && (apart(placeX, x) || apart(placeY, y));
+        }
+        return phantom(root, x, y, sx, sy);
+    }
+
+    // ------------------------------------------- native components
+
+    private static final int PLAIN = 0;
+    private static final int DIRECT = 1;
+    private static final int SWALLOWED = 2;
+
+    /// What became of the press of the gesture under way: left to
+    /// Codename One, delivered here to a native component, or kept from
+    /// Codename One altogether.
+    private static int gesture;
+    private static Component captured;
+    private static Control capturedOwner;
+    private static int placeX;
+    private static int placeY;
+
+    /// Two display positions further apart than the rounding of a chain
+    /// of peers accounts for.
+    private static boolean apart(int a, int b) {
+        int d = a - b;
+        return d > 2 || d < -2;
+    }
+
+    /// Returns the control a scene point is over: the nearest one, from
+    /// the node the scene picks upwards, whose native component the
+    /// point lies in.
+    private static Control controlAt(Scene scene, double sx, double sy) {
+        Parent root = scene.getRoot();
+        Node n = root == null ? null : root.cn1Pick(sx, sy);
+        while (n != null) {
+            if (n instanceof Control) {
+                Control c = (Control) n;
+                Component nat = c.cn1Native();
+                if (nat != null && place(c, sx, sy) && nat.contains(placeX, placeY)) {
+                    return c;
+                }
+            }
+            n = n.getParent();
+        }
+        return null;
+    }
+
+    /// Takes a scene point to the display position it has in the peer of
+    /// a node, which is where Codename One believes the node to be.
+    private static boolean place(Node node, double sx, double sy) {
+        Component peer = node.cn1Peer();
+        Point2D local = node.sceneToLocal(sx, sy);
+        placeX = peer.getAbsoluteX() + Units.toPixels(local.getX());
+        placeY = peer.getAbsoluteY() + Units.toPixels(local.getY());
+        return true;
+    }
+
+    /// Returns the innermost component of a native at a display
+    /// position, or the native itself where that is the peer of a node.
+    private static Component deepest(Component nat, int x, int y) {
+        if (!(nat instanceof Container)) {
+            return nat;
+        }
+        Component at = ((Container) nat).getComponentAt(x, y);
+        for (Component c = at; c != null && c != nat; c = c.getParent()) {
+            if (c instanceof FxPeer) {
+                return nat;
+            }
+        }
+        return at == null ? nat : at;
+    }
+
+    /// Returns whether Codename One would deliver a pointer at a display
+    /// position to a native component whose node is not drawn there.
+    private static boolean phantom(Component root, int x, int y, double sx, double sy) {
+        if (!(root instanceof Container)) {
+            return false;
+        }
+        Component c = ((Container) root).getComponentAt(x, y);
+        if (c == null || c instanceof FxPeer) {
+            return false;
+        }
+        while (c != null && c != root && !(c instanceof FxPeer)) {
+            c = c.getParent();
+        }
+        if (!(c instanceof FxPeer)) {
+            return false;
+        }
+        Node owner = ((FxPeer) c).node();
+        return owner != null && place(owner, sx, sy) && (apart(placeX, x) || apart(placeY, y));
+    }
+
+    /// Lets go of a native component that was pressed here and is not to
+    /// act on the release: the pointer came up somewhere else.
+    private static void cancel(Component target) {
+        if (target instanceof ReleasableComponent) {
+            ((ReleasableComponent) target).setReleased();
+        }
     }
 
     /// A touch was held in place: a context menu request.
@@ -191,16 +389,68 @@ public final class SceneInput {
             return false;
         }
         KeyCode code = code(keyCode);
+        if (StagePopup.key(KeyEvent.KEY_PRESSED, code, text(keyCode))) {
+            return true;
+        }
         boolean consumed = scene.cn1Key(KeyEvent.KEY_PRESSED, code, text(keyCode));
         if (keyCode >= 32 && keyCode != 127) {
             consumed |= scene.cn1Key(KeyEvent.KEY_TYPED, KeyCode.UNDEFINED, text(keyCode));
         }
-        return consumed;
+        // Tab is the scene's: it moved the focus in the order of the scene
+        // graph, or the application took the key. A form of a desktop that
+        // is handed Tab as well moves the focus a second time, in an order
+        // of its own, and the two leave it on a control the scene does not
+        // think has it.
+        return consumed || code == KeyCode.TAB || toFocused(scene, keyCode, code, true);
+    }
+
+    /// Hands a key nothing in the scene wanted to the native component of
+    /// the control with the focus, and answers that the form is not to
+    /// have it. A form given a key looks for the component it believes
+    /// has the focus and, finding none or one that makes nothing of the
+    /// key, moves the focus by rules of its own; the focus of a scene is
+    /// the scene's, and a key is for the control the scene says has it.
+    /// Escape stays the form's, which closes a dialog with it.
+    private static boolean toFocused(Scene scene, int keyCode, KeyCode code, boolean down) {
+        if (code == KeyCode.ESCAPE) {
+            return false;
+        }
+        Node owner = scene.getFocusOwner();
+        if (!(owner instanceof Control) || owner.isDisabled()) {
+            return true;
+        }
+        Component nat = ((Control) owner).cn1Native();
+        if (nat == null) {
+            return true;
+        }
+        Component target = nat;
+        Form form = nat.getComponentForm();
+        Component focused = form == null ? null : form.getFocused();
+        for (Component c = focused; c != null; c = c.getParent()) {
+            if (c == nat) {
+                target = focused;
+                break;
+            }
+        }
+        if (target.isEnabled()) {
+            if (down) {
+                target.keyPressed(keyCode);
+            } else {
+                target.keyReleased(keyCode);
+            }
+        }
+        return true;
     }
 
     /// A key came up.
     public static boolean keyReleased(Scene scene, int keyCode) {
-        return scene != null && scene.cn1Key(KeyEvent.KEY_RELEASED, code(keyCode), text(keyCode));
+        if (scene == null) {
+            return false;
+        }
+        KeyCode code = code(keyCode);
+        return StagePopup.key(KeyEvent.KEY_RELEASED, code, text(keyCode))
+                || scene.cn1Key(KeyEvent.KEY_RELEASED, code, text(keyCode)) || code == KeyCode.TAB
+                || toFocused(scene, keyCode, code, false);
     }
 
     private static String text(int keyCode) {

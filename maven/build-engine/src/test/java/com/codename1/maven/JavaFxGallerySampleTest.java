@@ -71,8 +71,13 @@ public class JavaFxGallerySampleTest {
     private static final String FX = "com.codename1.fxcompat.javafx.";
 
     /// The tabs in their order, and one string each draws that no other does.
+    ///
+    /// The headless display is a phone's width, narrower than the row of
+    /// buttons on the first tab, so that row shrinks and its buttons end in
+    /// three points as they do in JavaFX; the string looked for there is a
+    /// check box on a row of its own.
     private static final String[][] TABS = {
-        {"Controls", "Click me"},
+        {"Controls", "Send me the newsletter"},
         {"Data", "Filter by name"},
         {"Layouts", "GridPane form"},
         {"Bindings", "Clicked 0 times"},

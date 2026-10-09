@@ -38,6 +38,7 @@ import javafx.geometry.Point2D;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.input.KeyEvent;
 import javafx.stage.Window;
 
 /// A popup that lists menu items, one row each.
@@ -209,10 +210,25 @@ public class ContextMenu extends PopupControl {
         content = new MenuContent(this);
         if (popupScene == null) {
             popupScene = new Scene(content);
+            popupScene.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
+                @Override
+                public void handle(KeyEvent event) {
+                    if (content != null && content.key(event.getCode())) {
+                        event.consume();
+                    }
+                }
+            });
             setScene(popupScene);
         } else {
             popupScene.setRoot(content);
         }
+    }
+
+    /// Returns whether this is the popup of a menu inside another menu.
+    boolean isSubMenu() {
+        Node owner = getOwnerNode();
+        Scene s = owner == null ? null : owner.getScene();
+        return s != null && s.getWindow() instanceof ContextMenu;
     }
 
     /// Returns the rows of the menu as it last opened, or `null`.

@@ -1,0 +1,23 @@
+# The Swing gallery under a real pointer and real keys, at 1000x800.
+# Every step but the quiet ones has to change the picture, outside whatever
+# was moving by itself; see RealPortDriver.java.
+sleep 4000
+shot start
+# A button and a radio button, then the check box, which disables both.
+click 0.061 0.268
+click 0.245 0.270
+click 0.132 0.270
+# A text field: focus, typing, and Tab on to the next one.
+click 0.370 0.382
+type bc
+key TAB
+# The slider follows a drag, and the progress bar starts.
+drag 0.536 0.573 0.640 0.573 400
+click 0.210 0.725
+# Tabs: Layouts, Data and back.
+click 0.101 0.063
+shot layouts
+click 0.158 0.063
+shot data
+click 0.035 0.063
+shot controls

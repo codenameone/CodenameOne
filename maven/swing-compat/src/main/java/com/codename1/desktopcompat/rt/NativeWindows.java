@@ -269,20 +269,23 @@ final class NativeWindows implements SecondaryWindows {
 
         @Override
         public void keyPressed(int keyCode) {
-            EventBridge.key(window, true, keyCode);
-            super.keyPressed(keyCode);
+            if (!EventBridge.key(window, true, keyCode)) {
+                super.keyPressed(keyCode);
+            }
         }
 
         @Override
         public void keyRepeated(int keyCode) {
-            EventBridge.key(window, true, keyCode);
-            super.keyRepeated(keyCode);
+            if (!EventBridge.key(window, true, keyCode)) {
+                super.keyRepeated(keyCode);
+            }
         }
 
         @Override
         public void keyReleased(int keyCode) {
-            EventBridge.key(window, false, keyCode);
-            super.keyReleased(keyCode);
+            if (!EventBridge.key(window, false, keyCode)) {
+                super.keyReleased(keyCode);
+            }
         }
     }
 }

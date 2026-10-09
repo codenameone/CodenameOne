@@ -49,8 +49,10 @@ import javafx.util.StringConverter;
 /// The native slider counts in whole steps, so the range is mapped onto
 /// 10000 of them; a value the user drags to is one of those.
 ///
-/// Tick marks, tick labels, the label formatter and `valueChanging` are
-/// recorded and not shown by the native slider. `snapToTicks`,
+/// Tick marks, tick labels and the label formatter are recorded and not
+/// shown by the native slider. `valueChanging` is true while the user
+/// drags the slider and false again when the pointer is let go of.
+/// `snapToTicks`,
 /// `majorTickUnit` and `minorTickCount` do take part in
 /// [#adjustValue(double)], [#increment()] and [#decrement()]. The
 /// pseudo-classes `horizontal` and `vertical` follow the orientation.
@@ -96,6 +98,26 @@ public class Slider extends Control {
 
     private void init() {
         getStyleClass().add("slider");
+        // The value is changing from the moment a press on the slider turns
+        // into a drag until the pointer is let go of.
+        addEventHandler(javafx.scene.input.MouseEvent.DRAG_DETECTED,
+                new javafx.event.EventHandler<javafx.scene.input.MouseEvent>() {
+                    @Override
+                    public void handle(javafx.scene.input.MouseEvent event) {
+                        if (!isDisabled()) {
+                            setValueChanging(true);
+                        }
+                    }
+                });
+        addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED,
+                new javafx.event.EventHandler<javafx.scene.input.MouseEvent>() {
+                    @Override
+                    public void handle(javafx.scene.input.MouseEvent event) {
+                        if (isValueChanging()) {
+                            setValueChanging(false);
+                        }
+                    }
+                });
         pseudoClassStateChanged(HORIZONTAL, true);
     }
 

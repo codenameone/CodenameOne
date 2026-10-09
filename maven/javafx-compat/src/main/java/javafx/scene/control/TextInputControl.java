@@ -162,7 +162,7 @@ public abstract class TextInputControl extends Control {
             if (area.isEditable() != isEditable()) {
                 area.setEditable(isEditable());
             }
-            Style style = area.getAllStyles();
+            Style style = com.codename1.fxcompat.runtime.PeerPaint.allStyles(area);
             if (textFill instanceof Color) {
                 if (!fillShown) {
                     // Remembered so that withdrawing the fill shows the

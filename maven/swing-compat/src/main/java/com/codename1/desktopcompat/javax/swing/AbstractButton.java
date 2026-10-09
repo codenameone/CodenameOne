@@ -139,7 +139,7 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
             // A Codename One toggle shows this one while it is selected.
             b.setRolloverPressedIcon(nativeIcon(4, selectedIcon));
             if (horizontalAlignmentSet) {
-                b.getAllStyles().setAlignment(Align.horizontal(horizontalAlignment));
+                com.codename1.desktopcompat.rt.PeerSupport.allStyles(b).setAlignment(Align.horizontal(horizontalAlignment));
             }
             if (verticalAlignmentSet) {
                 b.setVerticalAlignment(Align.vertical(verticalAlignment));
@@ -208,7 +208,7 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
         if (!restyled) {
             return;
         }
-        com.codename1.ui.plaf.Style s = b.getAllStyles();
+        com.codename1.ui.plaf.Style s = com.codename1.desktopcompat.rt.PeerSupport.allStyles(b);
         int line = outline ? Math.max(1, Units.toDevice(1)) : 0;
         if (margin != null || plain) {
             // A button that is only its icon keeps the two pixels the
