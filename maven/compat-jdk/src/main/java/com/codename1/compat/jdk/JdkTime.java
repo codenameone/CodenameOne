@@ -346,6 +346,19 @@ public final class JdkTime {
             throw new NullPointerException("temporal");
         }
         Known k = known(formatter);
+        if (k != null && temporal instanceof LocalDate) {
+            // The device's formatter of a pattern formats an instant or a
+            // date WITH a time and throws for anything else, so a date
+            // alone goes to it at midnight and a time alone on the first
+            // day of the epoch. The fields that were made up are the ones
+            // the pattern may not name, as on the JDK.
+            requireFields(k.pattern, DATE_FIELDS, temporal);
+            return formatter.format(LocalDateTime.of((LocalDate) temporal, LocalTime.MIDNIGHT));
+        }
+        if (k != null && temporal instanceof LocalTime) {
+            requireFields(k.pattern, TIME_FIELDS, temporal);
+            return formatter.format(LocalDateTime.of(LocalDate.ofEpochDay(0), (LocalTime) temporal));
+        }
         if (k == null || k.zone == null) {
             return formatter.format(temporal);
         }
@@ -362,6 +375,59 @@ public final class JdkTime {
             return formatter.format(ZonedDateTime.of((LocalDateTime) temporal, k.zone));
         }
         return formatter.format(temporal);
+    }
+
+    /// The pattern letters a date alone can answer, and those a time alone
+    /// can: the JDK's, less the ones it cannot print for a local value.
+    private static final String DATE_FIELDS = "GuyDMLdQqYwWEecFg";
+    private static final String TIME_FIELDS = "ahKkHmsSAnNB";
+
+    /// Throws what the JDK throws when `pattern` names a field `temporal`
+    /// does not have: a letter outside quotes that is not one of
+    /// `allowed`.
+    private static void requireFields(String pattern, String allowed, TemporalAccessor temporal) {
+        boolean quoted = false;
+        for (int i = 0; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            if (c == '\'') {
+                quoted = !quoted;
+            } else if (!quoted && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) && allowed.indexOf(c) < 0) {
+                throw new DateTimeException("Unsupported field: " + c + " of pattern " + pattern + " for "
+                        + temporal);
+            }
+        }
+    }
+
+    /// `date.format(formatter)`.
+    public static String format(LocalDate date, DateTimeFormatter formatter) {
+        return format(formatter, date);
+    }
+
+    /// `time.format(formatter)`.
+    public static String format(LocalTime time, DateTimeFormatter formatter) {
+        return format(formatter, time);
+    }
+
+    /// `dateTime.format(formatter)`, honouring the zone of [#withZone].
+    public static String format(LocalDateTime dateTime, DateTimeFormatter formatter) {
+        return format(formatter, dateTime);
+    }
+
+    /// `LocalDate.parse(text, formatter)`. The device's formatter of a
+    /// pattern parses into a date with a time, whatever was asked for.
+    public static LocalDate parseLocalDate(CharSequence text, DateTimeFormatter formatter) {
+        if (text == null || formatter == null) {
+            throw new NullPointerException();
+        }
+        return localDateFrom(formatter.parse(text));
+    }
+
+    /// `LocalTime.parse(text, formatter)`; see [#parseLocalDate].
+    public static LocalTime parseLocalTime(CharSequence text, DateTimeFormatter formatter) {
+        if (text == null || formatter == null) {
+            throw new NullPointerException();
+        }
+        return localTimeFrom(formatter.parse(text));
     }
 
     /// `zoned.format(formatter)`, honouring the zone of [#withZone].

@@ -251,8 +251,9 @@ public class CompatRewritesTest {
             assertFalse(gone + " survived: " + after, after.contains(gone));
         }
         assertTrue(after.toString(), after.contains(Relocation.JDK_PACKAGE + "JdkTime.withZone"));
-        // A local time is formatted by the device's own class, untouched.
-        assertTrue(after.toString(), after.contains("java/time/LocalTime.format"));
+        // A time alone is not left to the device's formatter either: of a
+        // pattern, it throws "Unsupported temporal type" for one.
+        assertFalse(after.toString(), after.contains("java/time/LocalTime.format"));
         Class<?> t = new CompatFixtures.Defining(getClass().getClassLoader()).define(relocated);
         Object[] out = (Object[]) t.getMethod("run").invoke(null);
         assertEquals(Arrays.asList("07:07:09", "01:02:03", "GMT+02:00", "null", "07:07:09", "04:05:06"),
