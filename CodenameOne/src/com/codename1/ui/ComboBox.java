@@ -565,9 +565,18 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             popBlurOverride();
         }
         parentForm.setTintColor(tint);
+        // The last clause is every other way of leaving without a choice: Escape on a
+        // popup that has no back command, a dispose() from application code, a window
+        // closing under it. The selection is shared with the popup, which moves it as a
+        // highlight -- under the pointer, with the arrow keys, on a press that is then
+        // dragged away -- so a popup that reported no choice and returned no command must
+        // not leave that highlight behind as the value. A subclass that returns a command
+        // of its own from showPopupDialog is saying what happened and is left alone.
         if (result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() || //NOPMD CompareObjectsWithEquals
-                popupDialog.wasDisposedDueToRotation()) {
-            setSelectedIndex(originalSel);
+                popupDialog.wasDisposedDueToRotation() || (result == null && !l.popupSelectionFired)) {
+            if (originalSel >= 0) {
+                setSelectedIndex(originalSel);
+            }
         }
     }
 

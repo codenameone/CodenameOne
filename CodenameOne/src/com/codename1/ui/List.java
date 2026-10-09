@@ -171,6 +171,9 @@ public class List<T> extends Component implements ActionSource {
     Object eventSource = this;
     /// Used internally by the combo box
     boolean disposeDialogOnSelection;
+    /// Set once this list, as the popup of a `ComboBox`, has reported a choice. The combo
+    /// reads it to tell a popup that closed on a choice from one that just went away.
+    boolean popupSelectionFired;
     /// #### See also
     ///
     /// - #setRenderingPrototype
@@ -1664,6 +1667,7 @@ public class List<T> extends Component implements ActionSource {
     protected void fireActionEvent(ActionEvent a) {
         if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             if (disposeDialogOnSelection) {
+                popupSelectionFired = true;
                 // The enclosing Dialog, found the same way an activated command finds
                 // who owns it. getComponentForm() used to be enough because a Dialog
                 // always was the current form; a Dialog hosted in a Window is a
@@ -1926,9 +1930,39 @@ public class List<T> extends Component implements ActionSource {
         super.pointerPressed(x, y);
     }
 
-    /// {@inheritDoc}
+    /// Highlights the row under the pointer, in the popup of a `ComboBox` and nowhere else.
+    ///
+    /// The highlight is the model's selection, because that is the only thing a list
+    /// paints as highlighted and the thing Enter and a click then act on. In a combo popup
+    /// that is safe: the selection there is provisional until a row is chosen, and
+    /// `ComboBox#fireClicked()` puts the original one back whenever the popup goes away
+    /// without a choice. It is what every desktop toolkit does with a drop down.
+    ///
+    /// A list sitting on a form is deliberately left alone. Its selection is state: the
+    /// application reads it, listens to it and often loads a detail view from it, and
+    /// nothing would restore it afterwards. Moving it because the mouse crossed the list
+    /// on its way somewhere else would be a change the user never asked for.
+    ///
+    /// A list with a fixed selection (the spinner arrangement) is skipped as well: there
+    /// the selected row is a position on screen that the rows move through, so it cannot
+    /// follow the pointer. No scrolling goes with the highlight -- a half visible row at
+    /// the edge would otherwise pull the list along under a pointer that is standing still.
     @Override
     public void pointerHover(int[] x, int[] y) {
+        if (!disposeDialogOnSelection || !isEnabled() || x == null || y == null
+                || x.length == 0 || y.length == 0) {
+            return;
+        }
+        if (fixedSelection > FIXED_NONE_BOUNDRY || isDragActivated() || Display.impl.isScrollWheeling()) {
+            return;
+        }
+        if (!contains(x[0], y[0])) {
+            return;
+        }
+        int row = pointerSelect(x[0], y[0]);
+        if (row > -1 && row != model.getSelectedIndex()) {
+            model.setSelectedIndex(row);
+        }
     }
 
     /// {@inheritDoc}
