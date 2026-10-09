@@ -78,7 +78,9 @@ public final class CssBoxRasterizer {
         int padTop = style.getPadTop();
         double fullW = boxW + padLeft + style.getPadRight();
         double fullH = boxH + padTop + style.getPadBottom();
-        if (fullW * fullH > MAX_PIXELS) {
+        // The limit is on the image that is allocated, not on the box: a
+        // side shorter than a pixel still takes a whole row or column.
+        if (Math.max(1, Math.floor(fullW)) * Math.max(1, Math.floor(fullH)) > MAX_PIXELS) {
             throw new IllegalArgumentException("borderBoxWidth x borderBoxHeight plus padding is "
                     + fullW + " x " + fullH + " px, more than this rasterizer paints");
         }

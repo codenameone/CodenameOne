@@ -177,6 +177,14 @@ class CssBoxRasterizerTest {
     }
 
     @Test
+    void aSliverTooLongToAllocateIsRefused() {
+        // A tenth of a pixel high still takes a whole row of the image.
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> paint(BoxStyle.builder().size(100000000, 0.1)));
+        assertTrue(e.getMessage().contains("more than this rasterizer paints"), e.getMessage());
+    }
+
+    @Test
     void zeroSizeNamesTheField() {
         IllegalArgumentException w = assertThrows(IllegalArgumentException.class,
                 () -> paint(BoxStyle.builder().size(0, 10)));

@@ -326,6 +326,19 @@ class CSSGeneratedImageTest {
                 "written first, the image covers the gradient");
     }
 
+    @Test
+    void gradientStopsPlacedInRemAndViewportUnitsArePaintedThere(@TempDir Path dir) throws Exception {
+        // 2rem is 32px and 10vw is 64px of the 640px page. The box starts
+        // 2px in, so the hard edges fall at x = 34 and x = 66.
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
+                + " background: linear-gradient(to right, #ffffff 2rem, #000000 2rem, #000000 10vw, #ffffff 10vw);"
+                + " box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertTrue((img.getRGB(2 + 20, 40) & 0xff) > 0xe0, "white before 2rem");
+        assertTrue((img.getRGB(2 + 48, 40) & 0xff) < 0x20, "black between 2rem and 10vw");
+        assertTrue((img.getRGB(2 + 80, 40) & 0xff) > 0xe0, "white after 10vw");
+    }
+
     // ---- gradients that used to hang the compiler ----
 
     private static void assertCompilesPromptly(Path dir, String css) {

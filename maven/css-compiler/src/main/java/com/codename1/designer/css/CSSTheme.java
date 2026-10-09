@@ -597,7 +597,7 @@ public class CSSTheme {
                         extent = RadialGradient.EXTENT_EXPLICIT;
                         sawShapeOrExtent = true;
                     }
-                } else if (isLength(t)) {
+                } else if (isLength(p)) {
                     if (rasterWidth <= 0 || rasterHeight <= 0) {
                         // Used to be skipped without a word, leaving a gradient
                         // centred or sized somewhere other than where the rule
@@ -608,7 +608,7 @@ public class CSSTheme {
                         return;
                     }
                     ScaledUnit n = (ScaledUnit) p.getNextLexicalUnit();
-                    boolean pair = n != null && isLength(n.getLexicalUnitType());
+                    boolean pair = n != null && isLength(n);
                     if (sawAt) {
                         centre[0] = (float) (rasterLength(p, rasterWidth) / rasterWidth);
                         if (pair) {
@@ -764,7 +764,7 @@ public class CSSTheme {
             for (ScaledUnit u = first; u != null; u = (ScaledUnit) u.getNextLexicalUnit()) {
                 int t = u.getLexicalUnitType();
                 boolean keyword = isIdentLike(u) && isPositionKeyword(identValue(u));
-                if (!keyword && t != LexicalUnit.SAC_PERCENTAGE && !isLength(t)) {
+                if (!keyword && t != LexicalUnit.SAC_PERCENTAGE && !isLength(u)) {
                     break;
                 }
                 tokens.add(u);
@@ -845,8 +845,8 @@ public class CSSTheme {
             }
         }
 
-        private static boolean isLength(int type) {
-            switch (type) {
+        private static boolean isLength(ScaledUnit u) {
+            switch (u.getLexicalUnitType()) {
                 case LexicalUnit.SAC_PIXEL:
                 case LexicalUnit.SAC_POINT:
                 case LexicalUnit.SAC_MILLIMETER:
@@ -854,6 +854,13 @@ public class CSSTheme {
                 case LexicalUnit.SAC_INCH:
                 case LexicalUnit.SAC_EM:
                     return true;
+                case LexicalUnit.SAC_DIMENSION: {
+                    // The units the parser has no type of its own for, and
+                    // rasterLength() measures against the page.
+                    String unit = u.getDimensionUnitText();
+                    return "rem".equals(unit) || "vw".equals(unit) || "vh".equals(unit)
+                            || "vmin".equals(unit) || "vmax".equals(unit);
+                }
                 default:
                     return false;
             }
@@ -913,7 +920,7 @@ public class CSSTheme {
                     p = (ScaledUnit) p.getNextLexicalUnit();
                     continue;
                 }
-                if (!colors.isEmpty() && (t == LexicalUnit.SAC_PERCENTAGE || isLength(t) || angleDegrees(p) != null)) {
+                if (!colors.isEmpty() && (t == LexicalUnit.SAC_PERCENTAGE || isLength(p) || angleDegrees(p) != null)) {
                     // A position with no colour, between two stops, is a
                     // colour hint: where the blend of its neighbours is half
                     // way. It is remembered until the colour after it is read.
@@ -962,7 +969,7 @@ public class CSSTheme {
                         // A conic stop is placed by an angle, in any of the
                         // four units the gradient's own angle accepts.
                         pos = (float) (angleDegrees(nx).doubleValue() / 360.0);
-                    } else if (isLength(nt)) {
+                    } else if (isLength(nx)) {
                         if (lengthBasis <= 0) {
                             // No box to measure the length in; see rasterWidth.
                             return null;
