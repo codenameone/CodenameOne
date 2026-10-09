@@ -164,8 +164,14 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     /// inspect pixels flip it.
     public static boolean pixelImages;
 
+    /// How many images were made from pixels or made to be drawn on: the
+    /// ones that are memory of the platform on a device. A test that
+    /// counts sets it to zero first.
+    public static int imagesMade;
+
     @Override
     public java.lang.Object createImage(int[] a0, int a1, int a2) {
+        imagesMade++;
         if (pixelImages && a1 > 0 && a2 > 0) {
             int[][] rows = new int[a2][a1];
             for (int y = 0; y < a2; y++) {
@@ -198,6 +204,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.lang.Object createMutableImage(int a0, int a1, int a2) {
+        imagesMade++;
         if (rasterImages && a0 > 0 && a1 > 0) {
             int[][] rows = new int[a1][a0];
             for (int y = 0; y < a1; y++) {

@@ -1140,7 +1140,11 @@ public final class GraphicsContext {
         double top = within(y1 - sy);
         double right = within(sx + sw - x2);
         double bottom = within(sy + sh - y2);
-        image(full.subImage(x1, y1, x2 - x1, y2 - y1, true), dx + left * kx, dy + top * ky,
+        // The whole picture is the picture: cutting it out of itself made
+        // a second image of the platform for every call, and the native
+        // Linux port does not give the memory of an image back.
+        boolean all = x1 == 0 && y1 == 0 && x2 == full.getWidth() && y2 == full.getHeight();
+        image(all ? full : full.subImage(x1, y1, x2 - x1, y2 - y1, true), dx + left * kx, dy + top * ky,
                 dw - (left + right) * kx, dh - (top + bottom) * ky);
     }
 
