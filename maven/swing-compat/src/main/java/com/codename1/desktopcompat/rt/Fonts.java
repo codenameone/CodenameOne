@@ -146,9 +146,21 @@ public final class Fonts {
         return new Font(Font.DIALOG, Font.PLAIN, Math.max(1, Math.round(px / Units.scale())));
     }
 
-    /// The font of a component that was given none: the theme's label font,
+    /// The font an application chose for everything by putting it under
+    /// `defaultFont`, the key the FlatLaf look and feels read, or `null`
+    /// when it put none.
+    public static Font applicationFont() {
+        return com.codename1.desktopcompat.javax.swing.UIManager.cn1PutFont("defaultFont");
+    }
+
+    /// The font of a component that was given none: the one the
+    /// application put under `defaultFont`, else the theme's label font,
     /// or 12 pixel Dialog before a display exists.
     public static Font defaultFont() {
+        Font chosen = applicationFont();
+        if (chosen != null) {
+            return chosen;
+        }
         if (!Display.isInitialized()) {
             return new Font(Font.DIALOG, Font.PLAIN, 12);
         }

@@ -44,9 +44,12 @@ public final class CellTheme {
     private CellTheme() {
     }
 
-    /// Whether rows are sized for a finger.
+    /// Whether rows are sized for a finger: a touch screen that is not a
+    /// desktop's. A desktop port answers that it has a touch screen, since
+    /// a pointer does all a finger does, and its rows are still a mouse's.
     public static boolean touch() {
-        return Display.isInitialized() && Display.getInstance().isTouchScreenDevice();
+        return Display.isInitialized() && Display.getInstance().isTouchScreenDevice()
+                && !Display.getInstance().isDesktop();
     }
 
     /// `a` with the fraction `t` of `b` mixed in.

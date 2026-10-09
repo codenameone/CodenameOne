@@ -355,9 +355,42 @@ public class JToolBar extends JComponent implements Accessible, SwingConstants {
             return getSeparatorSize();
         }
 
+        /// As wide as the gap along the tool bar and as long as the bar
+        /// across it, so the line it draws runs the bar's whole height.
         @Override
         public Dimension getMaximumSize() {
-            return getSeparatorSize();
+            Dimension d = getSeparatorSize();
+            if (cn1AcrossHorizontalBar()) {
+                d.height = Short.MAX_VALUE;
+            } else {
+                d.width = Short.MAX_VALUE;
+            }
+            return d;
+        }
+
+        private boolean cn1AcrossHorizontalBar() {
+            java.lang.Object p = getParent();
+            return !(p instanceof JToolBar) || ((JToolBar) p).getOrientation() == HORIZONTAL;
+        }
+
+        /// A line across the tool bar in the middle of the gap, where the
+        /// separator of a menu draws one along its top.
+        @Override
+        protected void paintComponent(com.codename1.desktopcompat.java.awt.Graphics g) {
+            com.codename1.desktopcompat.java.awt.Color line = com.codename1.desktopcompat.rt.LafTheme.line();
+            if (line == null) {
+                return;
+            }
+            g.setColor(line);
+            int w = getWidth();
+            int h = getHeight();
+            if (cn1AcrossHorizontalBar()) {
+                int pad = Math.min(4, h / 4);
+                g.fillRect(w / 2, pad, 1, Math.max(0, h - 2 * pad));
+            } else {
+                int pad = Math.min(4, w / 4);
+                g.fillRect(pad, h / 2, Math.max(0, w - 2 * pad), 1);
+            }
         }
 
         @Override

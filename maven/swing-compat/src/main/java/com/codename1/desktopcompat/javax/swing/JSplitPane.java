@@ -75,7 +75,14 @@ public class JSplitPane extends JComponent implements Accessible {
     protected boolean continuousLayout;
     protected Component leftComponent;
     protected Component rightComponent;
-    protected int dividerSize = 10;
+    protected int dividerSize = cn1DefaultDividerSize();
+
+    /// The look and feel's width of a divider: one to press with a finger
+    /// on a touch screen, a thin one to drag with a mouse.
+    private static int cn1DefaultDividerSize() {
+        Object v = com.codename1.desktopcompat.rt.LafTheme.value("SplitPane.dividerSize");
+        return v instanceof Integer ? ((Integer) v).intValue() : 10;
+    }
     protected boolean oneTouchExpandable;
     protected int lastDividerLocation;
 
@@ -644,6 +651,11 @@ public class JSplitPane extends JComponent implements Accessible {
         if (bg == null) {
             return Color.LIGHT_GRAY;
         }
+        if (!com.codename1.desktopcompat.rt.CellTheme.touch()) {
+            // A divider dragged with a mouse is a gap between the two
+            // sides with a grip in it, not a bar.
+            return bg;
+        }
         int lum = (bg.getRed() * 3 + bg.getGreen() * 6 + bg.getBlue()) / 10;
         return lum > 128 ? bg.darker() : bg.brighter();
     }
@@ -664,7 +676,9 @@ public class JSplitPane extends JComponent implements Accessible {
         int hh = h ? getHeight() - in.top - in.bottom : dividerSize;
         g.fillRect(x, y, w, hh);
         int lum = (c.getRed() * 3 + c.getGreen() * 6 + c.getBlue()) / 10;
-        g.setColor(lum > 128 ? c.darker().darker() : c.brighter().brighter());
+        g.setColor(com.codename1.desktopcompat.rt.CellTheme.touch()
+                ? (lum > 128 ? c.darker().darker() : c.brighter().brighter())
+                : com.codename1.desktopcompat.rt.LafTheme.disabledText());
         // A grip in the middle of the divider.
         int mx = x + w / 2;
         int my = y + hh / 2;

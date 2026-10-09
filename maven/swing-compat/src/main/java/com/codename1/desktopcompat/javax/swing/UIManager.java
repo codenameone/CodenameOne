@@ -309,6 +309,16 @@ public class UIManager {
         return v instanceof Color ? (Color) v : null;
     }
 
+    /// The font an application or its look and feel put under a key, or
+    /// `null`: never a value of the theme.
+    public static Font cn1PutFont(Object key) {
+        Object v = VALUES.raw(key);
+        if (v == null) {
+            v = LAF.raw(key);
+        }
+        return v instanceof Font ? (Font) v : null;
+    }
+
     public static Object get(Object key) {
         return VALUES.get(key);
     }

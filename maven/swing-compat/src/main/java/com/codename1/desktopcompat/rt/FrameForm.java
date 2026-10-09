@@ -117,6 +117,8 @@ public final class FrameForm extends Form implements WindowHost {
     @Override
     public void title(String title) {
         setTitle(title);
+        // A title label keeps the width of the text it was laid out with.
+        revalidate();
     }
 
     @Override
@@ -162,9 +164,25 @@ public final class FrameForm extends Form implements WindowHost {
         revalidate();
     }
 
+    /// Whether the menu bar is shown as commands and not drawn in the
+    /// window.
+    ///
+    /// On a desktop it is drawn, as a row of menus above the content: a
+    /// window there has the room and its user looks for the menus there.
+    /// Anywhere else it becomes commands. The display property
+    /// `desktopcompat.menuBar` overrides either way, with `window` or
+    /// `commands`.
     @Override
     public boolean takesCommands() {
-        return true;
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        String asked = d.getProperty("desktopcompat.menuBar", null);
+        if ("window".equals(asked)) {
+            return false;
+        }
+        if ("commands".equals(asked)) {
+            return true;
+        }
+        return !d.isDesktop();
     }
 
     @Override
