@@ -22,6 +22,7 @@
  */
 package com.codename1.desktopcompat.javax.swing;
 
+import com.codename1.desktopcompat.java.awt.LayoutManager;
 import com.codename1.desktopcompat.java.awt.Component;
 import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
@@ -91,6 +92,7 @@ public class JScrollPane extends JComponent implements Accessible, ScrollPaneCon
     private boolean syncing;
 
     public JScrollPane(Component view, int vsbPolicy, int hsbPolicy) {
+        setLayout(new ScrollPaneLayout.UIResource());
         setVerticalScrollBarPolicy(vsbPolicy);
         setHorizontalScrollBarPolicy(hsbPolicy);
         setViewport(createViewport());
@@ -548,6 +550,14 @@ public class JScrollPane extends JComponent implements Accessible, ScrollPaneCon
         }
     }
 
+    /// A bar that has no room is not visible, which is how a layout of
+    /// the application's knows whether there is one.
+    private static void shown(JScrollBar bar, boolean visible) {
+        if (bar != null && bar.isVisible() != visible) {
+            bar.setVisible(visible);
+        }
+    }
+
     private void place(boolean vsb, boolean hsb, int t) {
         Insets in = space();
         int x = in.left;
@@ -570,6 +580,8 @@ public class JScrollPane extends JComponent implements Accessible, ScrollPaneCon
         bounds(viewport, x + headW, y + headH, w - headW - barW, h - headH - barH);
         bounds(verticalScrollBar, x + w - barW, y + headH, barW, barW == 0 ? 0 : h - headH - barH);
         bounds(horizontalScrollBar, x + headW, y + h - barH, barH == 0 ? 0 : w - headW - barW, barH);
+        shown(verticalScrollBar, barW > 0);
+        shown(horizontalScrollBar, barH > 0);
         bounds(upperRight, x + w - cornerW, y, cornerW, cornerW == 0 ? 0 : headH);
         bounds(corner(UPPER_LEFT_CORNER, UPPER_LEADING_CORNER), x, y, headW, headW == 0 ? 0 : headH);
         bounds(corner(LOWER_LEFT_CORNER, LOWER_LEADING_CORNER), x, y + h - barH, headW, headW == 0 ? 0 : barH);
@@ -577,8 +589,48 @@ public class JScrollPane extends JComponent implements Accessible, ScrollPaneCon
                 barW == 0 ? 0 : barH);
     }
 
+    /// Sets the layout, which has to be a [ScrollPaneLayout].
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: if `layout` is neither `null` nor a
+    ///   `ScrollPaneLayout`
+    @Override
+    public void setLayout(LayoutManager layout) {
+        if (layout != null && !(layout instanceof ScrollPaneLayout)) {
+            throw new ClassCastException("layout of JScrollPane must be a ScrollPaneLayout");
+        }
+        super.setLayout(layout);
+        cn1SyncLayout();
+    }
+
+    /// Tells the layout of the parts the pane has now.
+    private void cn1SyncLayout() {
+        LayoutManager l = getLayout();
+        if (l instanceof ScrollPaneLayout) {
+            ((ScrollPaneLayout) l).syncWithScrollPane(this);
+        }
+    }
+
+    @Override
+    public void revalidate() {
+        // Every change of a part comes through here.
+        cn1SyncLayout();
+        super.revalidate();
+    }
+
     @Override
     public void doLayout() {
+        LayoutManager l = getLayout();
+        if (l instanceof ScrollPaneLayout) {
+            l.layoutContainer(this);
+        } else {
+            cn1Layout();
+        }
+    }
+
+    /// The standard placement, which is what `ScrollPaneLayout` does.
+    void cn1Layout() {
         int t = ScrollDelegate.barThickness();
         boolean[] bars = barsFor(t, false);
         place(bars[0], bars[1], t);
@@ -605,6 +657,11 @@ public class JScrollPane extends JComponent implements Accessible, ScrollPaneCon
         if (isPreferredSizeSet()) {
             return super.getPreferredSize();
         }
+        LayoutManager l = getLayout();
+        return l instanceof ScrollPaneLayout ? l.preferredLayoutSize(this) : cn1PreferredSize();
+    }
+
+    Dimension cn1PreferredSize() {
         Insets in = space();
         Dimension d = viewport == null ? new Dimension(0, 0) : viewport.getPreferredSize();
         int w = d.width;
@@ -623,6 +680,11 @@ public class JScrollPane extends JComponent implements Accessible, ScrollPaneCon
         if (isMinimumSizeSet()) {
             return super.getMinimumSize();
         }
+        LayoutManager l = getLayout();
+        return l instanceof ScrollPaneLayout ? l.minimumLayoutSize(this) : cn1MinimumSize();
+    }
+
+    Dimension cn1MinimumSize() {
         Insets in = space();
         int w = 4;
         int h = 4;
