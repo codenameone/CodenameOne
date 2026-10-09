@@ -307,6 +307,25 @@ class CSSGeneratedImageTest {
                 "the gradient replaced the image");
     }
 
+    @Test
+    void aGradientAndAnImageInOneShorthandStackInTheOrderWritten(@TempDir Path dir) throws Exception {
+        png(new File(dir.toFile(), "img/blue.png"), 4, 4, 0xff0000ff);
+        String red = "linear-gradient(#ff0000, #ff0000)";
+        String box = "width: 50%; height: 10%; box-shadow: 0 0 4px black;";
+
+        Compiled gradientFirst = compile(dir, "Banner { " + box + " background: " + red + ", url(img/blue.png); }");
+        BufferedImage img = stored(gradientFirst.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xffff0000, img.getRGB(img.getWidth() / 2, img.getHeight() / 2),
+                "the layer written first is on top, and that is the gradient");
+
+        Path other = Files.createDirectory(dir.resolve("other"));
+        png(new File(other.toFile(), "img/blue.png"), 4, 4, 0xff0000ff);
+        Compiled imageFirst = compile(other, "Banner { " + box + " background: url(img/blue.png), " + red + "; }");
+        img = stored(imageFirst.res, "Banner_1.png", Display.DENSITY_HD);
+        assertEquals(0xff0000ff, img.getRGB(img.getWidth() / 2, img.getHeight() / 2),
+                "written first, the image covers the gradient");
+    }
+
     // ---- gradients that used to hang the compiler ----
 
     private static void assertCompilesPromptly(Path dir, String css) {

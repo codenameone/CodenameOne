@@ -4886,6 +4886,11 @@ public class CSSTheme {
                     bgImage = null;
                 }
             }
+            if (gradient != null && bgImage != null) {
+                // Both came from one shorthand, and CSS puts the layer
+                // written first on top.
+                box.gradientOverImage(urlFollows(gradient, bgImage));
+            }
             if (gradient != null) {
                 double[] tile = bgImage == null ? explicitBackgroundSize(styles, paintWidth, paintHeight) : null;
                 if (tile == null) {
@@ -4949,9 +4954,29 @@ public class CSSTheme {
 
         /// Whether the url() `image` was written inside the `background`
         /// shorthand `shorthand`, as opposed to in a declaration of its own.
+        /// `shorthand` is the gradient the declaration was recorded under, so
+        /// the url() may be on either side of it.
         private boolean sameShorthand(LexicalUnit shorthand, LexicalUnit image) {
+            if (shorthand == null) {
+                return false;
+            }
+            if (urlFollows(shorthand, image)) {
+                return true;
+            }
             String url = image.getStringValue();
-            for (LexicalUnit u = shorthand; u != null; u = u.getNextLexicalUnit()) {
+            for (LexicalUnit u = shorthand.getPreviousLexicalUnit(); u != null; u = u.getPreviousLexicalUnit()) {
+                if (u.getLexicalUnitType() == LexicalUnit.SAC_URI && url != null && url.equals(u.getStringValue())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// Whether the url() `image` is written after `from` in the value
+        /// `from` belongs to.
+        private boolean urlFollows(LexicalUnit from, LexicalUnit image) {
+            String url = image.getStringValue();
+            for (LexicalUnit u = from; u != null; u = u.getNextLexicalUnit()) {
                 if (u.getLexicalUnitType() == LexicalUnit.SAC_URI && url != null && url.equals(u.getStringValue())) {
                     return true;
                 }

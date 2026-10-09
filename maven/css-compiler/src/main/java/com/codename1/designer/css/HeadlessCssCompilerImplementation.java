@@ -302,6 +302,11 @@ public final class HeadlessCssCompilerImplementation extends CodenameOneImplemen
     @Override public int charsWidth(Object nativeFont, char[] ch, int offset, int length) { return 0; }
     @Override public int stringWidth(Object nativeFont, String str) { return 0; }
     @Override public int charWidth(Object nativeFont, char ch) { return 0; }
+    // No font is measured here, and none needs to be. A theme font is
+    // written as a face, a style and a size setting, or as a file name and a
+    // size setting; the height of the system font is read only to size the
+    // preview glyphs of a file-backed font, which are never stored. Zero
+    // gives a zero-point preview and the same resource file.
     @Override public int getHeight(Object nativeFont) { return 0; }
     @Override public Object getDefaultFont() { return new Triple(0, 0, 0); }
     @Override public Object connect(String url, boolean read, boolean write) throws IOException { return null; }

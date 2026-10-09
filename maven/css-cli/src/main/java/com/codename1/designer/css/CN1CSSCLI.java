@@ -354,6 +354,11 @@ public class CN1CSSCLI {
             // belong to the native theme build, which always compiles.
             return false;
         }
+        // The output is what this compiler builds and nothing else: it is
+        // overwritten whenever the stylesheet is newer, and no copy of the old
+        // one is kept. A resource file edited by hand belongs under another
+        // name; one that shares the output's name is replaced by the next
+        // compile, which is also what a build directory has always done.
         File output = options.outputFile;
         if (!output.exists()) {
             return false;

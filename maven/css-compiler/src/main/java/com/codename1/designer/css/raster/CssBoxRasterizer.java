@@ -32,10 +32,10 @@ import java.awt.image.BufferedImage;
 /// The layers are painted bottom to top:
 ///
 /// 1. the outer shadow, which is not drawn under the border box;
-/// 2. the background colour, then the gradient, then the background image,
+/// 2. the background colour, then the gradient and the background image,
 ///    each clipped to the rounded border box (`background-clip:
 ///    border-box`). A style that sets both a gradient and an image gets
-///    both, the image on top;
+///    both, the image on top unless [BoxStyle#isGradientOverImage()];
 /// 3. the inset shadow, clipped to the rounded padding box;
 /// 4. the borders, or the border image when there is one. As in CSS, a
 ///    border image replaces the border styles instead of being drawn over
@@ -101,28 +101,14 @@ public final class CssBoxRasterizer {
 
         Pixels.fill(px, style.getBackgroundColor(), borderCoverage);
 
-        GradientSpec gradient = style.getGradient();
-        if (gradient != null) {
-            // A gradient is sized and positioned in the padding box, the
-            // initial background-origin, and shows through to the border
-            // edge, the initial background-clip. A box that is all border has
-            // no padding box to measure in and falls back to the border box.
-            GradientPainter painter = paddingBox.isEmpty()
-                    ? new GradientPainter(gradient, padLeft, padTop, boxW, boxH)
-                    : new GradientPainter(gradient, paddingBox.getX(), paddingBox.getY(),
-                            paddingBox.getWidth(), paddingBox.getHeight());
-            Pixels.layer(px, painter.paint(w, h), borderCoverage);
-        }
-
-        BackgroundImage bg = style.getBackgroundImage();
-        if (bg != null && !paddingBox.isEmpty()) {
-            int[] layer = BackgroundImagePainter.paint(bg, w, h,
-                    new Rectangle2D.Double(paddingBox.getX(), paddingBox.getY(),
-                            paddingBox.getWidth(), paddingBox.getHeight()),
-                    new Rectangle2D.Double(padLeft, padTop, boxW, boxH));
-            if (layer != null) {
-                Pixels.layer(px, layer, borderCoverage);
-            }
+        // The two background layers go down bottom first. The image is the
+        // upper one unless the style says the gradient was written first.
+        if (style.isGradientOverImage()) {
+            paintBackgroundImage(px, w, h, style, paddingBox, borderCoverage);
+            paintGradient(px, w, h, style, paddingBox, borderCoverage);
+        } else {
+            paintGradient(px, w, h, style, paddingBox, borderCoverage);
+            paintBackgroundImage(px, w, h, style, paddingBox, borderCoverage);
         }
 
         if (shadow != null && shadow.inset) {
@@ -146,6 +132,40 @@ public final class CssBoxRasterizer {
             }
         }
         return out;
+    }
+
+    private static void paintGradient(int[] px, int w, int h, BoxStyle style, RoundedBox paddingBox,
+            float[] borderCoverage) {
+        GradientSpec gradient = style.getGradient();
+        if (gradient == null) {
+            return;
+        }
+        // A gradient is sized and positioned in the padding box, the
+        // initial background-origin, and shows through to the border
+        // edge, the initial background-clip. A box that is all border has
+        // no padding box to measure in and falls back to the border box.
+        GradientPainter painter = paddingBox.isEmpty()
+                ? new GradientPainter(gradient, style.getPadLeft(), style.getPadTop(),
+                        style.getBorderBoxWidth(), style.getBorderBoxHeight())
+                : new GradientPainter(gradient, paddingBox.getX(), paddingBox.getY(),
+                        paddingBox.getWidth(), paddingBox.getHeight());
+        Pixels.layer(px, painter.paint(w, h), borderCoverage);
+    }
+
+    private static void paintBackgroundImage(int[] px, int w, int h, BoxStyle style, RoundedBox paddingBox,
+            float[] borderCoverage) {
+        BackgroundImage bg = style.getBackgroundImage();
+        if (bg == null || paddingBox.isEmpty()) {
+            return;
+        }
+        int[] layer = BackgroundImagePainter.paint(bg, w, h,
+                new Rectangle2D.Double(paddingBox.getX(), paddingBox.getY(),
+                        paddingBox.getWidth(), paddingBox.getHeight()),
+                new Rectangle2D.Double(style.getPadLeft(), style.getPadTop(),
+                        style.getBorderBoxWidth(), style.getBorderBoxHeight()));
+        if (layer != null) {
+            Pixels.layer(px, layer, borderCoverage);
+        }
     }
 
     private static void validate(BoxStyle s) {

@@ -38,6 +38,7 @@ public final class BoxStyle {
     private final int backgroundColor;
     private final GradientSpec gradient;
     private final BackgroundImage backgroundImage;
+    private final boolean gradientOverImage;
     private final BorderSide top;
     private final BorderSide right;
     private final BorderSide bottom;
@@ -56,6 +57,7 @@ public final class BoxStyle {
         backgroundColor = b.backgroundColor;
         gradient = b.gradient == null ? null : new GradientSpec(b.gradient);
         backgroundImage = b.backgroundImage;
+        gradientOverImage = b.gradientOverImage;
         top = b.top;
         right = b.right;
         bottom = b.bottom;
@@ -108,9 +110,17 @@ public final class BoxStyle {
         return gradient == null ? null : new GradientSpec(gradient);
     }
 
-    /// The image painted over the background colour and gradient, or `null`.
+    /// The image painted over the background colour, or `null`. It is above
+    /// the gradient unless [#isGradientOverImage()] says otherwise.
     public BackgroundImage getBackgroundImage() {
         return backgroundImage;
+    }
+
+    /// Whether the gradient is the upper of the two layers. In CSS the layer
+    /// written first is the one on top, so this is `true` for
+    /// `background: linear-gradient(...), url(...)`.
+    public boolean isGradientOverImage() {
+        return gradientOverImage;
     }
 
     public BorderSide getTop() {
@@ -154,6 +164,7 @@ public final class BoxStyle {
         private int backgroundColor;
         private GradientSpec gradient;
         private BackgroundImage backgroundImage;
+        private boolean gradientOverImage;
         private BorderSide top = BorderSide.NONE;
         private BorderSide right = BorderSide.NONE;
         private BorderSide bottom = BorderSide.NONE;
@@ -223,6 +234,11 @@ public final class BoxStyle {
 
         public Builder backgroundImage(BackgroundImage v) {
             backgroundImage = v;
+            return this;
+        }
+
+        public Builder gradientOverImage(boolean v) {
+            gradientOverImage = v;
             return this;
         }
 
