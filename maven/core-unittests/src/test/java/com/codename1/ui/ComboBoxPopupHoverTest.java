@@ -82,6 +82,21 @@ class ComboBoxPopupHoverTest extends UITestBase {
         assertEquals(0, combo.actionCount, "and tells nobody a choice was made");
     }
 
+    /// A combo that opened with nothing selected goes back to nothing selected.
+    @FormTest
+    void aHoverOverAnEmptySelectionLeavesItEmpty() throws Exception {
+        ScriptedComboBox combo = comboOnForm(5);
+        combo.getModel().setSelectedIndex(-1);
+        ComboBoxPopupTestSupport.open(combo, new PopupScript() {
+            @Override
+            public void run(Dialog popup, List<String> list) {
+                hover(popup, list, 4);
+                popup.dispose();
+            }
+        });
+        assertEquals(-1, combo.getSelectedIndex(), "closing without choosing keeps the selection empty");
+    }
+
     @FormTest
     void clickingTheHoveredRowChoosesIt() throws Exception {
         ScriptedComboBox combo = comboOnForm(5);

@@ -682,6 +682,11 @@ public class ComboBox<T> extends List<T> implements ActionSource {
                 popupDialog.wasDisposedDueToRotation() || (result == null && !l.popupSelectionFired)) {
             if (originalSel >= 0) {
                 setSelectedIndex(originalSel);
+            } else {
+                // A combo that opened with nothing selected goes back to nothing selected, or
+                // cancelling would commit the highlighted row. Only the model takes -1:
+                // List.setSelectedIndex rejects a negative index.
+                getModel().setSelectedIndex(originalSel);
             }
         }
     }

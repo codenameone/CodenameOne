@@ -7381,9 +7381,9 @@
   // there. It means them for its own dropdown markup, but the accessibility tree gives a
   // Codename One list the role "listbox" and focuses it, so with a list focused those keys
   // were stopped at the document and never reached the application: the arrows did not move
-  // the selection and Escape did not close a ComboBox popup. Nothing here uses Bootstrap's
-  // dropdowns by role, so the two delegations are removed; the one bound to
-  // [data-toggle="dropdown"] is left alone.
+  // the selection and Escape did not close a ComboBox popup. The two delegations are put back
+  // behind a test that skips the accessibility tree (every node there has an id starting
+  // "cn1-a11y-"), so a Bootstrap dropdown the page's own markup uses keeps its keys.
   //
   // Done on the way down of the first keydown, not at load: the page may load Bootstrap after
   // this file, and a handler removed before jQuery's document dispatch runs is not called
@@ -7393,8 +7393,22 @@
     if (!jq || !jq.fn || !jq.fn.dropdown) {
       return false;
     }
-    jq(document).off('keydown.bs.dropdown.data-api', '[role="menu"]')
-        .off('keydown.bs.dropdown.data-api', '[role="listbox"]');
+    var ctor = jq.fn.dropdown.Constructor;
+    var bootstrapKeydown = ctor && ctor.prototype && ctor.prototype.keydown;
+    var outsideAccessibilityTree = function(e) {
+      var t = e.target;
+      if (t && typeof t.closest === 'function' && t.closest('[id^="cn1-a11y-"]')) {
+        return undefined;
+      }
+      return bootstrapKeydown.apply(this, arguments);
+    };
+    var roles = ['[role="menu"]', '[role="listbox"]'];
+    for (var i = 0; i < roles.length; i++) {
+      jq(document).off('keydown.bs.dropdown.data-api', roles[i]);
+      if (typeof bootstrapKeydown === 'function') {
+        jq(document).on('keydown.bs.dropdown.data-api', roles[i], outsideAccessibilityTree);
+      }
+    }
     return true;
   }
   if (global.document && typeof global.document.addEventListener === 'function') {
