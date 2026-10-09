@@ -49,6 +49,9 @@
  *     - a swipe scrolls the content (#5912: it did nothing at all);
  *     - a tap on the hamburger opens the side menu, and a tap on a button fires it (#5912);
  *     - with the side menu open, none of the form's DOM text floats over the menu's shade.
+ *   iOS user agent (Chromium presenting itself as an iPhone):
+ *     - a tap and a mouse click each fire a button (every press threw "document is not
+ *       defined" in a branch only an iOS user agent takes).
  *
  * Usage:
  *   node scripts/test-javascript-composited-rendering.mjs <bundle-dir> [artifacts-dir]
@@ -382,6 +385,45 @@ async function desktop(name, browserType) {
   }
 }
 
+// An iPhone or iPad is told apart by its user agent, and the branches that takes are ones no
+// other device runs. One of them asked the document a question on every pointer press, from
+// the worker, which has no document: the press threw "document is not defined" and nothing on
+// the page could be tapped or clicked. Chromium wearing an iPhone's user agent takes the same
+// branches, which is enough to catch that; it says nothing about Safari's own behaviour.
+async function iosUserAgent() {
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({ ...devices['iPhone 13'] });
+    const inputs = [
+      ['a tap', (page, x, y) => page.touchscreen.tap(x, y)],
+      // A trackpad or mouse attached to an iPad, and "Request Desktop Website" in reverse.
+      ['a mouse click', (page, x, y) => page.mouse.click(x, y)]
+    ];
+    for (const [what, press] of inputs) {
+      const logs = [];
+      const page = await context.newPage();
+      await boot(page, logs);
+      const vp = page.viewportSize();
+      const before = await canvasPixels(page, [[6, vp.height - 6]]);
+      const button = await span(page, 'Hello World');
+      await press(page, Math.round(button.x), Math.round(button.y));
+      await page.waitForTimeout(2500);
+      const slug = what.replace(/[^a-z]+/g, '-');
+      await page.screenshot({ path: path.join(outDir, `ios-user-agent-${slug}.png`) });
+      const after = await canvasPixels(page, [[6, vp.height - 6]]);
+      const errors = logs.filter((l) => /is not defined|Exception/.test(l));
+      check(luminance(after[0]) < luminance(before[0]) - 15 && after[0][3] === 255,
+        `iOS user agent: ${what} on a button fires it`,
+        `corner luminance ${Math.round(luminance(before[0]))} -> ${Math.round(luminance(after[0]))}`);
+      check(errors.length === 0, `iOS user agent: ${what} raises no error`, errors.length ? errors[0].slice(0, 200) : '');
+      fs.writeFileSync(path.join(outDir, `ios-user-agent-${slug}-console.txt`), logs.join('\n'));
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
 async function phone() {
   const browser = await chromium.launch();
   try {
@@ -497,6 +539,7 @@ try {
     await desktop(name, types[name]);
   }
   await phone();
+  await iosUserAgent();
 } catch (err) {
   check(false, 'the run completed', err && err.stack ? err.stack : String(err));
 } finally {
