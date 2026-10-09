@@ -354,6 +354,40 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void aConicGradientCentredByLengthsCompiles(@TempDir Path dir) {
+        assertCompilesPromptly(dir, "G { background: conic-gradient(at 20px 30px, #ff0000, #0000ff);"
+                + " box-shadow: 0 0 4px black; }");
+    }
+
+    @Test
+    void aGradientCentreIsMeasuredFromTheEdgesItNames(@TempDir Path dir) throws Exception {
+        // The page is 640x100, so 20px in from the right and 10px up from the
+        // bottom is (620, 90).
+        Callable<Compiled> job = () -> compile(dir,
+                "G { background: radial-gradient(circle 40px at right 20px bottom 10px, #ffffff, #000000); }");
+        Compiled c = assertTimeoutPreemptively(Duration.ofSeconds(60), job::call);
+        BufferedImage img = stored(c.res, "G_1.png", Display.DENSITY_HD);
+        assertTrue((img.getRGB(620, 90) & 0xff) > 0xe0, "white at the centre, was "
+                + Integer.toHexString(img.getRGB(620, 90)));
+        assertTrue((img.getRGB(20, 10) & 0xff) < 0x20, "black at the opposite corner, was "
+                + Integer.toHexString(img.getRGB(20, 10)));
+    }
+
+    @Test
+    void aSizedGradientIsTiledLikeAnImage(@TempDir Path dir) throws Exception {
+        // Each 20px tile is white for 10px and black for 10px. The shadow
+        // reserves 2px, so the box starts at (2, 2) in the image.
+        Compiled c = compile(dir, "Banner { width: 50%; height: 10%;"
+                + " background: linear-gradient(to right, #ffffff 50%, #000000 50%);"
+                + " background-size: 20px 20px; box-shadow: 0 0 4px black; }");
+        BufferedImage img = stored(c.res, "Banner_1.png", Display.DENSITY_HD);
+        assertTrue((img.getRGB(2 + 5, 40) & 0xff) > 0xe0, "white in the first half of the first tile");
+        assertTrue((img.getRGB(2 + 15, 40) & 0xff) < 0x20, "black in its second half");
+        assertTrue((img.getRGB(2 + 25, 40) & 0xff) > 0xe0, "white again where the second tile starts, was "
+                + Integer.toHexString(img.getRGB(2 + 25, 40)));
+    }
+
+    @Test
     void aRadialGradientPositionedByALengthIsPaintedWhereItSays(@TempDir Path dir) throws Exception {
         // A length has no meaning in a resolution-independent gradient, so this
         // one is painted: the page is 640x100 and the centre is 10px in from

@@ -281,6 +281,41 @@ class CN1CSSCLIEndToEndTest {
     }
 
     @Test
+    void anEditedImageIsRepaintedIntoARuleWhoseCssDidNotChange(@TempDir Path tmp) throws Exception {
+        File common = mavenProject(tmp.toFile());
+        File css = write(new File(common, "src/main/css/theme.css"),
+                "Banner { width: 50%; height: 10%; background-image: url(img/a.png);"
+                + " box-shadow: 0 0 4px black; }\n");
+        File image = png(new File(common, "src/main/css/img/a.png"), 8, 8, 0xffff0000);
+        File res = new File(common, "target/classes/theme.res");
+        String[] args = {"-input", css.getPath(), "-output", res.getPath()};
+
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        int[] before = open(res).getImage("Banner_1.png").getRGB();
+        assertEquals(0xffff0000, before[before.length / 2], "the image fills the box");
+
+        png(image, 8, 8, 0xff0000ff);
+        assertTrue(image.setLastModified(System.currentTimeMillis() + 5000));
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+
+        int[] after = open(res).getImage("Banner_1.png").getRGB();
+        assertEquals(0xff0000ff, after[after.length / 2], "the rule was painted again from the new image");
+    }
+
+    @Test
+    void aMissingImportIsStillSomethingTheStylesheetDependsOn(@TempDir Path tmp) throws Exception {
+        File css = write(new File(tmp.toFile(), "theme.css"),
+                "@import \"first.css\";\n@import \"absent.css\";\n");
+        File first = write(new File(tmp.toFile(), "first.css"), "A { color: red; }\n");
+
+        java.util.Set<File> found = CssImports.collectReachable(css);
+
+        assertTrue(found.contains(first.getCanonicalFile()), found.toString());
+        assertTrue(found.contains(new File(tmp.toFile(), "absent.css").getCanonicalFile())
+                || found.contains(new File(tmp.toFile(), "absent.css")), found.toString());
+    }
+
+    @Test
     void bundlesLocalizationAndRecompilesWhenOnlyABundleChanges(@TempDir Path tmp) throws Exception {
         File common = mavenProject(tmp.toFile());
         File css = write(new File(common, "src/main/css/theme.css"), "Label { color: #000001; }\n");

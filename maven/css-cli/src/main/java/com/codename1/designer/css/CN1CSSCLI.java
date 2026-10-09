@@ -311,14 +311,16 @@ public class CN1CSSCLI {
     /// output depends on: the files it imports and the localization bundles.
     private static List<File> dependencies(File css, Options options) {
         List<File> out = new ArrayList<File>();
+        // A broken import is the compile's error to report, with its message.
+        // The file it names is still a dependency: it appearing is a change.
+        out.addAll(CssImports.collectReachable(css));
         try {
-            out.addAll(CssImports.collect(css));
             // The images and fonts too. An edit to one changes the theme and
             // no stylesheet; in a merged build the copy in the mirror is what
             // the merged file names, and refreshing it moves its time.
             out.addAll(CssImports.assets(css));
         } catch (IOException ex) {
-            // A broken import is the compile's error to report, with its message.
+            // As above: the compile reports it.
         }
         if (options.localizationDir != null && options.localizationDir.isDirectory()) {
             collectLocalizationFiles(options.localizationDir, out);
@@ -360,6 +362,12 @@ public class CN1CSSCLI {
         if (css.lastModified() > built) {
             return false;
         }
+        if (!new File(css.getAbsoluteFile().getParentFile(), css.getName() + ".checksums").exists()) {
+            // Every compile this check follows leaves that file, except one
+            // in a native theme mode, which removes it. An output without it
+            // was built with other units, or by something else altogether.
+            return false;
+        }
         try {
             CssImports.collect(css);
         } catch (IOException ex) {
@@ -389,7 +397,16 @@ public class CN1CSSCLI {
         // The per-selector cache lets a recompile reuse the generated images of
         // rules that did not change.
         File cacheFile = new File(css.getAbsoluteFile().getParentFile(), css.getName() + ".checksums");
-        if (incremental && outputFile.exists() && cacheFile.exists()) {
+        // The cache knows a rule by its CSS alone. It cannot tell that an
+        // image the rule names was edited, nor which units or which raster
+        // policy the existing output was built with, so in each of those
+        // cases nothing is reused and every rule is built again.
+        boolean nativeThemeMode = options.noRaster || options.nativeThemeUnits;
+        if (nativeThemeMode && cacheFile.exists() && !cacheFile.delete()) {
+            throw new IOException("Could not delete " + cacheFile);
+        }
+        if (incremental && !nativeThemeMode && outputFile.exists() && cacheFile.exists()
+                && !assetsNewerThan(css, cacheFile.lastModified())) {
             theme.loadResourceFile();
             theme.loadSelectorCacheStatus(cacheFile);
         }
@@ -403,8 +420,22 @@ public class CN1CSSCLI {
             theme.applyLocalizationBundles(localizationBundles);
         }
         theme.save(outputFile);
-        if (incremental) {
+        if (incremental && !nativeThemeMode) {
             theme.saveSelectorChecksums(cacheFile);
+        }
+    }
+
+    private static boolean assetsNewerThan(File css, long time) {
+        try {
+            for (File asset : CssImports.assets(css)) {
+                if (asset.lastModified() > time) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (IOException ex) {
+            // Cannot tell, so nothing is assumed unchanged.
+            return true;
         }
     }
 

@@ -61,6 +61,21 @@ class CssImportDependenciesTest {
     }
 
     @Test
+    void aQuotedImportNameKeepsItsSpaces(@TempDir Path tmp) throws Exception {
+        File dir = tmp.toFile();
+        File css = new File(dir, "css");
+        write(new File(css, "theme.css"), "@import \"../shared/base theme.css\";\n@import url('../shared/more parts.css');\n");
+        File base = write(new File(dir, "shared/base theme.css"), "A { color: red; }\n");
+        File more = write(new File(dir, "shared/more parts.css"), "B { color: red; }\n");
+
+        Set<File> found = CssImportDependencies.outside(css);
+
+        assertEquals(2, found.size(), found.toString());
+        assertTrue(found.contains(base.getCanonicalFile()));
+        assertTrue(found.contains(more.getCanonicalFile()));
+    }
+
+    @Test
     void findsTheAssetsAnOutsideImportNames(@TempDir Path tmp) throws Exception {
         File dir = tmp.toFile();
         File css = new File(dir, "css");

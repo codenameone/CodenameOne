@@ -28,6 +28,7 @@ import com.codename1.designer.css.raster.BorderSide;
 import com.codename1.designer.css.raster.BorderStyle;
 import com.codename1.designer.css.raster.BoxStyle;
 import com.codename1.designer.css.raster.CssBoxRasterizer;
+import com.codename1.designer.css.raster.GradientPainter;
 import com.codename1.designer.css.raster.GradientSpec;
 import com.codename1.designer.css.raster.Shadow;
 import com.codename1.io.JSONParser;
@@ -544,6 +545,13 @@ public class CSSTheme {
                         extent = RadialGradient.EXTENT_FARTHEST_CORNER; sawShapeOrExtent = true;
                     } else if ("at".equals(s)) {
                         sawAt = true;
+                        if (!parsePosition((ScaledUnit) p.getNextLexicalUnit(), centre)) {
+                            return;
+                        }
+                        if (positionEnd != null) {
+                            p = positionEnd;
+                            sawShapeOrExtent = true;
+                        }
                     } else if (sawAt) {
                         applyPositionKeyword(s, centre);
                     } else if (!inPrelude) {
@@ -671,26 +679,14 @@ public class CSSTheme {
                         }
                         consumedHeader = true;
                     } else if ("at".equals(s)) {
-                        ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
-                        if (nx != null && isIdentLike(nx)) {
-                            float[] centre = {cx, cy};
-                            applyPositionKeyword(identValue(nx), centre);
-                            ScaledUnit second = (ScaledUnit) nx.getNextLexicalUnit();
-                            if (second != null && isIdentLike(second)) {
-                                applyPositionKeyword(identValue(second), centre);
-                                nx = second;
-                            }
-                            cx = centre[0]; cy = centre[1];
-                            p = nx;
-                        } else if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
-                            cx = (float) (nx.getNumericValue() / 100f);
-                            ScaledUnit ny = (ScaledUnit) nx.getNextLexicalUnit();
-                            if (ny != null && ny.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
-                                cy = (float) (ny.getNumericValue() / 100f);
-                                p = ny;
-                            } else {
-                                p = nx;
-                            }
+                        float[] centre = {cx, cy};
+                        if (!parsePosition((ScaledUnit) p.getNextLexicalUnit(), centre)) {
+                            return;
+                        }
+                        cx = centre[0];
+                        cy = centre[1];
+                        if (positionEnd != null) {
+                            p = positionEnd;
                         }
                         consumedHeader = true;
                     } else {
@@ -737,6 +733,96 @@ public class CSSTheme {
         /// Applies one position keyword to a centre, touching only the axis it
         /// names, so `at top left` lands in the corner rather than on whichever
         /// edge was written last.
+        /// The last token [#parsePosition] read, or null when it read none.
+        private ScaledUnit positionEnd;
+
+        /// Reads the position that follows `at` in a radial or conic
+        /// gradient into `centre`, as fractions of the box.
+        ///
+        /// One or two values are an x and a y (`left`, `20px 30px`,
+        /// `center top`), a missing one staying where `centre` had it. Three
+        /// or four are offsets from named edges: `right 20px bottom 10px` is
+        /// 20px in from the right and 10px up from the bottom.
+        ///
+        /// #### Returns
+        ///
+        /// false, with [#reason] set, when the position holds a length and
+        /// there is no box to measure it in.
+        private boolean parsePosition(ScaledUnit first, float[] centre) {
+            positionEnd = null;
+            List<ScaledUnit> tokens = new ArrayList<ScaledUnit>();
+            for (ScaledUnit u = first; u != null; u = (ScaledUnit) u.getNextLexicalUnit()) {
+                int t = u.getLexicalUnitType();
+                boolean keyword = isIdentLike(u) && isPositionKeyword(identValue(u));
+                if (!keyword && t != LexicalUnit.SAC_PERCENTAGE && !isLength(t)) {
+                    break;
+                }
+                tokens.add(u);
+            }
+            if (tokens.isEmpty()) {
+                return true;
+            }
+            boolean edgeOffsets = tokens.size() > 2;
+            boolean xSet = false;
+            for (int i = 0; i < tokens.size(); i++) {
+                ScaledUnit u = tokens.get(i);
+                if (!isIdentLike(u)) {
+                    Float f = positionFraction(u, !xSet);
+                    if (f == null) {
+                        return false;
+                    }
+                    centre[xSet ? 1 : 0] = f.floatValue();
+                    xSet = true;
+                    continue;
+                }
+                String s = identValue(u);
+                if ("center".equals(s)) {
+                    centre[xSet ? 1 : 0] = 0.5f;
+                    xSet = true;
+                    continue;
+                }
+                boolean horizontal = "left".equals(s) || "right".equals(s);
+                boolean fromStart = "left".equals(s) || "top".equals(s);
+                float v = fromStart ? 0f : 1f;
+                if (edgeOffsets && i + 1 < tokens.size() && !isIdentLike(tokens.get(i + 1))) {
+                    Float f = positionFraction(tokens.get(i + 1), horizontal);
+                    if (f == null) {
+                        return false;
+                    }
+                    v = fromStart ? f.floatValue() : 1f - f.floatValue();
+                    i++;
+                }
+                centre[horizontal ? 0 : 1] = v;
+                if (horizontal) {
+                    xSet = true;
+                }
+            }
+            positionEnd = tokens.get(tokens.size() - 1);
+            return true;
+        }
+
+        private static boolean isPositionKeyword(String s) {
+            return "left".equals(s) || "right".equals(s) || "top".equals(s) || "bottom".equals(s)
+                    || "center".equals(s);
+        }
+
+        /// One value of a position as a fraction of the box's width or
+        /// height, or null, with [#reason] set, for a length when there is
+        /// no box.
+        private Float positionFraction(ScaledUnit u, boolean horizontal) {
+            if (u.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                return (float) (u.getNumericValue() / 100f);
+            }
+            int basis = horizontal ? rasterWidth : rasterHeight;
+            if (basis <= 0) {
+                // Declining sends the rule to a generated image, where the
+                // length has a box to be measured in.
+                reason = "A length in the position of a gradient cannot be expressed as a native gradient";
+                return null;
+            }
+            return (float) (rasterLength(u, basis) / basis);
+        }
+
         private static void applyPositionKeyword(String s, float[] centre) {
             if ("left".equals(s)) {
                 centre[0] = 0f;
@@ -4742,7 +4828,24 @@ public class CSSTheme {
                 }
             }
             if (gradient != null) {
-                box.gradient(CN1Gradient.describeForRaster((ScaledUnit) gradient, (int) paintWidth, (int) paintHeight));
+                double[] tile = bgImage == null ? explicitBackgroundSize(styles, paintWidth, paintHeight) : null;
+                if (tile == null) {
+                    box.gradient(CN1Gradient.describeForRaster((ScaledUnit) gradient,
+                            (int) paintWidth, (int) paintHeight));
+                } else {
+                    // A gradient given a `background-size` is an image of
+                    // that size, laid out by `background-repeat` like any
+                    // other. An `auto` axis is the whole box, a gradient
+                    // having no size of its own.
+                    int tileW = (int) Math.max(1, Math.round(tile[0] < 0 ? paintWidth : tile[0]));
+                    int tileH = (int) Math.max(1, Math.round(tile[1] < 0 ? paintHeight : tile[1]));
+                    GradientSpec spec = CN1Gradient.describeForRaster((ScaledUnit) gradient, tileW, tileH);
+                    BufferedImage image = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_ARGB);
+                    image.setRGB(0, 0, tileW, tileH,
+                            new GradientPainter(spec, 0, 0, tileW, tileH).paint(tileW, tileH), 0, tileW);
+                    box.backgroundImage(new BackgroundImage(image).withRepeat(rasterRepeat(styles))
+                            .withPosition(0, true, 0, true).withSize(tileW, tileH));
+                }
             }
             if (bgImage != null) {
                 String url = bgImage.getStringValue();
@@ -4802,6 +4905,30 @@ public class CSSTheme {
         private BackgroundImage rasterBackgroundImage(Map<String, LexicalUnit> styles, LexicalUnit bgImage,
                 double boxWidth, double boxHeight) {
             BufferedImage image = readRasterImage(bgImage.getStringValue());
+            BackgroundImage.Repeat repeat = rasterRepeat(styles);
+            BackgroundImage.Size size = BackgroundImage.Size.AUTO;
+            double[] explicit = explicitBackgroundSize(styles, boxWidth, boxHeight);
+            LexicalUnit sizeUnit = styles.get("background-size");
+            if (explicit != null) {
+                size = BackgroundImage.Size.EXPLICIT;
+            } else if (sizeUnit != null && "cover".equals(sizeUnit.getStringValue())) {
+                size = BackgroundImage.Size.COVER;
+            } else if (sizeUnit != null && "contain".equals(sizeUnit.getStringValue())) {
+                size = BackgroundImage.Size.CONTAIN;
+            }
+            // The image sits at the CSS initial position, the top left
+            // corner, because no position ever reaches this point: the
+            // background-position longhand is not a property the compiler
+            // accepts (it is rejected as unsupported before it is stored),
+            // and the shorthand's position keywords are skipped. The page
+            // these images used to be captured from was built from the same
+            // stored properties, so it painted at the top left as well.
+            BackgroundImage layer = new BackgroundImage(image).withRepeat(repeat).withPosition(0, true, 0, true);
+            return explicit != null ? layer.withSize(explicit[0], explicit[1]) : layer.withSize(size);
+        }
+
+        /// The `background-repeat` of a rule, as the painter names it.
+        private BackgroundImage.Repeat rasterRepeat(Map<String, LexicalUnit> styles) {
             BackgroundImage.Repeat repeat = BackgroundImage.Repeat.REPEAT;
             LexicalUnit repeatUnit = styles.get("background-repeat");
             if (repeatUnit != null && repeatUnit.getStringValue() != null) {
@@ -4827,36 +4954,31 @@ public class CSSTheme {
                     repeat = BackgroundImage.Repeat.REPEAT_Y;
                 }
             }
-            BackgroundImage.Size size = BackgroundImage.Size.AUTO;
-            double sizeW = -1;
-            double sizeH = -1;
+            return repeat;
+        }
+
+        /// The width and height a `background-size` written as lengths or
+        /// percentages gives, a negative value standing for an `auto` axis.
+        /// Null when the rule sets none, or sets `auto`, `cover` or `contain`.
+        private double[] explicitBackgroundSize(Map<String, LexicalUnit> styles, double boxWidth, double boxHeight) {
             LexicalUnit sizeUnit = styles.get("background-size");
-            if (sizeUnit != null) {
-                String keyword = sizeUnit.getLexicalUnitType() == LexicalUnit.SAC_IDENT ? sizeUnit.getStringValue() : null;
-                if ("cover".equals(keyword)) {
-                    size = BackgroundImage.Size.COVER;
-                } else if ("contain".equals(keyword)) {
-                    size = BackgroundImage.Size.CONTAIN;
-                } else if (!"auto".equals(keyword) || sizeUnit.getNextLexicalUnit() != null) {
-                    size = BackgroundImage.Size.EXPLICIT;
-                    sizeW = "auto".equals(keyword) ? -1 : rasterLength(sizeUnit, boxWidth);
-                    LexicalUnit second = sizeUnit.getNextLexicalUnit();
-                    if (second != null) {
-                        boolean auto = second.getLexicalUnitType() == LexicalUnit.SAC_IDENT
-                                && "auto".equals(second.getStringValue());
-                        sizeH = auto ? -1 : rasterLength(second, boxHeight);
-                    }
-                }
+            if (sizeUnit == null) {
+                return null;
             }
-            // The image sits at the CSS initial position, the top left
-            // corner, because no position ever reaches this point: the
-            // background-position longhand is not a property the compiler
-            // accepts (it is rejected as unsupported before it is stored),
-            // and the shorthand's position keywords are skipped. The page
-            // these images used to be captured from was built from the same
-            // stored properties, so it painted at the top left as well.
-            BackgroundImage layer = new BackgroundImage(image).withRepeat(repeat).withPosition(0, true, 0, true);
-            return size == BackgroundImage.Size.EXPLICIT ? layer.withSize(sizeW, sizeH) : layer.withSize(size);
+            String keyword = sizeUnit.getLexicalUnitType() == LexicalUnit.SAC_IDENT ? sizeUnit.getStringValue() : null;
+            if ("cover".equals(keyword) || "contain".equals(keyword)
+                    || ("auto".equals(keyword) && sizeUnit.getNextLexicalUnit() == null)) {
+                return null;
+            }
+            double sizeW = "auto".equals(keyword) ? -1 : rasterLength(sizeUnit, boxWidth);
+            double sizeH = -1;
+            LexicalUnit second = sizeUnit.getNextLexicalUnit();
+            if (second != null) {
+                boolean auto = second.getLexicalUnitType() == LexicalUnit.SAC_IDENT
+                        && "auto".equals(second.getStringValue());
+                sizeH = auto ? -1 : rasterLength(second, boxHeight);
+            }
+            return new double[] {sizeW, sizeH};
         }
 
         private BorderImage rasterBorderImage(Map<String, LexicalUnit> styles, LexicalUnit borderImage) {

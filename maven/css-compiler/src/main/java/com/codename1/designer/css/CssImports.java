@@ -82,6 +82,38 @@ public final class CssImports {
         return imported;
     }
 
+    /// [#collect(File)] for a caller that still wants an answer when an
+    /// import cannot be followed: the files found before the broken one, and
+    /// the file that is missing. A watcher needs that one most of all, since
+    /// creating it is what makes the stylesheet compile again.
+    public static Set<File> collectReachable(File css) {
+        Set<File> imported = new java.util.LinkedHashSet<File>();
+        try {
+            inline(css, readFully(css), imported);
+        } catch (MissingImportException ex) {
+            imported.add(ex.getFile());
+        } catch (IOException ex) {
+            // Unreadable or malformed: what was found so far is the answer.
+        }
+        return imported;
+    }
+
+    /// An `@import` that names a file which is not there.
+    public static final class MissingImportException extends IOException {
+        private static final long serialVersionUID = 1L;
+        private final File file;
+
+        MissingImportException(String message, File file) {
+            super(message);
+            this.file = file;
+        }
+
+        /// The file the import names.
+        public File getFile() {
+            return file;
+        }
+    }
+
     /// Every existing local file a `url()` of `css`, or of anything it
     /// imports, names: its images and fonts.
     ///
@@ -177,7 +209,8 @@ public final class CssImports {
             file = new File(current.getParentFile(), target);
         }
         if (!file.isFile()) {
-            throw new IOException("@import in " + current + " names a file that does not exist: " + file);
+            throw new MissingImportException(
+                    "@import in " + current + " names a file that does not exist: " + file, file);
         }
         file = file.getCanonicalFile();
         if (stack.contains(file)) {

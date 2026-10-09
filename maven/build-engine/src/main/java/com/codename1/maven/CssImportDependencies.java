@@ -51,7 +51,7 @@ public final class CssImportDependencies {
     private static final Pattern COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
 
     private static final Pattern IMPORT = Pattern.compile(
-            "@import\\s+(?:url\\(\\s*)?[\"']?([^\"')\\s;]+)", Pattern.CASE_INSENSITIVE);
+            "@import\\s+(?:url\\(\\s*)?(?:\"([^\"]*)\"|'([^']*)'|([^\"')\\s;]+))", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern URL = Pattern.compile(
             "url\\(\\s*[\"']?([^\"')]+?)[\"']?\\s*\\)", Pattern.CASE_INSENSITIVE);
@@ -97,7 +97,10 @@ public final class CssImportDependencies {
             }
             Matcher m = IMPORT.matcher(text);
             while (m.find()) {
-                File file = resolve(css, m.group(1));
+                // A quoted name is taken whole, spaces included; a bare one
+                // ends at the first space.
+                String target = m.group(1) != null ? m.group(1) : m.group(2) != null ? m.group(2) : m.group(3);
+                File file = resolve(css, target);
                 if (file == null || !seen.add(file)) {
                     continue;
                 }
