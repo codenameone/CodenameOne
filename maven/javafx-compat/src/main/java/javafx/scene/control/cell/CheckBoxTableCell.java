@@ -122,8 +122,10 @@ public class CheckBoxTableCell<S, T> extends TableCell<S, T> {
             return callback.call(Integer.valueOf(getIndex()));
         }
         TableColumn<S, T> column = getTableColumn();
-        Object value = column == null ? null : column.getCellObservableValue(getIndex());
-        return value instanceof ObservableValue ? (ObservableValue<Boolean>) value : null;
+        // The column's value is read as a boolean; only the type argument
+        // is taken on trust, and no class is checked for it at run time.
+        ObservableValue<?> value = column == null ? null : column.getCellObservableValue(getIndex());
+        return (ObservableValue<Boolean>) value;
     }
 
     @Override

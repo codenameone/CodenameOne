@@ -130,6 +130,8 @@
             <Class name="javafx.stage.WindowEvent"/>
             <!-- The cell an edit event is about, and the value it ended with. -->
             <Class name="javafx.scene.control.TableColumn$CellEditEvent"/>
+            <!-- The item a tree event is about; transient in JavaFX too. -->
+            <Class name="javafx.scene.control.TreeItem$TreeModificationEvent"/>
         </Or>
         <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
     </Match>
@@ -250,4 +252,24 @@
             <Bug pattern="EI_EXPOSE_REP2"/>
         </Or>
     </Match>
+    <!--
+        These constructors register listeners whose bodies call methods
+        JavaFX declares overridable: Spinner.increment(), ComboBoxBase.show()
+        and hide(), TreeItem.isLeaf() (overridden by every lazily loaded
+        tree), TreeView.refresh(), Parent.requestLayout(). The listener runs
+        on a click or a change, long after construction, and an application
+        override must be the method that runs, so the call is not replaced
+        by a private copy. No constructor here calls one of them itself.
+    -->
+    <Match>
+        <Or>
+            <Class name="javafx.scene.control.ColorPicker"/>
+            <Class name="javafx.scene.control.Spinner"/>
+            <Class name="javafx.scene.control.TreeCell"/>
+            <Class name="javafx.scene.control.TreeItem"/>
+            <Class name="javafx.scene.control.TreeView"/>
+        </Or>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
 </FindBugsFilter>

@@ -79,6 +79,6 @@ public class ListCell<T> extends IndexedCell<T> {
 
     @Override
     boolean striped() {
-        return getIndex() % 2 == 1;
+        return getIndex() > 0 && (getIndex() & 1) != 0;
     }
 }

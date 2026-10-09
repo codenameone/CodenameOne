@@ -313,9 +313,6 @@ public class TextFlow extends Pane {
             return null;
         }
         String s = ((Text) child).getText();
-        if (s == null) {
-            return null;
-        }
         s = s.substring(0, s.length() - trailingFeeds(s));
         return s.indexOf('\n') >= 0 ? null : s;
     }

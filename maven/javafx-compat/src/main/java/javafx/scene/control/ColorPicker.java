@@ -92,7 +92,7 @@ public class ColorPicker extends ComboBoxBase<Color> {
         HBox.setMargin(arrow, new javafx.geometry.Insets(0, 0, 0, 4));
         row.setAlignment(Pos.CENTER_LEFT);
         cn1MadeOf(row);
-        valueProperty().addListener((observable, was, now) -> shown());
+        super.valueProperty().addListener((observable, was, now) -> shown());
         addEventHandler(MouseEvent.MOUSE_CLICKED, e -> {
             if (!isDisabled()) {
                 if (isShowing()) {

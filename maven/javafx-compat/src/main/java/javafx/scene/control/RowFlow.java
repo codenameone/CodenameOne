@@ -149,7 +149,7 @@ final class RowFlow extends Region {
             return;
         }
         for (int row = first; y < getHeight(); row++, y += rh) {
-            if (row % 2 == 1 && y + rh > 0) {
+            if ((row & 1) != 0 && y + rh > 0) {
                 double top = Math.max(0, y);
                 renderer.fillRect(0, top, getWidth(), Math.min(y + rh, getHeight()) - top, alt);
             }

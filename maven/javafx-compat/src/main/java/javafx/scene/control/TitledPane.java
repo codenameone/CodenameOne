@@ -60,21 +60,31 @@ public class TitledPane extends Labeled {
     private final BooleanProperty collapsible = new SimpleBooleanProperty(this, "collapsible", true);
     private final Label title = new Label();
     private final Polygon arrow = new Polygon(0, 0, 8, 4, 0, 8);
-    private final HBox bar = new HBox(6) {
+    private final HBox bar = new Bar();
+    private final StackPane area = new Area();
+
+    /// The title bar, drawn as the standard theme draws it.
+    private static final class Bar extends HBox {
+        Bar() {
+            super(6);
+        }
+
         @Override
         public String cn1DefaultStyle() {
             return "-fx-background-color: -fx-box-border, derive(-fx-color, 50%), linear-gradient(to bottom,"
                     + " derive(-fx-color, 8%), derive(-fx-color, -8%)); -fx-background-insets: 0, 1, 2;"
                     + " -fx-padding: 0.3333em 0.75em 0.3333em 0.75em;";
         }
-    };
-    private final StackPane area = new StackPane() {
+    }
+
+    /// What holds the content, with the border around three sides.
+    private static final class Area extends StackPane {
         @Override
         public String cn1DefaultStyle() {
             return "-fx-background-color: -fx-box-border, -fx-background; -fx-background-insets: 0, 0 1 1 1;"
                     + " -fx-padding: 0.167em;";
         }
-    };
+    }
     private final VBox whole = new VBox(bar, area);
 
     /// Creates a panel with no title and no content.
