@@ -25,6 +25,7 @@ package com.codename1.fxcompat.runtime;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.ReleasableComponent;
 import com.codename1.ui.events.PointerEvent;
 
@@ -391,16 +392,68 @@ public final class SceneInput {
             return false;
         }
         KeyCode code = code(keyCode);
+        if (StagePopup.key(KeyEvent.KEY_PRESSED, code, text(keyCode))) {
+            return true;
+        }
         boolean consumed = scene.cn1Key(KeyEvent.KEY_PRESSED, code, text(keyCode));
         if (keyCode >= 32 && keyCode != 127) {
             consumed |= scene.cn1Key(KeyEvent.KEY_TYPED, KeyCode.UNDEFINED, text(keyCode));
         }
-        return consumed;
+        // Tab is the scene's: it moved the focus in the order of the scene
+        // graph, or the application took the key. A form of a desktop that
+        // is handed Tab as well moves the focus a second time, in an order
+        // of its own, and the two leave it on a control the scene does not
+        // think has it.
+        return consumed || code == KeyCode.TAB || toFocused(scene, keyCode, code, true);
+    }
+
+    /// Hands a key nothing in the scene wanted to the native component of
+    /// the control with the focus, and answers that the form is not to
+    /// have it. A form given a key looks for the component it believes
+    /// has the focus and, finding none or one that makes nothing of the
+    /// key, moves the focus by rules of its own; the focus of a scene is
+    /// the scene's, and a key is for the control the scene says has it.
+    /// Escape stays the form's, which closes a dialog with it.
+    private static boolean toFocused(Scene scene, int keyCode, KeyCode code, boolean down) {
+        if (code == KeyCode.ESCAPE) {
+            return false;
+        }
+        Node owner = scene.getFocusOwner();
+        if (!(owner instanceof Control) || owner.isDisabled()) {
+            return true;
+        }
+        Component nat = ((Control) owner).cn1Native();
+        if (nat == null) {
+            return true;
+        }
+        Component target = nat;
+        Form form = nat.getComponentForm();
+        Component focused = form == null ? null : form.getFocused();
+        for (Component c = focused; c != null; c = c.getParent()) {
+            if (c == nat) {
+                target = focused;
+                break;
+            }
+        }
+        if (target.isEnabled()) {
+            if (down) {
+                target.keyPressed(keyCode);
+            } else {
+                target.keyReleased(keyCode);
+            }
+        }
+        return true;
     }
 
     /// A key came up.
     public static boolean keyReleased(Scene scene, int keyCode) {
-        return scene != null && scene.cn1Key(KeyEvent.KEY_RELEASED, code(keyCode), text(keyCode));
+        if (scene == null) {
+            return false;
+        }
+        KeyCode code = code(keyCode);
+        return StagePopup.key(KeyEvent.KEY_RELEASED, code, text(keyCode))
+                || scene.cn1Key(KeyEvent.KEY_RELEASED, code, text(keyCode)) || code == KeyCode.TAB
+                || toFocused(scene, keyCode, code, false);
     }
 
     private static String text(int keyCode) {

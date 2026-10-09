@@ -29,6 +29,7 @@ import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Side;
 import javafx.scene.Node;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
@@ -122,6 +123,56 @@ final class MenuContent extends Region {
         @Override
         public void handle(MouseEvent event) {
             row.setBackground(background);
+        }
+    }
+
+    private int current = -1;
+
+    /// Does what a key does to an open menu: Down and Up move to the next
+    /// and the previous item that can be chosen, around the ends; Enter
+    /// and Space choose the item moved to; Right opens the sub-menu of
+    /// that item and Left closes a sub-menu; Escape closes the menu.
+    /// Answers whether the key was one of these.
+    boolean key(KeyCode code) {
+        if (code == KeyCode.DOWN) {
+            move(1);
+        } else if (code == KeyCode.UP) {
+            move(-1);
+        } else if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
+            if (current >= 0) {
+                choose(rowItems.get(current));
+            }
+        } else if (code == KeyCode.RIGHT) {
+            if (current >= 0 && rowItems.get(current) instanceof Menu
+                    && !((Menu) rowItems.get(current)).isShowing()) {
+                choose(rowItems.get(current));
+            }
+        } else if (code == KeyCode.LEFT) {
+            if (popup.isSubMenu()) {
+                popup.hide();
+            }
+        } else if (code == KeyCode.ESCAPE) {
+            popup.hide();
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    private void move(int step) {
+        int n = rows.size();
+        int at = current;
+        for (int tries = 0; tries < n; tries++) {
+            at = at < 0 ? (step > 0 ? 0 : n - 1) : (at + step + n) % n;
+            Node row = rows.get(at);
+            if (row instanceof MenuRow && !row.isDisabled()) {
+                if (current >= 0 && rows.get(current) instanceof MenuRow) {
+                    ((MenuRow) rows.get(current)).setBackground(null);
+                }
+                current = at;
+                ((MenuRow) row).setBackground(HOVER);
+                return;
+            }
         }
     }
 

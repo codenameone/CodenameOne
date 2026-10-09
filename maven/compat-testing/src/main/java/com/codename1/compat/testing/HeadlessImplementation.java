@@ -470,6 +470,22 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         }
     }
 
+    private static boolean desktop;
+
+    /// Makes the implementation answer that it is a desktop, as the port
+    /// an application runs on at a desk does, or not. A form of a desktop
+    /// moves the focus itself on Tab and acts on Escape, which a test of
+    /// the keyboard has to run with; a test that asked for it turns it
+    /// off again when it is done.
+    public static void setDesktop(boolean value) {
+        desktop = value;
+    }
+
+    @Override
+    public boolean isDesktop() {
+        return desktop;
+    }
+
     @Override
     public boolean isTouchDevice() {
         return true;

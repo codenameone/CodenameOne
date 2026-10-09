@@ -47,6 +47,8 @@ import javafx.event.EventDispatchChain;
 import javafx.event.EventHandler;
 import javafx.event.EventTarget;
 import javafx.event.EventType;
+import javafx.geometry.Bounds;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
@@ -54,6 +56,7 @@ import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
@@ -341,6 +344,8 @@ public class Scene implements EventTarget {
         return accelerators;
     }
 
+    private ButtonBase keyArmed;
+
     private boolean runAccelerator(KeyEvent event) {
         if (accelerators != null && !accelerators.isEmpty()) {
             ArrayList<KeyCombination> keys = new ArrayList<KeyCombination>(accelerators.keySet());
@@ -540,6 +545,55 @@ public class Scene implements EventTarget {
             next = (at + (backward ? order.size() - 1 : 1)) % order.size();
         }
         cn1SetFocusOwner(order.get(next), true);
+    }
+
+    /// Moves the focus from a node to the nearest one that takes it in
+    /// the direction of an arrow key, as the arrows do on a button, which
+    /// has no use of its own for them. Nearest counts the distance along
+    /// the arrow once and the distance across it twice, so a node straight
+    /// ahead wins over a closer one off to the side. Answers whether the
+    /// key was an arrow.
+    private boolean traverseTowards(KeyCode code, Node from) {
+        int dx = code == KeyCode.LEFT ? -1 : code == KeyCode.RIGHT ? 1 : 0;
+        int dy = code == KeyCode.UP ? -1 : code == KeyCode.DOWN ? 1 : 0;
+        if (dx == 0 && dy == 0) {
+            return false;
+        }
+        ArrayList<Node> order = new ArrayList<Node>();
+        if (getRoot() != null) {
+            collectTraversable(getRoot(), order);
+        }
+        Bounds here = from.localToScene(from.getBoundsInLocal());
+        if (here == null) {
+            return true;
+        }
+        double hx = (here.getMinX() + here.getMaxX()) / 2;
+        double hy = (here.getMinY() + here.getMaxY()) / 2;
+        Node best = null;
+        double bestCost = 0;
+        for (int i = 0; i < order.size(); i++) {
+            Node n = order.get(i);
+            Bounds b = n == from ? null : n.localToScene(n.getBoundsInLocal());
+            if (b == null) {
+                continue;
+            }
+            double ox = (b.getMinX() + b.getMaxX()) / 2 - hx;
+            double oy = (b.getMinY() + b.getMaxY()) / 2 - hy;
+            double along = dx != 0 ? ox * dx : oy * dy;
+            double across = Math.abs(dx != 0 ? oy : ox);
+            if (along <= 0 || across > along * 2) {
+                continue;
+            }
+            double cost = along + across * 2;
+            if (best == null || cost < bestCost) {
+                best = n;
+                bestCost = cost;
+            }
+        }
+        if (best != null) {
+            cn1SetFocusOwner(best, true);
+        }
+        return true;
     }
 
     // ------------------------------------------------------------ input
@@ -823,6 +877,9 @@ public class Scene implements EventTarget {
         if (deliverable(target)) {
             handled[0] = cn1FireAndReport(target, event);
         }
+        if (!handled[0] && kind != KeyEvent.KEY_TYPED && pressFocused(kind, code, owner)) {
+            return true;
+        }
         if (kind == KeyEvent.KEY_PRESSED && !handled[0] && SceneInput.altDown() && code != null
                 && (code.isLetterKey() || code.isDigitKey()) && code.getName().length() == 1
                 && mnemonic(getRoot(), Mnemonics.upper(code.getName().charAt(0)))) {
@@ -831,10 +888,77 @@ public class Scene implements EventTarget {
         if (kind == KeyEvent.KEY_PRESSED && !handled[0] && runAccelerator(event)) {
             return EventHandlerManager.wasConsumedByFilter();
         }
+        if (kind == KeyEvent.KEY_PRESSED && !handled[0] && fireStanding(code, owner)) {
+            return true;
+        }
         if (kind == KeyEvent.KEY_PRESSED && code == KeyCode.TAB && !handled[0]) {
             traverse(SceneInput.shiftDown());
         }
+        if (kind == KeyEvent.KEY_PRESSED && !handled[0] && owner instanceof ButtonBase && traverseTowards(code, owner)) {
+            return true;
+        }
         return EventHandlerManager.wasConsumedByFilter();
+    }
+
+    /// What Space and Enter do to the button with the focus: the press
+    /// arms it and the release fires it, as a press and a release of the
+    /// pointer over it do. The scene does this itself, and answers that
+    /// the key is spoken for, because the native component of the button
+    /// is told about a key only by a port that knows it has the focus,
+    /// and would then act a second time.
+    private boolean pressFocused(EventType<KeyEvent> kind, KeyCode code, Node owner) {
+        if ((code != KeyCode.ENTER && code != KeyCode.SPACE) || !(owner instanceof ButtonBase)
+                || owner.isDisabled()) {
+            return false;
+        }
+        ButtonBase button = (ButtonBase) owner;
+        if (kind == KeyEvent.KEY_PRESSED) {
+            keyArmed = button;
+            button.arm();
+        } else if (keyArmed == button) {
+            keyArmed = null;
+            if (button.isArmed()) {
+                button.disarm();
+                button.fire();
+            }
+        }
+        return true;
+    }
+
+    /// Enter fires the default button of the scene and Escape its cancel
+    /// button, when nothing nearer the focus wanted the key. A text
+    /// control keeps Enter: it reports its own action.
+    private boolean fireStanding(KeyCode code, Node owner) {
+        boolean enter = code == KeyCode.ENTER && !(owner instanceof TextInputControl);
+        if (!enter && code != KeyCode.ESCAPE) {
+            return false;
+        }
+        Button standing = standing(getRoot(), enter);
+        if (standing == null) {
+            return false;
+        }
+        standing.fire();
+        return true;
+    }
+
+    private static Button standing(Node node, boolean isDefault) {
+        if (node == null || !node.isVisible() || node.isDisabled()) {
+            return null;
+        }
+        if (node instanceof Button) {
+            Button b = (Button) node;
+            return (isDefault ? b.isDefaultButton() : b.isCancelButton()) ? b : null;
+        }
+        if (node instanceof Parent) {
+            List<Node> children = ((Parent) node).getChildrenUnmodifiable();
+            for (int i = 0; i < children.size(); i++) {
+                Button found = standing(children.get(i), isDefault);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
     }
 
     /// Acts on the first control under a node that is on screen, enabled
