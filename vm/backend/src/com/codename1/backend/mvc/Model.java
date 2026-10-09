@@ -25,7 +25,7 @@ package com.codename1.backend.mvc;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Request-owned model shared by a controller and its compiled view. */
+/// Request-owned model shared by a controller and its compiled view.
 public final class Model {
     private final Map<String, Object> values = new LinkedHashMap<String, Object>();
 

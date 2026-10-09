@@ -411,6 +411,26 @@ public class MvcTemplatesTest {
     }
 
     @Test
+    public void urlSchemesAreIndependentOfDefaultLocale() {
+        Locale previous = Locale.getDefault();
+        try {
+            Locale.setDefault(new Locale("tr", "TR"));
+            for (String url : Arrays.asList("HTTPS://example.test/", "MaIlTo:test@example.test", "TEL:123", "/products")) {
+                Html.safeUrl(url);
+            }
+            for (String url : Arrays.asList("JAVASCRIPT:alert(1)", "ma\u0131lto:test@example.test", "ma\u0130lto:test@example.test")) {
+                try {
+                    Html.safeUrl(url);
+                    fail(url);
+                } catch (IllegalArgumentException expected) {
+                }
+            }
+        } finally {
+            Locale.setDefault(previous);
+        }
+    }
+
+    @Test
     public void modelErrorsAndUnsafeRedirects() throws Exception {
         setup();
         template("a", DECL + "<p th:text=\"${product.name}\"></p>");

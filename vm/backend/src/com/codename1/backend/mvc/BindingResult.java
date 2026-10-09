@@ -28,7 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Conversion errors, submitted values, and application validation for one form. */
+/// Conversion errors, submitted values, and application validation for one form.
 public final class BindingResult {
     private final Map<String, String> values = new LinkedHashMap<String, String>();
     private final Map<String, List<String>> errors = new LinkedHashMap<String, List<String>>();
@@ -66,9 +66,13 @@ public final class BindingResult {
     public String messages(String field) {
         StringBuilder text = new StringBuilder();
         for (Map.Entry<String, List<String>> entry : errors.entrySet()) {
-            if (!"*".equals(field) && !entry.getKey().equals(field)) continue;
+            if (!"*".equals(field) && !entry.getKey().equals(field)) {
+                continue;
+            }
             for (String message : entry.getValue()) {
-                if (text.length() > 0) text.append("; ");
+                if (text.length() > 0) {
+                    text.append("; ");
+                }
                 text.append(message);
             }
         }

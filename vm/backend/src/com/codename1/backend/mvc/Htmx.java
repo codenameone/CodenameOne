@@ -24,7 +24,7 @@ package com.codename1.backend.mvc;
 
 import com.codename1.backend.HttpServer;
 
-/** Helpers for the htmx wire protocol. */
+/// Helpers for the htmx wire protocol.
 public final class Htmx {
     private Htmx() {}
 
@@ -47,12 +47,14 @@ public final class Htmx {
     }
 
     public static HttpServer.Response trigger(HttpServer.Response response, String event) {
-        if (event == null || event.length() == 0 || !letter(event.charAt(0)))
+        if (event == null || event.length() == 0 || !letter(event.charAt(0))) {
             throw new IllegalArgumentException("Invalid htmx event name");
+        }
         for (int i = 1; i < event.length(); i++) {
             char c = event.charAt(i);
-            if (!letter(c) && !(c >= '0' && c <= '9') && "_:.-".indexOf(c) < 0)
+            if (!letter(c) && !(c >= '0' && c <= '9') && "_:.-".indexOf(c) < 0) {
                 throw new IllegalArgumentException("Invalid htmx event name");
+            }
         }
         return response.header("HX-Trigger", event);
     }

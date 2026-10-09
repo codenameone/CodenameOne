@@ -22,7 +22,7 @@
  */
 package com.codename1.backend.mvc;
 
-/** A compiled view name and the values supplied to it. */
+/// A compiled view name and the values supplied to it.
 public final class ModelAndView {
     private final String viewName;
     private final Model model = new Model();

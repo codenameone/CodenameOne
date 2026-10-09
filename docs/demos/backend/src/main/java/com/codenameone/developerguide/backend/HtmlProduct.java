@@ -20,26 +20,17 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.backend.mvc;
+package com.codenameone.developerguide.backend;
 
-/// Strict scalar form conversion used by generated binders.
-public final class FormValues {
-    private FormValues() {}
+public final class HtmlProduct {
+    private final int id;
+    private final String name;
 
-    public static Boolean bool(String raw) {
-        if ("true".equalsIgnoreCase(raw) || "on".equalsIgnoreCase(raw) || "1".equals(raw)) {
-            return Boolean.TRUE;
-        }
-        if ("false".equalsIgnoreCase(raw) || "off".equalsIgnoreCase(raw) || "0".equals(raw)) {
-            return Boolean.FALSE;
-        }
-        throw new IllegalArgumentException("Invalid boolean");
+    public HtmlProduct(int id, String name) {
+        this.id = id;
+        this.name = name;
     }
 
-    public static Character character(String raw) {
-        if (raw == null || raw.length() != 1) {
-            throw new IllegalArgumentException("Invalid character");
-        }
-        return Character.valueOf(raw.charAt(0));
-    }
+    public int getId() { return id; }
+    public String getName() { return name; }
 }

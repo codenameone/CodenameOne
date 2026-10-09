@@ -22,7 +22,7 @@
  */
 package com.codename1.backend.annotations;
 import java.lang.annotation.*;
-/** Build-time MVC declaration. */
+/// Build-time MVC declaration.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Controller {  }

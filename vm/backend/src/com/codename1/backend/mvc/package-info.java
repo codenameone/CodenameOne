@@ -20,26 +20,6 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+/// Typed models, form binding results, and HTML/htmx helpers for build-time compiled views.
+/// Renderers call these primitives directly; templates and expressions are compiled during the build.
 package com.codename1.backend.mvc;
-
-/// Strict scalar form conversion used by generated binders.
-public final class FormValues {
-    private FormValues() {}
-
-    public static Boolean bool(String raw) {
-        if ("true".equalsIgnoreCase(raw) || "on".equalsIgnoreCase(raw) || "1".equals(raw)) {
-            return Boolean.TRUE;
-        }
-        if ("false".equalsIgnoreCase(raw) || "off".equalsIgnoreCase(raw) || "0".equals(raw)) {
-            return Boolean.FALSE;
-        }
-        throw new IllegalArgumentException("Invalid boolean");
-    }
-
-    public static Character character(String raw) {
-        if (raw == null || raw.length() != 1) {
-            throw new IllegalArgumentException("Invalid character");
-        }
-        return Character.valueOf(raw.charAt(0));
-    }
-}

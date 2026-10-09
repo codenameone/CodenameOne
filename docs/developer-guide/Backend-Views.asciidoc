@@ -21,14 +21,7 @@ constructor injection, sessions and security chains as a REST controller.
 
 [source,java]
 ----
-@Controller
-public class Products {
-    @GetMapping("/products")
-    public String list(Model model) {
-        model.addAttribute("products", products.findAll());
-        return "products";
-    }
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/HtmlProducts.java[tag=backend-views-controller,indent=0]
 ----
 
 A string return value selects a compiled view. `products` selects
@@ -48,13 +41,7 @@ Declare model types with comments. Names are explicit and types are fully qualif
 
 [source,html]
 ----
-<!-- cn1:model products java.util.List<com.example.Product> -->
-<ul th:fragment="rows">
-  <li th:each="product : ${products}">
-    <a th:href="@{/products/{id}(id=${product.id})}"
-       th:text="${product.name}">Example product</a>
-  </li>
-</ul>
+include::../demos/backend/src/main/snippets/products.html[tag=backend-views-list,indent=0]
 ----
 
 The build resolves public JavaBean getters or public fields and emits direct
@@ -97,18 +84,7 @@ A mapped method can receive a dedicated form DTO:
 
 [source,java]
 ----
-@PostMapping("/products")
-public String save(@ModelAttribute("form") ProductForm form,
-                   BindingResult errors, Model model) {
-    if (form.name == null || form.name.trim().isEmpty()) {
-        errors.rejectValue("name", "Enter a name.");
-    }
-    if (errors.hasErrors()) {
-        return "edit";
-    }
-    products.save(form);
-    return "redirect:/products";
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/HtmlProducts.java[tag=backend-views-save,indent=0]
 ----
 
 Form DTOs need a public no-argument constructor and writable scalar fields or
@@ -125,13 +101,7 @@ are not implemented.
 
 [source,html]
 ----
-<!-- cn1:model form com.example.ProductForm -->
-<form method="post" action="/products" th:object="${form}">
-  <label for="name">Name</label>
-  <input th:field="*{name}">
-  <span th:errors="*{name}"></span>
-  <button type="submit">Save</button>
-</form>
+include::../demos/backend/src/main/snippets/edit.html[tag=backend-views-form,indent=0]
 ----
 
 `th:field` renders the name, a default id, and the submitted value if binding failed.

@@ -27,7 +27,7 @@ import com.codename1.backend.HttpServer;
 import com.codename1.backend.security.CsrfToken;
 import com.codename1.impl.backend.security.SecuritySupport;
 
-/** Primitives called by generated views; no template evaluation occurs here. */
+/// Primitives called by generated views; no template evaluation occurs here.
 public final class Html {
     private Html() {}
 
@@ -61,30 +61,41 @@ public final class Html {
         String s = string(value);
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c == '&') out.putAscii("&amp;");
-            else if (c == '<') out.putAscii("&lt;");
-            else if (c == '>') out.putAscii("&gt;");
-            else if (c == '"') out.putAscii("&quot;");
-            else if (c == '\'') out.putAscii("&#39;");
-            else if (Character.isHighSurrogate(c)
+            if (c == '&') {
+                out.putAscii("&amp;");
+            } else if (c == '<') {
+                out.putAscii("&lt;");
+            } else if (c == '>') {
+                out.putAscii("&gt;");
+            } else if (c == '"') {
+                out.putAscii("&quot;");
+            } else if (c == '\'') {
+                out.putAscii("&#39;");
+            } else if (Character.isHighSurrogate(c)
                     && i + 1 < s.length()
                     && Character.isLowSurrogate(s.charAt(i + 1))) {
                 out.putCodePoint(Character.toCodePoint(c, s.charAt(++i)));
-            } else out.putCodePoint(Character.isSurrogate(c) ? 0xfffd : c);
+            } else {
+                out.putCodePoint(Character.isSurrogate(c) ? 0xfffd : c);
+            }
         }
     }
 
     public static void attribute(ByteSink out, String name, Object value) {
-        if (value == null) return;
-        if (name.equals("href")
-                || name.equals("src")
-                || name.equals("action")
-                || name.equals("formaction")
-                || name.equals("hx-get")
-                || name.equals("hx-post")
-                || name.equals("hx-put")
-                || name.equals("hx-patch")
-                || name.equals("hx-delete")) safeUrl(string(value));
+        if (value == null) {
+            return;
+        }
+        if ("href".equals(name)
+                || "src".equals(name)
+                || "action".equals(name)
+                || "formaction".equals(name)
+                || "hx-get".equals(name)
+                || "hx-post".equals(name)
+                || "hx-put".equals(name)
+                || "hx-patch".equals(name)
+                || "hx-delete".equals(name)) {
+            safeUrl(string(value));
+        }
         out.put(' ');
         out.putAscii(name);
         out.putAscii("=\"");
@@ -93,7 +104,9 @@ public final class Html {
     }
 
     public static void booleanAttribute(ByteSink out, String name, Object value) {
-        if (truth(value)) attribute(out, name, name);
+        if (truth(value)) {
+            attribute(out, name, name);
+        }
     }
 
     public static String urlPart(Object value) {
@@ -108,8 +121,11 @@ public final class Html {
                     || c == '-'
                     || c == '_'
                     || c == '.'
-                    || c == '~') out.append((char) c);
-            else out.append('%').append(hex.charAt(c >> 4)).append(hex.charAt(c & 15));
+                    || c == '~') {
+                out.append((char) c);
+            } else {
+                out.append('%').append(hex.charAt(c >> 4)).append(hex.charAt(c & 15));
+            }
         }
         return out.toString();
     }
@@ -119,8 +135,9 @@ public final class Html {
     }
 
     public static Object require(Model model, String name, String view) {
-        if (!model.containsAttribute(name))
+        if (!model.containsAttribute(name)) {
             throw new IllegalStateException("Missing model '" + name + "' for " + view);
+        }
         return model.getAttribute(name);
     }
 
@@ -136,7 +153,9 @@ public final class Html {
 
     public static boolean checked(Object value, Object candidate) {
         if ("true".equalsIgnoreCase(string(candidate))
-                && ("on".equalsIgnoreCase(string(value)) || "1".equals(string(value)))) return true;
+                && ("on".equalsIgnoreCase(string(value)) || "1".equals(string(value)))) {
+            return true;
+        }
         return string(value).equals(string(candidate));
     }
 
@@ -146,7 +165,9 @@ public final class Html {
 
     public static void csrf(ByteSink out, Model model) {
         CsrfToken token = (CsrfToken) model.getAttribute("_csrf");
-        if (token == null) return;
+        if (token == null) {
+            return;
+        }
         out.putAscii("<input type=\"hidden\"");
         attribute(out, "name", token.getParameterName());
         attribute(out, "value", token.getToken());
@@ -154,28 +175,41 @@ public final class Html {
     }
 
     public static void safeUrl(String value) {
-        String lower = value.trim().toLowerCase();
-        for (int i = 0; i < lower.length(); i++)
-            if (lower.charAt(i) < 32 || lower.charAt(i) == 127 || lower.charAt(i) == '\\')
+        // URI schemes are ASCII. Avoid both locale dependence and runtime Locale support.
+        char[] chars = value.trim().toCharArray();
+        for (int i = 0; i < chars.length; i++) {
+            if (chars[i] >= 'A' && chars[i] <= 'Z') {
+                chars[i] = (char) (chars[i] + ('a' - 'A'));
+            }
+        }
+        String lower = new String(chars);
+        for (int i = 0; i < lower.length(); i++) {
+            if (lower.charAt(i) < 32 || lower.charAt(i) == 127 || lower.charAt(i) == '\\') {
                 throw new IllegalArgumentException("Invalid URL");
+            }
+        }
         int colon = lower.indexOf(':');
         if (colon >= 0
                 && !lower.startsWith("https:")
                 && !lower.startsWith("http:")
                 && !lower.startsWith("mailto:")
-                && !lower.startsWith("tel:"))
+                && !lower.startsWith("tel:")) {
             throw new IllegalArgumentException("Unsafe URL scheme");
+        }
     }
 
     public static void localLocation(String location) {
         if (location == null
                 || !location.startsWith("/")
                 || location.startsWith("//")
-                || location.indexOf('\\') >= 0)
+                || location.indexOf('\\') >= 0) {
             throw new IllegalArgumentException("Redirect must be a local absolute path");
-        for (int i = 0; i < location.length(); i++)
-            if (location.charAt(i) <= 32 || location.charAt(i) == 127)
+        }
+        for (int i = 0; i < location.length(); i++) {
+            if (location.charAt(i) <= 32 || location.charAt(i) == 127) {
                 throw new IllegalArgumentException("Invalid redirect");
+            }
+        }
     }
 
     public static HttpServer.Response redirect(HttpServer.Request request, String location) {

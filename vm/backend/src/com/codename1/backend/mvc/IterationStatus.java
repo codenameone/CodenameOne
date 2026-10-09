@@ -22,9 +22,10 @@
  */
 package com.codename1.backend.mvc;
 
-/** Thymeleaf-style iteration status for a compiled loop. */
+/// Thymeleaf-style iteration status for a compiled loop.
 public final class IterationStatus {
-    private final int index, size;
+    private final int index;
+    private final int size;
 
     public IterationStatus(int index, int size) {
         this.index = index;
