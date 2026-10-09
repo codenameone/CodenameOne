@@ -25,6 +25,7 @@ package com.codename1.jsfixture;
 import com.codename1.components.SpanLabel;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.Button;
+import com.codename1.ui.ComboBox;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
@@ -45,6 +46,10 @@ public class CompositedApp extends Lifecycle {
         String query = Display.getInstance().getProperty("browser.window.location.search", "");
         if (query.indexOf("screen=picker") >= 0) {
             showPicker();
+            return;
+        }
+        if (query.indexOf("screen=combo") >= 0) {
+            showCombo();
             return;
         }
         Form hi = new Form("Hi World", BoxLayout.y());
@@ -77,6 +82,21 @@ public class CompositedApp extends Lifecycle {
         });
         form.add(picker);
         form.add(picked);
+        form.show();
+    }
+
+    /// A ComboBox for the keyboard checks: its popup is a list, which the accessibility tree
+    /// mirrors as a focused `listbox` element, and that is where the page's key events land.
+    private void showCombo() {
+        Form form = new Form("Combo", BoxLayout.y());
+        ComboBox<String> combo = new ComboBox<String>("Alpha", "Beta", "Gamma", "Delta");
+        Label chose = new Label("Chose nothing");
+        combo.addActionListener(e -> {
+            chose.setText("Chose " + combo.getSelectedItem());
+            form.revalidate();
+        });
+        form.add(combo);
+        form.add(chose);
         form.show();
     }
 

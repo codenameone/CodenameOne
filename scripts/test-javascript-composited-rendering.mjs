@@ -43,6 +43,8 @@
  *     - a click on a string Picker puts its native <select> on the page, opens the list where
  *       the browser can, and a choice made there reaches the Picker (it failed with "Option is
  *       not defined"; also run on the phone);
+ *     - the arrow keys move a ComboBox popup's selection and Escape closes it (Bootstrap
+ *       cancelled those keys on the accessibility tree's listbox element);
  *   phone (Chromium with touch emulation):
  *     - a swipe scrolls the content (#5912: it did nothing at all);
  *     - a tap on the hamburger opens the side menu, and a tap on a button fires it (#5912);
@@ -242,6 +244,60 @@ async function picker(name, page, press) {
   fs.writeFileSync(path.join(outDir, `${name}-picker-console.txt`), logs.join('\n'));
 }
 
+// The keyboard in a list. The accessibility tree mirrors a Codename One list as an element
+// with the role "listbox" and focuses it, and Bootstrap, which the page loads, cancels Up,
+// Down, Escape and Space on every element with that role: the keys stopped at the document, so
+// the arrows did not move a ComboBox popup's selection and Escape did not close it.
+async function comboKeys(name, page) {
+  const logs = [];
+  await boot(page, logs, '?screen=combo', 'chose nothing');
+  const waitText = async (text) => {
+    try {
+      await page.waitForFunction((t) => Array.from(document.querySelectorAll('#cn1-text-layer span'))
+        .some((s) => s.textContent.trim().toLowerCase() === t), text, { timeout: 10000 });
+      return true;
+    } catch (err) {
+      return false;
+    }
+  };
+  const face = await span(page, 'Alpha');
+  check(!!face, `${name}: the ComboBox shows its value`);
+  if (face) {
+    const closed = await page.screenshot();
+    const band = [Math.ceil(face.bottom) + 30, 440];
+    await page.mouse.click(face.x, face.y);
+    await page.waitForTimeout(1500);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Enter');
+    check(await waitText('chose gamma'), `${name}: the arrow keys move a ComboBox popup's selection`,
+      logs.filter((l) => /Exception/.test(l)).slice(0, 1).join(''));
+    await page.waitForTimeout(1000);
+    const reopenAt = await span(page, 'Gamma');
+    if (reopenAt) {
+      await page.mouse.click(reopenAt.x, reopenAt.y);
+      await page.waitForTimeout(1500);
+      const open = await page.screenshot({ path: path.join(outDir, `${name}-combo-open.png`) });
+      const opened = await diffFraction(page, closed, open, band);
+      check(opened > 0.02, `${name}: a click opens the ComboBox popup`, `${(opened * 100).toFixed(2)}% changed`);
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(1500);
+      const after = await page.screenshot({ path: path.join(outDir, `${name}-combo-escaped.png`) });
+      const left = await diffFraction(page, closed, after, band);
+      check(left < 0.01, `${name}: Escape closes a ComboBox popup`, `${(left * 100).toFixed(2)}% of the popup's area still differs`);
+      const kept = await span(page, 'Chose Gamma');
+      check(!!kept, `${name}: Escape leaves the ComboBox's value alone`);
+    } else {
+      check(false, `${name}: the ComboBox shows the chosen value`);
+    }
+  }
+  fs.writeFileSync(path.join(outDir, `${name}-combo-console.txt`), logs.join('\n'));
+}
+
 async function desktop(name, browserType) {
   const browser = await browserType.launch();
   try {
@@ -314,6 +370,11 @@ async function desktop(name, browserType) {
     {
       const page = await browser.newPage({ viewport: { width: 1000, height: 450 } });
       await picker(name, page, (x, y) => page.mouse.click(x, y));
+      await page.close();
+    }
+    {
+      const page = await browser.newPage({ viewport: { width: 1000, height: 450 } });
+      await comboKeys(name, page);
       await page.close();
     }
   } finally {

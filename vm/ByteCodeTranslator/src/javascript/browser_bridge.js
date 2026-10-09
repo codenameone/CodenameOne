@@ -7376,6 +7376,38 @@
   }
   try { installMenuAccelerators(); } catch (e) { /* non-fatal */ }
 
+  // Bootstrap's dropdown plugin, loaded by the page, delegates a document keydown handler to
+  // every [role="menu"] and [role="listbox"] element and cancels Up, Down, Escape and Space
+  // there. It means them for its own dropdown markup, but the accessibility tree gives a
+  // Codename One list the role "listbox" and focuses it, so with a list focused those keys
+  // were stopped at the document and never reached the application: the arrows did not move
+  // the selection and Escape did not close a ComboBox popup. Nothing here uses Bootstrap's
+  // dropdowns by role, so the two delegations are removed; the one bound to
+  // [data-toggle="dropdown"] is left alone.
+  //
+  // Done on the way down of the first keydown, not at load: the page may load Bootstrap after
+  // this file, and a handler removed before jQuery's document dispatch runs is not called
+  // for that same event.
+  function releaseListKeysFromBootstrap() {
+    var jq = global.jQuery;
+    if (!jq || !jq.fn || !jq.fn.dropdown) {
+      return false;
+    }
+    jq(document).off('keydown.bs.dropdown.data-api', '[role="menu"]')
+        .off('keydown.bs.dropdown.data-api', '[role="listbox"]');
+    return true;
+  }
+  if (global.document && typeof global.document.addEventListener === 'function') {
+    var releaseOnKeydown = function() {
+      try {
+        if (releaseListKeysFromBootstrap()) {
+          global.document.removeEventListener('keydown', releaseOnKeydown, true);
+        }
+      } catch (e) { /* non-fatal */ }
+    };
+    global.document.addEventListener('keydown', releaseOnKeydown, true);
+  }
+
   // An open HTML menu closes on a press anywhere else -- the app's canvas, the title bar, a
   // native text field, a DOM peer such as a BrowserComponent. Listening on the canvas alone
   // missed all but the first: peer routing sets the canvas to pointer-events: none over peers,
