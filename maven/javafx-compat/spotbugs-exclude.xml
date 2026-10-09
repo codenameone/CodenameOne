@@ -214,8 +214,8 @@
     </Match>
 
     <!--
-        The default style engine and the FXML registry are created on first
-        use, on the JavaFX application thread like every call of the layer:
+        The default style engine, the FXML registry and the property registry
+        are created on first use, on the JavaFX application thread like every call of the layer:
         Codename One is single threaded, and a lock or a volatile here would
         be the only ones in the runtime.
     -->
@@ -227,6 +227,10 @@
             </And>
             <And>
                 <Class name="com.codename1.fxcompat.runtime.FxmlDispatch"/>
+                <Method name="current"/>
+            </And>
+            <And>
+                <Class name="com.codename1.fxcompat.runtime.PropertyAccess"/>
                 <Method name="current"/>
             </And>
         </Or>
