@@ -494,6 +494,13 @@ isn't available.
 `ImageIcon`, `ImageIO.read` and the JavaFX `Image` decode PNG and JPEG
 through the platform. A JavaFX `Image` doesn't load `http` or `https` URLs.
 
+A device has no working directory, so a relative `file:` URL such as
+`new Image("file:resources/logo.png")` is looked for in two places: the
+application's home directory, where a relative `File` path the application
+wrote ends up, and then the bundled resources under the same path. An image
+that isn't found doesn't throw. As in JavaFX, `isError()` answers `true` and
+`getException()` holds the reason.
+
 ==== Third-party libraries
 
 A library written against Swing or JavaFX itself, such as a layout

@@ -23,6 +23,7 @@
 package com.codename1.fxcompat.runtime;
 
 import com.codename1.compat.jdk.Resources;
+import com.codename1.io.FileSystemStorage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -141,6 +142,59 @@ public final class ResourceUrls {
     public static InputStream open(String url) {
         String path = find(url);
         return path == null ? null : Resources.open(path);
+    }
+
+    /// Opens what a `file:` URL string names, or answers `null`; nothing a
+    /// port throws leaves here.
+    ///
+    /// A port's file system takes absolute `file:/` paths only and throws
+    /// for anything else, so the URL is never handed over as written. An
+    /// absolute one is read from the file system. A relative one --
+    /// `file:resources/logo.png`, which a desktop reads from the working
+    /// directory -- is looked for in the application home first, where the
+    /// `File` shim puts a relative path the application wrote, and then
+    /// among the bundled resources, where the files a desktop project kept
+    /// beside its jar end up. An absolute URL that names no file is tried
+    /// as a resource too: it may be a desktop build directory.
+    public static InputStream openFile(String url) {
+        String rest = url;
+        if (rest.regionMatches(true, 0, "file:", 0, 5)) {
+            rest = rest.substring(5);
+        }
+        int query = rest.indexOf('?');
+        if (query >= 0) {
+            rest = rest.substring(0, query);
+        }
+        rest = decode(rest);
+        InputStream in = null;
+        try {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            String storage;
+            if (rest.startsWith("/")) {
+                int start = 0;
+                while (start + 1 < rest.length() && rest.charAt(start + 1) == '/') {
+                    start++;
+                }
+                storage = "file://" + rest.substring(start);
+            } else {
+                String home = fs.getAppHomePath();
+                if (home == null || rest.length() == 0) {
+                    storage = null;
+                } else {
+                    storage = home.endsWith("/") ? home + rest : home + "/" + rest;
+                }
+            }
+            if (storage != null && fs.exists(storage) && !fs.isDirectory(storage)) {
+                in = fs.openInputStream(storage);
+            }
+        } catch (IOException unreadable) {
+            in = null;
+        } catch (RuntimeException refused) {
+            // A port rejects a path it does not like by throwing; the
+            // caller is told the file is not there, as a desktop is.
+            in = null;
+        }
+        return in != null ? in : open(url);
     }
 
     /// Reads a stream to its end. The stream is left open.

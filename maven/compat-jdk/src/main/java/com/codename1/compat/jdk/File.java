@@ -116,17 +116,20 @@ public class File implements Comparable<File>, java.io.Serializable {
 
     /// The `FileSystemStorage` path for this file.
     public String storagePath() {
-        if (path.startsWith("file:")) {
+        if (path.startsWith("file:/")) {
             return path;
         }
         if (path.startsWith("/")) {
             return "file://" + path;
         }
+        // A relative path, a "file:" with no slash after it included: a
+        // port's file system throws for anything but an absolute file:/.
+        String rel = path.startsWith("file:") ? path.substring(5) : path;
         String home = FileSystemStorage.getInstance().getAppHomePath();
         if (!home.endsWith("/")) {
             home = home + "/";
         }
-        return home + path;
+        return home + rel;
     }
 
     private static FileSystemStorage fs() {

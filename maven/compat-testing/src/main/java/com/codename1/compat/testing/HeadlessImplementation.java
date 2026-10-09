@@ -775,8 +775,20 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     /// exact same path, so tests can see which path the runtime addressed.
     public static final java.util.Map<String, byte[]> FILES = new java.util.HashMap<String, byte[]>();
 
+    /// Refuses what a real port's file system refuses: a path that is not
+    /// an absolute `file:/` one. The simulator throws exactly this for a
+    /// relative path or a bare `file:name`, so code that hands one over
+    /// must fail here too rather than pass a test and die on a device.
+    private static void checkPath(java.lang.Object path) {
+        if (path instanceof String && !((String) path).startsWith("file:/")) {
+            throw new IllegalArgumentException(path + " is not a valid path, use "
+                    + "FileSystemStorage.getInstance().getAppHomePath() to get a valid dir path to read/write files");
+        }
+    }
+
     @Override
     public java.io.OutputStream openOutputStream(final java.lang.Object a0) throws java.io.IOException {
+        checkPath(a0);
         if (!(a0 instanceof String)) {
             return null;
         }
@@ -796,6 +808,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.io.InputStream openInputStream(java.lang.Object a0) throws java.io.IOException {
+        checkPath(a0);
         byte[] b = a0 instanceof String ? FILES.get(a0) : null;
         return b == null ? null : new java.io.ByteArrayInputStream(b);
     }
@@ -868,6 +881,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.lang.String[] listFiles(java.lang.String a0) throws java.io.IOException {
+        checkPath(a0);
         return null;
     }
 
@@ -883,10 +897,12 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void mkdir(java.lang.String a0) {
+        checkPath(a0);
     }
 
     @Override
     public void deleteFile(java.lang.String a0) {
+        checkPath(a0);
         if (fileSystem && !UNDELETABLE.contains(a0)) {
             FILES.remove(a0);
         }
@@ -900,6 +916,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isHidden(java.lang.String a0) {
+        checkPath(a0);
         return false;
     }
 
@@ -909,21 +926,25 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public long getFileLength(java.lang.String a0) {
+        checkPath(a0);
         return 0;
     }
 
     @Override
     public boolean isDirectory(java.lang.String a0) {
+        checkPath(a0);
         return false;
     }
 
     @Override
     public boolean exists(java.lang.String a0) {
+        checkPath(a0);
         return fileSystem && FILES.containsKey(a0);
     }
 
     @Override
     public void rename(java.lang.String a0, java.lang.String a1) {
+        checkPath(a0);
     }
 
     @Override

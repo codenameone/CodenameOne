@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import com.codename1.fxcompat.runtime.ResourceUrls;
-import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
 
 import javafx.beans.NamedArg;
@@ -126,6 +125,11 @@ public class Image {
             decode(in);
         } catch (IOException failed) {
             fail(failed);
+        } catch (RuntimeException failed) {
+            // JavaFX never throws for a URL it cannot load: the image is
+            // in error, with the reason kept. A port may refuse a path or
+            // a picture by throwing.
+            fail(failed);
         } finally {
             close(in);
         }
@@ -152,6 +156,8 @@ public class Image {
         try {
             decode(is);
         } catch (IOException failed) {
+            fail(failed);
+        } catch (RuntimeException failed) {
             fail(failed);
         }
     }
@@ -254,7 +260,13 @@ public class Image {
             throw new IOException("Remote images are not supported: " + url);
         }
         if (startsWith(url, "file:")) {
-            return FileSystemStorage.getInstance().openInputStream(url);
+            // Never the URL as written: a port's file system throws for a
+            // path that is not absolute.
+            InputStream file = ResourceUrls.openFile(url);
+            if (file == null) {
+                throw new IOException("Image not found: " + url);
+            }
+            return file;
         }
         String path = url;
         int bang = path.lastIndexOf("!/");

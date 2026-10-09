@@ -911,6 +911,16 @@ Traps that have already cost a fix:
   gradient stroke go through `GradientRaster`, per pixel, and
   `GradientAndImageTest` holds them to values computed from the JavaFX
   definition.
+- **A port's file system throws for any path that is not an absolute
+  `file:/` one**, and a test harness must not be kinder. `new
+  Image("file:resources/logo.png")` reached `FileSystemStorage` as written
+  and killed an application in `start` in the simulator, while every test
+  and every capture passed: `HeadlessImplementation` resolved the relative
+  path, and the capture harness had called
+  `JavaSEPort.setExposeFilesystem(true)`, which switches the check off.
+  `HeadlessImplementation.checkPath` now throws what `JavaSEPort.unfile`
+  throws; a `file:` URL goes through `ResourceUrls.openFile`, and a JavaFX
+  loader records an error instead of letting a port exception out.
 - **`Class.getSuperclass()` is not on the device** -- absent from
   `Ports/CLDC11`, though `vm/JavaAPI` has it, so the simulator and iOS pass and
   the compliance check does not. `JTable` finds a renderer by assignability,
