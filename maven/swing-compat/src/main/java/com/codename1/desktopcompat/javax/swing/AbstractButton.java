@@ -32,6 +32,8 @@ import com.codename1.desktopcompat.java.awt.event.ItemListener;
 import com.codename1.desktopcompat.javax.swing.event.ChangeEvent;
 import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 import com.codename1.desktopcompat.rt.Align;
+import com.codename1.desktopcompat.rt.ButtonPeer;
+import com.codename1.desktopcompat.rt.CellTheme;
 import com.codename1.desktopcompat.rt.Icons;
 import com.codename1.desktopcompat.rt.MiniHtml;
 import com.codename1.desktopcompat.rt.Peer;
@@ -87,6 +89,7 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
     private int displayedMnemonicIndex = -1;
     private boolean hideActionText;
     private boolean restyled;
+    private int styleSignature;
     private final Icon[] iconKeys = new Icon[5];
     private final com.codename1.ui.Image[] iconImages = new com.codename1.ui.Image[5];
 
@@ -180,27 +183,51 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
         com.codename1.ui.Button b = (com.codename1.ui.Button) p;
         boolean checkMark = (p instanceof com.codename1.ui.CheckBox || p instanceof com.codename1.ui.RadioButton)
                 && !b.isToggle();
-        boolean noBorder = !borderPainted && !checkMark;
-        boolean noFill = !contentAreaFilled && !checkMark;
-        if (margin == null && !noBorder && !noFill && !restyled) {
+        boolean plain = !checkMark && cn1Plain();
+        boolean inBar = getParent() instanceof JToolBar;
+        boolean outline = plain && borderPainted && !inBar;
+        boolean noBorder = (!borderPainted || plain) && !checkMark;
+        boolean noFill = (!contentAreaFilled || plain) && !checkMark;
+        int signature = (margin == null ? 0 : 1 + margin.top * 31 + margin.left * 961 + margin.bottom * 29791
+                + margin.right * 923521) * 16 + (noBorder ? 1 : 0) + (noFill ? 2 : 0) + (plain ? 4 : 0)
+                + (outline ? 8 : 0);
+        if (signature == styleSignature && (restyled || signature == 0)) {
             return;
         }
+        styleSignature = signature;
         if (restyled) {
             b.setUIID(b.getUIID());
             if (p instanceof Peer) {
                 ((Peer) p).support().applyStyle();
             }
         }
-        restyled = margin != null || noBorder || noFill;
+        restyled = signature != 0;
+        if (p instanceof ButtonPeer) {
+            ((ButtonPeer) p).setPlain(plain);
+        }
+        if (!restyled) {
+            return;
+        }
         com.codename1.ui.plaf.Style s = b.getAllStyles();
-        if (margin != null) {
+        int line = outline ? Math.max(1, Units.toDevice(1)) : 0;
+        if (margin != null || plain) {
+            // A button that is only its icon keeps the two pixels the
+            // icon needs to stand clear of a neighbour.
+            int t = margin == null ? 2 : margin.top;
+            int l = margin == null ? 2 : margin.left;
+            int bt = margin == null ? 2 : margin.bottom;
+            int r = margin == null ? 2 : margin.right;
+            int extra = plain ? line + Math.max(1, Units.toDevice(1)) : 0;
             byte px = com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS;
             s.setPaddingUnit(px, px, px, px);
-            s.setPadding(Units.toDevice(margin.top), Units.toDevice(margin.bottom), Units.toDevice(margin.left),
-                    Units.toDevice(margin.right));
+            s.setPadding(Units.toDevice(t) + extra, Units.toDevice(bt) + extra, Units.toDevice(l) + extra,
+                    Units.toDevice(r) + extra);
         }
         com.codename1.ui.plaf.Border border = b.getUnselectedStyle().getBorder();
-        if (noBorder || (noFill && border != null && border.isBackgroundPainter())) {
+        if (outline) {
+            s.setBorder(com.codename1.ui.plaf.Border.createLineBorder(line,
+                    CellTheme.grid(null).getRGB() & 0xffffff));
+        } else if (noBorder || (noFill && border != null && border.isBackgroundPainter())) {
             s.setBorder(com.codename1.ui.plaf.Border.createEmpty());
         }
         if (noFill) {
@@ -208,8 +235,34 @@ public abstract class AbstractButton extends JComponent implements ItemSelectabl
         }
     }
 
+    /// Whether the button is drawn without the theme's button shape: one
+    /// that shows only an icon, and any button of a tool bar.
+    ///
+    /// A theme sizes and shapes its button for a caption -- a pill, or a
+    /// circle when the button is as wide as it is high -- and an icon put
+    /// in that shape is cut by it or spills out of it. A desktop look and
+    /// feel draws such a button as the icon in a thin rectangle, and a
+    /// tool bar button as the icon alone.
+    private boolean cn1Plain() {
+        Object o = this;
+        if (o instanceof JMenuItem) {
+            return false;
+        }
+        boolean iconOnly = icon != null && (text == null || text.length() == 0);
+        return iconOnly || getParent() instanceof JToolBar;
+    }
+
+    /// The shape of a button depends on where it is, which is known when
+    /// it is added.
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        restyle();
+    }
+
     private void changed() {
         html = null;
+        restyle();
         sync();
         revalidate();
         repaint();

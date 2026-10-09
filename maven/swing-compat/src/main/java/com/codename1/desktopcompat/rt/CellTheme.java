@@ -73,14 +73,33 @@ public final class CellTheme {
     }
 
     /// The background of cells: the cell style's if it has one, else the
-    /// window background.
+    /// one content areas have.
     public static Color background(String key) {
         Color c = put(key);
         if (c != null) {
             return c;
         }
         Style s = style("TableCell", false);
-        return filled(s) ? new Color(s.getBgColor() & 0xffffff) : EventBridge.defaultBackground();
+        return filled(s) ? new Color(s.getBgColor() & 0xffffff) : fieldBackground();
+    }
+
+    /// The background of a content area -- a list, a tree, a table, a text
+    /// area -- as opposed to the window around it. A desktop look and feel
+    /// draws these white on a grey window, which is what tells a reader
+    /// where the content is; on a light theme that is white here too, and
+    /// on a dark one a shade off the window.
+    public static Color fieldBackground() {
+        Color w = EventBridge.defaultBackground();
+        if (w.getRed() + w.getGreen() + w.getBlue() >= 3 * 128) {
+            return Color.WHITE;
+        }
+        return mix(w, Color.WHITE, 0.1f);
+    }
+
+    /// The background of a desktop pane: that of a content area, which is
+    /// what the frames on it stand out from.
+    public static Color desktopBackground() {
+        return fieldBackground();
     }
 
     /// The color of cell text.

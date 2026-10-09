@@ -49,7 +49,7 @@ public class JDesktopPane extends JLayeredPane {
     @Override
     protected void paintComponent(Graphics g) {
         if (isOpaque()) {
-            g.setColor(isBackgroundSet() ? getBackground() : JInternalFrame.cn1Shade(UIManager.getColor("control"), 24));
+            g.setColor(getBackground());
             g.fillRect(0, 0, getWidth(), getHeight());
         }
     }

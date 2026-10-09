@@ -78,6 +78,16 @@ public final class RootPan extends Container {
         return measuring;
     }
 
+    /// The width of the display in logical pixels: the widest a window
+    /// is laid out without being panned, which is where a row of
+    /// components that can wrap does so.
+    public static int displayWidth() {
+        if (!com.codename1.ui.Display.isInitialized()) {
+            return Integer.MAX_VALUE;
+        }
+        return Units.toLogical(com.codename1.ui.Display.getInstance().getDisplayWidth());
+    }
+
     /// The least size the window is laid out at, in device pixels: the
     /// minimum size of its content, or nothing when the window has none.
     int[] least() {
@@ -104,6 +114,7 @@ public final class RootPan extends Container {
             measuring = was;
         }
     }
+
 
     @Override
     public Dimension getScrollDimension() {

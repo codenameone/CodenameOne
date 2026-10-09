@@ -75,11 +75,29 @@ public final class Fonts {
                 || family.equalsIgnoreCase("Courier New"));
     }
 
-    /// The platform's fixed width font. It comes in three sizes and no
-    /// more, so this is the one nearest in height to what was asked for.
+    /// A fixed width font of the size asked for.
+    ///
+    /// The platform's own comes in three sizes and no more: a system font
+    /// cannot be derived to a size, only a TrueType font can, and the
+    /// `native:` families that exist at every size have no fixed width
+    /// member. So the exact size is available when the application ships a
+    /// fixed width TrueType font and names it in the display property
+    /// `desktopcompat.monospaced`, as `Font Name|file.ttf`; otherwise this
+    /// is the platform's font nearest in height to what was asked for.
     private static com.codename1.ui.Font fixedWidth(Font font, float devicePixels) {
         int style = (font.isBold() ? com.codename1.ui.Font.STYLE_BOLD : 0)
                 | (font.isItalic() ? com.codename1.ui.Font.STYLE_ITALIC : 0);
+        String named = Display.getInstance().getProperty("desktopcompat.monospaced", null);
+        int bar = named == null ? -1 : named.indexOf('|');
+        if (bar > 0 && bar < named.length() - 1 && com.codename1.ui.Font.isTrueTypeFileSupported()) {
+            try {
+                return com.codename1.ui.Font.createTrueTypeFont(named.substring(0, bar), named.substring(bar + 1))
+                        .derive(devicePixels, style);
+            } catch (RuntimeException missing) {
+                // The font named is not in the application: the platform's.
+                com.codename1.io.Log.p("desktopcompat.monospaced: " + missing.getMessage());
+            }
+        }
         int[] sizes = {com.codename1.ui.Font.SIZE_SMALL, com.codename1.ui.Font.SIZE_MEDIUM,
             com.codename1.ui.Font.SIZE_LARGE};
         // A font is about a fifth taller than its size says.

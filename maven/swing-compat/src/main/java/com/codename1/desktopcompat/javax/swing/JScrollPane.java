@@ -96,6 +96,7 @@ public class JScrollPane extends JComponent implements Accessible, ScrollPaneCon
         setViewport(createViewport());
         setVerticalScrollBar(createVerticalScrollBar());
         setHorizontalScrollBar(createHorizontalScrollBar());
+        setBorder(UIManager.getBorder("ScrollPane.border"));
         if (view != null) {
             setViewportView(view);
         }

@@ -67,6 +67,31 @@ public class EtchedBorder extends AbstractBorder {
         return bg == null ? Color.lightGray : bg;
     }
 
+    /// The highlight derived from a component's background, `steps` shades
+    /// up.
+    ///
+    /// A background that is already as bright as a colour gets has nothing
+    /// brighter to offer, and a highlight equal to it would leave those
+    /// sides of the border unpainted. The highlight is then a light tint
+    /// towards the shadow instead, so every side stays visible and the lit
+    /// sides still read as lighter than the shaded ones.
+    static Color highlight(Component c, int steps) {
+        Color b = base(c);
+        Color up = b;
+        for (int i = 0; i < steps; i++) {
+            up = up.brighter();
+        }
+        if (apart(up, b)) {
+            return up;
+        }
+        return com.codename1.desktopcompat.rt.CellTheme.mix(b, b.darker(), steps > 1 ? 0.25f : 0.5f);
+    }
+
+    private static boolean apart(Color a, Color b) {
+        return Math.abs(a.getRed() - b.getRed()) + Math.abs(a.getGreen() - b.getGreen())
+                + Math.abs(a.getBlue() - b.getBlue()) >= 24;
+    }
+
     @Override
     public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
         Color old = g.getColor();
@@ -100,7 +125,7 @@ public class EtchedBorder extends AbstractBorder {
     }
 
     public Color getHighlightColor(Component c) {
-        return highlight != null ? highlight : base(c).brighter();
+        return highlight != null ? highlight : highlight(c, 1);
     }
 
     public Color getHighlightColor() {

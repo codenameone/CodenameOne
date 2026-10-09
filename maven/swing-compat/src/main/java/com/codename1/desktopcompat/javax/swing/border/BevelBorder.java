@@ -80,11 +80,11 @@ public class BevelBorder extends AbstractBorder {
     }
 
     public Color getHighlightOuterColor(Component c) {
-        return highlightOuter != null ? highlightOuter : EtchedBorder.base(c).brighter().brighter();
+        return highlightOuter != null ? highlightOuter : EtchedBorder.highlight(c, 2);
     }
 
     public Color getHighlightInnerColor(Component c) {
-        return highlightInner != null ? highlightInner : EtchedBorder.base(c).brighter();
+        return highlightInner != null ? highlightInner : EtchedBorder.highlight(c, 1);
     }
 
     public Color getShadowInnerColor(Component c) {

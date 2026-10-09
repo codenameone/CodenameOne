@@ -46,6 +46,8 @@ public class ComboPeer extends com.codename1.ui.ComboBox<Object> implements Peer
 
     public ComboPeer(Component owner, ListModel<Object> model) {
         super(model);
+        // Wide enough for the widest entry, not for the first few.
+        setListSizeCalculationSampleCount(200);
         support = new PeerSupport(owner, this);
         support.trackFocus();
     }

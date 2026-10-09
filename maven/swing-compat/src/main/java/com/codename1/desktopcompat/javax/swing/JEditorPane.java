@@ -238,7 +238,7 @@ public class JEditorPane extends JTextComponent {
         }
         com.codename1.ui.Component p = cn1PeerOrNull();
         if (isOpaque()) {
-            Color bg = isBackgroundSet() || p == null ? getBackground() : new Color(p.getStyle().getBgColor() & 0xffffff);
+            Color bg = getBackground();
             if (bg != null) {
                 g.setColor(bg);
                 g.fillRect(0, 0, getWidth(), getHeight());
