@@ -44,7 +44,9 @@
 /// `ClassLoader` and `Thread`, answered from the flat application bundle),
 /// `JdkObjects` and `JdkLocale`. `ResourceNames` is the rule both the build
 /// and `Resources` use to name a nested resource in that bundle, and
-/// `CompatBoot` installs what the build recorded (`CompatRegistry`).
+/// `CompatBoot` installs what the build recorded (`CompatRegistry`), the
+/// providers a `ServiceLoader` finds among it. The package `osgi` beside this
+/// one is the answer "not running in OSGi" for a library that asks.
 ///
 /// Codename One runs user interface code on one thread. The classes named
 /// after `java.util.concurrent` keep the API and the iteration guarantees of

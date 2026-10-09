@@ -28,22 +28,25 @@ package com.codename1.compat.jdk;
 /// [#cn1Install()] hands [Resources] the paths of the classpath resources
 /// the application ships and [ResourceBundle] its bundles -- the
 /// `.properties` files by path, and every `ListResourceBundle` subclass
-/// through a factory that creates it with `new`.
+/// through a factory that creates it with `new` -- and hands [ServiceLoader]
+/// the provider classes its `META-INF/services` files list, created through
+/// a factory in the same way.
 ///
 /// The placeholder registers nothing, which is the right answer wherever no
 /// build step ran: the tests of this module, and a compatibility layer's own
 /// tests. [Resources] then reads a resource under the path it was asked for.
 ///
 /// It has the SHAPE of the generated class -- the same constructor and the
-/// same two methods -- because the build's compliance check reads a class's
+/// same methods -- because the build's compliance check reads a class's
 /// members from this artifact's jar, and so checks the generated class's
 /// references to itself against what is declared here. What the generated
 /// class needs beyond these members it puts in classes of its own
 /// (`CompatRegistry$Part0`, ...), which only the application has.
-public final class CompatRegistry implements ResourceBundle.Cn1Factory {
+public final class CompatRegistry implements ResourceBundle.Cn1Factory, ServiceLoader.Cn1Factory {
 
     /// The generated class passes an instance of itself to
-    /// [ResourceBundle#cn1RegisterBundleClass(String, ResourceBundle.Cn1Factory, int)].
+    /// [ResourceBundle#cn1RegisterBundleClass(String, ResourceBundle.Cn1Factory, int)]
+    /// and to [ServiceLoader#cn1RegisterProvider(String, ServiceLoader.Cn1Factory, int)].
     public CompatRegistry() {
         // Nothing to set up: the class has no state.
     }
@@ -57,6 +60,20 @@ public final class CompatRegistry implements ResourceBundle.Cn1Factory {
     /// registers none.
     @Override
     public ResourceBundle cn1Create(int id) {
+        return null;
+    }
+
+    /// Creates the service provider registered under `id`. The placeholder
+    /// registers none.
+    @Override
+    public Object cn1CreateService(int id) {
+        return null;
+    }
+
+    /// The class of the service provider registered under `id`. The
+    /// placeholder registers none.
+    @Override
+    public Class<?> cn1ServiceType(int id) {
         return null;
     }
 }
