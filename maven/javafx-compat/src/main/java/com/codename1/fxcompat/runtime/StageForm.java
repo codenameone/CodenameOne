@@ -91,6 +91,22 @@ public final class StageForm extends Form implements StageHost {
         }
     }
 
+    /// The drag of a pointer as the display delivers it. A form has two
+    /// overloads and the display calls this one, which is an
+    /// implementation of its own and never reaches the one above: with
+    /// only that one overridden no drag got to the scene on a device,
+    /// while a press and a release, which a form routes through the plain
+    /// overloads, did. More than one pointer is a gesture of Codename
+    /// One's.
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+        if (x != null && y != null && x.length == 1 && y.length == 1
+                && SceneInput.dragged(core.scene(), core.rootPeer(), x[0], y[0])) {
+            return;
+        }
+        super.pointerDragged(x, y);
+    }
+
     @Override
     public void pointerReleased(int x, int y) {
         if (!SceneInput.released(core.scene(), core.rootPeer(), x, y)) {

@@ -151,4 +151,38 @@ public class NarrowScreenTest {
         assertEquals(w + 200, content.getScrollDimension().getWidth());
         assertEquals(h + 300, content.getScrollDimension().getHeight());
     }
+
+    /// The display hands a form every pointer event as arrays of
+    /// coordinates, one element for one finger. A press and a release get
+    /// to the plain overloads from there and a drag does not, so a scene
+    /// that heard of drags only through the plain overload heard of none
+    /// on a device: no swipe, no slider, no divider.
+    @Test
+    public void aDragDeliveredAsTheDisplayDeliversItReachesTheScene() {
+        Pane root = new Pane();
+        root.setMinSize(100, 100);
+        final java.util.List<String> seen = new java.util.ArrayList<String>();
+        javafx.event.EventHandler<javafx.scene.input.MouseEvent> log =
+                new javafx.event.EventHandler<javafx.scene.input.MouseEvent>() {
+            @Override
+            public void handle(javafx.scene.input.MouseEvent event) {
+                seen.add(event.getEventType().getName() + "@" + Math.round(event.getX()));
+            }
+        };
+        root.setOnMousePressed(log);
+        root.setOnMouseDragged(log);
+        root.setOnMouseReleased(log);
+        Container content = shown(root);
+        com.codename1.ui.Form form = (com.codename1.ui.Form) stage.cn1Host();
+        int x = content.getAbsoluteX() + 20;
+        int y = content.getAbsoluteY() + 20;
+        form.pointerPressed(new int[] {x}, new int[] {y});
+        form.pointerDragged(new int[] {x + 30}, new int[] {y});
+        form.pointerReleased(new int[] {x + 30}, new int[] {y});
+        assertEquals("[MOUSE_PRESSED@20, MOUSE_DRAGGED@50, MOUSE_RELEASED@50]", seen.toString());
+        // Two fingers are a gesture of Codename One's, not a drag of the scene's.
+        seen.clear();
+        form.pointerDragged(new int[] {x, x + 40}, new int[] {y, y});
+        assertEquals("[]", seen.toString());
+    }
 }
