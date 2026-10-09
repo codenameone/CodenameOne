@@ -6,24 +6,24 @@
 |===
 |Application |Toolkit |`jlink` image |`jlink` image, zipped |`jpackage` image, zipped |Native build |Native build, zipped |JVM zip / native zip
 
-|`swing-gallery` sample |Swing |56.3 |34.6 |34.8 |19.1 |7.0 |4.9x
+|`swing-gallery` sample |Swing |56.3 |34.6 |34.8 |19.6 |7.2 |4.8x
 
-|SwingSet2, the JDK demo |Swing |55.6 |34.1 |34.2 |20.1 |8.1 |4.2x
+|SwingSet2, the JDK demo |Swing |55.6 |34.1 |34.2 |20.5 |8.2 |4.2x
 
-|Notepad, the JDK demo |Swing |54.3 |32.8 |32.9 |17.3 |6.4 |5.1x
+|Notepad, the JDK demo |Swing |54.3 |32.8 |32.9 |17.8 |6.5 |5.0x
 
-|Falling-blocks game |Swing |54.1 |32.7 |32.8 |13.9 |5.1 |6.3x
+|Falling-blocks game |Swing |54.1 |32.7 |32.8 |17.4 |6.4 |5.1x
 
-|`javafx-gallery` sample |JavaFX |61.6 |39.1 |39.2 |19.1 |7.0 |5.6x
+|`javafx-gallery` sample |JavaFX |61.6 |39.1 |39.2 |19.3 |7.0 |5.5x
 
-|Open-source 2048 game |JavaFX |61.6 |39.1 |39.3 |16.2 |5.9 |6.6x
+|Open-source 2048 game |JavaFX |61.6 |39.1 |39.3 |18.3 |6.7 |5.8x
 
-|Address book |JavaFX |61.5 |39.1 |39.2 |15.7 |5.8 |6.7x
+|Address book |JavaFX |61.5 |39.1 |39.2 |17.8 |6.5 |6.0x
 
-|Mandelbrot explorer |JavaFX |61.3 |38.9 |39.0 |15.4 |5.7 |6.9x
+|Mandelbrot explorer |JavaFX |61.3 |38.9 |39.0 |17.7 |6.5 |6.0x
 |===
 
-Against the zipped `jlink` image the native build is smaller in 8 applications, of the 8 measured. Its best result is 6.9x for Mandelbrot explorer (5.7 MB against 38.9 MB).
+Against the zipped `jlink` image the native build is smaller in 8 applications, of the 8 measured. Its best result is 6.0x for Mandelbrot explorer (6.5 MB against 38.9 MB).
 
 .macOS: the distributed application (MB)
 [cols="<3,>2,>2,>2,>2,>2,>2",options="header"]
@@ -76,37 +76,37 @@ Against the zipped `jlink` image the native build is smaller in 8 applications, 
 |===
 |Application |Layer |Classes handed to the builder |Classes translated |Kept
 
-|`swing-gallery` sample |`swing-compat` |940 |697 |74%
+|`swing-gallery` sample |`swing-compat` |1039 |737 |71%
 
-|`swing-gallery` sample |`compat-jdk` |194 |42 |22%
+|`swing-gallery` sample |`compat-jdk` |340 |75 |22%
 
-|SwingSet2, the JDK demo |`swing-compat` |940 |545 |58%
+|SwingSet2, the JDK demo |`swing-compat` |1039 |587 |56%
 
-|SwingSet2, the JDK demo |`compat-jdk` |194 |84 |43%
+|SwingSet2, the JDK demo |`compat-jdk` |340 |88 |26%
 
-|Notepad, the JDK demo |`swing-compat` |940 |523 |56%
+|Notepad, the JDK demo |`swing-compat` |1039 |566 |54%
 
-|Notepad, the JDK demo |`compat-jdk` |194 |34 |18%
+|Notepad, the JDK demo |`compat-jdk` |340 |38 |11%
 
-|Falling-blocks game |`swing-compat` |940 |494 |53%
+|Falling-blocks game |`swing-compat` |1039 |538 |52%
 
-|Falling-blocks game |`compat-jdk` |193 |21 |11%
+|Falling-blocks game |`compat-jdk` |339 |25 |7%
 
-|`javafx-gallery` sample |`javafx-compat` |839 |668 |80%
+|`javafx-gallery` sample |`javafx-compat` |898 |685 |76%
 
-|`javafx-gallery` sample |`compat-jdk` |194 |19 |10%
+|`javafx-gallery` sample |`compat-jdk` |340 |23 |7%
 
-|Open-source 2048 game |`javafx-compat` |836 |388 |46%
+|Open-source 2048 game |`javafx-compat` |894 |413 |46%
 
-|Open-source 2048 game |`compat-jdk` |194 |92 |47%
+|Open-source 2048 game |`compat-jdk` |340 |99 |29%
 
-|Address book |`javafx-compat` |838 |445 |53%
+|Address book |`javafx-compat` |896 |461 |51%
 
-|Address book |`compat-jdk` |194 |15 |8%
+|Address book |`compat-jdk` |340 |19 |6%
 
-|Mandelbrot explorer |`javafx-compat` |836 |410 |49%
+|Mandelbrot explorer |`javafx-compat` |893 |442 |49%
 
-|Mandelbrot explorer |`compat-jdk` |194 |63 |32%
+|Mandelbrot explorer |`compat-jdk` |340 |96 |28%
 |===
 
 .Linux: warm start, from process start to the first painted frame (ms, median with the range)
@@ -114,129 +114,129 @@ Against the zipped `jlink` image the native build is smaller in 8 applications, 
 |===
 |Application |JVM, default |JVM, tuned |Native build |Default / native |Tuned / native
 
-|`swing-gallery` sample |1616 (1268-2209) |952 (820-1333) |404 (333-556) |4.0x |2.4x
+|`swing-gallery` sample |509 (489-616) |306 (287-393) |152 (85-242) |3.3x |2.0x
 
-|SwingSet2, the JDK demo |495 (402-562) |341 (246-429) |187 (148-203) |2.6x |1.8x
+|SwingSet2, the JDK demo |338 (307-387) |215 (207-255) |132 (114-160) |2.6x |1.6x
 
-|Notepad, the JDK demo |416 (343-582) |259 (212-267) |158 (100-180) |2.6x |1.6x
+|Notepad, the JDK demo |282 (227-335) |176 (157-226) |127 (80-168) |2.2x |1.4x
 
-|Falling-blocks game |287 (232-335) |178 (111-259) |137 (118-246) |2.1x |1.3x
+|Falling-blocks game |150 (145-171) |104 (99-112) |115 (76-188) |1.3x |0.9x
 
-|`javafx-gallery` sample |1568 (1377-1827) |-- |197 (153-426) |7.9x |--
+|`javafx-gallery` sample |1150 (1084-1227) |572 (536-665) |130 (107-146) |8.9x |4.4x
 
-|Open-source 2048 game |606 (525-738) |506 (356-617) |156 (92-176) |3.9x |3.2x
+|Open-source 2048 game |475 (446-507) |271 (265-332) |-- |-- |--
 
-|Address book |877 (488-1137) |447 (290-579) |241 (142-311) |3.6x |1.9x
+|Address book |581 (420-679) |341 (228-412) |125 (117-180) |4.7x |2.7x
 
-|Mandelbrot explorer |720 (607-828) |763 (661-997) |207 (168-243) |3.5x |3.7x
+|Mandelbrot explorer |576 (553-594) |353 (318-405) |168 (149-222) |3.4x |2.1x
 |===
 
-Against the default JVM the native build is quicker in 8 applications, of the 8 measured. Its best result is 7.9x for `javafx-gallery` sample (197 ms against 1568 ms).
+Against the default JVM the native build is quicker in 7 applications, of the 7 measured. Its best result is 8.9x for `javafx-gallery` sample (130 ms against 1150 ms).
 
-Against the tuned JVM the native build is quicker in 7 applications, of the 7 measured. Its best result is 3.7x for Mandelbrot explorer (207 ms against 763 ms).
+Against the tuned JVM the native build is quicker in 6 applications and slower in 1 application, of the 7 measured. Its best result is 4.4x for `javafx-gallery` sample (130 ms against 572 ms). Its worst is 0.9x for Falling-blocks game (115 ms against 104 ms).
 
 .Linux: cold start, from process start to the first painted frame (ms, median with the range)
 [cols="<3,>2,>2,>2,>2,>2",options="header"]
 |===
 |Application |JVM, default |JVM, tuned |Native build |Default / native |Tuned / native
 
-|`swing-gallery` sample |1736 (1474-2238) |1044 (1011-1356) |450 (392-557) |3.9x |2.3x
+|`swing-gallery` sample |584 (558-738) |346 (314-411) |174 (152-200) |3.4x |2.0x
 
-|SwingSet2, the JDK demo |578 (448-801) |345 (222-471) |232 (178-326) |2.5x |1.5x
+|SwingSet2, the JDK demo |425 (375-702) |266 (246-334) |140 (92-145) |3.0x |1.9x
 
-|Notepad, the JDK demo |476 (369-568) |291 (230-327) |182 (150-216) |2.6x |1.6x
+|Notepad, the JDK demo |293 (259-339) |201 (182-255) |163 (141-182) |1.8x |1.2x
 
-|Falling-blocks game |387 (357-440) |255 (200-343) |141 (120-355) |2.7x |1.8x
+|Falling-blocks game |214 (176-273) |132 (125-176) |149 (143-159) |1.4x |0.9x
 
-|`javafx-gallery` sample |1620 (1508-2044) |-- |222 (185-374) |7.3x |--
+|`javafx-gallery` sample |1206 (1160-1283) |615 (570-688) |159 (142-187) |7.6x |3.9x
 
-|Open-source 2048 game |795 (574-1026) |376 (311-666) |186 (98-246) |4.3x |2.0x
+|Open-source 2048 game |545 (507-609) |299 (257-307) |-- |-- |--
 
-|Address book |1171 (723-1409) |536 (335-772) |234 (185-299) |5.0x |2.3x
+|Address book |675 (550-727) |376 (316-503) |136 (129-191) |5.0x |2.8x
 
-|Mandelbrot explorer |910 (725-1239) |743 (549-978) |224 (158-277) |4.1x |3.3x
+|Mandelbrot explorer |640 (616-669) |380 (366-395) |185 (161-308) |3.5x |2.1x
 |===
 
-Against the default JVM the native build is quicker in 8 applications, of the 8 measured. Its best result is 7.3x for `javafx-gallery` sample (222 ms against 1620 ms).
+Against the default JVM the native build is quicker in 7 applications, of the 7 measured. Its best result is 7.6x for `javafx-gallery` sample (159 ms against 1206 ms).
 
-Against the tuned JVM the native build is quicker in 7 applications, of the 7 measured. Its best result is 3.3x for Mandelbrot explorer (224 ms against 743 ms).
+Against the tuned JVM the native build is quicker in 6 applications and slower in 1 application, of the 7 measured. Its best result is 3.9x for `javafx-gallery` sample (159 ms against 615 ms). Its worst is 0.9x for Falling-blocks game (149 ms against 132 ms).
 
 .Linux: memory 10 seconds after the first frame (MB, RSS / PSS)
 [cols="<3,>2,>2,>2,>2,>2",options="header"]
 |===
 |Application |JVM, default |JVM, tuned |Native build |Default RSS / native |Tuned RSS / native
 
-|`swing-gallery` sample |173.3 / 148.9 |135.6 / 111.2 |112.2 / 85.5 |1.5x |1.2x
+|`swing-gallery` sample |174.1 / 149.4 |137.4 / 112.7 |118.4 / 90.5 |1.5x |1.2x
 
-|SwingSet2, the JDK demo |127.5 / 123.3 |87.1 / 82.9 |143.5 / 115.3 |0.9x |0.6x
+|SwingSet2, the JDK demo |126.8 / 122.6 |87.0 / 82.9 |143.3 / 115.4 |0.9x |0.6x
 
-|Notepad, the JDK demo |83.2 / 79.1 |62.6 / 58.5 |106.0 / 79.4 |0.8x |0.6x
+|Notepad, the JDK demo |82.4 / 78.3 |62.6 / 58.6 |110.6 / 82.8 |0.7x |0.6x
 
-|Falling-blocks game |65.9 / 61.9 |52.7 / 48.7 |107.6 / 79.9 |0.6x |0.5x
+|Falling-blocks game |65.7 / 61.7 |52.7 / 48.7 |109.1 / 81.5 |0.6x |0.5x
 
-|`javafx-gallery` sample |287.9 / 259.1 |-- |136.6 / 107.8 |2.1x |--
+|`javafx-gallery` sample |281.1 / 253.5 |212.5 / 184.9 |147.9 / 119.1 |1.9x |1.4x
 
-|Open-source 2048 game |198.9 / 173.3 |151.4 / 125.8 |120.1 / 91.5 |1.7x |1.3x
+|Open-source 2048 game |201.5 / 175.7 |152.5 / 126.6 |-- |-- |--
 
-|Address book |230.2 / 204.2 |170.6 / 144.6 |110.6 / 83.0 |2.1x |1.5x
+|Address book |232.5 / 206.3 |171.5 / 145.2 |112.4 / 84.6 |2.1x |1.5x
 
-|Mandelbrot explorer |263.0 / 236.2 |185.2 / 158.3 |566.0 / 538.4 |0.5x |0.3x
+|Mandelbrot explorer |264.7 / 237.7 |186.0 / 159.0 |414.7 / 387.0 |0.6x |0.4x
 |===
 
-Against the default JVM the native build is smaller in 4 applications and larger in 4 applications, of the 8 measured. Its best result is 2.1x for `javafx-gallery` sample (136.6 MB against 287.9 MB). Its worst is 0.5x for Mandelbrot explorer (566.0 MB against 263.0 MB).
+Against the default JVM the native build is smaller in 3 applications and larger in 4 applications, of the 7 measured. Its best result is 2.1x for Address book (112.4 MB against 232.5 MB). Its worst is 0.6x for Falling-blocks game (109.1 MB against 65.7 MB).
 
-Against the tuned JVM the native build is smaller in 3 applications and larger in 4 applications, of the 7 measured. Its best result is 1.5x for Address book (110.6 MB against 170.6 MB). Its worst is 0.3x for Mandelbrot explorer (566.0 MB against 185.2 MB).
+Against the tuned JVM the native build is smaller in 3 applications and larger in 4 applications, of the 7 measured. Its best result is 1.5x for Address book (112.4 MB against 171.5 MB). Its worst is 0.4x for Mandelbrot explorer (414.7 MB against 186.0 MB).
 
-Not measured, and shown as `--`: `javafx-gallery` sample under the tuned JVM (no painted window within 90s).
+Not measured, and shown as `--`: Mandelbrot explorer under the native build (exited during the input script (status 137)); Mandelbrot explorer under the native build (exited during the input script (status 137)).
 
 .Linux: memory after the scripted interaction (MB, RSS / PSS)
 [cols="<3,>2,>2,>2,>2,>2",options="header"]
 |===
 |Application |JVM, default |JVM, tuned |Native build |Default RSS / native |Tuned RSS / native
 
-|`swing-gallery` sample |174.8 / 150.4 |137.1 / 112.7 |119.4 / 90.9 |1.5x |1.1x
+|`swing-gallery` sample |175.2 / 150.5 |138.0 / 113.3 |120.4 / 92.6 |1.5x |1.1x
 
-|SwingSet2, the JDK demo |128.2 / 124.2 |87.2 / 83.1 |146.2 / 118.0 |0.9x |0.6x
+|SwingSet2, the JDK demo |127.4 / 123.4 |87.2 / 83.1 |145.8 / 117.8 |0.9x |0.6x
 
-|Notepad, the JDK demo |88.7 / 84.6 |63.8 / 59.7 |113.9 / 85.3 |0.8x |0.6x
+|Notepad, the JDK demo |88.5 / 84.4 |63.9 / 59.8 |111.0 / 83.1 |0.8x |0.6x
 
-|Falling-blocks game |68.2 / 64.2 |53.8 / 49.7 |108.7 / 81.0 |0.6x |0.5x
+|Falling-blocks game |68.7 / 64.7 |53.8 / 49.9 |110.3 / 82.6 |0.6x |0.5x
 
-|`javafx-gallery` sample |311.4 / 281.3 |-- |148.2 / 119.4 |2.1x |--
+|`javafx-gallery` sample |296.8 / 269.1 |213.6 / 185.9 |152.6 / 123.8 |1.9x |1.4x
 
-|Open-source 2048 game |208.0 / 182.4 |155.2 / 129.6 |122.8 / 94.2 |1.7x |1.3x
+|Open-source 2048 game |209.7 / 183.8 |156.0 / 130.1 |-- |-- |--
 
-|Address book |240.4 / 214.3 |172.3 / 146.2 |113.1 / 85.3 |2.1x |1.5x
+|Address book |247.2 / 220.9 |172.8 / 146.6 |114.4 / 86.6 |2.2x |1.5x
 
-|Mandelbrot explorer |263.7 / 236.9 |185.9 / 158.6 |566.3 / 538.8 |0.5x |0.3x
+|Mandelbrot explorer |265.7 / 238.6 |186.3 / 159.3 |5815.4 / 5787.6 |0.0x |0.0x
 |===
 
-Against the default JVM the native build is smaller in 4 applications and larger in 4 applications, of the 8 measured. Its best result is 2.1x for Address book (113.1 MB against 240.4 MB). Its worst is 0.5x for Mandelbrot explorer (566.3 MB against 263.7 MB).
+Against the default JVM the native build is smaller in 3 applications and larger in 4 applications, of the 7 measured. Its best result is 2.2x for Address book (114.4 MB against 247.2 MB). Its worst is 0.0x for Mandelbrot explorer (5815.4 MB against 265.7 MB).
 
-Against the tuned JVM the native build is smaller in 3 applications and larger in 4 applications, of the 7 measured. Its best result is 1.5x for Address book (113.1 MB against 172.3 MB). Its worst is 0.3x for Mandelbrot explorer (566.3 MB against 185.9 MB).
+Against the tuned JVM the native build is smaller in 3 applications and larger in 4 applications, of the 7 measured. Its best result is 1.5x for Address book (114.4 MB against 172.8 MB). Its worst is 0.0x for Mandelbrot explorer (5815.4 MB against 186.3 MB).
 
-Not measured, and shown as `--`: `javafx-gallery` sample under the tuned JVM (no painted window within 90s).
+Not measured, and shown as `--`: Mandelbrot explorer under the native build (exited during the input script (status 137)); Mandelbrot explorer under the native build (exited during the input script (status 137)).
 
 .Linux: peak RSS over a whole session (MB)
 [cols="<3,>2,>2,>2,>2,>2,>2",options="header"]
 |===
 |Application |JVM, default |JVM, tuned |Native build |Default / native |Tuned / native |Tuned `-Xmx` (MB)
 
-|`swing-gallery` sample |178.4 |141.0 |118.9 |1.5x |1.2x |8
+|`swing-gallery` sample |177.4 |141.8 |119.9 |1.5x |1.2x |8
 
-|SwingSet2, the JDK demo |129.1 |87.4 |145.8 |0.9x |0.6x |24
+|SwingSet2, the JDK demo |127.7 |87.5 |145.1 |0.9x |0.6x |24
 
-|Notepad, the JDK demo |91.5 |64.2 |113.4 |0.8x |0.6x |8
+|Notepad, the JDK demo |89.9 |64.1 |110.6 |0.8x |0.6x |8
 
-|Falling-blocks game |70.0 |54.3 |108.0 |0.6x |0.5x |8
+|Falling-blocks game |70.1 |54.4 |109.9 |0.6x |0.5x |8
 
-|`javafx-gallery` sample |318.9 |-- |148.6 |2.1x |-- |32
+|`javafx-gallery` sample |299.6 |216.2 |152.2 |2.0x |1.4x |48
 
-|Open-source 2048 game |211.0 |157.9 |122.2 |1.7x |1.3x |8
+|Open-source 2048 game |212.3 |158.7 |-- |-- |-- |8
 
-|Address book |243.0 |174.7 |112.5 |2.2x |1.6x |48
+|Address book |249.7 |175.1 |114.0 |2.2x |1.5x |48
 
-|Mandelbrot explorer |266.1 |188.4 |584.6 |0.5x |0.3x |48
+|Mandelbrot explorer |268.1 |188.7 |6250.9 |0.0x |0.0x |48
 |===
 
 .Linux: CPU while idle (share of one core)
@@ -244,24 +244,24 @@ Not measured, and shown as `--`: `javafx-gallery` sample under the tuned JVM (no
 |===
 |Application |JVM, default |JVM, tuned |Native build
 
-|`swing-gallery` sample |0.2% |0.2% |0.2%
+|`swing-gallery` sample |0.0% |0.0% |0.2%
 
-|SwingSet2, the JDK demo |0.2% |0.0% |0.2%
+|SwingSet2, the JDK demo |0.0% |0.0% |0.0%
 
 |Notepad, the JDK demo |0.0% |0.0% |0.0%
 
-|Falling-blocks game |0.4% |0.4% |0.2%
+|Falling-blocks game |0.4% |0.2% |0.2%
 
-|`javafx-gallery` sample |21.3% |-- |4.2%
+|`javafx-gallery` sample |10.7% |10.7% |1.8%
 
-|Open-source 2048 game |1.2% |1.8% |0.8%
+|Open-source 2048 game |1.2% |0.8% |--
 
-|Address book |0.4% |0.4% |0.0%
+|Address book |0.2% |0.2% |0.0%
 
-|Mandelbrot explorer |1.5% |1.0% |0.2%
+|Mandelbrot explorer |0.8% |0.8% |0.0%
 |===
 
-Of the 8 native builds, 7 idle at or under 1% of a core. Above it: `javafx-gallery` sample (4.2%).
+Of the 7 native builds, 6 idle at or under 1% of a core. Above it: `javafx-gallery` sample (1.8%).
 
 .Where the figures were measured
 * *Linux*: Ubuntu 24.04.5 LTS, aarch64, 4 CPUs, 7.7 GB of memory, in a container, hosted on Apple M4 Max. The display is a virtual framebuffer, Xvfb, of 1280 by 800 pixels. GTK 3.24.41. OpenJFX 23.0.2 for the JavaFX baselines.
