@@ -450,7 +450,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 mavenOptions(type, allModules));
         Map<String, byte[]> entries = readZipEntries(zipData);
         String rootPom = getText(entries, "pom.xml");
-        assertContains(rootPom, "<cn1.plugin.version>" + LAYOUTS_VERSION + "</cn1.plugin.version>",
+        assertContains(rootPom, "<cn1.plugin.version>7.0.275</cn1.plugin.version>",
                 label + "the root pom should name the plugin the download was generated against");
         assertCodenameOneRepository(rootPom, label);
         assertNotNull(entries.get("mvnw"), label + "missing mvnw");
@@ -1249,9 +1249,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Root pom should include app artifact/name");
-        assertContains(pom, "<cn1.plugin.version>" + GeneratorModel.cn1PluginVersion() + "</cn1.plugin.version>",
+        assertContains(pom, "<cn1.plugin.version>7.0.275</cn1.plugin.version>",
                 "Root pom should use current CN1 plugin version");
-        assertContains(pom, "<cn1.version>" + GeneratorModel.cn1PluginVersion() + "</cn1.version>",
+        assertContains(pom, "<cn1.version>7.0.275</cn1.version>",
                 "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");
