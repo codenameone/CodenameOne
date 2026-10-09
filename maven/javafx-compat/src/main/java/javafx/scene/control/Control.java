@@ -74,6 +74,22 @@ public abstract class Control extends Region {
     private final ObjectProperty<Tooltip> tooltip = new SimpleObjectProperty<Tooltip>(this, "tooltip");
     private Component nativeComponent;
     private boolean creating;
+    private Region made;
+
+    /// Makes this control out of other nodes of the layer: `root` is its
+    /// one child, fills it inside its insets, and gives it its sizes. A
+    /// control that is made so has no native component.
+    final void cn1MadeOf(Region root) {
+        made = root;
+        cn1Children().setAll(root);
+        requestLayout();
+    }
+
+    /// Returns the node this control is made of, or `null` for one that
+    /// shows a native component.
+    final Region cn1Made() {
+        return made;
+    }
 
     /// Creates a control.
     protected Control() {
@@ -250,6 +266,12 @@ public abstract class Control extends Region {
     @Override
     protected void layoutChildren() {
         placeNative();
+        if (made != null) {
+            Insets in = getInsets();
+            made.resizeRelocate(in.getLeft(), in.getTop(), Math.max(0, getWidth() - in.getLeft() - in.getRight()),
+                    Math.max(0, getHeight() - in.getTop() - in.getBottom()));
+            return;
+        }
         super.layoutChildren();
     }
 
@@ -263,22 +285,36 @@ public abstract class Control extends Region {
     @Override
     protected double computePrefWidth(double height) {
         Insets in = getInsets();
+        if (made != null) {
+            return in.getLeft() + made.prefWidth(height) + in.getRight();
+        }
         return in.getLeft() + snapSizeX(Units.toLogical(cn1NativePreferredSize().getWidth())) + in.getRight();
     }
 
     @Override
     protected double computePrefHeight(double width) {
         Insets in = getInsets();
+        if (made != null) {
+            return in.getTop() + made.prefHeight(width) + in.getBottom();
+        }
         return in.getTop() + snapSizeY(Units.toLogical(cn1NativePreferredSize().getHeight())) + in.getBottom();
     }
 
     @Override
     protected double computeMinWidth(double height) {
+        if (made != null) {
+            Insets in = getInsets();
+            return in.getLeft() + made.minWidth(height) + in.getRight();
+        }
         return computePrefWidth(height);
     }
 
     @Override
     protected double computeMinHeight(double width) {
+        if (made != null) {
+            Insets in = getInsets();
+            return in.getTop() + made.minHeight(width) + in.getBottom();
+        }
         return computePrefHeight(width);
     }
 

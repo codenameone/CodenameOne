@@ -121,6 +121,13 @@ public class Cell<T> extends Labeled {
         return true;
     }
 
+    /// The room kept free before the graphic and the text, in logical
+    /// pixels: none, but a cell of a tree keeps its indent and its arrow
+    /// there.
+    double leading() {
+        return 0;
+    }
+
     private Node shownGraphic() {
         Node g = getGraphic();
         return g == null || getContentDisplay() == ContentDisplay.TEXT_ONLY ? null : g;
@@ -152,7 +159,7 @@ public class Cell<T> extends Labeled {
         // The text starts after the graphic, which is a node of its own.
         Style style = c.getAllStyles();
         style.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
-        style.setPaddingLeft(basePadding + Units.toPixels(graphicWidth()));
+        style.setPaddingLeft(basePadding + Units.toPixels(leading() + graphicWidth()));
     }
 
     /// The bar behind a selected cell: the theme's `-fx-selection-bar`
@@ -205,7 +212,8 @@ public class Cell<T> extends Labeled {
                 if (g.isResizable()) {
                     g.resize(w, h);
                 }
-                g.relocate(in.getLeft() + Units.toLogical(Math.max(0, basePadding)) - g.getLayoutBounds().getMinX(),
+                g.relocate(in.getLeft() + leading() + Units.toLogical(Math.max(0, basePadding))
+                        - g.getLayoutBounds().getMinX(),
                         in.getTop() + (space - h) / 2 - g.getLayoutBounds().getMinY());
             }
         }
