@@ -29,6 +29,7 @@ import com.codename1.ui.Graphics;
 public class ButtonPeer extends com.codename1.ui.Button implements Peer {
 
     private final PeerSupport support;
+    private boolean plain;
 
     public ButtonPeer(Component owner) {
         support = new PeerSupport(owner, this);
@@ -45,9 +46,25 @@ public class ButtonPeer extends com.codename1.ui.Button implements Peer {
         return true;
     }
 
+    /// Whether the button is drawn without the theme's shape, as an icon
+    /// in a tool bar is; a press then shows as a wash.
+    public void setPlain(boolean plain) {
+        this.plain = plain;
+    }
+
     @Override
     public void paintNativeLook(Graphics g) {
         support.paintStyleBackground(g);
+        if (plain && getState() == STATE_PRESSED) {
+            // Without the theme's shape nothing else shows the press.
+            int alpha = g.getAlpha();
+            int color = g.getColor();
+            g.setColor(getUnselectedStyle().getFgColor());
+            g.setAlpha(56);
+            g.fillRect(getX(), getY(), getWidth(), getHeight());
+            g.setAlpha(alpha);
+            g.setColor(color);
+        }
         super.paint(g);
         super.paintBorder(g);
     }

@@ -242,6 +242,18 @@ public class JComboBox<E> extends JComponent
             rendererList = new JList<E>();
         }
         rendererList.setFont(getFont());
+        // A row is drawn inside the box, in the colour of the box, and not
+        // in that of a list standing on its own.
+        Color box = getBackground();
+        com.codename1.ui.Component p = cn1PeerOrNull();
+        if (!isBackgroundSet() && p != null) {
+            com.codename1.ui.plaf.Style s = p.getUnselectedStyle();
+            com.codename1.ui.plaf.Border b = s.getBorder();
+            if ((s.getBgTransparency() & 0xff) != 0 || (b != null && b.isBackgroundPainter())) {
+                box = new Color(s.getBgColor() & 0xffffff);
+            }
+        }
+        rendererList.setBackground(box);
         if (getForeground() != null) {
             rendererList.setForeground(getForeground());
         }
@@ -898,5 +910,12 @@ public class JComboBox<E> extends JComponent
         }
         bridge.dataChanged(DataChangedListener.REMOVED, e.getIndex0());
         cn1Refresh();
+    }
+
+    /// A combo box takes the room a layout has to give, as the JDK's
+    /// does: in a column of them all are as wide as the column.
+    @Override
+    public Dimension getMaximumSize() {
+        return isMaximumSizeSet() ? super.getMaximumSize() : new Dimension(Short.MAX_VALUE, Short.MAX_VALUE);
     }
 }

@@ -453,7 +453,9 @@ public class JViewport extends JComponent implements Accessible {
     protected void paintComponent(Graphics g) {
         if (isOpaque()) {
             Component view = getView();
-            Color bg = view != null && view.isBackgroundSet() ? view.getBackground() : getBackground();
+            Color bg = view != null && (view.isBackgroundSet()
+                    || view instanceof com.codename1.desktopcompat.javax.swing.text.JTextComponent)
+                    ? view.getBackground() : getBackground();
             if (bg != null) {
                 g.setColor(bg);
                 g.fillRect(0, 0, getWidth(), getHeight());

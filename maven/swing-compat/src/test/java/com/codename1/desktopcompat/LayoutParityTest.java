@@ -57,6 +57,19 @@ import static org.junit.Assert.assertTrue;
 /// their arithmetic has far more paths than a handful of examples reach.
 public class LayoutParityTest {
 
+    /// The comparison is with a desktop, whose display holds the rows laid
+    /// out here: on one that is narrower a flow layout asks for the height
+    /// of the rows it wraps into, which no desktop does.
+    @org.junit.Before
+    public void aDisplayWideEnough() {
+        com.codename1.desktopcompat.rt.Units.setScale(1f);
+    }
+
+    @org.junit.After
+    public void theDisplaysOwnScale() {
+        com.codename1.desktopcompat.rt.Units.setScale(0);
+    }
+
     static {
         System.setProperty("java.awt.headless", "true");
     }

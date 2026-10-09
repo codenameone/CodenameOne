@@ -472,10 +472,17 @@ public class DesktopPaneAndFriendsTest extends KernelTestBase {
         p.add(plain);
         p.add(iconed);
         f.getContentPane().add(p, BorderLayout.CENTER);
-        show(f);
-        assertTrue("an icon of two pixels leaves no room for an indicator: " + iconed.getPreferredSize().width
-                + " against " + plain.getPreferredSize().width,
-                iconed.getPreferredSize().width < plain.getPreferredSize().width);
+        // The indicator is an image drawn by the layer, which has a size
+        // only where images are kept.
+        com.codename1.compat.testing.HeadlessImplementation.rasterImages = true;
+        try {
+            show(f);
+            assertTrue("an icon of two pixels leaves no room for an indicator: " + iconed.getPreferredSize().width
+                    + " against " + plain.getPreferredSize().width,
+                    iconed.getPreferredSize().width < plain.getPreferredSize().width);
+        } finally {
+            com.codename1.compat.testing.HeadlessImplementation.rasterImages = false;
+        }
     }
 
     /// The title bar, the edges and the three title buttons answer the

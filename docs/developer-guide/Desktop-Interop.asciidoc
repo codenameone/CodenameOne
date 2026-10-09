@@ -323,9 +323,49 @@ Three rules keep ordinary screens from panning:
 * A `JDesktopPane` can be any size. Internal frames that lie outside it
   stay where the application put them and can be dragged into view.
 
-A row of buttons in a `FlowLayout` wraps, and a `BoxLayout` row doesn't,
-exactly as on the desktop. To make a wide form usable on a phone without
+A row of components in a `FlowLayout` that is wider than the display
+wraps, and the layout asks for the height of all its rows, so the rows
+below the first aren't cut off as they are in a desktop window that is
+too narrow. A row that fits the display is measured as on the desktop. A
+`BoxLayout` row never wraps. To make a wide form usable on a phone without
 panning, put it in a `JScrollPane` or choose layouts that wrap or stack.
+
+Sizes are logical pixels of 1/96 inch, so a phone is narrower than its
+resolution suggests: a display 390 device pixels wide at twice the
+density of a desktop monitor is 195 logical pixels wide. A form designed
+for a 600 pixel window pans there. The display property
+`desktopcompat.scale` sets how many device pixels a logical pixel takes,
+and a smaller value fits more of the form at the cost of smaller widgets.
+
+==== What widgets look like
+
+Widgets are drawn by the theme of the device, with these exceptions,
+which hold on every theme:
+
+* A `JCheckBox` is a square with a tick and a `JRadioButton` a circle
+  with a dot, in the colors of the theme. Themes are free to draw the two
+  alike, and a desktop application tells its options apart by the mark.
+  Their text has the color of a label.
+* A button that shows only an icon is the icon in a thin rectangle, or
+  the icon alone when `setBorderPainted(false)` was called. Any button in
+  a `JToolBar` is drawn without a shape. A pressed button and a selected
+  toggle button are shaded. A theme shapes its buttons for a caption, and
+  an icon doesn't fit a pill or a circle.
+* Lists, trees, tables, text areas and editor panes have the content
+  background, which is white on a light theme, and not the background of
+  the window. `UIManager.getColor("List.background")` and the other keys
+  of this kind answer the same colors, and a color the application puts
+  under a key is used instead. A `JScrollPane` has a one pixel line
+  around it, which `setBorder(null)` removes.
+* Etched and bevelled borders derive their highlight from the background
+  of the component. Where the background is white there is nothing
+  brighter, so the highlight is a light gray and all four sides show.
+
+The `Monospaced` family is the fixed width font of the platform, which
+exists in three sizes only. The size nearest the one requested is used.
+An application that needs exact sizes ships a fixed width TrueType font
+and names it in the display property `desktopcompat.monospaced` as
+`Font Name|file.ttf`.
 
 ==== Windows
 

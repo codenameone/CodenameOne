@@ -50,6 +50,20 @@ import static org.junit.Assert.assertTrue;
 /// way it follows the Codename One container that really scrolls.
 public class ScrollPaneTest extends KernelTestBase {
 
+    /// What is asserted here is the geometry of the pane's own layout, to
+    /// the pixel, so the line a pane has around it by default is taken
+    /// away, the way an application does.
+    @org.junit.Before
+    public void noPaneBorder() {
+        com.codename1.desktopcompat.javax.swing.UIManager.put("ScrollPane.border",
+                new com.codename1.desktopcompat.javax.swing.border.EmptyBorder(0, 0, 0, 0));
+    }
+
+    @org.junit.After
+    public void themePaneBorder() {
+        com.codename1.desktopcompat.javax.swing.UIManager.put("ScrollPane.border", null);
+    }
+
     private JPanel view;
     private JScrollPane pane;
 

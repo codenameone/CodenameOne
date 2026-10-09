@@ -170,6 +170,20 @@ public class UIManager {
         if (k.endsWith(".gridColor")) {
             return CellTheme.grid(null);
         }
+        if ("List.background".equals(k) || "Tree.background".equals(k) || "Table.background".equals(k)) {
+            return CellTheme.background(null);
+        }
+        if ("Desktop.background".equals(k) || "desktop".equals(k)) {
+            return CellTheme.desktopBackground();
+        }
+        if ("text".equals(k) || "TextArea.background".equals(k) || "TextField.background".equals(k)
+                || "EditorPane.background".equals(k) || "TextPane.background".equals(k)
+                || "FormattedTextField.background".equals(k) || "PasswordField.background".equals(k)) {
+            return CellTheme.fieldBackground();
+        }
+        if ("ScrollPane.border".equals(k)) {
+            return new com.codename1.desktopcompat.javax.swing.border.LineBorder(CellTheme.grid(null), 1);
+        }
         if (k.endsWith(".background") || "control".equals(k) || "window".equals(k) || "menu".equals(k)) {
             return EventBridge.defaultBackground();
         }

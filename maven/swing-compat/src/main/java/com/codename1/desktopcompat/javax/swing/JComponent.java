@@ -210,7 +210,11 @@ public abstract class JComponent extends Container {
     @Override
     public Color getBackground() {
         if (!isBackgroundSet() && cn1LookAndFeelColors()) {
-            Color c = UIManager.getColor("control");
+            Object o = this;
+            // A content area is not the colour of the window around it.
+            String key = o instanceof JDesktopPane ? "Desktop.background"
+                    : o instanceof com.codename1.desktopcompat.javax.swing.text.JTextComponent ? "text" : "control";
+            Color c = UIManager.getColor(key);
             if (c != null) {
                 return c;
             }

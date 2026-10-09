@@ -33,6 +33,8 @@ public class RadioButtonPeer extends com.codename1.ui.RadioButton implements Pee
 
     public RadioButtonPeer(Component owner) {
         support = new PeerSupport(owner, this);
+        // The room between the mark and its text.
+        setGap(Units.toDevice(4));
         support.trackFocus();
     }
 
@@ -49,9 +51,13 @@ public class RadioButtonPeer extends com.codename1.ui.RadioButton implements Pee
     @Override
     public void paintNativeLook(Graphics g) {
         support.paintStyleBackground(g);
-        if (getIcon() != null) {
+        if (getIcon() != null || ownMark()) {
             // In Swing an icon takes the place of the indicator; it is not
-            // drawn beside it.
+            // drawn beside it. Without one the indicator is the mark drawn
+            // here, which the button shows as its icon.
+            if (ownMark()) {
+                Indicators.labelText(this, support);
+            }
             getUIManager().getLookAndFeel().drawButton(g, this);
         } else {
             super.paint(g);
@@ -59,10 +65,35 @@ public class RadioButtonPeer extends com.codename1.ui.RadioButton implements Pee
         super.paintBorder(g);
     }
 
-    /// With an icon there is no indicator to make room for.
+    /// Whether the indicator is the mark drawn here rather than the
+    /// theme's: always, unless the button is a toggle or shows an icon in
+    /// its place.
+    private boolean ownMark() {
+        return !isToggle() && getIcon() == null;
+    }
+
+    private com.codename1.ui.Image mark() {
+        return Indicators.mark(true, isSelected(), isEnabled(), Indicators.size(getUnselectedStyle()));
+    }
+
+    @Override
+    public com.codename1.ui.Image getIconFromState() {
+        return ownMark() ? mark() : super.getIconFromState();
+    }
+
+    @Override
+    public com.codename1.ui.Image getMaskedIcon() {
+        return ownMark() ? mark() : super.getMaskedIcon();
+    }
+
+    /// With an icon there is no indicator to make room for, and the mark
+    /// drawn here is measured as one.
     @Override
     protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-        if (getIcon() != null) {
+        if (ownMark()) {
+            Indicators.labelText(this, support);
+        }
+        if (getIcon() != null || ownMark()) {
             return getUIManager().getLookAndFeel().getButtonPreferredSize(this);
         }
         return super.calcPreferredSize();
