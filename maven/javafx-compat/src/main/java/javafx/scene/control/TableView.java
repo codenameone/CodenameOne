@@ -235,6 +235,7 @@ public class TableView<S> extends Control {
             "items");
     private final ObservableList<TableColumn<S, ?>> columns = FXCollections.observableArrayList();
     private final ObjectProperty<Node> placeholder = new SimpleObjectProperty<Node>(this, "placeholder");
+    private final Label noContent = new Label();
     private final ObjectProperty<TableViewSelectionModel<S>> selectionModel =
             new SimpleObjectProperty<TableViewSelectionModel<S>>(this, "selectionModel");
     private final DoubleProperty fixedCellSize = new SimpleDoubleProperty(this, "fixedCellSize", USE_COMPUTED_SIZE);
@@ -311,6 +312,7 @@ public class TableView<S> extends Control {
         // The name JavaFX gives the strip behind its column headers.
         header.getStyleClass().add("column-header-background");
         flow = new RowFlow(new FlowRows());
+        flow.stripes = true;
         cn1Children().add(flow);
         cn1Children().add(header);
         this.items.addListener(new ChangeListener<ObservableList<S>>() {
@@ -360,6 +362,9 @@ public class TableView<S> extends Control {
                 syncSelection();
             }
         });
+        noContent.setMouseTransparent(true);
+        noContent.setVisible(false);
+        cn1Children().add(noContent);
         placeholder.addListener(new ChangeListener<Node>() {
             @Override
             public void changed(ObservableValue<? extends Node> observable, Node oldValue, Node newValue) {
@@ -801,17 +806,23 @@ public class TableView<S> extends Control {
             }
             x += column.getWidth();
         }
+        // A table with nothing to show says so, in the words of the standard
+        // skin, unless the application gave it something else to show.
         Node empty = getPlaceholder();
+        if (empty == null) {
+            empty = noContent;
+            noContent.setText(columns.isEmpty() ? "No columns in table" : "No content in table");
+        } else {
+            noContent.setVisible(false);
+        }
         ObservableList<S> list = getItems();
-        boolean showEmpty = empty != null && (list == null || list.isEmpty());
+        boolean showEmpty = list == null || list.isEmpty() || columns.isEmpty();
         flow.setVisible(!showEmpty);
         flow.resizeRelocate(in.getLeft(), in.getTop() + hh, w, h - hh);
-        if (empty != null) {
-            empty.setVisible(showEmpty);
-            if (showEmpty) {
-                layoutInArea(empty, in.getLeft(), in.getTop() + hh, w, h - hh, 0, javafx.geometry.HPos.CENTER,
-                        javafx.geometry.VPos.CENTER);
-            }
+        empty.setVisible(showEmpty);
+        if (showEmpty) {
+            layoutInArea(empty, in.getLeft(), in.getTop() + hh, w, h - hh, 0, javafx.geometry.HPos.CENTER,
+                    javafx.geometry.VPos.CENTER);
         }
     }
 

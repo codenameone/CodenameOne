@@ -480,9 +480,45 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         if ((top != null || moved) && target.getParent() != null) {
             target = target.getParent();
         }
+        // Codename One paints a component over the backgrounds of its
+        // parents and takes siblings not to overlap, so a node that lies
+        // over an earlier sibling -- the indicator over the veil of a
+        // stack pane -- would be painted again on a hole in that sibling.
+        // The parent paints both.
+        for (int level = 0; level < 8 && target.peer != null; level++) {
+            Parent holder = target.getParent();
+            if (holder == null || !target.liesOverASibling(holder)) {
+                break;
+            }
+            target = holder;
+        }
         if (target.peer != null) {
             target.peer.repaint();
         }
+    }
+
+    private static final int OVERLAP_SIBLINGS = 64;
+
+    /// Whether a visible sibling drawn before this node lies under any
+    /// part of it. Not asked of a parent with many children, which is a
+    /// list of rows that do not overlap.
+    private boolean liesOverASibling(Parent holder) {
+        List<Node> all = holder.getChildrenUnmodifiable();
+        int n = all.size();
+        if (n < 2 || n > OVERLAP_SIBLINGS || all.get(0) == this) {
+            return false;
+        }
+        Bounds mine = getBoundsInParent();
+        for (int i = 0; i < n; i++) {
+            Node other = all.get(i);
+            if (other == this) {
+                break;
+            }
+            if (other.isVisible() && other.getBoundsInParent().intersects(mine)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Asks for the layout that places this node to run again.

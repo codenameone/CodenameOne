@@ -76,4 +76,9 @@ public class ListCell<T> extends IndexedCell<T> {
         MultipleSelectionModel<T> model = view == null ? null : view.getSelectionModel();
         updateSelected(valid && model != null && model.isSelected(newIndex));
     }
+
+    @Override
+    boolean striped() {
+        return getIndex() % 2 == 1;
+    }
 }

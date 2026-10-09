@@ -197,4 +197,9 @@ public class TableCell<S, T> extends IndexedCell<T> {
         TableView.TableViewSelectionModel<S> model = table == null ? null : table.getSelectionModel();
         updateSelected(valid && model != null && model.isSelected(newIndex));
     }
+
+    @Override
+    boolean striped() {
+        return getIndex() % 2 == 1;
+    }
 }

@@ -32,6 +32,7 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
@@ -50,9 +51,10 @@ import javafx.util.StringConverter;
 /// focus reads the text back through the converter, and a text the
 /// converter cannot read puts the value back.
 ///
-/// The arrows are one above the other at the right of the editor,
-/// whatever arrow style class is added: the `STYLE_CLASS_*` constants are
-/// there for the sheets that name them.
+/// The arrows are one above the other at the right of the editor unless
+/// one of the `STYLE_CLASS_*` constants is among the style classes, which
+/// moves them as its name says. Arrows beside the editor point left and
+/// right, and the one that steps up is the right one.
 public class Spinner<T> extends Control {
 
     /// The arrows beside each other at the right.
@@ -71,6 +73,12 @@ public class Spinner<T> extends Control {
             new SimpleObjectProperty<SpinnerValueFactory<T>>(this, "valueFactory");
     private final BooleanProperty editable = new SimpleBooleanProperty(this, "editable", false);
     private final TextField editor = new TextField();
+    private final Arrow up = new Arrow(true);
+    private final Arrow down = new Arrow(false);
+    private final VBox pair = new VBox();
+    private final HBox row = new HBox();
+    private final VBox box = new VBox();
+    private int arranged = -1;
     private final ChangeListener<T> stepped = new ChangeListener<T>() {
         @Override
         public void changed(ObservableValue<? extends T> observable, T was, T now) {
@@ -82,12 +90,36 @@ public class Spinner<T> extends Control {
     /// One of the two arrows: a region with the standard theme's button
     /// look and a triangle on it.
     private static final class Arrow extends StackPane {
+        private final boolean up;
+        private final Polygon mark = new Polygon();
+
         Arrow(boolean up) {
+            this.up = up;
             getStyleClass().add(up ? "increment-arrow-button" : "decrement-arrow-button");
-            Polygon mark = up ? new Polygon(0, 4, 4, 0, 8, 4) : new Polygon(0, 0, 8, 0, 4, 4);
             mark.setFill(Color.gray(0.25));
             mark.setMouseTransparent(true);
             getChildren().add(mark);
+            point(false);
+        }
+
+        /// Points the triangle up or down, or right or left for arrows
+        /// that are beside each other.
+        void point(boolean sideways) {
+            Double[] p;
+            if (sideways) {
+                p = up ? corners(0, 0, 4, 4, 0, 8) : corners(4, 0, 0, 4, 4, 8);
+            } else {
+                p = up ? corners(0, 4, 4, 0, 8, 4) : corners(0, 0, 8, 0, 4, 4);
+            }
+            mark.getPoints().setAll(p);
+        }
+
+        private static Double[] corners(double... at) {
+            Double[] out = new Double[at.length];
+            for (int i = 0; i < at.length; i++) {
+                out[i] = Double.valueOf(at[i]);
+            }
+            return out;
         }
 
         @Override
@@ -101,14 +133,12 @@ public class Spinner<T> extends Control {
     public Spinner() {
         getStyleClass().add("spinner");
         editor.setPrefColumnCount(6);
+        editor.setMinWidth(0);
         editor.setEditable(false);
-        Arrow up = new Arrow(true);
-        Arrow down = new Arrow(false);
         VBox.setVgrow(up, Priority.ALWAYS);
         VBox.setVgrow(down, Priority.ALWAYS);
-        VBox arrows = new VBox(up, down);
         HBox.setHgrow(editor, Priority.ALWAYS);
-        HBox row = new HBox(editor, arrows);
+        getStyleClass().addListener((ListChangeListener<String>) change -> arrange());
         up.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
             if (!isDisabled()) {
                 increment();
@@ -140,7 +170,63 @@ public class Spinner<T> extends Control {
             }
             show();
         });
-        cn1MadeOf(row);
+        arrange();
+        cn1MadeOf(box);
+    }
+
+    /// Puts the editor and the arrows where the style classes say.
+    private void arrange() {
+        ObservableList<String> classes = getStyleClass();
+        int now = 0;
+        if (classes.contains(STYLE_CLASS_ARROWS_ON_RIGHT_HORIZONTAL)) {
+            now = 1;
+        } else if (classes.contains(STYLE_CLASS_ARROWS_ON_LEFT_VERTICAL)) {
+            now = 2;
+        } else if (classes.contains(STYLE_CLASS_ARROWS_ON_LEFT_HORIZONTAL)) {
+            now = 3;
+        } else if (classes.contains(STYLE_CLASS_SPLIT_ARROWS_VERTICAL)) {
+            now = 4;
+        } else if (classes.contains(STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL)) {
+            now = 5;
+        }
+        if (now == arranged) {
+            return;
+        }
+        arranged = now;
+        box.getChildren().clear();
+        row.getChildren().clear();
+        pair.getChildren().clear();
+        boolean sideways = now == 1 || now == 3 || now == 5;
+        up.point(sideways);
+        down.point(sideways);
+        if (now == 4) {
+            box.getChildren().addAll(up, editor, down);
+        } else if (now == 5) {
+            row.getChildren().addAll(down, editor, up);
+            box.getChildren().add(row);
+        } else if (now == 1) {
+            row.getChildren().addAll(editor, down, up);
+            box.getChildren().add(row);
+        } else if (now == 3) {
+            row.getChildren().addAll(down, up, editor);
+            box.getChildren().add(row);
+        } else {
+            pair.getChildren().addAll(up, down);
+            if (now == 2) {
+                row.getChildren().addAll(pair, editor);
+            } else {
+                row.getChildren().addAll(editor, pair);
+            }
+            box.getChildren().add(row);
+        }
+        requestLayout();
+    }
+
+    /// A spinner is as wide as its editor and its arrows unless it is
+    /// given a width, and the editor then takes what the arrows leave.
+    @Override
+    protected double computeMinWidth(double height) {
+        return 0;
     }
 
     /// Creates a spinner of whole numbers that steps by one.

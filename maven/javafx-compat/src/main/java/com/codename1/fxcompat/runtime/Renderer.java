@@ -335,6 +335,12 @@ public final class Renderer {
             fill(path, stops.get(stops.size() / 2).getColor(), bx, by, bw, bh);
             return;
         }
+        // A gradient that repeats or reflects is coloured here, point by
+        // point: the platform's paint put the reflected half of a
+        // reflecting gradient first, so the stops read backwards.
+        if (lg.getCycleMethod() != CycleMethod.NO_CYCLE && masked(path, null, lg, bx, by, bw, bh)) {
+            return;
+        }
         double sx = lg.isProportional() ? bx + lg.getStartX() * bw : lg.getStartX();
         double sy = lg.isProportional() ? by + lg.getStartY() * bh : lg.getStartY();
         double ex = lg.isProportional() ? bx + lg.getEndX() * bw : lg.getEndX();

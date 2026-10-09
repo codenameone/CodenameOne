@@ -188,6 +188,12 @@ public abstract class TextInputControl extends Control {
             if (hint != null && promptTextFill instanceof Color) {
                 hint.getAllStyles().setFgColor(((Color) promptTextFill).cn1Argb() & 0xffffff);
             }
+            if (hint != null && f != null) {
+                // The prompt is written in the font of the control: the
+                // hint is a label of its own, which otherwise keeps the
+                // theme's size beside a field given a larger one.
+                hint.getAllStyles().setFont(Fonts.of(f));
+            }
         } finally {
             syncing = false;
         }

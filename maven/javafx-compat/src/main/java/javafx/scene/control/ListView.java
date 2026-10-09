@@ -113,6 +113,7 @@ public class ListView<T> extends Control {
         setBorder(new Border(new BorderStroke(Color.rgb(200, 200, 200), BorderStrokeStyle.SOLID, CornerRadii.EMPTY,
                 new BorderWidths(1))));
         flow = new RowFlow(new FlowRows());
+        flow.stripes = true;
         cn1Children().add(flow);
         this.items.addListener(new ChangeListener<ObservableList<T>>() {
             @Override

@@ -237,6 +237,47 @@ public class ControlsContainerTest {
         assertEquals(0, decimal.getValue().doubleValue(), 0);
     }
 
+    /// The arrow style classes move the arrows, and a spinner given a
+    /// width keeps it: the editor takes what the arrows leave.
+    @Test
+    public void theArrowsOfASpinnerAreWhereItsStyleClassPutsThem() {
+        Spinner<Integer> spinner = new Spinner<Integer>(0, 10, 5);
+        spinner.setPrefWidth(80);
+        Scene scene = sceneOf(new javafx.scene.layout.HBox(spinner), 300, 60);
+        Node up = spinner.lookup(".increment-arrow-button");
+        Node down = spinner.lookup(".decrement-arrow-button");
+        Node editor = spinner.getEditor();
+        assertEquals("the width it was given", 80, spinner.getWidth(), 0.5);
+        assertTrue("arrows at the right", x(up, spinner) > x(editor, spinner));
+        assertTrue("one above the other", y(up, spinner) < y(down, spinner));
+        assertEquals(x(up, spinner), x(down, spinner), 0.5);
+
+        spinner.getStyleClass().add(Spinner.STYLE_CLASS_ARROWS_ON_LEFT_HORIZONTAL);
+        scene.cn1Layout(300, 60);
+        assertEquals(80, spinner.getWidth(), 0.5);
+        assertTrue("the step down is the left one", x(down, spinner) < x(up, spinner));
+        assertTrue("both left of the editor", x(up, spinner) < x(editor, spinner));
+        assertEquals(y(up, spinner), y(down, spinner), 0.5);
+
+        spinner.getStyleClass().setAll("spinner", Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+        scene.cn1Layout(300, 60);
+        assertTrue(x(down, spinner) < x(editor, spinner));
+        assertTrue(x(editor, spinner) < x(up, spinner));
+
+        spinner.getStyleClass().setAll("spinner", Spinner.STYLE_CLASS_SPLIT_ARROWS_VERTICAL);
+        scene.cn1Layout(300, 60);
+        assertTrue(y(up, spinner) < y(editor, spinner));
+        assertTrue(y(editor, spinner) < y(down, spinner));
+    }
+
+    private static double x(Node node, Node in) {
+        return in.sceneToLocal(node.localToScene(0, 0)).getX();
+    }
+
+    private static double y(Node node, Node in) {
+        return in.sceneToLocal(node.localToScene(0, 0)).getY();
+    }
+
     @Test
     public void anEditableSpinnerReadsWhatWasTyped() {
         Spinner<Integer> spinner = new Spinner<Integer>(0, 100, 5);

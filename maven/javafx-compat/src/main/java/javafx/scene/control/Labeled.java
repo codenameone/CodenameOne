@@ -350,6 +350,21 @@ public abstract class Labeled extends Control {
     protected double computeMinWidth(double height) {
         double pref = computePrefWidth(height);
         Component c = cn1NativeIfCreated();
+        if (c == null || cn1BareText()) {
+            // Asked before there is a native label, which is when a pane
+            // first sizes its children, or of a plain label, which is its
+            // text and nothing else: the same sum from the font of the
+            // control, so the answer does not change when the native label
+            // appears. Answering the whole text here made a label given a
+            // preferred width narrower than its text as wide as the text,
+            // and a tile pane of such labels a column short.
+            String text = getText();
+            if (text == null || text.length() == 0) {
+                return pref;
+            }
+            double room = Fonts.width(getFont(), text) - Fonts.width(getFont(), ELLIPSIS);
+            return room > 0 ? Math.max(0, pref - room) : pref;
+        }
         if (!(c instanceof com.codename1.ui.Label)) {
             return pref;
         }

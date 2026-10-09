@@ -326,9 +326,12 @@ public class Text extends Shape {
         return Fonts.ascent(getFont());
     }
 
+    /// A text a flow cut into runs draws them where the flow put them,
+    /// which is beyond the box of the text when a run of another text
+    /// stands between two of its own.
     @Override
     public boolean cn1PaintsOutsideBounds() {
-        return false;
+        return flowParts != null;
     }
 
     @Override

@@ -161,4 +161,29 @@ public class ControlSizeTest {
         assertTrue("and the native look again without it", red.getBackground() == null
                 || red.getBackground().getFills().isEmpty());
     }
+
+    @Test
+    public void aLabelGivenAWidthNarrowerThanItsTextKeepsThatWidth() {
+        // The text is cut short with an ellipsis; the label is not made
+        // as wide as the text, before it is shown or after.
+        javafx.scene.layout.TilePane tiles = new javafx.scene.layout.TilePane(5, 5);
+        javafx.scene.control.Label[] labels = new javafx.scene.control.Label[3];
+        String[] texts = {"HAND", "A_VERY_LONG_NAME_THAT_DOES_NOT_FIT_AT_ALL", "MOVE"};
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = new javafx.scene.control.Label(texts[i]);
+            labels[i].setAlignment(javafx.geometry.Pos.CENTER);
+            labels[i].setPrefSize(85, 65);
+            labels[i].setStyle("-fx-border-color: #aaaaaa; -fx-background-color: #dddddd;");
+            tiles.getChildren().add(labels[i]);
+        }
+        assertEquals(85, labels[1].prefWidth(-1), 0.01);
+        // Five columns is what a tile pane asks for when it is not told.
+        assertEquals(5 * 85 + 4 * 5, tiles.prefWidth(-1), 0.01);
+        javafx.scene.Scene scene = new javafx.scene.Scene(tiles, 600, 400);
+        scene.cn1Layout(600, 400);
+        scene.cn1Layout(600, 400);
+        assertEquals(85, labels[1].getWidth(), 0.01);
+        assertEquals(90, labels[1].getLayoutX() - labels[0].getLayoutX(), 0.01);
+        assertEquals(85, labels[1].prefWidth(-1), 0.01);
+    }
 }

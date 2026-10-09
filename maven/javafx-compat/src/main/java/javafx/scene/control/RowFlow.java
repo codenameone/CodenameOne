@@ -126,6 +126,34 @@ final class RowFlow extends Region {
         });
     }
 
+    /// Whether every second row is shaded across the whole view, and the
+    /// room below the last row as rows would be, which the standard theme
+    /// does in a list and a table, not a tree.
+    boolean stripes;
+
+    @Override
+    public void cn1Paint(com.codename1.fxcompat.runtime.Renderer renderer) {
+        super.cn1Paint(renderer);
+        double rh = rowHeight();
+        if (!stripes || !(rh > 0)) {
+            return;
+        }
+        // From the first row in view: a row is shaded to the edge of the
+        // view, past its last cell, and so is the room below the rows.
+        int first = (int) Math.floor(offset / rh);
+        double y = first * rh - offset;
+        Color alt = com.codename1.fxcompat.runtime.CssEngine.themeColor(this, "-fx-control-inner-background-alt");
+        if (alt == null) {
+            return;
+        }
+        for (int row = first; y < getHeight(); row++, y += rh) {
+            if (row % 2 == 1 && y + rh > 0) {
+                double top = Math.max(0, y);
+                renderer.fillRect(0, top, getWidth(), Math.min(y + rh, getHeight()) - top, alt);
+            }
+        }
+    }
+
     /// Returns the height of a row.
     double rowHeight() {
         double fixed = rows.fixedCellSize();

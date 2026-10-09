@@ -898,6 +898,19 @@ Traps that have already cost a fix:
   One's wheel event to the `MouseWheelListener`s before anything scrolls, and
   the content then scrolled as well. The Codename One event is consumed when a
   listener received it or the pane has wheel scrolling off.
+- **A JavaFX node repainted alone punches a hole in the sibling under it.**
+  Codename One repaints a component over its *parents'* backgrounds and
+  takes siblings not to overlap, so a progress indicator over the veil of a
+  `StackPane` redrew itself on a square of bare scene. `Node.repaint` walks
+  up to the parent while the node lies over an earlier sibling. A capture
+  taken while such a scene animates can also catch a half-painted frame;
+  shoot it at a different moment before reading it as a bug.
+- **A reflecting `LinearGradient` is not handed to `LinearGradientPaint`.**
+  The JavaSE port drew the reflected half first, so the stops read
+  backwards. Gradients that cycle, radial ones with a focus and every
+  gradient stroke go through `GradientRaster`, per pixel, and
+  `GradientAndImageTest` holds them to values computed from the JavaFX
+  definition.
 - **`Class.getSuperclass()` is not on the device** -- absent from
   `Ports/CLDC11`, though `vm/JavaAPI` has it, so the simulator and iOS pass and
   the compliance check does not. `JTable` finds a renderer by assignability,

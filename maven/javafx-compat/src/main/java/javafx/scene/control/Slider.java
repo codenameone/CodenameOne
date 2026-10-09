@@ -37,6 +37,7 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.css.PseudoClass;
+import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.util.StringConverter;
 
@@ -175,6 +176,37 @@ public class Slider extends Control {
             }
         }
         super.cn1Invalidated(what);
+    }
+
+    /// The length a slider asks for is JavaFX's, 140, and not the platform
+    /// slider's, which asks for most of a screen: a slider among other
+    /// controls in a row would push them out of it.
+    @Override
+    protected double computePrefWidth(double height) {
+        if (getOrientation() == Orientation.VERTICAL) {
+            return super.computePrefWidth(height);
+        }
+        Insets in = getInsets();
+        return in.getLeft() + 140 + in.getRight();
+    }
+
+    @Override
+    protected double computePrefHeight(double width) {
+        if (getOrientation() != Orientation.VERTICAL) {
+            return super.computePrefHeight(width);
+        }
+        Insets in = getInsets();
+        return in.getTop() + 140 + in.getBottom();
+    }
+
+    @Override
+    protected double computeMinWidth(double height) {
+        return getOrientation() == Orientation.VERTICAL ? computePrefWidth(height) : Math.min(60, computePrefWidth(height));
+    }
+
+    @Override
+    protected double computeMinHeight(double width) {
+        return getOrientation() == Orientation.VERTICAL ? Math.min(60, computePrefHeight(width)) : computePrefHeight(width);
     }
 
     @Override

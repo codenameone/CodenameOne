@@ -815,9 +815,19 @@ and the row and column constraints
 |Controls
 |`Label`, `Button`, `ToggleButton`, `CheckBox`, `RadioButton`, `Hyperlink`,
 `TextField`, `PasswordField`, `TextArea`, `ComboBox`, `ChoiceBox`,
-`DatePicker`, `Slider`, `ProgressBar`, `ProgressIndicator`, `Separator`,
-`ScrollPane`, `SplitPane`, `TabPane`, `ListView`, `TableView`, `ButtonBar`
-and `Tooltip`
+`DatePicker`, `ColorPicker`, `Spinner` with its value factories, `Slider`,
+`ScrollBar`, `ProgressBar`, `ProgressIndicator`, `Separator`, `ScrollPane`,
+`SplitPane`, `TabPane`, `TitledPane`, `Accordion`, `ToolBar`, `Pagination`,
+`ListView`, `TableView`, `TreeView` with `TreeItem` and `TreeCell`,
+`ButtonBar` and `Tooltip`
+
+|Cells
+|`ListCell`, `TableCell`, `TreeCell`, `TextFieldTableCell`,
+`CheckBoxTableCell` and `PropertyValueFactory`
+
+|Charts
+|`LineChart`, `AreaChart`, `BarChart`, `ScatterChart` and `PieChart`, with
+`NumberAxis` and `CategoryAxis`
 
 |Menus and dialogs
 |`MenuBar`, `Menu`, `MenuItem`, `CheckMenuItem`, `SeparatorMenuItem`,
@@ -834,19 +844,25 @@ and expression classes and `When`
 `FilteredList` and `SortedList`
 
 |Shapes, text and paint
-|The shapes and path elements of `javafx.scene.shape`, `Text`, `Font`,
-`Color`, `LinearGradient` and `RadialGradient`
+|The shapes and path elements of `javafx.scene.shape`, `SVGPath`, `Text`,
+`TextFlow`, `Font`, `Color`, and `LinearGradient` and `RadialGradient` with
+their cycle methods, any number of stops, a focus, and proportional or
+absolute coordinates
+
+|Effects
+|`DropShadow`, `InnerShadow`, `GaussianBlur`, `BoxBlur` and `Glow`
 
 |Canvas and images
-|`Canvas`, `GraphicsContext`, `Image` and `ImageView`
+|`Canvas`, `GraphicsContext`, `Image`, `ImageView`, `WritableImage`,
+`PixelReader`, `PixelWriter` and `Node.snapshot`
 
 |Transforms
 |`Affine`, `Rotate`, `Scale`, `Shear` and `Translate`
 
 |Animation
 |`Timeline`, `KeyFrame`, `KeyValue`, `Interpolator`, `AnimationTimer`, the
-fade, translate, rotate, scale and pause transitions, and the sequential
-and parallel transitions
+fade, fill, stroke, translate, rotate, scale and pause transitions, and the
+sequential and parallel transitions
 
 |Concurrency
 |`Task`, `Service` and `Worker`
@@ -859,7 +875,9 @@ and parallel transitions
 |`FXMLLoader`, `@FXML`, `Initializable` and `LoadException`
 
 |Styling
-|Style classes, ids, inline styles, `PseudoClass` and style sheets
+|Style classes, ids, inline styles, `PseudoClass` and style sheets, with
+looked-up colors, layered backgrounds and borders, background images and
+border images
 
 |Utilities
 |`Duration`, `Pair`, `Callback`, `StringConverter` with the number, boolean
@@ -894,20 +912,39 @@ Swing and AWT:
 
 JavaFX:
 
-* Effects, blend modes, `Node.setClip`, snapshots, three-dimensional
-  shapes, cameras and transforms.
-* `WebView`, media playback, charts, printing and the Swing embedding
+* Blend modes, and the `Lighting`, `Reflection`, `SepiaTone`, `Bloom`,
+  `ColorAdjust` and `DisplacementMap` effects.
+* Three-dimensional shapes, cameras, lights and transforms.
+* `WebView`, `HTMLEditor`, media playback, printing and the Swing embedding
   classes.
-* `TreeView`, `TreeTableView`, `Spinner`, `ColorPicker`, `Accordion`,
-  `TitledPane`, `ToolBar`, `Pagination`, `FileChooser` and
-  `DirectoryChooser`.
-* Editing, sorting, cell selection, row factories and column resize
-  policies in `TableView`. A column that doesn't fit is cut off; the table
-  doesn't scroll sideways. `ListView` is vertical and can't be edited.
-* Skins, the user agent style sheet and CSS metadata. Background images,
-  and layered backgrounds and borders from a style sheet.
-* The system menu bar, scene accelerators and mnemonics, and dragging data between nodes.
-* `WritableImage`, pixel readers and animated images.
+* The zoom and rotate gestures. Swipes and touch points are reported.
+* `TreeTableView`, `DirectoryChooser`, `TextFormatter`, the path transition,
+  and the stacked and bubble charts.
+* Shape arithmetic: `Shape.union`, `subtract` and `intersect`.
+* The date cells and day cell factory of `DatePicker`, which shows the
+  platform's date picker.
+* A horizontal `ListView`. A list can't be edited.
+* Skins, the user agent style sheet and CSS metadata.
+* Style rules for the parts of a chart, such as `.chart-bar` or
+  `.chart-series-line`. A chart draws its bars, lines and symbols in the
+  standard colors.
+* The system menu bar, and dragging data between nodes.
+* Animated images, and FXML builder factories.
+
+`PropertyValueFactory` finds its property by name, which on the desktop is
+reflection. Here the build generates the lookup, for every class of the
+public class of the application that has at least one public method named
+`...Property()`, and for a public class with a getter for a name that the
+code passes to the `PropertyValueFactory` constructor as a constant. A
+property of a row the build generated nothing for throws an
+`IllegalStateException` that names the class and the property, where the
+desktop leaves the cell empty. A cell value factory written as a lambda
+needs none of this.
+
+Text that mixes left-to-right and right-to-left scripts: the runs of a
+`TextFlow` line are put in visual order, and the platform orders the
+characters inside each run when it draws it. A flow whose base direction
+is right to left isn't mirrored.
 
 Both toolkits:
 

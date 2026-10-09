@@ -24,6 +24,7 @@ package javafx.scene.control;
 
 import java.util.List;
 
+import com.codename1.fxcompat.runtime.CssEngine;
 import com.codename1.fxcompat.runtime.Renderer;
 import com.codename1.fxcompat.runtime.Units;
 import com.codename1.ui.Component;
@@ -245,7 +246,20 @@ public class Cell<T> extends Labeled {
         super.cn1Paint(renderer);
         if (isSelected() && getBackground() == null) {
             renderer.fillRect(0, 0, getWidth(), getHeight(), selectionBar());
+        } else if (getBackground() == null && striped()) {
+            // The standard theme shades every second row of a list and of
+            // a table. It is painted, not given as a background, so that a
+            // cell an application colours is still told from one it left.
+            Color alt = CssEngine.themeColor(this, "-fx-control-inner-background-alt");
+            if (alt != null) {
+                renderer.fillRect(0, 0, getWidth(), getHeight(), alt);
+            }
         }
+    }
+
+    /// Whether this cell is on a row the standard theme shades.
+    boolean striped() {
+        return false;
     }
 
     /// The item this cell shows.

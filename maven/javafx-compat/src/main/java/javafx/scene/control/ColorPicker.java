@@ -85,7 +85,11 @@ public class ColorPicker extends ComboBoxBase<Color> {
     public ColorPicker(Color color) {
         getStyleClass().add("color-picker");
         swatch.setStroke(Color.gray(0.4));
-        HBox row = new HBox(6, swatch, name);
+        // The arrow every combo box of the standard theme ends in.
+        javafx.scene.shape.Polygon arrow = new javafx.scene.shape.Polygon(0, 0, 7, 0, 3.5, 4);
+        arrow.setFill(Color.gray(0.25));
+        HBox row = new HBox(6, swatch, name, arrow);
+        HBox.setMargin(arrow, new javafx.geometry.Insets(0, 0, 0, 4));
         row.setAlignment(Pos.CENTER_LEFT);
         cn1MadeOf(row);
         valueProperty().addListener((observable, was, now) -> shown());
