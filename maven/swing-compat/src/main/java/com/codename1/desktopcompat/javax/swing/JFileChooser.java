@@ -730,4 +730,18 @@ public class JFileChooser extends JComponent {
     public boolean isTraversable(File f) {
         return f != null && f.isDirectory();
     }
+
+    // ------------------------------------------------------------ drag
+
+    /// Records whether dragging out of the component is wanted. The layer
+    /// starts no drag of its own, so this is a property and nothing more.
+    public void setDragEnabled(boolean b) {
+        cn1DragEnabled = b;
+    }
+
+    public boolean getDragEnabled() {
+        return cn1DragEnabled;
+    }
+
+    private boolean cn1DragEnabled;
 }

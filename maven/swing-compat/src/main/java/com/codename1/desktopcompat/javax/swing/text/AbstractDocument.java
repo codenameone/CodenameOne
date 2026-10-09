@@ -24,6 +24,11 @@ package com.codename1.desktopcompat.javax.swing.text;
 
 import com.codename1.desktopcompat.javax.swing.event.DocumentEvent;
 import com.codename1.desktopcompat.javax.swing.event.DocumentListener;
+import com.codename1.desktopcompat.javax.swing.event.UndoableEditEvent;
+import com.codename1.desktopcompat.javax.swing.event.UndoableEditListener;
+import com.codename1.desktopcompat.javax.swing.undo.CannotRedoException;
+import com.codename1.desktopcompat.javax.swing.undo.CannotUndoException;
+import com.codename1.desktopcompat.javax.swing.undo.CompoundEdit;
 import com.codename1.desktopcompat.javax.swing.event.EventListenerList;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -60,6 +65,8 @@ public abstract class AbstractDocument implements Document {
     private DocumentFilter documentFilter;
     private DocumentFilter.FilterBypass filterBypass;
     private int modCount;
+    /// An undo or a redo is changing the text.
+    private boolean replaying;
 
     AbstractDocument() {
     }
@@ -89,6 +96,14 @@ public abstract class AbstractDocument implements Document {
             throw new BadLocationException("Invalid location", offset < 0 ? offset : offset + length);
         }
         return text.substring(offset, offset + length);
+    }
+
+    @Override
+    public void getText(int offset, int length, Segment txt) throws BadLocationException {
+        String s = getText(offset, length);
+        txt.array = s.toCharArray();
+        txt.offset = 0;
+        txt.count = txt.array.length;
     }
 
     // ------------------------------------------------------------ changes
@@ -158,8 +173,11 @@ public abstract class AbstractDocument implements Document {
             }
         }
         DefaultDocumentEvent e = new DefaultDocumentEvent(offs, len, DocumentEvent.EventType.INSERT);
+        e.cn1Text = str;
         insertUpdate(e, a);
+        e.end();
         fireInsertUpdate(e);
+        cn1PostEdit(e);
     }
 
     void handleRemove(int offs, int len) throws BadLocationException {
@@ -170,6 +188,7 @@ public abstract class AbstractDocument implements Document {
             throw new BadLocationException("Invalid remove", offs < 0 ? offs : offs + len);
         }
         DefaultDocumentEvent e = new DefaultDocumentEvent(offs, len, DocumentEvent.EventType.REMOVE);
+        e.cn1Text = text.substring(offs, offs + len);
         removeUpdate(e);
         text.delete(offs, offs + len);
         modCount++;
@@ -184,7 +203,37 @@ public abstract class AbstractDocument implements Document {
             }
         }
         postRemoveUpdate(e);
+        e.end();
         fireRemoveUpdate(e);
+        cn1PostEdit(e);
+    }
+
+    /// Posts the edit of a change to the undoable edit listeners, unless
+    /// the change is itself an undo or a redo.
+    private void cn1PostEdit(DefaultDocumentEvent e) {
+        if (!replaying && listenerList.getListenerCount(UndoableEditListener.class) > 0) {
+            fireUndoableEditUpdate(new UndoableEditEvent(this, e));
+        }
+    }
+
+    /// Takes an edit back or applies it again: the plain insertion or
+    /// removal, with the document listeners told and no new edit posted.
+    void cn1Replay(boolean insert, int offs, String str) {
+        boolean was = replaying;
+        replaying = true;
+        try {
+            if (insert) {
+                handleInsertString(Math.min(offs, text.length()), str, null);
+            } else {
+                int from = Math.min(offs, text.length());
+                handleRemove(from, Math.min(str.length(), text.length() - from));
+            }
+        } catch (BadLocationException e) {
+            // The offsets were clamped to the document above.
+            throw new IllegalStateException(e.getMessage());
+        } finally {
+            replaying = was;
+        }
     }
 
     /// Called after text went in and before the listeners hear of it.
@@ -332,6 +381,27 @@ public abstract class AbstractDocument implements Document {
         listenerList.remove(DocumentListener.class, listener);
     }
 
+    @Override
+    public void addUndoableEditListener(UndoableEditListener listener) {
+        listenerList.add(UndoableEditListener.class, listener);
+    }
+
+    @Override
+    public void removeUndoableEditListener(UndoableEditListener listener) {
+        listenerList.remove(UndoableEditListener.class, listener);
+    }
+
+    public UndoableEditListener[] getUndoableEditListeners() {
+        return listenerList.getListeners(UndoableEditListener.class);
+    }
+
+    protected void fireUndoableEditUpdate(UndoableEditEvent e) {
+        UndoableEditListener[] ls = listenerList.getListeners(UndoableEditListener.class);
+        for (int i = ls.length - 1; i >= 0; i--) {
+            ls[i].undoableEditHappened(e);
+        }
+    }
+
     public DocumentListener[] getDocumentListeners() {
         return listenerList.getListeners(DocumentListener.class);
     }
@@ -361,12 +431,17 @@ public abstract class AbstractDocument implements Document {
         }
     }
 
-    /// The event a document sends for one change.
-    public class DefaultDocumentEvent implements DocumentEvent {
+    /// The event a document sends for one change. It is also the edit
+    /// that takes the change back: undoing an insertion removes the text
+    /// again and undoing a removal puts it back, and the document
+    /// listeners hear of either as an ordinary change.
+    public class DefaultDocumentEvent extends CompoundEdit implements DocumentEvent {
 
         private final int offset;
         private final int length;
         private final DocumentEvent.EventType type;
+        /// The characters that went in or came out.
+        String cn1Text = "";
 
         public DefaultDocumentEvent(int offs, int len, DocumentEvent.EventType type) {
             offset = offs;
@@ -397,6 +472,52 @@ public abstract class AbstractDocument implements Document {
         @Override
         public DocumentEvent.ElementChange getChange(Element elem) {
             return null;
+        }
+
+        @Override
+        public void undo() throws CannotUndoException {
+            super.undo();
+            if (type == DocumentEvent.EventType.INSERT) {
+                cn1Replay(false, offset, cn1Text);
+            } else if (type == DocumentEvent.EventType.REMOVE) {
+                cn1Replay(true, offset, cn1Text);
+            }
+        }
+
+        @Override
+        public void redo() throws CannotRedoException {
+            super.redo();
+            if (type == DocumentEvent.EventType.INSERT) {
+                cn1Replay(true, offset, cn1Text);
+            } else if (type == DocumentEvent.EventType.REMOVE) {
+                cn1Replay(false, offset, cn1Text);
+            }
+        }
+
+        @Override
+        public boolean isSignificant() {
+            return true;
+        }
+
+        @Override
+        public String getPresentationName() {
+            if (type == DocumentEvent.EventType.INSERT) {
+                return "addition";
+            }
+            if (type == DocumentEvent.EventType.REMOVE) {
+                return "deletion";
+            }
+            return "style change";
+        }
+
+        @Override
+        public String getUndoPresentationName() {
+            return UndoName + " " + getPresentationName();
+        }
+
+        @Override
+        public String getRedoPresentationName() {
+            return RedoName + " " + getPresentationName();
         }
 
         @Override

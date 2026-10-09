@@ -102,7 +102,8 @@ import java.util.Vector;
 ///  - There are no lines between nodes and no stock icons.
 ///  - Editing is the plain kind: a text field over the row, started by
 ///    [#startEditingAtPath], F2 or a third click.
-///  - Drag and drop, tool tips per row and type-ahead search are absent.
+///  - No drag starts from the tree (`setDragEnabled` is kept as a property);
+///    tool tips per row and type-ahead search are absent.
 public class JTree extends JComponent implements Scrollable {
 
     public static final String CELL_RENDERER_PROPERTY = "cellRenderer";
@@ -1775,4 +1776,18 @@ public class JTree extends JComponent implements Scrollable {
             return super.children();
         }
     }
+
+    // ------------------------------------------------------------ drag
+
+    /// Records whether dragging out of the component is wanted. The layer
+    /// starts no drag of its own, so this is a property and nothing more.
+    public void setDragEnabled(boolean b) {
+        cn1DragEnabled = b;
+    }
+
+    public boolean getDragEnabled() {
+        return cn1DragEnabled;
+    }
+
+    private boolean cn1DragEnabled;
 }

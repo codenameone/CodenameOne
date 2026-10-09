@@ -27,6 +27,7 @@ import com.codename1.desktopcompat.java.awt.Dimension;
 import com.codename1.desktopcompat.java.awt.Insets;
 import com.codename1.desktopcompat.java.awt.Rectangle;
 import com.codename1.desktopcompat.java.awt.event.FocusEvent;
+import com.codename1.desktopcompat.javax.swing.Action;
 import com.codename1.desktopcompat.javax.swing.InputVerifier;
 import com.codename1.desktopcompat.javax.swing.JComponent;
 import com.codename1.desktopcompat.javax.swing.JViewport;
@@ -57,9 +58,11 @@ import com.codename1.ui.events.DataChangedListener;
 /// (an insertion at or before it pushes it along), and the selection it
 /// describes drives `getSelectedText`, `replaceSelection`, cut, copy and
 /// paste -- through the Codename One clipboard -- but is not highlighted
-/// in the widget. Not supported: key maps and actions, highlighters,
-/// `modelToView`/`viewToModel`, reading and writing streams, drag and
-/// drop, input methods and printing. The input verifier, which the
+/// in the widget. [#getActions] answers the editing actions of
+/// [DefaultEditorKit] that this layer carries out. Not supported: key maps,
+/// highlighters, `modelToView`/`viewToModel`, reading and writing streams,
+/// input methods and printing. [#setDragEnabled] is kept as a property: no
+/// drag starts from the text on its own. The input verifier, which the
 /// desktop keeps on `JComponent`, is implemented here.
 public abstract class JTextComponent extends JComponent implements Scrollable {
 
@@ -81,6 +84,10 @@ public abstract class JTextComponent extends JComponent implements Scrollable {
     private boolean pushing;
     /// The widget's text is being applied to the document.
     private boolean pulling;
+    private boolean dragEnabled;
+    /// The text component that had the focus last; a menu's actions work
+    /// on it while the menu is open.
+    private static JTextComponent lastFocused;
 
     public JTextComponent() {
         setCaret(new DefaultCaret());
@@ -522,6 +529,37 @@ public abstract class JTextComponent extends JComponent implements Scrollable {
         }
     }
 
+    // ------------------------------------------------------------ actions
+
+    /// The editing commands of this component: cut, copy, paste, select
+    /// all, insert break and insert tab, under their `DefaultEditorKit`
+    /// names. Each works on the text component it is fired from, or on the
+    /// one that had the focus last.
+    public Action[] getActions() {
+        return new DefaultEditorKit().getActions();
+    }
+
+    /// Records whether dragging the selection out of the component is
+    /// wanted. No drag is started by the layer.
+    public void setDragEnabled(boolean b) {
+        dragEnabled = b;
+    }
+
+    public boolean getDragEnabled() {
+        return dragEnabled;
+    }
+
+    /// The text component that has, or last had, the focus; null when
+    /// none did or it is no longer showing.
+    static JTextComponent cn1LastFocused() {
+        JTextComponent c = lastFocused;
+        return c != null && c.isShowing() ? c : null;
+    }
+
+    private static void cn1RememberFocus(JTextComponent c) {
+        lastFocused = c;
+    }
+
     // ------------------------------------------------------------ clipboard
 
     public void copy() {
@@ -642,6 +680,9 @@ public abstract class JTextComponent extends JComponent implements Scrollable {
     @Override
     protected void processFocusEvent(FocusEvent e) {
         super.processFocusEvent(e);
+        if (e.getID() == FocusEvent.FOCUS_GAINED) {
+            cn1RememberFocus(this);
+        }
         InputVerifier inputVerifier = getInputVerifier();
         if (e.getID() == FocusEvent.FOCUS_LOST && e.getOppositeComponent() == null && inputVerifier != null
                 && !inputVerifier.shouldYieldFocus(this)) {

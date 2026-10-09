@@ -104,7 +104,8 @@ import java.util.Vector;
 ///    F2 are handled when a key event carries them, which no port does
 ///    today: `KeyMap` cannot tell them from the printable character whose
 ///    code they share, so they arrive as that character.
-///  - Printing, drag and drop and tool tips per cell are absent.
+///  - Printing and tool tips per cell are absent, and no drag starts from
+///    the table (`setDragEnabled` is kept as a property).
 public class JTable extends JComponent implements TableModelListener, Scrollable, TableColumnModelListener,
         ListSelectionListener, CellEditorListener, RowSorterListener {
 
@@ -2234,4 +2235,18 @@ public class JTable extends JComponent implements TableModelListener, Scrollable
             return parsed;
         }
     }
+
+    // ------------------------------------------------------------ drag
+
+    /// Records whether dragging out of the component is wanted. The layer
+    /// starts no drag of its own, so this is a property and nothing more.
+    public void setDragEnabled(boolean b) {
+        cn1DragEnabled = b;
+    }
+
+    public boolean getDragEnabled() {
+        return cn1DragEnabled;
+    }
+
+    private boolean cn1DragEnabled;
 }
