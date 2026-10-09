@@ -202,7 +202,13 @@ public final class CssImports {
         StringBuilder out = new StringBuilder(body.length() + 64);
         out.append("\n/* @import ").append(file.getName()).append(" */\n");
         if (rest.length() > 0) {
-            // A media-qualified import applies its rules only under that media.
+            // A media-qualified import applies its rules only under that
+            // media, exactly as if they had been written in an `@media` block
+            // here. The queries a theme evaluates are the Codename One ones
+            // (`platform-*`, `density-*`, `device-*`); a browser media type
+            // such as `print` or `screen` selects nothing in a theme and its
+            // rules apply, in an import as in a block. Dropping the rules of
+            // one here and not the other would make the two forms disagree.
             out.append("@media ").append(rest).append(" {\n").append(body).append("\n}\n");
         } else {
             out.append(body).append('\n');

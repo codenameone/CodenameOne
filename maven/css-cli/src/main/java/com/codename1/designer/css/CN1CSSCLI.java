@@ -260,20 +260,21 @@ public class CN1CSSCLI {
     /// true when the output was written, false when it was already newer than
     /// everything it is built from.
     private static boolean compileOnce(Options options) throws IOException {
-        File css = options.inputFiles[0];
-        if (options.mergeFile != null) {
-            updateMergeFile(options.inputFiles, options.mergeFile);
-            css = options.mergeFile;
-        }
+        File css = options.mergeFile != null ? options.mergeFile : options.inputFiles[0];
         File outputDir = options.outputFile.getAbsoluteFile().getParentFile();
         if (outputDir != null && !outputDir.isDirectory() && !outputDir.mkdirs()) {
             throw new IOException("Could not create the output directory " + outputDir);
         }
-        ProjectLayout layout = getLayout(css);
+        // The project is found from where the stylesheet is, which is known
+        // before a merged one has been written for the first time.
+        ProjectLayout layout = getLayout(css.isFile() ? css : css.getAbsoluteFile().getParentFile());
         if (layout == null) {
             // Not inside a project (the framework's own theme build, a one-off
             // compile). There is no state directory to keep anything in, so the
             // compile is unconditional and leaves nothing behind but its output.
+            if (options.mergeFile != null) {
+                updateMergeFile(options.inputFiles, options.mergeFile);
+            }
             compile(css, options, false);
             return true;
         }
@@ -286,6 +287,12 @@ public class CN1CSSCLI {
             FileChannel channel = lockFile.getChannel();
             FileLock lock = channel.lock();
             try {
+                // The merged stylesheet is rewritten under the lock. A build
+                // and the simulator's watcher compile the same theme, and one
+                // must not replace the file the other is parsing.
+                if (options.mergeFile != null) {
+                    updateMergeFile(options.inputFiles, options.mergeFile);
+                }
                 if (isUpToDate(css, options)) {
                     System.out.println("File has not changed since last compile.");
                     return false;

@@ -818,10 +818,10 @@ public class CSSTheme {
                     Float pos;
                     if (nt == LexicalUnit.SAC_PERCENTAGE) {
                         pos = (float) (nx.getNumericValue() / 100f);
-                    } else if (nt == LexicalUnit.SAC_DEGREE) {
-                        pos = (float) (nx.getNumericValue() / 360.0);
-                    } else if (nt == LexicalUnit.SAC_RADIAN) {
-                        pos = (float) (nx.getNumericValue() / (2 * Math.PI));
+                    } else if (angleDegrees(nx) != null) {
+                        // A conic stop is placed by an angle, in any of the
+                        // four units the gradient's own angle accepts.
+                        pos = (float) (angleDegrees(nx).doubleValue() / 360.0);
                     } else if (isLength(nt)) {
                         if (lengthBasis <= 0) {
                             // No box to measure the length in; see rasterWidth.
@@ -3939,6 +3939,11 @@ public class CSSTheme {
             case LexicalUnit.SAC_PERCENTAGE:
                 return numericValue(value) / 100.0 * percentBase;
             case LexicalUnit.SAC_EM:
+                // The page default. An `em` never arrives here from a rule:
+                // a rule that needs a generated image and holds one is
+                // refused before it is painted ("Unsupported lex unit type",
+                // from renderAsCSSValue), as it was when a browser painted
+                // these, so there is no font size of the rule to measure in.
                 return numericValue(value) * 16.0;
             case LexicalUnit.SAC_IDENT: {
                 String keyword = value.getStringValue();

@@ -338,6 +338,22 @@ class CSSGeneratedImageTest {
     }
 
     @Test
+    void conicStopsPlacedInGradiansAndTurnsCompile(@TempDir Path dir) {
+        assertCompilesPromptly(dir, "G { background: conic-gradient(#ff0000 0.25turn, #0000ff 300grad);"
+                + " box-shadow: 0 0 4px black; }");
+    }
+
+    @Test
+    void anEmOnARuleThatNeedsAGeneratedImageIsRefused(@TempDir Path dir) {
+        // No generated image has ever been painted from an `em`: the rule is
+        // refused first, whatever its font size.
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> compile(dir,
+                "Card { font-size: 32px; background-color: #ffffff; border-radius: 1em;"
+                + " box-shadow: inset 0 0 2px rgba(0,0,0,0.5); }"));
+        assertTrue(ex.getMessage().contains("Card"), ex.getMessage());
+    }
+
+    @Test
     void aRadialGradientPositionedByALengthIsPaintedWhereItSays(@TempDir Path dir) throws Exception {
         // A length has no meaning in a resolution-independent gradient, so this
         // one is painted: the page is 640x100 and the centre is 10px in from
