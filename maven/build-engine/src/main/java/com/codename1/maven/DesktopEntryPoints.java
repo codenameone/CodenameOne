@@ -414,7 +414,9 @@ final class DesktopEntryPoints {
     private static void callMain(MethodVisitor mv, String owner) {
         mv.visitInsn(Opcodes.ICONST_0);
         mv.visitTypeInsn(Opcodes.ANEWARRAY, "java/lang/String");
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, owner, "main", MAIN_DESCRIPTOR, false);
+        // The name the relocation ships every main under: see
+        // ClassRelocator.DESKTOP_MAIN for why none may keep its own.
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, owner, ClassRelocator.DESKTOP_MAIN, MAIN_DESCRIPTOR, false);
     }
 
     private static byte[] bridge(String name, String mainClass) {
@@ -429,11 +431,11 @@ final class DesktopEntryPoints {
         init.visitInsn(Opcodes.RETURN);
         init.visitMaxs(0, 0);
         init.visitEnd();
-        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "main", MAIN_DESCRIPTOR, null,
-                new String[] {"java/lang/Exception"});
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, ClassRelocator.DESKTOP_MAIN,
+                MAIN_DESCRIPTOR, null, new String[] {"java/lang/Exception"});
         mv.visitCode();
         mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, mainClass, "main", MAIN_DESCRIPTOR, false);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, mainClass, ClassRelocator.DESKTOP_MAIN, MAIN_DESCRIPTOR, false);
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
@@ -528,7 +530,9 @@ final class DesktopEntryPoints {
                 public MethodVisitor visitMethod(int access, String n, String descriptor, String signature,
                                                  String[] exceptions) {
                     int publicStatic = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
-                    if ("main".equals(n) && MAIN_DESCRIPTOR.equals(descriptor)
+                    // Under either name: a class is read here before the
+                    // relocation has renamed its main, and after.
+                    if (ClassRelocator.isMain(n, descriptor)
                             && (access & publicStatic) == publicStatic) {
                         info.main = true;
                     }

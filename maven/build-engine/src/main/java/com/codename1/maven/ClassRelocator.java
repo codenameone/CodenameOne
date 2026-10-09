@@ -27,6 +27,7 @@ import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.commons.ClassRemapper;
@@ -155,10 +156,86 @@ public final class ClassRelocator {
         if (desktop) {
             // Ahead of the relocation: the rules name what an application
             // is compiled against.
-            chain = CompatRewrites.visitor(chain);
+            chain = CompatRewrites.visitor(new MainRenamer(chain));
         }
         cr.accept(chain, 0);
         return cw.toByteArray();
+    }
+
+    /// The name a desktop application's `main(String[])` ships under.
+    ///
+    /// Every desktop application declares a `main`, and often several: one per
+    /// launcher, one in a demo class of a library. ParparVM takes the class
+    /// holding a static `main` with one array argument to be THE entry point
+    /// of the program and refuses a second one outright
+    /// (`Multiple main classes: ...Stub and ...`), so an imported application
+    /// failed its translation for iOS, macOS, Windows and Linux before a line
+    /// of it was translated; only the JavaScript target, which names its main
+    /// class to the translator, built. Nothing on a device calls `main` by
+    /// that name -- the generated lifecycle ([DesktopEntryPoints]) is what
+    /// starts the application -- so the method is renamed here, together with
+    /// every call of it, and the name ParparVM reserves stays the stub's.
+    static final String DESKTOP_MAIN = "cn1DesktopMain";
+
+    /// The descriptor of a `main(String[])`.
+    static final String MAIN_DESCRIPTOR = "([Ljava/lang/String;)V";
+
+    /// Whether `name` and `descriptor` are those of a `main(String[])`,
+    /// under the name it was compiled with or the one it ships under.
+    static boolean isMain(String name, String descriptor) {
+        return MAIN_DESCRIPTOR.equals(descriptor) && ("main".equals(name) || DESKTOP_MAIN.equals(name));
+    }
+
+    /// Renames every static `main(String[])` to [#DESKTOP_MAIN], and every
+    /// static call or method reference that names one. Applied to each class
+    /// of a build with a desktop layer, so a declaration and its callers move
+    /// together; running it again over its own output changes nothing.
+    private static final class MainRenamer extends ClassVisitor {
+
+        MainRenamer(ClassVisitor next) {
+            super(Opcodes.ASM9, next);
+        }
+
+        private static String rename(String name, String descriptor) {
+            return "main".equals(name) && MAIN_DESCRIPTOR.equals(descriptor) ? DESKTOP_MAIN : name;
+        }
+
+        private static Object rename(Object argument) {
+            if (argument instanceof Handle) {
+                Handle h = (Handle) argument;
+                if (h.getTag() == Opcodes.H_INVOKESTATIC) {
+                    return new Handle(h.getTag(), h.getOwner(), rename(h.getName(), h.getDesc()), h.getDesc(),
+                            h.isInterface());
+                }
+            }
+            return argument;
+        }
+
+        @Override
+        public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
+                                         String[] exceptions) {
+            String shipped = (access & Opcodes.ACC_STATIC) != 0 ? rename(name, descriptor) : name;
+            MethodVisitor mv = super.visitMethod(access, shipped, descriptor, signature, exceptions);
+            if (mv == null) {
+                return null;
+            }
+            return new MethodVisitor(Opcodes.ASM9, mv) {
+                @Override
+                public void visitMethodInsn(int opcode, String owner, String n, String d, boolean isInterface) {
+                    super.visitMethodInsn(opcode, owner, opcode == Opcodes.INVOKESTATIC ? rename(n, d) : n, d,
+                            isInterface);
+                }
+
+                @Override
+                public void visitInvokeDynamicInsn(String n, String d, Handle bootstrap, Object... arguments) {
+                    Object[] mapped = new Object[arguments.length];
+                    for (int i = 0; i < arguments.length; i++) {
+                        mapped[i] = rename(arguments[i]);
+                    }
+                    super.visitInvokeDynamicInsn(n, d, bootstrap, mapped);
+                }
+            };
+        }
     }
 
     /// What the remapper itself does not cover: two source interfaces can map
