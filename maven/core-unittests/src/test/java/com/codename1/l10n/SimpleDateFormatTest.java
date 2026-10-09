@@ -251,6 +251,19 @@ class SimpleDateFormatTest extends UITestBase {
     }
 
     @Test
+    void zonesSharingAnIdButNotTheirRulesAreNotEqual() {
+        SimpleDateFormat a = new SimpleDateFormat("HH:mm");
+        a.setTimeZone(new java.util.SimpleTimeZone(0, "Custom"));
+        SimpleDateFormat b = new SimpleDateFormat("HH:mm");
+        b.setTimeZone(new java.util.SimpleTimeZone(3600000, "Custom"));
+        assertNotEquals(a, b, "same ID, different raw offset");
+        SimpleDateFormat c = new SimpleDateFormat("HH:mm");
+        c.setTimeZone(new java.util.SimpleTimeZone(0, "Custom"));
+        assertEquals(a, c);
+        assertEquals(a.hashCode(), c.hashCode());
+    }
+
+    @Test
     void formatsInTheZoneItIsGiven() {
         java.util.TimeZone saved = java.util.TimeZone.getDefault();
         java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"));

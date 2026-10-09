@@ -97,7 +97,14 @@ public final class JavaEmitter {
 
     public List<GeneratedFile> emit() {
         List<GeneratedFile> out = new ArrayList<GeneratedFile>();
-        String mainLib = null;
+        // Every library with a top-level main(), collected in source order (which is itself
+        // sorted by path -- see DartTranspiler.transpile -- not necessarily the order a
+        // human would expect). Resolved to a single entry point once the whole program has
+        // been scanned, below, instead of overwriting a "last one wins" field as libraries
+        // are visited: a tree with both lib/main.dart and lib/main_dev.dart (a common Flutter
+        // flavor/dev-entry-point convention) would otherwise hand FlutterRegistry whichever
+        // of the two sorts last, silently, with no diagnostic.
+        List<Library> mainCandidates = new ArrayList<Library>();
         for (Library lib : program.libraries) {
             for (ClassDecl c : lib.classes) {
                 try {
@@ -127,11 +134,12 @@ public final class JavaEmitter {
                 }
                 for (FunctionDecl f : lib.functions) {
                     if (f.name.equals("main")) {
-                        mainLib = Program.libClassName(lib.fileName);
+                        mainCandidates.add(lib);
                     }
                 }
             }
         }
+        String mainLib = resolveMainLib(mainCandidates);
         if (mainLib != null) {
             out.add(emitRegistry(mainLib));
         }
@@ -140,6 +148,48 @@ public final class JavaEmitter {
             out.add(emitRecordClass(e.getKey(), e.getValue()));
         }
         return out;
+    }
+
+    /**
+     * Picks the single library FlutterRegistry should invoke, out of every library that
+     * declares a top-level main(). Deterministic rather than "last in source order wins":
+     * with exactly one candidate it is used as-is; with several, the conventional Flutter
+     * entry point (source-root {@code main.dart}, or {@code lib/main.dart} when the source
+     * root is the Flutter project root rather than its {@code lib} directory) is preferred
+     * when present; otherwise emission fails with a diagnostic naming every candidate rather
+     * than silently picking one.
+     */
+    private String resolveMainLib(List<Library> mainCandidates) {
+        if (mainCandidates.isEmpty()) {
+            return null;
+        }
+        if (mainCandidates.size() == 1) {
+            return Program.libClassName(mainCandidates.get(0).fileName);
+        }
+        for (Library lib : mainCandidates) {
+            if (isConventionalMainEntry(lib.fileName)) {
+                return Program.libClassName(lib.fileName);
+            }
+        }
+        StringBuilder names = new StringBuilder();
+        for (Library lib : mainCandidates) {
+            if (names.length() > 0) {
+                names.append(", ");
+            }
+            names.append(lib.fileName);
+        }
+        diags.error(mainCandidates.get(0).fileName, 0, 0, "E0006",
+                "Multiple libraries declare a top-level main() and none is the conventional "
+                + "entry point (lib/main.dart): " + names
+                + ". Remove or rename the extra main() functions, or make the intended entry "
+                + "point lib/main.dart.");
+        return null;
+    }
+
+    /** Whether {@code fileName} is Flutter's default target, {@code lib/main.dart}. */
+    private static boolean isConventionalMainEntry(String fileName) {
+        String norm = fileName.replace('\\', '/');
+        return norm.equals("main.dart") || norm.equals("lib/main.dart");
     }
 
     /** Registers a record shape (idempotent) and returns its generated class name. */
@@ -505,42 +555,81 @@ public final class JavaEmitter {
      */
     private String emitLazyTopLevel(FieldDecl v, TypeRef vt, String jt, Ctx ctx) {
         boolean cannotThrow = initializerCannotThrow(v);
-        ctx.pushWriter(cannotThrow ? 3 : 4);
+        // Only the non-late throwing case wraps the initialiser in a try/finally (one
+        // more indent level than the cannotThrow fast path); late re-entry runs the
+        // initialiser inline with no guard at all, so it sits at that same, shallower
+        // depth.
+        boolean guardReentry = !cannotThrow && !v.isLate;
+        ctx.pushWriter(guardReentry ? 4 : 3);
         Out init = emitExpr(v.initializer, vt, ctx);
         String lifted = ctx.popWriter();
         StringBuilder sb = new StringBuilder();
         sb.append("    private static ").append(jt).append(' ').append(v.name)
                 .append("$value;\n");
-        sb.append("    private static boolean ").append(v.name).append("$ready;\n\n");
+        sb.append("    private static boolean ").append(v.name).append("$ready;\n");
+        if (guardReentry) {
+            // Non-late only: Dart treats a read of a top-level/static variable while its
+            // own initialiser is still running as an error -- there is no `late` here to
+            // fall back to re-running it. This flag is the only way to tell "never
+            // started" apart from "currently running"; `ready` alone cannot, since it is
+            // set only once the store below actually succeeds.
+            sb.append("    private static boolean ").append(v.name).append("$initializing;\n");
+        }
+        sb.append('\n');
         sb.append("    /** Dart `").append(v.name)
                 .append("` -- initialised on first read, as Dart does. */\n");
         sb.append("    public static ").append(jt).append(" get$").append(v.name)
                 .append("() {\n");
         sb.append("        if (!").append(v.name).append("$ready) {\n");
-        // Marked ready BEFORE the initialiser runs: a variable whose own
-        // initialiser reads it back is a cycle, and returning the zero value
-        // beats recursing until the stack goes.
-        sb.append("            ").append(v.name).append("$ready = true;\n");
         if (cannotThrow) {
             // A constant is evaluated by the Dart compiler, so it never throws at run
             // time and the reset below would be dead code. It is not free dead code:
             // ParparVM gives a method with a handler a full frame and an unwind
             // point, and the gallery's 190-odd constant getters grew the Linux
-            // executable by 2% when every one carried it.
+            // executable by 2% when every one carried it. A constant cannot read
+            // itself either, so it needs no initializing flag.
             sb.append(lifted);
             sb.append("            ").append(v.name).append("$value = ")
                     .append(coerce(init, vt, ctx)).append(";\n");
+            sb.append("            ").append(v.name).append("$ready = true;\n");
+        } else if (v.isLate) {
+            // `late`: Dart re-runs the initialiser on a re-entrant read instead of
+            // throwing (spec), so every nested call stores into $value and marks $ready
+            // on ITS OWN completion -- whichever call is outermost finishes last and
+            // leaves the value that is actually kept. `late final` additionally forbids
+            // a second store: if some inner call already bound the variable by the time
+            // this one finishes evaluating, storing again would be a repeat assignment,
+            // so it throws instead of silently overwriting.
+            sb.append(lifted);
+            sb.append("            ").append(jt).append(" $computed = ")
+                    .append(coerce(init, vt, ctx)).append(";\n");
+            if (v.isFinal) {
+                sb.append("            if (").append(v.name).append("$ready) {\n");
+                sb.append("                throw new dart.core.LateInitializationError(\"LateInitializationError: Field '")
+                        .append(v.name).append("' has been assigned during initialization.\");\n");
+                sb.append("            }\n");
+            }
+            sb.append("            ").append(v.name).append("$value = $computed;\n");
+            sb.append("            ").append(v.name).append("$ready = true;\n");
         } else {
-            // An initialiser that throws leaves the variable uninitialised in Dart, and the
-            // next read runs it again. Left marked ready, every later read answered the
-            // Java zero value -- null, 0 or false, even in a non-nullable variable.
+            // Non-late: a recursive read while $initializing is Dart's cyclic-initialiser
+            // error, thrown BEFORE the initialiser runs again -- there is no zero value to
+            // fall back to here, unlike the old (wrong) always-ready-first behaviour. An
+            // initialiser that throws outright still leaves $ready false exactly as
+            // before: nothing marks it until the store below runs, and $initializing is
+            // reset in the finally so the next, unrelated read is free to retry.
+            sb.append("            if (").append(v.name).append("$initializing) {\n");
+            sb.append("                throw new dart.core.LateInitializationError(\"Reading static variable '")
+                    .append(v.name).append("' during its initialization\");\n");
+            sb.append("            }\n");
+            sb.append("            ").append(v.name).append("$initializing = true;\n");
             sb.append("            try {\n");
             sb.append(lifted);
             sb.append("                ").append(v.name).append("$value = ")
                     .append(coerce(init, vt, ctx)).append(";\n");
-            sb.append("            } catch (Throwable $e) {\n");
-            sb.append("                ").append(v.name).append("$ready = false;\n");
-            sb.append("                throw $e;\n");
+            sb.append("                ").append(v.name).append("$ready = true;\n");
+            sb.append("            } finally {\n");
+            sb.append("                ").append(v.name).append("$initializing = false;\n");
             sb.append("            }\n");
         }
         sb.append("        }\n");

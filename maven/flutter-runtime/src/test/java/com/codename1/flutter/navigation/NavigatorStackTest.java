@@ -23,6 +23,7 @@
  */
 package com.codename1.flutter.navigation;
 
+import com.codename1.flutter.cupertino.CupertinoPageRoute;
 import com.codename1.flutter.material.Dialogs;
 import com.codename1.flutter.testsupport.ProbeBox;
 
@@ -116,6 +117,44 @@ class NavigatorStackTest {
         Navigator.push(null, r);
         assertEquals(0, built[0], "no Display: the page never mounts, the builder never runs");
         assertEquals(1, Navigator.stackSize());
+    }
+
+    // --- Non-MaterialPageRoute Route subtypes --------------------------------
+    // Navigator.push(context, route) (NavigatorState.push -> pushAny) used to accept
+    // ONLY a MaterialPageRoute; any other Route subtype -- CupertinoPageRoute,
+    // PageRouteBuilder -- was reported "unsupported route type" and the push silently
+    // did nothing (an already-completed null future, stack unchanged). Both implement
+    // buildPage like any other Route, so both must be accepted.
+
+    @Test
+    void navigatorStatePushAcceptsACupertinoPageRoute() {
+        CupertinoPageRoute<Object> route = new CupertinoPageRoute<Object>();
+        route.builder((context) -> new ProbeBox(1, 1));
+
+        NavigatorState state = Navigator.of(null, null);
+        state.push(route);
+
+        assertEquals(1, Navigator.stackSize(), "a CupertinoPageRoute must not be rejected");
+    }
+
+    @Test
+    void navigatorStatePushAcceptsAPageRouteBuilder() {
+        PageRouteBuilder<Object> route = new PageRouteBuilder<Object>();
+        route.pageBuilder((context, animation, secondaryAnimation) -> new ProbeBox(1, 1));
+
+        NavigatorState state = Navigator.of(null, null);
+        state.push(route);
+
+        assertEquals(1, Navigator.stackSize(), "a PageRouteBuilder must not be rejected");
+    }
+
+    @Test
+    void pushAnyRejectsSomethingThatIsNotARouteAtAll() {
+        // Not a regression target of this fix -- confirms widening the accepted type to
+        // Route did not also start accepting arbitrary objects.
+        NavigatorState state = Navigator.of(null, null);
+        state.push("not a route");
+        assertEquals(0, Navigator.stackSize());
     }
 
     @Test

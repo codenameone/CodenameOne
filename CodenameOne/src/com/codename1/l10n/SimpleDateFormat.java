@@ -225,7 +225,17 @@ public class SimpleDateFormat extends DateFormat {
                 (patternTokens == null ? that.patternTokens == null : patternTokens.equals(that.patternTokens)) &&
                 // The zone decides the fields an instant formats to, so it is part of the value.
                 // Compared as the effective zone: no zone means the device's.
-                getTimeZone().getID().equals(that.getTimeZone().getID());
+                sameZone(getTimeZone(), that.getTimeZone());
+    }
+
+    /// Two zones format alike when they share the ID, the raw offset and whether they observe
+    /// daylight time. A custom zone can reuse a standard ID with other rules, so the ID alone is
+    /// not enough. The transition dates themselves are not compared: neither device runtime
+    /// offers `TimeZone.hasSameRules`, and `hashCode` hashes the ID, which equal zones share.
+    private static boolean sameZone(TimeZone a, TimeZone b) {
+        return a.getID().equals(b.getID())
+                && a.getRawOffset() == b.getRawOffset()
+                && a.useDaylightTime() == b.useDaylightTime();
     }
 
     /// {@inheritDoc}

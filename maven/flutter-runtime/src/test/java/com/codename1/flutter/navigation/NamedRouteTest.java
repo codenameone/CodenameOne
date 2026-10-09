@@ -23,6 +23,7 @@
  */
 package com.codename1.flutter.navigation;
 
+import com.codename1.flutter.cupertino.CupertinoPageRoute;
 import com.codename1.flutter.testsupport.ProbeBox;
 
 import dart.runtime.Funcs;
@@ -151,6 +152,66 @@ class NamedRouteTest {
 
         state.pushReplacementNamed("/c", null, null);
         assertEquals(2, Navigator.stackSize(), "one popped, one pushed");
+    }
+
+    @Test
+    void pushReplacementFromTheInitialRouteBecomesTheNewNonPoppableBase() {
+        // The implicit base route (nothing pushed yet) is never on the stack, so a
+        // pushReplacementNamed here finds pop() a no-op. Before the fix, push() still
+        // recorded the (unpopped) base as the replacement's previousForm and left the
+        // replacement on the stack, so canPop() wrongly answered true and popping it
+        // would have resurrected the removed base route -- Flutter's own rule is that
+        // replacing the only route makes the replacement itself the new, non-poppable
+        // base.
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+        assertEquals(0, Navigator.stackSize());
+        assertFalse(state.canPop());
+
+        state.pushReplacementNamed("/a", null, null);
+
+        assertEquals(0, Navigator.stackSize(),
+                "the replacement becomes the new implicit base, not a poppable entry");
+        assertFalse(state.canPop(), "nothing below the replacement to pop back to");
+
+        // A pop here must stay a no-op -- never resurrect anything.
+        state.pop(null);
+        assertEquals(0, Navigator.stackSize());
+    }
+
+    @Test
+    void pushReplacementOfAPushedRouteStaysPoppableToWhatWasBelowIt() {
+        // Contrast case: replacing a route that is NOT the implicit base must keep the
+        // normal (poppable) behavior -- only the implicit-base case is special-cased.
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+        state.pushNamed("/a", null);
+        assertTrue(state.canPop());
+
+        state.pushReplacementNamed("/b", null, null);
+
+        assertEquals(1, Navigator.stackSize());
+        assertTrue(state.canPop(), "the base route is still below the replacement");
+    }
+
+    @Test
+    void pushReplacementNamedAcceptsACupertinoPageRouteFromOnGenerateRoute() {
+        // onGenerateRoute can hand back ANY Route, not only a MaterialPageRoute built
+        // from the routes map -- the replace path's old instanceof MaterialPageRoute
+        // gate rejected a CupertinoPageRoute here exactly like pushAny once rejected one
+        // from a plain Navigator.push.
+        Navigator.installRouteTable(null, settings -> {
+            CupertinoPageRoute<Object> r = new CupertinoPageRoute<Object>();
+            r.builder((context) -> new ProbeBox(10, 10));
+            return r;
+        }, null);
+        NavigatorState state = Navigator.of(null, null);
+        state.pushNamed("/a", null);
+        assertEquals(1, Navigator.stackSize());
+
+        state.pushReplacementNamed("/b", null, null);
+
+        assertEquals(1, Navigator.stackSize(), "the CupertinoPageRoute replacement must not be rejected");
     }
 
     @Test

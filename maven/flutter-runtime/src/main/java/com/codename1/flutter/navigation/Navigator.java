@@ -152,7 +152,7 @@ public class Navigator extends StatelessWidget {
      *         answer nothing, so {@code await Navigator.push(...)} could not wait for
      *         the page to close.
      */
-    public static dart.async.Future<Object> push(BuildContext context, MaterialPageRoute route) {
+    public static dart.async.Future<Object> push(BuildContext context, Route route) {
         RouteEntry e = new RouteEntry(route);
         if (Display.isInitialized()) {
             // The form to come BACK to, which during a pop's transition is not the
@@ -325,6 +325,10 @@ public class Navigator extends StatelessWidget {
             if (routes instanceof java.util.Map) {
                 Object builder = ((java.util.Map<Object, Object>) routes).get(settings.name());
                 if (builder instanceof Funcs.Func1) {
+                    // Genuinely Material-specific: the `routes` map is a plain name ->
+                    // WidgetBuilder table (no Route factory), and Flutter's own MaterialApp
+                    // wraps each entry in a MaterialPageRoute -- unlike onGenerateRoute
+                    // below, there is no route object here to preserve the type of.
                     MaterialPageRoute<Object> route = new MaterialPageRoute<Object>();
                     route.builder((Funcs.Func1<BuildContext, Widget>) builder);
                     route.settings(settings);
@@ -444,14 +448,17 @@ public class Navigator extends StatelessWidget {
      */
     static dart.async.Future<Object> pushNamedForResult(BuildContext context, String name, Object arguments) {
         Route route = resolveRoute(context, name, arguments);
-        if (route instanceof MaterialPageRoute) {
-            // Name the screen so any error it raises reports where it happened.
-            com.codename1.flutter.FlutterErrorReport.route(name);
-            return push(context, (MaterialPageRoute) route);
+        if (route == null) {
+            // resolveRoute's own return type is Route, so a non-null result is ALWAYS
+            // pushable -- there is no "wrong Route type" case here, only "nothing
+            // resolved" (no routes-map entry, and neither onGenerateRoute nor
+            // onUnknownRoute produced one).
+            com.codename1.flutter.FlutterErrorReport.noRoute(name, null);
+            return null;
         }
-        com.codename1.flutter.FlutterErrorReport.noRoute(name, route == null ? null
-                : "(unsupported route type " + route.getClass().getName() + ")");
-        return null;
+        // Name the screen so any error it raises reports where it happened.
+        com.codename1.flutter.FlutterErrorReport.route(name);
+        return push(context, route);
     }
 
     /**
@@ -464,14 +471,30 @@ public class Navigator extends StatelessWidget {
     static dart.async.Future<Object> replaceNamed(BuildContext context, String name, Object arguments,
                                                   Object result) {
         Route route = resolveRoute(context, name, arguments);
-        if (!(route instanceof MaterialPageRoute)) {
-            com.codename1.flutter.FlutterErrorReport.noRoute(name, route == null ? null
-                    : "(unsupported route type " + route.getClass().getName() + ")");
+        if (route == null) {
+            // Same as pushNamedForResult: resolveRoute's return type is already Route,
+            // so the only failure here is nothing having resolved at all.
+            com.codename1.flutter.FlutterErrorReport.noRoute(name, null);
             return nothingPushed();
         }
+        // Replacing the IMPLICIT base route: the stack is empty, so the pop() below is a
+        // no-op -- nothing is removed and nothing is torn down. Without this check, push()
+        // still went ahead and recorded the base form (still on screen, since pop() did
+        // nothing) as the replacement's previousForm, and added the replacement to the
+        // poppable stack. canPop() then answered true for a route Flutter would report as
+        // non-poppable, and popping it played the base form back in -- resurrecting the
+        // very route pushReplacement was supposed to have removed. Flutter semantics: after
+        // pushReplacement on the only route, the replacement itself becomes the new
+        // (non-poppable) base.
+        boolean replacingImplicitBase = stack.isEmpty();
         pop(context, result);
         com.codename1.flutter.FlutterErrorReport.route(name);
-        return push(context, (MaterialPageRoute) route);
+        dart.async.Future<Object> pushed = push(context, route);
+        if (replacingImplicitBase) {
+            RouteEntry e = stack.remove(stack.size() - 1);
+            e.previousForm = null;
+        }
+        return pushed;
     }
 
     /**
@@ -487,10 +510,18 @@ public class Navigator extends StatelessWidget {
         return pushed != null ? pushed : nothingPushed();
     }
 
-    /** A push of any route: a MaterialPageRoute is shown, anything else is reported. */
+    /**
+     * A push of any route: any {@link Route} -- MaterialPageRoute, CupertinoPageRoute,
+     * PageRouteBuilder, or a custom subclass -- is shown via its own {@code buildPage};
+     * anything else is reported. This used to require a MaterialPageRoute specifically,
+     * so {@code Navigator.push(context, CupertinoPageRoute(...))} (the Cupertino demos'
+     * own navigation bar push, and any {@code PageRouteBuilder}) reported "unsupported
+     * route type" and returned an already-completed null future -- the push silently
+     * did nothing.
+     */
     private static dart.async.Future<Object> pushAny(BuildContext context, Object route) {
-        if (route instanceof MaterialPageRoute) {
-            return push(context, (MaterialPageRoute) route);
+        if (route instanceof Route) {
+            return push(context, (Route) route);
         }
         com.codename1.flutter.FlutterErrorReport.noRoute(null, route == null ? "(null route)"
                 : "(unsupported route type " + route.getClass().getName() + ")");
@@ -754,14 +785,17 @@ public class Navigator extends StatelessWidget {
 
     /**
      * Restoration-aware push. Restoration is not persisted here, so the route
-     * is pushed immediately when it is a {@link MaterialPageRoute} and an empty
+     * is pushed immediately when it is any {@link Route} -- not just a
+     * MaterialPageRoute, since {@code routeBuilder} is a plain
+     * {@code Route Function(BuildContext, Object?)} and can hand back a
+     * CupertinoPageRoute or PageRouteBuilder just as well -- and an empty
      * (informational) restoration id is returned.
      */
     public static String restorablePush(BuildContext context,
             dart.runtime.Funcs.Func2<BuildContext, Object, Object> routeBuilder, Object arguments) {
         Object route = routeBuilder != null ? routeBuilder.call(context, arguments) : null;
-        if (route instanceof MaterialPageRoute) {
-            push(context, (MaterialPageRoute) route);
+        if (route instanceof Route) {
+            push(context, (Route) route);
         }
         return "";
     }
@@ -779,14 +813,16 @@ public class Navigator extends StatelessWidget {
     }
 
     private static final class RouteEntry {
-        final MaterialPageRoute route;
+        /** Any {@link Route} -- MaterialPageRoute, CupertinoPageRoute, PageRouteBuilder... --
+         *  not just a MaterialPageRoute; {@link #buildPage} is all the stack needs. */
+        final Route route;
         /** Completed by the pop that removes this route, with that pop's result. */
         final dart.async.Completer<Object> popped = new dart.async.Completer<Object>();
         Form form;
         Form previousForm;
         Element rootElement;
 
-        RouteEntry(MaterialPageRoute route) {
+        RouteEntry(Route route) {
             this.route = route;
         }
     }

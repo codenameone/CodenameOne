@@ -231,6 +231,10 @@ public final class AstBuilder {
                 type = buildType(ctx.varOrType().type());
             }
             boolean isFinal = ctx.FINAL_() != null || ctx.CONST_() != null;
+            // `late` reaches here only through `LATE_ FINAL_ ... initializedIdentifierList`
+            // or `LATE_? varOrType initializedIdentifierList` -- never through
+            // staticFinalDeclarationList, which has no LATE_ alternative at all.
+            boolean isLate = ctx.LATE_() != null;
             if (ctx.initializedIdentifierList() != null) {
                 for (Dart2Parser.InitializedIdentifierContext ii : ctx.initializedIdentifierList().initializedIdentifier()) {
                     FieldDecl f = new FieldDecl();
@@ -240,6 +244,7 @@ public final class AstBuilder {
                     f.isFinal = isFinal;
                     f.isConst = ctx.CONST_() != null;
                     f.isStatic = true;
+                    f.isLate = isLate;
                     f.javaName = javaName;
                     if (ii.expr() != null) {
                         f.initializer = buildExpr(ii.expr());

@@ -1056,9 +1056,12 @@ final class ReachabilityCull {
             return m;
         }
 
-        /// "a/b/C$D" or "a.b.C$D" -> "a_b_C_D", the translator's class naming.
+        /// "a/b/C$D" or "a.b.C$D" -> "a_b_C_D", the translator's class naming. It must fold every
+        /// character the other manglers fold, '-' included (Kotlin lambdas, renamed classes): a
+        /// raw name that misses here is never marked allocated, and every instance method reached
+        /// through it is emitted as the CN1_CULL_TRAP stub (HyphenatedNamesIntegrationTest).
         private static String mangle(String internal) {
-            return internal.replace('/', '_').replace('.', '_').replace('$', '_');
+            return internal.replace('/', '_').replace('.', '_').replace('$', '_').replace('-', '_');
         }
     }
 
