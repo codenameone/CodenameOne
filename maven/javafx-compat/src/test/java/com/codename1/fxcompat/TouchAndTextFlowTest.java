@@ -420,4 +420,58 @@ public class TouchAndTextFlowTest {
         org.junit.Assert.assertTrue(com.codename1.fxcompat.runtime.ParentPeer
                 .clipsChildren(new javafx.scene.control.ListView<String>()));
     }
+
+    /// What a pane may paint in was the clip its parent last painted
+    /// with. Codename One also paints a peer on its own, and the peers
+    /// lying over it clipped to that one's area, so the clip a parent
+    /// was left with could be a few pixels of a label elsewhere: a pane
+    /// that then painted on its own drew nothing, and a whole scene came
+    /// up empty now and then. Outside a paint of the parent the area
+    /// comes from where the peers are.
+    @Test
+    public void whatAPaneMayPaintInDoesNotComeFromAnEarlierPaint() {
+        javafx.scene.layout.Pane inner = new javafx.scene.layout.Pane();
+        inner.setPrefSize(40, 30);
+        inner.setMaxSize(40, 30);
+        javafx.scene.control.ListView<String> list = new javafx.scene.control.ListView<String>();
+        list.setPrefSize(100, 80);
+        list.setMaxSize(100, 80);
+        javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(inner, list);
+        javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane(box);
+        javafx.scene.Scene scene = new javafx.scene.Scene(root, 400, 300);
+        scene.cn1Layout(400, 300);
+        com.codename1.ui.Component rootPeer = root.cn1Peer();
+        rootPeer.setWidth(400);
+        rootPeer.setHeight(300);
+        scene.cn1Layout(400, 300);
+        com.codename1.fxcompat.runtime.ParentPeer top = (com.codename1.fxcompat.runtime.ParentPeer) rootPeer;
+        com.codename1.fxcompat.runtime.ParentPeer boxPeer =
+                (com.codename1.fxcompat.runtime.ParentPeer) box.cn1Peer();
+        com.codename1.fxcompat.runtime.ParentPeer listPeer =
+                (com.codename1.fxcompat.runtime.ParentPeer) list.cn1Peer();
+
+        // Never painted, and painted for a corner of it only: the same.
+        for (int pass = 0; pass < 2; pass++) {
+            int[] area = new int[4];
+            org.junit.Assert.assertTrue(top.childClip(area));
+            org.junit.Assert.assertArrayEquals(new int[] {0, 0, 400, 300}, area);
+            // A pane hands on the area of its parent, in its own coordinates.
+            org.junit.Assert.assertTrue(boxPeer.childClip(area));
+            org.junit.Assert.assertArrayEquals(
+                    new int[] {-boxPeer.getX(), -boxPeer.getY(), 400, 300}, area);
+            // A control ends it at its own bounds.
+            org.junit.Assert.assertTrue(listPeer.childClip(area));
+            org.junit.Assert.assertArrayEquals(
+                    new int[] {0, 0, listPeer.getWidth(), listPeer.getHeight()}, area);
+            com.codename1.ui.Image picture = com.codename1.ui.Image.createImage(400, 300, 0xffffffff);
+            com.codename1.ui.Graphics g = picture.getGraphics();
+            g.setClip(390, 290, 2, 2);
+            top.paint(g);
+        }
+
+        // Under a scale the area is not a rectangle of the screen.
+        box.setScaleX(0.5);
+        org.junit.Assert.assertFalse(boxPeer.childClip(new int[4]));
+        org.junit.Assert.assertFalse(listPeer.childClip(new int[4]));
+    }
 }

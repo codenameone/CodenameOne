@@ -50,7 +50,7 @@ public class ParentPeer extends Container implements FxPeer {
     private int childClipY;
     private int childClipW;
     private int childClipH;
-    private boolean hasChildClip;
+    private int painting;
 
     /// Creates the peer of a parent.
     public ParentPeer(Parent node) {
@@ -66,16 +66,60 @@ public class ParentPeer extends Container implements FxPeer {
         return node;
     }
 
-    /// The area the children may paint in, in their coordinates, recorded
-    /// when this peer last painted; answers false before the first paint.
+    /// The area the children may paint in, in their coordinates; answers
+    /// false when there is none to give.
+    ///
+    /// While this peer paints its children it is the clip it painted them
+    /// with. That clip must not be kept for later, though. Codename One
+    /// also paints a peer on its own -- the one that asked to be painted
+    /// again -- and paints the peers lying over it clipped to that one's
+    /// area; a clip recorded during such a pass is that small area, and a
+    /// pane painted on its own afterwards took it for all it may draw in
+    /// and drew nothing. So outside a paint of this peer the area is
+    /// worked out from where the peers are.
     public boolean childClip(int[] out) {
-        if (!hasChildClip) {
+        if (painting > 0) {
+            out[0] = childClipX;
+            out[1] = childClipY;
+            out[2] = childClipW;
+            out[3] = childClipH;
+            return true;
+        }
+        return allowed(out);
+    }
+
+    /// The area the children of this peer may ever paint in: its own
+    /// bounds where it cuts them off, and whatever its parent allows
+    /// where it does not. Answers false under a transform or a clip of
+    /// the application's, neither of which is a rectangle of the screen;
+    /// what asks then keeps the clip it has.
+    private boolean allowed(int[] out) {
+        if (node.cn1PaintMatrix() != null || node.cn1ClipPath() != null) {
             return false;
         }
-        out[0] = childClipX;
-        out[1] = childClipY;
-        out[2] = childClipW;
-        out[3] = childClipH;
+        Container above = getParent();
+        if (!(above instanceof ParentPeer)) {
+            out[0] = 0;
+            out[1] = 0;
+            out[2] = getWidth();
+            out[3] = getHeight();
+            return true;
+        }
+        if (!((ParentPeer) above).allowed(out)) {
+            return false;
+        }
+        out[0] -= getX();
+        out[1] -= getY();
+        if (clipsChildren(node)) {
+            int x1 = Math.max(0, out[0]);
+            int y1 = Math.max(0, out[1]);
+            int x2 = Math.min(getWidth(), out[0] + out[2]);
+            int y2 = Math.min(getHeight(), out[1] + out[3]);
+            out[0] = x1;
+            out[1] = y1;
+            out[2] = Math.max(0, x2 - x1);
+            out[3] = Math.max(0, y2 - y1);
+        }
         return true;
     }
 
@@ -131,9 +175,10 @@ public class ParentPeer extends Container implements FxPeer {
         childClipY = g.getClipY() - getY();
         childClipW = g.getClipWidth();
         childClipH = g.getClipHeight();
-        hasChildClip = true;
         Transform saved = PeerPaint.push(g, node, m, getX(), getY());
+        painting++;
         super.paint(g);
+        painting--;
         if (saved != null) {
             PeerPaint.setDeviceTransform(g, saved);
         }
