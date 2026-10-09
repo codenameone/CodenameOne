@@ -6,3 +6,8 @@ vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h linguist-vendored linguist-
 vm/ByteCodeTranslator/src/cn1_sqlite3.h             linguist-vendored linguist-generated -diff
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js              linguist-vendored -diff
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js linguist-vendored -diff
+
+# Generated browser demo and plot output. The source archive, build notes and
+# chart script accompany these artifacts; keep compiler/vendor formatting intact.
+docs/website/static/android-compatibility-demo/** linguist-generated -diff -whitespace
+docs/website/static/blog/release-2026-10-09/*.svg linguist-generated -whitespace
