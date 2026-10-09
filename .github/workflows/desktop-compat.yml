@@ -16,6 +16,11 @@ name: Desktop compatibility
 #                                 desktop with identical uploads from both
 #                                 tools, and built once in a project that also
 #                                 holds an Android application
+#   desktop-compat-realport       the two galleries that script staged, run on
+#                                 the real JavaSE port under xvfb and driven
+#                                 with the display server's pointer and keys;
+#                                 fails on anything thrown and on a click, a
+#                                 drag or a key that changes no pixel
 on:
   pull_request:
     branches: [ master ]
@@ -32,6 +37,7 @@ on:
       - 'maven/cn1app-archetype/**'
       - 'maven/pom.xml'
       - 'maven/integration-tests/desktop-compat-test.sh'
+      - 'maven/integration-tests/desktop-compat-realport/**'
       - 'maven/integration-tests/inc/**'
       - 'scripts/desktop-compat-samples/**'
       # The script builds one project holding both layers from this sample.
@@ -52,6 +58,7 @@ on:
       - 'maven/cn1app-archetype/**'
       - 'maven/pom.xml'
       - 'maven/integration-tests/desktop-compat-test.sh'
+      - 'maven/integration-tests/desktop-compat-realport/**'
       - 'maven/integration-tests/inc/**'
       - 'scripts/desktop-compat-samples/**'
       - 'scripts/android-compat-samples/gallery/**'
@@ -119,10 +126,22 @@ jobs:
       - name: Desktop samples, imported and built by Maven and Gradle
         working-directory: maven/integration-tests
         run: xvfb-run -a bash desktop-compat-test.sh
+      # The galleries the step above staged, on the real port, under the
+      # display server's own pointer and keys. The unit tests fire events at
+      # the node they are meant for; this is the only place a dead button or a
+      # key the port never delivers can fail. It runs on GRADLE_JAVA_HOME,
+      # the JDK 17: the port needs 11 or newer at run time. The screen is
+      # named because xvfb-run's default is smaller than the application.
+      - name: The galleries on the real JavaSE port, under real input
+        working-directory: maven/integration-tests
+        run: xvfb-run -a -s "-screen 0 1400x1000x24" bash desktop-compat-realport/run.sh
       - name: Upload the test projects' logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: desktop-compat-logs
-          path: maven/integration-tests/build/desktop-compat/**/*.log
+          path: |
+            maven/integration-tests/build/desktop-compat/**/*.log
+            maven/integration-tests/build/desktop-compat-realport/**/realport.log
+            maven/integration-tests/build/desktop-compat-realport/**/frames/*.png
           if-no-files-found: ignore

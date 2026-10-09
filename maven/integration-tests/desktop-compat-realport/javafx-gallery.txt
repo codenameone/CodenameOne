@@ -1,0 +1,25 @@
+# The JavaFX gallery under a real pointer and real keys, at 1000x800.
+# Every step but the quiet ones has to change the picture, outside whatever
+# was moving by itself; see RealPortDriver.java.
+sleep 4000
+shot start
+# A button, a toggle, a check box and a radio button, each reported in the line below the controls.
+click 0.067 0.181
+click 0.475 0.173
+click 0.027 0.291
+click 0.027 0.333
+# A text field: focus, typing, and Tab on to the next one.
+click 0.300 0.394
+type ada
+key TAB
+# The slider follows a drag.
+drag 0.483 0.715 0.250 0.715 400
+# Tabs: Data, Layouts, Animation and back.
+click 0.095 0.065
+shot data
+click 0.155 0.065
+shot layouts
+click 0.420 0.065
+shot animation
+click 0.035 0.065
+shot controls
