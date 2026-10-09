@@ -519,14 +519,20 @@ public final class EventBridge {
     /// by key typed where the key has a character and neither control,
     /// alt nor meta is held, or key released. A key held down arrives as
     /// further key pressed events.
-    public static void key(Window w, boolean pressed, int code) {
+    ///
+    /// Answers whether the key is spoken for, in which case the host does
+    /// not hand it to the form as well. Tab is: the focus has moved by
+    /// the traversal policy, and the form of a desktop given the same key
+    /// moves the focus of its own components a second time, by an order
+    /// of its own.
+    public static boolean key(Window w, boolean pressed, int code) {
         int vk = KeyMap.virtualKey(code);
         MenuSelectionManager menus = MenuSelectionManager.defaultManager();
         if (vk == KeyEvent.VK_ESCAPE && menus.cn1PopupShowing()) {
             if (pressed) {
                 menus.clearSelectedPath();
             }
-            return;
+            return false;
         }
         Container c = w;
         Component target = focusOwner != null && (focusOwner == w || c.isAncestorOf(focusOwner)) ? focusOwner : w;
@@ -536,7 +542,7 @@ public final class EventBridge {
         KeyEvent e = new KeyEvent(target, pressed ? KeyEvent.KEY_PRESSED : KeyEvent.KEY_RELEASED, now, mods, vk, ch);
         deliver(target, e);
         if (!pressed) {
-            return;
+            return vk == KeyEvent.VK_TAB;
         }
         boolean command = (mods & (InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK
                 | InputEvent.META_DOWN_MASK)) != 0;
@@ -551,6 +557,7 @@ public final class EventBridge {
                 m.focusNextComponent(target);
             }
         }
+        return vk == KeyEvent.VK_TAB;
     }
 
     /// Hands the event to the target, and to the key bindings when the
