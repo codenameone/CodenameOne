@@ -24,15 +24,17 @@ package javafx.scene.effect;
 
 /// The base of the filters JavaFX runs over the picture of a node.
 ///
-/// **No effect is drawn.** An effect set on a node is recorded, read
-/// back and bound like any other property, and the node is painted
-/// exactly as it is without one: no shadow, no glow, no blur. The
-/// `-fx-effect` of a style sheet is not read at all and is reported as
-/// an ignored declaration when the sheet is compiled.
-/// An effect also adds nothing to the bounds of its node. The classes
-/// are here because an effect is nearly always decoration, and an
-/// application that sets one is better drawn without it than not built
-/// at all. The effects that change what a node shows rather than
+/// **Two effects are drawn: [DropShadow] and [InnerShadow]**, set on a
+/// node or by the `-fx-effect` of a style sheet (`dropshadow(...)`,
+/// `innershadow(...)`), behind or inside whatever the node paints. Each
+/// is also drawn when it is the `input` of the other.
+///
+/// Every other effect is recorded, read back and bound like any other
+/// property, and the node is painted exactly as it is without one: no
+/// glow, no blur. An effect adds nothing to the bounds of its node, drawn
+/// or not. The other classes are here because an effect is nearly always
+/// decoration, and an application that sets one is better drawn without
+/// it than not built at all. The effects that change what a node shows rather than
 /// decorate it - the perspective transform, lighting, blending, the
 /// displacement map - are deliberately not part of this package.
 ///

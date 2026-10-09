@@ -28,7 +28,7 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.scene.paint.Color;
 
-/// A shadow cast inside the edges of a node. **Recorded and not drawn**:
+/// A shadow cast inside the edges of a node, drawn over what it paints:
 /// see [Effect].
 public class InnerShadow extends Effect {
 

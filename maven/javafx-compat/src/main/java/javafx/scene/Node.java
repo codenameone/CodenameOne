@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import com.codename1.fxcompat.runtime.Dirty;
+import com.codename1.fxcompat.runtime.Effects;
 import com.codename1.fxcompat.runtime.EventHandlerManager;
 import com.codename1.fxcompat.runtime.FxBoolean;
 import com.codename1.fxcompat.runtime.FxDouble;
@@ -160,6 +161,7 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     private ObservableList<Transform> transforms;
     private ObjectProperty<Node> clip;
     private ObjectProperty<Effect> effect;
+    private Object effectCache;
     private ObjectProperty<Cursor> cursor;
     private Object userData;
     private ObservableMap<Object, Object> properties;
@@ -331,6 +333,8 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     /// implementation.
     @Override
     public void cn1Invalidated(int what) {
+        // Whatever changed, the picture an effect above keeps of it is old.
+        Effects.invalidate(this);
         if ((what & VISIBILITY) != 0 && peer != null) {
             peer.setVisible(isVisible());
         }
@@ -372,7 +376,9 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         }
         Node top = null;
         for (Node n = this; n != null; n = n.getParent()) {
-            if (n.cn1PaintMatrix() != null || n.getOpacity() < 1) {
+            // A shadow lies outside its node, so it is the parent that
+            // has to paint again.
+            if (n.cn1PaintMatrix() != null || n.getOpacity() < 1 || (n.effect != null && n.effect.get() != null)) {
                 top = n;
             }
         }
@@ -658,6 +664,8 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
             return Double.valueOf(getTranslateX());
         } else if ("-fx-translate-y".equals(property)) {
             return Double.valueOf(getTranslateY());
+        } else if ("-fx-effect".equals(property)) {
+            return getEffect();
         } else if ("-fx-cursor".equals(property)) {
             return getCursor();
         } else if ("visibility".equals(property)) {
@@ -673,7 +681,16 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     /// or a value of a type the property cannot use. `null` is only
     /// passed for a property whose value was `null` before it was styled.
     protected boolean cn1SetStyleValue(String property, Object value) {
-        if ("-fx-cursor".equals(property)) {
+        if ("-fx-effect".equals(property)) {
+            if (value == null) {
+                setEffect(null);
+                return true;
+            } else if (value instanceof Effect) {
+                setEffect((Effect) value);
+                return true;
+            }
+            return false;
+        } else if ("-fx-cursor".equals(property)) {
             if (value == null || value instanceof Cursor) {
                 setCursor((Cursor) value);
                 return true;
@@ -1013,9 +1030,10 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         return cursor;
     }
 
-    /// Sets the effect of this node. It is recorded and not drawn: the
-    /// node is painted as it is without one, and its bounds do not grow
-    /// by what the effect would add. See [Effect].
+    /// Sets the effect of this node. A drop shadow and an inner shadow are
+    /// drawn; any other effect is recorded and the node is painted as it
+    /// is without one. The bounds of a node do not grow by what an effect
+    /// adds. See [Effect].
     public final void setEffect(Effect value) {
         effectProperty().set(value);
     }
@@ -1025,12 +1043,23 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         return effect == null ? null : effect.get();
     }
 
-    /// The effect of this node, recorded and not drawn.
+    /// The effect of this node; see [#setEffect(Effect)].
     public final ObjectProperty<Effect> effectProperty() {
         if (effect == null) {
-            effect = new javafx.beans.property.SimpleObjectProperty<Effect>(this, "effect");
+            effect = new FxObject<Effect>(this, "effect", null, Dirty.PAINT);
         }
         return effect;
+    }
+
+    /// The picture `com.codename1.fxcompat.runtime.Effects` keeps of this
+    /// node for its effect, `null` when it keeps none.
+    public final Object cn1EffectCache() {
+        return effectCache;
+    }
+
+    /// Sets what [#cn1EffectCache()] answers.
+    public final void cn1SetEffectCache(Object cache) {
+        effectCache = cache;
     }
 
     /// Returns the application's own object attached to this node.

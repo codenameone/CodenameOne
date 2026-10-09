@@ -50,6 +50,10 @@ import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.RadialGradient;
 import javafx.scene.paint.Stop;
+import javafx.scene.effect.BlurType;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.Effect;
+import javafx.scene.effect.InnerShadow;
 import javafx.scene.text.Font;
 
 /// The style engine that is installed by default: it reads the compiled
@@ -851,6 +855,8 @@ public final class CssEngine extends StyleEngine {
                 return v.text();
             case CssProperties.POS:
                 return v.text() == null ? null : POSITIONS.get(v.text());
+            case CssProperties.EFFECT:
+                return effect(v, node);
             case CssProperties.CURSOR:
                 try {
                     return v.text() == null ? null : Cursor.cursor(v.text());
@@ -861,6 +867,29 @@ public final class CssEngine extends StyleEngine {
             default:
                 return null;
         }
+    }
+
+    /// What `none` stands for: an effect that draws nothing, since a
+    /// declaration has to decode to something to win over another.
+    private static final Effect NO_EFFECT = new Effect() {
+    };
+
+    private static Object effect(CssValue v, Node node) {
+        int kind = v.flags() & 0xf;
+        if (kind == 0 || v.count() < 4) {
+            return NO_EFFECT;
+        }
+        Color c = v.partCount() == 0 ? null : color(v.part(0), node, 0);
+        if (c == null) {
+            return null;
+        }
+        int passes = v.flags() >> 4;
+        BlurType blur = passes == 1 ? BlurType.ONE_PASS_BOX
+                : (passes == 2 ? BlurType.TWO_PASS_BOX : BlurType.THREE_PASS_BOX);
+        if (kind == CssValue.EFFECT_INNER) {
+            return new InnerShadow(blur, c, v.num(0), v.num(1), v.num(2), v.num(3));
+        }
+        return new DropShadow(blur, c, v.num(0), v.num(1), v.num(2), v.num(3));
     }
 
     private static double length(CssValue v, int i, double em) {

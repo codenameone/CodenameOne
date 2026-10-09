@@ -72,6 +72,8 @@ public final class CssProperties {
     /// What an unknown name with a paint for a value is: a colour other
     /// rules look up by that name.
     public static final int LOOKUP_DEFINITION = 15;
+    /// `-fx-effect`: `dropshadow(...)`, `innershadow(...)` or `none`.
+    public static final int EFFECT = 17;
 
     private static final HashMap<String, Integer> KINDS = new HashMap<String, Integer>();
     private static final HashMap<String, String[]> KEYWORDS = new HashMap<String, String[]>();
@@ -96,6 +98,7 @@ public final class CssProperties {
         add(FONT_STYLE, "-fx-font-style");
         add(POS, "-fx-alignment");
         add(CURSOR, "-fx-cursor");
+        add(EFFECT, "-fx-effect");
         keyword("visibility", "visible", "hidden", "collapse");
         keyword("-fx-border-style", "none", "solid", "dashed", "dotted");
         keyword("-fx-orientation", "horizontal", "vertical");

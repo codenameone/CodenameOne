@@ -28,10 +28,11 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.scene.paint.Color;
 
-/// A shadow cast behind a node. **Recorded and not drawn**: a node with
-/// a drop shadow is painted without one, see [Effect]. The values keep
-/// the ranges and defaults of JavaFX so that code reading them back sees
-/// what it set.
+/// A shadow cast behind a node: the outline of what the node paints,
+/// blurred over the radius, in the shadow's colour, moved by the offset.
+/// Every blur type is drawn with box passes -- three for a Gaussian one --
+/// and the radius decides the reach; `width` and `height` are kept and
+/// not read. A change of a value is drawn when the node is next painted.
 public class DropShadow extends Effect {
 
     private final ObjectProperty<Effect> input = new SimpleObjectProperty<Effect>(this, "input");

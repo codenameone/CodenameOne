@@ -515,4 +515,27 @@ public class CssTest {
         scene.getStylesheets().add("cn1res:/none.css");
         assertEquals(Color.BLACK, plain.getTextFill());
     }
+
+    /// JavaFX reads a comment that runs to the end of its line, which CSS
+    /// has not; a sheet written for it has them, and the declaration on
+    /// the next line was swallowed into the comment's "property name".
+    /// The two slashes of an address inside `url()` are no comment.
+    @Test
+    public void aLineCommentEndsWithItsLineAndAnEffectIsCompiled() throws Exception {
+        app = new FxmlHarness("linecomment").resource("app.css", ".t {\n"
+                + "    -fx-text-fill: #f2b179; // f9f6f2\n"
+                + "    -fx-effect: dropshadow( three-pass-box, rgba(243, 215, 116, 1), 10, 0.5, 0, 0 );\n"
+                + "}\n");
+        assertTrue(app.compile().isEmpty());
+        CssSheetData data = read(app);
+        assertEquals(2, data.declarationCount(data.blockOf(0)));
+        assertEquals("-fx-effect", data.declaration(data.blockOf(0), 1).name());
+        CssValue effect = data.declaration(data.blockOf(0), 1).value();
+        assertEquals(CssValue.EFFECT, effect.type());
+        assertEquals(CssValue.EFFECT_DROP | (3 << 4), effect.flags());
+        assertEquals(10, effect.num(0), 0);
+        assertEquals(0.5, effect.num(1), 0);
+        assertEquals(CssValue.COLOR, effect.part(0).type());
+        assertEquals("a(b://c) d", com.codename1.fxml.css.CssDeclarations.stripComments("a(b://c) d// e").trim());
+    }
 }

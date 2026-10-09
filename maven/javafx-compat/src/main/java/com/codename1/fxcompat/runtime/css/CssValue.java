@@ -53,6 +53,11 @@ package com.codename1.fxcompat.runtime.css;
 ///   the low 16 bits and above them 1 for an upright and 2 for an italic
 ///   posture.
 /// - [#URL]: `text` is the address as written.
+/// - [#EFFECT]: `-fx-effect`. The low four bits of `flags` are
+///   [#EFFECT_DROP] or [#EFFECT_INNER] (0 for `none`), the bits above them
+///   the number of box passes of the blur; `nums` holds the radius, the
+///   spread or choke as a fraction, and the x and y offsets; `parts[0]` is
+///   the colour.
 ///
 /// A value is immutable; the arrays are never changed after construction.
 public final class CssValue {
@@ -81,6 +86,13 @@ public final class CssValue {
     public static final int FONT = 11;
     /// An address.
     public static final int URL = 12;
+    /// A shadow effect.
+    public static final int EFFECT = 13;
+
+    /// The `flags` of an [#EFFECT] that is `dropshadow()`.
+    public static final int EFFECT_DROP = 1;
+    /// The `flags` of an [#EFFECT] that is `innershadow()`.
+    public static final int EFFECT_INNER = 2;
 
     /// No unit: a plain number, or an angle in degrees.
     public static final byte UNIT_NONE = 0;

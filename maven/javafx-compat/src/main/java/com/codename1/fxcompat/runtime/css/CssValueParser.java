@@ -235,6 +235,8 @@ public final class CssValueParser {
                 }
                 return CssValue.text(CssValue.KEYWORD, CssProperties.lower(first));
             }
+            case CssProperties.EFFECT:
+                return one(terms) ? effect(first) : fail("expected dropshadow(), innershadow() or none");
             case CssProperties.FONT:
                 return font(terms);
             case CssProperties.FONT_SIZE: {
@@ -815,6 +817,63 @@ public final class CssValueParser {
             return fail("'" + term + "' is not a colour");
         }
         return v;
+    }
+
+    /// `dropshadow(blur-type, colour, radius, spread, x, y)`,
+    /// `innershadow(blur-type, colour, radius, choke, x, y)` or `none`.
+    private CssValue effect(String term) {
+        String word = CssProperties.lower(term);
+        if ("none".equals(word) || "null".equals(word)) {
+            return new CssValue(CssValue.EFFECT, 0, new double[4], null, null, null);
+        }
+        int open = term.indexOf('(');
+        if (open <= 0 || term.charAt(term.length() - 1) != ')') {
+            return fail("expected dropshadow(), innershadow() or none");
+        }
+        String name = CssProperties.lower(term.substring(0, open).trim());
+        int kind = "dropshadow".equals(name) ? CssValue.EFFECT_DROP
+                : ("innershadow".equals(name) ? CssValue.EFFECT_INNER : 0);
+        if (kind == 0) {
+            return fail("'" + name + "()' is not an effect this layer draws");
+        }
+        List<String> args = split(term.substring(open + 1, term.length() - 1), ',');
+        if (args == null || args.size() != 6) {
+            return fail(name + "() needs a blur type, a colour, a radius, a spread and two offsets");
+        }
+        String blur = CssProperties.lower(args.get(0).trim());
+        int passes;
+        if ("one-pass-box".equals(blur)) {
+            passes = 1;
+        } else if ("two-pass-box".equals(blur)) {
+            passes = 2;
+        } else if ("three-pass-box".equals(blur) || "gaussian".equals(blur)) {
+            passes = 3;
+        } else {
+            return fail("'" + args.get(0).trim() + "' is not a blur type");
+        }
+        CssValue color = colorOnly(args.get(1).trim());
+        if (color == null) {
+            return null;
+        }
+        double[] nums = new double[4];
+        for (int i = 0; i < 4; i++) {
+            String arg = args.get(2 + i).trim();
+            if (i == 1 && arg.endsWith("%")) {
+                nums[i] = component(arg, 1);
+            } else {
+                CssValue n = length(arg, false);
+                if (n == null || n.unit(0) == CssValue.UNIT_EM) {
+                    nums[i] = Double.NaN;
+                } else {
+                    nums[i] = n.num(0);
+                }
+            }
+            if (nums[i] != nums[i]) {
+                return fail("'" + arg + "' is not a number");
+            }
+        }
+        nums[1] = Math.max(0, Math.min(1, nums[1]));
+        return new CssValue(CssValue.EFFECT, kind | (passes << 4), nums, null, null, new CssValue[] {color});
     }
 
     private CssValue derive(List<String> args, String term) {

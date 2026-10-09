@@ -67,6 +67,12 @@ public class NodePeer extends Component implements FxPeer {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
+        boolean effect = Effects.has(node);
+        if (effect) {
+            g.setAlpha(old);
+            Effects.paintBehind(g, node, this);
+            g.setAlpha(opacity < 1 ? PeerPaint.alpha(old, opacity) : old);
+        }
         boolean widened = node.cn1PaintMatrix() != null || node.cn1PaintsOutsideBounds();
         if (widened) {
             PeerPaint.widenClip(g, this);
@@ -76,6 +82,14 @@ public class NodePeer extends Component implements FxPeer {
             g.setClip(cx, cy, cw, ch);
         }
         g.setAlpha(old);
+        if (effect) {
+            Effects.paintOver(g, node, this);
+        }
+    }
+
+    /// Paints the node into a picture of its own, for [Effects].
+    void capture(Graphics g) {
+        paint(g);
     }
 
     @Override

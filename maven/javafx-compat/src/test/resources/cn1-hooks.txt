@@ -10,6 +10,8 @@ javafx.scene.Node#cn1ClipPath
 javafx.scene.Node#cn1ComputeBoundsInLocal
 javafx.scene.Node#cn1ComputeLayoutBounds
 javafx.scene.Node#cn1CreatePeer
+javafx.scene.Node#cn1EffectCache
+javafx.scene.Node#cn1SetEffectCache
 javafx.scene.Node#cn1Events
 javafx.scene.Node#cn1FocusRequested
 javafx.scene.Node#cn1GeometryChanged

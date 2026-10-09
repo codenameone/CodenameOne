@@ -45,15 +45,16 @@ public final class CssDeclarations {
 
     /// `text` with every comment replaced by spaces, so that what is left
     /// keeps its offsets and its line numbers. A comment left open runs to
-    /// the end of the text.
+    /// the end of the text. Two slashes outside quotes and parentheses
+    /// start a comment that ends with its line, as in JavaFX.
     public static String stripComments(String text) {
-        int at = text.indexOf("/*");
-        if (at < 0) {
+        if (text.indexOf("/*") < 0 && text.indexOf("//") < 0) {
             return text;
         }
         char[] out = text.toCharArray();
         int n = out.length;
         char quote = 0;
+        int depth = 0;
         for (int i = 0; i < n; i++) {
             char c = out[i];
             if (quote != 0) {
@@ -73,6 +74,18 @@ public final class CssDeclarations {
                     }
                 }
                 i = end - 1;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth = depth > 0 ? depth - 1 : 0;
+            } else if (c == '/' && depth == 0 && i + 1 < n && out[i + 1] == '/') {
+                // A comment to the end of the line, which JavaFX reads
+                // though CSS has none. Inside parentheses it is the two
+                // slashes of an address.
+                while (i < n && out[i] != '\n' && out[i] != '\r') {
+                    out[i++] = ' ';
+                }
+                i--;
             }
         }
         return new String(out);

@@ -114,6 +114,17 @@ public class ParentPeer extends Container implements FxPeer {
             g.setClip(cx, cy, cw, ch);
         }
         g.setAlpha(old);
+        if (Effects.has(node)) {
+            Effects.paintOver(g, node, this);
+        }
+    }
+
+    /// Paints the node and everything in it into a picture of its own,
+    /// for [Effects]: what Codename One paints for a container, without
+    /// the backgrounds of what is above it.
+    void capture(Graphics g) {
+        paintBackground(g);
+        paint(g);
     }
 
     @Override
@@ -129,6 +140,9 @@ public class ParentPeer extends Container implements FxPeer {
         }
         if (PeerPaint.unseen(node)) {
             return;
+        }
+        if (Effects.has(node)) {
+            Effects.paintBehind(g, node, this);
         }
         double opacity = node.getOpacity();
         if (opacity < 1) {
