@@ -398,6 +398,33 @@ public class DartCoreSemanticsTest {
         assertEquals(999, early.microsecond());
     }
 
+    /// Dart's DateTime is valid for +/-100,000,000 days from the epoch
+    /// (+/-8,640,000,000,000,000 milliseconds). fromMillisecondsSinceEpoch used
+    /// to multiply by 1000 to get microseconds BEFORE checking this -- it did
+    /// not check it at all -- so Long.MAX_VALUE milliseconds overflowed the
+    /// long multiply and wrapped around to a small, in-range microsecond value,
+    /// landing near the epoch instead of failing the way Dart does.
+    @Test
+    public void dateTimeRejectsOutOfRangeMillisecondsAndMicroseconds() {
+        long maxMillis = 8640000000000000L;
+        // At the bound is still valid.
+        assertEquals(maxMillis, DateTime.fromMillisecondsSinceEpoch(maxMillis, true).millisecondsSinceEpoch());
+        assertEquals(-maxMillis, DateTime.fromMillisecondsSinceEpoch(-maxMillis, true).millisecondsSinceEpoch());
+        assertThrows(ArgumentError.class, () -> DateTime.fromMillisecondsSinceEpoch(maxMillis + 1, true));
+        assertThrows(ArgumentError.class, () -> DateTime.fromMillisecondsSinceEpoch(-maxMillis - 1, true));
+        // The overflow case the review found: a huge millisecond value that
+        // used to wrap around through the *1000 multiply into something small
+        // and in-range instead of being rejected.
+        assertThrows(ArgumentError.class, () -> DateTime.fromMillisecondsSinceEpoch(Long.MAX_VALUE, true));
+        assertThrows(ArgumentError.class, () -> DateTime.fromMillisecondsSinceEpoch(Long.MIN_VALUE, true));
+        // fromMicrosecondsSinceEpoch never multiplies, but still must not
+        // silently accept a value outside Dart's range.
+        long maxMicros = maxMillis * 1000L;
+        assertEquals(maxMicros, DateTime.fromMicrosecondsSinceEpoch(maxMicros, true).microsecondsSinceEpoch());
+        assertThrows(ArgumentError.class, () -> DateTime.fromMicrosecondsSinceEpoch(maxMicros + 1, true));
+        assertThrows(ArgumentError.class, () -> DateTime.fromMicrosecondsSinceEpoch(-maxMicros - 1, true));
+    }
+
     @Test
     public void anIdentityMapKeepsEqualKeysApart() {
         DartMap<Object, String> m = DartMap.identity();
@@ -450,7 +477,49 @@ public class DartCoreSemanticsTest {
         } finally {
             java.util.Locale.setDefault(saved);
         }
-        assertEquals("STRA\u00dfE", DString.toUpperCase("stra\u00dfe"), "Dart leaves the sharp s alone");
+    }
+
+    /// Dart's toUpperCase/toLowerCase use Unicode's FULL default case mapping,
+    /// not a per-UTF-16-unit one: measured on the Dart 3.9 VM,
+    /// 'stra\u00dfe'.toUpperCase() (sharp s, U+00DF) answers "STRASSE", not
+    /// "STRA\u00dfE" -- a single character expands to two. A per-char
+    /// Character.toUpperCase(char) loop cannot do this (nowhere to put the
+    /// second output char) and would also split a supplementary-plane
+    /// surrogate pair into two lone, unmapped halves.
+    @Test
+    public void caseConversionUsesUnicodesFullMapping() {
+        assertEquals("STRASSE", DString.toUpperCase("stra\u00dfe"), "sharp s expands to SS");
+        assertEquals("FI", DString.toUpperCase("\ufb01"), "the fi ligature expands to two letters");
+        assertEquals("\ufb03", DString.toLowerCase("\ufb03"), "an already-lower ligature has no lower mapping of its own");
+        // U+0130 (capital I with dot above) lowercases to "i" plus a combining
+        // dot above, the one unconditional entry whose LOWER mapping (not just
+        // upper) is multi-character.
+        assertEquals("i\u0307", DString.toLowerCase("\u0130"));
+        // A surrogate pair (U+10428 DESERET SMALL LETTER LONG I, upper is
+        // U+10400) has to travel through this as one code point: mapping each
+        // UTF-16 half on its own would answer two lone, unpaired surrogates.
+        String deseretLower = new String(Character.toChars(0x10428));
+        String deseretUpper = new String(Character.toChars(0x10400));
+        String upperedResult = DString.toUpperCase(deseretLower);
+        assertEquals(deseretUpper, upperedResult);
+        assertEquals(deseretLower, DString.toLowerCase(deseretUpper));
+        assertEquals(1, upperedResult.codePointCount(0, upperedResult.length()),
+                "still one code point, not two mismatched surrogate halves");
+    }
+
+    /// Unicode's Final_Sigma: the one context-sensitive rule the default
+    /// (locale-free) case-mapping algorithm still applies. A capital sigma
+    /// lowercases to the final form (U+03C2) at the end of a word and to the
+    /// medial form (U+03C3) everywhere else -- confirmed against the real
+    /// JDK's String.toLowerCase(Locale.ROOT), which implements the same
+    /// Unicode default algorithm.
+    @Test
+    public void toLowerCaseAppliesFinalSigmaAtWordEnd() {
+        // Greek "AS": sigma is the last letter -> final form.
+        assertEquals("\u03b1\u03c2", DString.toLowerCase("\u0391\u03a3"), "sigma at the end of a word");
+        // Greek "ASA": sigma is followed by another letter -> medial form.
+        assertEquals("\u03b1\u03c3\u03b1", DString.toLowerCase("\u0391\u03a3\u0391"),
+                "sigma in the middle of a word");
     }
 
     @Test
@@ -763,6 +832,33 @@ public class DartCoreSemanticsTest {
         assertEquals("mailto:a%20b@x.com", DartUri.parse("mailto:a b@x.com").toString());
         assertEquals("https://x/!$&'()*+,;=:@-._~", DartUri.parse("https://x/!$&'()*+,;=:@-._~").toString());
         assertEquals("a b", DartUri.parse("https://x/a b").pathSegments().get(0));
+    }
+
+    /// Dart's Uri.decodeComponent/decodeQueryComponent are strict
+    /// (allowMalformed: false): a percent escape that is not valid UTF-8
+    /// throws FormatException. java.net.URLDecoder cannot do this -- it
+    /// decodes through {@code new String(bytes, "UTF-8")}, whose Charset
+    /// decoder REPLACEs a bad sequence with U+FFFD instead of raising
+    /// anything a catch could see, so "/%FF" used to come back as a
+    /// replacement character instead of failing.
+    @Test
+    public void uriComponentDecodingIsStrictAboutUtf8() {
+        assertThrows(FormatException.class, () -> DartUri.parse("https://x/%FF").pathSegments().get(0),
+                "a lone continuation byte is not valid UTF-8");
+        assertThrows(FormatException.class, () -> DartUri.parse("https://x/%C0%80").pathSegments().get(0),
+                "an overlong encoding of U+0000 is rejected, not accepted as NUL");
+        assertThrows(FormatException.class, () -> DartUri.parse("https://x/%ED%A0%80").pathSegments().get(0),
+                "a UTF-8 encoded surrogate code point is rejected");
+        assertThrows(FormatException.class,
+                () -> DartUri.parse("https://x/p?q=%FF").queryParameters().get("q"),
+                "queryParameters decodes just as strictly as pathSegments");
+        // Valid multi-byte UTF-8 still decodes correctly.
+        assertEquals("caf\u00E9", DartUri.parse("https://x/caf%C3%A9").pathSegments().get(0));
+        assertEquals("\uD83D\uDE00", DartUri.parse("https://x/%F0%9F%98%80").pathSegments().get(0),
+                "a 4-byte sequence decodes back to its surrogate pair");
+        // '+' is a literal plus in a path segment but a space in a query value.
+        assertEquals("a+b", DartUri.parse("https://x/a+b").pathSegments().get(0));
+        assertEquals("a b", DartUri.parse("https://x/p?q=a+b").queryParameters().get("q"));
     }
 
     @Test

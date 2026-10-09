@@ -772,26 +772,143 @@ public final class DartUri {
     }
 
     /// Dart's {@code Uri.decodeComponent}, for path segments: a {@code +} is a
-    /// literal plus. URLDecoder is a form decoder and would turn it into a space,
-    /// so it is escaped first.
+    /// literal plus.
     private static String decodeComponent(String s) {
-        try {
-            return java.net.URLDecoder.decode(s.replace("+", "%2B"), "UTF-8");
-        } catch (Exception e) {
-            return s;
-        }
+        return percentDecode(s, false);
     }
 
     /// Dart's {@code Uri.decodeQueryComponent}, for query keys and values, where
     /// a {@code +} IS a space -- {@code ?q=hello+world} reads back as "hello world".
-    /// This is exactly URLDecoder's form decoding. The two used to share the
-    /// path rule, which kept every plus in a query literal.
+    /// The two used to share the path rule, which kept every plus in a query literal.
     private static String decodeQueryComponent(String s) {
-        try {
-            return java.net.URLDecoder.decode(s, "UTF-8");
-        } catch (Exception e) {
-            return s;
+        return percentDecode(s, true);
+    }
+
+    /// Dart's percent-decoding is strict (allowMalformed: false): a malformed
+    /// escape or an invalid UTF-8 byte sequence throws FormatException rather than
+    /// being papered over. {@code java.net.URLDecoder} cannot do this -- it joins
+    /// consecutive %XX bytes and decodes them with {@code new String(bytes, "UTF-8")},
+    /// whose Charset decoder REPLACEs a bad sequence with U+FFFD instead of raising
+    /// anything a catch could see, so decoding "/%FF" used to answer a replacement
+    /// character instead of failing. This decodes to raw bytes first (percent-escapes,
+    /// or '+' as a space in a query component, or an ASCII byte as itself -- the three
+    /// kinds of character {@code normalize()} ever leaves in a component) and then runs
+    /// the bytes through a hand-written strict UTF-8 validator: this runtime has no
+    /// {@code java.nio.charset.CharsetDecoder} (neither vm/JavaAPI nor Ports/CLDC11
+    /// defines one) to delegate to.
+    private static String percentDecode(String s, boolean plusIsSpace) {
+        int len = s.length();
+        // Each input char can grow into at most 3 UTF-8 bytes (the non-ASCII
+        // fallback below, which treats one UTF-16 unit as one value up to
+        // 0xFFFF); a percent escape or a plain ASCII/'+' char shrinks or stays
+        // the same, so 3x len is always enough.
+        byte[] bytes = new byte[len * 3];
+        int n = 0;
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c == '%') {
+                if (i + 2 >= len) {
+                    throw new FormatException("Truncated URI (at offset " + i + "): " + s);
+                }
+                int hi = hexValue(s.charAt(i + 1));
+                int lo = hexValue(s.charAt(i + 2));
+                if (hi < 0 || lo < 0) {
+                    throw new FormatException("Truncated URI (at offset " + i + "): " + s);
+                }
+                bytes[n++] = (byte) ((hi << 4) | lo);
+                i += 2;
+            } else if (plusIsSpace && c == '+') {
+                bytes[n++] = (byte) ' ';
+            } else if (c < 0x80) {
+                bytes[n++] = (byte) c;
+            } else {
+                // normalize() always percent-encodes anything outside ASCII before a
+                // component reaches here; encode it back the same way rather than
+                // assume it cannot happen.
+                utf8ToBytes(c, bytes, n);
+                n += utf8Length(c);
+            }
         }
+        return strictUtf8Decode(bytes, n, s);
+    }
+
+    private static int utf8Length(int cp) {
+        return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+    }
+
+    private static void utf8ToBytes(int cp, byte[] out, int at) {
+        if (cp < 0x80) {
+            out[at] = (byte) cp;
+        } else if (cp < 0x800) {
+            out[at] = (byte) (0xC0 | (cp >> 6));
+            out[at + 1] = (byte) (0x80 | (cp & 0x3F));
+        } else if (cp < 0x10000) {
+            out[at] = (byte) (0xE0 | (cp >> 12));
+            out[at + 1] = (byte) (0x80 | ((cp >> 6) & 0x3F));
+            out[at + 2] = (byte) (0x80 | (cp & 0x3F));
+        } else {
+            out[at] = (byte) (0xF0 | (cp >> 18));
+            out[at + 1] = (byte) (0x80 | ((cp >> 12) & 0x3F));
+            out[at + 2] = (byte) (0x80 | ((cp >> 6) & 0x3F));
+            out[at + 3] = (byte) (0x80 | (cp & 0x3F));
+        }
+    }
+
+    /**
+     * A hand-written strict UTF-8 decoder (no overlong encodings, no lone or
+     * missing continuation bytes, no surrogate code points, nothing past
+     * U+10FFFF): Dart's decodeComponent/decodeQueryComponent run with
+     * {@code allowMalformed: false} and throw FormatException on any of these,
+     * where {@code new String(bytes, "UTF-8")} would substitute U+FFFD instead.
+     */
+    private static String strictUtf8Decode(byte[] bytes, int length, String original) {
+        StringBuilder out = new StringBuilder(length);
+        int i = 0;
+        while (i < length) {
+            int b0 = bytes[i] & 0xFF;
+            int cp;
+            int size;
+            int min;
+            if (b0 < 0x80) {
+                cp = b0;
+                size = 1;
+                min = 0;
+            } else if ((b0 & 0xE0) == 0xC0) {
+                cp = b0 & 0x1F;
+                size = 2;
+                min = 0x80;
+            } else if ((b0 & 0xF0) == 0xE0) {
+                cp = b0 & 0x0F;
+                size = 3;
+                min = 0x800;
+            } else if ((b0 & 0xF8) == 0xF0) {
+                cp = b0 & 0x07;
+                size = 4;
+                min = 0x10000;
+            } else {
+                throw new FormatException("Invalid UTF-8 byte sequence: " + original);
+            }
+            if (i + size > length) {
+                throw new FormatException("Invalid UTF-8 byte sequence: " + original);
+            }
+            for (int k = 1; k < size; k++) {
+                int bk = bytes[i + k] & 0xFF;
+                if ((bk & 0xC0) != 0x80) {
+                    throw new FormatException("Invalid UTF-8 byte sequence: " + original);
+                }
+                cp = (cp << 6) | (bk & 0x3F);
+            }
+            if (cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
+                throw new FormatException("Invalid UTF-8 byte sequence: " + original);
+            }
+            if (size == 1) {
+                out.append((char) cp);
+            } else {
+                out.append(Character.toChars(cp));
+            }
+            i += size;
+        }
+        return out.toString();
     }
 
     /**

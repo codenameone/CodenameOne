@@ -232,3 +232,35 @@ public class SiteUnlisted {
         Seeds.poke(Class.forName(Seeds.name("rehtOdeeS")).newInstance());
     }
 }
+//// FILE KotlinLikeReflection.java
+/// Stands in for kotlin.jvm.internal.Reflection's own `static {}`, which loads
+/// "kotlin.reflect.jvm.internal.ReflectionFactoryImpl" -- a class kotlin-reflect defines
+/// and that is therefore never part of the translated universe, since kotlin-reflect is
+/// never bundled. The constant reaches Class.forName directly, with no intervening local
+/// or field (the exact shape javap shows for the real class): ldc "..."; invokestatic
+/// Class.forName. See ReachabilityCull.Allocation.literalForNameTargets.
+public class KotlinLikeReflection {
+    private static final Object factory;
+    static {
+        Object f;
+        try {
+            f = Class.forName("not.bundled.reflect.ReflectionFactoryImpl").newInstance();
+        } catch (Exception e) {
+            f = null;
+        }
+        factory = f;
+    }
+
+    public static Object getFactory() {
+        return factory;
+    }
+}
+//// FILE SiteKotlinLikeReflection.java
+/// A forName fed only a literal naming an absent class must narrow to NOTHING: none of
+/// the Seeds may be kept by this alone, unlike SiteUnlisted above.
+public class SiteKotlinLikeReflection {
+    public static void main(String[] args) throws Exception {
+        Seeds.keepAll();
+        System.out.println("CASE|factory|" + KotlinLikeReflection.getFactory());
+    }
+}

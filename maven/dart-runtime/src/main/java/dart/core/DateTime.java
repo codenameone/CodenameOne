@@ -50,7 +50,8 @@ public final class DateTime {
     /** Local-time constructor mirroring {@code DateTime(year, [month, day, ...])}. */
     public DateTime(long year, long month, long day, long hour, long minute,
                     long second, long millisecond, long microsecond) {
-        this(build(year, month, day, hour, minute, second, millisecond, false) * 1000L + microsecond, false);
+        this(millisToMicros(build(year, month, day, hour, minute, second, millisecond, false)) + microsecond,
+                false);
     }
 
     public static DateTime now() {
@@ -60,16 +61,49 @@ public final class DateTime {
     /** UTC constructor mirroring {@code DateTime.utc(year, [month, day, ...])}. */
     public static DateTime utc(long year, long month, long day, long hour, long minute,
                                long second, long millisecond, long microsecond) {
-        return new DateTime(build(year, month, day, hour, minute, second, millisecond, true) * 1000L
+        return new DateTime(millisToMicros(build(year, month, day, hour, minute, second, millisecond, true))
                 + microsecond, true);
     }
 
     public static DateTime fromMillisecondsSinceEpoch(long millisecondsSinceEpoch, boolean isUtc) {
-        return new DateTime(millisecondsSinceEpoch * 1000L, isUtc);
+        return new DateTime(millisToMicros(millisecondsSinceEpoch), isUtc);
     }
 
     public static DateTime fromMicrosecondsSinceEpoch(long microsecondsSinceEpoch, boolean isUtc) {
+        checkMicrosRange(microsecondsSinceEpoch);
         return new DateTime(microsecondsSinceEpoch, isUtc);
+    }
+
+    /**
+     * Dart's DateTime is valid for +/-100,000,000 days from the epoch, i.e.
+     * +/-8,640,000,000,000,000 milliseconds (the same bound the dart:core VM
+     * enforces, named {@code _maxMillisecondsSinceEpoch} there). This has to be
+     * checked BEFORE multiplying by 1000 to get microseconds: multiplying first
+     * and checking after lets a huge millisecond value (Long.MAX_VALUE, say)
+     * silently wrap through long overflow into a small, in-range microsecond
+     * value, so the resulting instant lands near the epoch instead of failing --
+     * every caller of this conversion goes through here rather than writing the
+     * multiply inline.
+     */
+    private static final long MAX_MILLISECONDS_SINCE_EPOCH = 8640000000000000L;
+
+    private static long millisToMicros(long milliseconds) {
+        if (milliseconds > MAX_MILLISECONDS_SINCE_EPOCH || milliseconds < -MAX_MILLISECONDS_SINCE_EPOCH) {
+            throw new ArgumentError("DateTime is outside valid range: " + milliseconds);
+        }
+        return milliseconds * 1000L;
+    }
+
+    /** Same bound as {@link #millisToMicros}, expressed in microseconds, for the
+     * constructor ({@link #fromMicrosecondsSinceEpoch}) that never multiplies and so
+     * cannot overflow, but still must not silently accept a value Dart itself rejects.
+     */
+    private static final long MAX_MICROSECONDS_SINCE_EPOCH = MAX_MILLISECONDS_SINCE_EPOCH * 1000L;
+
+    private static void checkMicrosRange(long microseconds) {
+        if (microseconds > MAX_MICROSECONDS_SINCE_EPOCH || microseconds < -MAX_MICROSECONDS_SINCE_EPOCH) {
+            throw new ArgumentError("DateTime is outside valid range: " + microseconds / 1000L);
+        }
     }
 
     /** Milliseconds since the epoch, rounded toward negative infinity as Dart does. */

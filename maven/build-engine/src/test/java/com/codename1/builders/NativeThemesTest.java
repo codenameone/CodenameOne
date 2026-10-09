@@ -90,6 +90,31 @@ public class NativeThemesTest {
     }
 
     @Test
+    public void aThemeOpenedByItsBareLayeredNameIsKept() throws IOException {
+        // Resources.openLayered("/iOSModernTheme") appends ".res" itself, so the class file
+        // only holds the bare name, as a whole constant-pool string.
+        File dir = portDir();
+        File classes = tmp.newFolder("layeredclasses");
+        File cls = new File(classes, "com/example/App.class");
+        cls.getParentFile().mkdirs();
+        Files.write(cls.toPath(), bytesWith(utf8Constant("/iOSModernTheme")));
+        NativeThemes.removeUnused(dir, "iOS7Theme", classes);
+        assertTrue(new File(dir, "iOSModernTheme.res").isFile());
+        assertFalse(new File(dir, "iPhoneTheme.res").isFile());
+    }
+
+    @Test
+    public void aLongerIdentifierStartingWithAThemeNameIsNotAUse() throws IOException {
+        File dir = portDir();
+        File classes = tmp.newFolder("prefixclasses");
+        File cls = new File(classes, "com/example/App.class");
+        cls.getParentFile().mkdirs();
+        Files.write(cls.toPath(), bytesWith(utf8Constant("iOSModernThemeSettings")));
+        NativeThemes.removeUnused(dir, "iOS7Theme", classes);
+        assertFalse(new File(dir, "iOSModernTheme.res").isFile());
+    }
+
+    @Test
     public void thePortsOwnReferencesDoNotKeepAnything() throws IOException {
         // IOSImplementation names every theme; that must not count as a use.
         File dir = portDir();
@@ -242,6 +267,11 @@ public class NativeThemesTest {
         Files.write(new File(dir, "CN1Resource.res").toPath(), new byte[] {1});
         Files.write(new File(dir, "cn1_globals.m").toPath(), new byte[] {1});
         return dir;
+    }
+
+    /// A CONSTANT_Utf8 entry as a class file stores it: tag 1, a two-byte length, the bytes.
+    private static String utf8Constant(String value) {
+        return "\u0001\u0000" + (char) value.length() + value;
     }
 
     private static byte[] bytesWith(String s) {

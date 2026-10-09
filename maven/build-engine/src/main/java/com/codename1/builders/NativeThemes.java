@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /// Which of the port's native theme resources an application actually ships.
 ///
@@ -223,7 +224,7 @@ final class NativeThemes {
         }
         Set<String> referenced = new LinkedHashSet<String>();
         for (String name : candidates) {
-            if (namesAny(appClasses, new String[] {name + ".res"})) {
+            if (referencesTheme(appClasses, name)) {
                 referenced.add(name);
             }
         }
@@ -247,12 +248,39 @@ final class NativeThemes {
     /// The ports' own `com.codename1.impl` packages are skipped, since they name
     /// every theme and every mode property, and so is `com.codename1.annotations`,
     /// whose build-hint declarations name the properties without setting them.
-    static boolean namesAny(File classesDir, String[] needles) throws IOException {
+    static boolean namesAny(File classesDir, final String[] needles) throws IOException {
         return classesDir != null && classesDir.isDirectory()
-                && scan(classesDir, classesDir, needles);
+                && scan(classesDir, classesDir, new Predicate<String>() {
+                    @Override
+                    public boolean test(String body) {
+                        for (String needle : needles) {
+                            if (body.contains(needle)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                });
     }
 
-    private static boolean scan(File root, File f, String[] needles) throws IOException {
+    /// Whether the application names the theme `name`: as "name.res" anywhere (a path such as
+    /// "/name.res" included), or as the bare name in a whole constant, because
+    /// `Resources.openLayered("/name")` appends the extension itself and its argument never
+    /// contains ".res". The JavaScript build's pruning matches the same way
+    /// (`JavaScriptBuildHints.scanBytes`).
+    static boolean referencesTheme(File classesDir, final String name) throws IOException {
+        return classesDir != null && classesDir.isDirectory()
+                && scan(classesDir, classesDir, new Predicate<String>() {
+                    @Override
+                    public boolean test(String body) {
+                        return body.contains(name + ".res")
+                                || JavaScriptBuildHints.containsConstant(body, name)
+                                || JavaScriptBuildHints.containsConstant(body, "/" + name);
+                    }
+                });
+    }
+
+    private static boolean scan(File root, File f, Predicate<String> matches) throws IOException {
         if (f.isDirectory()) {
             String rel = root.toPath().relativize(f.toPath()).toString().replace('\\', '/');
             if ("com/codename1/impl".equals(rel) || "com/codename1/annotations".equals(rel)) {
@@ -261,7 +289,7 @@ final class NativeThemes {
             File[] children = f.listFiles();
             if (children != null) {
                 for (File c : children) {
-                    if (scan(root, c, needles)) {
+                    if (scan(root, c, matches)) {
                         return true;
                     }
                 }
@@ -274,12 +302,7 @@ final class NativeThemes {
         // The class file's constant pool holds a string literal as modified UTF-8,
         // which for these ASCII names is the same bytes as the name itself.
         String body = new String(Files.readAllBytes(f.toPath()), StandardCharsets.ISO_8859_1);
-        for (String needle : needles) {
-            if (body.contains(needle)) {
-                return true;
-            }
-        }
-        return false;
+        return matches.test(body);
     }
 
     private static String asciiLower(String s) {

@@ -33,8 +33,8 @@ package com.codename1.ui.spinner;
 /// picker.
 ///
 /// The value's runtime type is the implementation's own: `Date` for
-/// [DateSpinner3D][com.codename1.ui.spinner.DateSpinner3D], an `int[]` of
-/// hours and minutes for
+/// [DateSpinner3D][com.codename1.ui.spinner.DateSpinner3D], a `Long` duration
+/// in milliseconds for
 /// [DurationSpinner3D][com.codename1.ui.spinner.DurationSpinner3D], and so on.
 /// Each implementation documents what it expects; passing something else is a
 /// programming error rather than a recoverable condition.

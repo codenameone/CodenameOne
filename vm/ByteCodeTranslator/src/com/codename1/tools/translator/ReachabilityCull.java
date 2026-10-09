@@ -990,6 +990,26 @@ final class ReachabilityCull {
                 }
             }
             if (type == null) {
+                List<String> literals = literalForNameTargets(site);
+                if (literals != null) {
+                    // Every forName call in this method names a compile-time constant --
+                    // see literalForNameTargets -- so nothing here is actually unbounded;
+                    // allocate exactly the named classes (narrowing absent ones to nothing)
+                    // and skip the FOR_NAME_SITES fallback below entirely.
+                    int before = allocated.size();
+                    for (String literal : literals) {
+                        String cn = mangle(literal);
+                        if (byName.containsKey(cn)) {
+                            allocate(cn);
+                        }
+                        // Else: forNameImpl (nativeMethods.m) has no entry for a class
+                        // outside the translated universe, forName() throws
+                        // ClassNotFoundException, and newInstance() never runs -- this
+                        // literal contributes no allocation, not "every no-arg class".
+                    }
+                    reflectiveOnly += allocated.size() - before;
+                    return;
+                }
                 unnarrowedForName.add(site.getClsName() + "." + site.getMethodName());
             }
             if (everything) {
@@ -1006,6 +1026,56 @@ final class ReachabilityCull {
                 }
             }
             reflectiveOnly += allocated.size() - before;
+        }
+
+        /// Every Class.forName call this method's own bytecode makes, or null if any of
+        /// them cannot be proven constant. A call counts only when the instruction right
+        /// before it (skipping label/line-number/debug pseudo-instructions, which have no
+        /// stack effect) is an Ldc of a String -- the shape
+        /// kotlin.jvm.internal.Reflection's own `static {}` uses to load
+        /// "kotlin.reflect.jvm.internal.ReflectionFactoryImpl": `ldc "..."; invokestatic
+        /// Class.forName`. kotlin-reflect is never bundled, so that name is never part of
+        /// the translated universe, and without this, seedForNameSite had no way to tell
+        /// "this name can never resolve" from "this name is unknown", and widened to every
+        /// concrete no-arg class for every app that merely links the Kotlin stdlib. This
+        /// stays deliberately narrow -- a 3-arg forName(String,boolean,ClassLoader) call
+        /// never matches, because its ClassLoader argument sits between the Ldc and the
+        /// invoke -- rather than growing into general constant propagation.
+        private static List<String> literalForNameTargets(BytecodeMethod site) {
+            List<com.codename1.tools.translator.bytecodes.Instruction> ins = site.getInstructions();
+            if (ins == null) {
+                return null;
+            }
+            List<String> literals = new ArrayList<String>();
+            com.codename1.tools.translator.bytecodes.Instruction prev = null;
+            boolean sawForName = false;
+            for (com.codename1.tools.translator.bytecodes.Instruction i : ins) {
+                Class<?> k = i.getClass();
+                if (k == com.codename1.tools.translator.bytecodes.LabelInstruction.class
+                        || k == com.codename1.tools.translator.bytecodes.LineNumber.class
+                        || k == com.codename1.tools.translator.bytecodes.LocalVariable.class
+                        || k == com.codename1.tools.translator.bytecodes.TryCatch.class) {
+                    continue;
+                }
+                if (k == com.codename1.tools.translator.bytecodes.Invoke.class) {
+                    com.codename1.tools.translator.bytecodes.Invoke call =
+                            (com.codename1.tools.translator.bytecodes.Invoke) i;
+                    String sig = call.getDesc() + "." + call.getName();
+                    if (FOR_NAME.equals(sig) || FOR_NAME_3.equals(sig)) {
+                        sawForName = true;
+                        if (prev == null || prev.getClass() != com.codename1.tools.translator.bytecodes.Ldc.class) {
+                            return null;
+                        }
+                        Object v = ((com.codename1.tools.translator.bytecodes.Ldc) prev).getValue();
+                        if (!(v instanceof String)) {
+                            return null;
+                        }
+                        literals.add((String) v);
+                    }
+                }
+                prev = i;
+            }
+            return sawForName ? literals : null;
         }
 
         private static boolean hasNoArgConstructor(ByteCodeClass c) {

@@ -94,6 +94,33 @@ class ForNameSeedIntegrationTest {
         assertTrue(buildAndRun(f, "SiteUnlisted").contains("CASE|other|probed"));
     }
 
+    /// Mirrors kotlin.jvm.internal.Reflection's own `static {}`: a literal naming a class
+    /// absent from the universe (kotlin-reflect is never bundled) must narrow to NOTHING --
+    /// unlike SiteUnlisted above, where the name is not a compile-time constant at all.
+    @Test
+    void aLiteralNamingAnAbsentClassNarrowsToNothing() throws Exception {
+        Fixture f = compileFixture();
+        String log = translate(f, "SiteKotlinLikeReflection");
+        assertFalse(log.contains("is not narrowed"),
+                "A forName fed directly by an Ldc constant (kotlin.jvm.internal.Reflection's "
+                        + "own shape) must narrow to nothing, since the named class is absent "
+                        + "from the universe -- not fall back to every concrete no-arg class. "
+                        + "Translator output:\n" + log);
+        Path src = f.out.resolve("SiteKotlinLikeReflection").resolve("dist")
+                .resolve("SiteKotlinLikeReflection-src");
+        for (String seed : SEEDS) {
+            assertTrue(read(src, seed).contains(stub(seed)),
+                    seed + " is not reachable from a constant naming an absent class, so it "
+                            + "must stay culled");
+        }
+        String run = buildAndRun(f, "SiteKotlinLikeReflection");
+        assertTrue(run.contains("CASE|factory|null"),
+                "Class.forName on a name absent from the universe must throw "
+                        + "ClassNotFoundException and be caught, exactly like on the JVM. "
+                        + "Output:\n" + run);
+        assertFalse(run.contains("CN1 FATAL"), "No culled method may run. Output:\n" + run);
+    }
+
     /// The real core and iOS port: every forName they make reachable must be in the table.
     @Test
     void theRealForNameSitesAreAllNarrowed() throws Exception {

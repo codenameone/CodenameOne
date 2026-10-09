@@ -40,10 +40,10 @@ import java.util.NoSuchElementException;
  * <p>Dart's grammar is JavaScript-flavoured ECMAScript, which overlaps with
  * {@link RE}'s Perl5 syntax for the constructs apps actually use: anchors,
  * character classes, quantifiers, alternation and capturing groups. The flag
- * surface Dart exposes is mapped where the engine has an equivalent —
- * {@code multiLine} and {@code caseSensitive}; {@code unicode} and
- * {@code dotAll} are accepted and recorded but have no engine counterpart, so
- * they are inert rather than silently changing the match.</p>
+ * surface Dart exposes is mapped where the engine has an equivalent --
+ * {@code multiLine}, {@code caseSensitive} and {@code dotAll}. {@code unicode}
+ * has no engine counterpart and is accepted and recorded but inert; see
+ * {@link #unicode(boolean)}.</p>
  */
 public final class RegExp {
 
@@ -84,6 +84,14 @@ public final class RegExp {
         this.compiled = null;
     }
 
+    /**
+     * Records Dart's {@code unicode} flag. The engine matches UTF-16 code units, so in
+     * unicode mode a character outside the Basic Multilingual Plane (an emoji, a surrogate
+     * pair) still counts as two for {@code .} and quantifiers, and {@code \\u{...}} and
+     * {@code \\p{...}} are not understood. It is deliberately not rejected: apps set the flag
+     * routinely on patterns over BMP text, where both modes match identically, and failing
+     * those would break working code to report a difference they never hit.
+     */
     public void unicode(boolean value) {
         this.unicode = value;
         this.compiled = null;
