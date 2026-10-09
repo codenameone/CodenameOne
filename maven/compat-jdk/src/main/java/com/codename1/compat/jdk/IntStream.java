@@ -32,6 +32,17 @@ import java.util.function.Supplier;
 /// There is no parallel evaluation: `parallel()` answers the same stream.
 public interface IntStream extends BaseStream<Integer, IntStream> {
 
+    /// Declared again with this type, as the JDK does: a call compiled
+    /// against the JDK names `IntStream.sequential()` answering `IntStream`,
+    /// and the method inherited from [BaseStream] answers its type
+    /// variable, which is another descriptor.
+    @Override
+    IntStream sequential();
+
+    /// Declared again with this type; see [#sequential()].
+    @Override
+    IntStream parallel();
+
     IntStream filter(IntPredicate predicate);
 
     IntStream map(IntUnaryOperator mapper);

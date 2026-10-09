@@ -509,4 +509,25 @@ public class PrimitiveStreamDifferentialTest {
             assertEquals("none", expected.getMessage());
         }
     }
+
+    /// A call compiled against the JDK is linked by descriptor, and the
+    /// JDK's primitive streams declare `parallel()` and `sequential()`
+    /// answering their own type. Inherited from the base interface they
+    /// answer its erasure instead, and the call of an application that
+    /// writes `IntStream.range(0, n).parallel()` names a method the shim
+    /// did not have.
+    @Test
+    public void parallelAndSequentialAnswerTheStreamsOwnType() throws Exception {
+        Class<?>[] mine = {IntStream.class, LongStream.class, DoubleStream.class};
+        Class<?>[] theirs = {java.util.stream.IntStream.class, java.util.stream.LongStream.class,
+            java.util.stream.DoubleStream.class};
+        for (int i = 0; i < mine.length; i++) {
+            org.junit.Assert.assertSame(mine[i], mine[i].getDeclaredMethod("parallel").getReturnType());
+            org.junit.Assert.assertSame(mine[i], mine[i].getDeclaredMethod("sequential").getReturnType());
+            org.junit.Assert.assertSame(theirs[i], theirs[i].getDeclaredMethod("parallel").getReturnType());
+            org.junit.Assert.assertSame(theirs[i], theirs[i].getDeclaredMethod("sequential").getReturnType());
+        }
+        org.junit.Assert.assertEquals(java.util.stream.IntStream.range(0, 5).parallel().sequential().sum(),
+                IntStream.range(0, 5).parallel().sequential().sum());
+    }
 }

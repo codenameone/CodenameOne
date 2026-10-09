@@ -32,6 +32,17 @@ import java.util.function.Supplier;
 /// There is no parallel evaluation: `parallel()` answers the same stream.
 public interface DoubleStream extends BaseStream<Double, DoubleStream> {
 
+    /// Declared again with this type, as the JDK does: a call compiled
+    /// against the JDK names `DoubleStream.sequential()` answering `DoubleStream`,
+    /// and the method inherited from [BaseStream] answers its type
+    /// variable, which is another descriptor.
+    @Override
+    DoubleStream sequential();
+
+    /// Declared again with this type; see [#sequential()].
+    @Override
+    DoubleStream parallel();
+
     DoubleStream filter(DoublePredicate predicate);
 
     DoubleStream map(DoubleUnaryOperator mapper);

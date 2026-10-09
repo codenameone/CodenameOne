@@ -32,6 +32,17 @@ import java.util.function.Supplier;
 /// There is no parallel evaluation: `parallel()` answers the same stream.
 public interface LongStream extends BaseStream<Long, LongStream> {
 
+    /// Declared again with this type, as the JDK does: a call compiled
+    /// against the JDK names `LongStream.sequential()` answering `LongStream`,
+    /// and the method inherited from [BaseStream] answers its type
+    /// variable, which is another descriptor.
+    @Override
+    LongStream sequential();
+
+    /// Declared again with this type; see [#sequential()].
+    @Override
+    LongStream parallel();
+
     LongStream filter(LongPredicate predicate);
 
     LongStream map(LongUnaryOperator mapper);
