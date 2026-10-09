@@ -277,6 +277,28 @@ public class ControlLookTest {
         assertTrue("the bright dot moved on", firstAfter < firstBefore);
     }
 
+    /// A spinner on a tab that is not selected is in the scene and
+    /// hidden. It used to take a frame sixty times a second all the same,
+    /// which kept an application that showed nothing moving from idling.
+    @Test
+    public void anIndicatorThatIsHiddenTakesNoFrames() {
+        FrameClock.setManual(true);
+        ProgressIndicator spinner = new ProgressIndicator();
+        StackPane tab = new StackPane(spinner);
+        Scene scene = new Scene(new StackPane(tab), 300, 100);
+        assertNotNull(scene);
+        spinner.resize(50, 50);
+        assertTrue(FrameClock.isActive());
+        FrameClock.advance(16);
+        assertTrue("visible, it goes on", FrameClock.isActive());
+        tab.setVisible(false);
+        FrameClock.advance(16);
+        assertFalse("hidden, it leaves the clock", FrameClock.isActive());
+        tab.setVisible(true);
+        paint(spinner);
+        assertTrue("painted again, it takes frames again", FrameClock.isActive());
+    }
+
     // ------------------------------------------------------------- graphic
 
     @Test

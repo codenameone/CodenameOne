@@ -90,6 +90,15 @@ public class ProgressIndicator extends Control {
     private final FrameClock.Pulse frames = new FrameClock.Pulse() {
         @Override
         public void pulse(long nowNanos) {
+            if (!seen()) {
+                // On a tab that is not selected, or under anything else
+                // that is hidden, nothing turns: the clock is left, and
+                // with nothing else running it stops and the application
+                // is idle. The next paint, which only something visible
+                // gets, takes the frames up again.
+                FrameClock.remove(frames);
+                return;
+            }
             frameMillis = nowNanos / 1000000L;
             // A peer that is on no form is not drawn.
             progressShown();
@@ -135,8 +144,19 @@ public class ProgressIndicator extends Control {
         return null;
     }
 
+    /// Whether the indicator and everything it is in are visible.
+    private boolean seen() {
+        for (javafx.scene.Node n = this; n != null; n = n.getParent()) {
+            if (!n.isVisible()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Runs the frames of the indeterminate look while it can be seen:
-    /// the progress is unknown and the indicator is in a scene.
+    /// the progress is unknown and the indicator is in a scene. A frame
+    /// that finds it hidden stops them, and a paint starts them again.
     private void animate() {
         if (isIndeterminate() && getScene() != null) {
             FrameClock.add(frames);
@@ -237,6 +257,7 @@ public class ProgressIndicator extends Control {
     @Override
     public void cn1Paint(Renderer renderer) {
         super.cn1Paint(renderer);
+        animate();
         Insets in = getInsets();
         double w = getWidth() - in.getLeft() - in.getRight();
         double h = getHeight() - in.getTop() - in.getBottom();
