@@ -123,6 +123,24 @@ jobs:
         run: |
           cat $HOME/.m2/settings.xml
           cd maven
+          # update-version.sh runs `mvn versions:set` with no profile, and it
+          # does not need -Dunity-compat to reach cil-translator and
+          # unity-compat: versions:set walks the <modules> of every profile of
+          # the aggregator, active or not, which is also how core-unittests,
+          # tests and backend-parparvm have always been bumped. Measured, not
+          # assumed (versions-maven-plugin 2.22.0): on a copy of the pom tree,
+          #   mvn versions:set -DnewVersion=9.9.9-fake && mvn versions:commit
+          # leaves both modules' <version> and <parent><version> at the new
+          # version, and nothing else names their version -- unity-compat asks
+          # for the translator at ${project.version}, and the archetype and
+          # both build plugins resolve the pair at their own. To check again:
+          #   mkdir /tmp/v && (cd maven && git ls-files | grep 'pom\.xml$' \
+          #     | cpio -pdm /tmp/v) && (cd /tmp/v && mvn versions:set \
+          #     -DnewVersion=9.9.9-fake) && grep -c 9.9.9-fake \
+          #     /tmp/v/cil-translator/pom.xml /tmp/v/unity-compat/pom.xml
+          # which prints 2 for each. "Confirm artifacts on R2" below names
+          # both artifacts at the release version, so a release in which this
+          # had stopped being true would go red there, not publish quietly.
           bash update-version.sh "$GITHUB_REF_NAME"
           export GPG_TTY=$(tty)
           # R2 is the repository. `deploy` is still the phase to run because

@@ -199,6 +199,59 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void numericResultsMatchTheJvmOnBothEmitters(CompilerHelper.CompilerConfig config) throws Exception {
+        // A differential check rather than a test of one instruction: arithmetic
+        // on all four numeric types, every conversion between them (NaN, the
+        // infinities and out-of-range values included), the DUP/DUP_X/DUP2_X
+        // shapes of compound assignments on locals, statics, fields and arrays
+        // of both widths, multi-dimensional arrays, the Math natives, the float
+        // constants, int sums that overflow before something reads them, and
+        // the text of a float, over generated operands. The expected number is
+        // what a JVM computes for the same source (identical on JDK 8, 17 and
+        // 21); run the fixture's main there and it prints a hash per section,
+        // which is how to find what diverged -- the sections static holds the
+        // same numbers on this target.
+        //
+        // It was written while chasing a three pixel shift of the title of every
+        // form holding an XY chart, which appeared when float results started
+        // being rounded. The rounding was right: the chart undid a rotation by
+        // rotating back, the round trip is not exact in float arithmetic, and
+        // the JavaScript port switches text rendering on an exactly-identity
+        // transform. The "layout" section keeps that arithmetic pinned.
+        //
+        // What it did find, each wrong before and each fixed with it:
+        //  - I2D and I2F read an int sum without wrapping it, so
+        //    (double) (Integer.MAX_VALUE + Integer.MAX_VALUE) was 4294967294.
+        //  - F2I and D2I wrapped where Java saturates: (int) 3.0e9f was
+        //    -1294967296 and (int) Float.POSITIVE_INFINITY was 0.
+        //  - A static never assigned before its first read was undefined, not
+        //    0: the bundle writer replaced the quoted key of its default with
+        //    an alias, which an object literal reads as a key of that name.
+        //  - Float.toString printed the digits of the double: 0.1f came out as
+        //    0.10000000149011612 and 9999999.0f as 9999999.
+        final int expected = -1502780893;
+        WorkerRunResult structured = translateAndRunFixture(config, "JsNumericDifferentialApp.java", "JsNumericDifferentialApp");
+        assertEquals(expected, structured.result,
+                "structured emitter: raw=" + structured.rawMessage + " err=" + structured.errorMessage);
+
+        String prevSkip = System.getProperty("parparvm.js.structured.skip");
+        System.setProperty("parparvm.js.structured.skip", "JsNumericDifferentialApp.");
+        WorkerRunResult interpreted;
+        try {
+            interpreted = translateAndRunFixture(config, "JsNumericDifferentialApp.java", "JsNumericDifferentialApp");
+        } finally {
+            if (prevSkip == null) {
+                System.clearProperty("parparvm.js.structured.skip");
+            } else {
+                System.setProperty("parparvm.js.structured.skip", prevSkip);
+            }
+        }
+        assertEquals(expected, interpreted.result,
+                "pc-switch emitter: raw=" + interpreted.rawMessage + " err=" + interpreted.errorMessage);
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void aCallComparedAsAFloatOrADoubleRunsOnceOnBothEmitters(CompilerHelper.CompilerConfig config) throws Exception {
         // FCMPx and DCMPx are written as an expression that names each operand
         // three times - twice for NaN and the two orderings. The structured

@@ -96,12 +96,23 @@ public abstract class UnityApplication {
         Random.InitState(seed(display.getProperty("unity.seed", "")));
         installProject();
         onProjectInstalled();
+        // `begin()` builds the first scene and runs every script's Awake
+        // and OnEnable, so everything a script may ask a host for has to
+        // be in place before it, not when the view is first shown: the
+        // view's services -- where PlayerPrefs are kept, the device an
+        // AudioSource set to Play On Awake plays on, the platform, the
+        // touch screen -- and a size. Made after `onProjectInstalled()`,
+        // so that hook still runs with no scene and no view, and before
+        // the first Awake. The field is set once the scene is up: until
+        // then `getView()` answers null, as it always did during Awake.
+        UnityGameView gameView = new UnityGameView();
+        gameView.installServices();
         // The view reports its real size before every frame; this is for
         // what a script reads in Awake and Start, before the first one.
         UnityRuntime.resize(display.getDisplayWidth(), display.getDisplayHeight());
         UnityRuntime.begin();
 
-        view = new UnityGameView();
+        view = gameView;
         form = createForm(view);
         form.show();
         view.start();

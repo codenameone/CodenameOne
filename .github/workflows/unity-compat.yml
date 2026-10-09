@@ -52,6 +52,8 @@ on:
       - 'maven/integration-tests/inc/**'
       - 'scripts/unity-compat-samples/**'
       - 'CodenameOne/src/com/codename1/gaming/**'
+      # The platform the offscreen check of the game view runs on.
+      - 'maven/core-unittests/src/test/java/com/codename1/testing/**'
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'vm/selfhost/js/**'
@@ -79,6 +81,8 @@ on:
       - 'maven/integration-tests/inc/**'
       - 'scripts/unity-compat-samples/**'
       - 'CodenameOne/src/com/codename1/gaming/**'
+      # The platform the offscreen check of the game view runs on.
+      - 'maven/core-unittests/src/test/java/com/codename1/testing/**'
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'vm/selfhost/js/**'
@@ -130,7 +134,20 @@ jobs:
           RETRY_DELAY_SECONDS: '60'
         run: |
           cd maven
-          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl cil-translator,unity-compat -am
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl cil-translator,unity-compat,javase -am
+      # The samples are also run on a real game view with no window
+      # (player/offscreen-check.sh). That needs the JavaSE port's jar, built
+      # above for its software rasteriser and fonts, and the core unit tests'
+      # implementation of the platform, which is only compiled here: the
+      # module is in the `unittests` profile and `-am` above never reaches it.
+      - name: Compile the core unit tests' platform implementation
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh mvn -B test-compile -DunitTests -DskipTests -Dmaven.javadoc.skip=true -pl core-unittests -am
       - name: Unit tests
         working-directory: maven
         run: xvfb-run -a mvn -B -Plocal-dev-javase -Dunity-compat -Dunity.requireDotnet=true -pl cil-translator,unity-compat test
@@ -166,9 +183,13 @@ jobs:
         run: |
           test -d maven/unity-compat/target/classes/UnityEngine
           scripts/check-cast-semantics.sh maven/unity-compat/target/classes
+      # The offscreen check runs the JavaSE port's classes, which need JDK 11
+      # or newer; the job's own JDK is 8. The runner image carries a 17.
       - name: Samples on the JVM, native and JavaScript
         working-directory: maven/integration-tests
-        run: bash unity-compat-test.sh --parparvm
+        run: |
+          test -x "${JAVA_HOME_17_X64}/bin/javac"
+          UNITY_PLAYER_JAVA_HOME="${JAVA_HOME_17_X64}" bash unity-compat-test.sh --parparvm
       - name: Upload the samples' logs and traces
         if: failure()
         uses: actions/upload-artifact@v7

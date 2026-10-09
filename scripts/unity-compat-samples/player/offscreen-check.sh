@@ -10,14 +10,17 @@
 #   [--seed n] [--frames n] [--size WxH] [--input file] [--dump f1,f2,...]
 #   [--png dir] [--trace file] [--count Prefix]... [--reference dir]
 #
-# It opens nothing: the JVM is headless. It is not part of the framework's
-# build, because it needs a project built with the .NET SDK; run it by hand
-# or from a job that has one, after build-unity-project.sh.
+# It opens nothing: the JVM is headless, and nothing in it is of one desktop --
+# no window toolkit, no GPU, fonts from the port's own jar -- so it runs the
+# same on a Linux runner with no display. It is not part of the framework's
+# build, because it needs a project built with the .NET SDK;
+# maven/integration-tests/unity-compat-test.sh runs it on every sample, after
+# build-unity-project.sh.
 #
 # Needs what run-unity-project.sh needs, and the core unit tests' classes,
 # whose implementation of the platform this drives:
 #
-#   cd maven && mvn test-compile -DunitTests -pl core-unittests
+#   cd maven && mvn test-compile -DunitTests -DskipTests -pl core-unittests -am
 set -e
 HERE="$( cd "$(dirname "$0")" ; pwd -P )"
 ROOT="$( cd "$HERE/../../.." ; pwd -P )"
@@ -40,7 +43,7 @@ TESTS="$ROOT/maven/core-unittests/target/test-classes"
 CORE="$ROOT/maven/core/target/classes"
 FACTORY="$ROOT/maven/factory/target/classes"
 [ -e "$TESTS/com/codename1/testing/TestCodenameOneImplementation.class" ] \
-  || fail "the core unit tests are not compiled. Compile them first: (cd maven && mvn test-compile -DunitTests -pl core-unittests)"
+  || fail "the core unit tests are not compiled. Compile them first: (cd maven && mvn test-compile -DunitTests -DskipTests -pl core-unittests -am)"
 [ -e "$FACTORY/com/codename1/impl/ImplementationFactory.class" ] || fail "maven/factory is not built"
 
 # The core and the factory in front of the port's jar, which has its own of

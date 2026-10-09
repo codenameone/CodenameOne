@@ -66,10 +66,58 @@ public final class Interop {
         throw new InvalidCastException();
     }
 
-    /// Reached on an integer division by zero. Explicit because ParparVM
-    /// answers 0.
-    public static void divideByZero() {
-        throw new DivideByZeroException();
+    // Translated code reaches the four methods below only when a signed
+    // divisor is 0 or -1 -- one test in line decides that, see the
+    // translator's `MethodTranslator.divide` -- so every other division is
+    // the bare instruction. They never run the instruction on the smallest
+    // value and -1: that pair has no answer the type holds, a JVM quietly
+    // answers the smallest value again, and in the C ParparVM generates it is
+    // undefined behaviour, a SIGFPE on x86. CIL's `div` throws there, and
+    // .NET's `rem` does too -- C# promises `x % y` throws wherever `x / y`
+    // would -- which is what `dotnet run` of the console sample prints.
+
+    /// `a / b` for a `b` that is 0 or -1.
+    public static int divideEdge(int a, int b) {
+        if (b == 0) {
+            throw new DivideByZeroException();
+        }
+        if (a == Integer.MIN_VALUE) {
+            throw new OverflowException("Arithmetic operation resulted in an overflow.");
+        }
+        return -a;
+    }
+
+    /// `a % b` for a `b` that is 0 or -1.
+    public static int remainderEdge(int a, int b) {
+        if (b == 0) {
+            throw new DivideByZeroException();
+        }
+        if (a == Integer.MIN_VALUE) {
+            throw new OverflowException("Arithmetic operation resulted in an overflow.");
+        }
+        return 0;
+    }
+
+    /// `a / b` for a `b` that is 0 or -1.
+    public static long divideEdge(long a, long b) {
+        if (b == 0) {
+            throw new DivideByZeroException();
+        }
+        if (a == Long.MIN_VALUE) {
+            throw new OverflowException("Arithmetic operation resulted in an overflow.");
+        }
+        return -a;
+    }
+
+    /// `a % b` for a `b` that is 0 or -1.
+    public static long remainderEdge(long a, long b) {
+        if (b == 0) {
+            throw new DivideByZeroException();
+        }
+        if (a == Long.MIN_VALUE) {
+            throw new OverflowException("Arithmetic operation resulted in an overflow.");
+        }
+        return 0;
     }
 
     // -------------------------------------------------------------- unboxing

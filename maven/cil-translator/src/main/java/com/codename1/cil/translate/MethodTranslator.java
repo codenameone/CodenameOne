@@ -1010,22 +1010,54 @@ final class MethodTranslator implements Opcodes {
         push(Val.of(k, null));
     }
 
-    /// Integer division throws on a zero divisor in C#. ParparVM answers 0
-    /// instead, so the test is spelled out rather than left to the VM.
+    /// Signed integer division and remainder. Two divisors need more than
+    /// the instruction, and neither can be left to the VM:
+    ///
+    /// - zero throws `DivideByZeroException` in CIL, where ParparVM answers 0;
+    /// - -1 under the smallest value throws `OverflowException` (ECMA-335
+    ///   III.3.31 for `div`; III.3.55 lets `rem` throw and .NET does, as C#
+    ///   requires), where a JVM answers the smallest value and the C ParparVM
+    ///   generates is undefined, a SIGFPE on x86.
+    ///
+    /// Both are found with the one branch the zero test already cost:
+    /// `(divisor + 1) & -2` is zero for 0 and -1 and for nothing else. Only
+    /// then is the operation handed to `Interop`, which never executes the
+    /// instruction on that pair; every other division is the instruction
+    /// itself. `div.un` and `rem.un` do not come here ([#unsignedDivide]):
+    /// read unsigned, -1 is the largest divisor and nothing overflows.
     private void divide(int intOpcode) {
         int k = unify();
         if (k == Val.I4 || k == Val.I8) {
-            Label ok = new Label();
+            Label plain = new Label();
+            Label done = new Label();
+            String helper = intOpcode == IDIV ? "divideEdge" : "remainderEdge";
             if (k == Val.I4) {
                 mv.visitInsn(DUP);
+                mv.visitInsn(ICONST_1);
+                mv.visitInsn(IADD);
+                mv.visitIntInsn(BIPUSH, -2);
+                mv.visitInsn(IAND);
+                mv.visitJumpInsn(IFNE, plain);
+                invoke(INVOKESTATIC, Names.INTEROP, helper, "(II)I", false);
             } else {
                 mv.visitInsn(DUP2);
+                mv.visitInsn(LCONST_1);
+                mv.visitInsn(LADD);
+                mv.visitLdcInsn(Long.valueOf(-2L));
+                mv.visitInsn(LAND);
                 mv.visitInsn(LCONST_0);
                 mv.visitInsn(LCMP);
+                mv.visitJumpInsn(IFNE, plain);
+                invoke(INVOKESTATIC, Names.INTEROP, helper, "(JJ)J", false);
             }
-            mv.visitJumpInsn(IFNE, ok);
-            invoke(INVOKESTATIC, Names.INTEROP, "divideByZero", "()V", false);
-            mv.visitLabel(ok);
+            mv.visitJumpInsn(GOTO, done);
+            mv.visitLabel(plain);
+            mv.visitInsn(intOpcode + k);
+            mv.visitLabel(done);
+            pop();
+            pop();
+            push(Val.of(k, null));
+            return;
         }
         pop();
         pop();

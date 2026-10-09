@@ -970,7 +970,11 @@ Traps that have already cost a fix:
   compares traces; **`unity-compat-project-test.sh`** imports one into an
   archetype application, builds it with the Maven goal, converts it to
   Gradle and holds every target's staged upload to the same entries from both
-  (`.github/workflows/unity-compat.yml`).
+  (`.github/workflows/unity-compat.yml`). The first also runs each scene
+  sample through the real view path without a window
+  (`scripts/unity-compat-samples/player/offscreen-check.sh`), so it needs the
+  JavaSE port jar and compiled `core-unittests` test classes and stops with the
+  build command when either is missing.
 - **`netstandard.dll` in the references jar is Microsoft's**, from the NuGet
   package `NETStandard.Library.Ref` (MIT). Its `LICENSE.TXT` and
   `THIRD-PARTY-NOTICES.TXT` are kept verbatim in

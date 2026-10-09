@@ -1246,8 +1246,23 @@ public class BufferedGraphics extends HTML5Graphics {
 
     // Shared by text runs and persistent editors: DOM rectangles cannot represent
     // a transformed paint context or a nonrectangular clip.
+    //
+    // "Transformed" is judged within a tolerance and not exactly. Rotating the
+    // graphics and rotating it back leaves a matrix that is the identity to
+    // fifteen digits, and an exact test called that a transform: every string
+    // painted after one rotated label left the DOM layer for the canvas, where
+    // it is measured differently. JavaScriptTransformTolerance has the bounds
+    // and why nothing drawn can tell the difference.
     boolean supportsNativeTextOverlay() {
-        return !clipEmpty && !isClipShape && (transform == null || transform.isIdentity());
+        return !clipEmpty && !isClipShape && isIdentityForText(transform);
+    }
+
+    private static boolean isIdentityForText(Transform t) {
+        if (t == null || t.isIdentity()) {
+            return true;
+        }
+        Object nativeTransform = t.getNativeTransform();
+        return nativeTransform instanceof JSAffineTransform && ((JSAffineTransform) nativeTransform).isNearIdentity();
     }
 
     /**

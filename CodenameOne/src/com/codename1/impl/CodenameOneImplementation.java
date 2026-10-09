@@ -3768,7 +3768,17 @@ public abstract class CodenameOneImplementation {
         if (dragActivationCounter == 0 && x[0] != pointerPressedX && y[0] != pointerPressedY) {
             hasDragStarted(pointerPressedX, pointerPressedY);
             if (hasDragStarted(x, y)) {
+                // The single point overloads all hand over the same two arrays, so a
+                // release that came through pointerReleased(int, int) IS those arrays,
+                // and the drag synthesized at the press position below writes over it:
+                // the drag meant for the release point and then the release itself
+                // were both delivered at the press point, and the component under the
+                // real release point never heard it.
+                int releasedX = x[0];
+                int releasedY = y[0];
                 pointerDragged(pointerPressedX, pointerPressedY);
+                x[0] = releasedX;
+                y[0] = releasedY;
                 pointerDragged(x, y);
             }
         }

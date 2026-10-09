@@ -69,12 +69,15 @@ public class UnityPlayer {
         String seed = display.getProperty("unity.player.seed", "");
         Random.InitState(seed.length() > 0 ? Integer.parseInt(seed) : (int) System.currentTimeMillis());
         UnityAppImpl.install();
+        // Before `begin()`, which runs every Awake: preferences, sound and
+        // the platform are the view's to give, and a script asks in Awake.
+        view = new UnityGameView();
+        view.installServices();
         // The view reports its real size before every frame; this is for
         // what a script reads in Awake and Start, before the first one.
         UnityRuntime.resize(display.getDisplayWidth(), display.getDisplayHeight());
         UnityRuntime.begin();
 
-        view = new UnityGameView();
         form = new Form(new BorderLayout()) {
             // A form keeps Escape for its back command and never shows it
             // to the component with the focus. A game reads it -- pause,

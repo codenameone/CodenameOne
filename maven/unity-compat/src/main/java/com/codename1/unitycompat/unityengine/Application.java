@@ -27,6 +27,9 @@ package com.codename1.unitycompat.unityengine;
 public final class Application {
     private static int targetFrameRate = -1;
     private static boolean quit;
+    /// A number of `RuntimePlatform`; see [UnityRuntime#platform(int)] for
+    /// who sets it and why this is what it starts as.
+    private static int platform = UnityRuntime.PLATFORM_LINUX;
 
     private Application() {
     }
@@ -44,12 +47,34 @@ public final class Application {
         return true;
     }
 
+    /// Never: what runs here is a built player, whatever it runs on -- the
+    /// simulator included. [#get_platform()] agrees, and is never one of
+    /// the editor's members.
     public static boolean get_isEditor() {
         return false;
     }
 
+    static void platform(int runtimePlatform) {
+        platform = runtimePlatform;
+    }
+
+    /// `Application.platform`, a `RuntimePlatform` by its number. The
+    /// runtime has no display to ask, so the host says which
+    /// ([UnityRuntime#platform(int)]); `UnityGameView` does, from Codename
+    /// One's platform name.
+    public static int get_platform() {
+        return platform;
+    }
+
+    /// True on the two platforms Unity documents as handheld, iOS and
+    /// Android, and derived from [#get_platform()] so that the two can never
+    /// disagree. A phone's browser is `WebGLPlayer` and answers false:
+    /// Codename One's JavaScript port names its platform without saying what
+    /// it runs on, and a game that asks this wants to know whether to show
+    /// touch controls, for which `Input.touchSupported` is the exact answer
+    /// there.
     public static boolean get_isMobilePlatform() {
-        return false;
+        return platform == UnityRuntime.PLATFORM_IOS || platform == UnityRuntime.PLATFORM_ANDROID;
     }
 
     /// Recorded for the host to act on: see [UnityRuntime#quitRequested].

@@ -65,15 +65,35 @@ import player.UnityPlayer;
 ///     [--png dir] [--trace file] [--count Prefix]... [--reference dir]
 /// ```
 ///
-/// `--input` is a script of `headless.HeadlessTrace`'s kind. `--trace` is
-/// a trace that class printed for the same seed, size and script: every
-/// `frame` line of it must be what this run finds at that frame, which is
-/// only so if every key arrived, and on its frame. `--reference` is a
-/// directory of `frame-<n>.png` to measure the dumped frames against.
+/// `--input` is a script of `headless.HeadlessTrace`'s kind, of which this
+/// delivers the keys and the pointer: a `touch`, a `host` or an `app` line
+/// is refused, because nothing here is a touch screen or the Java side of a
+/// project, and a script played without them would be another script.
+/// `--trace` is a trace that class printed for the same seed, size and
+/// script: every `frame` line of it must be what this run finds at that
+/// frame, which is only so if every key arrived, and on its frame.
+/// `--reference` is a directory of `frame-<n>.png` to measure the dumped
+/// frames against.
 ///
-/// It exits with 1 and a line for each thing that was wrong.
+/// Nothing here knows the project. What depends on one is asked of it: an
+/// axis is pressed with the keys the project's input settings give it, and
+/// is left alone, with a line that says so, where they have none; pixels are
+/// expected only of a scene that draws; and `Time.time` is held to the time
+/// scale the scripts have set, which a game that starts behind a menu has at
+/// zero.
+///
+/// It exits with 1 and a line for each thing that was wrong, and with 1 and
+/// a stack trace if anything threw: the event dispatch thread is not a
+/// daemon, so an exception left to end `main` would leave the JVM waiting
+/// for ever.
 public final class OffscreenCheck {
     private static final List<String> FAILURES = new ArrayList<String>();
+    // What a line of the input script does.
+    private static final int UP = 0;
+    private static final int DOWN = 1;
+    private static final int MOVE = 2;
+    /// No key of the port stands for a Unity key code.
+    private static final int NO_PORT_KEY = Integer.MIN_VALUE;
     private static OffscreenImplementation impl;
 
     private OffscreenCheck() {
@@ -166,7 +186,20 @@ public final class OffscreenCheck {
         return n;
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+        int status = 1;
+        try {
+            status = run(args);
+        } catch (Throwable t) { // NOPMD - anything at all, or the JVM never exits
+            System.out.println("FAILED: the check threw " + t);
+            t.printStackTrace(System.out);
+            System.out.println("OFFSCREEN FAILED: threw");
+        }
+        System.out.flush();
+        System.exit(status);
+    }
+
+    private static int run(String[] args) throws Exception {
         int seed = 1;
         int frames = 600;
         int width = 960;
@@ -206,7 +239,7 @@ public final class OffscreenCheck {
                 counted.add(args[++i]);
             } else {
                 System.err.println("OffscreenCheck: unknown option " + a);
-                System.exit(2);
+                return 2;
             }
         }
         List<int[]> events = new ArrayList<int[]>();
@@ -217,14 +250,27 @@ public final class OffscreenCheck {
                 continue;
             }
             String[] parts = line.split(" +");
-            int down = parts[2].equals("down") ? 1 : 0;
-            if (parts[1].startsWith("pointer:")) {
+            if (parts.length != 3) {
+                throw new IllegalArgumentException("input script: not `<frame> <key> down|up`: " + line);
+            }
+            if (parts[1].equals("touch") || parts[1].equals("host") || parts[1].equals("app")) {
+                throw new IllegalArgumentException("input script: a `" + parts[1] + "` line is not one this check can "
+                        + "deliver; run the project without --input, or with a script of keys and the pointer: "
+                        + line);
+            }
+            boolean pointer = parts[1].startsWith("pointer:");
+            int kind = parts[2].equals("down") ? DOWN : parts[2].equals("up") ? UP : parts[2].equals("move") && pointer
+                    ? MOVE : -1;
+            if (kind < 0) {
+                throw new IllegalArgumentException("input script: not `<frame> <key> down|up`: " + line);
+            }
+            if (pointer) {
                 // A pointer event, in pixels from the view's top left.
                 String[] at = parts[1].substring(8).split(",");
-                events.add(new int[] {Integer.parseInt(parts[0]), 0, down, Integer.parseInt(at[0]),
+                events.add(new int[] {Integer.parseInt(parts[0]), 0, kind, Integer.parseInt(at[0]),
                     Integer.parseInt(at[1])});
             } else {
-                events.add(new int[] {Integer.parseInt(parts[0]), portCode(parts[1]), down});
+                events.add(new int[] {Integer.parseInt(parts[0]), portCode(parts[1]), kind});
             }
         }
 
@@ -267,20 +313,24 @@ public final class OffscreenCheck {
         for (int frame = 1; frame <= frames; frame++) {
             for (int[] e : events) {
                 if (e[0] == frame && e.length > 3) {
-                    if (e[2] == 1) {
+                    if (e[2] == DOWN) {
                         impl.portPointerPressed(view.getAbsoluteX() + e[3], view.getAbsoluteY() + e[4]);
+                    } else if (e[2] == MOVE) {
+                        impl.portPointerDragged(view.getAbsoluteX() + e[3], view.getAbsoluteY() + e[4]);
                     } else {
                         impl.portPointerReleased(view.getAbsoluteX() + e[3], view.getAbsoluteY() + e[4]);
                     }
                     settle();
                 } else if (e[0] == frame) {
-                    key(e[1], e[2] == 1);
+                    key(e[1], e[2] == DOWN);
                 }
             }
             view.frame(dt);
             String expected = null;
             for (String line : trace) {
-                if (line.startsWith("frame " + frame + " ")) {
+                // The line the trace player prints of a frame, and not a
+                // line of a script's own that begins the same way.
+                if (line.startsWith("frame " + frame + " objects=")) {
                     expected = line;
                 }
             }
@@ -315,7 +365,7 @@ public final class OffscreenCheck {
         resized(view, surface, png);
         clock(view, surface);
         System.out.println(FAILURES.isEmpty() ? "OFFSCREEN OK" : "OFFSCREEN FAILED: " + FAILURES.size());
-        System.exit(FAILURES.isEmpty() ? 0 : 1);
+        return FAILURES.isEmpty() ? 0 : 1;
     }
 
     /// Renders a frame that was already stepped: paused, so that the
@@ -367,7 +417,10 @@ public final class OffscreenCheck {
                 + " were drawn");
         BufferedImage image = render(view, surface);
         int ink = ink(image);
-        check(ink > 0, "frame " + frame + ": nothing was rasterised");
+        // Of a scene that draws: one with no renderer in it is a blank frame,
+        // and rightly.
+        check(ink > 0 || list.size() == 0, "frame " + frame + ": " + list.size() + " commands were drawn and "
+                + "nothing was rasterised");
         StringBuilder sb = new StringBuilder();
         sb.append("dump ").append(frame).append(" sprites=").append(visible).append(" texts=").append(texts)
                 .append(" ink=").append(ink);
@@ -411,17 +464,11 @@ public final class OffscreenCheck {
             view.frame(dt);
             check(!held(c[1]), "port key " + c[0] + " did not release Unity key " + c[1]);
         }
-        // The axes Unity's default input settings give the arrows and WASD.
-        key(OffscreenImplementation.GAME_KEY_CODE_LEFT, true);
-        key('w', true);
-        view.frame(dt);
-        check(Input.GetAxisRaw("Horizontal") == -1f, "Horizontal is " + Input.GetAxisRaw("Horizontal")
-                + " with left held");
-        check(Input.GetAxisRaw("Vertical") == 1f, "Vertical is " + Input.GetAxisRaw("Vertical") + " with w held");
-        key(OffscreenImplementation.GAME_KEY_CODE_LEFT, false);
-        key('w', false);
-        view.frame(dt);
-        check(Input.GetAxisRaw("Horizontal") == 0f && Input.GetAxisRaw("Vertical") == 0f, "an axis is stuck");
+        // The two axes a game steers with, by the keys this project gives
+        // them. Unity's own settings give the arrows and WASD; a project with
+        // settings of its own has what it kept of those, which may be one
+        // axis, other keys, or neither.
+        String axes = axis(view, "Horizontal") + ", " + axis(view, "Vertical");
         // Three keys held together, let go in the order they went down:
         // turning while thrusting while firing.
         key(OffscreenImplementation.GAME_KEY_CODE_LEFT, true);
@@ -487,14 +534,95 @@ public final class OffscreenCheck {
         check(Input.GetKeyDown(32) && !held(32), "a tap between two frames was lost");
         view.frame(dt);
         check(!Input.get_anyKey(), "a key is still held when none is");
-        System.out.println("keys: " + cases.length + " keys, axes, shift, repeat, held past the repeat delay and tap "
-                + "checked");
+        System.out.println("keys: " + cases.length + " keys, shift, repeat, held past the repeat delay and tap "
+                + "checked; " + axes);
+    }
+
+    /// The port's code for a Unity key code, or [#NO_PORT_KEY].
+    private static int portCodeOfUnity(int unityKey) {
+        switch (unityKey) {
+            case 273:
+                return OffscreenImplementation.GAME_KEY_CODE_UP;
+            case 274:
+                return OffscreenImplementation.GAME_KEY_CODE_DOWN;
+            case 275:
+                return OffscreenImplementation.GAME_KEY_CODE_RIGHT;
+            case 276:
+                return OffscreenImplementation.GAME_KEY_CODE_LEFT;
+            case 13:
+                return '\n';
+            case 27:
+                return 27;
+            default:
+                return (unityKey >= 'a' && unityKey <= 'z') || (unityKey >= '0' && unityKey <= '9') || unityKey == ' '
+                        ? unityKey : NO_PORT_KEY;
+        }
+    }
+
+    /// Presses every key the project's input settings give an axis, each
+    /// through the port, and reads the axis back: -1 for a negative key, 1
+    /// for a positive one, and 0 again once it is let go. Answers what it
+    /// did, for the line that reports the keys.
+    private static String axis(UnityGameView view, String name) {
+        if (!Input.$hasAxis(name)) {
+            return name + " skipped (the project's input settings have no such axis)";
+        }
+        double dt = 1f / 60;
+        int[] keys = Input.$axisKeys(name);
+        int pressed = 0;
+        for (int i = 0; i < keys.length; i++) {
+            int port = keys[i] == 0 ? NO_PORT_KEY : portCodeOfUnity(keys[i]);
+            if (port == NO_PORT_KEY) {
+                // No key in this place, or one a keyboard here cannot press:
+                // a joystick button, a mouse button.
+                continue;
+            }
+            float want = i % 2 == 0 ? -1f : 1f;
+            key(port, true);
+            view.frame(dt);
+            check(Input.GetAxisRaw(name) == want, name + " is " + Input.GetAxisRaw(name) + " with Unity key "
+                    + keys[i] + " held, which the project's input settings make " + want);
+            key(port, false);
+            view.frame(dt);
+            check(Input.GetAxisRaw(name) == 0f, name + " is stuck at " + Input.GetAxisRaw(name) + " after Unity key "
+                    + keys[i] + " was let go");
+            pressed++;
+        }
+        return pressed == 0 ? name + " skipped (no key of a keyboard drives it in this project)"
+                : name + " by its " + pressed + " keys";
     }
 
     private static void pointer(UnityGameView view) {
         double dt = 1f / 60;
         int x = view.getAbsoluteX() + 100;
         int y = view.getAbsoluteY() + 40;
+        if (Input.get_touchSupported() && !Input.get_simulateMouseWithTouches()) {
+            // The project has told Unity that a finger is not the mouse, and
+            // this display is a touch screen: a press is a touch and nothing
+            // else, and a mouse button that went down would be the bug.
+            impl.portPointerPressed(x, y);
+            settle();
+            view.frame(dt);
+            check(Input.get_touchCount() == 1, "a pointer press is " + Input.get_touchCount() + " touches");
+            check(!Input.GetMouseButton(0), "a finger pressed mouse button 0 with Input.simulateMouseWithTouches "
+                    + "off");
+            impl.portPointerReleased(x, y);
+            settle();
+            // The frame that reports the touch as ended, and the one after.
+            view.frame(dt);
+            view.frame(dt);
+            check(Input.get_touchCount() == 0, "a finger is stuck after its release: " + Input.get_touchCount());
+            check(view.getComponentForm().getFocused() == view, "a touch moved the focus off the game view, to "
+                    + view.getComponentForm().getFocused());
+            key('w', true);
+            view.frame(dt);
+            check(held('w'), "keys no longer arrive after a touch");
+            key('w', false);
+            view.frame(dt);
+            System.out.println("pointer: touch, release, focus checked; the mouse skipped (the project turned "
+                    + "Input.simulateMouseWithTouches off, and this display is a touch screen)");
+            return;
+        }
         impl.portPointerPressed(x, y);
         settle();
         view.frame(dt);
@@ -573,31 +701,59 @@ public final class OffscreenCheck {
                 && com.codename1.unitycompat.unityengine.Screen.get_height() == height, "Screen is "
                 + com.codename1.unitycompat.unityengine.Screen.get_width() + "x"
                 + com.codename1.unitycompat.unityengine.Screen.get_height() + " after the resize");
+        int drawn = UnityRuntime.render().size();
         BufferedImage image = render(view, surface);
-        check(image.getWidth() == width && image.getHeight() == height && ink(image) > 0,
-                "nothing was rasterised at the new size");
+        check(image.getWidth() == width && image.getHeight() == height, "the frame is " + image.getWidth() + "x"
+                + image.getHeight() + " after the resize");
+        // A scene with nothing to draw -- one that is all physics, or all
+        // scripts -- is a blank frame at any size.
+        check(ink(image) > 0 || drawn == 0, drawn + " commands were drawn and nothing was rasterised at the new "
+                + "size");
         if (png != null) {
             write(image, new File(png, "resized-" + width + "x" + height + ".png"));
         }
-        System.out.println("resized: " + width + "x" + height + " ink=" + ink(image));
+        System.out.println("resized: " + width + "x" + height + " ink=" + ink(image) + (drawn == 0
+                ? " (the scene draws nothing: pixels not expected)" : ""));
     }
 
     /// Frames as the port drives them: the renderer steps the view, by
-    /// the clock.
+    /// the clock. The clock is Unity's unscaled time; `Time.time` follows it
+    /// at the scale the scripts have set, which is nothing at all for a game
+    /// waiting behind its menu with `Time.timeScale = 0`.
     private static void clock(UnityGameView view, OffscreenSurface surface) throws Exception {
         float before = com.codename1.unitycompat.unityengine.Time.get_time();
+        float realBefore = com.codename1.unitycompat.unityengine.Time.get_unscaledTime();
+        float scale = com.codename1.unitycompat.unityengine.Time.get_timeScale();
         long spent = 0;
+        long began = System.nanoTime();
         for (int i = 0; i < 5; i++) {
             long from = System.nanoTime();
             surface.frame(view.getRenderer(), view.getWidth(), view.getHeight());
             spent += System.nanoTime() - from;
             Thread.sleep(20);
         }
-        float after = com.codename1.unitycompat.unityengine.Time.get_time();
-        check(after > before + 0.05f && after < before + 1.5f, "five frames by the clock, 20 ms apart, moved "
-                + "Time.time by " + (after - before));
-        System.out.println("clock: 5 renderer-driven frames advanced Time.time by "
-                + (int) ((after - before) * 1000) + " ms; a frame of " + view.getWidth() + "x" + view.getHeight()
-                + " took the software rasteriser " + spent / 5000000 + " ms");
+        float moved = com.codename1.unitycompat.unityengine.Time.get_time() - before;
+        float real = com.codename1.unitycompat.unityengine.Time.get_unscaledTime() - realBefore;
+        // Held to the time that really went by, and not to a guess at how
+        // long five frames take: on a loaded machine they take what they
+        // take. The first of them also counts what passed since the frame
+        // before these, which the renderer caps at a quarter of a second.
+        float wall = (System.nanoTime() - began) / 1e9f;
+        check(real > 0.05f && real < wall + 0.4f, "five frames by the clock, 20 ms apart, moved Time.unscaledTime "
+                + "by " + real + " in " + wall + " s");
+        if (scale != com.codename1.unitycompat.unityengine.Time.get_timeScale()) {
+            // A script changed the scale during these frames; what Time.time
+            // should have done is the script's business.
+            System.out.println("clock: Time.timeScale changed during the frames; Time.time not checked");
+        } else if (scale == 0f) {
+            check(moved == 0f, "Time.time moved by " + moved + " with Time.timeScale at 0");
+        } else {
+            check(moved > 0.05f * scale && moved < (wall + 0.4f) * scale, "five frames by the clock, 20 ms apart, "
+                    + "moved Time.time by " + moved + " in " + wall + " s with Time.timeScale at " + scale);
+        }
+        System.out.println("clock: 5 renderer-driven frames advanced Time.unscaledTime by " + (int) (real * 1000)
+                + " ms and Time.time, at a scale of " + scale + ", by " + (int) (moved * 1000) + " ms; a frame of "
+                + view.getWidth() + "x" + view.getHeight() + " took the software rasteriser " + spent / 5000000
+                + " ms");
     }
 }

@@ -33,6 +33,9 @@ public final class Time {
     static float fixedTime;
     static float timeScale = 1f;
     static int frameCount;
+    /// What `time` and `fixedTime` read when the current scene was loaded.
+    static float levelLoadTime;
+    static float levelLoadFixedTime;
     /// True while `FixedUpdate` runs, where Unity has `deltaTime` answer
     /// with the fixed step.
     static boolean inFixedUpdate;
@@ -49,6 +52,14 @@ public final class Time {
         timeScale = 1f;
         frameCount = 0;
         inFixedUpdate = false;
+        levelLoadTime = 0f;
+        levelLoadFixedTime = 0f;
+    }
+
+    /// A scene has just been built: its clock starts here.
+    static void levelLoaded() {
+        levelLoadTime = time;
+        levelLoadFixedTime = fixedTime;
     }
 
     public static float get_deltaTime() {
@@ -82,9 +93,13 @@ public final class Time {
         return unscaledTime;
     }
 
-    /// One scene's worth: the clock restarts when a scene is loaded.
+    /// One scene's worth: the clock restarts when a scene is loaded, the
+    /// first one and every `SceneManager.LoadScene` after it, and an object
+    /// kept with `DontDestroyOnLoad` reads the new scene's clock like any
+    /// other. Inside `FixedUpdate` it is counted in fixed time, as
+    /// [#get_time()] is.
     public static float get_timeSinceLevelLoad() {
-        return time;
+        return inFixedUpdate ? fixedTime - levelLoadFixedTime : time - levelLoadTime;
     }
 
     public static float get_timeScale() {

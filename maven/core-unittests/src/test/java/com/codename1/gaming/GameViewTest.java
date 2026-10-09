@@ -212,4 +212,77 @@ class GameViewTest extends UITestBase {
         assertTrue(v.getInput().wasKeyReleased('d'));
         assertEquals(1, releases[0]);
     }
+
+    /// A click after the pointer was once dragged is still a click. A form hands
+    /// a drag to the component under it with every finger, in arrays, and a
+    /// press and a release with the first finger alone, as two numbers. The view
+    /// took the first event that came in arrays for proof that all of them
+    /// would, stopped listening to the form for presses, and after one drag
+    /// never heard a press again.
+    @Test
+    void aPressAfterADragIsHeard() {
+        CountingView v = new CountingView();
+        Form f = new Form("Game", new BorderLayout());
+        f.add(BorderLayout.CENTER, v);
+        f.show();
+        flushSerialCalls();
+        v.start();
+        int ox = v.getAbsoluteX();
+        int oy = v.getAbsoluteY();
+        int w = v.getWidth();
+        int h = v.getHeight();
+        assertTrue(w > 40 && h > 40, "the view was laid out");
+
+        f.pointerPressed(new int[] {ox + 10}, new int[] {oy + 10});
+        flushSerialCalls();
+        assertTrue(v.getInput().isPointerDown());
+        assertTrue(v.getInput().wasPointerPressed());
+        f.pointerDragged(new int[] {ox + 30}, new int[] {oy + 25});
+        flushSerialCalls();
+        assertEquals(30, v.getInput().getPointerX());
+        assertEquals(25, v.getInput().getPointerY());
+        f.pointerReleased(new int[] {ox + 30}, new int[] {oy + 25});
+        flushSerialCalls();
+        assertFalse(v.getInput().isPointerDown());
+        assertTrue(v.getInput().wasPointerReleased());
+        v.frame(1.0 / 60);
+
+        f.pointerPressed(new int[] {ox + 20}, new int[] {oy + 15});
+        flushSerialCalls();
+        assertTrue(v.getInput().isPointerDown(), "a press after a drag did not reach the view");
+        assertTrue(v.getInput().wasPointerPressed(), "a press after a drag was not a press");
+        assertEquals(20, v.getInput().getPointerX());
+        assertEquals(15, v.getInput().getPointerY());
+        f.pointerReleased(new int[] {ox + 20}, new int[] {oy + 15});
+        flushSerialCalls();
+        assertFalse(v.getInput().isPointerDown());
+    }
+
+    /// A release far from its press, with no drag reported between, is delivered
+    /// where the pointer was let go. The implementation makes up the drag such a
+    /// gesture lacks, first at the press point, and it wrote that point into the
+    /// arrays the release itself was waiting in: the view was told of a release
+    /// where the press had been.
+    @Test
+    void aReleaseAwayFromItsPressKeepsItsPosition() {
+        CountingView v = new CountingView();
+        Form f = new Form("Game", new BorderLayout());
+        f.add(BorderLayout.CENTER, v);
+        f.show();
+        flushSerialCalls();
+        v.start();
+        int ox = v.getAbsoluteX();
+        int oy = v.getAbsoluteY();
+        assertTrue(v.getWidth() > 40 && v.getHeight() > 40, "the view was laid out");
+
+        implementation.setHasDragStarted(true);
+        implementation.dispatchPointerPress(ox + 5, oy + 6);
+        flushSerialCalls();
+        assertTrue(v.getInput().isPointerDown());
+        implementation.dispatchPointerRelease(ox + 35, oy + 30);
+        flushSerialCalls();
+        assertFalse(v.getInput().isPointerDown());
+        assertEquals(35, v.getInput().getPointerX(), "the release was moved to where the press was");
+        assertEquals(30, v.getInput().getPointerY(), "the release was moved to where the press was");
+    }
 }

@@ -60,6 +60,14 @@ public final class Int32_ {
     /// an optional sign, digits, white space. Returns the value in a `long`,
     /// or `Long.MIN_VALUE` for text that is not a number and
     /// `Long.MAX_VALUE` for a number an `int` cannot hold.
+    ///
+    /// The two sentinels are values of a `long`, and no `int` is either of
+    /// them: `"-2147483648"` comes back as -2147483648L, which is not
+    /// `Long.MIN_VALUE`, so the smallest `int` parses. The magnitude is
+    /// allowed to reach 2147483648 for exactly that text, and the same
+    /// digits without the sign are caught by the test against
+    /// `Integer.MAX_VALUE` below. The console sample holds both to what
+    /// .NET prints ("parse" and "smallest"). No other type has a parser here.
     private static long scan(String s) {
         int end = s.length();
         int at = 0;

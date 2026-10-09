@@ -409,6 +409,23 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         // Deliberately empty: see above.
     }
 
+    /// A form hands a press to the component under it through this overload and
+    /// never through the one that takes arrays, which only a drag arrives by.
+    /// Unless it is passed on, the first drag marks the view as hearing its
+    /// touches directly, the form's own listeners stop feeding it presses, and
+    /// from then on no press reaches the game at all: a click after the pointer
+    /// had once been dragged did nothing.
+    @Override
+    public void pointerPressed(int x, int y) {
+        pointerPressed(new int[] {x}, new int[] {y});
+    }
+
+    /// The release of `#pointerPressed(int, int)`, for the same reason.
+    @Override
+    public void pointerReleased(int x, int y) {
+        pointerReleased(new int[] {x}, new int[] {y});
+    }
+
     @Override
     public void pointerPressed(int[] x, int[] y) {
         touchesArrive = true;

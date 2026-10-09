@@ -337,6 +337,23 @@ public class JSAffineTransform {
         }
         return jsoIsIdentity(inner);
     }
+    /// Whether this transform is the identity as far as anything drawn can
+    /// tell: exactly, or within the residue that turning the graphics and
+    /// turning it back leaves behind. See
+    /// `com.codename1.impl.html5.JavaScriptTransformTolerance`, which says why
+    /// and how close. `#isIdentity()` stays exact, and is what every caller
+    /// that goes on to multiply by the matrix should ask; this one is for the
+    /// choice between text in the DOM and text on the canvas, where an exact
+    /// test let a rounding error decide. A transform with a 4x4 matrix is
+    /// held to the exact test: nothing two-dimensional leaves one behind.
+    public boolean isNearIdentity() {
+        if (m4 != null) {
+            return JSMatrix4.isIdentity(m4);
+        }
+        return com.codename1.impl.html5.JavaScriptTransformTolerance.isNearIdentity(jsoScaleX(inner),
+                jsoShearY(inner), jsoShearX(inner), jsoScaleY(inner), jsoTranslateX(inner), jsoTranslateY(inner));
+    }
+
     public JSAffineTransform cloneTransform() {
         JSAffineTransform copy = new JSAffineTransform(jsoClone(inner));
         if (m4 != null) {

@@ -568,6 +568,44 @@ public final class Input {
         return -1;
     }
 
+    /// Whether the project's input settings have an axis or a button of
+    /// this name: one `GetAxis` answers for, and does not throw.
+    public static boolean $hasAxis(String name) {
+        for (int i = 0; i < axes.length; i++) { // NOPMD ForLoopCanBeForeach
+            if (axes[i].name.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The keys that drive an axis, for a host or a test that has to press
+    /// them without knowing the project: four key codes for every definition
+    /// of the name that keys drive -- negative, positive, and the alternative
+    /// of each, zero for none -- one definition after another. Empty for an
+    /// axis only the mouse drives and for a name the settings do not have;
+    /// [#$hasAxis(String)] tells the two apart.
+    public static int[] $axisKeys(String name) {
+        int count = 0;
+        for (int i = 0; i < axes.length; i++) { // NOPMD ForLoopCanBeForeach
+            if (axes[i].mouse < 0 && axes[i].name.equals(name)) {
+                count++;
+            }
+        }
+        int[] keys = new int[count * 4];
+        int at = 0;
+        for (int i = 0; i < axes.length; i++) { // NOPMD ForLoopCanBeForeach
+            Axis a = axes[i];
+            if (a.mouse < 0 && a.name.equals(name)) {
+                keys[at++] = a.negative;
+                keys[at++] = a.positive;
+                keys[at++] = a.altNegative;
+                keys[at++] = a.altPositive;
+            }
+        }
+        return keys;
+    }
+
     /// The key a name of the classic input manager stands for -- `"a"`,
     /// `"space"`, `"left ctrl"`, `"mouse 0"` -- or zero. Names are lower
     /// case, as Unity writes them; a single character is itself.

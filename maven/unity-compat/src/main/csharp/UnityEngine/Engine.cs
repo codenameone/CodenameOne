@@ -208,6 +208,7 @@ namespace UnityEngine
         public static bool isPlaying { get { throw null; } }
         public static bool isEditor { get { throw null; } }
         public static bool isMobilePlatform { get { throw null; } }
+        public static RuntimePlatform platform { get { throw null; } }
         public static void Quit() { throw null; }
     }
 

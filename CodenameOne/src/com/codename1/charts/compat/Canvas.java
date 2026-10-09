@@ -215,6 +215,36 @@ public class Canvas {
         g.setTransform(t);
     }
 
+    /// Copies the transform in effect into `out`, so that a temporary rotation,
+    /// scale or translation can be undone by handing the same object to
+    /// `#setTransform(Transform)`.
+    ///
+    /// Undo a temporary transform this way and never by applying its inverse.
+    /// The angle of a rotation is a `float`, its sine and cosine are not exact,
+    /// and rotating by `a` and then by `-a` leaves a matrix that is identity to
+    /// fifteen digits and not to the sixteenth. Nothing shows on a platform that
+    /// only multiplies by it, but the JavaScript port draws text as DOM nodes
+    /// under an identity transform and on the canvas under any other, with
+    /// different metrics: one rotated axis title moved every label painted after
+    /// it, the form's own title included, by a few pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: receives the current transform
+    public void getTransform(Transform out) {
+        g.getTransform(out);
+    }
+
+    /// Replaces the transform in effect, typically with one captured by
+    /// `#getTransform(Transform)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the transform to install
+    public void setTransform(Transform t) {
+        g.setTransform(t);
+    }
+
     public void scale(float x, float y) {
         Transform t = g.getTransform();
         t.translate(bounds.getX(), bounds.getY());

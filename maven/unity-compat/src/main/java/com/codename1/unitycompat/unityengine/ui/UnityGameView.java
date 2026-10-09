@@ -59,13 +59,17 @@ import java.util.concurrent.atomic.AtomicReference;
 /// runtime that needs `com.codename1.ui`; the rest compiles, and runs,
 /// against nothing but the class library and Box2D.
 ///
-/// The project is installed by the caller, before the view is started:
+/// The project is installed by the caller, before the view is started.
+/// The view is made first and asked for its services, because
+/// `UnityRuntime.begin()` runs every script's `Awake` and `OnEnable`, and
+/// those already read preferences, play sounds and ask where they run:
 ///
 /// ```java
 /// UnityRuntime.reset();
 /// UnityAppImpl.install();
-/// UnityRuntime.begin();
 /// UnityGameView view = new UnityGameView();
+/// view.installServices();
+/// UnityRuntime.begin();
 /// form.add(BorderLayout.CENTER, view);
 /// form.show();
 /// view.start();
@@ -270,6 +274,65 @@ public class UnityGameView extends GameView {
         super.deinitialize();
     }
 
+    /// Gives the runtime what only a host with a display has: somewhere
+    /// for `PlayerPrefs` to stay, a device for `AudioSource` to play on,
+    /// the platform `Application.platform` names and whether there is a
+    /// touch screen.
+    ///
+    /// Call it before `UnityRuntime.begin()`. That call runs the `Awake`
+    /// and `OnEnable` of the first scene, long before this view is shown,
+    /// and without these a high score read in `Awake` is the default, one
+    /// written there goes to a memory nobody reads again, and a source set
+    /// to Play On Awake plays to nothing. `UnityApplication` does; a host
+    /// that drives the view itself must.
+    ///
+    /// Calling it again does nothing new, and the view calls it itself when
+    /// it is shown, which also brings the services back after the view was
+    /// taken off a form and they were withdrawn.
+    public final void installServices() {
+        if (audio == null) {
+            audio = new UnityGameAudio();
+        }
+        AudioSource.$output(audio);
+        PlayerPrefs.$store(prefs);
+        Display display = Display.getInstance();
+        UnityRuntime.platform(platform(display.getPlatformName()));
+        UnityRuntime.touchSupported(display.isTouchScreenDevice());
+    }
+
+    /// Unity's `RuntimePlatform` for a Codename One platform name.
+    ///
+    /// The name is the signal because it is the one thing every port
+    /// answers and answers exactly: `ios`, `and`, `HTML5`, `mac`, `win`,
+    /// `linux`. `isDesktop()` and `isTablet()` describe a form factor and
+    /// are a guess on some ports; they cannot tell iOS from Android, which
+    /// is what a script compares the platform for. The simulator is the
+    /// desktop it runs on, as a game run from Unity's editor reports the
+    /// editor's machine and not the phone it targets.
+    ///
+    /// Compared as written, never case folded: the names are constants of
+    /// the ports, and folding by the device's locale would misread the `I`
+    /// of a name on a Turkish one. A name no port is known to give is taken
+    /// for a desktop, where a script expects least of the device.
+    static int platform(String name) {
+        if ("ios".equals(name)) {
+            return UnityRuntime.PLATFORM_IOS;
+        }
+        if ("and".equals(name)) {
+            return UnityRuntime.PLATFORM_ANDROID;
+        }
+        if ("HTML5".equals(name)) {
+            return UnityRuntime.PLATFORM_WEB;
+        }
+        if ("mac".equals(name)) {
+            return UnityRuntime.PLATFORM_MAC;
+        }
+        if ("win".equals(name)) {
+            return UnityRuntime.PLATFORM_WINDOWS;
+        }
+        return UnityRuntime.PLATFORM_LINUX;
+    }
+
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -278,11 +341,10 @@ public class UnityGameView extends GameView {
         // the last two pressed for a stray one and drops it, and the key
         // it belonged to stays down for good.
         Display.getInstance().setMultiKeyMode(true);
-        // Sound has a device to play on for as long as the view is shown.
-        audio = new UnityGameAudio();
-        AudioSource.$output(audio);
-        // And preferences have somewhere to stay.
-        PlayerPrefs.$store(prefs);
+        // Sound has a device to play on and preferences somewhere to stay.
+        // A host has usually asked already, before the first scene woke;
+        // this is for the view shown again, and for a host that did not.
+        installServices();
         PeerComponent surface = getPeer();
         if (surface != null) {
             // The surface is the whole of the view: a margin would draw
@@ -757,16 +819,19 @@ public class UnityGameView extends GameView {
             cut = new HashMap();
             parts.put(d.sprite, cut);
         }
-        // An image is narrower than 65536 pixels, so x and y fit one key;
-        // two sprites of a sheet never start at the same place.
-        Integer key = Integer.valueOf(d.sourceX << 16 | d.sourceY);
+        int w = Math.min(d.sourceWidth, whole.getWidth() - d.sourceX);
+        int h = Math.min(d.sourceHeight, whole.getHeight() - d.sourceY);
+        if (w <= 0 || h <= 0) {
+            return null;
+        }
+        // An image is narrower than 65536 pixels, so the four numbers of a
+        // part fit one key. Where it starts is not enough to name it: a
+        // filled image -- a health bar -- is cut from the same corner at
+        // every width it has had, and keyed by its corner alone it went on
+        // being drawn from the first width it was asked for, stretched.
+        Long key = Long.valueOf((long) d.sourceX << 48 | (long) d.sourceY << 32 | (long) w << 16 | h);
         Image image = (Image) cut.get(key);
         if (image == null) {
-            int w = Math.min(d.sourceWidth, whole.getWidth() - d.sourceX);
-            int h = Math.min(d.sourceHeight, whole.getHeight() - d.sourceY);
-            if (w <= 0 || h <= 0) {
-                return null;
-            }
             image = whole.subImage(d.sourceX, d.sourceY, w, h, true);
             cut.put(key, image);
         }

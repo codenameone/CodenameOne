@@ -121,6 +121,19 @@ public final class UnityRuntime {
         java.lang.Object loadResource(String path, Class type);
     }
 
+    /// `RuntimePlatform.OSXPlayer`.
+    public static final int PLATFORM_MAC = 1;
+    /// `RuntimePlatform.WindowsPlayer`.
+    public static final int PLATFORM_WINDOWS = 2;
+    /// `RuntimePlatform.IPhonePlayer`: iOS, a phone or a tablet.
+    public static final int PLATFORM_IOS = 8;
+    /// `RuntimePlatform.Android`.
+    public static final int PLATFORM_ANDROID = 11;
+    /// `RuntimePlatform.LinuxPlayer`.
+    public static final int PLATFORM_LINUX = 13;
+    /// `RuntimePlatform.WebGLPlayer`: a browser.
+    public static final int PLATFORM_WEB = 17;
+
     private static final ArrayList objects = new ArrayList();
     private static final ArrayList behaviours = new ArrayList();
     private static final ArrayList unstarted = new ArrayList();
@@ -473,6 +486,8 @@ public final class UnityRuntime {
 
     private static void load(int index) {
         scene = index;
+        // Before the scene is built: its scripts' Awake already reads zero.
+        Time.levelLoaded();
         int mark = $begin();
         app.buildScene(index);
         $end(mark);
@@ -651,6 +666,19 @@ public final class UnityRuntime {
 
     public static void pointerMoved(float x, float y) {
         Input.pointerMoved(x, y);
+    }
+
+    /// Says where the game runs, which is what `Application.platform` and
+    /// `Application.isMobilePlatform` answer: one of the `PLATFORM_`
+    /// constants, which are the numbers of Unity's `RuntimePlatform`. A host
+    /// calls it before [#begin], so that a script's `Awake` already reads it;
+    /// [#reset] leaves it alone, because it is a fact about the process and
+    /// not about the project. Until a host says, the runtime answers
+    /// [#PLATFORM_LINUX]: it has no display to ask and is most often a
+    /// headless run, and a desktop player is the answer under which a script
+    /// expects neither a touch screen nor an editor.
+    public static void platform(int runtimePlatform) {
+        Application.platform(runtimePlatform);
     }
 
     /// Says whether the device has a touch screen, which is what
@@ -1538,6 +1566,15 @@ public final class UnityRuntime {
         c.waitingFor = null;
         c.resumeAt = 0f;
         c.phase = 0;
+        // Whatever it waits for after `Update`, it waits at least for the
+        // `Update` of another frame. Unity documents `yield return null` as
+        // resuming "after all Update functions have been called on the next
+        // frame"; without this a coroutine started from `Start` or `Update`
+        // ran to its first yield and was resumed by this same frame's pass,
+        // a few lines further down in [#step]. The two other phases are left
+        // alone: the end of the frame a coroutine was started in is the one
+        // `WaitForEndOfFrame` means.
+        c.notBefore = Time.frameCount + 1;
         if (yielded instanceof WaitForSeconds) {
             c.resumeAt = Time.time + ((WaitForSeconds) yielded).seconds;
         } else if (yielded instanceof Coroutine) {
@@ -1569,7 +1606,8 @@ public final class UnityRuntime {
                 finished = true;
                 continue;
             }
-            if (c.phase != phase || (c.waitingFor != null && !c.waitingFor.done) || Time.time < c.resumeAt) {
+            if (c.phase != phase || (c.waitingFor != null && !c.waitingFor.done) || Time.time < c.resumeAt
+                    || (phase == 0 && Time.frameCount < c.notBefore)) {
                 continue;
             }
             advance(c);

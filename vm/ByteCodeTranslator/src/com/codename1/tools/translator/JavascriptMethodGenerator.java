@@ -5069,10 +5069,19 @@ final class JavascriptMethodGenerator {
             case Opcodes.L2D:
                 return emitUnary(out, ctx, "_Ll2d(%s)");
             // An int above 2^24 and most doubles are not floats.
+            //
+            // The int conversions also wrap their operand with |0. IADD, ISUB
+            // and INEG leave a sum past 2^31 as it is and every instruction
+            // that reads an int wraps it on the way in; a conversion to float
+            // or double is such a reader, and without the wrap
+            // (double) (Integer.MAX_VALUE + 1) was 2147483648.0 where Java
+            // says -2147483648.0, and (float) -Integer.MIN_VALUE was positive.
             case Opcodes.I2F:
+                return emitUnary(out, ctx, "Math.fround(%s|0)");
             case Opcodes.D2F:
                 return emitUnary(out, ctx, "Math.fround(%s)");
             case Opcodes.I2D:
+                return emitUnary(out, ctx, "(%s|0)");
             case Opcodes.F2D:
                 return true;
             case Opcodes.I2B:
@@ -5083,9 +5092,13 @@ final class JavascriptMethodGenerator {
                 return emitUnary(out, ctx, "((%s << 16) >> 16)");
             case Opcodes.L2I:
                 return emitUnary(out, ctx, "_Ll2i(%s)");
+            // Java saturates: (int) 3.0e9 is Integer.MAX_VALUE and
+            // (int) Float.POSITIVE_INFINITY is too. "x | 0" wraps instead,
+            // modulo 2^32, so the first was -1294967296 and the second 0.
+            // The runtime's _d2i clamps before it truncates.
             case Opcodes.F2I:
             case Opcodes.D2I:
-                return emitUnary(out, ctx, "(%s | 0)");
+                return emitUnary(out, ctx, "_d2i(%s)");
             case Opcodes.F2L:
             case Opcodes.D2L:
                 return emitUnary(out, ctx, "_Ld2l(%s)");
@@ -7125,8 +7138,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.D2F:
-            case Opcodes.I2F:
                 out.append("        stack.p(Math.fround(stack.q())); pc = ").append(index + 1).append("; break;\n");
+                return;
+            // |0: see the structured I2F and I2D above.
+            case Opcodes.I2F:
+                out.append("        stack.p(Math.fround(stack.q()|0)); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.I2B:
                 out.append("        stack.p((stack.q() << 24) >> 24); pc = ").append(index + 1).append("; break;\n");
@@ -7140,9 +7156,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.L2I:
                 out.append("        stack.p(_Ll2i(stack.q())); pc = ").append(index + 1).append("; break;\n");
                 return;
+            // _d2i saturates: see the structured F2I and D2I above.
             case Opcodes.F2I:
             case Opcodes.D2I:
-                out.append("        stack.p(stack.q() | 0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(_d2i(stack.q())); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.L2F:
                 out.append("        stack.p(_Ll2f(stack.q())); pc = ").append(index + 1).append("; break;\n");
@@ -7155,7 +7172,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        stack.p(_Ld2l(stack.q())); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.I2D:
-                out.append("        pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(stack.q()|0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCMP:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lcmp(a, b)); pc = ").append(index + 1).append("; break; }\n");

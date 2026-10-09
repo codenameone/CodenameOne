@@ -29,6 +29,9 @@ public final class Coroutine extends YieldInstruction {
     MonoBehaviour owner;
     IEnumerator routine;
     float resumeAt;
+    /// The first frame, by `Time.frameCount`, whose pass after `Update` may
+    /// resume it: the one after the frame it last yielded in.
+    int notBefore;
     Coroutine waitingFor;
     /// 0 the next frame, 1 after the next physics step, 2 the end of a frame.
     int phase;

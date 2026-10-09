@@ -1298,6 +1298,32 @@ final class JavascriptBundleWriter {
      * {@code _O}, {@code _L}, {@code _Z} in parparvm_runtime.js); the
      * generator names start with {@code $} or a letter.
      */
+    /**
+     * True when the quoted literal at {@code src[open..close]} is the key of
+     * an object literal: what precedes it is {@code {} or {@code ,} and what
+     * follows is {@code :}. A ternary's {@code ? "a" : "b"} is preceded by
+     * {@code ?} and a {@code case "a":} by a keyword, so neither qualifies.
+     */
+    private static boolean isObjectKeyPosition(String src, int open, int close, StringBuilder emitted) {
+        int n = src.length();
+        int next = close + 1;
+        while (next < n && Character.isWhitespace(src.charAt(next))) {
+            next++;
+        }
+        if (next >= n || src.charAt(next) != ':') {
+            return false;
+        }
+        int prev = emitted.length() - 1;
+        while (prev >= 0 && Character.isWhitespace(emitted.charAt(prev))) {
+            prev--;
+        }
+        if (prev < 0) {
+            return false;
+        }
+        char before = emitted.charAt(prev);
+        return before == '{' || before == ',';
+    }
+
     private static String hoistStringConstants(String src, int[] aliasCounter) {
         // First pass: walk the source, find every "..." literal that is
         // a pure identifier of length >= 4. Skip single-quoted strings
@@ -1460,7 +1486,20 @@ final class JavascriptBundleWriter {
                     alias = aliases.get(body);
                 }
                 if (alias != null) {
-                    out.append(alias);
+                    // A quoted literal in key position -- ``{"count": 0`` or
+                    // ``, "count": 0`` -- needs the computed form. A bare
+                    // alias there is not a reference to the constant but a
+                    // property literally named after it: the static field
+                    // map ``s: {"count": 0}`` became ``s: {_q1p: 0}``, the
+                    // field ``count`` had no default at all, and a static
+                    // never assigned before its first read was undefined
+                    // where Java says 0 -- an array index that stored
+                    // nowhere, a double that turned NaN on its first +=.
+                    if (isObjectKeyPosition(src, i, j, out)) {
+                        out.append('[').append(alias).append(']');
+                    } else {
+                        out.append(alias);
+                    }
                 } else {
                     out.append(src, i, j + 1);
                 }

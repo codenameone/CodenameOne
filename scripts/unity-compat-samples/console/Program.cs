@@ -566,6 +566,87 @@ namespace Spike
             Log("char math=" + (char)('a' + 2) + " bool=" + true + " long=" + 12345678901L);
         }
 
+        // ---- the edges of integer arithmetic ---------------------------------------
+
+        private static int Quotient(int a, int b)
+        {
+            return a / b;
+        }
+
+        private static int Remainder(int a, int b)
+        {
+            return a % b;
+        }
+
+        private static long Quotient(long a, long b)
+        {
+            return a / b;
+        }
+
+        private static long Remainder(long a, long b)
+        {
+            return a % b;
+        }
+
+        // What an integer operation answers, or the exception it ends in. The
+        // operands arrive as arguments so that nothing is folded by the compiler.
+        private static string Edge(int op, long a, long b)
+        {
+            try
+            {
+                switch (op)
+                {
+                    case 0: return "" + Quotient((int)a, (int)b);
+                    case 1: return "" + Remainder((int)a, (int)b);
+                    case 2: return "" + Quotient(a, b);
+                    case 3: return "" + Remainder(a, b);
+                    case 4: return "" + ((uint)a / (uint)b);
+                    case 5: return "" + ((uint)a % (uint)b);
+                    case 6: return "" + ((ulong)a / (ulong)b);
+                    case 7: return "" + ((ulong)a % (ulong)b);
+                    case 8: return "" + Math.Abs((int)a);
+                    default: return "" + Math.Abs(a);
+                }
+            }
+            catch (DivideByZeroException)
+            {
+                return "zero";
+            }
+            catch (OverflowException)
+            {
+                return "overflow";
+            }
+        }
+
+        // The smallest value divided by -1 has no answer an int or a long holds:
+        // division throws, and so does the remainder, where C# says x % y throws
+        // wherever x / y would. Every other division by -1 is ordinary, the
+        // unsigned operators read the same bits as large numbers and never
+        // overflow, and Math.Abs has no answer for the smallest value either.
+        private static void IntegerEdges()
+        {
+            Section("integer edges");
+            long min = int.MinValue;
+            long wide = long.MinValue;
+            Log("int div " + Edge(0, min, -1) + " " + Edge(0, min + 1, -1) + " " + Edge(0, min, 1) + " "
+                + Edge(0, min, 2) + " " + Edge(0, -7, -1) + " " + Edge(0, 0, -1) + " " + Edge(0, 7, 0) + " "
+                + Edge(0, min, 0));
+            Log("int rem " + Edge(1, min, -1) + " " + Edge(1, min + 1, -1) + " " + Edge(1, min, 1) + " "
+                + Edge(1, min, 2) + " " + Edge(1, -7, -1) + " " + Edge(1, -7, 3) + " " + Edge(1, 7, 0));
+            Log("long div " + Edge(2, wide, -1) + " " + Edge(2, wide + 1, -1) + " " + Edge(2, wide, 1) + " "
+                + Edge(2, min, -1) + " " + Edge(2, -7, -1) + " " + Edge(2, 7, 0) + " " + Edge(2, wide, 0));
+            Log("long rem " + Edge(3, wide, -1) + " " + Edge(3, wide + 1, -1) + " " + Edge(3, wide, 10) + " "
+                + Edge(3, -7, -1) + " " + Edge(3, 7, 0));
+            Log("unsigned " + Edge(4, min, -1) + " " + Edge(5, min, -1) + " " + Edge(6, wide, -1) + " "
+                + Edge(7, wide, -1) + " " + Edge(4, -1, 1) + " " + Edge(4, 7, 0) + " " + Edge(7, 7, 0));
+            Log("abs " + Edge(8, min, 0) + " " + Edge(8, min + 1, 0) + " " + Edge(8, -4, 0) + " " + Edge(9, wide, 0)
+                + " " + Edge(9, wide + 1, 0) + " " + Edge(9, min, 0));
+            int smallest = int.Parse("-2147483648");
+            int value;
+            Log("smallest " + smallest + " " + int.TryParse(" -2147483648 ", out value) + "/" + value + " "
+                + int.TryParse("-2147483649", out value) + "/" + value);
+        }
+
         // ---- exceptions ----------------------------------------------------------
 
         private static int Divide(int a, int b)
@@ -1242,6 +1323,7 @@ namespace Spike
             Iterators();
             BoxingAndTypes();
             Arithmetic();
+            IntegerEdges();
             MultiDimensional();
             SplittingAndParsing();
             Dictionaries();

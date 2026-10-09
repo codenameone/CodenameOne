@@ -116,6 +116,15 @@ need "$RUNTIME/com/codename1/unitycompat/unityengine/UnityRuntime.class" "the Un
 need "$RUNTIME/UnityEngine/Vector2.class" "the translated UnityEngine value types" "$UNITY_BUILD"
 need "$CORE/com/codename1/gaming/physics/box2d/dynamics/World.class" "the Codename One core" "$UNITY_BUILD"
 CIL="$CIL_CLASSES:$(ls "$CIL_DEPS"/*.jar | tr '\n' ':')"
+# What the offscreen check of the real view (below) runs on beside those: the
+# JavaSE port, for its software rasteriser and its fonts, and the core unit
+# tests' implementation of the platform, which is the display with no window.
+OFFSCREEN_BUILD="(cd maven && mvn install -Plocal-dev-javase -DskipTests -pl javase -am && mvn test-compile -DunitTests -DskipTests -pl core-unittests -am)"
+ls "$ROOT"/maven/javase/target/codenameone-javase-*-jar-with-dependencies.jar > /dev/null 2>&1 \
+  || fail "the JavaSE port is not built (maven/javase/target/codenameone-javase-*-jar-with-dependencies.jar). Build it first: $OFFSCREEN_BUILD"
+need "$ROOT/maven/core-unittests/target/test-classes/com/codename1/testing/TestCodenameOneImplementation.class" \
+  "the core unit tests' platform implementation" "$OFFSCREEN_BUILD"
+need "$ROOT/maven/factory/target/classes/com/codename1/impl/ImplementationFactory.class" "maven/factory" "$OFFSCREEN_BUILD"
 
 WORKDIR="$SCRIPTPATH/build/unity-compat"
 rm -rf "$WORKDIR"
@@ -136,6 +145,33 @@ compare() {
   else
     echo "FAIL: $1 differs from $2 (< expected, > actual):"
     head -40 "$3.diff"
+    FAILED=1
+  fi
+}
+
+# offscreen <sample> <out dir of build-unity-project.sh> [OffscreenCheck options]
+#
+# The trace runs above and below step the runtime and read its draw list;
+# none of them has a game view. This is the same project on the view an
+# application has -- a form, the event dispatch thread, the port's keys and
+# pointer, the software rasteriser -- with no window: the JVM is headless and
+# the display is the core unit tests'. It asks of the project what it must
+# know (which keys an axis has, whether the scene draws, the time scale, whether
+# a finger is the mouse), so it is the same check for every sample.
+#
+# A sample whose script is keys and the pointer is played with its script and
+# held to its committed trace. One whose script has fingers, host calls or
+# application events, which this view has no source of, is played without.
+offscreen() {
+  local sample="$1" out="$2"
+  shift 2
+  if "$SAMPLES/player/offscreen-check.sh" "$out" "$@" > "$out/offscreen.txt" 2>&1 \
+      && [ "$(tail -1 "$out/offscreen.txt")" = "OFFSCREEN OK" ]; then
+    echo "   $sample on a game view, offscreen: $(grep -c '' "$out/offscreen.txt" | tr -d ' ') lines, OK"
+  else
+    echo "FAIL: $sample: the offscreen check of the game view (log: $out/offscreen.txt):"
+    grep -E '^(FAIL|FAILED|OFFSCREEN)' "$out/offscreen.txt" | head -40
+    tail -5 "$out/offscreen.txt"
     FAILED=1
   fi
 }
@@ -184,6 +220,12 @@ run_logged "$SC/javac.log" "scene2d: javac of the generated scene" \
 java -Xverify:all -cp "$SC/main:$SC/app:$RUNTIME:$CORE" scene.SceneMain > "$SC/hotspot.txt" 2> "$SC/hotspot.err" \
   || { cat "$SC/hotspot.err"; fail "scene2d: the scene failed on the JVM"; }
 compare "scene2d on the JVM" "$SAMPLES/scene2d/expected-trace.txt" "$SC/hotspot.txt"
+# The same project built the way any project is, for the game view: the trace
+# above is of scene.SceneMain, which is this sample's own driver.
+SCP="$WORKDIR/scene2d-project"
+run_logged "$WORKDIR/scene2d-project-build.log" "scene2d: build-unity-project.sh" \
+  "$SAMPLES/build-unity-project.sh" "$SAMPLES/scene2d" "$SCP"
+offscreen scene2d "$SCP"
 
 echo "== arcade2d"
 AR="$WORKDIR/arcade2d"
@@ -200,6 +242,7 @@ java -Xverify:all -Djava.awt.headless=true -cp "$AR/classes:$AR/resources:$RUNTI
   "${ARCADE_ARGS[@]}" > "$AR/hotspot.txt" 2> "$AR/hotspot.err" \
   || { cat "$AR/hotspot.err"; fail "arcade2d: the project failed on the JVM"; }
 compare "arcade2d on the JVM" "$SAMPLES/arcade2d/expected-trace.txt" "$AR/hotspot.txt"
+offscreen arcade2d "$AR" "${ARCADE_ARGS[@]}" --trace "$SAMPLES/arcade2d/expected-trace.txt"
 
 echo "== menu2d"
 MN="$WORKDIR/menu2d"
@@ -214,6 +257,7 @@ java -Xverify:all -Djava.awt.headless=true -cp "$MN/classes:$MN/resources:$RUNTI
   "${MENU_ARGS[@]}" > "$MN/hotspot.txt" 2> "$MN/hotspot.err" \
   || { cat "$MN/hotspot.err"; fail "menu2d: the project failed on the JVM"; }
 compare "menu2d on the JVM" "$SAMPLES/menu2d/expected-trace.txt" "$MN/hotspot.txt"
+offscreen menu2d "$MN" "${MENU_ARGS[@]}" --trace "$SAMPLES/menu2d/expected-trace.txt"
 
 echo "== query2d"
 QR="$WORKDIR/query2d"
@@ -228,6 +272,7 @@ java -Xverify:all -Djava.awt.headless=true -cp "$QR/classes:$QR/resources:$RUNTI
   "${QUERY_ARGS[@]}" > "$QR/hotspot.txt" 2> "$QR/hotspot.err" \
   || { cat "$QR/hotspot.err"; fail "query2d: the project failed on the JVM"; }
 compare "query2d on the JVM" "$SAMPLES/query2d/expected-trace.txt" "$QR/hotspot.txt"
+offscreen query2d "$QR"
 
 echo "== host2d"
 HO="$WORKDIR/host2d"
@@ -248,6 +293,7 @@ java -Xverify:all -Djava.awt.headless=true -cp "$HO/classes:$HO/resources:$RUNTI
   "${HOST_ARGS[@]}" > "$HO/hotspot.txt" 2> "$HO/hotspot.err" \
   || { cat "$HO/hotspot.err"; fail "host2d: the project failed on the JVM"; }
 compare "host2d on the JVM" "$SAMPLES/host2d/expected-trace.txt" "$HO/hotspot.txt"
+offscreen host2d "$HO"
 
 # An animator with a parameter of each kind, exit times and events; a tilemap
 # under one composite outline that a box slides along without catching a seam;
@@ -266,6 +312,7 @@ java -Xverify:all -Djava.awt.headless=true -cp "$PF/classes:$PF/resources:$RUNTI
   "${PLATFORMER_ARGS[@]}" > "$PF/hotspot.txt" 2> "$PF/hotspot.err" \
   || { cat "$PF/hotspot.err"; fail "platformer2d: the project failed on the JVM"; }
 compare "platformer2d on the JVM" "$SAMPLES/platformer2d/expected-trace.txt" "$PF/hotspot.txt"
+offscreen platformer2d "$PF" "${PLATFORMER_ARGS[@]}" --trace "$SAMPLES/platformer2d/expected-trace.txt"
 
 if [ $PARPARVM -eq 0 ]; then
   [ $FAILED -eq 0 ] || exit 1

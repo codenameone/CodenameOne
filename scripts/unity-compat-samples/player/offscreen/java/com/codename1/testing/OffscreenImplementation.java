@@ -96,6 +96,12 @@ public final class OffscreenImplementation extends TestCodenameOneImplementation
         pointerPressed(x, y);
     }
 
+    /// The pointer moved while it was down, as a mouse reports on its way
+    /// from where it was pressed to where it is let go.
+    public void portPointerDragged(int x, int y) {
+        pointerDragged(x, y);
+    }
+
     public void portPointerReleased(int x, int y) {
         pointerReleased(x, y);
     }

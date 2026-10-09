@@ -85,6 +85,14 @@ trunc=7 -7 round=2 floor=-8 sqrt=1414 abs=4 max=8
 float bits=33333334 double bits=33333333333333
 and=15 or=65295 xor=61680 not=-3856 shl=-252706816 shift mask=2
 jagged=10 longs=1099511627771 flags=FalseTrue chars=ok
+== integer edges
+int div overflow 2147483647 -2147483648 -1073741824 7 0 zero zero
+int rem overflow 0 0 0 0 -1 zero
+long div overflow 9223372036854775807 -9223372036854775808 2147483648 7 zero zero
+long rem overflow 0 -8 0 zero
+unsigned 0 2147483648 0 9223372036854775808 4294967295 zero zero
+abs overflow 2147483647 4 overflow 9223372036854775807 2147483648
+smallest -2147483648 True/-2147483648 False/0
 == multi-dimensional arrays
 grid[2,3]=23 [0,3]=3 [1,0]=10 sum=138 length=12 rank=2 dims=3x4 upper=2,3 lower=0
 range: range range range range 23 range

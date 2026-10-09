@@ -49,6 +49,13 @@ public class Keeper : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
         Debug.Log("keeper awake host=" + (Bridge.Host != null) + " gauge=" + (gauge != null));
+        // What a host with a display has in place before the first Awake: the
+        // platform, and the preferences an earlier run left. The write is read
+        // back by the host, from its own store.
+        Debug.Log("keeper platform=" + Application.platform + " mobile=" + Application.isMobilePlatform
+            + " iphone=" + (Application.platform == RuntimePlatform.IPhonePlayer) + " editor="
+            + Application.isEditor + " best=" + PlayerPrefs.GetInt("best", -1));
+        PlayerPrefs.SetInt("best", PlayerPrefs.GetInt("best", -1) + 1);
         if (Bridge.Host != null)
         {
             Bridge.Host.Report("awake");
@@ -61,7 +68,11 @@ public class Keeper : MonoBehaviour
         for (int n = 1; ; n++)
         {
             yield return new WaitForSeconds(0.5f);
-            Debug.Log("keeper tick " + n + " frame " + Time.frameCount + " in " + SceneManager.GetActiveScene().name);
+            // The scene's clock, in thousandths: it restarted with each load,
+            // though this object and its coroutine came through.
+            Debug.Log("keeper tick " + n + " frame " + Time.frameCount + " in " + SceneManager.GetActiveScene().name
+                + " since load " + Mathf.RoundToInt(Time.timeSinceLevelLoad * 1000f) + " of "
+                + Mathf.RoundToInt(Time.time * 1000f));
         }
     }
 

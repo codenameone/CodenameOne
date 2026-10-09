@@ -642,6 +642,9 @@ namespace UnityEngine
         public static float Pow(float f, float p) { return (float)Math.Pow(f, p); }
         public static float Exp(float power) { return (float)Math.Exp(power); }
         public static float Log(float f) { return (float)Math.Log(f); }
+        // Not System.Math.Abs, which throws an OverflowException for the smallest
+        // int: Unity's documentation of Mathf.Abs(int) promises no exception, so
+        // this one wraps and answers the smallest int again.
         public static int Abs(int value) { return value < 0 ? -value : value; }
         public static int Min(int a, int b) { return a < b ? a : b; }
         public static int Max(int a, int b) { return a > b ? a : b; }
@@ -801,6 +804,30 @@ namespace UnityEngine
         Bold = 1,
         Italic = 2,
         BoldAndItalic = 3
+    }
+
+    // Where a game runs, by the numbers Unity gives the members. The ones a
+    // script is likely to compare with; a Codename One application reports
+    // the players of the two phones, the three desktops and the browser, and
+    // never an editor.
+    public enum RuntimePlatform
+    {
+        OSXEditor = 0,
+        OSXPlayer = 1,
+        WindowsPlayer = 2,
+        WindowsEditor = 7,
+        IPhonePlayer = 8,
+        Android = 11,
+        LinuxPlayer = 13,
+        LinuxEditor = 16,
+        WebGLPlayer = 17,
+        WSAPlayerX86 = 18,
+        WSAPlayerX64 = 19,
+        WSAPlayerARM = 20,
+        PS4 = 25,
+        XboxOne = 27,
+        tvOS = 31,
+        Switch = 32
     }
 
     public enum RenderMode

@@ -57,12 +57,30 @@ public final class Math {
         return floor % 2 == 0 ? floor : floor + 1;
     }
 
+    /// The smallest `int` has no positive counterpart, and .NET documents
+    /// an `OverflowException` for it where Java answers the same negative
+    /// number. `UnityEngine.Mathf.Abs(int)` is another method, written in C#
+    /// among the value types, and is not held to this: Unity's documentation
+    /// promises no exception for it.
     public static int Abs(int v) {
-        return v < 0 ? -v : v;
+        if (v >= 0) {
+            return v;
+        }
+        if (v == Integer.MIN_VALUE) {
+            throw new OverflowException("Negating the minimum value of a twos complement number is invalid.");
+        }
+        return -v;
     }
 
+    /// As [#Abs(int)]: the smallest `long` throws.
     public static long Abs(long v) {
-        return v < 0 ? -v : v;
+        if (v >= 0) {
+            return v;
+        }
+        if (v == Long.MIN_VALUE) {
+            throw new OverflowException("Negating the minimum value of a twos complement number is invalid.");
+        }
+        return -v;
     }
 
     public static float Abs(float v) {

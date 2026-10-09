@@ -20,16 +20,43 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-// Says what a scene finds when it starts.
+// Says what a scene finds when it starts, and when a coroutine that yields
+// null comes back: in the frame after the one it was started in, whether that
+// was from Start or from Update, and at the end of the same frame when it
+// waits for that instead.
 public class Marker : MonoBehaviour
 {
+    private bool updated;
+
     private void Start()
     {
         Debug.Log("marker start in " + SceneManager.GetActiveScene().name + " keeper=" + (Keeper.Instance != null)
             + " total=" + Keeper.Instance.total + " keepers=" + FindObjectsOfType<Keeper>().Length
             + " frame " + Time.frameCount);
+        StartCoroutine(Next("start", null));
+    }
+
+    private void Update()
+    {
+        if (!updated)
+        {
+            updated = true;
+            StartCoroutine(Next("update", null));
+            StartCoroutine(Next("update end of frame", new WaitForEndOfFrame()));
+        }
+    }
+
+    private IEnumerator Next(string from, object wait)
+    {
+        int began = Time.frameCount;
+        yield return wait;
+        int resumed = Time.frameCount;
+        yield return null;
+        Debug.Log("marker coroutine from " + from + " began " + began + " resumed " + resumed + " again "
+            + Time.frameCount);
     }
 }
