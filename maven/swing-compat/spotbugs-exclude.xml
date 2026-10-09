@@ -576,4 +576,83 @@
     </Match>
 
     <!-- END hardening slice -->
+
+    <!-- BEGIN drag and drop, styled text and created fonts -->
+
+    <!-- The desktop, the toolkit, the default style context and the three
+         clipboard actions of TransferHandler are each one object for the
+         whole application, handed out by a static method: that is the
+         JDK's contract, and every one is touched on the event dispatch
+         thread only. The style context is made on first use there. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.Desktop"/>
+                <Method name="getDesktop"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.java.awt.Toolkit"/>
+                <Method name="getDefaultToolkit"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.text.StyleContext"/>
+                <Method name="getDefaultStyleContext"/>
+            </And>
+            <And>
+                <Class name="com.codename1.desktopcompat.javax.swing.TransferHandler"/>
+                <Or>
+                    <Method name="getCutAction"/>
+                    <Method name="getCopyAction"/>
+                    <Method name="getPasteAction"/>
+                </Or>
+            </And>
+        </Or>
+        <Or>
+            <Bug pattern="MS_EXPOSE_REP"/>
+            <Bug pattern="LI_LAZY_INIT_STATIC"/>
+        </Or>
+    </Match>
+
+    <!-- The drop target events and the desktop's application events are
+         Serializable only because java.util.EventObject is. A device has
+         no object streams, so there is no serialized form to version and
+         no field that could fail to be written. -->
+    <Match>
+        <Class name="~com\.codename1\.desktopcompat\.java\.awt\.(dnd|desktop)\..*Event"/>
+        <Or>
+            <Bug pattern="SE_NO_SERIALVERSIONID"/>
+            <Bug pattern="SE_BAD_FIELD"/>
+        </Or>
+    </Match>
+
+    <!-- A text pane's document has to be a styled one, so JTextPane
+         overrides setDocument, which the constructor of JEditorPane
+         calls (as the JDK does) before this class has its fields. The
+         override reads its listener field to tell that call apart, and
+         a null there is the answer it is looking for. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.javax.swing.JTextPane"/>
+        <Method name="setDocument"/>
+        <Bug pattern="UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- A face hands out the platform's font of its file, which is an
+         immutable handle: deriving a size from it makes another. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.rt.FontFiles$Face"/>
+        <Method name="base"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Making a drop target for a component attaches it: the JDK's
+         constructor calls the component's setDropTarget, a public method
+         of Component, and so does this one. The target's own fields are
+         all set before the call. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.java.awt.dnd.DropTarget"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+
+    <!-- END drag and drop, styled text and created fonts -->
 </FindBugsFilter>
