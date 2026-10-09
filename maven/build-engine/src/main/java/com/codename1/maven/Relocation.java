@@ -119,6 +119,71 @@ public final class Relocation {
         // java.net. The device has URI and URISyntaxException.
         {"java/net/URL", JDK_PACKAGE + "URL"},
         {"java/net/MalformedURLException", JDK_PACKAGE + "MalformedURLException"},
+        // java.util.stream, whole. The device has four classes of that
+        // package, with a handful of methods and factories that answer
+        // null; none of them may be reached, so every name an application
+        // can write is redirected.
+        {"java/util/stream/BaseStream", JDK_PACKAGE + "BaseStream"},
+        {"java/util/stream/Stream", JDK_PACKAGE + "Stream"},
+        {"java/util/stream/Stream$Builder", JDK_PACKAGE + "Stream$Builder"},
+        {"java/util/stream/IntStream", JDK_PACKAGE + "IntStream"},
+        {"java/util/stream/LongStream", JDK_PACKAGE + "LongStream"},
+        {"java/util/stream/DoubleStream", JDK_PACKAGE + "DoubleStream"},
+        {"java/util/stream/Collector", JDK_PACKAGE + "Collector"},
+        {"java/util/stream/Collector$Characteristics", JDK_PACKAGE + "Collector$Characteristics"},
+        {"java/util/stream/Collectors", JDK_PACKAGE + "Collectors"},
+        // What the streams answer and iterate with.
+        {"java/util/OptionalInt", JDK_PACKAGE + "OptionalInt"},
+        {"java/util/OptionalLong", JDK_PACKAGE + "OptionalLong"},
+        {"java/util/OptionalDouble", JDK_PACKAGE + "OptionalDouble"},
+        {"java/util/IntSummaryStatistics", JDK_PACKAGE + "IntSummaryStatistics"},
+        {"java/util/LongSummaryStatistics", JDK_PACKAGE + "LongSummaryStatistics"},
+        {"java/util/DoubleSummaryStatistics", JDK_PACKAGE + "DoubleSummaryStatistics"},
+        {"java/util/PrimitiveIterator", JDK_PACKAGE + "PrimitiveIterator"},
+        {"java/util/PrimitiveIterator$OfInt", JDK_PACKAGE + "PrimitiveIterator$OfInt"},
+        {"java/util/PrimitiveIterator$OfLong", JDK_PACKAGE + "PrimitiveIterator$OfLong"},
+        {"java/util/PrimitiveIterator$OfDouble", JDK_PACKAGE + "PrimitiveIterator$OfDouble"},
+        // java.util.function. The device has the eight interfaces over
+        // objects (BiConsumer, BiFunction, BinaryOperator, Consumer,
+        // Function, Predicate, Supplier, UnaryOperator) and none of the
+        // primitive ones.
+        {"java/util/function/BiPredicate", JDK_PACKAGE + "BiPredicate"},
+        {"java/util/function/BooleanSupplier", JDK_PACKAGE + "BooleanSupplier"},
+        {"java/util/function/DoubleBinaryOperator", JDK_PACKAGE + "DoubleBinaryOperator"},
+        {"java/util/function/DoubleConsumer", JDK_PACKAGE + "DoubleConsumer"},
+        {"java/util/function/DoubleFunction", JDK_PACKAGE + "DoubleFunction"},
+        {"java/util/function/DoublePredicate", JDK_PACKAGE + "DoublePredicate"},
+        {"java/util/function/DoubleSupplier", JDK_PACKAGE + "DoubleSupplier"},
+        {"java/util/function/DoubleToIntFunction", JDK_PACKAGE + "DoubleToIntFunction"},
+        {"java/util/function/DoubleToLongFunction", JDK_PACKAGE + "DoubleToLongFunction"},
+        {"java/util/function/DoubleUnaryOperator", JDK_PACKAGE + "DoubleUnaryOperator"},
+        {"java/util/function/IntBinaryOperator", JDK_PACKAGE + "IntBinaryOperator"},
+        {"java/util/function/IntConsumer", JDK_PACKAGE + "IntConsumer"},
+        {"java/util/function/IntFunction", JDK_PACKAGE + "IntFunction"},
+        {"java/util/function/IntPredicate", JDK_PACKAGE + "IntPredicate"},
+        {"java/util/function/IntSupplier", JDK_PACKAGE + "IntSupplier"},
+        {"java/util/function/IntToDoubleFunction", JDK_PACKAGE + "IntToDoubleFunction"},
+        {"java/util/function/IntToLongFunction", JDK_PACKAGE + "IntToLongFunction"},
+        {"java/util/function/IntUnaryOperator", JDK_PACKAGE + "IntUnaryOperator"},
+        {"java/util/function/LongBinaryOperator", JDK_PACKAGE + "LongBinaryOperator"},
+        {"java/util/function/LongConsumer", JDK_PACKAGE + "LongConsumer"},
+        {"java/util/function/LongFunction", JDK_PACKAGE + "LongFunction"},
+        {"java/util/function/LongPredicate", JDK_PACKAGE + "LongPredicate"},
+        {"java/util/function/LongSupplier", JDK_PACKAGE + "LongSupplier"},
+        {"java/util/function/LongToDoubleFunction", JDK_PACKAGE + "LongToDoubleFunction"},
+        {"java/util/function/LongToIntFunction", JDK_PACKAGE + "LongToIntFunction"},
+        {"java/util/function/LongUnaryOperator", JDK_PACKAGE + "LongUnaryOperator"},
+        {"java/util/function/ObjDoubleConsumer", JDK_PACKAGE + "ObjDoubleConsumer"},
+        {"java/util/function/ObjIntConsumer", JDK_PACKAGE + "ObjIntConsumer"},
+        {"java/util/function/ObjLongConsumer", JDK_PACKAGE + "ObjLongConsumer"},
+        {"java/util/function/ToDoubleBiFunction", JDK_PACKAGE + "ToDoubleBiFunction"},
+        {"java/util/function/ToDoubleFunction", JDK_PACKAGE + "ToDoubleFunction"},
+        {"java/util/function/ToIntBiFunction", JDK_PACKAGE + "ToIntBiFunction"},
+        {"java/util/function/ToIntFunction", JDK_PACKAGE + "ToIntFunction"},
+        {"java/util/function/ToLongBiFunction", JDK_PACKAGE + "ToLongBiFunction"},
+        {"java/util/function/ToLongFunction", JDK_PACKAGE + "ToLongFunction"},
+        // java.time. A query is what parse(text, LocalDate::from) takes.
+        {"java/time/temporal/TemporalQuery", JDK_PACKAGE + "TemporalQuery"},
     };
 
     private final String name;

@@ -70,6 +70,42 @@ public final class Optional<T> {
         return value != null;
     }
 
+    public boolean isEmpty() {
+        return value == null;
+    }
+
+    public void ifPresentOrElse(Consumer<? super T> action, Runnable emptyAction) {
+        if (value != null) {
+            action.accept(value);
+        } else {
+            emptyAction.run();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public Optional<T> or(Supplier<? extends Optional<? extends T>> supplier) {
+        if (supplier == null) {
+            throw new NullPointerException();
+        }
+        if (value != null) {
+            return this;
+        }
+        Optional<T> result = (Optional<T>) supplier.get();
+        if (result == null) {
+            throw new NullPointerException();
+        }
+        return result;
+    }
+
+    /// A stream of the value, or an empty one.
+    public Stream<T> stream() {
+        return value == null ? Stream.<T>empty() : Stream.of(value);
+    }
+
+    public T orElseThrow() {
+        return get();
+    }
+
     public void ifPresent(Consumer<? super T> consumer) {
         if (value != null) {
             consumer.accept(value);

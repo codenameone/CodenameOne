@@ -26,6 +26,9 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +53,15 @@ import java.util.Map;
 ///
 /// The same is done to a method reference (`Objects::isNull`), which a class
 /// file holds as a method handle among the arguments of an `invokedynamic`.
+///
+/// The interfaces are treated the same way. The device's `Comparator`,
+/// `Predicate`, `Function` and collection interfaces are there, without the
+/// default and static methods the JDK's gained later: `comparator.reversed()`
+/// is `JdkFunctions.reversed(comparator)`, `list.stream()` is
+/// `JdkCollections.stream(list)`, `List.of(a, b)` is
+/// `JdkCollections.listOf(a, b)`. What a stream call answers is not the
+/// device's own `java.util.stream.Stream` but the one the shared JDK classes
+/// carry, by a row of [Relocation#JDK_SHIMS].
 ///
 /// #### Where it runs
 ///
@@ -86,6 +98,22 @@ final class CompatRewrites {
     private static final String SYSTEM = Relocation.JDK_PACKAGE + "JdkSystem";
     private static final String STRINGS = Relocation.JDK_PACKAGE + "JdkStrings";
     private static final String NUMBERS = Relocation.JDK_PACKAGE + "JdkNumbers";
+    private static final String FUNCTIONS = Relocation.JDK_PACKAGE + "JdkFunctions";
+    private static final String COLLECTIONS = Relocation.JDK_PACKAGE + "JdkCollections";
+    private static final String TIME = Relocation.JDK_PACKAGE + "JdkTime";
+    private static final String OBJECT = "Ljava/lang/Object;";
+
+    /// What `stream()` and `parallelStream()` are declared to return, as an
+    /// application names it and as it reads once relocated.
+    private static final String STREAM = "Ljava/util/stream/Stream;";
+    private static final String STREAM_MOVED = "L" + Relocation.JDK_PACKAGE + "Stream;";
+    /// The JDK's collection types an application is likely to hold a
+    /// reference of when it asks for a stream. Any other type is covered by
+    /// [#anyOwner].
+    private static final String[] COLLECTION_OWNERS = {"Collection", "List", "Set", "ArrayList", "LinkedList",
+        "HashSet", "LinkedHashSet", "TreeSet", "SortedSet", "NavigableSet", "Queue", "Deque", "ArrayDeque", "Vector",
+        "Stack", "PriorityQueue", "AbstractList", "AbstractCollection", "AbstractSet", "AbstractQueue",
+        "AbstractSequentialList"};
     /// The framework's own math class: the device's `Math` has no
     /// transcendental functions, and this one has them under the JDK's names.
     private static final String MATH_UTIL = "com/codename1/util/MathUtil";
@@ -96,7 +124,14 @@ final class CompatRewrites {
     /// In all three tables a target of the form `class#name` names a member
     /// called something else than the one it stands in for, which is how two
     /// methods that differ only in their return type -- `Long.decode` and
-    /// `Integer.decode` -- share one class.
+    /// `Integer.decode` -- share one class. `class#name(descriptor)` gives
+    /// the stand-in's descriptor as well, for an instance method whose
+    /// stand-in takes the receiver as a wider type than the one the call
+    /// names: `ArrayList.stream()` and `Set.stream()` are both
+    /// `stream(Collection)`.
+    ///
+    /// An instance method is looked up here whether it is called on a class
+    /// or on an interface.
     private static final Map<String, String> VIRTUAL = new HashMap<String, String>();
     /// Static methods, as `owner.name descriptor`, to the class holding the
     /// static method of the same name and descriptor.
@@ -313,7 +348,258 @@ final class CompatRewrites {
         }
     }
 
+    static {
+        // The device's Comparator and function interfaces are their one
+        // abstract method each; the defaults and factories are stand-ins.
+        String cmp = "java/util/Comparator.";
+        String cmpT = "Ljava/util/Comparator;";
+        String fn = "java/util/function/";
+        String fnT = "L" + fn + "Function;";
+        STATIC.put(cmp + "naturalOrder()" + cmpT, FUNCTIONS);
+        STATIC.put(cmp + "reverseOrder()" + cmpT, FUNCTIONS);
+        STATIC.put(cmp + "nullsFirst(" + cmpT + ")" + cmpT, FUNCTIONS);
+        STATIC.put(cmp + "nullsLast(" + cmpT + ")" + cmpT, FUNCTIONS);
+        STATIC.put(cmp + "comparing(" + fnT + ")" + cmpT, FUNCTIONS);
+        STATIC.put(cmp + "comparing(" + fnT + cmpT + ")" + cmpT, FUNCTIONS);
+        VIRTUAL.put(cmp + "reversed()" + cmpT, FUNCTIONS);
+        VIRTUAL.put(cmp + "thenComparing(" + cmpT + ")" + cmpT, FUNCTIONS);
+        VIRTUAL.put(cmp + "thenComparing(" + fnT + ")" + cmpT, FUNCTIONS);
+        VIRTUAL.put(cmp + "thenComparing(" + fnT + cmpT + ")" + cmpT, FUNCTIONS);
+        for (String kind : new String[] {"Int", "Long", "Double"}) {
+            String to = "L" + fn + "To" + kind + "Function;";
+            STATIC.put(cmp + "comparing" + kind + "(" + to + ")" + cmpT, FUNCTIONS);
+            VIRTUAL.put(cmp + "thenComparing" + kind + "(" + to + ")" + cmpT, FUNCTIONS);
+        }
+
+        String predT = "L" + fn + "Predicate;";
+        VIRTUAL.put(fn + "Predicate.and(" + predT + ")" + predT, FUNCTIONS);
+        VIRTUAL.put(fn + "Predicate.or(" + predT + ")" + predT, FUNCTIONS);
+        VIRTUAL.put(fn + "Predicate.negate()" + predT, FUNCTIONS);
+        STATIC.put(fn + "Predicate.not(" + predT + ")" + predT, FUNCTIONS);
+        STATIC.put(fn + "Predicate.isEqual(" + OBJECT + ")" + predT, FUNCTIONS);
+
+        String unaryT = "L" + fn + "UnaryOperator;";
+        String biFnT = "L" + fn + "BiFunction;";
+        String binaryT = "L" + fn + "BinaryOperator;";
+        String consumerT = "L" + fn + "Consumer;";
+        String biConsumerT = "L" + fn + "BiConsumer;";
+        STATIC.put(fn + "Function.identity()" + fnT, FUNCTIONS);
+        STATIC.put(fn + "UnaryOperator.identity()" + unaryT, FUNCTIONS + "#unaryIdentity");
+        for (String op : new String[] {"andThen", "compose"}) {
+            VIRTUAL.put(fn + "Function." + op + "(" + fnT + ")" + fnT, FUNCTIONS);
+            // A UnaryOperator is a Function on the device as well.
+            VIRTUAL.put(fn + "UnaryOperator." + op + "(" + fnT + ")" + fnT,
+                    FUNCTIONS + "#" + op + "(" + fnT + fnT + ")" + fnT);
+        }
+        VIRTUAL.put(fn + "BiFunction.andThen(" + fnT + ")" + biFnT, FUNCTIONS);
+        STATIC.put(fn + "BinaryOperator.minBy(" + cmpT + ")" + binaryT, FUNCTIONS);
+        STATIC.put(fn + "BinaryOperator.maxBy(" + cmpT + ")" + binaryT, FUNCTIONS);
+        VIRTUAL.put(fn + "Consumer.andThen(" + consumerT + ")" + consumerT, FUNCTIONS);
+        VIRTUAL.put(fn + "BiConsumer.andThen(" + biConsumerT + ")" + biConsumerT, FUNCTIONS);
+    }
+
+    static {
+        // Into a stream. The device's collections have no stream() at all.
+        String util = "java/util/";
+        String collectionT = "Ljava/util/Collection;";
+        String intFunctionT = "Ljava/util/function/IntFunction;";
+        for (String owner : COLLECTION_OWNERS) {
+            VIRTUAL.put(util + owner + ".stream()" + STREAM, COLLECTIONS + "#stream(" + collectionT + ")" + STREAM);
+            VIRTUAL.put(util + owner + ".parallelStream()" + STREAM,
+                    COLLECTIONS + "#parallelStream(" + collectionT + ")" + STREAM);
+            VIRTUAL.put(util + owner + ".toArray(" + intFunctionT + ")[" + OBJECT,
+                    COLLECTIONS + "#toArray(" + collectionT + intFunctionT + ")[" + OBJECT);
+        }
+        String arrays = util + "Arrays.stream(";
+        STATIC.put(arrays + "[" + OBJECT + ")" + STREAM, COLLECTIONS);
+        STATIC.put(arrays + "[" + OBJECT + "II)" + STREAM, COLLECTIONS);
+        for (String[] kind : new String[][] {{"I", "IntStream"}, {"J", "LongStream"}, {"D", "DoubleStream"}}) {
+            STATIC.put(arrays + "[" + kind[0] + ")Ljava/util/stream/" + kind[1] + ";", COLLECTIONS);
+            STATIC.put(arrays + "[" + kind[0] + "II)Ljava/util/stream/" + kind[1] + ";", COLLECTIONS);
+        }
+
+        String consumerT = "Ljava/util/function/Consumer;";
+        String iteratorT = "Ljava/util/Iterator;";
+        VIRTUAL.put(util + "Iterator.forEachRemaining(" + consumerT + ")V", COLLECTIONS);
+        VIRTUAL.put(util + "ListIterator.forEachRemaining(" + consumerT + ")V",
+                COLLECTIONS + "#forEachRemaining(" + iteratorT + consumerT + ")V");
+        STATIC.put(util + "Collections.emptyIterator()" + iteratorT, COLLECTIONS);
+
+        // The immutable factories. Three interfaces declare an "of" that
+        // differs in nothing but what it returns, so each has its own name.
+        String listT = "Ljava/util/List;";
+        String setT = "Ljava/util/Set;";
+        String mapT = "Ljava/util/Map;";
+        String entryT = "Ljava/util/Map$Entry;";
+        String cmpT = "Ljava/util/Comparator;";
+        StringBuilder objects = new StringBuilder();
+        for (int n = 0; n <= 10; n++) {
+            STATIC.put(util + "List.of(" + objects + ")" + listT, COLLECTIONS + "#listOf");
+            STATIC.put(util + "Set.of(" + objects + ")" + setT, COLLECTIONS + "#setOf");
+            STATIC.put(util + "Map.of(" + objects + objects + ")" + mapT, COLLECTIONS + "#mapOf");
+            objects.append(OBJECT);
+        }
+        STATIC.put(util + "List.of([" + OBJECT + ")" + listT, COLLECTIONS + "#listOf");
+        STATIC.put(util + "Set.of([" + OBJECT + ")" + setT, COLLECTIONS + "#setOf");
+        STATIC.put(util + "List.copyOf(" + collectionT + ")" + listT, COLLECTIONS + "#listCopyOf");
+        STATIC.put(util + "Set.copyOf(" + collectionT + ")" + setT, COLLECTIONS + "#setCopyOf");
+        STATIC.put(util + "Map.copyOf(" + mapT + ")" + mapT, COLLECTIONS + "#mapCopyOf");
+        STATIC.put(util + "Map.ofEntries([" + entryT + ")" + mapT, COLLECTIONS + "#mapOfEntries");
+        STATIC.put(util + "Map.entry(" + OBJECT + OBJECT + ")" + entryT, COLLECTIONS);
+        for (String by : new String[] {"comparingByKey", "comparingByValue"}) {
+            STATIC.put(util + "Map$Entry." + by + "()" + cmpT, COLLECTIONS);
+            STATIC.put(util + "Map$Entry." + by + "(" + cmpT + ")" + cmpT, COLLECTIONS);
+        }
+    }
+
+    static {
+        String str = "java/lang/String.";
+        VIRTUAL.put(str + "split(" + STRING + ")[" + STRING, STRINGS);
+        VIRTUAL.put(str + "split(" + STRING + "I)[" + STRING, STRINGS);
+        VIRTUAL.put(str + "formatted([" + OBJECT + ")" + STRING, STRINGS);
+        VIRTUAL.put(str + "isBlank()Z", STRINGS);
+        VIRTUAL.put(str + "repeat(I)" + STRING, STRINGS);
+        VIRTUAL.put(str + "lines()" + STREAM, STRINGS);
+        for (String strip : new String[] {"strip", "stripLeading", "stripTrailing"}) {
+            VIRTUAL.put(str + strip + "()" + STRING, STRINGS);
+        }
+        String ints = "Ljava/util/stream/IntStream;";
+        for (String sequence : new String[] {"String", "CharSequence", "StringBuilder", "StringBuffer"}) {
+            VIRTUAL.put("java/lang/" + sequence + ".chars()" + ints,
+                    STRINGS + "#chars(Ljava/lang/CharSequence;)" + ints);
+        }
+
+        // java.time. The device's classes add and compare, and leave the
+        // subtracting and the reading out of a parsed value to these.
+        String time = "java/time/LocalTime.";
+        String timeT = "Ljava/time/LocalTime;";
+        for (String op : new String[] {"plusNanos", "minusNanos", "minusSeconds", "minusMinutes", "minusHours"}) {
+            VIRTUAL.put(time + op + "(J)" + timeT, TIME);
+        }
+        VIRTUAL.put(time + "isBefore(" + timeT + ")Z", TIME);
+        VIRTUAL.put(time + "isAfter(" + timeT + ")Z", TIME);
+        String date = "java/time/LocalDate.";
+        String dateT = "Ljava/time/LocalDate;";
+        // The device has no java.time.chrono. The stand-ins take the other
+        // date as the one interface the device's LocalDate implements; an
+        // interface-typed argument is assignable from whatever the
+        // application pushed, and the stand-in accepts a LocalDate alone.
+        String chrono = "Ljava/time/chrono/ChronoLocalDate;";
+        String accessorT = "Ljava/time/temporal/TemporalAccessor;";
+        for (String test : new String[] {"isBefore", "isAfter", "isEqual"}) {
+            VIRTUAL.put(date + test + "(" + chrono + ")Z", TIME + "#" + test + "(" + dateT + accessorT + ")Z");
+        }
+        VIRTUAL.put(date + "compareTo(" + chrono + ")I", TIME + "#compareTo(" + dateT + accessorT + ")I");
+        for (String op : new String[] {"minusMonths", "minusYears", "plusWeeks", "minusWeeks"}) {
+            VIRTUAL.put(date + op + "(J)" + dateT, TIME);
+        }
+        String accessor = "(Ljava/time/temporal/TemporalAccessor;)";
+        STATIC.put(date + "from" + accessor + dateT, TIME + "#localDateFrom");
+        STATIC.put(time + "from" + accessor + timeT, TIME + "#localTimeFrom");
+        STATIC.put("java/time/LocalDateTime.from" + accessor + "Ljava/time/LocalDateTime;",
+                TIME + "#localDateTimeFrom");
+        VIRTUAL.put("java/time/format/DateTimeFormatter.parse(Ljava/lang/CharSequence;"
+                + "Ljava/time/temporal/TemporalQuery;)" + OBJECT, TIME);
+    }
+
     private CompatRewrites() {
+    }
+
+    /// Whether `name` and `descriptor` are those of `Collection.stream()` or
+    /// `parallelStream()`. The return type is matched in both spellings, so
+    /// a class that reaches this already relocated is read like one that is
+    /// not.
+    private static boolean isStreamMethod(String name, String descriptor) {
+        return ("stream".equals(name) || "parallelStream".equals(name))
+                && (("()" + STREAM).equals(descriptor) || ("()" + STREAM_MOVED).equals(descriptor));
+    }
+
+    /// The stand-in for `stream()` or `parallelStream()` called on a type no
+    /// row of [#VIRTUAL] names, or null when the call is not one of those.
+    ///
+    /// The rows cover the JDK's own collection types, by name. They cannot
+    /// cover an application's own class, or a list type of another layer
+    /// (`javafx.collections.ObservableList`), because the class file names
+    /// the type the call was compiled against and nothing here knows what
+    /// that type extends. So a call is recognised by what it is instead: no
+    /// arguments, called `stream` or `parallelStream`, declared to return
+    /// `java.util.stream.Stream`. The stand-in takes the receiver as an
+    /// `Object`, which every verifier accepts for any type, and finds out
+    /// when it runs what it was handed: a class that declares the method
+    /// ([#declareStreamSources]) is called, any other collection gives its
+    /// elements.
+    ///
+    /// A JDK type is only taken for a collection where it can be one --
+    /// `java.util` and `java.util.concurrent` -- and the two there that have
+    /// a `stream()` without being one are left out. A call on any other JDK
+    /// class stays as it is, for the compliance check to report.
+    private static String anyOwner(String owner, String name, String descriptor) {
+        if (!isStreamMethod(name, descriptor)) {
+            return null;
+        }
+        if (owner.startsWith(Relocation.JDK_PACKAGE) || owner.startsWith("[")) {
+            return null;
+        }
+        if (owner.startsWith("java/") || owner.startsWith("javax/") || owner.startsWith("jdk/")) {
+            String simple = owner.substring(owner.lastIndexOf('/') + 1);
+            String pkg = owner.substring(0, owner.length() - simple.length());
+            if (!"java/util/".equals(pkg) && !"java/util/concurrent/".equals(pkg)) {
+                return null;
+            }
+            if ("java/util/Optional".equals(owner) || "java/util/ServiceLoader".equals(owner)) {
+                return null;
+            }
+        }
+        return COLLECTIONS + "#" + name + "Of(" + OBJECT + ")" + descriptor.substring(2);
+    }
+
+    /// The stand-in for `super.name(...)` -- or `List.super.name(...)` --
+    /// where the method asked for is one of the JDK's defaults the device
+    /// lacks, or null. The default's behaviour is what the static method
+    /// implements, so the call goes straight to it; for `stream()` that has
+    /// to be the one that never calls back into the receiver's own method.
+    private static String superCall(String owner, String name, String descriptor) {
+        String target = VIRTUAL.get(owner + "." + name + descriptor);
+        if (target == null) {
+            return null;
+        }
+        if (isStreamMethod(name, descriptor)) {
+            return COLLECTIONS + "#defaultStream(Ljava/util/Collection;)" + STREAM;
+        }
+        String to = targetOwner(target);
+        return COLLECTIONS.equals(to) || FUNCTIONS.equals(to) ? target : null;
+    }
+
+    /// Marks a class that declares `stream()` or `parallelStream()` as a
+    /// `StreamSource` or `ParallelStreamSource`, so that the stand-ins can
+    /// call the method the application wrote. See [#anyOwner].
+    ///
+    /// The method is made public, as an interface method has to be. It is a
+    /// method javac let every caller in the application reach already, and
+    /// each class that overrides it is widened by this same rule.
+    private static void declareStreamSources(ClassNode cls) {
+        for (MethodNode method : cls.methods) {
+            if ((method.access & Opcodes.ACC_STATIC) != 0 || !isStreamMethod(method.name, method.desc)) {
+                continue;
+            }
+            String marker = Relocation.JDK_PACKAGE
+                    + ("stream".equals(method.name) ? "StreamSource" : "ParallelStreamSource");
+            if (!cls.interfaces.contains(marker)) {
+                cls.interfaces.add(marker);
+                // The generic signature lists the interfaces too, and ends
+                // with them: the new one goes there as a raw type.
+                if (cls.signature != null) {
+                    cls.signature = cls.signature + "L" + marker + ";";
+                }
+            }
+            method.access = (method.access & ~(Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED)) | Opcodes.ACC_PUBLIC;
+        }
+    }
+
+    /// The rule for an instance method, or null.
+    private static String virtual(String owner, String name, String descriptor) {
+        String target = VIRTUAL.get(owner + "." + name + descriptor);
+        return target != null ? target : anyOwner(owner, name, descriptor);
     }
 
     /// The class of a rule's target.
@@ -325,7 +611,17 @@ final class CompatRewrites {
     /// The member a rule's target names, `name` unless it says otherwise.
     private static String targetName(String target, String name) {
         int hash = target.indexOf('#');
-        return hash < 0 ? name : target.substring(hash + 1);
+        if (hash < 0) {
+            return name;
+        }
+        int paren = target.indexOf('(', hash);
+        return paren < 0 ? target.substring(hash + 1) : target.substring(hash + 1, paren);
+    }
+
+    /// The descriptor of a rule's target, `descriptor` unless it gives one.
+    private static String targetDescriptor(String target, String descriptor) {
+        int paren = target.indexOf('(');
+        return paren < 0 ? descriptor : target.substring(paren);
     }
 
     /// Whether the class named `internalName` is one whose calls are left as
@@ -337,22 +633,27 @@ final class CompatRewrites {
 
     /// A visitor that applies the rules to the class it is shown and passes
     /// the result to `next`.
-    static ClassVisitor visitor(ClassVisitor next) {
-        return new ClassVisitor(Opcodes.ASM9, next) {
-            private boolean exempt;
-
+    static ClassVisitor visitor(final ClassVisitor next) {
+        // The whole class is read before any of it is passed on: whether it
+        // declares a stream() is known from its methods, and the interface
+        // that says so belongs in the header, which comes first.
+        return new ClassNode(Opcodes.ASM9) {
             @Override
-            public void visit(int version, int access, String name, String signature, String superName,
-                              String[] interfaces) {
-                exempt = exempt(name);
-                super.visit(version, access, name, signature, superName, interfaces);
-            }
-
-            @Override
-            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
-                                             String[] exceptions) {
-                MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                return mv == null || exempt ? mv : new Rewriter(mv);
+            public void visitEnd() {
+                super.visitEnd();
+                if (exempt(name)) {
+                    accept(next);
+                    return;
+                }
+                declareStreamSources(this);
+                accept(new ClassVisitor(Opcodes.ASM9, next) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
+                                                     String[] exceptions) {
+                        MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+                        return mv == null ? null : new Rewriter(mv);
+                    }
+                });
             }
         };
     }
@@ -381,14 +682,21 @@ final class CompatRewrites {
                             descriptor, false);
                     return;
                 }
-            } else if (opcode == Opcodes.INVOKEVIRTUAL) {
-                String target = VIRTUAL.get(owner + "." + name + descriptor);
+            } else if (opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE) {
+                String target = virtual(owner, name, descriptor);
                 if (target != null) {
                     super.visitMethodInsn(Opcodes.INVOKESTATIC, targetOwner(target), targetName(target, name),
-                            receiverFirst(owner, descriptor), false);
+                            targetDescriptor(target, receiverFirst(owner, descriptor)), false);
                     return;
                 }
-            } else if (opcode == Opcodes.INVOKESPECIAL && JAVA_LOCALE.equals(owner) && "<init>".equals(name)) {
+            } else if (opcode == Opcodes.INVOKESPECIAL && !"<init>".equals(name)) {
+                String target = superCall(owner, name, descriptor);
+                if (target != null) {
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, targetOwner(target), targetName(target, name),
+                            targetDescriptor(target, receiverFirst(owner, descriptor)), false);
+                    return;
+                }
+            } else if (opcode == Opcodes.INVOKESPECIAL && JAVA_LOCALE.equals(owner)) {
                 // The device's Locale is a language and a country. A locale
                 // of a language alone has the empty country; a variant has
                 // nowhere to go and is dropped.
@@ -422,6 +730,7 @@ final class CompatRewrites {
         @Override
         public void visitInvokeDynamicInsn(String name, String descriptor, Handle bootstrap, Object... arguments) {
             Object[] rewritten = arguments;
+            String site = descriptor;
             for (int i = 0; i < arguments.length; i++) {
                 if (arguments[i] instanceof Handle) {
                     Handle moved = rewrite((Handle) arguments[i]);
@@ -430,26 +739,50 @@ final class CompatRewrites {
                             rewritten = arguments.clone();
                         }
                         rewritten[i] = moved;
+                        site = boundReceiver(site, (Handle) arguments[i], moved);
                     }
                 }
             }
-            super.visitInvokeDynamicInsn(name, descriptor, bootstrap, rewritten);
+            super.visitInvokeDynamicInsn(name, site, bootstrap, rewritten);
+        }
+
+        /// The call site's descriptor for a method reference whose target
+        /// moved from `from` to `to`.
+        ///
+        /// A reference bound to its receiver (`words::stream`) captures the
+        /// receiver as the call site's one argument, typed as the method's
+        /// owner, and the JVM's lambda factory requires a captured argument
+        /// to have exactly the type the target takes it as. A stand-in that
+        /// takes its receiver as something wider -- `stream(Collection)` for
+        /// `List.stream()` -- therefore has the capture declared as that
+        /// wider type, which is what the value on the stack is anyway.
+        private static String boundReceiver(String site, Handle from, Handle to) {
+            if (from.getTag() == Opcodes.H_INVOKESTATIC || site.startsWith("()")) {
+                return site;
+            }
+            Type[] captured = Type.getArgumentTypes(site);
+            Type[] taken = Type.getArgumentTypes(to.getDesc());
+            if (captured.length != 1 || taken.length == 0 || captured[0].equals(taken[0])) {
+                return site;
+            }
+            return Type.getMethodDescriptor(Type.getReturnType(site), taken[0]);
         }
 
         /// The handle a method reference should hold instead of `h`, or `h`.
         private static Handle rewrite(Handle h) {
-            String key = h.getOwner() + "." + h.getName() + h.getDesc();
             if (h.getTag() == Opcodes.H_INVOKESTATIC) {
-                String target = STATIC.get(key);
+                String target = STATIC.get(h.getOwner() + "." + h.getName() + h.getDesc());
                 if (target != null) {
                     return new Handle(Opcodes.H_INVOKESTATIC, targetOwner(target), targetName(target, h.getName()),
                             h.getDesc(), false);
                 }
-            } else if (h.getTag() == Opcodes.H_INVOKEVIRTUAL) {
-                String target = VIRTUAL.get(key);
+            } else if (h.getTag() == Opcodes.H_INVOKEVIRTUAL || h.getTag() == Opcodes.H_INVOKEINTERFACE) {
+                // Collection::stream, Comparator::reversed: the reference
+                // takes its receiver as the first argument either way.
+                String target = virtual(h.getOwner(), h.getName(), h.getDesc());
                 if (target != null) {
                     return new Handle(Opcodes.H_INVOKESTATIC, targetOwner(target), targetName(target, h.getName()),
-                            receiverFirst(h.getOwner(), h.getDesc()), false);
+                            targetDescriptor(target, receiverFirst(h.getOwner(), h.getDesc())), false);
                 }
             }
             return h;
