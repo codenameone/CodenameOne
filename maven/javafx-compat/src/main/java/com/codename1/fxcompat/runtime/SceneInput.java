@@ -318,9 +318,6 @@ public final class SceneInput {
     private static boolean place(Node node, double sx, double sy) {
         Component peer = node.cn1Peer();
         Point2D local = node.sceneToLocal(sx, sy);
-        if (peer == null || local == null) {
-            return false;
-        }
         placeX = peer.getAbsoluteX() + Units.toPixels(local.getX());
         placeY = peer.getAbsoluteY() + Units.toPixels(local.getY());
         return true;

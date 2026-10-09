@@ -564,9 +564,6 @@ public class Scene implements EventTarget {
             collectTraversable(getRoot(), order);
         }
         Bounds here = from.localToScene(from.getBoundsInLocal());
-        if (here == null) {
-            return true;
-        }
         double hx = (here.getMinX() + here.getMaxX()) / 2;
         double hy = (here.getMinY() + here.getMaxY()) / 2;
         Node best = null;
