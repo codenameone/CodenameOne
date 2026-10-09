@@ -176,4 +176,51 @@ public final class NumberAxis extends ValueAxis<Number> {
         }
         return plain(n.doubleValue(), decimals, grouping);
     }
+
+    /// A formatter of tick labels that writes a number the way the axis
+    /// does, between a prefix and a suffix.
+    public static class DefaultFormatter extends StringConverter<Number> {
+
+        private final String prefix;
+        private final String suffix;
+
+        /// Creates a formatter for an axis.
+        public DefaultFormatter(NumberAxis axis) {
+            this(axis, null, null);
+        }
+
+        /// Creates a formatter that puts a text before and after a number.
+        public DefaultFormatter(NumberAxis axis, String prefix, String suffix) {
+            this.prefix = prefix;
+            this.suffix = suffix;
+        }
+
+        @Override
+        public String toString(Number object) {
+            if (object == null) {
+                return "";
+            }
+            double v = object.doubleValue();
+            String number = v == Math.rint(v) && Math.abs(v) < 1e15 ? String.valueOf((long) v) : String.valueOf(v);
+            return (prefix == null ? "" : prefix) + number + (suffix == null ? "" : suffix);
+        }
+
+        @Override
+        public Number fromString(String string) {
+            if (string == null) {
+                return null;
+            }
+            int from = prefix == null || !string.startsWith(prefix) ? 0 : prefix.length();
+            int to = suffix == null || suffix.length() == 0 || !string.endsWith(suffix) ? string.length()
+                    : string.length() - suffix.length();
+            if (to <= from) {
+                return null;
+            }
+            try {
+                return Double.valueOf(string.substring(from, to).trim());
+            } catch (NumberFormatException notANumber) {
+                return null;
+            }
+        }
+    }
 }

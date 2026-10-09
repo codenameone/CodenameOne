@@ -58,6 +58,8 @@ import javafx.scene.paint.Color;
 public class MenuBar extends Control {
 
     private final ObservableList<Menu> menus = FXCollections.observableArrayList();
+    private final javafx.beans.property.BooleanProperty useSystemMenuBar =
+            new javafx.beans.property.SimpleBooleanProperty(this, "useSystemMenuBar", false);
     private final ArrayList<Header> headers = new ArrayList<Header>();
     private Menu justClosed;
 
@@ -273,5 +275,21 @@ public class MenuBar extends Control {
             menu.showingProperty().removeListener(showing);
             link.detach();
         }
+    }
+
+    /// Sets whether the menus go to the menu bar of the system; recorded,
+    /// the bar is always shown where it is in the scene.
+    public final void setUseSystemMenuBar(boolean value) {
+        useSystemMenuBar.set(value);
+    }
+
+    /// Returns whether the menus were asked to go to the system's bar.
+    public final boolean isUseSystemMenuBar() {
+        return useSystemMenuBar.get();
+    }
+
+    /// Whether the menus go to the menu bar of the system; recorded.
+    public final javafx.beans.property.BooleanProperty useSystemMenuBarProperty() {
+        return useSystemMenuBar;
     }
 }

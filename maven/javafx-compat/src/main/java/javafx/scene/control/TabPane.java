@@ -75,7 +75,9 @@ import javafx.scene.paint.Color;
 ///   rotated.
 /// - Headers that do not fit the strip are cut off; there is no menu of
 ///   hidden tabs, and tabs cannot be dragged to reorder them.
-/// - The tab size limits, `rotateGraphic` and the drag policy are not
+/// - `rotateGraphic` is recorded: headers on a left or right side are not
+///   rotated, so their graphics have nothing to turn with.
+/// - The tab size limits and the drag policy are not
 ///   part of this layer.
 ///
 /// The pseudo-classes `top`, `right`, `bottom` and `left` follow the
@@ -111,6 +113,8 @@ public class TabPane extends Control {
     private final ObservableList<Tab> tabs = FXCollections.observableArrayList();
     private final ObjectProperty<SingleSelectionModel<Tab>> selectionModel =
             new FxObject<SingleSelectionModel<Tab>>(this, "selectionModel", null, MODEL);
+    private final javafx.beans.property.BooleanProperty rotateGraphic =
+            new javafx.beans.property.SimpleBooleanProperty(this, "rotateGraphic", false);
     private final ObjectProperty<Side> side = new FxObject<Side>(this, "side", Side.TOP, SIDE | Dirty.LAYOUT);
     private final ObjectProperty<TabClosingPolicy> tabClosingPolicy = new FxObject<TabClosingPolicy>(this,
             "tabClosingPolicy", TabClosingPolicy.SELECTED_TAB, HEADERS);
@@ -656,5 +660,21 @@ public class TabPane extends Control {
             List<Node> children = getChildrenUnmodifiable();
             return children.isEmpty() ? 0 : children.get(0).minHeight(-1);
         }
+    }
+
+    /// Sets whether the graphic of a header turns with a side header;
+    /// recorded, since side headers are upright here.
+    public final void setRotateGraphic(boolean value) {
+        rotateGraphic.set(value);
+    }
+
+    /// Returns whether the graphic of a header turns with a side header.
+    public final boolean isRotateGraphic() {
+        return rotateGraphic.get();
+    }
+
+    /// Whether the graphic of a header turns with a side header; recorded.
+    public final javafx.beans.property.BooleanProperty rotateGraphicProperty() {
+        return rotateGraphic;
     }
 }

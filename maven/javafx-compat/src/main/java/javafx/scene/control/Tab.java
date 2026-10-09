@@ -88,6 +88,7 @@ public class Tab implements EventTarget, Styleable {
     private final StringProperty text = new SimpleStringProperty(this, "text");
     private final ObjectProperty<Node> graphic = new SimpleObjectProperty<Node>(this, "graphic");
     private final ObjectProperty<Node> content = new SimpleObjectProperty<Node>(this, "content");
+    private final ObjectProperty<Tooltip> tooltip = new SimpleObjectProperty<Tooltip>(this, "tooltip");
     private final BooleanProperty closable = new SimpleBooleanProperty(this, "closable", true);
     private final BooleanProperty disable = new SimpleBooleanProperty(this, "disable", false);
     private final ReadOnlyBooleanWrapper disabled = new ReadOnlyBooleanWrapper(this, "disabled", false);
@@ -413,5 +414,20 @@ public class Tab implements EventTarget, Styleable {
     /// Returns whether any property was attached.
     public boolean hasProperties() {
         return properties != null && !properties.isEmpty();
+    }
+
+    /// Sets the tooltip of the tab; recorded, the header shows none.
+    public final void setTooltip(Tooltip value) {
+        tooltip.set(value);
+    }
+
+    /// Returns the tooltip of the tab.
+    public final Tooltip getTooltip() {
+        return tooltip.get();
+    }
+
+    /// The tooltip of the tab; recorded.
+    public final ObjectProperty<Tooltip> tooltipProperty() {
+        return tooltip;
     }
 }

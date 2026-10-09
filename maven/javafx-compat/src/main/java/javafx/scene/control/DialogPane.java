@@ -51,7 +51,9 @@ import javafx.scene.layout.Pane;
 /// button answers the dialog with its type and closes it, unless a
 /// handler of the button consumed the `ActionEvent` first.
 ///
-/// The graphic is recorded and not drawn. The header node, the expandable
+/// The graphic is recorded and not drawn. An expandable content is shown
+/// under the content by a `Show Details` link, in the window as it is: the
+/// dialog does not grow for it, so it takes room from the content. The header node, the expandable
 /// content and the style sheet of the JavaFX pane are absent.
 ///
 /// ## Style
@@ -73,6 +75,12 @@ public class DialogPane extends Pane {
     private final StringProperty contentText = new SimpleStringProperty(this, "contentText");
     private final ObjectProperty<Node> content = new SimpleObjectProperty<Node>(this, "content");
     private final ObjectProperty<Node> graphic = new SimpleObjectProperty<Node>(this, "graphic");
+    private final ObjectProperty<Node> expandableContent = new SimpleObjectProperty<Node>(this,
+            "expandableContent");
+    private final javafx.beans.property.BooleanProperty expanded =
+            new javafx.beans.property.SimpleBooleanProperty(this, "expanded", false);
+    private final Hyperlink detailsLink = new Hyperlink();
+    private final javafx.scene.layout.VBox withDetails = new javafx.scene.layout.VBox(PAD);
     private final Label headerLabel = new Label();
     private final Label contentLabel = new Label();
     private Dialog<?> dialog;
@@ -93,6 +101,15 @@ public class DialogPane extends Pane {
         headerText.addListener(rebuild);
         contentText.addListener(rebuild);
         content.addListener(rebuild);
+        expandableContent.addListener(rebuild);
+        expanded.addListener(rebuild);
+        detailsLink.getStyleClass().add("details-button");
+        detailsLink.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent event) {
+                setExpanded(!isExpanded());
+            }
+        });
         buttons.addListener(new ListChangeListener<ButtonType>() {
             @Override
             public void onChanged(Change<? extends ButtonType> change) {
@@ -132,12 +149,36 @@ public class DialogPane extends Pane {
         rebuild();
     }
 
-    private Node body() {
+    private Node plainBody() {
         Node c = content.get();
         if (c != null) {
             return c;
         }
         return blank(contentText.get()) ? null : contentLabel;
+    }
+
+    /// What is between the header and the buttons: the content, and with
+    /// an expandable content the link that shows it and, once expanded,
+    /// that content under it.
+    private Node body() {
+        Node plain = plainBody();
+        Node more = expandableContent.get();
+        if (more == null) {
+            return plain;
+        }
+        ArrayList<Node> all = new ArrayList<Node>();
+        if (plain != null) {
+            all.add(plain);
+        }
+        detailsLink.setText(isExpanded() ? "Hide Details" : "Show Details");
+        all.add(detailsLink);
+        if (isExpanded()) {
+            all.add(more);
+        }
+        if (!all.equals(withDetails.getChildren())) {
+            withDetails.getChildren().setAll(all);
+        }
+        return withDetails;
     }
 
     private void rebuild() {
@@ -350,5 +391,35 @@ public class DialogPane extends Pane {
         if (body != null) {
             place(body, x, y, w, Math.max(0, bottom - y));
         }
+    }
+
+    /// What a `Show Details` link shows under the content.
+    public final ObjectProperty<Node> expandableContentProperty() {
+        return expandableContent;
+    }
+
+    /// Sets what a `Show Details` link shows under the content.
+    public final void setExpandableContent(Node value) {
+        expandableContent.set(value);
+    }
+
+    /// Returns what a `Show Details` link shows under the content.
+    public final Node getExpandableContent() {
+        return expandableContent.get();
+    }
+
+    /// Whether the expandable content is shown.
+    public final javafx.beans.property.BooleanProperty expandedProperty() {
+        return expanded;
+    }
+
+    /// Shows or hides the expandable content.
+    public final void setExpanded(boolean value) {
+        expanded.set(value);
+    }
+
+    /// Returns whether the expandable content is shown.
+    public final boolean isExpanded() {
+        return expanded.get();
     }
 }

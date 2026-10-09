@@ -52,6 +52,8 @@ public class Tooltip extends PopupControl {
 
     private final StringProperty text = new SimpleStringProperty(this, "text", "");
     private final ArrayList<Node> nodes = new ArrayList<Node>();
+    private final javafx.beans.property.ObjectProperty<Node> graphic =
+            new javafx.beans.property.SimpleObjectProperty<Node>(this, "graphic");
 
     /// Creates a tooltip with no text.
     public Tooltip() {
@@ -149,5 +151,20 @@ public class Tooltip extends PopupControl {
     @Override
     public String getTypeSelector() {
         return "Tooltip";
+    }
+
+    /// Sets the graphic; recorded, a tooltip shows its text only.
+    public final void setGraphic(Node value) {
+        graphic.set(value);
+    }
+
+    /// Returns the graphic.
+    public final Node getGraphic() {
+        return graphic.get();
+    }
+
+    /// The graphic; recorded.
+    public final javafx.beans.property.ObjectProperty<Node> graphicProperty() {
+        return graphic;
     }
 }

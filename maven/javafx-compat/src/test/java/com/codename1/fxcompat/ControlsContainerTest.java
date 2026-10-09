@@ -401,4 +401,63 @@ public class ControlsContainerTest {
         assertSame(a.getChildren().get(1), a.getChildren().get(0).nextSibling());
         assertNull(a.getChildren().get(0).previousSibling());
     }
+
+    @Test
+    public void aDialogPaneShowsItsExpandableContentWhenAsked() {
+        javafx.scene.control.DialogPane pane = new javafx.scene.control.DialogPane();
+        pane.setContentText("message");
+        Label details = new Label("details");
+        details.setPrefSize(100, 60);
+        double plain = pane.prefHeight(-1);
+        pane.setExpandableContent(details);
+        double withLink = pane.prefHeight(-1);
+        assertTrue("the link to the details takes a line", withLink > plain);
+        assertNull("closed, the details are not in the pane", details.getParent());
+        pane.setExpanded(true);
+        assertNotNull(details.getParent());
+        assertTrue(pane.prefHeight(-1) >= withLink + 60);
+        pane.setExpanded(false);
+        assertNull(details.getParent());
+    }
+
+    @Test
+    public void theDefaultTickFormatterWritesANumberBetweenItsPrefixAndSuffix() {
+        javafx.scene.chart.NumberAxis axis = new javafx.scene.chart.NumberAxis();
+        javafx.scene.chart.NumberAxis.DefaultFormatter money =
+                new javafx.scene.chart.NumberAxis.DefaultFormatter(axis, "$", "k");
+        assertEquals("$12k", money.toString(Integer.valueOf(12)));
+        assertEquals("$1.5k", money.toString(Double.valueOf(1.5)));
+        assertEquals(12.0, money.fromString("$12k").doubleValue(), 0);
+        assertNull(money.fromString("$k"));
+        assertEquals("7", new javafx.scene.chart.NumberAxis.DefaultFormatter(axis).toString(Double.valueOf(7)));
+    }
+
+    @Test
+    public void aFillAndAStrokeTransitionBlendTheColoursOfAShape() {
+        com.codename1.fxcompat.runtime.FrameClock.reset();
+        com.codename1.fxcompat.runtime.FrameClock.setManual(true);
+        try {
+            javafx.scene.shape.Rectangle r = new javafx.scene.shape.Rectangle(10, 10, Color.BLACK);
+            r.setStroke(Color.WHITE);
+            javafx.animation.FillTransition fill = new javafx.animation.FillTransition(
+                    javafx.util.Duration.millis(1000), r, null, Color.WHITE);
+            fill.setInterpolator(javafx.animation.Interpolator.LINEAR);
+            javafx.animation.StrokeTransition stroke = new javafx.animation.StrokeTransition(
+                    javafx.util.Duration.millis(1000), r, Color.RED, Color.BLUE);
+            stroke.setInterpolator(javafx.animation.Interpolator.LINEAR);
+            fill.play();
+            stroke.play();
+            com.codename1.fxcompat.runtime.FrameClock.advance(500);
+            Color half = (Color) r.getFill();
+            assertEquals("half way from the fill the shape had", 0.5, half.getRed(), 0.02);
+            Color line = (Color) r.getStroke();
+            assertEquals(0.5, line.getRed(), 0.02);
+            assertEquals(0.5, line.getBlue(), 0.02);
+            com.codename1.fxcompat.runtime.FrameClock.advance(600);
+            assertEquals(Color.WHITE, r.getFill());
+            assertEquals(Color.BLUE, r.getStroke());
+        } finally {
+            com.codename1.fxcompat.runtime.FrameClock.reset();
+        }
+    }
 }

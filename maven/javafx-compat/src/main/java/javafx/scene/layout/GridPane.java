@@ -78,7 +78,8 @@ import javafx.scene.Node;
 /// alignment constraints, then by those of the row and column, and
 /// otherwise left and vertically centered.
 ///
-/// Grid lines (`gridLinesVisible`) are not supported.
+/// Grid lines (`gridLinesVisible`) are drawn solid along the edges of
+/// every column and row, behind the children; JavaFX dashes them.
 ///
 /// #### Styling
 ///
@@ -102,6 +103,8 @@ public class GridPane extends Pane {
     private static final String FILL_WIDTH = "gridpane-fill-width";
     private static final String FILL_HEIGHT = "gridpane-fill-height";
 
+    private final javafx.beans.property.BooleanProperty gridLinesVisible =
+            new com.codename1.fxcompat.runtime.FxBoolean(this, "gridLinesVisible", false, Dirty.PAINT);
     private final DoubleProperty hgap = new FxDouble(this, "hgap", 0, Dirty.LAYOUT);
     private final DoubleProperty vgap = new FxDouble(this, "vgap", 0, Dirty.LAYOUT);
     private final ObjectProperty<Pos> alignment = new FxObject<Pos>(this, "alignment", Pos.TOP_LEFT, Dirty.LAYOUT);
@@ -983,5 +986,44 @@ public class GridPane extends Pane {
             return true;
         }
         return super.cn1SetStyleValue(property, value);
+    }
+
+    /// Sets whether the edges of the columns and rows are drawn, which is
+    /// meant for looking at a layout while it is made.
+    public final void setGridLinesVisible(boolean value) {
+        gridLinesVisible.set(value);
+    }
+
+    /// Returns whether the edges of the columns and rows are drawn.
+    public final boolean isGridLinesVisible() {
+        return gridLinesVisible.get();
+    }
+
+    /// Whether the edges of the columns and rows are drawn.
+    public final javafx.beans.property.BooleanProperty gridLinesVisibleProperty() {
+        return gridLinesVisible;
+    }
+
+    @Override
+    public void cn1Paint(com.codename1.fxcompat.runtime.Renderer renderer) {
+        super.cn1Paint(renderer);
+        int columns = Math.min(columnStarts.length, columnWidths.length);
+        int rows = Math.min(rowStarts.length, rowHeights.length);
+        if (!isGridLinesVisible() || columns == 0 || rows == 0) {
+            return;
+        }
+        javafx.scene.paint.Color line = javafx.scene.paint.Color.rgb(30, 30, 30);
+        double left = columnStarts[0];
+        double right = columnStarts[columns - 1] + columnWidths[columns - 1];
+        double top = rowStarts[0];
+        double bottom = rowStarts[rows - 1] + rowHeights[rows - 1];
+        for (int i = 0; i < columns; i++) {
+            renderer.fillRect(columnStarts[i], top, 1, bottom - top, line);
+            renderer.fillRect(columnStarts[i] + columnWidths[i], top, 1, bottom - top + 1, line);
+        }
+        for (int i = 0; i < rows; i++) {
+            renderer.fillRect(left, rowStarts[i], right - left, 1, line);
+            renderer.fillRect(left, rowStarts[i] + rowHeights[i], right - left + 1, 1, line);
+        }
     }
 }
