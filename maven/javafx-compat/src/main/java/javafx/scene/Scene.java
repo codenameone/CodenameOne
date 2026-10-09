@@ -697,7 +697,11 @@ public class Scene implements EventTarget {
                 fire(target, new ContextMenuEvent(target, target, ContextMenuEvent.CONTEXT_MENU_REQUESTED, x, y, x,
                         y, false, new PickResult(target, x, y)));
             }
-            EventType<SwipeEvent> swipe = b == MouseButton.PRIMARY ? swipe(x - pressX, y - pressY) : null;
+            // A swipe is a gesture of a finger. A mouse dragged across a JavaFX scene
+            // is a drag and nothing else, and an application that moves on a swipe
+            // stays where it is under a mouse, as it does on a desktop.
+            EventType<SwipeEvent> swipe = b == MouseButton.PRIMARY && SceneInput.touchInput()
+                    ? swipe(x - pressX, y - pressY) : null;
             if (swipe != null) {
                 fire(pressedOn, new SwipeEvent(pressedOn, pressedOn, swipe, pressX, pressY, pressX, pressY,
                         SceneInput.shiftDown(), SceneInput.controlDown(), SceneInput.altDown(),

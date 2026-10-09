@@ -424,14 +424,50 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return 0;
     }
 
+    /// The key codes of the arrows and of fire, which are those of the
+    /// desktop port. With no code for them a test could not press an
+    /// arrow at all: every game action answered the same key, zero, and
+    /// zero is no key.
+    private static final int KEY_FIRE = -90;
+    private static final int KEY_UP = -91;
+    private static final int KEY_DOWN = -92;
+    private static final int KEY_LEFT = -93;
+    private static final int KEY_RIGHT = -94;
+
     @Override
     public int getGameAction(int a0) {
-        return 0;
+        switch (a0) {
+            case KEY_FIRE:
+                return Display.GAME_FIRE;
+            case KEY_UP:
+                return Display.GAME_UP;
+            case KEY_DOWN:
+                return Display.GAME_DOWN;
+            case KEY_LEFT:
+                return Display.GAME_LEFT;
+            case KEY_RIGHT:
+                return Display.GAME_RIGHT;
+            default:
+                return 0;
+        }
     }
 
     @Override
     public int getKeyCode(int a0) {
-        return 0;
+        switch (a0) {
+            case Display.GAME_FIRE:
+                return KEY_FIRE;
+            case Display.GAME_UP:
+                return KEY_UP;
+            case Display.GAME_DOWN:
+                return KEY_DOWN;
+            case Display.GAME_LEFT:
+                return KEY_LEFT;
+            case Display.GAME_RIGHT:
+                return KEY_RIGHT;
+            default:
+                return 0;
+        }
     }
 
     @Override
