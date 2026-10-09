@@ -27,6 +27,7 @@ import java.util.List;
 
 import com.codename1.fxcompat.runtime.EventHandlerManager;
 import com.codename1.fxcompat.runtime.SceneHost;
+import com.codename1.fxcompat.runtime.Mnemonics;
 import com.codename1.fxcompat.runtime.SceneInput;
 import com.codename1.fxcompat.runtime.StyleEngine;
 
@@ -46,6 +47,9 @@ import javafx.event.EventDispatchChain;
 import javafx.event.EventHandler;
 import javafx.event.EventTarget;
 import javafx.event.EventType;
+import javafx.scene.control.ButtonBase;
+import javafx.scene.control.Label;
+import javafx.scene.control.Labeled;
 import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
@@ -58,6 +62,8 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.input.PickResult;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.input.SwipeEvent;
+import javafx.scene.input.TouchEvent;
+import javafx.scene.input.TouchPoint;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Window;
@@ -108,6 +114,8 @@ public class Scene implements EventTarget {
     private final ArrayList<Node> hovered = new ArrayList<Node>();
     private final ArrayList<Node> pressedNodes = new ArrayList<Node>();
     private EventTarget pressTarget;
+    private EventTarget touchTarget;
+    private int touchSet;
     private MouseButton pressButton = MouseButton.NONE;
     private double pressX;
     private double pressY;
@@ -632,6 +640,9 @@ public class Scene implements EventTarget {
         EventHandlerManager.resetConsumedByFilter();
         Node under = pick(x, y);
         EventTarget target = under == null ? this : under;
+        if (SceneInput.touchInput()) {
+            touch(kind, target, x, y);
+        }
         if (kind == MouseEvent.MOUSE_PRESSED) {
             updateHover(under, x, y);
             pressTarget = target;
@@ -700,6 +711,41 @@ public class Scene implements EventTarget {
             fire(target, mouse(MouseEvent.MOUSE_MOVED, target, x, y, MouseButton.NONE, 0, false, false));
         }
         return EventHandlerManager.wasConsumedByFilter();
+    }
+
+    /// The touch a pointer event of a touch screen is, fired ahead of the
+    /// mouse event JavaFX makes of the same finger. There is one touch
+    /// point: Codename One hands the scene one pointer. Every event of a
+    /// touch goes to what the finger came down on, as in JavaFX, and the
+    /// events of one touch share an event set of one event each.
+    private void touch(EventType<MouseEvent> kind, EventTarget under, double x, double y) {
+        EventType<TouchEvent> type;
+        TouchPoint.State state;
+        if (kind == MouseEvent.MOUSE_PRESSED) {
+            touchTarget = under;
+            type = TouchEvent.TOUCH_PRESSED;
+            state = TouchPoint.State.PRESSED;
+        } else if (touchTarget == null) {
+            return;
+        } else if (kind == MouseEvent.MOUSE_DRAGGED) {
+            type = TouchEvent.TOUCH_MOVED;
+            state = TouchPoint.State.MOVED;
+        } else if (kind == MouseEvent.MOUSE_RELEASED) {
+            type = TouchEvent.TOUCH_RELEASED;
+            state = TouchPoint.State.RELEASED;
+        } else {
+            return;
+        }
+        EventTarget to = touchTarget;
+        if (kind == MouseEvent.MOUSE_RELEASED) {
+            touchTarget = null;
+        }
+        touchSet++;
+        TouchPoint point = new TouchPoint(1, state, x, y, x, y, to, new PickResult(under, x, y));
+        ArrayList<TouchPoint> points = new ArrayList<TouchPoint>();
+        points.add(point);
+        fire(to, new TouchEvent(to, to, type, point, points, touchSet, SceneInput.shiftDown(),
+                SceneInput.controlDown(), SceneInput.altDown(), SceneInput.metaDown()));
     }
 
     /// The swipe a finished press amounts to: far enough, quick enough
@@ -773,6 +819,11 @@ public class Scene implements EventTarget {
         if (deliverable(target)) {
             handled[0] = cn1FireAndReport(target, event);
         }
+        if (kind == KeyEvent.KEY_PRESSED && !handled[0] && SceneInput.altDown() && code != null
+                && (code.isLetterKey() || code.isDigitKey()) && code.getName().length() == 1
+                && mnemonic(getRoot(), Mnemonics.upper(code.getName().charAt(0)))) {
+            return EventHandlerManager.wasConsumedByFilter();
+        }
         if (kind == KeyEvent.KEY_PRESSED && !handled[0] && runAccelerator(event)) {
             return EventHandlerManager.wasConsumedByFilter();
         }
@@ -780,6 +831,37 @@ public class Scene implements EventTarget {
             traverse(SceneInput.shiftDown());
         }
         return EventHandlerManager.wasConsumedByFilter();
+    }
+
+    /// Acts on the first control under a node that is on screen, enabled
+    /// and marks a key as its mnemonic: a button is fired, and a label
+    /// that stands for another control hands that control the focus.
+    private static boolean mnemonic(Node node, char key) {
+        if (node == null || !node.isVisible() || node.isDisabled()) {
+            return false;
+        }
+        if (node instanceof Labeled) {
+            Labeled labeled = (Labeled) node;
+            if (labeled.isMnemonicParsing() && Mnemonics.key(labeled.getText()) == key) {
+                if (labeled instanceof ButtonBase) {
+                    ((ButtonBase) labeled).fire();
+                    return true;
+                }
+                if (labeled instanceof Label && ((Label) labeled).getLabelFor() != null) {
+                    ((Label) labeled).getLabelFor().requestFocus();
+                    return true;
+                }
+            }
+        }
+        if (node instanceof Parent) {
+            List<Node> children = ((Parent) node).getChildrenUnmodifiable();
+            for (int i = 0; i < children.size(); i++) {
+                if (mnemonic(children.get(i), key)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// Fires an event and answers whether anything consumed it.

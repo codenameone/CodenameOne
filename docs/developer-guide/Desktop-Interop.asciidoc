@@ -309,6 +309,30 @@ or when it calls `Platform.exit()`. When the application moves to the
 background, Swing frames receive `windowIconified`, and `windowDeiconified`
 when it returns.
 
+==== A JavaFX scene on a small screen
+
+A JavaFX scene is laid out in the size of the form, so a scene whose root
+is a layout pane reflows to a phone the way it reflows when its desktop
+window is resized. Two kinds of scene can't shrink that far, and for those
+the stage scrolls instead of cutting the content off as a desktop window
+does:
+
+* A root whose minimum size is larger than the form is laid out at that
+  minimum size.
+* A root that isn't resizable, a `Group`, keeps the size of what it holds.
+
+The stage scrolls only along the axis that overflows, by dragging, and the
+scene reports the laid-out size as its width and height while the stage
+reports the size on screen. An application written for a wide window is
+still more comfortable to use when its root can shrink, so give a layout
+that only works at one width a smaller minimum or a second arrangement.
+
+On a touch screen each press, drag and release reaches the scene as a
+`TouchEvent` with one touch point, followed by the mouse event JavaFX
+derives from it, and a quick drag along one axis also fires a `SwipeEvent`.
+`Platform.isSupported(ConditionalFeature.INPUT_TOUCH)` answers whether the
+device is one. Multi-touch gestures aren't delivered.
+
 ==== Dialogs block
 
 A modal dialog blocks its caller the way it does on the desktop.

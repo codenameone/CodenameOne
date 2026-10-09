@@ -50,8 +50,28 @@ public final class SceneInput {
     private SceneInput() {
     }
 
+    private static int touch;
+    private static int alt;
+
     private static boolean display() {
         return Display.isInitialized();
+    }
+
+    /// Returns whether the pointer is a finger: the display is a touch
+    /// screen and the platform is not a desktop, where the pointer is a
+    /// mouse whatever the screen can do. A scene then fires a touch event
+    /// ahead of every mouse event.
+    public static boolean touchInput() {
+        if (touch != 0) {
+            return touch > 0;
+        }
+        return display() && Display.getInstance().isTouchScreenDevice() && !Display.getInstance().isDesktop();
+    }
+
+    /// Fixes the answer of [#touchInput()]: positive for a finger,
+    /// negative for a mouse, zero for what the display says.
+    public static void setTouchInput(int value) {
+        touch = value;
     }
 
     /// Returns whether Shift is down.
@@ -66,7 +86,16 @@ public final class SceneInput {
 
     /// Returns whether Alt is down.
     public static boolean altDown() {
+        if (alt != 0) {
+            return alt > 0;
+        }
         return display() && Display.getInstance().isAltKeyDown();
+    }
+
+    /// Fixes the answer of [#altDown()]: positive for down, negative for
+    /// up, zero for what the display says.
+    public static void setAltDown(int value) {
+        alt = value;
     }
 
     /// Returns whether Meta (Command on a Mac) is down.

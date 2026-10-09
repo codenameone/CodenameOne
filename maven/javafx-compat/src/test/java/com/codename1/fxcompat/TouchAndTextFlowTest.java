@@ -39,6 +39,7 @@ import org.junit.Test;
 import com.codename1.compat.testing.HeadlessImplementation;
 import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.fxcompat.runtime.Fonts;
+import com.codename1.fxcompat.runtime.SceneInput;
 import com.codename1.fxcompat.runtime.Units;
 import com.codename1.ui.Display;
 
@@ -82,6 +83,50 @@ public class TouchAndTextFlowTest {
     @After
     public void tearDown() {
         Units.setScale(0);
+        SceneInput.setTouchInput(0);
+    }
+
+    /// On a touch screen every pointer event is a touch first: pressed,
+    /// moved and released, one point, delivered to what the finger came
+    /// down on wherever it went, each ahead of the mouse event JavaFX
+    /// synthesises from it.
+    @Test
+    public void aFingerFiresATouchAheadOfEveryMouseEvent() {
+        SceneInput.setTouchInput(1);
+        assertTrue(Platform.isSupported(ConditionalFeature.INPUT_TOUCH));
+        assertFalse(Platform.isSupported(ConditionalFeature.INPUT_MULTITOUCH));
+        Pane root = new Pane();
+        root.setPrefSize(200, 200);
+        Pane inner = new Pane();
+        inner.resizeRelocate(40, 40, 50, 50);
+        inner.setStyle("-fx-background-color: red;");
+        root.getChildren().add(inner);
+        final List<TouchEvent> seen = new ArrayList<TouchEvent>();
+        inner.addEventHandler(TouchEvent.ANY, e -> {
+            seen.add(e);
+            log.add(e.getEventType().getName() + " " + e.getTouchPoint().getState() + " "
+                    + e.getTouchPoint().getX() + "," + e.getTouchPoint().getY() + " scene "
+                    + e.getTouchPoint().getSceneX() + "," + e.getTouchPoint().getSceneY() + " n" + e.getTouchCount());
+        });
+        inner.setOnMousePressed(e -> log.add("mouse pressed"));
+        inner.setOnMouseDragged(e -> log.add("mouse dragged"));
+        inner.setOnMouseReleased(e -> log.add("mouse released"));
+        Scene scene = new Scene(root, 200, 200);
+        scene.cn1Layout(200, 200);
+        inner.resizeRelocate(40, 40, 50, 50);
+        scene.cn1Pointer(MouseEvent.MOUSE_PRESSED, 50, 60, MouseButton.PRIMARY);
+        scene.cn1Pointer(MouseEvent.MOUSE_DRAGGED, 150, 160, MouseButton.PRIMARY);
+        scene.cn1Pointer(MouseEvent.MOUSE_RELEASED, 150, 160, MouseButton.PRIMARY);
+        assertEquals("[TOUCH_PRESSED PRESSED 10.0,20.0 scene 50.0,60.0 n1, mouse pressed,"
+                + " TOUCH_MOVED MOVED 110.0,120.0 scene 150.0,160.0 n1, mouse dragged,"
+                + " TOUCH_RELEASED RELEASED 110.0,120.0 scene 150.0,160.0 n1, mouse released]", log.toString());
+        assertEquals(1, seen.get(0).getTouchPoint().getId());
+        assertSame(inner, seen.get(2).getTouchPoint().getTarget());
+        assertTrue(seen.get(1).getEventSetId() > seen.get(0).getEventSetId());
+        // A pointer that only moves is no finger on the screen.
+        log.clear();
+        scene.cn1Pointer(MouseEvent.MOUSE_MOVED, 50, 60, MouseButton.NONE);
+        assertEquals("[]", log.toString());
     }
 
     private Scene swipeScene() {
@@ -170,7 +215,8 @@ public class TouchAndTextFlowTest {
     }
 
     @Test
-    public void touchHandlersRegisterAndTheSceneFiresNoTouchOfItsOwn() {
+    public void touchHandlersRegisterAndAMouseFiresNoTouch() {
+        SceneInput.setTouchInput(-1);
         assertFalse(Platform.isSupported(ConditionalFeature.INPUT_TOUCH));
         assertFalse(Platform.isSupported(ConditionalFeature.INPUT_MULTITOUCH));
         assertTrue(Platform.isSupported(ConditionalFeature.INPUT_POINTER));

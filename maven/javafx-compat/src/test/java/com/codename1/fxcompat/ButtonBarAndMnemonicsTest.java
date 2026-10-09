@@ -198,4 +198,49 @@ public class ButtonBarAndMnemonicsTest {
         item.setMnemonicParsing(false);
         assertFalse(item.mnemonicParsingProperty().get());
     }
+
+    /// Alt with the key a text marks fires the button, wherever the focus
+    /// is; without Alt the key is only a key, and a hidden or disabled
+    /// button is passed over.
+    @Test
+    public void altWithTheMarkedKeyFiresTheButton() {
+        final java.util.List<String> log = new java.util.ArrayList<String>();
+        Button save = new Button("_Save");
+        save.setOnAction(e -> log.add("save"));
+        Button other = new Button("Sa_ve as");
+        other.setOnAction(e -> log.add("other"));
+        Button hidden = new Button("_Open");
+        hidden.setOnAction(e -> log.add("hidden"));
+        hidden.setVisible(false);
+        Button open = new Button("Reopen_(o)");
+        open.setOnAction(e -> log.add("open"));
+        CheckBox check = new CheckBox("_Bold");
+        javafx.scene.layout.VBox root = new javafx.scene.layout.VBox(save, other, hidden, open, check);
+        javafx.scene.Scene scene = new javafx.scene.Scene(root, 300, 300);
+        scene.cn1Layout(300, 300);
+        assertEquals('S', Mnemonics.key("_Save"));
+        assertEquals('V', Mnemonics.key("Sa_ve as"));
+        assertEquals('O', Mnemonics.key("Reopen_(o)"));
+        assertEquals(0, Mnemonics.key("a__b"));
+        assertEquals(0, Mnemonics.key("end_"));
+        assertEquals(0, Mnemonics.key(null));
+        try {
+            scene.cn1Key(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyCode.S, "s");
+            assertEquals("[]", log.toString());
+            com.codename1.fxcompat.runtime.SceneInput.setAltDown(1);
+            scene.cn1Key(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyCode.S, "s");
+            scene.cn1Key(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyCode.V, "v");
+            scene.cn1Key(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyCode.O, "o");
+            assertEquals("[save, other, open]", log.toString());
+            assertFalse(check.isSelected());
+            scene.cn1Key(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyCode.B, "b");
+            assertTrue(check.isSelected());
+            save.setDisable(true);
+            scene.cn1Key(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyCode.S, "s");
+            scene.cn1Key(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyCode.X, "x");
+            assertEquals("[save, other, open]", log.toString());
+        } finally {
+            com.codename1.fxcompat.runtime.SceneInput.setAltDown(0);
+        }
+    }
 }

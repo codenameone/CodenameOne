@@ -22,6 +22,7 @@
  */
 package javafx.application;
 
+import com.codename1.fxcompat.runtime.SceneInput;
 import com.codename1.fxcompat.runtime.StageHosts;
 import com.codename1.ui.Display;
 
@@ -81,7 +82,8 @@ public final class Platform {
     public static boolean isSupported(ConditionalFeature feature) {
         return feature == ConditionalFeature.GRAPHICS || feature == ConditionalFeature.CONTROLS
                 || feature == ConditionalFeature.FXML || feature == ConditionalFeature.SHAPE_CLIP
-                || feature == ConditionalFeature.INPUT_POINTER;
+                || feature == ConditionalFeature.INPUT_POINTER
+                || (feature == ConditionalFeature.INPUT_TOUCH && SceneInput.touchInput());
     }
 
     /// The toolkit needs no starting on Codename One; the code is run on

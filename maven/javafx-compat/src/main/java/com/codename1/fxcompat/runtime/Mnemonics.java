@@ -26,8 +26,9 @@ package com.codename1.fxcompat.runtime;
 ///
 /// JavaFX lets an underscore in the text of a button or a menu item mark
 /// the character after it as the mnemonic, the key that with a modifier
-/// fires the control, and does not show the underscore. This layer has no
-/// such key, but the text must read as it does in JavaFX:
+/// fires the control, and does not show the underscore. The scene fires
+/// the control when that key comes with Alt held; the character is not
+/// drawn underlined. The text reads as it does in JavaFX:
 ///
 /// - two underscores are one underscore that marks nothing;
 /// - the first single underscore with a character after it is left out;
@@ -66,5 +67,36 @@ public final class Mnemonics {
             }
         }
         return out.toString();
+    }
+
+    /// Returns the mnemonic a text marks, folded to upper case, or zero
+    /// when it marks none: the character after the first single
+    /// underscore, or the one in brackets after it.
+    public static char key(String text) {
+        if (text == null) {
+            return 0;
+        }
+        int n = text.length();
+        for (int i = 0; i + 1 < n; i++) {
+            if (text.charAt(i) != '_') {
+                continue;
+            }
+            char next = text.charAt(i + 1);
+            if (next == '_') {
+                i++;
+                continue;
+            }
+            if (next == '(' && i + 3 < n && text.charAt(i + 3) == ')') {
+                next = text.charAt(i + 2);
+            }
+            return upper(next);
+        }
+        return 0;
+    }
+
+    /// Folds an ASCII letter to upper case and leaves anything else. A
+    /// mnemonic is matched against a key, which has no locale.
+    public static char upper(char c) {
+        return c >= 'a' && c <= 'z' ? (char) (c - 'a' + 'A') : c;
     }
 }
