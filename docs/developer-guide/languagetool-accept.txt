@@ -799,3 +799,9 @@ Toolchain
 # (performance.asciidoc).
 inlining
 inlined
+
+# -----------------------------------------------------------------------------
+# Desktop compatibility chapter (Desktop-Interop.asciidoc and its measured
+# tables): the SwingX component set and the CPU architecture of the test machine.
+SwingX
+aarch64
