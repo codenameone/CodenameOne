@@ -198,7 +198,162 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.lang.Object createMutableImage(int a0, int a1, int a2) {
+        if (rasterImages && a0 > 0 && a1 > 0) {
+            int[][] rows = new int[a1][a0];
+            for (int y = 0; y < a1; y++) {
+                java.util.Arrays.fill(rows[y], a2);
+            }
+            return rows;
+        }
         return new Object();
+    }
+
+    // ------------------------------------------------------------ raster
+
+    /// When set, a mutable image keeps its pixels (as an `int[][]` of
+    /// rows) and what is drawn into it is rasterized: rectangles, lines,
+    /// polygons and ellipses in the current color and alpha, inside the
+    /// clip, and pixel images copied. A rounded rectangle is drawn square,
+    /// an arc as its whole ellipse, and a string as a solid box of the size
+    /// it measures -- enough to assert where something was painted and in
+    /// which color, which is all it is for. Sets nothing else: a test that
+    /// flips it resets it, and wants [#trackClip] for clipping to count.
+    public static boolean rasterImages;
+    private static final java.util.Map<Object, Integer> COLORS = new java.util.IdentityHashMap<Object, Integer>();
+    private static final java.util.Map<Object, Integer> RASTER_ALPHAS =
+            new java.util.IdentityHashMap<Object, Integer>();
+
+    /// Forgets the color and alpha kept for every raster graphics.
+    public static void resetRaster() {
+        COLORS.clear();
+        RASTER_ALPHAS.clear();
+    }
+
+    private static boolean raster(Object graphics) {
+        return rasterImages && graphics instanceof int[][];
+    }
+
+    private static int blend(int under, int rgb, int alpha) {
+        if (alpha >= 255) {
+            return 0xff000000 | rgb;
+        }
+        if (alpha <= 0) {
+            return under;
+        }
+        int ua = under >>> 24;
+        int r = (((rgb >> 16) & 0xff) * alpha + ((under >> 16) & 0xff) * (255 - alpha)) / 255;
+        int g = (((rgb >> 8) & 0xff) * alpha + ((under >> 8) & 0xff) * (255 - alpha)) / 255;
+        int b = ((rgb & 0xff) * alpha + (under & 0xff) * (255 - alpha)) / 255;
+        return (Math.max(ua, alpha) << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    private static void span(Object graphics, int x, int y, int w, int h) {
+        int[][] rows = (int[][]) graphics;
+        Integer c = COLORS.get(graphics);
+        Integer a = RASTER_ALPHAS.get(graphics);
+        int rgb = c == null ? 0 : c.intValue() & 0xffffff;
+        int alpha = a == null ? 255 : a.intValue();
+        int x1 = Math.max(0, x);
+        int y1 = Math.max(0, y);
+        int x2 = Math.min(rows[0].length, x + w);
+        int y2 = Math.min(rows.length, y + h);
+        if (trackClip) {
+            x1 = Math.max(x1, clipX);
+            y1 = Math.max(y1, clipY);
+            x2 = Math.min(x2, clipX + clipW);
+            y2 = Math.min(y2, clipY + clipH);
+        }
+        for (int row = y1; row < y2; row++) {
+            int[] line = rows[row];
+            for (int col = x1; col < x2; col++) {
+                line[col] = blend(line[col], rgb, alpha);
+            }
+        }
+    }
+
+    private static void line(Object graphics, int x1, int y1, int x2, int y2) {
+        int dx = Math.abs(x2 - x1);
+        int dy = Math.abs(y2 - y1);
+        int steps = Math.max(dx, dy);
+        if (steps == 0) {
+            span(graphics, x1, y1, 1, 1);
+            return;
+        }
+        if (dy == 0) {
+            span(graphics, Math.min(x1, x2), y1, dx + 1, 1);
+            return;
+        }
+        if (dx == 0) {
+            span(graphics, x1, Math.min(y1, y2), 1, dy + 1);
+            return;
+        }
+        for (int i = 0; i <= steps; i++) {
+            span(graphics, x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps, 1, 1);
+        }
+    }
+
+    private static void ellipse(Object graphics, int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        double rx = w / 2.0;
+        double ry = h / 2.0;
+        for (int row = 0; row < h; row++) {
+            double t = (row + 0.5 - ry) / ry;
+            int half = (int) Math.round(rx * Math.sqrt(Math.max(0, 1 - t * t)));
+            if (half > 0) {
+                span(graphics, (int) Math.round(x + rx - half), y + row, half * 2, 1);
+            }
+        }
+    }
+
+    @Override
+    public void fillPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        if (!raster(graphics) || nPoints < 3) {
+            return;
+        }
+        int top = Integer.MAX_VALUE;
+        int bottom = Integer.MIN_VALUE;
+        for (int i = 0; i < nPoints; i++) {
+            top = Math.min(top, yPoints[i]);
+            bottom = Math.max(bottom, yPoints[i]);
+        }
+        for (int row = top; row <= bottom; row++) {
+            int left = Integer.MAX_VALUE;
+            int right = Integer.MIN_VALUE;
+            for (int i = 0; i < nPoints; i++) {
+                int j = (i + 1) % nPoints;
+                int ya = yPoints[i];
+                int yb = yPoints[j];
+                if (ya == yb) {
+                    if (ya == row) {
+                        left = Math.min(left, Math.min(xPoints[i], xPoints[j]));
+                        right = Math.max(right, Math.max(xPoints[i], xPoints[j]));
+                    }
+                    continue;
+                }
+                if (row < Math.min(ya, yb) || row > Math.max(ya, yb)) {
+                    continue;
+                }
+                int at = xPoints[i] + (xPoints[j] - xPoints[i]) * (row - ya) / (yb - ya);
+                left = Math.min(left, at);
+                right = Math.max(right, at);
+            }
+            if (left <= right) {
+                span(graphics, left, row, right - left + 1, 1);
+            }
+        }
+    }
+
+    @Override
+    public void drawPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        if (!raster(graphics)) {
+            return;
+        }
+        for (int i = 0; i < nPoints; i++) {
+            int j = (i + 1) % nPoints;
+            line(graphics, xPoints[i], yPoints[i], xPoints[j], yPoints[j]);
+        }
     }
 
     /// Counts encoded images handed to [#createImage(byte[], int, int)], so a
@@ -286,11 +441,15 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public int getColor(java.lang.Object a0) {
-        return 0;
+        Integer c = rasterImages ? COLORS.get(a0) : null;
+        return c == null ? 0 : c.intValue();
     }
 
     @Override
     public void setColor(java.lang.Object a0, int a1) {
+        if (raster(a0)) {
+            COLORS.put(a0, Integer.valueOf(a1));
+        }
     }
 
     /// When set, each graphics context keeps the alpha it was given, and
@@ -314,6 +473,9 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void setAlpha(java.lang.Object a0, int a1) {
+        if (raster(a0)) {
+            RASTER_ALPHAS.put(a0, Integer.valueOf(a1));
+        }
         if (recordDraws) {
             ALPHAS.put(a0, Integer.valueOf(a1));
         }
@@ -321,6 +483,10 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public int getAlpha(java.lang.Object a0) {
+        if (raster(a0)) {
+            Integer a = RASTER_ALPHAS.get(a0);
+            return a == null ? 255 : a.intValue();
+        }
         return recordDraws ? alphaOf(a0) : 0;
     }
 
@@ -425,10 +591,16 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawLine(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        if (raster(a0)) {
+            line(a0, a1, a2, a3, a4);
+        }
     }
 
     @Override
     public void fillRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        if (raster(a0)) {
+            span(a0, a1, a2, a3, a4);
+        }
         recordDraw("fillRect", a0);
     }
 
@@ -452,18 +624,31 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawRect(java.lang.Object a0, int a1, int a2, int a3, int a4) {
+        if (raster(a0)) {
+            line(a0, a1, a2, a1 + a3, a2);
+            line(a0, a1, a2 + a4, a1 + a3, a2 + a4);
+            line(a0, a1, a2, a1, a2 + a4);
+            line(a0, a1 + a3, a2, a1 + a3, a2 + a4);
+        }
     }
 
     @Override
     public void drawRoundRect(java.lang.Object a0, int a1, int a2, int a3, int a4, int a5, int a6) {
+        drawRect(a0, a1, a2, a3, a4);
     }
 
     @Override
     public void fillRoundRect(java.lang.Object a0, int a1, int a2, int a3, int a4, int a5, int a6) {
+        if (raster(a0)) {
+            span(a0, a1, a2, a3, a4);
+        }
     }
 
     @Override
     public void fillArc(java.lang.Object a0, int a1, int a2, int a3, int a4, int a5, int a6) {
+        if (raster(a0)) {
+            ellipse(a0, a1, a2, a3, a4);
+        }
     }
 
     @Override
@@ -472,6 +657,9 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawString(java.lang.Object a0, java.lang.String a1, int a2, int a3) {
+        if (raster(a0) && a1 != null) {
+            span(a0, a2, a3, a1.length() * CHAR_WIDTH, FONT_HEIGHT);
+        }
         if (recordText) {
             drawnText.add(new Object[]{a1, Integer.valueOf(a2), Integer.valueOf(a3)});
         }
@@ -484,6 +672,23 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawImage(java.lang.Object a0, java.lang.Object a1, int a2, int a3) {
+        if (raster(a0) && a1 instanceof int[][]) {
+            int[][] src = (int[][]) a1;
+            int[][] rows = (int[][]) a0;
+            for (int y = 0; y < src.length; y++) {
+                int row = a3 + y;
+                if (row < 0 || row >= rows.length || (trackClip && (row < clipY || row >= clipY + clipH))) {
+                    continue;
+                }
+                for (int x = 0; x < src[y].length; x++) {
+                    int col = a2 + x;
+                    if (col < 0 || col >= rows[row].length || (trackClip && (col < clipX || col >= clipX + clipW))) {
+                        continue;
+                    }
+                    rows[row][col] = blend(rows[row][col], src[y][x] & 0xffffff, src[y][x] >>> 24);
+                }
+            }
+        }
         recordDraw("drawImage", a0);
     }
 
@@ -500,7 +705,7 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     public java.lang.Object getNativeGraphics(java.lang.Object a0) {
         // With pixelImages, drawing into a pixel image draws into its rows;
         // only clearRect writes pixels so far.
-        if (pixelImages && a0 instanceof int[][]) {
+        if ((pixelImages || rasterImages) && a0 instanceof int[][]) {
             return a0;
         }
         return new Object();
@@ -540,8 +745,14 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return FONT;
     }
 
+    /// The face of the system font asked for last, -1 before any was:
+    /// every font here is the same one, so this is all a test can tell a
+    /// fixed width font by.
+    public static int lastFontFace = -1;
+
     @Override
     public java.lang.Object createFont(int a0, int a1, int a2) {
+        lastFontFace = a0;
         return FONT;
     }
 

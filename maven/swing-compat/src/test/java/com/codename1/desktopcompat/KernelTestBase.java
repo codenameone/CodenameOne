@@ -89,6 +89,48 @@ public abstract class KernelTestBase {
         }
     }
 
+    /// Paints the frame's form into pixels and answers them as rows of
+    /// ARGB, in device pixels. Shapes are filled in their color inside the
+    /// clip; a string is a solid box of the size it measures.
+    protected int[][] raster(JFrame f) {
+        boolean clip = HeadlessImplementation.trackClip;
+        HeadlessImplementation.rasterImages = true;
+        HeadlessImplementation.trackClip = true;
+        try {
+            Image target = Image.createImage(HeadlessImplementation.WIDTH, HeadlessImplementation.HEIGHT, 0xffffffff);
+            com.codename1.ui.Graphics g = target.getGraphics();
+            g.setClip(0, 0, HeadlessImplementation.WIDTH, HeadlessImplementation.HEIGHT);
+            f.cn1Form().paintComponent(g);
+            Object rows = target.getImage();
+            return rows instanceof int[][] ? (int[][]) rows : new int[0][0];
+        } finally {
+            HeadlessImplementation.rasterImages = false;
+            HeadlessImplementation.trackClip = clip;
+            HeadlessImplementation.resetRaster();
+        }
+    }
+
+    /// The pixel painted at a logical point of `c`, as RGB.
+    protected static int pixel(int[][] rows, Component c, int x, int y) {
+        int[] p = onDisplay(c, x, y);
+        return rows[p[1]][p[0]] & 0xffffff;
+    }
+
+    /// How many pixels inside the logical rectangle of `c` have the color.
+    protected static int count(int[][] rows, Component c, int x, int y, int w, int h, int rgb) {
+        int[] a = onDisplay(c, x, y);
+        int[] b = onDisplay(c, x + w, y + h);
+        int n = 0;
+        for (int row = Math.max(0, a[1]); row < Math.min(rows.length, b[1]); row++) {
+            for (int col = Math.max(0, a[0]); col < Math.min(rows[row].length, b[0]); col++) {
+                if ((rows[row][col] & 0xffffff) == (rgb & 0xffffff)) {
+                    n++;
+                }
+            }
+        }
+        return n;
+    }
+
     protected static Object[] find(List<Object[]> text, String s) {
         for (int i = 0; i < text.size(); i++) {
             if (s.equals(text.get(i)[0])) {
@@ -109,9 +151,12 @@ public abstract class KernelTestBase {
         f.cn1Form().pointerPressed(p[0], p[1]);
     }
 
+    /// Drags the pointer the way the display does: through the overload
+    /// of a form that takes arrays, which is the one a real drag arrives
+    /// at.
     protected static void drag(JFrame f, Component c, int x, int y) {
         int[] p = onDisplay(c, x, y);
-        f.cn1Form().pointerDragged(p[0], p[1]);
+        f.cn1Form().pointerDragged(new int[]{p[0]}, new int[]{p[1]});
     }
 
     protected static void release(JFrame f, Component c, int x, int y) {
