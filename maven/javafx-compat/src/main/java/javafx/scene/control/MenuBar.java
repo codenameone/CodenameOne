@@ -61,6 +61,12 @@ public class MenuBar extends Control {
     private final ArrayList<Header> headers = new ArrayList<Header>();
     private Menu justClosed;
 
+    /// The standard theme's bar: a shade under the base colour.
+    @Override
+    public String cn1DefaultStyle() {
+        return "-fx-background-color: derive(-fx-base, -3%);";
+    }
+
     /// Creates a bar with no menus.
     public MenuBar() {
         this((Menu[]) null);
@@ -231,7 +237,9 @@ public class MenuBar extends Control {
         Header(Menu m) {
             menu = m;
             label = new Label();
-            label.getStyleClass().setAll(m.getStyleClass());
+            // The label of a menu is a label to a style sheet as well:
+            // ".menu-bar .label" is how one sets the font of the bar.
+            label.getStyleClass().addAll(m.getStyleClass());
             label.setFocusTraversable(false);
             label.setPadding(new Insets(4, 8, 4, 8));
             link = new MenuLink(m, label, Side.BOTTOM).attach();

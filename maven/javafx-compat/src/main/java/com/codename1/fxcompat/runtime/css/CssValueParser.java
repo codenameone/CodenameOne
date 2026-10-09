@@ -40,17 +40,21 @@ import java.util.List;
 /// - paint: `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, a colour name,
 ///   `transparent`, `rgb()`, `rgba()`, `hsb()`, `hsba()`, `hsl()`,
 ///   `hsla()`, `derive(colour, n%)`, `linear-gradient(...)`,
-///   `radial-gradient(...)`, or the name of a looked-up colour. `ladder()`
-///   is not supported.
+///   `radial-gradient(...)`, `ladder(colour, stops)`, or the name of a
+///   looked-up colour. A border colour is one to four paints, one per
+///   side.
 /// - length: a number with `px`, `pt`, `pc`, `in`, `cm`, `mm`, `em`, `ex`
 ///   or no unit (pixels).
 /// - insets and radii: one to four lengths; radii also take percentages.
 /// - font: `[italic] [bold | 100..900] size family`.
 /// - flags, keywords, alignments and cursors: the word.
 ///
-/// A value in several layers (`-fx-background-color: a, b`) has only its
-/// last layer kept, since a node has one background and one border; that is
-/// reported through [#warning()], not as a failure.
+/// A value in several layers (`-fx-background-color: a, b`) is a
+/// [CssValue#LIST] for the properties of a background and a border, see
+/// [CssProperties#isLayered(String)]. A border style is read for its line
+/// only -- `segments()` as a dashed line -- and its placement, join and
+/// cap are left out. Anywhere else a list has only its last value kept,
+/// which is reported through [#warning()], not as a failure.
 ///
 /// An instance is not shared between threads; it holds the outcome of the
 /// last call.
@@ -163,6 +167,18 @@ public final class CssValueParser {
         if (kind == CssProperties.FONT_FAMILY || kind == CssProperties.FONT) {
             // The further families are fallbacks; a device has one font per name.
             value = layers.get(0);
+        } else if (layers.size() > 1 && CssProperties.isLayered(property)) {
+            CssValue[] parts = new CssValue[layers.size()];
+            String kept = null;
+            for (int i = 0; i < parts.length; i++) {
+                parts[i] = layer(kind, property, layers.get(i));
+                if (parts[i] == null) {
+                    return null;
+                }
+                kept = warning == null ? kept : warning;
+            }
+            warning = kept;
+            return new CssValue(CssValue.LIST, 0, null, null, null, parts);
         } else if (layers.size() > 1) {
             if (kind != CssProperties.PAINT && kind != CssProperties.INSETS && kind != CssProperties.RADII
                     && kind != CssProperties.LOOKUP_DEFINITION) {
@@ -171,11 +187,57 @@ public final class CssValueParser {
             warning = "layered values are not supported; only the last layer is used";
             value = layers.get(layers.size() - 1);
         }
+        return layer(kind, property, value);
+    }
+
+    /// The line of a border style: its first word, with `segments()`
+    /// standing for a dashed line.
+    private CssValue borderStyle(String first) {
+        String word = CssProperties.lower(first);
+        if (word.startsWith("segments(")) {
+            return CssValue.text(CssValue.KEYWORD, "dashed");
+        }
+        if (!CssProperties.accepts("-fx-border-style", word)) {
+            return fail("'" + first + "' is not a border style");
+        }
+        return CssValue.text(CssValue.KEYWORD, word);
+    }
+
+    /// One to four paints, for the top, right, bottom and left side; a
+    /// side left out takes the paint of the one opposite, as in CSS.
+    private CssValue sides(List<String> terms) {
+        CssValue[] p = new CssValue[4];
+        for (int i = 0; i < terms.size(); i++) {
+            p[i] = paint(terms.get(i));
+            if (p[i] == null) {
+                return null;
+            }
+        }
+        int n = terms.size();
+        if (n < 2) {
+            p[1] = p[0];
+        }
+        if (n < 3) {
+            p[2] = p[0];
+        }
+        if (n < 4) {
+            p[3] = p[1];
+        }
+        return new CssValue(CssValue.SIDES, 0, null, null, null, p);
+    }
+
+    private CssValue layer(int kind, String property, String value) {
         List<String> terms = split(value, ' ');
         if (terms == null || terms.isEmpty()) {
             return fail("the value is empty");
         }
         String first = terms.get(0);
+        if ("-fx-border-style".equals(property)) {
+            return borderStyle(first);
+        }
+        if ("-fx-border-color".equals(property) && terms.size() > 1 && terms.size() <= 4) {
+            return sides(terms);
+        }
         switch (kind) {
             case CssProperties.LOOKUP_DEFINITION: {
                 if (terms.size() != 1) {
@@ -626,7 +688,7 @@ public final class CssValueParser {
             } else if ("radial-gradient".equals(name)) {
                 return radial(args);
             } else if ("ladder".equals(name)) {
-                return fail("ladder() is not supported");
+                return ladder(args, term);
             }
             return fail("'" + name + "()' is not a paint");
         }
@@ -813,7 +875,8 @@ public final class CssValueParser {
 
     private CssValue colorOnly(String term) {
         CssValue v = paint(term);
-        if (v != null && v.type() != CssValue.COLOR && v.type() != CssValue.LOOKUP && v.type() != CssValue.DERIVE) {
+        if (v != null && v.type() != CssValue.COLOR && v.type() != CssValue.LOOKUP && v.type() != CssValue.DERIVE
+                && v.type() != CssValue.LADDER) {
             return fail("'" + term + "' is not a colour");
         }
         return v;
@@ -890,6 +953,27 @@ public final class CssValueParser {
             return fail("'" + amount + "' is not a percentage");
         }
         return new CssValue(CssValue.DERIVE, 0, new double[] {pct}, null, null, new CssValue[] {base});
+    }
+
+    /// `ladder(colour, stop, stop...)`: the colour at the place in the
+    /// stops that the brightness of the first colour marks.
+    private CssValue ladder(List<String> args, String term) {
+        if (args.size() < 3) {
+            return fail("'" + term + "' needs a colour and at least two stops");
+        }
+        CssValue base = colorOnly(args.get(0));
+        if (base == null) {
+            return null;
+        }
+        double[] nums = new double[args.size() - 1];
+        CssValue[] colors = stops(args, 1, nums, 0);
+        if (colors == null) {
+            return null;
+        }
+        CssValue[] parts = new CssValue[colors.length + 1];
+        parts[0] = base;
+        System.arraycopy(colors, 0, parts, 1, colors.length);
+        return new CssValue(CssValue.LADDER, 0, nums, null, null, parts);
     }
 
     /// Reads the stops from `args[from]` on into `nums` from `at` on, and

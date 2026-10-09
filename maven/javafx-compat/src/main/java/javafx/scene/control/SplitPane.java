@@ -181,7 +181,12 @@ public class SplitPane extends Control {
     }
 
     private Region bar(final Divider divider) {
-        Region r = new Region();
+        Region r = new Region() {
+            @Override
+            public String cn1DefaultStyle() {
+                return "-fx-background-color: derive(-fx-base, -12%);";
+            }
+        };
         r.setManaged(false);
         r.getStyleClass().add("split-pane-divider");
         r.setBackground(new Background(new BackgroundFill(Color.gray(0.8), CornerRadii.EMPTY, Insets.EMPTY)));

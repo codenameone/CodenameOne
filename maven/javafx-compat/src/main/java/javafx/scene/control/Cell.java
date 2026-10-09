@@ -82,7 +82,7 @@ public class Cell<T> extends Labeled {
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
     private static final PseudoClass EMPTY = PseudoClass.getPseudoClass("empty");
     private static final PseudoClass FILLED = PseudoClass.getPseudoClass("filled");
-    private static final Color HIGHLIGHT = Color.color(0, 0.59, 0.79, 0.35);
+    private static final Color HIGHLIGHT = Color.rgb(0, 150, 201);
 
     private final ObjectProperty<T> item = new SimpleObjectProperty<T>(this, "item");
     private final ReadOnlyBooleanWrapper empty = new ReadOnlyBooleanWrapper(this, "empty", true);
@@ -143,7 +143,8 @@ public class Cell<T> extends Labeled {
             return;
         }
         if (textFillProperty().get() == null && themeText >= 0) {
-            c.getAllStyles().setFgColor(onDark() ? 0xffffff : themeText);
+            c.getAllStyles().setFgColor(isSelected() && getBackground() == null ? selectedText()
+                    : (onDark() ? 0xffffff : themeText));
         }
         if (basePadding < 0) {
             basePadding = c.getStyle().getPaddingLeftNoRTL();
@@ -152,6 +153,21 @@ public class Cell<T> extends Labeled {
         Style style = c.getAllStyles();
         style.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
         style.setPaddingLeft(basePadding + Units.toPixels(graphicWidth()));
+    }
+
+    /// The bar behind a selected cell: the theme's `-fx-selection-bar`
+    /// where the cell stands, which a style sheet recolours through
+    /// `-fx-accent`.
+    private Color selectionBar() {
+        Color c = com.codename1.fxcompat.runtime.CssEngine.themeColor(this, "-fx-selection-bar");
+        return c == null ? HIGHLIGHT : c;
+    }
+
+    /// White on a bar that reads as dark, the theme's text otherwise.
+    private int selectedText() {
+        Color c = selectionBar();
+        return 0.3 * c.getRed() + 0.59 * c.getGreen() + 0.11 * c.getBlue() < 0.455 ? 0xffffff
+                : (themeText >= 0 ? themeText : 0);
     }
 
     /// Whether the nearest background behind the text is a dark colour.
@@ -220,7 +236,7 @@ public class Cell<T> extends Labeled {
     public void cn1Paint(Renderer renderer) {
         super.cn1Paint(renderer);
         if (isSelected() && getBackground() == null) {
-            renderer.fillRect(0, 0, getWidth(), getHeight(), HIGHLIGHT);
+            renderer.fillRect(0, 0, getWidth(), getHeight(), selectionBar());
         }
     }
 
@@ -333,6 +349,8 @@ public class Cell<T> extends Labeled {
         if (this.selected.get() != selected) {
             this.selected.set(selected);
             pseudoClassStateChanged(SELECTED, selected);
+            // The text changes colour with the bar behind it.
+            cn1Invalidated(com.codename1.fxcompat.runtime.Dirty.NATIVE);
             cn1Repaint();
         }
     }

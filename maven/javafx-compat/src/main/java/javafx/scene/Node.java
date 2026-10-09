@@ -591,6 +591,15 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         return styleState;
     }
 
+    /// The declarations this node has before any style sheet is read,
+    /// written as an inline style, or `null` for none. They are what the
+    /// standard theme of JavaFX would give the node, and lose to every
+    /// rule of a sheet; a colour they name is looked up where the node
+    /// stands, which is how redefining `-fx-base` recolours a control.
+    public String cn1DefaultStyle() {
+        return null;
+    }
+
     /// Stores what the style engine keeps for this node.
     public final void cn1SetStyleState(Object state) {
         styleState = state;

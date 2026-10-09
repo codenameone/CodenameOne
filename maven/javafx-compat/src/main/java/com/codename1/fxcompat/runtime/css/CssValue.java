@@ -58,6 +58,13 @@ package com.codename1.fxcompat.runtime.css;
 ///   the number of box passes of the blur; `nums` holds the radius, the
 ///   spread or choke as a fraction, and the x and y offsets; `parts[0]` is
 ///   the colour.
+/// - [#LIST]: `parts` holds one value per layer, in the order written,
+///   each of the type the property takes for a single layer.
+/// - [#SIDES]: `parts` holds the paints of the top, right, bottom and left
+///   side.
+/// - [#LADDER]: `parts[0]` is the colour whose brightness picks, the
+///   further parts the colours of the stops; `nums` holds one offset per
+///   stop, as [#LINEAR] does from its fifth number on.
 ///
 /// A value is immutable; the arrays are never changed after construction.
 public final class CssValue {
@@ -88,6 +95,12 @@ public final class CssValue {
     public static final int URL = 12;
     /// A shadow effect.
     public static final int EFFECT = 13;
+    /// The layers of a background or a border.
+    public static final int LIST = 14;
+    /// A paint for each side of a border.
+    public static final int SIDES = 15;
+    /// A colour picked from a row of stops by the brightness of another.
+    public static final int LADDER = 16;
 
     /// The `flags` of an [#EFFECT] that is `dropshadow()`.
     public static final int EFFECT_DROP = 1;

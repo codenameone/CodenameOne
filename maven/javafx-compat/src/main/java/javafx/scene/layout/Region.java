@@ -30,6 +30,7 @@ import com.codename1.fxcompat.runtime.FxDouble;
 import com.codename1.fxcompat.runtime.FxObject;
 import com.codename1.fxcompat.runtime.FxPath;
 import com.codename1.fxcompat.runtime.Renderer;
+import com.codename1.fxcompat.runtime.StyleList;
 import com.codename1.fxcompat.runtime.Units;
 
 import javafx.beans.property.BooleanProperty;
@@ -108,13 +109,14 @@ public class Region extends Parent {
     private Background baseBackground;
     private Border baseBorder;
     private boolean composing;
-    private Paint styleFill;
+    private Object styleFill;
     private Object styleFillRadii;
     private Object styleFillInsets;
-    private Paint styleStroke;
+    private Object styleStroke;
     private Object styleStrokeWidths;
     private Object styleStrokeRadii;
-    private BorderStrokeStyle styleStrokeStyle;
+    private Object styleStrokeStyle;
+    private Object styleStrokeInsets;
     private Insets insetsCache;
 
     /// Creates an empty region.
@@ -811,6 +813,40 @@ public class Region extends Parent {
         return fallback;
     }
 
+    private static Paint side(StyleList sides, int index) {
+        Object p = sides.get(index);
+        return p instanceof Paint ? (Paint) p : null;
+    }
+
+    /// Whether `value` is what `single` accepts, or layers that each are.
+    private static boolean layersOf(Object value, int what) {
+        for (int i = 0; i < StyleList.layers(value); i++) {
+            Object v = StyleList.layer(value, i);
+            boolean ok;
+            switch (what) {
+                case 0:
+                    ok = v instanceof Paint;
+                    break;
+                case 1:
+                    ok = v instanceof Paint || (v instanceof StyleList && ((StyleList) v).isSides());
+                    break;
+                case 2:
+                    ok = v instanceof CornerRadii || v instanceof Number;
+                    break;
+                case 3:
+                    ok = v instanceof Insets || v instanceof Number || v instanceof BorderWidths;
+                    break;
+                default:
+                    ok = strokeStyle(v) != null;
+                    break;
+            }
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void compose() {
         composing = true;
         try {
@@ -818,16 +854,27 @@ public class Region extends Parent {
             if (styleFill != null || styleFillRadii != null || styleFillInsets != null) {
                 List<BackgroundFill> fills = bg == null ? null : bg.getFills();
                 if (styleFill != null) {
+                    // One fill per colour; a colour without radii or
+                    // insets of its own takes those of the last layer
+                    // that has them.
                     BackgroundFill first = fills == null || fills.isEmpty() ? null : fills.get(0);
-                    bg = new Background(new BackgroundFill(styleFill,
-                            radii(styleFillRadii, first == null ? CornerRadii.EMPTY : first.getRadii()),
-                            insets(styleFillInsets, first == null ? Insets.EMPTY : first.getInsets())));
+                    BackgroundFill[] made = new BackgroundFill[StyleList.layers(styleFill)];
+                    for (int i = 0; i < made.length; i++) {
+                        Object paint = StyleList.layer(styleFill, i);
+                        made[i] = new BackgroundFill(paint instanceof Paint ? (Paint) paint : null,
+                                radii(StyleList.layer(styleFillRadii, i),
+                                        first == null ? CornerRadii.EMPTY : first.getRadii()),
+                                insets(StyleList.layer(styleFillInsets, i),
+                                        first == null ? Insets.EMPTY : first.getInsets()));
+                    }
+                    bg = new Background(made);
                 } else if (fills != null && !fills.isEmpty()) {
                     BackgroundFill[] changed = new BackgroundFill[fills.size()];
                     for (int i = 0; i < changed.length; i++) {
                         BackgroundFill f = fills.get(i);
-                        changed[i] = new BackgroundFill(f.getFill(), radii(styleFillRadii, f.getRadii()),
-                                insets(styleFillInsets, f.getInsets()));
+                        changed[i] = new BackgroundFill(f.getFill(),
+                                radii(StyleList.layer(styleFillRadii, i), f.getRadii()),
+                                insets(StyleList.layer(styleFillInsets, i), f.getInsets()));
                     }
                     bg = new Background(changed);
                 }
@@ -835,24 +882,59 @@ public class Region extends Parent {
             background.set(bg);
             Border b = baseBorder;
             if (styleStroke != null || styleStrokeWidths != null || styleStrokeRadii != null
-                    || styleStrokeStyle != null) {
+                    || styleStrokeStyle != null || styleStrokeInsets != null) {
                 List<BorderStroke> strokes = b == null ? null : b.getStrokes();
                 BorderStroke first = strokes == null || strokes.isEmpty() ? null : strokes.get(0);
-                Paint paint = styleStroke != null ? styleStroke : (first == null ? null : first.getTopStroke());
-                if (paint != null) {
-                    BorderWidths widths = first == null ? BorderWidths.DEFAULT : first.getWidths();
-                    if (styleStrokeWidths instanceof BorderWidths) {
-                        widths = (BorderWidths) styleStrokeWidths;
-                    } else if (styleStrokeWidths instanceof Insets) {
-                        Insets in = (Insets) styleStrokeWidths;
-                        widths = new BorderWidths(in.getTop(), in.getRight(), in.getBottom(), in.getLeft());
-                    } else if (styleStrokeWidths instanceof Number) {
-                        widths = new BorderWidths(((Number) styleStrokeWidths).doubleValue());
+                // One stroke per colour, as one fill per colour above.
+                BorderStroke[] made = new BorderStroke[StyleList.layers(styleStroke)];
+                int count = 0;
+                for (int i = 0; i < made.length; i++) {
+                    Object paint = StyleList.layer(styleStroke, i);
+                    Paint top = first == null ? null : first.getTopStroke();
+                    Paint right = first == null ? null : first.getRightStroke();
+                    Paint bottom = first == null ? null : first.getBottomStroke();
+                    Paint left = first == null ? null : first.getLeftStroke();
+                    if (paint instanceof Paint) {
+                        top = (Paint) paint;
+                        right = top;
+                        bottom = top;
+                        left = top;
+                    } else if (paint instanceof StyleList && ((StyleList) paint).size() == 4) {
+                        StyleList sides = (StyleList) paint;
+                        top = side(sides, 0);
+                        right = side(sides, 1);
+                        bottom = side(sides, 2);
+                        left = side(sides, 3);
                     }
-                    BorderStrokeStyle strokeStyle = styleStrokeStyle != null ? styleStrokeStyle
-                            : (first == null ? BorderStrokeStyle.SOLID : first.getTopStyle());
-                    b = new Border(new BorderStroke(paint, strokeStyle,
-                            radii(styleStrokeRadii, first == null ? CornerRadii.EMPTY : first.getRadii()), widths));
+                    if (top == null && right == null && bottom == null && left == null) {
+                        continue;
+                    }
+                    BorderWidths widths = first == null ? BorderWidths.DEFAULT : first.getWidths();
+                    Object w = StyleList.layer(styleStrokeWidths, i);
+                    if (w instanceof BorderWidths) {
+                        widths = (BorderWidths) w;
+                    } else if (w instanceof Insets) {
+                        Insets in = (Insets) w;
+                        widths = new BorderWidths(in.getTop(), in.getRight(), in.getBottom(), in.getLeft());
+                    } else if (w instanceof Number) {
+                        widths = new BorderWidths(((Number) w).doubleValue());
+                    }
+                    BorderStrokeStyle strokeStyle = strokeStyle(StyleList.layer(styleStrokeStyle, i));
+                    if (strokeStyle == null) {
+                        strokeStyle = first == null ? BorderStrokeStyle.SOLID : first.getTopStyle();
+                    }
+                    made[count++] = new BorderStroke(top, right, bottom, left, strokeStyle, strokeStyle,
+                            strokeStyle, strokeStyle,
+                            radii(StyleList.layer(styleStrokeRadii, i),
+                                    first == null ? CornerRadii.EMPTY : first.getRadii()),
+                            widths,
+                            insets(StyleList.layer(styleStrokeInsets, i),
+                                    first == null ? Insets.EMPTY : first.getInsets()));
+                }
+                if (count > 0) {
+                    BorderStroke[] kept = new BorderStroke[count];
+                    System.arraycopy(made, 0, kept, 0, count);
+                    b = new Border(kept);
                 }
             }
             border.set(b);
@@ -877,6 +959,8 @@ public class Region extends Parent {
             return styleStrokeRadii;
         } else if ("-fx-border-style".equals(property)) {
             return styleStrokeStyle;
+        } else if ("-fx-border-insets".equals(property)) {
+            return styleStrokeInsets;
         } else if ("-fx-padding".equals(property)) {
             return getPadding();
         } else if ("-fx-min-width".equals(property)) {
@@ -924,42 +1008,45 @@ public class Region extends Parent {
     @Override
     protected boolean cn1SetStyleValue(String property, Object value) {
         if ("-fx-background-color".equals(property)) {
-            if (value != null && !(value instanceof Paint)) {
+            if (value != null && !layersOf(value, 0)) {
                 return false;
             }
-            styleFill = (Paint) value;
+            styleFill = value;
         } else if ("-fx-background-radius".equals(property)) {
-            if (value != null && !(value instanceof CornerRadii) && !(value instanceof Number)) {
+            if (value != null && !layersOf(value, 2)) {
                 return false;
             }
             styleFillRadii = value;
         } else if ("-fx-background-insets".equals(property)) {
-            if (value != null && !(value instanceof Insets) && !(value instanceof Number)) {
+            if (value != null && !layersOf(value, 3)) {
                 return false;
             }
             styleFillInsets = value;
         } else if ("-fx-border-color".equals(property)) {
-            if (value != null && !(value instanceof Paint)) {
+            if (value != null && !layersOf(value, 1)) {
                 return false;
             }
-            styleStroke = (Paint) value;
+            styleStroke = value;
         } else if ("-fx-border-width".equals(property)) {
-            if (value != null && !(value instanceof Insets) && !(value instanceof BorderWidths)
-                    && !(value instanceof Number)) {
+            if (value != null && !layersOf(value, 3)) {
                 return false;
             }
             styleStrokeWidths = value;
         } else if ("-fx-border-radius".equals(property)) {
-            if (value != null && !(value instanceof CornerRadii) && !(value instanceof Number)) {
+            if (value != null && !layersOf(value, 2)) {
                 return false;
             }
             styleStrokeRadii = value;
         } else if ("-fx-border-style".equals(property)) {
-            BorderStrokeStyle parsed = strokeStyle(value);
-            if (value != null && parsed == null) {
+            if (value != null && !layersOf(value, 4)) {
                 return false;
             }
-            styleStrokeStyle = parsed;
+            styleStrokeStyle = value;
+        } else if ("-fx-border-insets".equals(property)) {
+            if (value != null && !layersOf(value, 3)) {
+                return false;
+            }
+            styleStrokeInsets = value;
         } else if ("-fx-padding".equals(property)) {
             Insets in = insets(value, null);
             if (in == null) {

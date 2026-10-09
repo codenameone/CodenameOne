@@ -83,9 +83,9 @@ public final class CssProperties {
                 "-fx-stroke");
         add(LENGTH, "-fx-min-width", "-fx-pref-width", "-fx-max-width", "-fx-min-height", "-fx-pref-height",
                 "-fx-max-height", "-fx-spacing", "-fx-hgap", "-fx-vgap", "-fx-graphic-text-gap", "-fx-stroke-width",
-                "-fx-stroke-dash-offset", "-fx-line-spacing", "-fx-translate-x", "-fx-translate-y");
+                "-fx-stroke-dash-offset", "-fx-line-spacing", "-fx-translate-x", "-fx-translate-y", "-fx-size");
         add(NUMBER, "-fx-opacity", "-fx-rotate", "-fx-scale-x", "-fx-scale-y", "-fx-stroke-miter-limit");
-        add(INSETS, "-fx-padding", "-fx-background-insets", "-fx-border-width");
+        add(INSETS, "-fx-padding", "-fx-background-insets", "-fx-border-width", "-fx-border-insets");
         add(RADII, "-fx-background-radius", "-fx-border-radius");
         add(BOOLEAN, "-fx-managed", "-fx-snap-to-pixel", "-fx-fill-height", "-fx-fill-width", "-fx-wrap-text",
                 "-fx-underline", "-fx-strikethrough", "-fx-fit-to-width", "-fx-fit-to-height", "-fx-pannable",
@@ -180,6 +180,16 @@ public final class CssProperties {
             }
         }
         return false;
+    }
+
+    /// Whether a value of `property` is written in layers, separated by
+    /// commas: the fills of a background and the strokes of a border, each
+    /// with its own colour, insets, radii, widths and style.
+    public static boolean isLayered(String property) {
+        return "-fx-background-color".equals(property) || "-fx-background-insets".equals(property)
+                || "-fx-background-radius".equals(property) || "-fx-border-color".equals(property)
+                || "-fx-border-width".equals(property) || "-fx-border-radius".equals(property)
+                || "-fx-border-insets".equals(property) || "-fx-border-style".equals(property);
     }
 
     /// Whether `property` is one of the five font names, which a node takes

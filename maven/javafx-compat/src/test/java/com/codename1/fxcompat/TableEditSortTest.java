@@ -143,9 +143,11 @@ public class TableEditSortTest {
         List<Node> children = table.getChildrenUnmodifiable();
         for (int i = 0; i < children.size(); i++) {
             Node n = children.get(i);
-            if (n instanceof Label && n.getStyleClass().contains("column-header")
-                    && text.equals(((Label) n).getText())) {
-                return (Label) n;
+            if (n instanceof Parent && n.getStyleClass().contains("column-header")) {
+                Node inside = ((Parent) n).getChildrenUnmodifiable().get(0);
+                if (inside instanceof Label && text.equals(((Label) inside).getText())) {
+                    return (Label) inside;
+                }
             }
         }
         return null;

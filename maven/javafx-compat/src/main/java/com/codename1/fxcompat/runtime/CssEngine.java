@@ -361,9 +361,11 @@ public final class CssEngine extends StyleEngine {
         State above = parent == null ? null : stateOf(parent);
         collectScope(node);
         String inlineText = node.getStyle();
+        String defaults = node.cn1DefaultStyle();
         boolean fresh = state == null;
         if (fresh) {
-            if (scope.isEmpty() && inlineText.length() == 0 && (above == null || !above.inherits())) {
+            if (scope.isEmpty() && inlineText.length() == 0 && defaults == null
+                    && (above == null || !above.inherits())) {
                 return false;
             }
             state = new State();
@@ -377,6 +379,13 @@ public final class CssEngine extends StyleEngine {
         String type = typeName(node);
         ObservableList<String> classes = node.getStyleClass();
         long signature = 0;
+        if (defaults != null) {
+            // Below every rule: a sheet's priority is never negative.
+            CssSheet.Decl[] own = defaultDecls(defaults);
+            for (int i = 0; i < own.length; i++) {
+                offer(own[i], -1);
+            }
+        }
         for (int s = 0; s < scope.size(); s++) {
             CssSheet sheet = scope.get(s);
             if (id != null) {
@@ -653,6 +662,19 @@ public final class CssEngine extends StyleEngine {
         }
     };
 
+    private final HashMap<String, CssSheet.Decl[]> defaultStyles = new HashMap<String, CssSheet.Decl[]>();
+
+    /// The declarations of a node's default style, read once per text:
+    /// every node of a class answers the same one.
+    private CssSheet.Decl[] defaultDecls(String text) {
+        CssSheet.Decl[] out = defaultStyles.get(text);
+        if (out == null) {
+            out = parseInline(text);
+            defaultStyles.put(text, out);
+        }
+        return out;
+    }
+
     private CssSheet.Decl[] parseInline(String text) {
         if (text.trim().length() == 0) {
             return NO_DECLS;
@@ -719,7 +741,7 @@ public final class CssEngine extends StyleEngine {
         while (at != null) {
             State s = stateOf(at);
             if (s == null || !s.lookupsAbove) {
-                return null;
+                break;
             }
             if (s.lookupNames != null) {
                 for (int i = 0; i < s.lookupNames.length; i++) {
@@ -730,7 +752,80 @@ public final class CssEngine extends StyleEngine {
             }
             at = at.getParent();
         }
-        return null;
+        return themeDefault(name);
+    }
+
+    /// The colours of the standard JavaFX theme, as that theme defines
+    /// them: mostly in terms of each other, so that a sheet redefining
+    /// `-fx-base` alone changes them all. The few the theme writes as
+    /// gradients are given as their middle colour, since a looked-up
+    /// name stands for a colour here.
+    private static final String[] THEME = {
+        "-fx-base", "#ececec",
+        "-fx-background", "derive(-fx-base, 26.4%)",
+        "-fx-control-inner-background", "derive(-fx-base, 80%)",
+        "-fx-control-inner-background-alt", "derive(-fx-control-inner-background, -2%)",
+        "-fx-dark-text-color", "black",
+        "-fx-mid-text-color", "#333333",
+        "-fx-light-text-color", "white",
+        "-fx-accent", "#0096c9",
+        "-fx-default-button", "#abd8ed",
+        "-fx-focus-color", "#039ed3",
+        "-fx-faint-focus-color", "#039ed322",
+        "-fx-color", "-fx-base",
+        "-fx-hover-base", "ladder(-fx-base, derive(-fx-base, 20%) 20%, derive(-fx-base, 30%) 35%,"
+                + " derive(-fx-base, 40%) 50%)",
+        "-fx-pressed-base", "derive(-fx-base, -6%)",
+        "-fx-text-background-color", "ladder(-fx-background, -fx-light-text-color 45%, -fx-dark-text-color 46%,"
+                + " -fx-dark-text-color 59%, -fx-mid-text-color 60%)",
+        "-fx-text-base-color", "ladder(-fx-color, -fx-light-text-color 45%, -fx-dark-text-color 46%,"
+                + " -fx-dark-text-color 59%, -fx-mid-text-color 60%)",
+        "-fx-text-inner-color", "ladder(-fx-control-inner-background, -fx-light-text-color 45%,"
+                + " -fx-dark-text-color 46%, -fx-dark-text-color 59%, -fx-mid-text-color 60%)",
+        "-fx-box-border", "ladder(-fx-color, black 20%, derive(-fx-color, -15%) 30%)",
+        "-fx-text-box-border", "ladder(-fx-background, black 10%, derive(-fx-background, -15%) 30%)",
+        "-fx-shadow-highlight-color", "rgba(255, 255, 255, 0.7)",
+        "-fx-outer-border", "derive(-fx-color, -23%)",
+        "-fx-inner-border", "derive(-fx-color, 50%)",
+        "-fx-inner-border-horizontal", "derive(-fx-color, 50%)",
+        "-fx-inner-border-bottomup", "derive(-fx-color, 50%)",
+        "-fx-body-color", "-fx-color",
+        "-fx-mark-color", "ladder(-fx-color, white 30%, derive(-fx-color, -63%) 31%)",
+        "-fx-mark-highlight-color", "ladder(-fx-color, derive(-fx-color, 80%) 60%, white 70%)",
+        "-fx-selection-bar", "-fx-accent",
+        "-fx-selection-bar-non-focused", "lightgrey",
+        "-fx-selection-bar-text", "ladder(-fx-selection-bar, -fx-light-text-color 45%, -fx-dark-text-color 46%,"
+                + " -fx-dark-text-color 59%, -fx-mid-text-color 60%)",
+        "-fx-cell-hover-color", "#cce3f4",
+        "-fx-cell-focus-inner-border", "derive(-fx-selection-bar, 20%)",
+        "-fx-focused-text-base-color", "-fx-text-base-color",
+        "-fx-focused-mark-color", "-fx-focused-text-base-color",
+        "-fx-table-cell-border-color", "derive(-fx-color, 5%)",
+        "-fx-table-header-border-color", "-fx-box-border",
+    };
+
+    private static HashMap<String, CssValue> themeDefaults;
+
+    private static CssValue themeDefault(String name) {
+        if (themeDefaults == null) {
+            HashMap<String, CssValue> made = new HashMap<String, CssValue>();
+            CssValueParser p = new CssValueParser();
+            for (int i = 0; i + 1 < THEME.length; i += 2) {
+                CssValue v = p.parse(THEME[i], THEME[i + 1]);
+                if (v != null) {
+                    made.put(THEME[i], v);
+                }
+            }
+            themeDefaults = made;
+        }
+        return themeDefaults.get(name);
+    }
+
+    /// The colour a theme name stands for where `node` is: what the
+    /// nearest rule defines it as, else what the standard theme does.
+    /// `null` for a name that is neither.
+    public static Color themeColor(Node node, String name) {
+        return color(CssValue.text(CssValue.LOOKUP, name), node, 0);
     }
 
     // ---------------------------------------------------- inherited: font
@@ -817,6 +912,18 @@ public final class CssEngine extends StyleEngine {
     }
 
     private static Object decode(int kind, String name, CssValue v, Node node, double em) {
+        if (v.type() == CssValue.LIST || v.type() == CssValue.SIDES) {
+            // Each layer, or side, is a value of the same kind; one that
+            // cannot be resolved takes the whole declaration with it.
+            Object[] items = new Object[v.partCount()];
+            for (int i = 0; i < items.length; i++) {
+                items[i] = v.part(i) == null ? null : decode(kind, name, v.part(i), node, em);
+                if (items[i] == null) {
+                    return null;
+                }
+            }
+            return new StyleList(items, v.type() == CssValue.SIDES);
+        }
         switch (kind) {
             case CssProperties.PAINT:
                 return paint(v, node, 0);
@@ -912,6 +1019,7 @@ public final class CssEngine extends StyleEngine {
             case CssValue.COLOR:
             case CssValue.LOOKUP:
             case CssValue.DERIVE:
+            case CssValue.LADDER:
                 return color(v, node, depth);
             case CssValue.LINEAR: {
                 List<Stop> stops = stops(v, 4, node, depth);
@@ -1000,9 +1108,47 @@ public final class CssEngine extends StyleEngine {
                 Color c = v.partCount() == 0 ? null : color(v.part(0), node, depth + 1);
                 return c == null || v.count() == 0 ? null : derive(c, v.num(0) / 100);
             }
+            case CssValue.LADDER:
+                return ladder(v, node, depth);
             default:
                 return null;
         }
+    }
+
+    /// JavaFX's `ladder()`: the stops are a gradient, and the brightness
+    /// of the first colour is the place in it the colour is read from.
+    /// That is how a theme picks a dark text for a light background and
+    /// a light one for a dark.
+    private static Color ladder(CssValue v, Node node, int depth) {
+        int n = v.partCount() - 1;
+        Color base = n < 1 ? null : color(v.part(0), node, depth + 1);
+        if (base == null || v.count() < n) {
+            return null;
+        }
+        // The brightness an eye sees, as JavaFX reads it here: the accent
+        // blue is a dark colour by this measure and takes a light text.
+        double at = 0.3 * base.getRed() + 0.59 * base.getGreen() + 0.11 * base.getBlue();
+        Color before = null;
+        double beforeAt = 0;
+        for (int i = 0; i < n; i++) {
+            Color c = color(v.part(i + 1), node, depth + 1);
+            if (c == null) {
+                return null;
+            }
+            double offset = v.num(i);
+            if (offset != offset) {
+                offset = n == 1 ? 0 : (double) i / (n - 1);
+            }
+            if (at <= offset) {
+                if (before == null || offset <= beforeAt) {
+                    return c;
+                }
+                return before.interpolate(c, (at - beforeAt) / (offset - beforeAt));
+            }
+            before = c;
+            beforeAt = offset;
+        }
+        return before;
     }
 
     /// JavaFX's `derive()`: a brightness change that is scaled by how

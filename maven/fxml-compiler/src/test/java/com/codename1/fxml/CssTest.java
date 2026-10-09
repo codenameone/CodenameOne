@@ -25,6 +25,7 @@ package com.codename1.fxml;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -387,7 +388,10 @@ public class CssTest {
         assertEquals(10 * 96 / 25.4, bar.getMinWidth(), 0.001);
         assertEquals(96 / 2.54, bar.getMaxHeight(), 0.001);
         assertFalse(bar.isFillHeight());
-        RadialGradient rg = (RadialGradient) fill(ok);
+        // Two layers are two fills, the first written at the bottom.
+        assertEquals(2, ok.getBackground().getFills().size());
+        assertEquals(Color.RED, fill(ok));
+        RadialGradient rg = (RadialGradient) ok.getBackground().getFills().get(1).getFill();
         assertEquals(CycleMethod.REFLECT, rg.getCycleMethod());
         assertEquals(0.5, rg.getRadius(), 0);
         assertEquals(0.8, rg.getStops().get(1).getOffset(), 0.0001);
@@ -398,8 +402,7 @@ public class CssTest {
         assertEquals(45, ok.getRotate(), 0);
         assertEquals(2, ok.getScaleX(), 0);
         assertEquals(-3, ok.getTranslateY(), 0);
-        // The layered background is a warning: only the last layer is kept.
-        assertTrue(app.warnings.toString(), app.warnings.toString().contains("layer"));
+        assertTrue(app.warnings.toString(), app.warnings.isEmpty());
     }
 
     // ---------------------------------------------------- the compiler
@@ -537,5 +540,192 @@ public class CssTest {
         assertEquals(0.5, effect.num(1), 0);
         assertEquals(CssValue.COLOR, effect.part(0).type());
         assertEquals("a(b://c) d", com.codename1.fxml.css.CssDeclarations.stripComments("a(b://c) d// e").trim());
+    }
+
+    /// A background is as many fills as it has colours and a border as
+    /// many strokes, each with insets, radii, widths and a style of its
+    /// own -- the last given standing in for a layer without one -- and a
+    /// stroke has a paint per side. The standard themes and every
+    /// "flat" restyling of a control are written that way.
+    @Test
+    public void layersSidesBorderInsetsAndALadder() throws Exception {
+        styled("layers", ".bar { -fx-base: #202020;"
+                + " -fx-background-color: red, derive(-fx-base, 20%), blue;"
+                + " -fx-background-insets: 0 0 0 0, 1, 2 3; -fx-background-radius: 5, 4;"
+                + " -fx-border-color: transparent transparent derive(-fx-base, 80%) transparent, white green;"
+                + " -fx-border-width: 0 0 1 0, 2; -fx-border-insets: 0 10 1 0, 4;"
+                + " -fx-border-style: solid, segments(1, 1) inside; }\n"
+                + ".primary { -fx-background-color: #101010; -fx-background-insets: 0 0 0 0, 0, 1, 2;"
+                + " -fx-border-color: #e2e2e2; -fx-border-width: 2; }\n"
+                + "#title { -fx-text-fill: ladder(#101010, white 49%, black 50%); }\n"
+                + ".root > .label { -fx-text-fill: ladder(#f0f0f0, white 49%, black 50%);"
+                + " -fx-background-color: ladder(gray, black 0%, white 100%); }\n");
+        assertTrue(app.warnings.toString(), app.warnings.isEmpty());
+        java.util.List<javafx.scene.layout.BackgroundFill> fills = bar.getBackground().getFills();
+        assertEquals(3, fills.size());
+        assertEquals(Color.RED, fills.get(0).getFill());
+        assertEquals(Color.BLUE, fills.get(2).getFill());
+        assertTrue(fills.get(1).getFill() instanceof Color);
+        assertEquals(new javafx.geometry.Insets(0), fills.get(0).getInsets());
+        assertEquals(new javafx.geometry.Insets(1), fills.get(1).getInsets());
+        assertEquals(new javafx.geometry.Insets(2, 3, 2, 3), fills.get(2).getInsets());
+        assertEquals(5, fills.get(0).getRadii().getTopLeftHorizontalRadius(), 0);
+        assertEquals(4, fills.get(1).getRadii().getTopLeftHorizontalRadius(), 0);
+        assertEquals("the last radius stands in", 4, fills.get(2).getRadii().getTopLeftHorizontalRadius(), 0);
+
+        java.util.List<javafx.scene.layout.BorderStroke> strokes = bar.getBorder().getStrokes();
+        assertEquals(2, strokes.size());
+        javafx.scene.layout.BorderStroke under = strokes.get(0);
+        assertEquals(Color.TRANSPARENT, under.getTopStroke());
+        assertEquals(Color.TRANSPARENT, under.getLeftStroke());
+        assertTrue(under.getBottomStroke() instanceof Color);
+        assertTrue(((Color) under.getBottomStroke()).getBrightness() > 0.5);
+        assertEquals(1, under.getWidths().getBottom(), 0);
+        assertEquals(0, under.getWidths().getTop(), 0);
+        assertEquals(new javafx.geometry.Insets(0, 10, 1, 0), under.getInsets());
+        assertEquals(javafx.scene.layout.BorderStrokeStyle.SOLID, under.getTopStyle());
+        javafx.scene.layout.BorderStroke over = strokes.get(1);
+        assertEquals(Color.WHITE, over.getTopStroke());
+        assertEquals(Color.GREEN, over.getRightStroke());
+        assertEquals(Color.WHITE, over.getBottomStroke());
+        assertEquals(Color.GREEN, over.getLeftStroke());
+        assertEquals(2, over.getWidths().getLeft(), 0);
+        assertEquals(new javafx.geometry.Insets(4), over.getInsets());
+        assertEquals(javafx.scene.layout.BorderStrokeStyle.DASHED, over.getTopStyle());
+
+        // One colour is one fill, whatever number of insets is written.
+        assertEquals(1, ok.getBackground().getFills().size());
+        assertEquals(new javafx.geometry.Insets(0), ok.getBackground().getFills().get(0).getInsets());
+        assertEquals(2, ok.getBorder().getStrokes().get(0).getWidths().getTop(), 0);
+
+        assertEquals("dark picks the stop below", Color.WHITE, title.getTextFill());
+        assertEquals("light the stop above", Color.BLACK, plain.getTextFill());
+        Color between = (Color) fill(plain);
+        assertEquals(Color.GRAY.getBrightness(), between.getRed(), 0.01);
+
+        // Withdrawn, the region has what it had.
+        bar.getStyleClass().clear();
+        assertNull(bar.getBackground());
+        assertNull(bar.getBorder());
+    }
+
+    private static javafx.scene.Node find(javafx.scene.Parent in, String styleClass) {
+        java.util.List<javafx.scene.Node> children = in.getChildrenUnmodifiable();
+        for (int i = 0; i < children.size(); i++) {
+            javafx.scene.Node n = children.get(i);
+            if (n.getStyleClass().contains(styleClass)) {
+                return n;
+            }
+            if (n instanceof javafx.scene.Parent) {
+                javafx.scene.Node deeper = find((javafx.scene.Parent) n, styleClass);
+                if (deeper != null) {
+                    return deeper;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// The colours of the standard theme are defined without any sheet,
+    /// in terms of `-fx-base`, and the controls drawn by this layer take
+    /// theirs from them: a sheet that redefines the base recolours a
+    /// table, and one that names `-fx-focus-color` finds it. A header is
+    /// a `.column-header` around a `.label`, and the text of a menu in a
+    /// bar is a `.label` too.
+    @Test
+    public void theThemeColoursAreDefinedAndRecolourATableItsHeadersAndAMenuBar() throws Exception {
+        styled("theme", ".primary { -fx-background-color: -fx-focus-color; -fx-text-fill: -fx-text-base-color; }\n"
+                + ".dark { -fx-base: #1d1d1d; -fx-control-inner-background: #1d1d1d; -fx-padding: 5;"
+                + " -fx-table-header-border-color: transparent; }\n"
+                + ".dark .column-header { -fx-size: 35; -fx-border-width: 0 0 1 0;"
+                + " -fx-border-color: transparent transparent derive(-fx-base, 80%) transparent;"
+                + " -fx-border-insets: 0 10 1 0; }\n"
+                + ".dark .column-header .label { -fx-font-size: 20pt; -fx-alignment: center-left; }\n"
+                + ".menu-bar .label { -fx-text-fill: white; }\n");
+        assertTrue(app.warnings.toString(), app.warnings.isEmpty());
+        assertEquals(Color.web("#039ed3"), fill(ok));
+        assertEquals("the base is light, its text dark", Color.web("#333333"), ok.getTextFill());
+
+        javafx.scene.control.TableView<String> plainTable = new javafx.scene.control.TableView<String>();
+        plainTable.getColumns().add(new javafx.scene.control.TableColumn<String, String>("One"));
+        javafx.scene.control.TableView<String> dark = new javafx.scene.control.TableView<String>();
+        dark.getStyleClass().add("dark");
+        dark.getColumns().add(new javafx.scene.control.TableColumn<String, String>("One"));
+        javafx.scene.control.MenuBar menus = new javafx.scene.control.MenuBar(new javafx.scene.control.Menu("File"));
+        root.getChildren().addAll(plainTable, dark, menus);
+        root.applyCss();
+        root.layout();
+
+        // The standard look: a border that is the fill under the inner one.
+        assertEquals(2, plainTable.getBackground().getFills().size());
+        Color border = (Color) plainTable.getBackground().getFills().get(0).getFill();
+        Color inner = (Color) plainTable.getBackground().getFills().get(1).getFill();
+        assertTrue("a light table: " + inner, inner.getBrightness() > 0.95);
+        assertTrue("with a grey edge: " + border, border.getBrightness() > 0.6 && border.getBrightness() < 0.9);
+        assertEquals(new javafx.geometry.Insets(1), plainTable.getPadding());
+
+        Color darkInner = (Color) dark.getBackground().getFills().get(1).getFill();
+        assertEquals(Color.web("#1d1d1d"), darkInner);
+        assertEquals("the edge of a dark base is black", Color.BLACK, dark.getBackground().getFills().get(0).getFill());
+        assertEquals(new javafx.geometry.Insets(5), dark.getPadding());
+
+        Region header = (Region) find(dark, "column-header");
+        assertNotNull(header);
+        assertTrue("-fx-size is the least height: " + header.prefHeight(-1), header.prefHeight(-1) >= 35);
+        javafx.scene.layout.BorderStroke line = header.getBorder().getStrokes().get(0);
+        assertEquals(Color.TRANSPARENT, line.getRightStroke());
+        assertTrue(((Color) line.getBottomStroke()).getBrightness() > 0.5);
+        assertEquals(new javafx.geometry.Insets(0, 10, 1, 0), line.getInsets());
+        Label text = (Label) find(header, "label");
+        assertNotNull("the header holds a label", text);
+        assertEquals(20 * 96.0 / 72, text.getFont().getSize(), 0.01);
+        assertEquals(Pos.CENTER_LEFT, text.getAlignment());
+        Label plainText = (Label) find((Region) find(plainTable, "column-header"), "label");
+        assertEquals(Pos.CENTER, plainText.getAlignment());
+
+        Label file = (Label) find(menus, "label");
+        assertNotNull("a menu's text is a label", file);
+        assertEquals(Color.WHITE, file.getTextFill());
+        assertTrue(file.getStyleClass().contains("menu"));
+    }
+
+    /// A button a sheet draws -- a fill, a border and a padding of its
+    /// own -- is that padding around its text: the padding the native
+    /// theme gives a button does not come on top, which made every
+    /// restyled button a third taller than in JavaFX. `:default` and
+    /// `:cancel` are states a sheet can name.
+    @Test
+    public void aRestyledButtonIsItsOwnPaddingAndKnowsDefaultAndCancel() throws Exception {
+        styled("button", ".primary { -fx-background-color: #101010; -fx-border-color: #e2e2e2;"
+                + " -fx-border-width: 2; -fx-padding: 5 22 5 22; }\n"
+                + ".primary:default { -fx-background-color: -fx-focus-color; }\n"
+                + ".primary:cancel { -fx-text-fill: red; }\n");
+        com.codename1.ui.Component c = ok.cn1Native();
+        // What the theme would add, made visible whatever the theme is.
+        root.applyCss();
+        com.codename1.ui.plaf.Style style = c.getStyle();
+        assertEquals(0, style.getPaddingTop() + style.getPaddingBottom() + style.getPaddingLeftNoRTL()
+                + style.getPaddingRightNoRTL());
+        double text = com.codename1.fxcompat.runtime.Units.toLogical(c.getPreferredSize().getHeight());
+        assertEquals(2 + 5 + text + 5 + 2, ok.prefHeight(-1), 1.0);
+        double wide = com.codename1.fxcompat.runtime.Units.toLogical(c.getPreferredSize().getWidth());
+        assertEquals(2 + 22 + wide + 22 + 2, ok.prefWidth(-1), 1.0);
+
+        assertEquals(Color.web("#101010"), fill(ok));
+        ok.setDefaultButton(true);
+        root.applyCss();
+        assertEquals(Color.web("#039ed3"), fill(ok));
+        ok.setDefaultButton(false);
+        ok.setCancelButton(true);
+        root.applyCss();
+        assertEquals(Color.web("#101010"), fill(ok));
+        assertEquals(Color.RED, ok.getTextFill());
+
+        // Without a padding of its own it keeps the theme's.
+        ok.getStyleClass().clear();
+        ok.setStyle("-fx-background-color: blue;");
+        root.applyCss();
+        com.codename1.ui.plaf.Style themed = com.codename1.ui.plaf.UIManager.getInstance().getComponentStyle(c.getUIID());
+        assertEquals(themed.getPaddingTop(), c.getStyle().getPaddingTop());
     }
 }

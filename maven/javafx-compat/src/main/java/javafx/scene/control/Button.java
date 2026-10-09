@@ -50,6 +50,7 @@ public class Button extends ButtonBase {
     private final BooleanProperty defaultButton = new SimpleBooleanProperty(this, "defaultButton", false);
     private final BooleanProperty cancelButton = new SimpleBooleanProperty(this, "cancelButton", false);
     private boolean ownChrome;
+    private boolean ownPadding;
 
     {
         InvalidationListener chrome = new InvalidationListener() {
@@ -60,6 +61,20 @@ public class Button extends ButtonBase {
         };
         backgroundProperty().addListener(chrome);
         borderProperty().addListener(chrome);
+        paddingProperty().addListener(chrome);
+        // ":default" and ":cancel" are how a style sheet marks the two.
+        defaultButton.addListener(new InvalidationListener() {
+            @Override
+            public void invalidated(Observable observable) {
+                pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("default"), defaultButton.get());
+            }
+        });
+        cancelButton.addListener(new InvalidationListener() {
+            @Override
+            public void invalidated(Observable observable) {
+                pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("cancel"), cancelButton.get());
+            }
+        });
         // The text of a button is centred unless the application says otherwise.
         setAlignment(javafx.geometry.Pos.CENTER);
     }
@@ -77,16 +92,27 @@ public class Button extends ButtonBase {
     protected void cn1SyncNative() {
         Component c = cn1NativeIfCreated();
         boolean own = drawsItself();
-        if (c != null && ownChrome && !own) {
+        // A button that draws itself and has a padding of its own is
+        // that padding around its text, as in JavaFX; the padding the
+        // theme gives its button would come on top of it.
+        javafx.geometry.Insets pad = getPadding();
+        boolean bare = own && getGraphic() == null && pad != null
+                && pad.getTop() + pad.getRight() + pad.getBottom() + pad.getLeft() > 0;
+        if (c != null && ((ownChrome && !own) || (ownPadding && !bare))) {
             // Setting the UIID again brings the styles of the theme back.
             c.setUIID(c.getUIID());
         }
         ownChrome = own;
+        ownPadding = bare;
         super.cn1SyncNative();
         if (c != null && own) {
             Style style = c.getAllStyles();
             style.setBgTransparency(0);
             style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
+            if (bare) {
+                style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                style.setPadding(0, 0, 0, 0);
+            }
         }
     }
 

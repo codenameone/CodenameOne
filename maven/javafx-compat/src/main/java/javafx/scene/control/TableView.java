@@ -49,10 +49,6 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
-import javafx.scene.layout.Border;
-import javafx.scene.layout.BorderStroke;
-import javafx.scene.layout.BorderStrokeStyle;
-import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
@@ -95,8 +91,11 @@ import javafx.util.Callback;
 ///
 /// The control has no native component. It starts with a white
 /// background and a thin grey border, which the `Region` style names
-/// replace; the headers are labels with the style class `column-header`,
-/// on a strip with the style class `column-header-background`.
+/// replace; each header is a region with the style class `column-header`
+/// holding a label, on a strip with the style class
+/// `column-header-background`, and `-fx-size` on a header is its least
+/// height. The colours are those of the standard theme, looked up where
+/// the table stands: `-fx-box-border` around `-fx-control-inner-background`.
 public class TableView<S> extends Control {
 
     /// The policy that leaves every column at its own width.
@@ -240,8 +239,13 @@ public class TableView<S> extends Control {
             new SimpleObjectProperty<TableViewSelectionModel<S>>(this, "selectionModel");
     private final DoubleProperty fixedCellSize = new SimpleDoubleProperty(this, "fixedCellSize", USE_COMPUTED_SIZE);
     private final RowFlow flow;
-    private final Region header = new Region();
-    private final ArrayList<Label> headerLabels = new ArrayList<Label>();
+    private final Region header = new Region() {
+        @Override
+        public String cn1DefaultStyle() {
+            return "-fx-background-color: derive(-fx-base, -2%);";
+        }
+    };
+    private final ArrayList<ColumnHeader> headerCells = new ArrayList<ColumnHeader>();
     private final ArrayList<Polygon> headerArrows = new ArrayList<Polygon>();
     private final ObservableList<TableColumn<S, ?>> sortOrder = FXCollections.observableArrayList();
     private final ReadOnlyObjectWrapper<Comparator<S>> comparator = new ReadOnlyObjectWrapper<Comparator<S>>(this,
@@ -302,8 +306,6 @@ public class TableView<S> extends Control {
     public TableView(ObservableList<S> items) {
         getStyleClass().add("table-view");
         setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY)));
-        setBorder(new Border(new BorderStroke(Color.rgb(200, 200, 200), BorderStrokeStyle.SOLID, CornerRadii.EMPTY,
-                new BorderWidths(1))));
         header.setBackground(new Background(new BackgroundFill(Color.rgb(232, 232, 232), CornerRadii.EMPTY,
                 Insets.EMPTY)));
         // The name JavaFX gives the strip behind its column headers.
@@ -434,21 +436,94 @@ public class TableView<S> extends Control {
         sortOrder.remove(column);
     }
 
+    /// The standard theme's table: a border that is the outermost fill,
+    /// showing around the inner one.
+    @Override
+    public String cn1DefaultStyle() {
+        return "-fx-background-color: -fx-box-border, -fx-control-inner-background;"
+                + " -fx-background-insets: 0, 1; -fx-padding: 1;";
+    }
+
+    /// The header of one column: a region a style sheet reaches as
+    /// `.column-header`, around the label it reaches as
+    /// `.column-header .label`.
+    private static final class ColumnHeader extends Region {
+        private final Label label;
+        private double size;
+
+        ColumnHeader(String text) {
+            getStyleClass().add("column-header");
+            label = new Label(text);
+            label.setAlignment(javafx.geometry.Pos.CENTER);
+            label.setMouseTransparent(true);
+            cn1Children().add(label);
+        }
+
+        @Override
+        public String cn1DefaultStyle() {
+            return "-fx-border-color: transparent -fx-table-header-border-color -fx-table-header-border-color"
+                    + " transparent; -fx-border-width: 0 1 1 0; -fx-padding: 2 8 2 8;";
+        }
+
+        @Override
+        protected Object cn1StyleValue(String property) {
+            if ("-fx-size".equals(property)) {
+                return Double.valueOf(size);
+            }
+            return super.cn1StyleValue(property);
+        }
+
+        @Override
+        protected boolean cn1SetStyleValue(String property, Object value) {
+            if ("-fx-size".equals(property)) {
+                if (!(value instanceof Number)) {
+                    return false;
+                }
+                size = ((Number) value).doubleValue();
+                requestLayout();
+                if (getParent() != null) {
+                    getParent().requestLayout();
+                }
+                return true;
+            }
+            return super.cn1SetStyleValue(property, value);
+        }
+
+        @Override
+        protected double computePrefHeight(double width) {
+            Insets in = getInsets();
+            return Math.max(size, in.getTop() + label.prefHeight(-1) + in.getBottom());
+        }
+
+        @Override
+        protected double computePrefWidth(double height) {
+            Insets in = getInsets();
+            return in.getLeft() + label.prefWidth(-1) + in.getRight();
+        }
+
+        @Override
+        protected void layoutChildren() {
+            Insets in = getInsets();
+            label.resizeRelocate(in.getLeft(), in.getTop(),
+                    Math.max(0, getWidth() - in.getLeft() - in.getRight()),
+                    Math.max(0, getHeight() - in.getTop() - in.getBottom()));
+        }
+    }
+
     /// The columns, their widths or what they show changed: the headers
     /// and every cell are made again.
     private void columnsChanged() {
-        for (int i = 0; i < headerLabels.size(); i++) {
-            cn1Children().remove(headerLabels.get(i));
+        for (int i = 0; i < headerCells.size(); i++) {
+            cn1Children().remove(headerCells.get(i));
         }
-        headerLabels.clear();
+        headerCells.clear();
         for (int i = 0; i < headerArrows.size(); i++) {
             cn1Children().remove(headerArrows.get(i));
         }
         headerArrows.clear();
         for (int i = 0; i < columns.size(); i++) {
             final TableColumn<S, ?> column = columns.get(i);
-            Label label = new Label(column.getText());
-            label.getStyleClass().add("column-header");
+            ColumnHeader label = new ColumnHeader(column.getText());
             label.setManaged(false);
             label.setVisible(column.isVisible());
             label.addEventHandler(MouseEvent.MOUSE_CLICKED, new EventHandler<MouseEvent>() {
@@ -459,7 +534,7 @@ public class TableView<S> extends Control {
                     }
                 }
             });
-            headerLabels.add(label);
+            headerCells.add(label);
             cn1Children().add(label);
             Polygon arrow = new Polygon();
             arrow.setManaged(false);
@@ -690,8 +765,8 @@ public class TableView<S> extends Control {
 
     private double headerHeight() {
         double h = 0;
-        for (int i = 0; i < headerLabels.size(); i++) {
-            h = Math.max(h, headerLabels.get(i).prefHeight(-1));
+        for (int i = 0; i < headerCells.size(); i++) {
+            h = Math.max(h, headerCells.get(i).prefHeight(-1));
         }
         return h > 0 ? h : 24;
     }
@@ -707,9 +782,9 @@ public class TableView<S> extends Control {
         }
         header.resizeRelocate(in.getLeft(), in.getTop(), w, hh);
         double x = 0;
-        for (int i = 0; i < headerLabels.size() && i < columns.size(); i++) {
+        for (int i = 0; i < headerCells.size() && i < columns.size(); i++) {
             TableColumn<S, ?> column = columns.get(i);
-            Label label = headerLabels.get(i);
+            ColumnHeader label = headerCells.get(i);
             if (!column.isVisible()) {
                 continue;
             }
