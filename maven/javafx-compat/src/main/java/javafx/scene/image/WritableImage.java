@@ -34,7 +34,7 @@ import javafx.scene.paint.Color;
 /// The pixels are kept as an array, which is what the writer and the
 /// reader work on. The Codename One image that is drawn is made from
 /// the array when it is next needed after a change, so a burst of
-/// writes costs one copy of the pixels and no image of the platform. A change reaches the views of the image on
+/// writes costs one image. A change reaches the views of the image on
 /// the application thread, once for all the writes made since the last
 /// time, whichever thread wrote.
 public class WritableImage extends Image {
@@ -93,14 +93,7 @@ public class WritableImage extends Image {
     @Override
     com.codename1.ui.Image current() {
         if (stale.getAndSet(false) || built == null) {
-            // A copy of the pixels as they are now, drawn straight from
-            // the array. An image of the platform made here is one made
-            // for every frame of a picture that is being computed, each a
-            // frame of memory outside the heap that the collector does
-            // not weigh, and that the native Linux port never frees.
-            int[] now = new int[argb.length];
-            System.arraycopy(argb, 0, now, 0, now.length);
-            built = new com.codename1.ui.RGBImage(now, w, h);
+            built = com.codename1.ui.Image.createImage(argb, w, h);
         }
         return built;
     }

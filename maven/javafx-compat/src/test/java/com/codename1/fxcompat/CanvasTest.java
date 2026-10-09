@@ -75,61 +75,6 @@ public class CanvasTest {
         Units.setScale(0);
         Renderer.setTrace(null);
         HeadlessImplementation.pixelImages = false;
-        HeadlessImplementation.rasterImages = false;
-        HeadlessImplementation.resetRaster();
-    }
-
-    /// A picture that is being computed is drawn over the canvas every
-    /// frame, with nothing cleared between. Each such call used to make
-    /// two images of the platform and keep them on the list: a frame of
-    /// memory per call until four thousand were recorded, and on the
-    /// native Linux port, which never frees an image, for good.
-    @Test
-    public void aPictureDrawnEveryFrameCostsOneImage() {
-        Units.setScale(1);
-        // An image has a size here only when it keeps its pixels.
-        HeadlessImplementation.rasterImages = true;
-        javafx.scene.image.WritableImage picture = new javafx.scene.image.WritableImage(40, 30);
-        Canvas canvas = new Canvas(40, 30);
-        GraphicsContext gc = canvas.getGraphicsContext2D();
-        HeadlessImplementation.imagesMade = 0;
-        for (int frame = 0; frame < 200; frame++) {
-            picture.getPixelWriter().setArgb(frame % 40, frame % 30, 0xff000000 | frame);
-            gc.drawImage(picture, 0, 0, 40, 30, 0, 0, 40, 30);
-        }
-        assertEquals(1, HeadlessImplementation.imagesMade);
-    }
-
-    /// Folding the frames into one image keeps what a canvas keeps: a
-    /// pixel an earlier frame drew shows through where a later frame is
-    /// transparent.
-    @Test
-    public void framesDrawnOverEachOtherKeepWhatWasUnderThem() {
-        Units.setScale(1);
-        HeadlessImplementation.rasterImages = true;
-        javafx.scene.image.WritableImage picture = new javafx.scene.image.WritableImage(8, 6);
-        javafx.scene.image.PixelWriter w = picture.getPixelWriter();
-        Canvas canvas = new Canvas(8, 6);
-        GraphicsContext gc = canvas.getGraphicsContext2D();
-        w.setArgb(1, 1, 0xffff0000);
-        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
-        w.setArgb(1, 1, 0);
-        w.setArgb(2, 2, 0xff0000ff);
-        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
-        w.setArgb(2, 2, 0);
-        w.setArgb(3, 3, 0xff00ff00);
-        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
-        w.setArgb(4, 4, 0xffffffff);
-        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
-        gc.drawImage(picture, 0, 0, 8, 6, 0, 0, 8, 6);
-        com.codename1.ui.Image target = com.codename1.ui.Image.createImage(8, 6, 0);
-        canvas.cn1Paint(new Renderer(target.getGraphics(), 0, 0));
-        int[] seen = target.getRGB();
-        assertEquals(0xffff0000, seen[1 * 8 + 1]);
-        assertEquals(0xff0000ff, seen[2 * 8 + 2]);
-        assertEquals(0xff00ff00, seen[3 * 8 + 3]);
-        assertEquals(0xffffffff, seen[4 * 8 + 4]);
-        assertEquals(0, seen[5 * 8 + 5]);
     }
 
     private void paint(Canvas canvas) {

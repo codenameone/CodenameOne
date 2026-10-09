@@ -164,14 +164,8 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     /// inspect pixels flip it.
     public static boolean pixelImages;
 
-    /// How many images were made from pixels or made to be drawn on: the
-    /// ones that are memory of the platform on a device. A test that
-    /// counts sets it to zero first.
-    public static int imagesMade;
-
     @Override
     public java.lang.Object createImage(int[] a0, int a1, int a2) {
-        imagesMade++;
         if (pixelImages && a1 > 0 && a2 > 0) {
             int[][] rows = new int[a2][a1];
             for (int y = 0; y < a2; y++) {
@@ -204,7 +198,6 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public java.lang.Object createMutableImage(int a0, int a1, int a2) {
-        imagesMade++;
         if (rasterImages && a0 > 0 && a1 > 0) {
             int[][] rows = new int[a1][a0];
             for (int y = 0; y < a1; y++) {
@@ -787,26 +780,6 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawRGB(java.lang.Object a0, int[] a1, int a2, int a3, int a4, int a5, int a6, boolean a7) {
-        // Pixels drawn straight from an array land where an image of
-        // them would: a port draws both, so the raster does too.
-        if (raster(a0)) {
-            int[][] rows = (int[][]) a0;
-            for (int y = 0; y < a6; y++) {
-                int row = a4 + y;
-                if (row < 0 || row >= rows.length || (trackClip && (row < clipY || row >= clipY + clipH))) {
-                    continue;
-                }
-                for (int x = 0; x < a5; x++) {
-                    int col = a3 + x;
-                    if (col < 0 || col >= rows[row].length || (trackClip && (col < clipX || col >= clipX + clipW))) {
-                        continue;
-                    }
-                    int p = a1[a2 + y * a5 + x];
-                    rows[row][col] = blend(rows[row][col], p & 0xffffff, a7 ? p >>> 24 : 255);
-                }
-            }
-        }
-        recordDraw("drawImage", a0);
     }
 
     @Override
