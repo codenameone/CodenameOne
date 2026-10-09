@@ -360,4 +360,26 @@ public class JPopupMenu extends JComponent implements Accessible, MenuElement {
             }
         }
     }
+
+    private static boolean defaultLightWeightPopupEnabled = true;
+    private boolean lightWeightPopup = defaultLightWeightPopupEnabled;
+
+    /// Records whether the popup may be drawn inside its window. It
+    /// always is, see the class description, so this is a hint that is
+    /// kept and changes nothing.
+    public void setLightWeightPopupEnabled(boolean aFlag) {
+        lightWeightPopup = aFlag;
+    }
+
+    public boolean isLightWeightPopupEnabled() {
+        return lightWeightPopup;
+    }
+
+    public static void setDefaultLightWeightPopupEnabled(boolean aFlag) {
+        defaultLightWeightPopupEnabled = aFlag;
+    }
+
+    public static boolean getDefaultLightWeightPopupEnabled() {
+        return defaultLightWeightPopupEnabled;
+    }
 }

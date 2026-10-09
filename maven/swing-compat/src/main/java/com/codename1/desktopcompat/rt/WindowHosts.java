@@ -180,6 +180,7 @@ public final class WindowHosts {
         Window old = active();
         SHOWING.remove(w);
         SHOWING.add(w);
+        Dnd.listen(w);
         if (old != w) {
             if (old != null) {
                 old.cn1Activated(false, w);

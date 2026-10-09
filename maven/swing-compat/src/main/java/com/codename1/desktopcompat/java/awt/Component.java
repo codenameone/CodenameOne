@@ -22,6 +22,8 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
+import com.codename1.desktopcompat.rt.AwtListeners;
+import com.codename1.desktopcompat.java.awt.dnd.DropTarget;
 import com.codename1.desktopcompat.java.awt.event.ComponentEvent;
 import com.codename1.desktopcompat.java.awt.event.ComponentListener;
 import com.codename1.desktopcompat.java.awt.event.FocusEvent;
@@ -94,6 +96,7 @@ public abstract class Component implements ImageObserver {
     private long eventMask;
     private com.codename1.ui.Component peer;
     private PropertyChangeSupport changeSupport;
+    private DropTarget dropTarget;
     private ArrayList<ComponentListener> componentListeners;
     private ArrayList<FocusListener> focusListeners;
     private ArrayList<HierarchyListener> hierarchyListeners;
@@ -1067,6 +1070,7 @@ public abstract class Component implements ImageObserver {
 
     /// Delivers the event to this component, at once.
     public final void dispatchEvent(AWTEvent e) {
+        AwtListeners.dispatching(e);
         processEvent(e);
     }
 
@@ -1192,5 +1196,26 @@ public abstract class Component implements ImageObserver {
     @Override
     public String toString() {
         return getClass().getName() + "[" + paramString() + "]";
+    }
+
+    /// Makes this component a place to drop a drag, or with `null` stops
+    /// it being one. A target that belonged to another component moves
+    /// here.
+    public void setDropTarget(DropTarget dt) {
+        if (dt == dropTarget) {
+            return;
+        }
+        DropTarget old = dropTarget;
+        dropTarget = dt;
+        if (old != null && old.getComponent() == this) {
+            old.setComponent(null);
+        }
+        if (dt != null && dt.getComponent() != this) {
+            dt.setComponent(this);
+        }
+    }
+
+    public DropTarget getDropTarget() {
+        return dropTarget;
     }
 }

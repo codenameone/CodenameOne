@@ -635,4 +635,23 @@ public class Window extends Container {
             ls[i].windowStateChanged(e);
         }
     }
+
+    private Dialog.ModalExclusionType modalExclusionType = Dialog.ModalExclusionType.NO_EXCLUDE;
+
+    /// Asks that this window stay usable while a modal dialog is open.
+    /// As on a desktop that cannot do it, a type the toolkit does not
+    /// support -- here every one but `NO_EXCLUDE`, see
+    /// `Toolkit.isModalExclusionTypeSupported` -- is taken as
+    /// `NO_EXCLUDE`, which is what [#getModalExclusionType()] then says.
+    public void setModalExclusionType(Dialog.ModalExclusionType exclusionType) {
+        Dialog.ModalExclusionType t = exclusionType;
+        if (t == null || !Toolkit.getDefaultToolkit().isModalExclusionTypeSupported(t)) {
+            t = Dialog.ModalExclusionType.NO_EXCLUDE;
+        }
+        modalExclusionType = t;
+    }
+
+    public Dialog.ModalExclusionType getModalExclusionType() {
+        return modalExclusionType;
+    }
 }

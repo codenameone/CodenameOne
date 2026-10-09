@@ -47,6 +47,14 @@ public class Dialog extends Window {
         TOOLKIT_MODAL
     }
 
+    /// Which windows a modal dialog leaves usable. Asked for with
+    /// `Window.setModalExclusionType`; see there for what is honoured.
+    public enum ModalExclusionType {
+        NO_EXCLUDE,
+        APPLICATION_EXCLUDE,
+        TOOLKIT_EXCLUDE
+    }
+
     public static final ModalityType DEFAULT_MODALITY_TYPE = ModalityType.APPLICATION_MODAL;
 
     private static final Runnable PAUSE = new Pause();

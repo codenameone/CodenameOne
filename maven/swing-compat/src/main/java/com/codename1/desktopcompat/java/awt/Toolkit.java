@@ -22,6 +22,9 @@
  */
 package com.codename1.desktopcompat.java.awt;
 
+import com.codename1.desktopcompat.rt.AwtListeners;
+import com.codename1.desktopcompat.java.awt.event.InputEvent;
+import com.codename1.desktopcompat.java.awt.event.AWTEventListener;
 import com.codename1.desktopcompat.java.awt.datatransfer.Clipboard;
 import com.codename1.desktopcompat.rt.DesktopToolkit;
 import java.net.URL;
@@ -86,8 +89,43 @@ public abstract class Toolkit {
 
     /// The control key everywhere. Menu accelerators given with it are
     /// shown with the platform's own primary modifier in a native menu.
+    /// The modifier of the platform's menu shortcuts, as an old style
+    /// mask: the command key on an Apple system, control elsewhere.
     public int getMenuShortcutKeyMask() {
-        return com.codename1.desktopcompat.java.awt.event.InputEvent.CTRL_MASK;
+        return AwtListeners.commandKey() ? InputEvent.META_MASK : InputEvent.CTRL_MASK;
+    }
+
+    /// The modifier of the platform's menu shortcuts, as an extended
+    /// mask: `META_DOWN_MASK` on an Apple system, `CTRL_DOWN_MASK`
+    /// elsewhere.
+    public int getMenuShortcutKeyMaskEx() {
+        return AwtListeners.commandKey() ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
+    }
+
+    /// Adds a listener that hears of every event in `eventMask`
+    /// dispatched to a component of the application, before the component
+    /// does.
+    public void addAWTEventListener(AWTEventListener listener, long eventMask) {
+        AwtListeners.add(listener, eventMask);
+    }
+
+    public void removeAWTEventListener(AWTEventListener listener) {
+        AwtListeners.remove(listener);
+    }
+
+    public AWTEventListener[] getAWTEventListeners() {
+        return AwtListeners.listeners(-1L);
+    }
+
+    public AWTEventListener[] getAWTEventListeners(long eventMask) {
+        return AwtListeners.listeners(eventMask);
+    }
+
+    /// Whether a window can stay usable while a modal dialog is open.
+    /// It cannot: a modal dialog takes all input, so only `NO_EXCLUDE` is
+    /// supported.
+    public boolean isModalExclusionTypeSupported(Dialog.ModalExclusionType modalExclusionType) {
+        return modalExclusionType == Dialog.ModalExclusionType.NO_EXCLUDE;
     }
 
     /// Whether a frame can be put in a state; true for the normal state
