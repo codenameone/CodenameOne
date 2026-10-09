@@ -24,30 +24,20 @@ package com.codename1.desktopcompat.javax.swing.text;
 
 import java.util.Enumeration;
 
-/// A read only set of attributes: of an element of a document, or made by
-/// the application to style text with, see [SimpleAttributeSet] and
-/// [StyleConstants].
-public interface AttributeSet {
+/// A set of attributes that can be changed.
+public interface MutableAttributeSet extends AttributeSet {
 
-    Object NameAttribute = "name";
+    void addAttribute(Object name, Object value);
 
-    Object ResolveAttribute = "resolver";
+    void addAttributes(AttributeSet attributes);
 
-    int getAttributeCount();
+    void removeAttribute(Object name);
 
-    boolean isDefined(Object attrName);
+    void removeAttributes(Enumeration<?> names);
 
-    boolean isEqual(AttributeSet attr);
+    /// Removes the attributes that `attributes` has with the same value.
+    void removeAttributes(AttributeSet attributes);
 
-    AttributeSet copyAttributes();
-
-    Object getAttribute(Object key);
-
-    Enumeration<?> getAttributeNames();
-
-    boolean containsAttribute(Object name, Object value);
-
-    boolean containsAttributes(AttributeSet attributes);
-
-    AttributeSet getResolveParent();
+    /// Sets the set an attribute is looked up in when this one lacks it.
+    void setResolveParent(AttributeSet parent);
 }

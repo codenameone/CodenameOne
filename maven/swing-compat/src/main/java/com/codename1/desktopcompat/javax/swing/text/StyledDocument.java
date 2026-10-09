@@ -22,32 +22,41 @@
  */
 package com.codename1.desktopcompat.javax.swing.text;
 
-import java.util.Enumeration;
+import com.codename1.desktopcompat.java.awt.Color;
+import com.codename1.desktopcompat.java.awt.Font;
 
-/// A read only set of attributes: of an element of a document, or made by
-/// the application to style text with, see [SimpleAttributeSet] and
-/// [StyleConstants].
-public interface AttributeSet {
+/// A document whose text has attributes: by stretch of characters, and
+/// by paragraph.
+public interface StyledDocument extends Document {
 
-    Object NameAttribute = "name";
+    Style addStyle(String nm, Style parent);
 
-    Object ResolveAttribute = "resolver";
+    void removeStyle(String nm);
 
-    int getAttributeCount();
+    Style getStyle(String nm);
 
-    boolean isDefined(Object attrName);
+    /// Gives the characters from `offset` on the attributes in `s`, in
+    /// place of the ones they have with `replace` and added to them
+    /// without.
+    void setCharacterAttributes(int offset, int length, AttributeSet s, boolean replace);
 
-    boolean isEqual(AttributeSet attr);
+    /// As [#setCharacterAttributes], for the paragraphs the range touches.
+    void setParagraphAttributes(int offset, int length, AttributeSet s, boolean replace);
 
-    AttributeSet copyAttributes();
+    /// Sets the style the paragraph at `pos` resolves its attributes in.
+    void setLogicalStyle(int pos, Style s);
 
-    Object getAttribute(Object key);
+    Style getLogicalStyle(int p);
 
-    Enumeration<?> getAttributeNames();
+    Element getParagraphElement(int pos);
 
-    boolean containsAttribute(Object name, Object value);
+    /// The stretch of characters with the same attributes that `pos` is
+    /// in.
+    Element getCharacterElement(int pos);
 
-    boolean containsAttributes(AttributeSet attributes);
+    Color getForeground(AttributeSet attr);
 
-    AttributeSet getResolveParent();
+    Color getBackground(AttributeSet attr);
+
+    Font getFont(AttributeSet attr);
 }

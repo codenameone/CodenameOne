@@ -22,32 +22,15 @@
  */
 package com.codename1.desktopcompat.javax.swing.text;
 
-import java.util.Enumeration;
+import com.codename1.desktopcompat.javax.swing.event.ChangeListener;
 
-/// A read only set of attributes: of an element of a document, or made by
-/// the application to style text with, see [SimpleAttributeSet] and
-/// [StyleConstants].
-public interface AttributeSet {
+/// A named set of attributes, kept by a [StyleContext] or a
+/// [StyledDocument], that tells its listeners when it changes.
+public interface Style extends MutableAttributeSet {
 
-    Object NameAttribute = "name";
+    String getName();
 
-    Object ResolveAttribute = "resolver";
+    void addChangeListener(ChangeListener l);
 
-    int getAttributeCount();
-
-    boolean isDefined(Object attrName);
-
-    boolean isEqual(AttributeSet attr);
-
-    AttributeSet copyAttributes();
-
-    Object getAttribute(Object key);
-
-    Enumeration<?> getAttributeNames();
-
-    boolean containsAttribute(Object name, Object value);
-
-    boolean containsAttributes(AttributeSet attributes);
-
-    AttributeSet getResolveParent();
+    void removeChangeListener(ChangeListener l);
 }
